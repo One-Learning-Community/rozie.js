@@ -110,6 +110,22 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
 
+  // Gate that suppresses the engine's SETUP-time `crop` events from writing the
+  // two-way `$model.data`. Cropper fires an initial `crop` with its OWN default box
+  // (autoCropArea) BEFORE the `ready` callback runs, and the `setData($props.data)`
+  // inside `ready` fires another. Writing those transient engine-internal boxes to
+  // `$model.data` is wrong — and on unified-model targets (Vue defineModel / Svelte
+  // $bindable / Angular model() signal, where the model read and write share ONE
+  // local) the pre-ready write CLOBBERS the very `$props.data` that `ready` then
+  // reads, so the consumer's initial `:data` crop box is lost and the default box is
+  // applied instead. (React/Solid read the external prop and Lit's property binding
+  // is controlled, so the write doesn't change their read — which is why only the
+  // template-emit family regressed.) We flip this true at the END of `ready`, after
+  // the initial box is applied, so only genuine post-init user crops drive the model.
+  let cropReady = false;
+
+  // pure crop-box equality (rounded px + exact transform) — no sigils, safe at top
+  // level. The round-trip guard that stops the setData→crop→$model.data→$watch loop.
   function sameData(a: any, b: any) {
     if (!a || !b) return false;
     return Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height) && a.rotate === b.rotate && a.scaleX === b.scaleX && a.scaleY === b.scaleY;
@@ -138,6 +154,8 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
       ready: (e: any) => {
         if (restoreData) instance.current.setData(restoreData);else if (data) instance.current.setData(data);
         if (props.disabled) instance.current.disable();
+        // Initial box is applied — from here on, real user crops drive the model.
+        cropReady = true;
         _rozieProp_onReady && _rozieProp_onReady();
       },
       cropstart: (e: any) => _rozieProp_onCropstart && _rozieProp_onCropstart({
@@ -151,6 +169,11 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
       }),
       // continuous crop → emit + drive the two-way model (guarded reverse $watch).
       crop: (e: any) => {
+        // Suppress the engine's setup-time crops (the default box before `ready`, and
+        // the `setData($props.data)` echo). Propagating them would (a) emit a spurious
+        // pre-init `crop` and (b) on unified-model targets clobber the consumer's
+        // initial `:data`. Genuine user crops fire after `cropReady`.
+        if (!cropReady) return;
         _rozieProp_onCrop && _rozieProp_onCrop(e.detail);
         if (e.detail) setData(e.detail);
       },

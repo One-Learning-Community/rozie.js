@@ -119,6 +119,19 @@ import CropperEngine from 'cropperjs'
 // idiom the engine-wrapper recipe relies on.
 let instance = null
 let imgEl = null
+// Gate that suppresses the engine's SETUP-time `crop` events from writing the
+// two-way `$model.data`. Cropper fires an initial `crop` with its OWN default box
+// (autoCropArea) BEFORE the `ready` callback runs, and the `setData($props.data)`
+// inside `ready` fires another. Writing those transient engine-internal boxes to
+// `$model.data` is wrong — and on unified-model targets (Vue defineModel / Svelte
+// $bindable / Angular model() signal, where the model read and write share ONE
+// local) the pre-ready write CLOBBERS the very `$props.data` that `ready` then
+// reads, so the consumer's initial `:data` crop box is lost and the default box is
+// applied instead. (React/Solid read the external prop and Lit's property binding
+// is controlled, so the write doesn't change their read — which is why only the
+// template-emit family regressed.) We flip this true at the END of `ready`, after
+// the initial box is applied, so only genuine post-init user crops drive the model.
+let cropReady = false
 
 // pure crop-box equality (rounded px + exact transform) — no sigils, safe at top
 // level. The round-trip guard that stops the setData→crop→$model.data→$watch loop.
@@ -164,6 +177,8 @@ const buildCropper = (restoreData) => {
       if (restoreData) instance.setData(restoreData)
       else if ($props.data) instance.setData($snapshot($props.data))
       if ($props.disabled) instance.disable()
+      // Initial box is applied — from here on, real user crops drive the model.
+      cropReady = true
       $emit('ready')
     },
     cropstart: (e) => $emit('cropstart', { action: e.detail && e.detail.action }),
@@ -171,6 +186,11 @@ const buildCropper = (restoreData) => {
     cropend: (e) => $emit('cropend', { action: e.detail && e.detail.action }),
     // continuous crop → emit + drive the two-way model (guarded reverse $watch).
     crop: (e) => {
+      // Suppress the engine's setup-time crops (the default box before `ready`, and
+      // the `setData($props.data)` echo). Propagating them would (a) emit a spurious
+      // pre-init `crop` and (b) on unified-model targets clobber the consumer's
+      // initial `:data`. Genuine user crops fire after `cropReady`.
+      if (!cropReady) return
       $emit('crop', e.detail)
       if (e.detail) $model.data = e.detail
     },

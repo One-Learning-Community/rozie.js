@@ -113,6 +113,7 @@ export class Cropper {
 
   instance: any = null;
   imgEl: any = null;
+  cropReady = false;
   sameData = (a: any, b: any) => {
     if (!a || !b) return false;
     return Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height) && a.rotate === b.rotate && a.scaleX === b.scaleX && a.scaleY === b.scaleY;
@@ -141,6 +142,8 @@ export class Cropper {
         const __data = this.data();
         if (restoreData) this.instance.setData(restoreData);else if (__data) this.instance.setData(__data);
         if ((this.disabled() || this.__rozieCvaDisabled())) this.instance.disable();
+        // Initial box is applied — from here on, real user crops drive the model.
+        this.cropReady = true;
         this.ready.emit();
       },
       cropstart: (e: any) => this.cropstart.emit({
@@ -154,6 +157,11 @@ export class Cropper {
       }),
       // continuous crop → emit + drive the two-way model (guarded reverse $watch).
       crop: (e: any) => {
+        // Suppress the engine's setup-time crops (the default box before `ready`, and
+        // the `setData($props.data)` echo). Propagating them would (a) emit a spurious
+        // pre-init `crop` and (b) on unified-model targets clobber the consumer's
+        // initial `:data`. Genuine user crops fire after `cropReady`.
+        if (!this.cropReady) return;
         this.crop.emit(e.detail);
         if (e.detail) this.data.set(e.detail), this.__rozieCvaOnChange(e.detail);
       },
