@@ -588,3 +588,100 @@ describe('rewriteRozieIdentifiers — $snapshot non-expression argument', () => 
     expect(code).not.toContain('$state.snapshot');
   });
 });
+
+// Regression — debug `svelte-prop-shadow-self-ref` (2026-06-08).
+//
+// The `$props.X` → bare-identifier rewrite is scope-blind: a local `const`/`let`
+// or a function param shadowing a prop name captures the rewritten identifier.
+// The `deconflictPropShadows` pre-pass renames the colliding local/param to
+// `<name>$local` BEFORE the rewrite so the bare prop identifier resolves to the
+// top-level rune prop binding. Covers BOTH facets:
+//   (a) `const X = $props.X`        → MUST NOT emit `const X = X` (TDZ self-ref).
+//   (b) `$props.X` inside fn(X){}   → MUST NOT capture the param (wrong value).
+describe('rewriteRozieIdentifiers — prop-shadow deconfliction (svelte-prop-shadow-self-ref)', () => {
+  it('FACET A: `const X = $props.X` does NOT emit a self-referential `const X = X` (model prop)', () => {
+    const ir = buildIR({ props: [prop('src', true)] });
+    const { code } = rewrite(
+      'function buildSource() { const src = $props.src; return src; }',
+      ir,
+    );
+    // No TDZ self-reference.
+    expect(code).not.toMatch(/const src = src\b/);
+    // Local renamed; initializer reads the real prop (bare `src`).
+    expect(code).toContain('const src$local = src;');
+    // The return reads the renamed local, not the prop.
+    expect(code).toContain('return src$local;');
+    expect(code).not.toContain('$props.');
+  });
+
+  it('FACET A: `const X = $props.X` for a NON-model prop also deconflicts', () => {
+    const ir = buildIR({ props: [prop('step', false)] });
+    const { code } = rewrite(
+      'function f() { const step = $props.step; return step + 1; }',
+      ir,
+    );
+    expect(code).not.toMatch(/const step = step\b/);
+    expect(code).toContain('const step$local = step;');
+    expect(code).toContain('return step$local + 1;');
+  });
+
+  it('FACET B: `$props.X` inside a function whose PARAM is named X reads the prop, not the param', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const { code } = rewrite(
+      'function compute(value) { return value + $props.value; }',
+      ir,
+    );
+    // The param is renamed; the `$props.value` lowers to bare `value` (the rune
+    // prop binding) while the param reference becomes `value$local`.
+    expect(code).toContain('function compute(value$local)');
+    expect(code).toContain('return value$local + value;');
+    expect(code).not.toContain('$props.');
+  });
+
+  it('FACET B: destructured object PARAM shadowing a prop is deconflicted', () => {
+    const ir = buildIR({ props: [prop('src', false)] });
+    const { code } = rewrite(
+      'function f({ src }) { return src + $props.src; }',
+      ir,
+    );
+    expect(code).toContain('src: src$local');
+    // `$props.src` → bare `src` (prop); the destructured value reference → renamed.
+    expect(code).toContain('return src$local + src;');
+  });
+
+  it('leaves a local whose name does NOT collide with any prop untouched (byte-identical)', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const { code } = rewrite(
+      'function f() { const other = $props.value; return other; }',
+      ir,
+    );
+    expect(code).toContain('const other = value;');
+    expect(code).not.toContain('$local');
+  });
+
+  it('does NOT rename a local that collides with a DATA name (only props are deconflicted)', () => {
+    // `count` is a <data> name, not a prop. A same-named local there is a
+    // genuine ROZ621-class concern handled elsewhere; deconflictPropShadows
+    // must not touch it.
+    const ir = buildIR({ state: [state('count')], props: [prop('value', true)] });
+    const { code } = rewrite(
+      'function f() { const count = 0; return count; }',
+      ir,
+    );
+    expect(code).not.toContain('$local');
+    expect(code).toContain('const count = 0;');
+  });
+
+  it('renames every reference to the shadowing local within its scope (not just the declaration)', () => {
+    const ir = buildIR({ props: [prop('src', false)] });
+    const { code } = rewrite(
+      'function f() { const src = $props.src; doA(src); doB(src); return src; }',
+      ir,
+    );
+    expect(code).not.toMatch(/const src = src\b/);
+    expect(code).toContain('const src$local = src;');
+    expect(code).toContain('doA(src$local)');
+    expect(code).toContain('doB(src$local)');
+    expect(code).toContain('return src$local;');
+  });
+});

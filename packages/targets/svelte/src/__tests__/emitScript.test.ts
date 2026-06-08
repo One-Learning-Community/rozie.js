@@ -465,3 +465,57 @@ describe('$expose — Svelte instance exports (Phase 21 Plan 04, REQ-6)', () => 
     expect(scriptBlock).not.toMatch(/export \/\//);
   });
 });
+
+// Regression — debug `svelte-prop-shadow-self-ref` (2026-06-08).
+//
+// End-to-end SFC compile of the two prop-shadow facets the unit suite covers at
+// the rewriteScript level. The svelte rune idiom lowers EVERY prop to a bare
+// destructured local, so a local/param shadowing a prop name would (pre-fix)
+// capture the rewritten `$props.X` → `X` identifier:
+//   (a) `const X = $props.X` → `const X = X` (TDZ self-reference, runtime crash).
+//   (b) `$props.X` inside fn(X){} → bare `X` binds the param (silent wrong value).
+// The `deconflictPropShadows` pre-pass renames the colliding local/param to
+// `<name>$local` before the rewrite. This test asserts the emitted <script>
+// block has NEITHER pathology.
+describe('prop-shadow deconfliction — end-to-end SFC emit (svelte-prop-shadow-self-ref)', () => {
+  it('a `.rozie` with `const X = $props.X` AND a param-shadow emits clean svelte (no self-ref, no param capture)', () => {
+    const src = `<rozie name="PropShadow">
+<props>
+{
+  src: { type: String, default: '' },
+  step: { type: Number, default: 1 }
+}
+</props>
+<script>
+  function buildSource() {
+    const src = $props.src;
+    return src.trim();
+  }
+  function advance(step) {
+    return step + $props.step;
+  }
+</script>
+<template>
+  <div>{{ buildSource() }} / {{ advance(2) }}</div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'PropShadow');
+
+    // FACET A — no `const src = src` TDZ self-reference. The local is renamed to
+    // `src$local` and its initializer reads the bare rune prop `src`.
+    expect(scriptBlock).not.toMatch(/const src = src\b/);
+    expect(scriptBlock).toContain('const src$local = src;');
+    expect(scriptBlock).toContain('return src$local.trim();');
+
+    // FACET B — the `step` param is renamed; `$props.step` lowers to the bare
+    // rune prop `step`, so the body reads BOTH the renamed param and the prop.
+    expect(scriptBlock).toContain('function advance(step$local');
+    expect(scriptBlock).toContain('return step$local + step;');
+
+    // No raw sigil survives in the emitted body.
+    expect(scriptBlock).not.toContain('$props.');
+    // The top-level rune prop bindings are still the bare names.
+    expect(scriptBlock).toMatch(/\bsrc = ''/);
+    expect(scriptBlock).toMatch(/\bstep = 1\b/);
+  });
+});
