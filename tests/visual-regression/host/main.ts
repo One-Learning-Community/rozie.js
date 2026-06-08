@@ -266,15 +266,22 @@ export const EXAMPLES = [
   'Cropper',
   'CropperScreenshot',
   // PdfViewer (PDF.js / pdfjs-dist v6) — the dynamic-import + canvas-render +
-  // two-way-page cell. BEHAVIORAL ONLY (loader → examples/demos/PdfViewerDemo
-  // .rozie, which imports ../../packages/ui/pdf/src/PdfViewer.rozie): a bundled
-  // worker + a network-free 3-page base64 PDF, @load → numPages readout, a canvas
-  // + selectable .textLayer, and r-model:page two-way driven by a Next button.
-  // Covered by pdf.spec.ts (structural/behavioral, no screenshot). There is NO
-  // PdfViewerScreenshot cell — pdfjs renders to a <canvas> (the chartjs/maplibre
-  // canvas-VR class where cross-emit byte-identity won't hold) and the
-  // worker/standard-font CDN can't load in Docker; behavioral 6/6 is the coverage.
+  // two-way-page cell. BEHAVIORAL (loader → examples/demos/PdfViewerDemo.rozie,
+  // which imports ../../packages/ui/pdf/src/PdfViewer.rozie): a bundled worker + a
+  // network-free 3-page base64 PDF, @load → numPages readout, a canvas + selectable
+  // .textLayer, and r-model:page two-way driven by a Next button. Covered by
+  // pdf.spec.ts (structural/behavioral).
   'PdfViewer',
+  // PdfViewerScreenshot is the content-STABLE pixel cell (loader →
+  // examples/demos/PdfViewerScreenshotDemo.rozie): the same network-free base64
+  // PDF + bundled worker, pinned to page 1 at scale 0.45 with text-layer OFF. pdfjs
+  // rasterizes the page into a 2D <canvas> from the SAME pdfjs-dist in every target,
+  // so the bitmap is engine-painted + emit-family-independent and a shared D-10
+  // `PdfViewerScreenshot.png` holds across all 6 (the Chart/MapLibre canvas-VR
+  // precedent — the earlier "cross-emit byte-identity won't hold for canvas" worry
+  // was disproven once those cells landed 6/6). Baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNG lands.
+  'PdfViewerScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -379,6 +386,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of PdfViewerDemo (the wrapper component is name="PdfViewer" →
   // 'rozie-pdf-viewer'). Behavioral only — no screenshot cell.
   PdfViewer: 'rozie-pdf-viewer',
+  PdfViewerScreenshot: 'rozie-pdf-viewer-screenshot',
 };
 
 export interface HostQuery {
@@ -525,10 +533,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // hardcodes the SVG data URL + FIXED_BOX in <script>. No parent props needed.
   Cropper: {},
   CropperScreenshot: {},
-  // PdfViewer — PdfViewerDemo is self-contained: it seeds page:1/total:0 in
-  // <data> and the bundled workerSrc + SAMPLE base64 PDF in <script>. No parent
-  // props needed.
+  // PdfViewer — both demos are self-contained: PdfViewerDemo seeds page:1/total:0
+  // in <data>; PdfViewerScreenshotDemo hardcodes the bundled workerSrc + SAMPLE
+  // base64 PDF + fixed page/scale in <script>. No parent props needed.
   PdfViewer: {},
+  PdfViewerScreenshot: {},
 };
 
 /**

@@ -308,6 +308,16 @@ const EXAMPLES = [
   // Behavioral CORRECTNESS (mount, crop box, two-way `data`) is green 6/6 in
   // cropper.spec.ts. The screenshot cell is now blessed for the 5 non-Lit targets.
   'CropperScreenshot',
+  // PdfViewer (pdfjs-dist v6) — PdfViewerScreenshot is the content-STABLE pixel
+  // cell (loader → examples/demos/PdfViewerScreenshotDemo.rozie): a network-free
+  // base64 PDF + bundled worker, pinned to page 1 at scale 0.45 with text-layer
+  // OFF. pdfjs rasterizes the page into a 2D <canvas> from the SAME pdfjs-dist in
+  // every target, so the bitmap is engine-painted + emit-family-independent → per
+  // D-10 all 6 targets diff against the SAME shared `PdfViewerScreenshot.png`
+  // (the Chart/MapLibre canvas-VR precedent). Baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNG lands. The BEHAVIORAL coverage
+  // (dynamic import, two-way page, Next) lives in pdf.spec.ts and is NOT a pixel cell.
+  'PdfViewerScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -654,6 +664,54 @@ async function settleExample(
     // The crop UI is positioned; a short settle absorbs any final reflow.
     await page.waitForTimeout(500);
   }
+  // PdfViewerScreenshot: the PdfViewer wrapper dynamic-imports pdfjs, calls
+  // getDocument(), then renders page 1 into a JS-created `<canvas>` inside a
+  // `.rozie-pdf-page` div (the page-div class is set at runtime via
+  // `el.className = 'rozie-pdf-page'`, so it survives React's CSS-Modules hashing
+  // and is identical across all 6 targets). All of that is async, so without a wait
+  // the screenshot clips an empty box. Poll until the page canvas has actually
+  // rasterized content — a healthy count of opaque non-white pixels (the rendered
+  // black text on the white page) — piercing shadow roots for the Lit target.
+  if (example === 'PdfViewerScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const deep = <T extends Element>(root: Document | ShadowRoot, sel: string): T | null => {
+              const hit = root.querySelector(sel) as T | null;
+              if (hit) return hit;
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) {
+                  const found = deep<T>(sr, sel);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            const canvas = deep<HTMLCanvasElement>(document, '.rozie-pdf-page canvas');
+            if (!canvas || !canvas.width || !canvas.height) return false;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return false;
+            const { width: W, height: H } = canvas;
+            const data = ctx.getImageData(0, 0, W, H).data;
+            let dark = 0;
+            for (let i = 0; i < data.length; i += 4) {
+              if (
+                data[i + 3]! > 10 &&
+                (data[i]! < 200 || data[i + 1]! < 200 || data[i + 2]! < 200)
+              ) {
+                if (++dark > 100) return true;
+              }
+            }
+            return false;
+          }),
+        { timeout: 25_000, intervals: [300, 600, 1200, 2400] },
+      )
+      .toBe(true);
+    // Page rasterized; a short settle absorbs any final reflow before the clip.
+    await page.waitForTimeout(300);
+  }
 }
 
 // TipTap · solid Solid-emitter TDZ runtime crash — RESOLVED 2026-05-20
@@ -832,6 +890,21 @@ const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 // .planning/todos/pending/lit-engine-global-css-shadow-bridge.md
 const CROPPER_LIT_SCREENSHOT_TODO = new Set<string>(['CropperScreenshot::lit']);
 
+// PdfViewer — the React PdfViewerScreenshot cell ONLY. pdfjs rasterizes page 1
+// into a 2D canvas; vue/svelte/angular/solid/lit all render it identically at the
+// demo's :scale="0.45" (canvas ≈275px, fits the 280px box) and bless a shared D-10
+// baseline. React renders the SAME page at a LARGER effective scale (the canvas
+// overflows the box) even though `scale: 0.45` is passed correctly to the wrapper
+// (verified in the compiled react demo) — so the divergence is inside the React
+// PdfViewer render path (the engine canvas is sized from $data.zoom, seeded from
+// $props.scale in $onMount; React ends up rendering bigger). A real React-specific
+// wrapper bug to root-cause, NOT a determinism limit. Gated until fixed; the other
+// 5 targets are blessed. Behavioral coverage is green 6/6 in pdf.spec.ts. Tracked:
+// .planning/todos/pending/pdf-react-screenshot-scale-divergence.md
+const PDFVIEWER_REACT_SCREENSHOT_TODO = new Set<string>([
+  'PdfViewerScreenshot::react',
+]);
+
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
@@ -854,13 +927,17 @@ for (const example of EXAMPLES) {
     const cropperLitScreenshotTodo = CROPPER_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
+    const pdfviewerReactScreenshotTodo = PDFVIEWER_REACT_SCREENSHOT_TODO.has(
+      `${example}::${target}`,
+    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
       maplibreLitScreenshotTodo ||
-      cropperLitScreenshotTodo
+      cropperLitScreenshotTodo ||
+      pdfviewerReactScreenshotTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {
