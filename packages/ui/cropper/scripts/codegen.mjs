@@ -89,7 +89,26 @@ function main() {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
 
-    const code = r.code;
+    // React leaf type-aid (token-anchored, fail-loud — the CodeMirror/codegen
+    // pattern, NOT an emitter edit; SCOPE FENCE). The React emitter types an
+    // element `ref` from a tag→type map that covers `div` (HTMLDivElement) but
+    // falls back to `HTMLElement` for `img` — so the `imageEl` ref is
+    // `useRef<HTMLElement | null>`, which is not assignable to an `<img ref=…>`
+    // (wants `Ref<HTMLImageElement>`) under strict tsc. Retype the imageEl ref to
+    // HTMLImageElement. If a future React emit no longer produces this exact
+    // token, the throw flags it (so the aid never silently rots).
+    let code = r.code;
+    if (target === 'react') {
+      const NEEDLE = 'const imageEl = useRef<HTMLElement | null>(null);';
+      if (!code.includes(NEEDLE)) {
+        throw new Error(
+          'codegen react: imageEl ref type-aid anchor not found — the React emit shape changed. ' +
+            `Expected to retype:\n  ${NEEDLE}\n` +
+            'Re-confirm the emitted React imageEl ref typing and update (or remove) this aid.',
+        );
+      }
+      code = code.replace(NEEDLE, 'const imageEl = useRef<HTMLImageElement | null>(null);');
+    }
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a

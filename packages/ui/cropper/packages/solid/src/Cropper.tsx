@@ -84,12 +84,11 @@ export default function Cropper(_props: CropperProps): JSX.Element {
   const [data, setData] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'data', undefined);
   onMount(() => {
     const _cleanup = (() => {
-    // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-    // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-    // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-    // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-    // here (ROZ123).
-    imgEl = containerElRef.querySelector('img');
+    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+    imgEl = imageElRef;
     buildCropper(null);
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
@@ -115,7 +114,7 @@ export default function Cropper(_props: CropperProps): JSX.Element {
     if (sameData(v, instance.getData())) return;
     instance.setData(v);
   })(v)), { defer: true }));
-  let containerElRef: HTMLElement | null = null;
+  let imageElRef: HTMLElement | null = null;
 
   // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
   // instance is the Cropper (whose strict Options/Data types the loosely-typed
@@ -248,8 +247,8 @@ export default function Cropper(_props: CropperProps): JSX.Element {
 
   return (
     <>
-    <div ref={(el) => { containerElRef = el as HTMLElement; }} {...attrs} class={"rozie-cropper" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-cddf3b42="">
-      <img class={"rozie-cropper-img"} src={local.src} alt="" data-rozie-s-cddf3b42="" />
+    <div {...attrs} class={"rozie-cropper" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-cddf3b42="">
+      <img class={"rozie-cropper-img"} ref={(el) => { imageElRef = el as HTMLElement; }} src={local.src} alt="" data-rozie-s-cddf3b42="" />
     </div>
     </>
   );

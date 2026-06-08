@@ -20,8 +20,8 @@ import CropperEngine from 'cropperjs';
   standalone: true,
   template: `
 
-    <div class="rozie-cropper" #containerEl #rozieSpread_0 #rozieListenersTarget_1>
-      <img class="rozie-cropper-img" [src]="src()" alt="" />
+    <div class="rozie-cropper" #rozieSpread_0 #rozieListenersTarget_1>
+      <img class="rozie-cropper-img" #imageEl [src]="src()" alt="" />
     </div>
 
   `,
@@ -64,7 +64,7 @@ export class Cropper {
   autoCropArea = input<number>(0.8);
   responsive = input<boolean>(true);
   options = input<Record<string, any>>((() => ({}))());
-  containerEl = viewChild<ElementRef<HTMLDivElement>>('containerEl');
+  imageEl = viewChild<ElementRef<HTMLElement>>('imageEl');
   ready = output<void>();
   cropstart = output<unknown>();
   cropmove = output<unknown>();
@@ -100,12 +100,11 @@ export class Cropper {
   }
 
   ngAfterViewInit() {
-    // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-    // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-    // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-    // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-    // here (ROZ123).
-    this.imgEl = this.containerEl()!.nativeElement.querySelector('img');
+    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+    this.imgEl = this.imageEl()?.nativeElement;
     this.buildCropper(null);
     this.__rozieDestroyRef.onDestroy(() => {
       if (this.instance) this.instance.destroy();

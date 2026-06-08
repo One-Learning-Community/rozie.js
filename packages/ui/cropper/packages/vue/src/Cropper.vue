@@ -1,7 +1,7 @@
 <template>
 
-<div class="rozie-cropper" ref="containerElRef" v-bind="$attrs">
-  <img class="rozie-cropper-img" :src="props.src" alt="" />
+<div class="rozie-cropper" v-bind="$attrs">
+  <img class="rozie-cropper-img" ref="imageElRef" :src="props.src" alt="" />
 </div>
 
 </template>
@@ -25,7 +25,7 @@ const emit = defineEmits<{
   zoom: [...args: any[]];
 }>();
 
-const containerElRef = ref<HTMLElement>();
+const imageElRef = ref<HTMLElement>();
 
 // The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
 // would collide with the component name `Cropper` (the rozie `name`), which the
@@ -178,12 +178,11 @@ function setDragMode(mode: any) {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-  // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-  // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-  // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-  // here (ROZ123).
-  imgEl = containerElRef.value!.querySelector('img');
+  // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+  // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+  // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+  // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+  imgEl = imageElRef.value;
   buildCropper(null);
   _cleanup_0 = () => {
     if (instance) instance.destroy();

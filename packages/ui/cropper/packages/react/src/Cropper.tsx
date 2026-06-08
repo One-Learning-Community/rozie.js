@@ -103,7 +103,7 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     defaultValue: props.defaultData ?? undefined,
     onValueChange: props.onDataChange,
   });
-  const containerEl = useRef<HTMLDivElement | null>(null);
+  const imageEl = useRef<HTMLImageElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
@@ -225,12 +225,11 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
   }
 
   useEffect(() => {
-    // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-    // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-    // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-    // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-    // here (ROZ123).
-    imgEl.current = containerEl.current!.querySelector('img');
+    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+    imgEl.current = imageEl.current;
     buildCropper(null);
     return () => {
       if (instance.current) instance.current.destroy();
@@ -269,8 +268,8 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
 
   return (
     <>
-    <div ref={containerEl} {...attrs} className={clsx("rozie-cropper", (attrs.className as string | undefined))} data-rozie-s-cddf3b42="">
-      <img className={"rozie-cropper-img"} src={props.src} alt="" data-rozie-s-cddf3b42="" />
+    <div {...attrs} className={clsx("rozie-cropper", (attrs.className as string | undefined))} data-rozie-s-cddf3b42="">
+      <img className={"rozie-cropper-img"} ref={imageEl} src={props.src} alt="" data-rozie-s-cddf3b42="" />
     </div>
     </>
   );

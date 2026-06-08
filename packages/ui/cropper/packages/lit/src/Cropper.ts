@@ -49,7 +49,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) autoCropArea: number = 0.8;
   @property({ type: Boolean, reflect: true }) responsive: boolean = true;
   @property({ type: Object }) options: any = {};
-  @query('[data-rozie-ref="containerEl"]') private _refContainerEl!: HTMLElement;
+  @query('[data-rozie-ref="imageEl"]') private _refImageEl!: HTMLElement;
 private __rozieWatchInitial_4 = true;
 private __rozieFirstUpdateDone = false;
 
@@ -69,12 +69,11 @@ private __rozieFirstUpdateDone = false;
       this.instance.setData(v);
     })(__watchVal); }); }));
 
-    // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-    // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-    // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-    // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-    // here (ROZ123).
-    this.imgEl = this._refContainerEl.querySelector('img');
+    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+    this.imgEl = this._refImageEl;
     this.buildCropper(null);
   }
 
@@ -112,8 +111,8 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<div class="rozie-cropper" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="containerEl" data-rozie-s-cddf3b42>
-  <img class="rozie-cropper-img" src=${this.src} alt="" data-rozie-s-cddf3b42 />
+<div class="rozie-cropper" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-cddf3b42>
+  <img class="rozie-cropper-img" src=${this.src} alt="" data-rozie-ref="imageEl" data-rozie-s-cddf3b42 />
 </div>
 `;
   }

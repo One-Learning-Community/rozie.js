@@ -65,7 +65,7 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-let containerEl = $state<HTMLElement | undefined>(undefined);
+let imageEl = $state<HTMLElement | undefined>(undefined);
 
 // The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
 // would collide with the component name `Cropper` (the rozie `name`), which the
@@ -217,12 +217,11 @@ export function setDragMode(mode: any) {
 }
 
 onMount(() => {
-  // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
-  // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
-  // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
-  // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
-  // here (ROZ123).
-  imgEl = containerEl!.querySelector('img');
+  // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+  // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+  // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+  // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+  imgEl = imageEl;
   buildCropper(null);
   return () => {
     if (instance) instance.destroy();
@@ -254,7 +253,7 @@ $effect(() => { const __watchVal = (() => data)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-<div bind:this={containerEl} {...__rozieAttrs} class={["rozie-cropper", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-cddf3b42><img class="rozie-cropper-img" src={src} alt="" data-rozie-s-cddf3b42 /></div>
+<div {...__rozieAttrs} class={["rozie-cropper", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-cddf3b42><img class="rozie-cropper-img" bind:this={imageEl} src={src} alt="" data-rozie-s-cddf3b42 /></div>
 
 <style>
 :global {
