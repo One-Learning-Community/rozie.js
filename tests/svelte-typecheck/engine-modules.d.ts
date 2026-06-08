@@ -32,6 +32,40 @@ declare module 'maplibre-gl';
 // export is therefore a class — usable as BOTH a constructor value and a type —
 // with permissive `any` members so the UNTYPED `SortableList` example (whose
 // emitted instance is typed `any`) still type-checks unchanged.
+// Cropper (cropperjs v1) — Cropper.rozie does `import CropperEngine from
+// 'cropperjs'` and `new CropperEngine(img, opts)`; the instance is held untyped
+// (null-let), so the default export resolves to `any`.
+declare module 'cropperjs';
+
+// Chart.js — Chart.rozie does `import { Chart as ChartJS } from 'chart.js'` and
+// `new ChartJS(canvas, cfg)`; untyped null-let instance.
+declare module 'chart.js';
+declare module 'chart.js/auto';
+
+// CodeMirror 6 — CodeMirror.rozie imports many named values from the
+// @codemirror/* packages (EditorView/EditorState/Compartment/… as constructors,
+// StateField/RangeSet/etc.). `class extends GutterMarker` / `extends WidgetType`
+// extend an `any`-typed import, which TS permits, so bare `any` modules suffice —
+// the gate verifies the emitted scaffolding, not CodeMirror's own types.
+declare module '@codemirror/state';
+declare module '@codemirror/view';
+declare module '@codemirror/commands';
+declare module '@codemirror/lang-javascript';
+declare module '@codemirror/theme-one-dark';
+declare module 'codemirror';
+
+// FullCalendar — FullCalendar.rozie does `import { Calendar } from
+// '@fullcalendar/core'` + default-import plugins; untyped null-let instance.
+declare module '@fullcalendar/core';
+declare module '@fullcalendar/daygrid';
+declare module '@fullcalendar/timegrid';
+declare module '@fullcalendar/interaction';
+
+// PDF.js — PdfViewer.rozie dynamically `import('pdfjs-dist')` in $onMount
+// (pdfjsLib held as a null-let → `any`), so getDocument / .TextLayer /
+// .GlobalWorkerOptions are unchecked. The dynamic import resolves against this stub.
+declare module 'pdfjs-dist';
+
 declare module 'sortablejs' {
   export interface Options {
     [key: string]: any;

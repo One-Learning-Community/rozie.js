@@ -61,6 +61,18 @@ const EXAMPLES = [
   // covering it here exercises the emit path. `maplibre-gl` resolves against the
   // ambient `engine-modules.d.ts` stub.
   'MapLibre',
+  // The remaining @rozie-ui engine wrappers (Cropper / Chart / CodeMirror /
+  // FullCalendar / PdfViewer) — added 2026-06-08 to close the coverage gap that
+  // let the svelte `const X = $props.X` → `const X = X` (TS2448) self-reference
+  // ship undetected: PdfViewer was NOT in this list, so svelte-check never ran
+  // over its emit. All five resolve their engine imports against the ambient
+  // `engine-modules.d.ts` stub. Now every @rozie-ui family's svelte emit is
+  // svelte-check-gated.
+  'Cropper',
+  'Chart',
+  'CodeMirror',
+  'FullCalendar',
+  'PdfViewer',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
@@ -71,7 +83,7 @@ const EXAMPLES = [
 const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired'];
 
 describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Svelte SFCs', () => {
-  it('all 13 emitted Svelte .svelte files (8 reference + 5 engine-wrapper) svelte-check clean', () => {
+  it('all 18 emitted Svelte .svelte files (8 reference + 10 engine-wrapper) svelte-check clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-'));
     try {
       for (const name of EXAMPLES) {
@@ -83,6 +95,11 @@ describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Sve
           Flatpickr: 'packages/ui/flatpickr/src/Flatpickr.rozie',
           TipTap: 'packages/ui/tiptap/src/TipTap.rozie',
           MapLibre: 'packages/ui/maplibre/src/MapLibre.rozie',
+          Cropper: 'packages/ui/cropper/src/Cropper.rozie',
+          Chart: 'packages/ui/chartjs/src/Chart.rozie',
+          CodeMirror: 'packages/ui/codemirror/src/CodeMirror.rozie',
+          FullCalendar: 'packages/ui/fullcalendar/src/FullCalendar.rozie',
+          PdfViewer: 'packages/ui/pdf/src/PdfViewer.rozie',
         };
         const srcPath = PKG_SRC[name]
           ? resolve(ROOT, PKG_SRC[name])
@@ -133,6 +150,71 @@ describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Sve
         const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
         throw new Error('svelte-check exited non-zero:\n' + stdout + '\n' + stderr);
       }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('SVELTE-CHECK (negative control) — the gate still flags a self-reference under the relaxed tsconfig', () => {
+  // The gate's tsconfig relaxes strictNullChecks/exactOptionalPropertyTypes to
+  // match the per-target leaf strictness policy (generated code is dist-parity-
+  // correct, not author-strict-clean). This probe LOCKS IN that the relaxation
+  // did NOT defeat detection of the bug class this gate exists for: the svelte
+  // `const X = $props.X` → `const X = X` self-reference (debug
+  // svelte-prop-shadow-self-ref). That emit is `TS2448 "Block-scoped variable
+  // used before its declaration"` — a TDZ/block-scope error that is
+  // strictness-INDEPENDENT. If a future tsconfig change (e.g. dropping to
+  // `strict: false`, which disables TS2448's sibling checks, or adding
+  // `// @ts-nocheck`-ish escape hatches) silently stopped flagging it, this test
+  // goes RED.
+  it('svelte-check reports a self-referential `const x = x` (TS2448) as an error', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-neg-'));
+    try {
+      // The exact shape the emitter bug produced: a top-level prop binding plus a
+      // local whose initializer references itself (what `const src = $props.src`
+      // lowered to before the fix). svelte-check must flag the self-reference.
+      writeFileSync(
+        join(tmpDir, 'SelfRef.svelte'),
+        [
+          '<script lang="ts">',
+          '  let { src = "" }: { src?: string } = $props();',
+          '  function buildSource() {',
+          '    const src = src;', // ← TS2448 self-reference (the bug shape)
+          '    return src;',
+          '  }',
+          '  buildSource();',
+          '</script>',
+          '',
+          '<div>{src}</div>',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const svelteCheckBin = resolve(HERE, 'node_modules/.bin/svelte-check');
+      let output = '';
+      let threw = false;
+      try {
+        execFileSync(
+          svelteCheckBin,
+          ['--tsconfig', './tsconfig.json', '--threshold', 'error', '--output', 'human'],
+          { cwd: tmpDir, stdio: 'pipe' },
+        );
+      } catch (err) {
+        threw = true;
+        output =
+          ((err as { stdout?: Buffer }).stdout?.toString() ?? '') +
+          ((err as { stderr?: Buffer }).stderr?.toString() ?? '');
+      }
+      // The gate MUST fail on the self-reference (proves the relaxed tsconfig
+      // still catches the bug class). If this assertion ever fails, the gate has
+      // been weakened into a no-op for the prop-shadow bug.
+      expect(threw).toBe(true);
+      expect(output).toMatch(/before its declaration|2448|used before being assigned|2454/);
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
