@@ -801,19 +801,19 @@ const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
 //     directives that would otherwise win over spread `style`).
 const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 
-// Phase 35 (maplibre) TRACKED TODO — the Lit MapLibreScreenshot pixel cell only.
-// MapLibre is a WebGL-canvas engine; on the Lit target the STATIC screenshot demo
-// (no controls/markers/slots filled, fixed camera) never produces a visible
-// `.maplibregl-map` in the open shadow root — the canvas stays 0×0 / non-visible,
-// with NO JS error (verified across 4 Linux-Docker repros, incl. removing
-// `interactive:false`). The BEHAVIORAL Lit cell (maplibre-map.spec.ts) mounts the
-// SAME wrapper fine (map + control + 3 marker portals + two-way camera all green),
-// so Lit-WebGL-in-shadow mounting WORKS — this is a narrow static-capture edge,
-// not a wrapper/emit regression. The other 5 targets bless a clean, deterministic
-// `MapLibreScreenshot.png` (the offline-style colored polygon). Ships behavioral
-// 6/6 + screenshot 5/6 per the Chart.js canvas-VR precedent (which deferred ALL
-// targets). Tracked: .planning/todos/pending/maplibre-lit-screenshot-mount.md
-const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>(['MapLibreScreenshot::lit']);
+// Phase 35 (maplibre) — the Lit MapLibreScreenshot cell was previously gated here as
+// a "0×0 canvas / never-visible" deferral. ROOT-CAUSED 2026-06-08: it was an infinite
+// render loop (NOT a sizing issue) — the demo's inline `:center="[-77, 37.5]"` array
+// literal re-committed a fresh-but-value-equal array each render, tripping the Lit
+// model-prop controllable's Object.is (reference) change guard → SignalWatcher
+// re-entrancy → pegged main thread → the map never laid out. Fixed by hoisting the
+// center literal to a stable `const` in MapLibreScreenshotDemo.rozie (lit-html's
+// per-binding dedup then commits it once). All 6 targets now render the offline-style
+// colored polygon identically; the gate is removed and the cell runs as a normal
+// shared-baseline test. The deeper emitter fix (auto-hoist pure-literal component-prop
+// bindings on Lit) is tracked in
+// .planning/todos/pending/lit-emitter-hoist-pure-literal-component-props.md.
+const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);

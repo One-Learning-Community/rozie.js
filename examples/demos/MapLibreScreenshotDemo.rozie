@@ -73,6 +73,17 @@ const stableOptions = {
   attributionControl: false,
   interactive: false,
 }
+
+// STABLE [lng, lat] reference — hoisted to a const so the one-way :center
+// binding commits the SAME array identity on every render. A fresh `[-77, 37.5]`
+// array literal in the template re-evaluates each render; on the Lit target that
+// fresh-but-value-equal array trips `notifyPropertyWrite`'s reference compare
+// (Object.is) in createLitControllableProperty, which re-dispatches `center-change`
+// and, via the SignalWatcher re-entrancy, never settles → an infinite render loop
+// that pegs the main thread (the map then never lays out → canvas reads 0×0 in the
+// Docker capture). A stable reference lets lit-html's per-binding `!==` dedup commit
+// it once. The behavioral MapLibreDemo dodges this by binding a stable `$data.center`.
+const CENTER = [-77, 37.5]
 </script>
 
 <template>
@@ -80,7 +91,7 @@ const stableOptions = {
   <div class="box">
     <MapLibre
       :map-style="OFFLINE_STYLE"
-      :center="[-77, 37.5]"
+      :center="CENTER"
       :zoom="4"
       :options="stableOptions"
     />
