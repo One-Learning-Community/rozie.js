@@ -355,6 +355,18 @@
 @msgpackr-extract/msgpackr-extract-linux-arm64
 @msgpackr-extract/msgpackr-extract-linux-x64
 @msgpackr-extract/msgpackr-extract-win32-x64
+@napi-rs/canvas
+@napi-rs/canvas-android-arm64
+@napi-rs/canvas-darwin-arm64
+@napi-rs/canvas-darwin-x64
+@napi-rs/canvas-linux-arm-gnueabihf
+@napi-rs/canvas-linux-arm64-gnu
+@napi-rs/canvas-linux-arm64-musl
+@napi-rs/canvas-linux-riscv64-gnu
+@napi-rs/canvas-linux-x64-gnu
+@napi-rs/canvas-linux-x64-musl
+@napi-rs/canvas-win32-arm64-msvc
+@napi-rs/canvas-win32-x64-msvc
 @napi-rs/nice
 @napi-rs/nice-android-arm-eabi
 @napi-rs/nice-android-arm64
@@ -791,6 +803,7 @@ core-js-compat
 core-util-is
 cosmiconfig
 crelt
+cropperjs
 cross-spawn
 crossws
 css-loader
@@ -1236,6 +1249,7 @@ path-to-regexp
 path-type
 pathe
 pbf
+pdfjs-dist
 peggy
 perfect-debounce
 piccolore
