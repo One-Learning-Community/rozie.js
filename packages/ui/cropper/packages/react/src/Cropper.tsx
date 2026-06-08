@@ -154,7 +154,14 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
       ready: (e: any) => {
         if (restoreData) instance.current.setData(restoreData);else if (data) instance.current.setData(data);
         if (props.disabled) instance.current.disable();
-        // Initial box is applied — from here on, real user crops drive the model.
+        // The engine's setup-time `crop` events (the default box fired BEFORE this
+        // `ready`, and the `setData` echo just above) are suppressed by the `cropReady`
+        // gate so they can't clobber the consumer's initial `:data` on unified-model
+        // targets (Vue defineModel / Svelte $bindable / Angular model()). But two-way
+        // consumers still need to READ the initial box, so echo the now-applied box
+        // exactly ONCE here (after `$props.data` has been read for setData — no clobber),
+        // then open the gate so genuine post-init user crops drive the model.
+        setData(instance.current.getData());
         cropReady = true;
         _rozieProp_onReady && _rozieProp_onReady();
       },
