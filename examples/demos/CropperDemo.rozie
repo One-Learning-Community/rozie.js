@@ -1,0 +1,112 @@
+<!--
+  CropperDemo.rozie — BEHAVIORAL consumer for the Cropper wrapper.
+
+  The companion of CropperScreenshotDemo (the content-stable pixel cell). THIS
+  demo drives the two-way `data` crop box + the imperative handle and asserts the
+  DOM reflects them, across all 6 targets (cropper.spec.ts):
+
+    - :src is a self-contained SVG data URL (network-free — Docker/CI has NO
+      network), so the cropper mounts a real image and builds its `.cropper-*`
+      crop UI deterministically.
+    - r-model:data two-way binds the crop box to $data.box; the live `width`
+      readout proves the box round-trips OUT (the continuous `crop` event echoes
+      into $model.data → readout climbs above 0).
+    - A "Shrink crop" button mutates $data.box.width DIRECTLY (not via the
+      handle); the model write flows into the wrapper → $watch → setData → the
+      `crop` echo → the readout shrinks. This drives the two-way WRITE path
+      uniformly across all 6 targets (the $expose handle is NOT used here — an
+      Angular child-component ref resolves to the host element, not the instance,
+      so a handle-driven action would no-op on Angular; the handle is covered
+      structurally + in the docs). setData applies x/y/width/height (NOT
+      rotate/scale — those go through rotate()/scale()), so the box is driven by
+      width.
+
+  This is the BEHAVIORAL cell — do NOT add screenshot stabilization here. The
+  content-stable SCREENSHOT cell is the SEPARATE CropperScreenshotDemo.rozie.
+-->
+
+<rozie name="CropperDemo">
+
+<components>
+{
+  Cropper: '../../packages/ui/cropper/src/Cropper.rozie',
+}
+</components>
+
+<data>
+{
+  box: undefined,
+}
+</data>
+
+<script>
+import 'cropperjs/dist/cropper.css'
+
+// Self-contained SVG data URL (network-free): a 320×240 image with saturated
+// blocks so the cropper has deterministic content with no tile/asset server.
+const SAMPLE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSczMjAnIGhlaWdodD0nMjQwJz48cmVjdCB3aWR0aD0nMzIwJyBoZWlnaHQ9JzI0MCcgZmlsbD0nI2NkZTNmMCcvPjxyZWN0IHg9JzAnIHk9JzAnIHdpZHRoPSczMjAnIGhlaWdodD0nODAnIGZpbGw9JyMwYTg0ZmYnLz48Y2lyY2xlIGN4PScxNjAnIGN5PScxNTAnIHI9JzYwJyBmaWxsPScjZTg3MTRhJy8+PHJlY3QgeD0nMzAnIHk9JzExMCcgd2lkdGg9JzcwJyBoZWlnaHQ9JzcwJyBmaWxsPScjMzRhODUzJy8+PHJlY3QgeD0nMjIwJyB5PScxMjAnIHdpZHRoPSc3MCcgaGVpZ2h0PSc5MCcgZmlsbD0nI2ZiYmMwNScvPjwvc3ZnPg=='
+
+// Drive the two-way `data` crop box DIRECTLY (not via the handle, so it works
+// uniformly on all 6 — Angular's child-component ref is the host element, not the
+// instance). Shrinking the bound box width flows into the wrapper → $watch →
+// setData → the `crop` echo updates $data.box, so the readout shrinks. setData
+// applies the crop box (x/y/width/height), so width is the field to drive.
+const shrink = () => {
+  const b = $data.box || { x: 0, y: 0, width: 200, height: 200 }
+  $data.box = { x: b.x, y: b.y, width: Math.max(40, b.width - 40), height: b.height }
+}
+</script>
+
+<template>
+<div class="cropper-demo">
+  <h3>Cropper — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="shrink" @click="shrink">Shrink crop</button>
+    <span class="readout" data-testid="readout-width">{{ ($data.box && $data.box.width) || 0 }}</span>
+  </div>
+
+  <div class="crop-wrap" style="height: 320px">
+    <Cropper
+      :src="SAMPLE"
+      r-model:data="$data.box"
+      :view-mode="1"
+      :aspect-ratio="1"
+    />
+  </div>
+</div>
+</template>
+
+<style>
+.cropper-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #c7c7cc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.readout {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.crop-wrap {
+  max-width: 420px;
+  background: #f2f2f7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+</style>
+
+</rozie>

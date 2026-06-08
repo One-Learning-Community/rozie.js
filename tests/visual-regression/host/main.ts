@@ -252,6 +252,19 @@ export const EXAMPLES = [
   // matrix.spec.ts (auto-fixme until the Linux PNG lands).
   'MapLibre',
   'MapLibreScreenshot',
+  // Cropper (Cropper.js v1) — the image-cropper image+overlay cells. Cropper is
+  // the BEHAVIORAL cell (loader → examples/demos/CropperDemo.rozie, which imports
+  // ../../packages/ui/cropper/src/Cropper.rozie). It binds r-model:data (the crop
+  // box) to $data with a live rotate readout, drives the $expose handle's
+  // rotateBy(90) from a button, and loads a network-free SVG data URL. Built for
+  // all 6 targets but NOT a screenshot cell — covered by cropper.spec.ts
+  // (structural/behavioral assertions, no screenshot), deliberately NOT in
+  // matrix.spec.ts EXAMPLES. CropperScreenshot is the content-STABLE pixel cell
+  // (loader → examples/demos/CropperScreenshotDemo.rozie): the same SVG data URL +
+  // a FIXED :data crop box + responsive:false, NO controls/interaction —
+  // registered in matrix.spec.ts (auto-fixme until the Linux PNG lands).
+  'Cropper',
+  'CropperScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -348,6 +361,10 @@ export const LIT_TAGS: Record<Example, string> = {
   // MapLibreDemo / MapLibreScreenshotDemo.
   MapLibre: 'rozie-map-libre',
   MapLibreScreenshot: 'rozie-map-libre-screenshot',
+  // Cropper — the lit entry appends '-demo' → tags 'rozie-cropper-demo' /
+  // 'rozie-cropper-screenshot-demo' = kebab of CropperDemo / CropperScreenshotDemo.
+  Cropper: 'rozie-cropper',
+  CropperScreenshot: 'rozie-cropper-screenshot',
 };
 
 export interface HostQuery {
@@ -489,6 +506,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // CodeMirror precedent. No parent props needed.
   MapLibre: {},
   MapLibreScreenshot: {},
+  // Cropper — both demos are self-contained: CropperDemo seeds box:undefined in
+  // <data> and the SVG data URL + SAMPLE in <script>; CropperScreenshotDemo
+  // hardcodes the SVG data URL + FIXED_BOX in <script>. No parent props needed.
+  Cropper: {},
+  CropperScreenshot: {},
 };
 
 /**

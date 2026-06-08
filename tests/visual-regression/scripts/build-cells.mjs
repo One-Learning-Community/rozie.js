@@ -103,6 +103,17 @@ const MAPLIBRE_SRC = resolve(
   'maplibre',
   'src',
 );
+// Same packaging move for @rozie-ui/cropper: Cropper.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Cropper.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const CROPPER_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'cropper',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -305,6 +316,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // maplibre src always exists post-port — defensive only
   }
   rmSync(resolve(MAPLIBRE_SRC, 'MapLibre.ts'), { force: true });
+  // Same sweep for @rozie-ui/cropper's package src (CropperDemo +
+  // CropperScreenshotDemo compose Cropper via <components>, so the Angular
+  // sub-build emits Cropper.rozie.ts + the Cropper.ts shim here). Leftovers (the
+  // emitted .rozie.ts imports @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(CROPPER_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(CROPPER_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // cropper src always exists post-port — defensive only
+  }
+  rmSync(resolve(CROPPER_SRC, 'Cropper.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

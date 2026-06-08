@@ -283,6 +283,27 @@ const EXAMPLES = [
   // camera, control + marker portal slots) lives in maplibre-map.spec.ts and is
   // NOT baseline-gated.
   'MapLibreScreenshot',
+  // Cropper (Cropper.js v1) — CropperScreenshot is the content-stable pixel cell.
+  // `CropperScreenshotDemo.rozie` mounts the engine on a network-free SVG data URL
+  // with a FIXED :data crop box (image coords) + an explicit pinned container size
+  // + :responsive="false"; the settle (settleExample below) waits for the
+  // `.cropper-canvas` image to load AND for cropper.css (an async code-split chunk)
+  // to apply, so the dark modal + crop-box chrome are present at clip time.
+  //
+  // TRACKED DEFERRAL (no committed baseline → `baselineExists()` auto-fixmes the
+  // cell; never red). Unlike maplibre's WebGL canvas — which fills the container
+  // edge-to-edge and renders byte-identically across 5 targets — Cropper draws an
+  // OUTLINED crop box + guide lines, and the box origin shifts ~1-3px between the
+  // template-emit family (vue/svelte) and the JSX-emit family (react/solid). A
+  // 1px shift of a 1px-wide outline mismatches the entire box perimeter →
+  // thousands of differing pixels, far past `maxDiffPixels: 2`, and not closeable
+  // by a sane tolerance. This is the documented engine-demo cross-emit pixel
+  // divergence (same root class as the text-node kerning split), here amplified by
+  // outlined chrome. The full cross-target CORRECTNESS proof (mount, crop box,
+  // two-way `data` round-trip) lives in cropper.spec.ts and is green 6/6; the
+  // screenshot cell stays registered (demo + settle ready) for a future per-emit-
+  // family or canvas-rasterized approach to byte-identity.
+  'CropperScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -568,6 +589,66 @@ async function settleExample(
     // symbol tween, so a short fixed settle absorbs the async style-load render
     // pass before the clip.
     await page.waitForTimeout(600);
+  }
+  // CropperScreenshot (Cropper.js v1): the engine attaches to the <img> on
+  // `$onMount`, hides it, and builds its `.cropper-container` (with a
+  // `.cropper-canvas > img`, the dark `.cropper-modal`, and the `.cropper-crop-box`
+  // / `.cropper-view-box`). The crop UI only lays out once the image LOADS, so a
+  // capture before load shows an empty container. Unlike chart/maplibre this is a
+  // DOM+<img> view (no WebGL/2D canvas to pixel-poll), so wait for the container +
+  // crop box, then poll until the engine's `.cropper-canvas img` has actually
+  // loaded (`complete` + `naturalWidth > 0`), then a short settle. The demo uses a
+  // network-free SVG data URL + a FIXED :data box + responsive:false, so once the
+  // image is loaded the layout is deterministic. CSS locators pierce Lit's shadow.
+  if (example === 'CropperScreenshot') {
+    await expect(page.locator('.cropper-container').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('.cropper-crop-box').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    // Wait until BOTH the engine's `.cropper-canvas img` has loaded AND the crop
+    // box + dark modal have been POSITIONED (non-zero geometry). Cropper builds
+    // the container/image first and computes the crop-box + modal layout on a
+    // later frame, so `.cropper-crop-box` can be present-but-unpositioned briefly
+    // — clipping then would capture the bare image without its crop chrome. Gating
+    // on a non-zero crop-box width ensures the modal/box geometry has painted.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const deep = <T extends Element>(root: Document | ShadowRoot, sel: string): T | null => {
+              const hit = root.querySelector(sel) as T | null;
+              if (hit) return hit;
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) {
+                  const found = deep<T>(sr, sel);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            const img = deep<HTMLImageElement>(document, '.cropper-canvas img');
+            const box = deep<HTMLElement>(document, '.cropper-crop-box');
+            const modal = deep<HTMLElement>(document, '.cropper-modal');
+            const imgReady = Boolean(img && img.complete && img.naturalWidth > 0);
+            const boxReady = Boolean(box && box.getBoundingClientRect().width > 1);
+            // cropper.css is a code-split chunk injected as an async <link>, so the
+            // box can have inline-style geometry BEFORE the stylesheet applies its
+            // chrome (the dark `.cropper-modal`, box border/guides/handles). Gate on
+            // the modal's computed background actually being cropper.css's value so
+            // the capture includes the crop chrome, not the bare image.
+            const cssReady = Boolean(
+              modal && getComputedStyle(modal).backgroundColor === 'rgb(0, 0, 0)',
+            );
+            return imgReady && boxReady && cssReady;
+          }),
+        { timeout: 10_000, intervals: [200, 400, 800, 1600] },
+      )
+      .toBe(true);
+    // The crop UI is positioned; a short settle absorbs any final reflow.
+    await page.waitForTimeout(500);
   }
 }
 
