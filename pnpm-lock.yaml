@@ -37,9 +37,87 @@ importers:
 
   docs:
     devDependencies:
+      '@codemirror/commands':
+        specifier: ^6.10.3
+        version: 6.10.3
+      '@codemirror/lang-css':
+        specifier: ^6
+        version: 6.3.1
+      '@codemirror/lang-html':
+        specifier: ^6
+        version: 6.4.11
+      '@codemirror/lang-javascript':
+        specifier: ^6.2.5
+        version: 6.2.5
+      '@codemirror/lang-json':
+        specifier: ^6
+        version: 6.0.2
+      '@codemirror/lang-markdown':
+        specifier: ^6
+        version: 6.5.0
+      '@codemirror/lang-python':
+        specifier: ^6
+        version: 6.2.1
+      '@codemirror/lang-sass':
+        specifier: ^6
+        version: 6.0.2
+      '@codemirror/lang-sql':
+        specifier: ^6
+        version: 6.10.0
+      '@codemirror/lang-vue':
+        specifier: ^0.1.3
+        version: 0.1.3
+      '@codemirror/lang-xml':
+        specifier: ^6
+        version: 6.1.0
+      '@codemirror/lang-yaml':
+        specifier: ^6
+        version: 6.1.3
+      '@codemirror/state':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@codemirror/theme-one-dark':
+        specifier: ^6.1.3
+        version: 6.1.3
+      '@codemirror/view':
+        specifier: ^6.43.0
+        version: 6.43.0
+      '@fullcalendar/core':
+        specifier: ^6.1.20
+        version: 6.1.20
+      '@fullcalendar/daygrid':
+        specifier: ^6.1.20
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@fullcalendar/interaction':
+        specifier: ^6.1.20
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@fullcalendar/timegrid':
+        specifier: ^6.1.20
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@rozie-ui/chartjs-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/chartjs/packages/vue
+      '@rozie-ui/codemirror-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/codemirror/packages/vue
       '@rozie-ui/cropper-vue':
         specifier: workspace:*
         version: link:../packages/ui/cropper/packages/vue
+      '@rozie-ui/flatpickr-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/flatpickr/packages/vue
+      '@rozie-ui/fullcalendar-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/fullcalendar/packages/vue
+      '@rozie-ui/maplibre-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/maplibre/packages/vue
+      '@rozie-ui/sortable-list-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/sortable-list/packages/vue
+      '@rozie-ui/tiptap-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/tiptap/packages/vue
       '@rozie/core':
         specifier: workspace:*
         version: link:../packages/core
@@ -49,15 +127,36 @@ importers:
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../packages/unplugin
+      '@tiptap/core':
+        specifier: ^3.23.5
+        version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extension-bubble-menu':
+        specifier: 3.23.5
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-floating-menu':
+        specifier: 3.23.5
+        version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3.23.5
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/starter-kit':
+        specifier: ^3.23.5
+        version: 3.23.5
       chart.js:
         specifier: ^4.5.1
         version: 4.5.1
+      codemirror:
+        specifier: ^6.0.2
+        version: 6.0.2
       cropperjs:
         specifier: ^1.6.2
         version: 1.6.2
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13
+      maplibre-gl:
+        specifier: ^5.24.0
+        version: 5.24.0
       sortablejs:
         specifier: ^1.15.7
         version: 1.15.7

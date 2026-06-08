@@ -107,6 +107,7 @@ export default defineConfig({
             { text: 'SortableList — showcase & API', link: '/guide/sortable-list' },
             { text: 'Sortable libraries comparison', link: '/guide/sortable-comparison' },
             { text: 'SortableList example & output', link: '/examples/sortable-list' },
+            { text: 'SortableList — live demo', link: '/guide/sortable-list-demo' },
           ],
         },
         {
@@ -115,6 +116,7 @@ export default defineConfig({
             { text: 'Flatpickr — showcase & API', link: '/guide/flatpickr' },
             { text: 'Flatpickr libraries comparison', link: '/guide/flatpickr-comparison' },
             { text: 'Flatpickr example & output', link: '/examples/flatpickr' },
+            { text: 'Flatpickr — live demo', link: '/guide/flatpickr-demo' },
           ],
         },
         {
@@ -122,6 +124,7 @@ export default defineConfig({
           items: [
             { text: 'FullCalendar — showcase & API', link: '/guide/fullcalendar' },
             { text: 'FullCalendar libraries comparison', link: '/guide/fullcalendar-comparison' },
+            { text: 'FullCalendar — live demo', link: '/guide/fullcalendar-demo' },
           ],
         },
         {
@@ -129,6 +132,7 @@ export default defineConfig({
           items: [
             { text: 'CodeMirror — showcase & API', link: '/guide/codemirror' },
             { text: 'CodeMirror libraries comparison', link: '/guide/codemirror-comparison' },
+            { text: 'CodeMirror — live demo', link: '/guide/codemirror-demo' },
           ],
         },
         {
@@ -136,6 +140,7 @@ export default defineConfig({
           items: [
             { text: 'Chart.js — showcase & API', link: '/guide/chartjs' },
             { text: 'Chart.js libraries comparison', link: '/guide/chartjs-comparison' },
+            { text: 'Chart.js — live demo', link: '/guide/chartjs-demo' },
           ],
         },
         {
@@ -143,6 +148,7 @@ export default defineConfig({
           items: [
             { text: 'TipTap — showcase & API', link: '/guide/tiptap' },
             { text: 'TipTap libraries comparison', link: '/guide/tiptap-comparison' },
+            { text: 'TipTap — live demo', link: '/guide/tiptap-demo' },
           ],
         },
         {
@@ -150,6 +156,7 @@ export default defineConfig({
           items: [
             { text: 'MapLibre — showcase & API', link: '/guide/maplibre' },
             { text: 'MapLibre libraries comparison', link: '/guide/maplibre-comparison' },
+            { text: 'MapLibre — live demo', link: '/guide/maplibre-demo' },
           ],
         },
         {
