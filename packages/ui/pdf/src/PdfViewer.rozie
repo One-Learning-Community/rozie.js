@@ -64,6 +64,10 @@
   // the PDF.js worker URL — defaults to the version-matched CDN so it works with
   // zero config; override for offline / CSP / bundled-worker.
   workerSrc:      { type: String,  default: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs' },
+  // directory of PDF.js's standard-font data, so the base-14 fonts (Helvetica,
+  // Times, Courier, …) render with correct glyphs. Version-matched CDN default;
+  // override (or pass a bundled dir) for offline / CSP.
+  standardFontDataUrl: { type: String, default: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/' },
   // continuous-scroll all pages vs single page with nav.
   renderAllPages: { type: Boolean, default: false },
   // render PDF.js's selectable text layer over each page canvas.
@@ -87,13 +91,17 @@
 </data>
 
 <script>
-import * as pdfjsLib from 'pdfjs-dist'
+// pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+// build evaluates browser globals (DOMMatrix, …) at module-load time, which
+// crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+// mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+// engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+// `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
+let pdfjsLib = null
 
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
+// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+// containerEl is the scroll host, observer is the continuous-mode scroll spy.
 let instance = null
 let containerEl = null
 let observer = null
@@ -106,6 +114,11 @@ let loadingTask = null
 let renderToken = 0
 // guards the scroll-spy → $data.current → scroll-to feedback loop.
 let suppressScroll = false
+// set in the $onMount teardown so a late-resolving dynamic import() bails. A
+// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+// would be out of scope there.
+let cancelled = false
 
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 const buildSource = () => {
@@ -127,6 +140,7 @@ const buildSource = () => {
     cfg.data = src
   }
   if ($props.password != null) cfg.password = $props.password
+  if ($props.standardFontDataUrl) cfg.standardFontDataUrl = $props.standardFontDataUrl
   return cfg
 }
 
@@ -226,6 +240,7 @@ const renderView = async () => {
 
 // ─── load the document ───────────────────────────────────────────────────────
 const load = async () => {
+  if (!pdfjsLib) return
   const token = ++renderToken
   if (observer) { observer.disconnect(); observer = null }
   // tear down the previous load via the loading task (PDFDocumentProxy has no
@@ -262,13 +277,21 @@ const applyFit = async (mode) => {
 }
 
 $onMount(() => {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = $props.workerSrc
+  cancelled = false
   containerEl = $refs.viewerEl
   $data.current = Math.max(1, $props.page)
   $data.zoom = $props.scale
   $data.rot = $props.rotation
-  load()
+  // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+  // load the document.
+  import('pdfjs-dist').then((mod) => {
+    if (cancelled) return
+    pdfjsLib = mod
+    pdfjsLib.GlobalWorkerOptions.workerSrc = $props.workerSrc
+    load()
+  })
   return () => {
+    cancelled = true
     renderToken++
     if (observer) { observer.disconnect(); observer = null }
     if (loadingTask) { loadingTask.destroy(); loadingTask = null }
@@ -279,7 +302,7 @@ $onMount(() => {
 // ─── reconcile props/state into the live view ────────────────────────────────
 $watch(() => $props.src, () => load())
 $watch(() => $props.password, () => load())
-$watch(() => $props.workerSrc, (v) => { if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v })
+$watch(() => $props.workerSrc, (v) => { if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v })
 
 // prop → internal state (guarded so consumer writes don't fight the verbs).
 $watch(() => $props.page, (v) => {

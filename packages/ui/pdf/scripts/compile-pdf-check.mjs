@@ -20,7 +20,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'PdfViewer',
-  props: ['src', 'page', 'scale', 'rotation', 'workerSrc', 'renderAllPages', 'textLayer', 'password', 'options'],
+  props: ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options'],
   models: ['page'],
   emits: ['load', 'error', 'pagechange', 'pagesrendered', 'passwordrequest'],
   slots: [],

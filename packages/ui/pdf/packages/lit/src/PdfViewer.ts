@@ -2,13 +2,6 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
 
 @customElement('rozie-pdf-viewer')
 export default class PdfViewer extends SignalWatcher(LitElement) {
@@ -66,6 +59,7 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) scale: number = 1;
   @property({ type: Number, reflect: true }) rotation: number = 0;
   @property({ type: String, reflect: true }) workerSrc: string = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs';
+  @property({ type: String, reflect: true }) standardFontDataUrl: string = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/';
   @property({ type: Boolean, reflect: true }) renderAllPages: boolean = false;
   @property({ type: Boolean, reflect: true }) textLayer: boolean = true;
   @property({ type: Object }) password: unknown = undefined;
@@ -87,6 +81,7 @@ private __rozieFirstUpdateDone = false;
 
   firstUpdated(): void {
     this._disconnectCleanups.push((() => {
+      this.cancelled = true;
       this.renderToken++;
       if (this.observer) {
         this.observer.disconnect();
@@ -118,19 +113,28 @@ private __rozieFirstUpdateDone = false;
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._zoom.value)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => this.renderView())(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rot.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); }));
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc;
+    this.cancelled = false;
     this.containerEl = this._refViewerEl;
     this._current.value = Math.max(1, this.page);
     this._zoom.value = this.scale;
     this._rot.value = this.rotation;
-    this.load();
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    import('pdfjs-dist').then((mod: any) => {
+      if (this.cancelled) return;
+      this.pdfjsLib = mod;
+      this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc;
+      this.load();
+    });
   }
 
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('src'))) { const __watchVal = (() => this.src)(); (() => this.load())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('password'))) { const __watchVal = (() => this.password)(); (() => this.load())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('workerSrc'))) { const __watchVal = (() => this.workerSrc)(); ((v: any) => {
-      if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+      if (this.pdfjsLib && v) this.pdfjsLib.GlobalWorkerOptions.workerSrc = v;
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('scale'))) { const __watchVal = (() => this.scale)(); ((v: any) => {
       if (typeof v === 'number' && v > 0) this._zoom.value = v;
@@ -164,6 +168,8 @@ private __rozieFirstUpdateDone = false;
 `;
   }
 
+  pdfjsLib: any = null;
+
   instance: any = null;
 
   containerEl: any = null;
@@ -175,6 +181,8 @@ private __rozieFirstUpdateDone = false;
   renderToken = 0;
 
   suppressScroll = false;
+
+  cancelled = false;
 
   buildSource = () => {
   let cfg: any = null;
@@ -197,6 +205,7 @@ private __rozieFirstUpdateDone = false;
     cfg.data = src;
   }
   if (this.password != null) cfg.password = this.password;
+  if (this.standardFontDataUrl) cfg.standardFontDataUrl = this.standardFontDataUrl;
   return cfg;
 };
 
@@ -230,7 +239,7 @@ private __rozieFirstUpdateDone = false;
     const tl = document.createElement('div');
     tl.className = 'textLayer';
     pageDiv.appendChild(tl);
-    const layer = new pdfjsLib.TextLayer({
+    const layer = new this.pdfjsLib.TextLayer({
       textContentSource: page.streamTextContent(),
       container: tl,
       viewport
@@ -314,6 +323,7 @@ private __rozieFirstUpdateDone = false;
 };
 
   load = async () => {
+  if (!this.pdfjsLib) return;
   const token = ++this.renderToken;
   if (this.observer) {
     this.observer.disconnect();
@@ -329,7 +339,7 @@ private __rozieFirstUpdateDone = false;
   if (this.containerEl) this.containerEl.innerHTML = '';
   if (!this.src) return;
   try {
-    this.loadingTask = pdfjsLib.getDocument(this.buildSource());
+    this.loadingTask = this.pdfjsLib.getDocument(this.buildSource());
     this.loadingTask.onPassword = (_updatePassword: any, reason: any) => {
       this.dispatchEvent(new CustomEvent("passwordrequest", {
         detail: {
@@ -440,7 +450,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'options']);
+    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'standard-font-data-url', 'standardfontdataurl', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'options']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

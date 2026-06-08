@@ -1,13 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
 
 __rozieInjectStyle('PdfViewer-3c863364', `.rozie-pdf[data-rozie-s-3c863364] {
   width: 100%;
@@ -63,6 +56,7 @@ interface PdfViewerProps {
   scale?: number;
   rotation?: number;
   workerSrc?: string;
+  standardFontDataUrl?: string;
   renderAllPages?: boolean;
   textLayer?: boolean;
   password?: unknown;
@@ -91,8 +85,8 @@ export interface PdfViewerHandle {
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
-  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', renderAllPages: false, textLayer: true, password: undefined, options: (() => ({}))() }, _props);
-  const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'renderAllPages', 'textLayer', 'password', 'options', 'ref']);
+  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: (() => ({}))() }, _props);
+  const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options', 'ref']);
   onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW }); });
 
   const [page, setPage] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'page', 1);
@@ -101,15 +95,23 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const [rot, setRot] = createSignal(0);
   onMount(() => {
     const _cleanup = (() => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = local.workerSrc;
+    cancelled = false;
     containerEl = viewerElRef;
     setCurrent(Math.max(1, page()));
     setZoom(local.scale);
     setRot(local.rotation);
-    load();
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    import('pdfjs-dist').then((mod: any) => {
+      if (cancelled) return;
+      pdfjsLib = mod;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = local.workerSrc;
+      load();
+    });
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
+    cancelled = true;
     renderToken++;
     if (observer) {
       observer.disconnect();
@@ -125,7 +127,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   createEffect(on(() => (() => local.src)(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.password)(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.workerSrc)(), (v) => untrack(() => ((v: any) => {
-    if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+    if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
   })(v)), { defer: true }));
   createEffect(on(() => (() => page())(), (v) => untrack(() => ((v: any) => {
     if (typeof v === 'number' && v >= 1 && v !== current()) setCurrent(v);
@@ -151,11 +153,17 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   createEffect(on(() => (() => local.textLayer)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
   let viewerElRef: HTMLElement | null = null;
 
-  // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-  // `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-  // don't satisfy — routing the render chain through `any` is the maplibre
-  // mapOptions idiom), containerEl is the scroll host, observer is the
-  // continuous-mode scroll spy.
+  // pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+  // build evaluates browser globals (DOMMatrix, …) at module-load time, which
+  // crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+  // mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+  // engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+  // `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
+  let pdfjsLib: any = null;
+
+  // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+  // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+  // containerEl is the scroll host, observer is the continuous-mode scroll spy.
   let instance: any = null;
   let containerEl: any = null;
   let observer: any = null;
@@ -168,6 +176,11 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   let renderToken = 0;
   // guards the scroll-spy → $data.current → scroll-to feedback loop.
   let suppressScroll = false;
+  // set in the $onMount teardown so a late-resolving dynamic import() bails. A
+  // TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+  // teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+  // would be out of scope there.
+  let cancelled = false;
 
   // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
   function buildSource() {
@@ -191,6 +204,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
       cfg.data = src;
     }
     if (local.password != null) cfg.password = local.password;
+    if (local.standardFontDataUrl) cfg.standardFontDataUrl = local.standardFontDataUrl;
     return cfg;
   }
 
@@ -303,6 +317,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
 
   // ─── load the document ───────────────────────────────────────────────────────
   async function load() {
+    if (!pdfjsLib) return;
     const token = ++renderToken;
     if (observer) {
       observer.disconnect();

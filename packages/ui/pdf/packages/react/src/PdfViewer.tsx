@@ -2,13 +2,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './PdfViewer.css';
 import './PdfViewer.global.css';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
 
 interface PdfViewerProps {
   src?: unknown;
@@ -18,6 +11,7 @@ interface PdfViewerProps {
   scale?: number;
   rotation?: number;
   workerSrc?: string;
+  standardFontDataUrl?: string;
   renderAllPages?: boolean;
   textLayer?: boolean;
   password?: unknown;
@@ -46,23 +40,26 @@ export interface PdfViewerHandle {
 
 const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer(_props: PdfViewerProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'renderAllPages' | 'textLayer' | 'password' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; renderAllPages: boolean; textLayer: boolean; password: unknown; options: Record<string, any> } = {
+  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; standardFontDataUrl: string; renderAllPages: boolean; textLayer: boolean; password: unknown; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? undefined,
     scale: _props.scale ?? 1,
     rotation: _props.rotation ?? 0,
     workerSrc: _props.workerSrc ?? 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs',
+    standardFontDataUrl: _props.standardFontDataUrl ?? 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/',
     renderAllPages: _props.renderAllPages ?? false,
     textLayer: _props.textLayer ?? true,
     password: _props.password ?? undefined,
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, page, scale, rotation, workerSrc, renderAllPages, textLayer, password, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
-    void src; void page; void scale; void rotation; void workerSrc; void renderAllPages; void textLayer; void password; void options; void defaultValue; void onPageChange; void defaultPage;
+    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
+    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void options; void defaultValue; void onPageChange; void defaultPage;
     return rest;
   })();
+  const cancelled = useRef(false);
   const containerEl = useRef<any>(null);
+  const pdfjsLib = useRef<any>(null);
   const renderToken = useRef(0);
   const observer = useRef<any>(null);
   const loadingTask = useRef<any>(null);
@@ -118,6 +115,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       cfg.data = src;
     }
     if (props.password != null) cfg.password = props.password;
+    if (props.standardFontDataUrl) cfg.standardFontDataUrl = props.standardFontDataUrl;
     return cfg;
   }
   async function renderPage(pdf: any, pageNum: any, container: any) {
@@ -150,7 +148,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       const tl = document.createElement('div');
       tl.className = 'textLayer';
       pageDiv.appendChild(tl);
-      const layer = new pdfjsLib.TextLayer({
+      const layer = new pdfjsLib.current.TextLayer({
         textContentSource: page.streamTextContent(),
         container: tl,
         viewport
@@ -223,6 +221,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   }
   const { onError: _rozieProp_onError, onLoad: _rozieProp_onLoad, onPasswordrequest: _rozieProp_onPasswordrequest } = props;
     const load = useCallback(async () => {
+    if (!pdfjsLib.current) return;
     const token = ++renderToken.current;
     if (observer.current) {
       observer.current.disconnect();
@@ -238,7 +237,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (containerEl.current) containerEl.current.innerHTML = '';
     if (!props.src) return;
     try {
-      loadingTask.current = pdfjsLib.getDocument(buildSource());
+      loadingTask.current = pdfjsLib.current.getDocument(buildSource());
       loadingTask.current.onPassword = (_updatePassword: any, reason: any) => {
         _rozieProp_onPasswordrequest && _rozieProp_onPasswordrequest({
           reason
@@ -314,13 +313,21 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   }
 
   useEffect(() => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = _workerSrcRef.current;
+    cancelled.current = false;
     containerEl.current = viewerEl.current;
     setCurrent(Math.max(1, _pageRef.current));
     setZoom(_scaleRef.current);
     setRot(_rotationRef.current);
-    load();
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    import('pdfjs-dist').then((mod: any) => {
+      if (cancelled.current) return;
+      pdfjsLib.current = mod;
+      pdfjsLib.current.GlobalWorkerOptions.workerSrc = _workerSrcRef.current;
+      load();
+    });
     return () => {
+      cancelled.current = true;
       renderToken.current++;
       if (observer.current) {
         observer.current.disconnect();
@@ -344,7 +351,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
     const v = props.workerSrc;
-    if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+    if (pdfjsLib.current && v) pdfjsLib.current.GlobalWorkerOptions.workerSrc = v;
   }, [props.workerSrc]);
   useEffect(() => {
     if (_watch3First.current) { _watch3First.current = false; return; }

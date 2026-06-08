@@ -10,6 +10,7 @@ export interface PdfViewerProps {
   scale?: number;
   rotation?: number;
   workerSrc?: string;
+  standardFontDataUrl?: string;
   renderAllPages?: boolean;
   textLayer?: boolean;
   password?: unknown;

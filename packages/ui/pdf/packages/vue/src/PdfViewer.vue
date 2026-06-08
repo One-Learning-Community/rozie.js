@@ -8,8 +8,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ src?: unknown; scale?: number; rotation?: number; workerSrc?: string; renderAllPages?: boolean; textLayer?: boolean; password?: unknown; options?: Record<string, any> }>(),
-  { src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', renderAllPages: false, textLayer: true, password: undefined, options: () => ({}) }
+  defineProps<{ src?: unknown; scale?: number; rotation?: number; workerSrc?: string; standardFontDataUrl?: string; renderAllPages?: boolean; textLayer?: boolean; password?: unknown; options?: Record<string, any> }>(),
+  { src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: () => ({}) }
 );
 
 const page = defineModel<number>('page', { default: 1 });
@@ -28,18 +28,20 @@ const rot = ref(0);
 
 const viewerElRef = ref<HTMLElement>();
 
-import * as pdfjsLib from 'pdfjs-dist';
+// pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+// build evaluates browser globals (DOMMatrix, …) at module-load time, which
+// crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+// mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+// engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+// `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
+let pdfjsLib: any = null;
 
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
+// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+// containerEl is the scroll host, observer is the continuous-mode scroll spy.
+// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+// containerEl is the scroll host, observer is the continuous-mode scroll spy.
 let instance: any = null;
 let containerEl: any = null;
 let observer: any = null;
@@ -58,6 +60,15 @@ let renderToken = 0;
 // guards the scroll-spy → $data.current → scroll-to feedback loop.
 // guards the scroll-spy → $data.current → scroll-to feedback loop.
 let suppressScroll = false;
+// set in the $onMount teardown so a late-resolving dynamic import() bails. A
+// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+// would be out of scope there.
+// set in the $onMount teardown so a late-resolving dynamic import() bails. A
+// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+// would be out of scope there.
+let cancelled = false;
 
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
@@ -82,6 +93,7 @@ const buildSource = () => {
     cfg.data = src;
   }
   if (props.password != null) cfg.password = props.password;
+  if (props.standardFontDataUrl) cfg.standardFontDataUrl = props.standardFontDataUrl;
   return cfg;
 };
 
@@ -198,6 +210,7 @@ const renderView = async () => {
 // ─── load the document ───────────────────────────────────────────────────────
 // ─── load the document ───────────────────────────────────────────────────────
 const load = async () => {
+  if (!pdfjsLib) return;
   const token = ++renderToken;
   if (observer) {
     observer.disconnect();
@@ -290,13 +303,21 @@ function rotateCCW() {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = props.workerSrc;
+  cancelled = false;
   containerEl = viewerElRef.value;
   current.value = Math.max(1, page.value);
   zoom.value = props.scale;
   rot.value = props.rotation;
-  load();
+  // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+  // load the document.
+  import('pdfjs-dist').then((mod: any) => {
+    if (cancelled) return;
+    pdfjsLib = mod;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = props.workerSrc;
+    load();
+  });
   _cleanup_0 = () => {
+    cancelled = true;
     renderToken++;
     if (observer) {
       observer.disconnect();
@@ -314,7 +335,7 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 watch(() => props.src, () => load());
 watch(() => props.password, () => load());
 watch(() => props.workerSrc, (v: any) => {
-  if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+  if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
 });
 watch(() => page.value, (v: any) => {
   if (typeof v === 'number' && v >= 1 && v !== current.value) current.value = v;

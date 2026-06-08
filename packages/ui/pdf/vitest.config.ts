@@ -4,7 +4,7 @@
 // per-framework leaves; those typecheck the emitted output). This config exists
 // to run the SURFACE gate (tests/surface.test.ts) under `turbo run test` — it
 // re-asserts the PdfViewer.rozie compile()/lowerToIR surface (the same contract the
-// standalone scripts/compile-pdf-check.mjs checks), so a drift in the 9-prop
+// standalone scripts/compile-pdf-check.mjs checks), so a drift in the 10-prop
 // / 5-emit / 0-slot / 12-expose surface or a new compile() error diagnostic fails
 // the test gate, not just the manual script.
 //

@@ -26,8 +26,8 @@ const source = readFileSync(SRC, 'utf8');
 const EXPECT = {
   name: 'PdfViewer',
   props: [
-    'src', 'page', 'scale', 'rotation', 'workerSrc', 'renderAllPages',
-    'textLayer', 'password', 'options',
+    'src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl',
+    'renderAllPages', 'textLayer', 'password', 'options',
   ],
   models: ['page'],
   emits: ['load', 'error', 'pagechange', 'pagesrendered', 'passwordrequest'],
@@ -55,7 +55,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (9 props)', () => {
+  it('props surface matches (10 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

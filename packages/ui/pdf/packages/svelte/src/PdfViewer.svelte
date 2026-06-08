@@ -9,6 +9,7 @@ interface Props {
   scale?: number;
   rotation?: number;
   workerSrc?: string;
+  standardFontDataUrl?: string;
   renderAllPages?: boolean;
   textLayer?: boolean;
   password?: unknown;
@@ -29,6 +30,7 @@ let {
   scale = 1,
   rotation = 0,
   workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs',
+  standardFontDataUrl = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/',
   renderAllPages = false,
   textLayer = true,
   password = undefined,
@@ -47,18 +49,20 @@ let rot = $state(0);
 
 let viewerEl = $state<HTMLElement | undefined>(undefined);
 
-import * as pdfjsLib from 'pdfjs-dist';
+// pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main
+// build evaluates browser globals (DOMMatrix, …) at module-load time, which
+// crashes SSR (Next / Nuxt / SvelteKit / Analog / VitePress). Lazy-importing it on
+// mount makes the component SSR-safe for ALL consumers AND code-splits the ~1MB
+// engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
+// `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
+let pdfjsLib: any = null;
 
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
+// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+// containerEl is the scroll host, observer is the continuous-mode scroll spy.
+// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
+// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
+// containerEl is the scroll host, observer is the continuous-mode scroll spy.
 let instance: any = null;
 let containerEl: any = null;
 let observer: any = null;
@@ -77,6 +81,15 @@ let renderToken = 0;
 // guards the scroll-spy → $data.current → scroll-to feedback loop.
 // guards the scroll-spy → $data.current → scroll-to feedback loop.
 let suppressScroll = false;
+// set in the $onMount teardown so a late-resolving dynamic import() bails. A
+// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+// would be out of scope there.
+// set in the $onMount teardown so a late-resolving dynamic import() bails. A
+// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
+// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
+// would be out of scope there.
+let cancelled = false;
 
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
@@ -101,6 +114,7 @@ const buildSource = () => {
     cfg.data = src;
   }
   if (password != null) cfg.password = password;
+  if (standardFontDataUrl) cfg.standardFontDataUrl = standardFontDataUrl;
   return cfg;
 };
 
@@ -217,6 +231,7 @@ const renderView = async () => {
 // ─── load the document ───────────────────────────────────────────────────────
 // ─── load the document ───────────────────────────────────────────────────────
 const load = async () => {
+  if (!pdfjsLib) return;
   const token = ++renderToken;
   if (observer) {
     observer.disconnect();
@@ -308,13 +323,21 @@ export function rotateCCW() {
 }
 
 onMount(() => {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+  cancelled = false;
   containerEl = viewerEl;
   current = Math.max(1, page);
   zoom = scale;
   rot = rotation;
-  load();
+  // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+  // load the document.
+  import('pdfjs-dist').then((mod: any) => {
+    if (cancelled) return;
+    pdfjsLib = mod;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    load();
+  });
   return () => {
+    cancelled = true;
     renderToken++;
     if (observer) {
       observer.disconnect();
@@ -334,7 +357,7 @@ let __rozieWatchInitial_1 = true;
 $effect(() => { (() => password)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => load())(); }); });
 let __rozieWatchInitial_2 = true;
 $effect(() => { const __watchVal = (() => workerSrc)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => {
-  if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+  if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
 })(__watchVal); }); });
 let __rozieWatchInitial_3 = true;
 $effect(() => { const __watchVal = (() => page)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {

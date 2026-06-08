@@ -1,14 +1,6 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import * as pdfjsLib from 'pdfjs-dist';
-
-// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
-// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
-// don't satisfy — routing the render chain through `any` is the maplibre
-// mapOptions idiom), containerEl is the scroll host, observer is the
-// continuous-mode scroll spy.
-
 @Component({
   selector: 'rozie-pdf-viewer',
   standalone: true,
@@ -80,6 +72,7 @@ export class PdfViewer {
   scale = input<number>(1);
   rotation = input<number>(0);
   workerSrc = input<string>('https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs');
+  standardFontDataUrl = input<string>('https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/');
   renderAllPages = input<boolean>(false);
   textLayer = input<boolean>(true);
   password = input<unknown>(undefined);
@@ -110,7 +103,7 @@ export class PdfViewer {
     effect(() => { const __watchVal = (() => this.src())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this._load())(); }); });
     effect(() => { const __watchVal = (() => this.password())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this._load())(); }); });
     effect(() => { const __watchVal = (() => this.workerSrc())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => {
-      if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+      if (this.pdfjsLib && v) this.pdfjsLib.GlobalWorkerOptions.workerSrc = v;
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.page())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
       if (typeof v === 'number' && v >= 1 && v !== this.current()) this.current.set(v);
@@ -137,13 +130,23 @@ export class PdfViewer {
   }
 
   ngAfterViewInit() {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc();
+    this.cancelled = false;
     this.containerEl = this.viewerEl()?.nativeElement;
     this.current.set(Math.max(1, this.page()));
     this.zoom.set(this.scale());
     this.rot.set(this.rotation());
-    this._load();
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+    // load the document.
+    import('pdfjs-dist').then((mod: any) => {
+      if (this.cancelled) return;
+      this.pdfjsLib = mod;
+      this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc();
+      this._load();
+    });
     this.__rozieDestroyRef.onDestroy(() => {
+      this.cancelled = true;
       this.renderToken++;
       if (this.observer) {
         this.observer.disconnect();
@@ -157,14 +160,17 @@ export class PdfViewer {
     });
   }
 
+  pdfjsLib: any = null;
   instance: any = null;
   containerEl: any = null;
   observer: any = null;
   loadingTask: any = null;
   renderToken = 0;
   suppressScroll = false;
+  cancelled = false;
   buildSource = () => {
     const __password = this.password();
+    const __standardFontDataUrl = this.standardFontDataUrl();
     let cfg: any = null;
     cfg = {
       ...this.options()
@@ -185,6 +191,7 @@ export class PdfViewer {
       cfg.data = src;
     }
     if (__password != null) cfg.password = __password;
+    if (__standardFontDataUrl) cfg.standardFontDataUrl = __standardFontDataUrl;
     return cfg;
   };
   renderPage = async (pdf: any, pageNum: any, container: any) => {
@@ -218,7 +225,7 @@ export class PdfViewer {
       const tl = document.createElement('div');
       tl.className = 'textLayer';
       pageDiv.appendChild(tl);
-      const layer = new pdfjsLib.TextLayer({
+      const layer = new this.pdfjsLib.TextLayer({
         textContentSource: page.streamTextContent(),
         container: tl,
         viewport
@@ -291,6 +298,7 @@ export class PdfViewer {
     this.pagesrendered.emit();
   };
   _load = async () => {
+    if (!this.pdfjsLib) return;
     const token = ++this.renderToken;
     if (this.observer) {
       this.observer.disconnect();
@@ -306,7 +314,7 @@ export class PdfViewer {
     if (this.containerEl) this.containerEl.innerHTML = '';
     if (!this.src()) return;
     try {
-      this.loadingTask = pdfjsLib.getDocument(this.buildSource());
+      this.loadingTask = this.pdfjsLib.getDocument(this.buildSource());
       this.loadingTask.onPassword = (_updatePassword: any, reason: any) => {
         this.passwordrequest.emit({
           reason

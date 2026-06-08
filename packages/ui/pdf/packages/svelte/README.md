@@ -39,6 +39,7 @@ No separate engine-CSS import is needed — `PdfViewer` ships the selectable tex
 | `scale` | `Number` | `1` |  |  |
 | `rotation` | `Number` | `0` |  |  |
 | `workerSrc` | `String` | `"https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs"` |  |  |
+| `standardFontDataUrl` | `String` | `"https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/"` |  |  |
 | `renderAllPages` | `Boolean` | `false` |  |  |
 | `textLayer` | `Boolean` | `true` |  |  |
 | `password` | `unknown` | `undefined` |  |  |
