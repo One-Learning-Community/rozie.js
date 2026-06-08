@@ -90,6 +90,7 @@ export class Chart {
 
   constructor() {
     effect(() => { const __watchVal = (() => this.data())(); untracked(() => ((v: any) => {
+      const __updateMode = this.updateMode();
       if (!this.instance) return;
       if (this.redraw()) {
         this.recreate();
@@ -103,6 +104,21 @@ export class Chart {
       // instance.data severs that identity.
       const next = v;
       const live = this.instance.data;
+
+      // Aliasing guard. On identity-$snapshot targets (React / Solid / Lit) $snapshot
+      // returns its argument unchanged, and Chart.js stores config.data by reference,
+      // so a freshly-constructed chart has `instance.data === $props.data === next`.
+      // The in-place `live.labels.length = 0` below would then empty the very array we
+      // read from on the next line (`next.labels` IS `live.labels`), wiping the labels
+      // → cartesian charts lose their category axis and render an empty plot (the
+      // doughnut, being radial, survives — it doesn't position by label). When live and
+      // next alias there is nothing to reconcile: the chart already holds this data, so
+      // just repaint. (Vue/Angular never hit this — their immediate $watch runs before
+      // $onMount, when instance is still null.)
+      if (live === next) {
+        this.instance.update(__updateMode);
+        return;
+      }
       live.labels ??= [];
       live.labels.length = 0;
       live.labels.push(...(next.labels ?? []));
@@ -129,7 +145,7 @@ export class Chart {
       });
       live.datasets.length = 0;
       live.datasets.push(...merged);
-      this.instance.update(this.updateMode());
+      this.instance.update(__updateMode);
     })(__watchVal)); });
     effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       if (!this.instance || !this.buildConfig) return;

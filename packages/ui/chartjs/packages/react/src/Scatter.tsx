@@ -303,6 +303,21 @@ const Scatter = forwardRef<ScatterHandle, ScatterProps>(function Scatter(_props:
     // instance.data severs that identity.
     const next = v;
     const live = instance.current.data;
+
+    // Aliasing guard. On identity-$snapshot targets (React / Solid / Lit) $snapshot
+    // returns its argument unchanged, and Chart.js stores config.data by reference,
+    // so a freshly-constructed chart has `instance.data === $props.data === next`.
+    // The in-place `live.labels.length = 0` below would then empty the very array we
+    // read from on the next line (`next.labels` IS `live.labels`), wiping the labels
+    // → cartesian charts lose their category axis and render an empty plot (the
+    // doughnut, being radial, survives — it doesn't position by label). When live and
+    // next alias there is nothing to reconcile: the chart already holds this data, so
+    // just repaint. (Vue/Angular never hit this — their immediate $watch runs before
+    // $onMount, when instance is still null.)
+    if (live === next) {
+      instance.current.update(props.updateMode);
+      return;
+    }
     live.labels ??= [];
     live.labels.length = 0;
     live.labels.push(...(next.labels ?? []));

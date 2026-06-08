@@ -232,12 +232,10 @@ const EXAMPLES = [
   // + devicePixelRatio:1 + a pinned font + fixed data, so a stable
   // `ChartScreenshot.png` baseline CAN exist (unlike a live/animated chart). The
   // chart bitmap is Chart.js-engine-rendered identically across targets, so per
-  // D-10 all 6 targets diff against the SAME shared `ChartScreenshot.png`. The
-  // baseline is owned by Plan 30-04 (Linux-Docker regen); until it lands the cell
-  // baseline-gates to `test.fixme` via `baselineExists()` (never red) — no
-  // macOS-rendered PNG is committed here. The BEHAVIORAL coverage (runtime
-  // type-switching, @click, :plugins, tooltip slot) lives in chart.spec.ts and
-  // is NOT baseline-gated.
+  // D-10 all 6 targets diff against the SAME shared `ChartScreenshot.png` (blessed
+  // 2026-06-08, Linux-Docker, all 6 verified non-update). The BEHAVIORAL coverage
+  // (runtime type-switching, @click, :plugins, tooltip slot) lives in chart.spec.ts
+  // and is NOT baseline-gated.
   //
   // Phase 33 (reactive-portal-slots) — TipTapNodeViewScreenshot is the content-
   // STABLE pixel cell for the REACTIVE nodeView portal slot. `TipTapNodeView
@@ -253,17 +251,17 @@ const EXAMPLES = [
   // gated.
   'TipTapNodeViewScreenshot',
   //
-  // ⚠ FLAGGED (2026-06-05, owner to debug): the FIRST Linux-Docker baseline regen
-  // captured the line + bar cells with AXES drawn but the DATA SERIES not yet
-  // painted (the doughnut completed) — a per-target on-load render-timing
-  // discrepancy the owner confirms predates this port (the old LineChart demo had
-  // it too). The settle-poll below was hardened (shadow-DOM-piercing + a
-  // saturated/"colored" pixel gate so axes-only no longer satisfies it), which
-  // renders all three cells correctly LOCALLY, but the cross-target first-paint
-  // discrepancy is a separate engine-wrapper issue to resolve before a shared
-  // baseline is blessed. Deliberately left baseline-gated (no flaky PNG shipped,
-  // per feedback_vr_linux_baselines + the canvas-VR fallback clause). See
-  // .planning/todos/pending/chartjs-onload-render-discrepancy.md.
+  // RESOLVED 2026-06-08: the line + bar cells previously captured with AXES but no
+  // DATA SERIES (doughnut fine) was NOT a first-paint/ResizeObserver timing issue —
+  // it was a real Chart wrapper bug. The data `$watch` was `{ immediate: true }`; on
+  // React/Lit/Solid that immediate watch runs AFTER `$onMount` (vs before on
+  // Vue/Angular, where instance is still null), and with identity-`$snapshot` +
+  // Chart.js storing config.data by reference, `instance.data === $props.data ===
+  // next`, so the reconcile's `live.labels.length = 0` emptied the SHARED labels
+  // array before reading it → cartesian charts lost their category axis and rendered
+  // empty (the radial doughnut survived). Fixed with an aliasing guard in
+  // Chart.rozie (`if (live === next) { instance.update(...); return }`). All 3 charts
+  // now render with data on all 6 targets; baseline blessed + non-update verified.
   'ChartScreenshot',
   // Phase 35 (maplibre) — MapLibreScreenshot is the content-STABLE WebGL-map
   // SCREENSHOT cell. `MapLibreScreenshotDemo.rozie` renders a single map painted
