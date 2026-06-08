@@ -37,6 +37,9 @@ importers:
 
   docs:
     devDependencies:
+      '@rozie-ui/cropper-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/cropper/packages/vue
       '@rozie/core':
         specifier: workspace:*
         version: link:../packages/core
@@ -49,6 +52,9 @@ importers:
       chart.js:
         specifier: ^4.5.1
         version: 4.5.1
+      cropperjs:
+        specifier: ^1.6.2
+        version: 1.6.2
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13

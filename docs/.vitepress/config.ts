@@ -157,6 +157,7 @@ export default defineConfig({
           items: [
             { text: 'Cropper — showcase & API', link: '/guide/cropper' },
             { text: 'Cropper libraries comparison', link: '/guide/cropper-comparison' },
+            { text: 'Cropper — live demo', link: '/guide/cropper-demo' },
           ],
         },
       ],
