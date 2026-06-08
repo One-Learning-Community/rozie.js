@@ -152,6 +152,13 @@ export default defineConfig({
             { text: 'MapLibre libraries comparison', link: '/guide/maplibre-comparison' },
           ],
         },
+        {
+          text: '@rozie-ui/cropper',
+          items: [
+            { text: 'Cropper — showcase & API', link: '/guide/cropper' },
+            { text: 'Cropper libraries comparison', link: '/guide/cropper-comparison' },
+          ],
+        },
       ],
       '/compatibility': [
         {
