@@ -100,61 +100,90 @@
     </header>
     <main id="grid"></main>
     <script>
-      // Mirror of EXAMPLES in tests/visual-regression/host/main.ts. Add new
-      // examples here when they land in the canonical list. The build script
-      // (scripts/build-cells.mjs) copies this file to `dist/compare.html` so
-      // it's served at http://localhost:4180/compare.html alongside the
-      // single-target router at /index.html.
-      const EXAMPLES = [
-        'Counter',
-        'SearchInput',
-        'Dropdown',
-        'TodoList',
-        'Modal',
-        'TreeNode',
-        'Card',
-        'CardHeader',
-        'ModalConsumer',
-        'DynamicSlotName',
-        'LitScopedFillFirstpaint',
-        'PortalList',
-        'FullCalendar',
-        'LineChart',
-        'CodeMirror',
-        'PortalListStyled',
-        // Engine-wrapper demos (quick-task 260520-hus).
-        'SortableList',
-        // SortableList drag-between + Kanban-nesting demos (2026-05-25).
-        'SortableListPair',
-        'SortableListNested',
-        // SortableList showcase trio (2026-05-27, quick-task 260526-uj3).
-        'SortableListClone',
-        'SortableListFilter',
-        'SortableListShowcase',
-        'Flatpickr',
-        'LeafletMap',
-        'TipTap',
-        'Uppy',
-        'Table',
-        'ThemedButtonConsumer',
-        // Phase 15 — listener-side sibling producers (D-04 / D-05). Composed
-        // by ThemedButtonConsumer above, but each one is also a standalone
-        // producer worth inspecting in isolation when debugging fallthrough.
-        'ThemedButtonListenersManual',
-        'ThemedButtonAllManual',
-        // Phase 15 — ROnProbe (D-07). The bare `r-on` modifier probe.
-        // INTENTIONALLY not in the VR matrix (Lit's custom-element host has
-        // no `:host { display }` rule so the cell collapses to inline-zero),
-        // but the matrix host bootstraps it for /compare.html inspection.
-        'ROnProbe',
+      // Grouped mirror of EXAMPLES in tests/visual-regression/host/main.ts. Two
+      // optgroups: core framework/feature "Examples", and "Rozie UI Demos" — the
+      // shipped @rozie-ui engine-wrapper families (packages/ui/*). Add new entries
+      // to the right group when they land in the canonical list. The build script
+      // (scripts/build-cells.mjs) copies this file to `dist/compare.html` so it's
+      // served at http://localhost:4180/compare.html alongside the single-target
+      // router at /index.html.
+      const GROUPS = [
+        {
+          label: 'Examples',
+          items: [
+            'Counter',
+            'SearchInput',
+            'Dropdown',
+            'TodoList',
+            'Modal',
+            'TreeNode',
+            'Card',
+            'CardHeader',
+            'ModalConsumer',
+            'DynamicSlotName',
+            'LitScopedFillFirstpaint',
+            'PortalList',
+            'PortalListStyled',
+            'Table',
+            'ThemedButtonConsumer',
+            // Phase 15 — listener-side sibling producers (D-04 / D-05). Composed
+            // by ThemedButtonConsumer above, but each one is also a standalone
+            // producer worth inspecting in isolation when debugging fallthrough.
+            'ThemedButtonListenersManual',
+            'ThemedButtonAllManual',
+            // Phase 15 — ROnProbe (D-07). The bare `r-on` modifier probe.
+            // INTENTIONALLY not in the VR matrix (Lit's custom-element host has
+            // no `:host { display }` rule so the cell collapses to inline-zero),
+            // but the matrix host bootstraps it for /compare.html inspection.
+            'ROnProbe',
+            // Engine-wrapper EXAMPLES (not shipped @rozie-ui packages) — one-off
+            // spike/demo wrappers, kept under Examples rather than UI Demos.
+            'LeafletMap',
+            'Uppy',
+          ],
+        },
+        {
+          // The shipped @rozie-ui component families (packages/ui/*) — one Rozie
+          // source compiled to all six frameworks, side-by-side here.
+          label: 'Rozie UI Demos',
+          items: [
+            // sortable-list — base + drag-between/Kanban-nesting + showcase trio.
+            'SortableList',
+            'SortableListPair',
+            'SortableListNested',
+            'SortableListClone',
+            'SortableListFilter',
+            'SortableListShowcase',
+            // flatpickr
+            'Flatpickr',
+            // chartjs
+            'LineChart',
+            // codemirror
+            'CodeMirror',
+            // tiptap
+            'TipTap',
+            // fullcalendar
+            'FullCalendar',
+            // maplibre / cropper / pdf — newest families (added 2026-06-08).
+            'MapLibre',
+            'Cropper',
+            'PdfViewer',
+          ],
+        },
       ];
+      const EXAMPLES = GROUPS.flatMap((g) => g.items);
       const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
       const select = document.getElementById('ex-select');
-      for (const ex of EXAMPLES) {
-        const opt = document.createElement('option');
-        opt.value = ex; opt.textContent = ex;
-        select.appendChild(opt);
+      for (const group of GROUPS) {
+        const og = document.createElement('optgroup');
+        og.label = group.label;
+        for (const ex of group.items) {
+          const opt = document.createElement('option');
+          opt.value = ex; opt.textContent = ex;
+          og.appendChild(opt);
+        }
+        select.appendChild(og);
       }
 
       const stack = document.getElementById('ex-stack');
