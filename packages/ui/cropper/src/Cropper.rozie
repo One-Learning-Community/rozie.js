@@ -1,0 +1,274 @@
+<!--
+  Cropper.rozie — data-bound port of Cropper.js v1 (fengyuanchen/cropperjs@^1).
+
+  Cropper.js is the de-facto vanilla-JS image-cropping engine. Per-framework
+  wrappers are LOPSIDED: React has the deep, maintained `react-cropper`; Vue has
+  the older `vue-cropperjs`; but Angular, Svelte, Solid and Lit have nothing
+  comparable (thin, stale, or absent). ONE Rozie source ships six idiomatic
+  packages — so Angular/Svelte/Solid/Lit consumers get a category-leading cropper
+  for free. That market gap (React served, the rest stranded) is exactly what
+  Rozie's write-once-ship-six thesis exists to close.
+
+  WHY v1 (1.6.x) and not v2 (2.x / `latest`): Cropper.js v2 was rewritten as a
+  set of Web Components (<cropper-canvas>, <cropper-image>, …) with a completely
+  different API — it is already "cross-framework" via custom elements and would be
+  redundant to wrap (especially into Lit). v1's imperative `new Cropper(img, opts)`
+  class IS the agnostic vanilla engine Rozie liberates, and it is what the
+  competing wrappers (react-cropper) target. Pin `cropperjs@^1`.
+
+  Usage:
+
+    <Cropper
+      :src="$data.imageUrl"
+      r-model:data="$data.crop"     (two-way { x, y, width, height, rotate, scaleX, scaleY })
+      :aspect-ratio="16 / 9"
+      view-mode="1"
+      @crop="onCrop"
+    />
+
+  Consumers must import Cropper's CSS themselves (the .rozie <style> is scoped, so
+  it cannot ship the .cropper-* selectors — the engine builds its crop UI as
+  sibling DOM that never carries Rozie's [data-rozie-s-*] scope attribute). Either:
+    - `import 'cropperjs/dist/cropper.css'` at the app entry, or
+    - <link> the CDN copy in index.html.
+
+  KEY Cropper.js facts that drive this port:
+    - The engine attaches to an <img> element: `new Cropper(imgEl, options)`. It
+      hides the original <img> and builds its own canvas/crop-box overlay as
+      siblings. We render the <img> (ref="imageEl"), bind its :src, and construct
+      in $onMount. $refs.imageEl is read ONLY inside $onMount (ROZ123).
+    - COLLISION DISCIPLINE — this engine names things three dangerous ways:
+        · `crop` and `zoom` are BOTH emitted events AND instance methods. A bare
+          `crop`/`zoom` $expose verb collides with the same-named emit (ROZ121,
+          the TipTap focus/blur event⇄verb class). So the imperative crop/zoom are
+          exposed under collision-free names: `showCropBox` (→ instance.crop()),
+          `zoomTo`/`zoomBy` (→ instance.zoomTo / instance.zoom). No bare `crop`/
+          `zoom` verb is exposed.
+        · `data` is the lone two-way model prop, so the React emitter auto-
+          generates an internal `setData` setter — a `setData` $expose verb would
+          collide (ROZ524, the MapLibre setCenter/setZoom class). So NO `setData`
+          verb is exposed; consumers set the crop box via the two-way `data`
+          binding, and `getData` (read-only, no auto-gen clash) is exposed.
+    - Few options are runtime-reconcilable: v1 ships setters only for aspectRatio
+      (setAspectRatio), dragMode (setDragMode), the crop box (setData) and
+      enable/disable; the source (replace). Everything else is CONSTRUCTION-TIME —
+      applied once in buildCropper(), documented "set at construction" (the
+      Runtime-updatable? column in docs/guide/cropper.md is No for them). The
+      `options` passthrough covers any v1 option not surfaced as a first-class
+      prop (modal, restore, minCropBox*, wheelZoomRatio, …).
+    - Two-way `data`: the continuous `crop` event carries the live
+      { x, y, width, height, rotate, scaleX, scaleY }; we echo it into $model.data
+      and emit it. The reverse $watch is round-trip-guarded (sameData vs
+      getData()) so a consumer-driven setData → crop → $model.data → $watch loop
+      settles instead of oscillating.
+-->
+
+<rozie name="Cropper">
+
+<props>
+{
+  // image source — bound onto the <img> AND reconciled at runtime via replace().
+  src:              { type: String,  default: '' },
+  // two-way crop box { x, y, width, height, rotate, scaleX, scaleY }. Untyped (no
+  // `type:`) so it emits as `unknown` and `default: undefined` merges cleanly
+  // under the strict framework-typecheck harness (the MapLibre maxBounds idiom; a
+  // typed Object + default undefined would emit `T | undefined` and clash).
+  data:             { default: undefined, model: true },
+  // NaN aspectRatio = free ratio (Cropper's own sentinel). Runtime-reconciled via
+  // setAspectRatio().
+  aspectRatio:      { type: Number,  default: NaN },
+  // 0|1|2|3 — construction-time (v1 has no setViewMode).
+  viewMode:         { type: Number,  default: 0 },
+  // 'crop' | 'move' | 'none' — runtime-reconciled via setDragMode().
+  dragMode:         { type: String,  default: 'crop' },
+  // enable/disable the whole cropper — runtime-reconciled.
+  disabled:         { type: Boolean, default: false },
+  // construction-time interaction/appearance toggles (no v1 runtime setters).
+  guides:           { type: Boolean, default: true },
+  center:           { type: Boolean, default: true },
+  background:       { type: Boolean, default: true },
+  movable:          { type: Boolean, default: true },
+  rotatable:        { type: Boolean, default: true },
+  scalable:         { type: Boolean, default: true },
+  zoomable:         { type: Boolean, default: true },
+  zoomOnWheel:      { type: Boolean, default: true },
+  cropBoxMovable:   { type: Boolean, default: true },
+  cropBoxResizable: { type: Boolean, default: true },
+  autoCrop:         { type: Boolean, default: true },
+  autoCropArea:     { type: Number,  default: 0.8 },
+  responsive:       { type: Boolean, default: true },
+  // passthrough — spread into the Cropper constructor BEFORE the curated keys
+  // (explicit props win), so power users can set any v1 option not surfaced here.
+  options:          { type: Object,  default: () => ({}) },
+}
+</props>
+
+<script>
+// The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
+// would collide with the component name `Cropper` (the rozie `name`), which the
+// emitters declare as a local `Cropper` class/function across React/Solid/Lit
+// (TS2440 import-conflict + a cascade of "not newable" errors). MapLibre dodged
+// this for free (its import was `maplibregl` ≠ `MapLibre`); same-named single-word
+// engines must alias.
+import CropperEngine from 'cropperjs'
+
+// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
+// instance is the Cropper (whose strict Options/Data types the loosely-typed
+// .rozie props don't satisfy), and imgEl holds the <img> the engine attaches to
+// (queried from the ref'd container in $onMount). Both are the `let x = null`
+// idiom the engine-wrapper recipe relies on.
+let instance = null
+let imgEl = null
+
+// pure crop-box equality (rounded px + exact transform) — no sigils, safe at top
+// level. The round-trip guard that stops the setData→crop→$model.data→$watch loop.
+const sameData = (a, b) => {
+  if (!a || !b) return false
+  return (
+    Math.round(a.x) === Math.round(b.x) &&
+    Math.round(a.y) === Math.round(b.y) &&
+    Math.round(a.width) === Math.round(b.width) &&
+    Math.round(a.height) === Math.round(b.height) &&
+    a.rotate === b.rotate &&
+    a.scaleX === b.scaleX &&
+    a.scaleY === b.scaleY
+  )
+}
+
+// Construct (or, on a future option change, re-construct) the engine. The whole
+// options object is a null-let `any` so the constructor's 2nd arg is unchecked —
+// the event-callback `e` params (CustomEvent) would otherwise fail the strict
+// react/solid/lit tsc against Cropper's Options callback types (the MapLibre
+// mapOptions idiom). restoreData re-applies the crop box if we ever rebuild.
+const buildCropper = (restoreData) => {
+  let cfg = null
+  cfg = {
+    ...$snapshot($props.options),
+    aspectRatio: $props.aspectRatio,
+    viewMode: $props.viewMode,
+    dragMode: $props.dragMode,
+    guides: $props.guides,
+    center: $props.center,
+    background: $props.background,
+    movable: $props.movable,
+    rotatable: $props.rotatable,
+    scalable: $props.scalable,
+    zoomable: $props.zoomable,
+    zoomOnWheel: $props.zoomOnWheel,
+    cropBoxMovable: $props.cropBoxMovable,
+    cropBoxResizable: $props.cropBoxResizable,
+    autoCrop: $props.autoCrop,
+    autoCropArea: $props.autoCropArea,
+    responsive: $props.responsive,
+    ready: (e) => {
+      if (restoreData) instance.setData(restoreData)
+      else if ($props.data) instance.setData($snapshot($props.data))
+      if ($props.disabled) instance.disable()
+      $emit('ready')
+    },
+    cropstart: (e) => $emit('cropstart', { action: e.detail && e.detail.action }),
+    cropmove: (e) => $emit('cropmove', { action: e.detail && e.detail.action }),
+    cropend: (e) => $emit('cropend', { action: e.detail && e.detail.action }),
+    // continuous crop → emit + drive the two-way model (guarded reverse $watch).
+    crop: (e) => {
+      $emit('crop', e.detail)
+      if (e.detail) $model.data = e.detail
+    },
+    zoom: (e) =>
+      $emit('zoom', { ratio: e.detail && e.detail.ratio, oldRatio: e.detail && e.detail.oldRatio }),
+  }
+  instance = new CropperEngine(imgEl, cfg)
+}
+
+$onMount(() => {
+  // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
+  // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
+  // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
+  // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
+  // here (ROZ123).
+  imgEl = $refs.containerEl.querySelector('img')
+  buildCropper(null)
+  return () => {
+    if (instance) instance.destroy()
+  }
+})
+
+// ─── reconcile the runtime-reconcilable props (no rebuild) ───────────────────
+$watch(() => $props.src, (v) => {
+  if (instance && typeof v === 'string' && v) instance.replace(v)
+})
+$watch(() => $props.aspectRatio, (v) => {
+  if (instance) instance.setAspectRatio(v)
+})
+$watch(() => $props.dragMode, (v) => {
+  if (instance && typeof v === 'string') instance.setDragMode(v)
+})
+$watch(() => $props.disabled, (v) => {
+  if (!instance) return
+  if (v) instance.disable()
+  else instance.enable()
+})
+$watch(() => $props.data, (v) => {
+  if (!instance || !v) return
+  if (sameData(v, instance.getData())) return
+  instance.setData($snapshot(v))
+})
+
+// ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
+// 18 verbs, all collision-clear across the three classes documented at the top:
+// no bare `crop`/`zoom` (event⇄verb ROZ121 — exposed as showCropBox/zoomTo/zoomBy),
+// no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`), and
+// none match a Lit reserved lifecycle name (update/render/firstUpdated/updated/
+// willUpdate/requestUpdate).
+function getCropper() { return instance }
+function getData() { return instance ? instance.getData() : null }
+function getCroppedCanvas(opts) { return instance ? instance.getCroppedCanvas(opts) : null }
+function getCroppedDataURL(opts) {
+  if (!instance) return null
+  const canvas = instance.getCroppedCanvas(opts)
+  return canvas ? canvas.toDataURL() : null
+}
+function reset() { if (instance) instance.reset() }
+function clear() { if (instance) instance.clear() }
+function showCropBox() { if (instance) instance.crop() }
+function replace(url) { if (instance) instance.replace(url) }
+function rotateTo(deg) { if (instance) instance.rotateTo(deg) }
+function rotateBy(deg) { if (instance) instance.rotate(deg) }
+function zoomTo(ratio) { if (instance) instance.zoomTo(ratio) }
+function zoomBy(ratio) { if (instance) instance.zoom(ratio) }
+function scaleX(n) { if (instance) instance.scaleX(n) }
+function scaleY(n) { if (instance) instance.scaleY(n) }
+function enable() { if (instance) instance.enable() }
+function disable() { if (instance) instance.disable() }
+function setAspectRatio(ratio) { if (instance) instance.setAspectRatio(ratio) }
+function setDragMode(mode) { if (instance) instance.setDragMode(mode) }
+
+$expose({
+  getCropper, getData, getCroppedCanvas, getCroppedDataURL,
+  reset, clear, showCropBox, replace,
+  rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY,
+  enable, disable, setAspectRatio, setDragMode,
+})
+</script>
+
+<template>
+<div class="rozie-cropper" ref="containerEl">
+  <img class="rozie-cropper-img" :src="$props.src" alt="" />
+</div>
+</template>
+
+<style>
+.rozie-cropper {
+  max-width: 100%;
+}
+/* Cropper.js requires the target <img> to be block-level and width-constrained;
+   the engine then hides it and builds its .cropper-* overlay (styled by the
+   consumer-imported cropperjs/dist/cropper.css — the scoped .rozie <style> cannot
+   reach that engine-created DOM). */
+.rozie-cropper-img {
+  display: block;
+  max-width: 100%;
+}
+</style>
+
+</rozie>

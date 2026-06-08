@@ -1,0 +1,313 @@
+import { LitElement, css, html } from 'lit';
+import { customElement, property, query } from 'lit/decorators.js';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
+import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+// The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
+// would collide with the component name `Cropper` (the rozie `name`), which the
+// emitters declare as a local `Cropper` class/function across React/Solid/Lit
+// (TS2440 import-conflict + a cascade of "not newable" errors). MapLibre dodged
+// this for free (its import was `maplibregl` ≠ `MapLibre`); same-named single-word
+// engines must alias.
+import CropperEngine from 'cropperjs';
+
+// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
+// instance is the Cropper (whose strict Options/Data types the loosely-typed
+// .rozie props don't satisfy), and imgEl holds the <img> the engine attaches to
+// (queried from the ref'd container in $onMount). Both are the `let x = null`
+// idiom the engine-wrapper recipe relies on.
+
+@customElement('rozie-cropper')
+export default class Cropper extends SignalWatcher(LitElement) {
+  static styles = css`
+.rozie-cropper[data-rozie-s-cddf3b42] {
+  max-width: 100%;
+}
+.rozie-cropper-img[data-rozie-s-cddf3b42] {
+  display: block;
+  max-width: 100%;
+}
+`;
+
+  @property({ type: String, reflect: true }) src: string = '';
+  @property({ type: Object, attribute: 'data' }) _data_attr: unknown = undefined;
+  private _dataControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'data-change', defaultValue: undefined, initialControlledValue: undefined });
+  @property({ type: Number, reflect: true }) aspectRatio: number = NaN;
+  @property({ type: Number, reflect: true }) viewMode: number = 0;
+  @property({ type: String, reflect: true }) dragMode: string = 'crop';
+  @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  @property({ type: Boolean, reflect: true }) guides: boolean = true;
+  @property({ type: Boolean, reflect: true }) center: boolean = true;
+  @property({ type: Boolean, reflect: true }) background: boolean = true;
+  @property({ type: Boolean, reflect: true }) movable: boolean = true;
+  @property({ type: Boolean, reflect: true }) rotatable: boolean = true;
+  @property({ type: Boolean, reflect: true }) scalable: boolean = true;
+  @property({ type: Boolean, reflect: true }) zoomable: boolean = true;
+  @property({ type: Boolean, reflect: true }) zoomOnWheel: boolean = true;
+  @property({ type: Boolean, reflect: true }) cropBoxMovable: boolean = true;
+  @property({ type: Boolean, reflect: true }) cropBoxResizable: boolean = true;
+  @property({ type: Boolean, reflect: true }) autoCrop: boolean = true;
+  @property({ type: Number, reflect: true }) autoCropArea: number = 0.8;
+  @property({ type: Boolean, reflect: true }) responsive: boolean = true;
+  @property({ type: Object }) options: any = {};
+  @query('[data-rozie-ref="containerEl"]') private _refContainerEl!: HTMLElement;
+private __rozieWatchInitial_4 = true;
+private __rozieFirstUpdateDone = false;
+
+  private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
+
+  firstUpdated(): void {
+    this._disconnectCleanups.push((() => {
+      if (this.instance) this.instance.destroy();
+    }));
+
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.data)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
+      if (!this.instance || !v) return;
+      if (this.sameData(v, this.instance.getData())) return;
+      this.instance.setData(v);
+    })(__watchVal); }); }));
+
+    // The ref lives on the CONTAINER div (the React emitter types a `div` ref as
+    // HTMLDivElement but falls back to HTMLElement for an `img` ref — an
+    // HTMLImageElement ref mismatch under strict tsc). Query the <img> from the
+    // ref'd container instead of ref-ing the <img> directly. $refs is read ONLY
+    // here (ROZ123).
+    this.imgEl = this._refContainerEl.querySelector('img');
+    this.buildCropper(null);
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('src'))) { const __watchVal = (() => this.src)(); ((v: any) => {
+      if (this.instance && typeof v === 'string' && v) this.instance.replace(v);
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('aspectRatio'))) { const __watchVal = (() => this.aspectRatio)(); ((v: any) => {
+      if (this.instance) this.instance.setAspectRatio(v);
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('dragMode'))) { const __watchVal = (() => this.dragMode)(); ((v: any) => {
+      if (this.instance && typeof v === 'string') this.instance.setDragMode(v);
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => {
+      if (!this.instance) return;
+      if (v) this.instance.disable();else this.instance.enable();
+    })(__watchVal); }
+    this.__rozieFirstUpdateDone = true;
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
+  }
+
+  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    super.attributeChangedCallback(name, old, value);
+    if (name === 'data') this._dataControllable.notifyAttributeChange(value as unknown as unknown);
+  }
+
+  render() {
+    return html`
+<div class="rozie-cropper" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="containerEl" data-rozie-s-cddf3b42>
+  <img class="rozie-cropper-img" src=${this.src} alt="" data-rozie-s-cddf3b42 />
+</div>
+`;
+  }
+
+  instance: any = null;
+
+  imgEl: any = null;
+
+  sameData = (a: any, b: any) => {
+  if (!a || !b) return false;
+  return Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height) && a.rotate === b.rotate && a.scaleX === b.scaleX && a.scaleY === b.scaleY;
+};
+
+  buildCropper = (restoreData: any) => {
+  let cfg: any = null;
+  cfg = {
+    ...this.options,
+    aspectRatio: this.aspectRatio,
+    viewMode: this.viewMode,
+    dragMode: this.dragMode,
+    guides: this.guides,
+    center: this.center,
+    background: this.background,
+    movable: this.movable,
+    rotatable: this.rotatable,
+    scalable: this.scalable,
+    zoomable: this.zoomable,
+    zoomOnWheel: this.zoomOnWheel,
+    cropBoxMovable: this.cropBoxMovable,
+    cropBoxResizable: this.cropBoxResizable,
+    autoCrop: this.autoCrop,
+    autoCropArea: this.autoCropArea,
+    responsive: this.responsive,
+    ready: (e: any) => {
+      if (restoreData) this.instance.setData(restoreData);else if (this.data) this.instance.setData(this.data);
+      if (this.disabled) this.instance.disable();
+      this.dispatchEvent(new CustomEvent("ready", {
+        detail: undefined,
+        bubbles: true,
+        composed: true
+      }));
+    },
+    cropstart: (e: any) => this.dispatchEvent(new CustomEvent("cropstart", {
+      detail: {
+        action: e.detail && e.detail.action
+      },
+      bubbles: true,
+      composed: true
+    })),
+    cropmove: (e: any) => this.dispatchEvent(new CustomEvent("cropmove", {
+      detail: {
+        action: e.detail && e.detail.action
+      },
+      bubbles: true,
+      composed: true
+    })),
+    cropend: (e: any) => this.dispatchEvent(new CustomEvent("cropend", {
+      detail: {
+        action: e.detail && e.detail.action
+      },
+      bubbles: true,
+      composed: true
+    })),
+    // continuous crop → emit + drive the two-way model (guarded reverse $watch).
+    crop: (e: any) => {
+      this.dispatchEvent(new CustomEvent("crop", {
+        detail: e.detail,
+        bubbles: true,
+        composed: true
+      }));
+      if (e.detail) this._dataControllable.write(e.detail);
+    },
+    zoom: (e: any) => this.dispatchEvent(new CustomEvent("zoom", {
+      detail: {
+        ratio: e.detail && e.detail.ratio,
+        oldRatio: e.detail && e.detail.oldRatio
+      },
+      bubbles: true,
+      composed: true
+    }))
+  };
+  this.instance = new CropperEngine(this.imgEl, cfg);
+};
+
+  getCropper() {
+    return this.instance;
+  }
+
+  getData() {
+    return this.instance ? this.instance.getData() : null;
+  }
+
+  getCroppedCanvas(opts: any) {
+    return this.instance ? this.instance.getCroppedCanvas(opts) : null;
+  }
+
+  getCroppedDataURL(opts: any) {
+    if (!this.instance) return null;
+    const canvas = this.instance.getCroppedCanvas(opts);
+    return canvas ? canvas.toDataURL() : null;
+  }
+
+  reset() {
+    if (this.instance) this.instance.reset();
+  }
+
+  clear() {
+    if (this.instance) this.instance.clear();
+  }
+
+  showCropBox() {
+    if (this.instance) this.instance.crop();
+  }
+
+  replace(url: any) {
+    if (this.instance) this.instance.replace(url);
+  }
+
+  rotateTo(deg: any) {
+    if (this.instance) this.instance.rotateTo(deg);
+  }
+
+  rotateBy(deg: any) {
+    if (this.instance) this.instance.rotate(deg);
+  }
+
+  zoomTo(ratio: any) {
+    if (this.instance) this.instance.zoomTo(ratio);
+  }
+
+  zoomBy(ratio: any) {
+    if (this.instance) this.instance.zoom(ratio);
+  }
+
+  scaleX(n: any) {
+    if (this.instance) this.instance.scaleX(n);
+  }
+
+  scaleY(n: any) {
+    if (this.instance) this.instance.scaleY(n);
+  }
+
+  enable() {
+    if (this.instance) this.instance.enable();
+  }
+
+  disable() {
+    if (this.instance) this.instance.disable();
+  }
+
+  setAspectRatio(ratio: any) {
+    if (this.instance) this.instance.setAspectRatio(ratio);
+  }
+
+  setDragMode(mode: any) {
+    if (this.instance) this.instance.setDragMode(mode);
+  }
+
+  get data(): unknown { return this._dataControllable.read(); }
+  set data(v: unknown) { this._dataControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   *
+   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered
+   * out so `$attrs` returns "rest after declared props" (semantic parity
+   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
+   * forms are folded into the skip set: kebab-case for model props
+   * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   */
+  private get $attrs(): Record<string, string> {
+    const __skip = new Set<string>(['src', 'data', 'aspect-ratio', 'aspectratio', 'view-mode', 'viewmode', 'drag-mode', 'dragmode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoom-on-wheel', 'zoomonwheel', 'crop-box-movable', 'cropboxmovable', 'crop-box-resizable', 'cropboxresizable', 'auto-crop', 'autocrop', 'auto-crop-area', 'autocroparea', 'responsive', 'options']);
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) {
+      if (__skip.has(a.name)) continue;
+      out[a.name] = a.value;
+    }
+    return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
+  }
+}

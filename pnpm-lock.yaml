@@ -1853,6 +1853,106 @@ importers:
         specifier: ^3.4
         version: 3.5.33(typescript@5.9.3)
 
+  packages/ui/cropper:
+    devDependencies:
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../core
+      cropperjs:
+        specifier: ^1.6.2
+        version: 1.6.2
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+
+  packages/ui/cropper/packages/angular:
+    dependencies:
+      '@angular/common':
+        specifier: ^19 || ^20 || ^21
+        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: ^19 || ^20 || ^21
+        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+
+  packages/ui/cropper/packages/lit:
+    dependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@preact/signals-core':
+        specifier: ^1.3.0
+        version: 1.14.2
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../../../runtime/lit
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+      lit:
+        specifier: ^3
+        version: 3.3.2
+
+  packages/ui/cropper/packages/react:
+    dependencies:
+      '@rozie/runtime-react':
+        specifier: workspace:*
+        version: link:../../../../runtime/react
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+      react:
+        specifier: ^18.2 || ^19
+        version: 19.2.6
+      react-dom:
+        specifier: ^18.2 || ^19
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/react':
+        specifier: ^18
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18
+        version: 18.3.7(@types/react@18.3.28)
+
+  packages/ui/cropper/packages/solid:
+    dependencies:
+      '@rozie/runtime-solid':
+        specifier: workspace:*
+        version: link:../../../../runtime/solid
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+      solid-js:
+        specifier: ^1.8
+        version: 1.9.12
+
+  packages/ui/cropper/packages/svelte:
+    dependencies:
+      '@rozie/runtime-svelte':
+        specifier: workspace:*
+        version: link:../../../../runtime/svelte
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+      svelte:
+        specifier: ^5
+        version: 5.55.5(@typescript-eslint/types@8.59.2)
+
+  packages/ui/cropper/packages/vue:
+    dependencies:
+      cropperjs:
+        specifier: ^1
+        version: 1.6.2
+      vue:
+        specifier: ^3.4
+        version: 3.5.33(typescript@5.9.3)
+
   packages/ui/flatpickr:
     devDependencies:
       '@rozie/core':
@@ -8589,6 +8689,9 @@ packages:
 
   crelt@1.0.6:
     resolution: {integrity: sha512-VQ2MBenTq1fWZUH9DJNGti7kKv6EeAuYr3cLwxUWhIu1baTaXh4Ib5W2CqHVqib4/MqbYGJqiL3Zb8GJZr3l4g==}
+
+  cropperjs@1.6.2:
+    resolution: {integrity: sha512-nhymn9GdnV3CqiEHJVai54TULFAE3VshJTXSqSJKa8yXAKyBKDWdhHarnlIPrshJ0WMFTGuFvG02YjLXfPiuOA==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -19169,6 +19272,8 @@ snapshots:
       typescript: 5.9.3
 
   crelt@1.0.6: {}
+
+  cropperjs@1.6.2: {}
 
   cross-spawn@7.0.6:
     dependencies:
