@@ -479,6 +479,169 @@ function tryWrapEscapingConstUseMemo(
 }
 
 /**
+ * Member-mutating instance methods. A call `X.<m>(...)` where `<m>` is one of
+ * these MUTATES the instance `X` (rather than reading from it — `.has`/`.get`/
+ * `.map`/`.size` are reads and deliberately excluded). Used by
+ * `collectMutatedInstanceBinders` to distinguish a cross-render scratch binder
+ * (must persist) from a read-only one.
+ */
+const MUTATING_INSTANCE_METHODS = new Set<string>([
+  // Set / Map
+  'add', 'set', 'delete', 'clear',
+  // Array
+  'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin',
+]);
+
+/** A `new X()`, `[...]`, or `{...}` initializer — a freshly-built mutable instance. */
+function isFreshMutableInstanceInit(init: t.Expression): boolean {
+  return t.isNewExpression(init) || t.isArrayExpression(init) || t.isObjectExpression(init);
+}
+
+/** Root identifier name of a (possibly nested) MemberExpression: `X.a.b`/`X[k]` → `X`. */
+function memberRootName(node: t.Node): string | null {
+  let cur: t.Node = node;
+  while (t.isMemberExpression(cur) || t.isOptionalMemberExpression(cur)) {
+    cur = cur.object;
+  }
+  return t.isIdentifier(cur) ? cur.name : null;
+}
+
+/**
+ * Phase 35 follow-up (feedback_react_const_mutinstance_not_stabilized) —
+ * collect the names of top-level `const`/`let` binders whose initializer is a
+ * freshly-constructed MUTABLE INSTANCE (`new X()`, `[...]`, `{...}`) AND which
+ * are MEMBER-MUTATED somewhere in the component (`X.add(...)`, `X.set(...)`,
+ * `X.push(...)`, `X.delete(...)`, `X[k] = …`, `X.foo++`, `delete X[k]`).
+ *
+ * Such a binder is cross-render scratch state in the author's setup-once mental
+ * model: the 5 setup-once targets run `<script>` ONCE so the instance persists,
+ * but React re-runs the component body every render, re-creating the instance
+ * and silently resetting the state. CodeMirrorDemo's `const gutterSeen = new
+ * Set()` dedupe guard is the canonical case — re-created every render →
+ * `markGutterMount` always re-increments `$data` (the guard never deduplicates)
+ * → render side-effect → re-render → infinite loop → 30s VR hang. Wrapping the
+ * binder in `useMemo(() => init, [])` restores per-instance setup-once identity
+ * (the const-analog of the reassigned-`let`→`useRef` hoist in `hoistModuleLet`,
+ * but useMemo keeps the binder name so reads/mutations need no `.current`
+ * rewrite).
+ *
+ * Conservatism, two gates:
+ *   - init-shape: only `new`/array/object literals — a pure derived `const total
+ *     = a + b` is never a fresh-instance init, so it is never frozen.
+ *   - member-mutation: the binder must actually be mutated; a read-only fresh
+ *     instance is left alone (its identity churn is harmless).
+ *
+ * `let` binders that are also REASSIGNED (`X = …`, a bare-identifier write) are
+ * excluded — useMemo cannot model reassignment; those are the `hoistModuleLet`
+ * → `useRef` case (already handled when they escape into a lifecycle hook).
+ */
+function collectMutatedInstanceBinders(program: t.File): Set<string> {
+  // 1. Candidate binders: top-level single-name const/let with a fresh-instance init.
+  const candidates = new Set<string>();
+  for (const stmt of program.program.body) {
+    if (!t.isVariableDeclaration(stmt)) continue;
+    if (stmt.kind !== 'const' && stmt.kind !== 'let') continue;
+    for (const d of stmt.declarations) {
+      if (!t.isIdentifier(d.id)) continue;
+      if (!d.init) continue;
+      if (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init)) continue;
+      if (!isFreshMutableInstanceInit(d.init)) continue;
+      candidates.add(d.id.name);
+    }
+  }
+  if (candidates.size === 0) return candidates;
+
+  // 2. Walk the whole program. Record member-mutations (→ mutated) and bare
+  //    reassignments (→ reassigned, which disqualify a `let`).
+  const mutated = new Set<string>();
+  const reassigned = new Set<string>();
+  traverse(program, {
+    AssignmentExpression(path) {
+      const left = path.node.left;
+      if (t.isIdentifier(left)) {
+        if (candidates.has(left.name)) reassigned.add(left.name);
+        return;
+      }
+      if (t.isMemberExpression(left)) {
+        const r = memberRootName(left);
+        if (r && candidates.has(r)) mutated.add(r);
+      }
+    },
+    UpdateExpression(path) {
+      const arg = path.node.argument;
+      if (t.isIdentifier(arg)) {
+        if (candidates.has(arg.name)) reassigned.add(arg.name);
+        return;
+      }
+      if (t.isMemberExpression(arg)) {
+        const r = memberRootName(arg);
+        if (r && candidates.has(r)) mutated.add(r);
+      }
+    },
+    UnaryExpression(path) {
+      if (path.node.operator !== 'delete') return;
+      const arg = path.node.argument;
+      if (t.isMemberExpression(arg)) {
+        const r = memberRootName(arg);
+        if (r && candidates.has(r)) mutated.add(r);
+      }
+    },
+    CallExpression(path) {
+      const callee = path.node.callee;
+      if (!t.isMemberExpression(callee) || callee.computed) return;
+      if (!t.isIdentifier(callee.property)) return;
+      if (!MUTATING_INSTANCE_METHODS.has(callee.property.name)) return;
+      if (!t.isIdentifier(callee.object)) return;
+      if (candidates.has(callee.object.name)) mutated.add(callee.object.name);
+    },
+  });
+
+  // Member-mutated AND not bare-reassigned (consts can never be reassigned).
+  const result = new Set<string>();
+  for (const name of mutated) {
+    if (!reassigned.has(name)) result.add(name);
+  }
+  return result;
+}
+
+/**
+ * Phase 35 follow-up — wrap a top-level member-mutated fresh-instance
+ * `const`/`let X = init` in `useMemo(() => init, [])` so the instance is built
+ * ONCE per component instance (setup-once parity). Companion detection lives in
+ * `collectMutatedInstanceBinders`. Returns the rendered line, or null when the
+ * binder isn't a stabilization target.
+ *
+ * Distinct from `tryWrapEscapingConstUseMemo`: that wraps a const that escapes
+ * into a useEffect dep array, keyed on its real reactive deps (`[...initDeps]`).
+ * This wraps cross-render MUTABLE STATE, which must NEVER be re-created — hence
+ * the empty `[]` dep array regardless of what the init reads (matching the
+ * setup-once targets, which capture init values once and never re-read them).
+ * Runs FIRST in the loop so a binder that is both escaping and mutated gets the
+ * stable `[]` identity.
+ */
+function tryWrapMutatedInstanceUseMemo(
+  stmt: t.Statement,
+  mutatedInstanceNames: ReadonlySet<string>,
+  collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
+): string | null {
+  if (!t.isVariableDeclaration(stmt)) return null;
+  if (stmt.kind !== 'const' && stmt.kind !== 'let') return null;
+  if (stmt.declarations.length !== 1) return null;
+  const decl = stmt.declarations[0]!;
+  if (!t.isIdentifier(decl.id)) return null;
+  const init = decl.init;
+  if (!init) return null;
+  if (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init)) return null;
+  if (!mutatedInstanceNames.has(decl.id.name)) return null;
+
+  collectors.react.add('useMemo');
+  // Preserve an author declarator annotation (`const seen: Set<string> = …`):
+  // `useMemo(() => new Set(), [])` would otherwise infer `Set<unknown>`.
+  const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
+  return `const ${decl.id.name}${declTypeSuffix} = useMemo(${arrowBody(init)}, []);`;
+}
+
+/**
  * Find all distinct `props.onX` names that appear in CALL position inside
  * `body`. Returns the set of names (without the `on` prefix? no — keep raw
  * since the destructure binds the same name, e.g. `const { onClose } = props`).
@@ -2459,6 +2622,14 @@ export function emitScript(
     }
   }
 
+  // 6a'. Phase 35 follow-up (feedback_react_const_mutinstance_not_stabilized) —
+  // collect top-level fresh-instance const/let binders that are member-mutated
+  // (cross-render scratch state, e.g. CodeMirrorDemo's `const gutterSeen = new
+  // Set()` dedupe guard). These must persist per-instance like the setup-once
+  // targets; without stabilization React re-creates them every render and the
+  // guard resets → render side-effects re-fire → infinite re-render → VR hang.
+  const mutatedInstanceNames = collectMutatedInstanceBinders(cloned);
+
   // 6b. Helper-name pre-scan (`allHelperNames` / `helperLocByName`) is built
   // earlier — hoisted above the lifecycle + watcher loops in Round 4 of
   // 260519 linechart-watch-recreate so the watcher loop's callback-body walk
@@ -2545,6 +2716,21 @@ export function emitScript(
       if (t.isIdentifier(callee) && callee.name === '$expose') {
         continue;
       }
+    }
+
+    // Phase 35 follow-up — member-mutated fresh-instance binder → useMemo(()=>init,[]).
+    // Runs FIRST so a binder that is BOTH escaping and mutated gets the stable
+    // `[]` identity (cross-render mutable state must never be re-created),
+    // rather than the reactive-deps `[...]` from tryWrapEscapingConstUseMemo.
+    const mutMemoWrapped = tryWrapMutatedInstanceUseMemo(
+      stmt,
+      mutatedInstanceNames,
+      collectors,
+    );
+    if (mutMemoWrapped) {
+      userArrowsLines.push(mutMemoWrapped);
+      // String output (like the other wraps) — excluded from mappableStmts.
+      continue;
     }
 
     // Try the useCallback escape-wrap first; falls back to function-decl
