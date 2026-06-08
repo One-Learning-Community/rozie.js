@@ -1,0 +1,132 @@
+<!--
+  PdfViewerDemo.rozie — BEHAVIORAL consumer for the PdfViewer wrapper.
+
+  Drives @rozie-ui/pdf (PDF.js, pdfjs-dist v6) across all 6 targets
+  (pdf.spec.ts). Network-free + canvas-rendered, so it is the BEHAVIORAL cell
+  only — there is no screenshot cell (pdfjs renders to a <canvas>, the same
+  canvas-VR class as chartjs/maplibre where cross-emit byte-identity won't hold,
+  and the worker/standard-font CDN can't load in Docker; behavioral 6/6 is the
+  real coverage).
+
+    - :worker-src is a Vite-BUNDLED worker (a static `?url` import of
+      pdfjs-dist/build/pdf.worker.min.mjs), NOT the wrapper's default CDN —
+      Docker/CI has NO network, and the worker is the #1 PDF.js integration
+      friction (GlobalWorkerOptions.workerSrc must resolve before getDocument).
+      The `?url` form (vs `new URL(..., import.meta.url)`) bundles AND
+      AOT-compiles cleanly on Angular too.
+    - :src is a self-contained 3-page PDF as a base64 data URL (copied verbatim
+      from docs/guide/pdf-demo.md) — network-free, so getDocument decodes bytes
+      with no asset server.
+    - @load echoes {numPages} into $data.total (the doc-loaded readout) — proves
+      the $onMount → dynamic-import('pdfjs-dist') → getDocument path booted.
+    - r-model:page two-way binds the current page to $data.page; the page readout
+      shows it. A "Next" button mutates $data.page DIRECTLY (the two-way model
+      write, NOT the $expose handle) — the write flows into the wrapper →
+      $watch($props.page) → $data.current → renderView + the $model.page echo, so
+      the readout advances. Driven via $data (cropper/maplibre precedent) so it is
+      uniform across all 6 — an Angular child-component ref resolves to the host
+      element, not the instance, so a handle-driven Next would no-op there. The
+      $expose handle (nextPage/zoomIn/…) is covered structurally + in the docs.
+    - standardFontDataUrl is left at its default; offline (Docker) it can't load,
+      so glyphs may fall back — fine, the spec asserts a .textLayer span exists
+      (selectable text present), not its exact glyphs.
+
+  No screenshot stabilization — this is the behavioral cell, full stop.
+-->
+
+<rozie name="PdfViewerDemo">
+
+<components>
+{
+  PdfViewer: '../../packages/ui/pdf/src/PdfViewer.rozie',
+}
+</components>
+
+<data>
+{
+  page: 1,
+  total: 0,
+}
+</data>
+
+<script>
+// Bundle the PDF.js worker locally — Docker/CI has NO network, so the wrapper's
+// default CDN workerSrc would fail. A static `?url` import (Vite resolves it at
+// transform time to a hashed bundled asset) instead of `new URL(...,
+// import.meta.url)`: the latter is left unresolved by the Angular (analogjs) AOT
+// pipeline AND its `import.meta.url` trips ngtsc into a JIT fallback. The `?url`
+// form bundles + AOT-compiles cleanly on all 6 targets.
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+// A self-contained 3-page PDF (base64 data URL) — network-free. Copied verbatim
+// from docs/guide/pdf-demo.md.
+const SAMPLE = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbNCAwIFIgNSAwIFIgNiAwIFJdL0NvdW50IDM+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKNCAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA2MTIgNzkyXS9SZXNvdXJjZXM8PC9Gb250PDwvRjEgMyAwIFI+Pj4+L0NvbnRlbnRzIDcgMCBSPj4KZW5kb2JqCjUgMCBvYmoKPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0vUmVzb3VyY2VzPDwvRm9udDw8L0YxIDMgMCBSPj4+Pi9Db250ZW50cyA4IDAgUj4+CmVuZG9iago2IDAgb2JqCjw8L1R5cGUvUGFnZS9QYXJlbnQgMiAwIFIvTWVkaWFCb3hbMCAwIDYxMiA3OTJdL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSAzIDAgUj4+Pj4vQ29udGVudHMgOSAwIFI+PgplbmRvYmoKNyAwIG9iago8PC9MZW5ndGggMTI3Pj4Kc3RyZWFtCkJUIC9GMSAyOCBUZiA2MCA3MDAgVGQgKFJvemllIFBERiB2aWV3ZXIgIC0gIHBhZ2UgMSkgVGogMCAtNDAgVGQgL0YxIDE0IFRmIChUaGUgcXVpY2sgYnJvd24gZm94IGp1bXBzIG92ZXIgdGhlIGxhenkgZG9nLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago4IDAgb2JqCjw8L0xlbmd0aCAxMzc+PgpzdHJlYW0KQlQgL0YxIDI4IFRmIDYwIDcwMCBUZCAoT25lIHNvdXJjZSwgc2l4IGZyYW1ld29ya3MgIC0gIHBhZ2UgMikgVGogMCAtNDAgVGQgL0YxIDE0IFRmIChUaGUgcXVpY2sgYnJvd24gZm94IGp1bXBzIG92ZXIgdGhlIGxhenkgZG9nLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago5IDAgb2JqCjw8L0xlbmd0aCAxNDU+PgpzdHJlYW0KQlQgL0YxIDI4IFRmIDYwIDcwMCBUZCAoU2VsZWN0YWJsZSB0ZXh0IHZpYSB0aGUgdGV4dCBsYXllciAgLSAgcGFnZSAzKSBUaiAwIC00MCBUZCAvRjEgMTQgVGYgKFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2cuKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCAxMAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1NCAwMDAwMCBuIAowMDAwMDAwMTE3IDAwMDAwIG4gCjAwMDAwMDAxODAgMDAwMDAgbiAKMDAwMDAwMDI5MiAwMDAwMCBuIAowMDAwMDAwNDA0IDAwMDAwIG4gCjAwMDAwMDA1MTYgMDAwMDAgbiAKMDAwMDAwMDY5MiAwMDAwMCBuIAowMDAwMDAwODc4IDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSAxMC9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjEwNzIKJSVFT0Y='
+
+// Advance the page via the two-way `page` model (NOT the $expose handle, so it is
+// uniform across all 6 — see the header note about Angular's child-component ref).
+const next = () => { $data.page = $data.page + 1 }
+
+// @load handler — robust to Lit's web-component event model. On Vue/React/Solid/
+// Svelte/Angular the emit payload arrives as the handler arg directly
+// (`e.numPages`); on Lit the consumer's `@load` is a native listener on the
+// custom element, so it receives the DOM CustomEvent and the payload is under
+// `e.detail`. Reading `e.detail.numPages ?? e.numPages` covers both — the
+// documented Lit consumer-event divergence (CLAUDE.md "documented edge cases").
+const onLoad = (e) => {
+  const n = e && e.detail && typeof e.detail.numPages === 'number' ? e.detail.numPages : e.numPages
+  $data.total = n
+}
+</script>
+
+<template>
+<div class="pdf-demo">
+  <h3>PdfViewer — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="next" @click="next">Next</button>
+    <span class="readout">page <b data-testid="page-readout">{{ $data.page }}</b> / <b data-testid="total-readout">{{ $data.total }}</b></span>
+  </div>
+
+  <div class="pdf-wrap" style="height: 360px">
+    <PdfViewer
+      :src="SAMPLE"
+      :worker-src="workerSrc"
+      r-model:page="$data.page"
+      @load="onLoad"
+    />
+  </div>
+</div>
+</template>
+
+<style>
+.pdf-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #c7c7cc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.readout {
+  font-variant-numeric: tabular-nums;
+}
+.pdf-wrap {
+  max-width: 520px;
+  background: #f2f2f7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+</style>
+
+</rozie>

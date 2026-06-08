@@ -58,6 +58,25 @@ function resolveCrossTreeBareImports(extraRoots: readonly string[]): Plugin {
       // Only intercept when the importer lives under one of our extra roots.
       const inExtraRoot = extraRoots.some((root) => importer.startsWith(root));
       if (!inExtraRoot) return null;
+      // Preserve any query suffix (`?url`, `?raw`, `?worker`, …) so Vite's asset
+      // plugins still handle it: `createRequire().resolve()` can't parse a query
+      // (it would throw → null → the Angular build's resolver chain, which lacks
+      // a `?url` handler here, then hard-fails). Split it off, resolve the bare
+      // path, and re-append the query to the absolute id Vite emits the asset for.
+      // (PdfViewerDemo imports `pdfjs-dist/build/pdf.worker.min.mjs?url` to bundle
+      // the PDF.js worker offline.)
+      const queryIdx = source.indexOf('?');
+      const query = queryIdx === -1 ? '' : source.slice(queryIdx);
+      const bareSource = queryIdx === -1 ? source : source.slice(0, queryIdx);
+      if (query) {
+        try {
+          const resolved = requireFromHere.resolve(bareSource);
+          return resolved + query;
+        } catch {
+          return null;
+        }
+      }
+      source = bareSource;
       // PREFER the ESM (`import`/`module`) entry over the CJS (`require`)
       // entry. `createRequire().resolve()` walks package.json `exports` with
       // the `require` condition first and so picks a package's `.cjs` build
@@ -249,6 +268,21 @@ export default defineConfig(async () => {
     'cropper',
     'src',
   );
+  // Same move for @rozie-ui/pdf: PdfViewer.rozie lives in the package src, so the
+  // Angular sub-build must walk it too (PdfViewerDemo's `imports: [PdfViewer]`
+  // would otherwise collapse to `any[]` → empty mount + "JIT compiler
+  // unavailable"). Lockstep with build-cells.mjs `PDF_SRC` sweep. NO `pdfjs-dist`
+  // ESM-interop alias needed — the wrapper dynamic-imports it inside $onMount, so
+  // it never goes through the Angular AOT type surface.
+  const pdfSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'pdf',
+    'src',
+  );
   // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
   // package's CJS build does `exports["default"] = plugin` without
   // `__esModule`, so a default ES import bundled through the CJS-interop path
@@ -305,10 +339,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

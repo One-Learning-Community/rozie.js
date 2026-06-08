@@ -265,6 +265,16 @@ export const EXAMPLES = [
   // registered in matrix.spec.ts (auto-fixme until the Linux PNG lands).
   'Cropper',
   'CropperScreenshot',
+  // PdfViewer (PDF.js / pdfjs-dist v6) — the dynamic-import + canvas-render +
+  // two-way-page cell. BEHAVIORAL ONLY (loader → examples/demos/PdfViewerDemo
+  // .rozie, which imports ../../packages/ui/pdf/src/PdfViewer.rozie): a bundled
+  // worker + a network-free 3-page base64 PDF, @load → numPages readout, a canvas
+  // + selectable .textLayer, and r-model:page two-way driven by a Next button.
+  // Covered by pdf.spec.ts (structural/behavioral, no screenshot). There is NO
+  // PdfViewerScreenshot cell — pdfjs renders to a <canvas> (the chartjs/maplibre
+  // canvas-VR class where cross-emit byte-identity won't hold) and the
+  // worker/standard-font CDN can't load in Docker; behavioral 6/6 is the coverage.
+  'PdfViewer',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -365,6 +375,10 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-cropper-screenshot-demo' = kebab of CropperDemo / CropperScreenshotDemo.
   Cropper: 'rozie-cropper',
   CropperScreenshot: 'rozie-cropper-screenshot',
+  // PdfViewer — the lit entry appends '-demo' → tag 'rozie-pdf-viewer-demo' =
+  // kebab of PdfViewerDemo (the wrapper component is name="PdfViewer" →
+  // 'rozie-pdf-viewer'). Behavioral only — no screenshot cell.
+  PdfViewer: 'rozie-pdf-viewer',
 };
 
 export interface HostQuery {
@@ -511,6 +525,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // hardcodes the SVG data URL + FIXED_BOX in <script>. No parent props needed.
   Cropper: {},
   CropperScreenshot: {},
+  // PdfViewer — PdfViewerDemo is self-contained: it seeds page:1/total:0 in
+  // <data> and the bundled workerSrc + SAMPLE base64 PDF in <script>. No parent
+  // props needed.
+  PdfViewer: {},
 };
 
 /**

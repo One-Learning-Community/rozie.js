@@ -114,6 +114,17 @@ const CROPPER_SRC = resolve(
   'cropper',
   'src',
 );
+// Same packaging move for @rozie-ui/pdf: PdfViewer.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `PdfViewer.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const PDF_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'pdf',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -330,6 +341,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // cropper src always exists post-port — defensive only
   }
   rmSync(resolve(CROPPER_SRC, 'Cropper.ts'), { force: true });
+  // Same sweep for @rozie-ui/pdf's package src (PdfViewerDemo composes PdfViewer
+  // via <components>, so the Angular sub-build emits PdfViewer.rozie.ts + the
+  // PdfViewer.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(PDF_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(PDF_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // pdf src always exists post-port — defensive only
+  }
+  rmSync(resolve(PDF_SRC, 'PdfViewer.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
