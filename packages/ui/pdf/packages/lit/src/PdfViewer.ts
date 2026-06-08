@@ -189,20 +189,25 @@ private __rozieFirstUpdateDone = false;
   cfg = {
     ...this.options
   };
-  const src = this.src;
-  if (typeof src === 'string') {
-    if (src.startsWith('data:')) {
+  // NOTE: the local must NOT be named `src` — a local `const src = $props.src`
+  // (same name as the `src` prop) hits a Svelte-emitter scope bug where the
+  // renamed local's initializer mis-resolves to itself (`const src2 = src2`, a
+  // TDZ ReferenceError) instead of the prop accessor. Naming it `srcInput`
+  // sidesteps the shadow on every target.
+  const srcInput = this.src;
+  if (typeof srcInput === 'string') {
+    if (srcInput.startsWith('data:')) {
       // decode a `data:` base64 URL to bytes — pdfjs `url` doesn't fetch data URLs.
-      const base64 = src.substring(src.indexOf(',') + 1);
+      const base64 = srcInput.substring(srcInput.indexOf(',') + 1);
       const bin = atob(base64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       cfg.data = bytes;
     } else {
-      cfg.url = src;
+      cfg.url = srcInput;
     }
-  } else if (src) {
-    cfg.data = src;
+  } else if (srcInput) {
+    cfg.data = srcInput;
   }
   if (this.password != null) cfg.password = this.password;
   if (this.standardFontDataUrl) cfg.standardFontDataUrl = this.standardFontDataUrl;
