@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './PdfViewer.css';
 import './PdfViewer.global.css';
@@ -81,6 +81,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const [current, setCurrent] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [rot, setRot] = useState(0);
+  const [engineReady, setEngineReady] = useState(0);
   const viewerEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
@@ -93,6 +94,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const _watch8First = useRef(true);
   const _watch9First = useRef(true);
   const _watch10First = useRef(true);
+  const _watch11First = useRef(true);
 
   function buildSource() {
     let cfg: any = null;
@@ -224,8 +226,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (props.renderAllPages) setupScrollSpy();
     props.onPagesrendered && props.onPagesrendered();
   }
-  const { onError: _rozieProp_onError, onLoad: _rozieProp_onLoad, onPasswordrequest: _rozieProp_onPasswordrequest } = props;
-    const load = useCallback(async () => {
+  async function load() {
     if (!pdfjsLib.current) return;
     const token = ++renderToken.current;
     if (observer.current) {
@@ -244,7 +245,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     try {
       loadingTask.current = pdfjsLib.current.getDocument(buildSource());
       loadingTask.current.onPassword = (_updatePassword: any, reason: any) => {
-        _rozieProp_onPasswordrequest && _rozieProp_onPasswordrequest({
+        props.onPasswordrequest && props.onPasswordrequest({
           reason
         });
       };
@@ -253,15 +254,15 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       if (token !== renderToken.current) return;
       instance.current = pdf;
       if (current > pdf.numPages) setCurrent(pdf.numPages);
-      _rozieProp_onLoad && _rozieProp_onLoad({
+      props.onLoad && props.onLoad({
         numPages: pdf.numPages
       });
       await renderView();
     } catch (e: any) {
       // a destroyed task rejects its promise — suppress the abort for stale loads.
-      if (token === renderToken.current) _rozieProp_onError && _rozieProp_onError(e);
+      if (token === renderToken.current) props.onError && props.onError(e);
     }
-  }, [_rozieProp_onError, _rozieProp_onLoad, _rozieProp_onPasswordrequest, buildSource, current, props.src, renderView]);
+  }
   async function applyFit(mode: any) {
     if (!instance.current || !containerEl.current) return;
     const n = Math.min(Math.max(current, 1), instance.current.numPages);
@@ -329,7 +330,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       if (cancelled.current) return;
       pdfjsLib.current = mod;
       pdfjsLib.current.GlobalWorkerOptions.workerSrc = _workerSrcRef.current;
-      load();
+      // hand off to the lazy $watch below rather than calling load() from this
+      // (React: mount-frozen) closure — see the $data.engineReady note above.
+      setEngineReady(prev => prev + 1);
     });
     return () => {
       cancelled.current = true;
@@ -348,33 +351,37 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     load();
-  }, [props.src]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [engineReady]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
     load();
-  }, [props.password]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.src]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
+    load();
+  }, [props.password]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     const v = props.workerSrc;
     if (pdfjsLib.current && v) pdfjsLib.current.GlobalWorkerOptions.workerSrc = v;
   }, [props.workerSrc]);
   useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
+    if (_watch4First.current) { _watch4First.current = false; return; }
     const v = page;
     if (typeof v === 'number' && v >= 1 && v !== current) setCurrent(v);
   }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch5First.current) { _watch5First.current = false; return; }
     const v = props.scale;
     if (typeof v === 'number' && v > 0) setZoom(v);
   }, [props.scale]);
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch6First.current) { _watch6First.current = false; return; }
     const v = props.rotation;
     if (typeof v === 'number') setRot((v % 360 + 360) % 360);
   }, [props.rotation]);
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const v = current;
     setPage(v);
     props.onPagechange && props.onPagechange({
@@ -385,19 +392,19 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     } else renderView();
   }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     renderView();
   }, [zoom]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch8First.current) { _watch8First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     renderView();
   }, [rot]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch9First.current) { _watch9First.current = false; return; }
+    if (_watch10First.current) { _watch10First.current = false; return; }
     renderView();
   }, [props.renderAllPages]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch10First.current) { _watch10First.current = false; return; }
+    if (_watch11First.current) { _watch11First.current = false; return; }
     renderView();
   }, [props.textLayer]); // eslint-disable-line react-hooks/exhaustive-deps
 

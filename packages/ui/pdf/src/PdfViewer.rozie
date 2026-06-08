@@ -87,6 +87,17 @@
   current: 1,
   zoom: 1,
   rot: 0,
+  // bumped once the dynamic import() of pdfjs resolves; a lazy $watch on it
+  // drives load(). This deliberately does NOT call load() straight from the
+  // import().then() continuation: on React that continuation is the mount
+  // effect's render-0 closure, where the just-seeded `$data.zoom = $props.scale`
+  // is NOT yet visible (React reads $data through a per-render `useState`
+  // binding, not a live ref), so load()→renderView()→renderPage() would
+  // rasterize at the stale default zoom (1) instead of the seeded scale. Routing
+  // load() through a $watch re-runs it in a post-mount, fresh-closure render
+  // where the seeded zoom/rot/current are committed — the other 5 targets read
+  // $data live so they were already correct; this aligns React with them.
+  engineReady: 0,
 }
 </data>
 
@@ -293,7 +304,9 @@ $onMount(() => {
     if (cancelled) return
     pdfjsLib = mod
     pdfjsLib.GlobalWorkerOptions.workerSrc = $props.workerSrc
-    load()
+    // hand off to the lazy $watch below rather than calling load() from this
+    // (React: mount-frozen) closure — see the $data.engineReady note above.
+    $data.engineReady++
   })
   return () => {
     cancelled = true
@@ -305,6 +318,9 @@ $onMount(() => {
 })
 
 // ─── reconcile props/state into the live view ────────────────────────────────
+// engine ready (dynamic import resolved) → first load, from a fresh post-mount
+// closure so React sees the seeded $data.zoom/rot/current (see <data> note).
+$watch(() => $data.engineReady, () => load())
 $watch(() => $props.src, () => load())
 $watch(() => $props.password, () => load())
 $watch(() => $props.workerSrc, (v) => { if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v })

@@ -93,6 +93,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const [current, setCurrent] = createSignal(1);
   const [zoom, setZoom] = createSignal(1);
   const [rot, setRot] = createSignal(0);
+  const [engineReady, setEngineReady] = createSignal(0);
   onMount(() => {
     const _cleanup = (() => {
     cancelled = false;
@@ -106,7 +107,9 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
       if (cancelled) return;
       pdfjsLib = mod;
       pdfjsLib.GlobalWorkerOptions.workerSrc = local.workerSrc;
-      load();
+      // hand off to the lazy $watch below rather than calling load() from this
+      // (React: mount-frozen) closure — see the $data.engineReady note above.
+      setEngineReady(engineReady() + 1);
     });
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
@@ -124,6 +127,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     instance = null;
   });
   });
+  createEffect(on(() => (() => engineReady())(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.src)(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.password)(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.workerSrc)(), (v) => untrack(() => ((v: any) => {

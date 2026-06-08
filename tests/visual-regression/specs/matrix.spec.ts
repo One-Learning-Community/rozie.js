@@ -890,21 +890,6 @@ const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 // .planning/todos/pending/lit-engine-global-css-shadow-bridge.md
 const CROPPER_LIT_SCREENSHOT_TODO = new Set<string>(['CropperScreenshot::lit']);
 
-// PdfViewer — the React PdfViewerScreenshot cell ONLY. pdfjs rasterizes page 1
-// into a 2D canvas; vue/svelte/angular/solid/lit all render it identically at the
-// demo's :scale="0.45" (canvas ≈275px, fits the 280px box) and bless a shared D-10
-// baseline. React renders the SAME page at a LARGER effective scale (the canvas
-// overflows the box) even though `scale: 0.45` is passed correctly to the wrapper
-// (verified in the compiled react demo) — so the divergence is inside the React
-// PdfViewer render path (the engine canvas is sized from $data.zoom, seeded from
-// $props.scale in $onMount; React ends up rendering bigger). A real React-specific
-// wrapper bug to root-cause, NOT a determinism limit. Gated until fixed; the other
-// 5 targets are blessed. Behavioral coverage is green 6/6 in pdf.spec.ts. Tracked:
-// .planning/todos/pending/pdf-react-screenshot-scale-divergence.md
-const PDFVIEWER_REACT_SCREENSHOT_TODO = new Set<string>([
-  'PdfViewerScreenshot::react',
-]);
-
 // SortableListFilter — the Vue cell ONLY. A stable ~204px (1%) sub-pixel difference
 // on the THREE unlocked item labels (Drafts/Sent/Archive) vs the shared baseline;
 // vue is the lone outlier (react/svelte/angular/solid/lit all match). It is COSMETIC
@@ -939,9 +924,6 @@ for (const example of EXAMPLES) {
     const cropperLitScreenshotTodo = CROPPER_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
-    const pdfviewerReactScreenshotTodo = PDFVIEWER_REACT_SCREENSHOT_TODO.has(
-      `${example}::${target}`,
-    );
     const sortableListFilterVueTodo = SORTABLELIST_FILTER_VUE_TODO.has(
       `${example}::${target}`,
     );
@@ -952,7 +934,6 @@ for (const example of EXAMPLES) {
       phase14_1Followup ||
       maplibreLitScreenshotTodo ||
       cropperLitScreenshotTodo ||
-      pdfviewerReactScreenshotTodo ||
       sortableListFilterVueTodo
         ? test.fixme
         : test;

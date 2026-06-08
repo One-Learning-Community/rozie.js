@@ -25,6 +25,7 @@ const emit = defineEmits<{
 const current = ref(1);
 const zoom = ref(1);
 const rot = ref(0);
+const engineReady = ref(0);
 
 const viewerElRef = ref<HTMLElement>();
 
@@ -319,7 +320,9 @@ onMounted(() => {
     if (cancelled) return;
     pdfjsLib = mod;
     pdfjsLib.GlobalWorkerOptions.workerSrc = props.workerSrc;
-    load();
+    // hand off to the lazy $watch below rather than calling load() from this
+    // (React: mount-frozen) closure — see the $data.engineReady note above.
+    engineReady.value++;
   });
   _cleanup_0 = () => {
     cancelled = true;
@@ -337,6 +340,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
+watch(() => engineReady.value, () => load());
 watch(() => props.src, () => load());
 watch(() => props.password, () => load());
 watch(() => props.workerSrc, (v: any) => {

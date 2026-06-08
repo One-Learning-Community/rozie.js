@@ -46,6 +46,7 @@ let {
 let current = $state(1);
 let zoom = $state(1);
 let rot = $state(0);
+let engineReady = $state(0);
 
 let viewerEl = $state<HTMLElement | undefined>(undefined);
 
@@ -339,7 +340,9 @@ onMount(() => {
     if (cancelled) return;
     pdfjsLib = mod;
     pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-    load();
+    // hand off to the lazy $watch below rather than calling load() from this
+    // (React: mount-frozen) closure — see the $data.engineReady note above.
+    engineReady++;
   });
   return () => {
     cancelled = true;
@@ -357,27 +360,29 @@ onMount(() => {
 });
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => src)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => load())(); }); });
+$effect(() => { (() => engineReady)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => load())(); }); });
 let __rozieWatchInitial_1 = true;
-$effect(() => { (() => password)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => load())(); }); });
+$effect(() => { (() => src)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => load())(); }); });
 let __rozieWatchInitial_2 = true;
-$effect(() => { const __watchVal = (() => workerSrc)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => {
+$effect(() => { (() => password)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => load())(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => workerSrc)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
   if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
 })(__watchVal); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => page)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => page)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
   if (typeof v === 'number' && v >= 1 && v !== current) current = v;
 })(__watchVal); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { const __watchVal = (() => scale)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => scale)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
   if (typeof v === 'number' && v > 0) zoom = v;
 })(__watchVal); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => rotation)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => rotation)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => {
   if (typeof v === 'number') rot = (v % 360 + 360) % 360;
 })(__watchVal); }); });
-let __rozieWatchInitial_6 = true;
-$effect(() => { const __watchVal = (() => current)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => {
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => current)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => {
   page = v;
   onpagechange?.({
     page: v
@@ -386,14 +391,14 @@ $effect(() => { const __watchVal = (() => current)(); untrack(() => { if (__rozi
     if (!suppressScroll) scrollToPage(v);
   } else renderView();
 })(__watchVal); }); });
-let __rozieWatchInitial_7 = true;
-$effect(() => { (() => zoom)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => renderView())(); }); });
 let __rozieWatchInitial_8 = true;
-$effect(() => { (() => rot)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => renderView())(); }); });
+$effect(() => { (() => zoom)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => renderView())(); }); });
 let __rozieWatchInitial_9 = true;
-$effect(() => { (() => renderAllPages)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => renderView())(); }); });
+$effect(() => { (() => rot)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => renderView())(); }); });
 let __rozieWatchInitial_10 = true;
-$effect(() => { (() => textLayer)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => renderView())(); }); });
+$effect(() => { (() => renderAllPages)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => renderView())(); }); });
+let __rozieWatchInitial_11 = true;
+$effect(() => { (() => textLayer)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => renderView())(); }); });
 </script>
 
 <div bind:this={viewerEl} {...__rozieAttrs} class={["rozie-pdf", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3c863364></div>

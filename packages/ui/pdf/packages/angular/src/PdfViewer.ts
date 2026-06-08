@@ -80,6 +80,7 @@ export class PdfViewer {
   current = signal(1);
   zoom = signal(1);
   rot = signal(0);
+  engineReady = signal(0);
   viewerEl = viewChild<ElementRef<HTMLDivElement>>('viewerEl');
   error = output<unknown>();
   pagesrendered = output<void>();
@@ -98,23 +99,25 @@ export class PdfViewer {
   private __rozieWatchInitial_8 = true;
   private __rozieWatchInitial_9 = true;
   private __rozieWatchInitial_10 = true;
+  private __rozieWatchInitial_11 = true;
 
   constructor() {
-    effect(() => { const __watchVal = (() => this.src())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this._load())(); }); });
-    effect(() => { const __watchVal = (() => this.password())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this._load())(); }); });
-    effect(() => { const __watchVal = (() => this.workerSrc())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.engineReady())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this._load())(); }); });
+    effect(() => { const __watchVal = (() => this.src())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this._load())(); }); });
+    effect(() => { const __watchVal = (() => this.password())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this._load())(); }); });
+    effect(() => { const __watchVal = (() => this.workerSrc())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
       if (this.pdfjsLib && v) this.pdfjsLib.GlobalWorkerOptions.workerSrc = v;
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.page())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.page())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
       if (typeof v === 'number' && v >= 1 && v !== this.current()) this.current.set(v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.scale())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.scale())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (typeof v === 'number' && v > 0) this.zoom.set(v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.rotation())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.rotation())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => {
       if (typeof v === 'number') this.rot.set((v % 360 + 360) % 360);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.current())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.current())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
       this.page.set(v), this.__rozieCvaOnChange(v);
       this.pagechange.emit({
         page: v
@@ -123,10 +126,10 @@ export class PdfViewer {
         if (!this.suppressScroll) this.scrollToPage(v);
       } else this.renderView();
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => this.renderView())(); }); });
-    effect(() => { const __watchVal = (() => this.rot())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); });
-    effect(() => { const __watchVal = (() => this.renderAllPages())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); });
-    effect(() => { const __watchVal = (() => this.textLayer())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.renderView())(); }); });
+    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); });
+    effect(() => { const __watchVal = (() => this.rot())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); });
+    effect(() => { const __watchVal = (() => this.renderAllPages())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.renderView())(); }); });
+    effect(() => { const __watchVal = (() => this.textLayer())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => this.renderView())(); }); });
   }
 
   ngAfterViewInit() {
@@ -143,7 +146,9 @@ export class PdfViewer {
       if (this.cancelled) return;
       this.pdfjsLib = mod;
       this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc();
-      this._load();
+      // hand off to the lazy $watch below rather than calling load() from this
+      // (React: mount-frozen) closure — see the $data.engineReady note above.
+      this.engineReady.set(this.engineReady() + 1);
     });
     this.__rozieDestroyRef.onDestroy(() => {
       this.cancelled = true;

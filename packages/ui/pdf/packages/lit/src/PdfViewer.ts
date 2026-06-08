@@ -67,11 +67,13 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   private _current = signal(1);
   private _zoom = signal(1);
   private _rot = signal(0);
+  private _engineReady = signal(0);
   @query('[data-rozie-ref="viewerEl"]') private _refViewerEl!: HTMLElement;
-private __rozieWatchInitial_3 = true;
-private __rozieWatchInitial_6 = true;
+private __rozieWatchInitial_0 = true;
+private __rozieWatchInitial_4 = true;
 private __rozieWatchInitial_7 = true;
 private __rozieWatchInitial_8 = true;
+private __rozieWatchInitial_9 = true;
 private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -94,10 +96,11 @@ private __rozieFirstUpdateDone = false;
       this.instance = null;
     }));
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.page)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._engineReady.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this.load())(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.page)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
       if (typeof v === 'number' && v >= 1 && v !== this._current.value) this._current.value = v;
     })(__watchVal); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._current.value)(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._current.value)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
       this._pageControllable.write(v);
       this.dispatchEvent(new CustomEvent("pagechange", {
         detail: {
@@ -110,8 +113,8 @@ private __rozieFirstUpdateDone = false;
         if (!this.suppressScroll) this.scrollToPage(v);
       } else this.renderView();
     })(__watchVal); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._zoom.value)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => this.renderView())(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rot.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._zoom.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rot.value)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); }));
 
     this.cancelled = false;
     this.containerEl = this._refViewerEl;
@@ -126,7 +129,9 @@ private __rozieFirstUpdateDone = false;
       if (this.cancelled) return;
       this.pdfjsLib = mod;
       this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc;
-      this.load();
+      // hand off to the lazy $watch below rather than calling load() from this
+      // (React: mount-frozen) closure — see the $data.engineReady note above.
+      this._engineReady.value++;
     });
   }
 
