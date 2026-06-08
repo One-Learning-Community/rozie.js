@@ -1,0 +1,78 @@
+{
+  "name": "@rozie-ui/pdf-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic React PDF viewer wrapping PDF.js — one Rozie source compiled to React.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "pdf",
+    "pdfjs",
+    "pdf-viewer",
+    "pdf-js",
+    "viewer",
+    "document",
+    "component",
+    "react"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/pdf/packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19",
+    "pdfjs-dist": "^6"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "pdfjs-dist": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ]
+}

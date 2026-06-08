@@ -1,0 +1,389 @@
+<!--
+  PdfViewer.rozie — data-bound port of PDF.js (mozilla/pdf.js, `pdfjs-dist` v6).
+
+  PDF.js is the de-facto vanilla-JS PDF renderer. Per-framework wrappers are
+  LOPSIDED: react-pdf (wojtekmaj) is deep and maintained for React; Vue
+  (vue-pdf-embed), Angular (ng2-pdf-viewer) and Svelte have thinner / older
+  options, and Solid + Lit have effectively nothing. ONE Rozie source ships six
+  idiomatic packages — so the five underserved frameworks get a real embeddable
+  PDF viewer with selectable text, page nav, zoom and rotation for free.
+
+  Usage:
+
+    <PdfViewer
+      :src="$data.pdfUrl"
+      r-model:page="$data.page"   (1-based current page, two-way)
+      :scale="1.2"
+      render-all-pages
+      @load="(e) => total = e.numPages"
+    />
+
+  WORKER — the #1 PDF.js integration friction: PDF.js parses in a Web Worker, so
+  `GlobalWorkerOptions.workerSrc` MUST be set before getDocument. The `workerSrc`
+  prop defaults to the version-matched jsDelivr CDN copy, so the component works
+  with ZERO config. For offline / CSP / bundled-worker setups, override it — e.g.
+  in Vite: `:worker-src="new URL('pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url).toString()"`.
+
+  TEXT LAYER — `textLayer` (default on) renders PDF.js's selectable text spans
+  over each page canvas so text is copyable/searchable (the differentiator vs a
+  dumb canvas image). It needs the `.textLayer` CSS + a `--scale-factor` CSS var;
+  both are shipped by this component (the `:root {}` engine-DOM escape hatch +
+  a per-page `--scale-factor`), so no extra CSS import is required.
+
+  RENDER MODES — default = single page (the two-way `page` drives which page
+  renders, with prev/next/goToPage). `render-all-pages` = continuous scroll of
+  every page; the visible page reflects back into the two-way `page` (and the
+  `pagechange` event) via an IntersectionObserver.
+
+  RENDER SOURCE OF TRUTH — the live render is driven by internal `$data.current`
+  / `$data.zoom` / `$data.rot` (seeded from the props in $onMount, updated by the
+  prop $watches AND by the $expose verbs). This decouples the imperative handle
+  from the consumer's binding: `nextPage()` / `zoomIn()` / `rotateCW()` work
+  whether or not the consumer two-way-binds `page` (only `page` mirrors back via
+  $model; `scale`/`rotation` are one-way props the verbs imperatively override).
+-->
+
+<rozie name="PdfViewer">
+
+<props>
+{
+  // PDF source — a URL string, a `data:` base64 URL, or binary data
+  // (ArrayBuffer / Uint8Array). No `type:` → emits `unknown`, so `default:
+  // undefined` merges cleanly under the strict framework typecheck (the maplibre
+  // maxBounds idiom).
+  src:            { default: undefined },
+  // 1-based current page — two-way. In single mode it drives which page renders;
+  // in render-all-pages mode it reflects the scrolled-to page (and scrolls when
+  // the consumer writes it).
+  page:           { type: Number,  default: 1, model: true },
+  // zoom scale (1 = 100%). One-way prop; the zoom verbs override it imperatively.
+  scale:          { type: Number,  default: 1 },
+  // rotation in degrees (0 / 90 / 180 / 270).
+  rotation:       { type: Number,  default: 0 },
+  // the PDF.js worker URL — defaults to the version-matched CDN so it works with
+  // zero config; override for offline / CSP / bundled-worker.
+  workerSrc:      { type: String,  default: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs' },
+  // continuous-scroll all pages vs single page with nav.
+  renderAllPages: { type: Boolean, default: false },
+  // render PDF.js's selectable text layer over each page canvas.
+  textLayer:      { type: Boolean, default: true },
+  // password for an encrypted PDF.
+  password:       { default: undefined },
+  // raw getDocument() DocumentInitParameters passthrough — spread BEFORE the
+  // curated keys (explicit src/password win). For cMapUrl, httpHeaders,
+  // withCredentials, etc.
+  options:        { type: Object,  default: () => ({}) },
+}
+</props>
+
+<data>
+{
+  // render source of truth (seeded from props in $onMount).
+  current: 1,
+  zoom: 1,
+  rot: 0,
+}
+</data>
+
+<script>
+import * as pdfjsLib from 'pdfjs-dist'
+
+// null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
+// `instance` is the PDFDocumentProxy (whose strict types the loosely-typed props
+// don't satisfy — routing the render chain through `any` is the maplibre
+// mapOptions idiom), containerEl is the scroll host, observer is the
+// continuous-mode scroll spy.
+let instance = null
+let containerEl = null
+let observer = null
+// the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
+// destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
+// src/password change or unmount can tear the previous load down.
+let loadingTask = null
+// monotonic token cancels stale async loads/renders (src can change mid-render,
+// pages render async — the SortableList rebuild-cancel discipline).
+let renderToken = 0
+// guards the scroll-spy → $data.current → scroll-to feedback loop.
+let suppressScroll = false
+
+// ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
+const buildSource = () => {
+  let cfg = null
+  cfg = { ...$snapshot($props.options) }
+  const src = $props.src
+  if (typeof src === 'string') {
+    if (src.startsWith('data:')) {
+      // decode a `data:` base64 URL to bytes — pdfjs `url` doesn't fetch data URLs.
+      const base64 = src.substring(src.indexOf(',') + 1)
+      const bin = atob(base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      cfg.data = bytes
+    } else {
+      cfg.url = src
+    }
+  } else if (src) {
+    cfg.data = src
+  }
+  if ($props.password != null) cfg.password = $props.password
+  return cfg
+}
+
+// ─── render one page (canvas + optional text layer) into the container ───────
+const renderPage = async (pdf, pageNum, container) => {
+  const page = await pdf.getPage(pageNum)
+  const viewport = page.getViewport({ scale: $data.zoom, rotation: $data.rot })
+
+  const pageDiv = document.createElement('div')
+  pageDiv.className = 'rozie-pdf-page'
+  pageDiv.setAttribute('data-page', String(pageNum))
+  pageDiv.style.width = Math.floor(viewport.width) + 'px'
+  pageDiv.style.height = Math.floor(viewport.height) + 'px'
+  // the text layer positions its spans with calc(var(--scale-factor) * …px).
+  pageDiv.style.setProperty('--scale-factor', String($data.zoom))
+
+  const outputScale = window.devicePixelRatio || 1
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.floor(viewport.width * outputScale)
+  canvas.height = Math.floor(viewport.height * outputScale)
+  canvas.style.width = Math.floor(viewport.width) + 'px'
+  canvas.style.height = Math.floor(viewport.height) + 'px'
+  pageDiv.appendChild(canvas)
+
+  const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined
+  await page.render({ canvas, viewport, transform }).promise
+
+  if ($props.textLayer) {
+    const tl = document.createElement('div')
+    tl.className = 'textLayer'
+    pageDiv.appendChild(tl)
+    const layer = new pdfjsLib.TextLayer({
+      textContentSource: page.streamTextContent(),
+      container: tl,
+      viewport,
+    })
+    await layer.render()
+  }
+
+  container.appendChild(pageDiv)
+  return pageDiv
+}
+
+// continuous-mode scroll spy — reflect the most-visible page into $data.current.
+const setupScrollSpy = () => {
+  if (observer) { observer.disconnect(); observer = null }
+  if (!containerEl) return
+  observer = new IntersectionObserver(
+    (entries) => {
+      let best = null
+      let bestRatio = 0
+      for (const e of entries) {
+        if (e.intersectionRatio > bestRatio) { bestRatio = e.intersectionRatio; best = e.target }
+      }
+      if (best) {
+        const n = Number(best.getAttribute('data-page'))
+        if (n && n !== $data.current) {
+          suppressScroll = true
+          $data.current = n
+          suppressScroll = false
+        }
+      }
+    },
+    { root: containerEl, threshold: [0.25, 0.5, 0.75] },
+  )
+  for (const child of containerEl.children) observer.observe(child)
+}
+
+const scrollToPage = (n) => {
+  if (!containerEl) return
+  const el = containerEl.querySelector('[data-page="' + n + '"]')
+  if (el) el.scrollIntoView({ block: 'start', behavior: 'auto' })
+}
+
+// ─── render the current view (single page, or all pages) ─────────────────────
+const renderView = async () => {
+  if (!instance || !containerEl) return
+  const token = ++renderToken
+  if (observer) { observer.disconnect(); observer = null }
+  containerEl.innerHTML = ''
+  const total = instance.numPages
+  const pages = $props.renderAllPages
+    ? Array.from({ length: total }, (_, i) => i + 1)
+    : [Math.min(Math.max($data.current, 1), total)]
+  for (const n of pages) {
+    if (token !== renderToken) return
+    try {
+      await renderPage(instance, n, containerEl)
+    } catch (e) {
+      if (token === renderToken) $emit('error', e)
+    }
+  }
+  if (token !== renderToken) return
+  if ($props.renderAllPages) setupScrollSpy()
+  $emit('pagesrendered')
+}
+
+// ─── load the document ───────────────────────────────────────────────────────
+const load = async () => {
+  const token = ++renderToken
+  if (observer) { observer.disconnect(); observer = null }
+  // tear down the previous load via the loading task (PDFDocumentProxy has no
+  // destroy() in pdfjs v6).
+  if (loadingTask) { loadingTask.destroy(); loadingTask = null }
+  instance = null
+  if (containerEl) containerEl.innerHTML = ''
+  if (!$props.src) return
+  try {
+    loadingTask = pdfjsLib.getDocument(buildSource())
+    loadingTask.onPassword = (_updatePassword, reason) => { $emit('passwordrequest', { reason }) }
+    const pdf = await loadingTask.promise
+    // stale (a newer load bumped the token + destroyed this task) — drop it.
+    if (token !== renderToken) return
+    instance = pdf
+    if ($data.current > pdf.numPages) $data.current = pdf.numPages
+    $emit('load', { numPages: pdf.numPages })
+    await renderView()
+  } catch (e) {
+    // a destroyed task rejects its promise — suppress the abort for stale loads.
+    if (token === renderToken) $emit('error', e)
+  }
+}
+
+const applyFit = async (mode) => {
+  if (!instance || !containerEl) return
+  const n = Math.min(Math.max($data.current, 1), instance.numPages)
+  const page = await instance.getPage(n)
+  const vp = page.getViewport({ scale: 1, rotation: $data.rot })
+  const cw = containerEl.clientWidth - 24
+  const ch = containerEl.clientHeight - 24
+  if (mode === 'width') $data.zoom = cw / vp.width
+  else $data.zoom = Math.min(cw / vp.width, ch / vp.height)
+}
+
+$onMount(() => {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = $props.workerSrc
+  containerEl = $refs.viewerEl
+  $data.current = Math.max(1, $props.page)
+  $data.zoom = $props.scale
+  $data.rot = $props.rotation
+  load()
+  return () => {
+    renderToken++
+    if (observer) { observer.disconnect(); observer = null }
+    if (loadingTask) { loadingTask.destroy(); loadingTask = null }
+    instance = null
+  }
+})
+
+// ─── reconcile props/state into the live view ────────────────────────────────
+$watch(() => $props.src, () => load())
+$watch(() => $props.password, () => load())
+$watch(() => $props.workerSrc, (v) => { if (v) pdfjsLib.GlobalWorkerOptions.workerSrc = v })
+
+// prop → internal state (guarded so consumer writes don't fight the verbs).
+$watch(() => $props.page, (v) => {
+  if (typeof v === 'number' && v >= 1 && v !== $data.current) $data.current = v
+})
+$watch(() => $props.scale, (v) => { if (typeof v === 'number' && v > 0) $data.zoom = v })
+$watch(() => $props.rotation, (v) => { if (typeof v === 'number') $data.rot = ((v % 360) + 360) % 360 })
+
+// internal state → render + two-way page echo.
+$watch(() => $data.current, (v) => {
+  $model.page = v
+  $emit('pagechange', { page: v })
+  if ($props.renderAllPages) { if (!suppressScroll) scrollToPage(v) }
+  else renderView()
+})
+$watch(() => $data.zoom, () => renderView())
+$watch(() => $data.rot, () => renderView())
+$watch(() => $props.renderAllPages, () => renderView())
+$watch(() => $props.textLayer, () => renderView())
+
+// ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
+// 12 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+// ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
+// pagesrendered/passwordrequest); none is a Lit reserved lifecycle. All drive
+// $data (not the props), so they work whether or not the consumer binds `page`.
+function getDocument() { return instance }
+function getPageCount() { return instance ? instance.numPages : 0 }
+function goToPage(n) {
+  if (!instance) return
+  $data.current = Math.min(Math.max(n, 1), instance.numPages)
+}
+function nextPage() { goToPage($data.current + 1) }
+function prevPage() { goToPage($data.current - 1) }
+function setScale(s) { if (typeof s === 'number' && s > 0) $data.zoom = s }
+function zoomIn() { $data.zoom = Math.min($data.zoom * 1.25, 10) }
+function zoomOut() { $data.zoom = Math.max($data.zoom / 1.25, 0.1) }
+function fitWidth() { applyFit('width') }
+function fitPage() { applyFit('page') }
+function rotateCW() { $data.rot = ($data.rot + 90) % 360 }
+function rotateCCW() { $data.rot = ($data.rot + 270) % 360 }
+
+$expose({
+  getDocument, getPageCount, goToPage, nextPage, prevPage,
+  setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW,
+})
+</script>
+
+<template>
+<div class="rozie-pdf" ref="viewerEl"></div>
+</template>
+
+<style>
+.rozie-pdf {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: auto;
+  background: #525659;
+  padding: 12px 0;
+}
+
+:root {
+  /* engine-created page/canvas/text-layer DOM never carries the
+     [data-rozie-s-*] scope attribute — reach it via the Phase-34 :root engine-DOM
+     escape hatch (NOT :global(), a ROZ128 hard error). This also ships the
+     essential PDF.js text-layer CSS so consumers need no separate import. */
+  .rozie-pdf .rozie-pdf-page {
+    position: relative;
+    margin: 0 auto 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    background: #fff;
+  }
+  .rozie-pdf .rozie-pdf-page canvas {
+    display: block;
+  }
+  .rozie-pdf .textLayer {
+    position: absolute;
+    text-align: initial;
+    inset: 0;
+    overflow: clip;
+    opacity: 1;
+    line-height: 1;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+    caret-color: CanvasText;
+    z-index: 1;
+  }
+  .rozie-pdf .textLayer span,
+  .rozie-pdf .textLayer br {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+  .rozie-pdf .textLayer span.markedContent {
+    top: 0;
+    height: 0;
+  }
+  .rozie-pdf .textLayer ::selection {
+    background: rgba(0, 100, 255, 0.3);
+  }
+}
+</style>
+
+</rozie>

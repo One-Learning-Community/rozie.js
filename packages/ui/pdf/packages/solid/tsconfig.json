@@ -1,0 +1,28 @@
+{
+  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the
+  // emitted Solid output is bundler-built (tsdown/oxc), not strict-tsc-authored.
+  // This gate typechecks generated code, so it opts out of the author-strictness
+  // flags the codegen does not satisfy while keeping the rest of strict mode.
+  //
+  // No `paths` alias for `pdfjs-dist`: the published pdfjs-dist package ships real
+  // types.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noImplicitOverride": false,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,37 @@
+.rozie-pdf .rozie-pdf-page {
+    position: relative;
+    margin: 0 auto 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    background: #fff;
+  }
+.rozie-pdf .rozie-pdf-page canvas {
+    display: block;
+  }
+.rozie-pdf .textLayer {
+    position: absolute;
+    text-align: initial;
+    inset: 0;
+    overflow: clip;
+    opacity: 1;
+    line-height: 1;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+    caret-color: CanvasText;
+    z-index: 1;
+  }
+.rozie-pdf .textLayer span,
+  .rozie-pdf .textLayer br {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+.rozie-pdf .textLayer span.markedContent {
+    top: 0;
+    height: 0;
+  }
+.rozie-pdf .textLayer ::selection {
+    background: rgba(0, 100, 255, 0.3);
+  }

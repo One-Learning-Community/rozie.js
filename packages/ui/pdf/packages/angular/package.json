@@ -1,0 +1,64 @@
+{
+  "name": "@rozie-ui/pdf-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular PDF viewer wrapping PDF.js — one Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "pdf",
+    "pdfjs",
+    "pdf-viewer",
+    "pdf-js",
+    "viewer",
+    "document",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/pdf/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/PdfViewer.ts",
+      "import": "./src/PdfViewer.ts",
+      "default": "./src/PdfViewer.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19 || ^20 || ^21",
+    "@angular/common": "^19 || ^20 || ^21",
+    "pdfjs-dist": "^6"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "pdfjs-dist": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}
