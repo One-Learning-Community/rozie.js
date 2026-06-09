@@ -71,6 +71,19 @@ export interface IRComponent {
    * `expose.length === 0` for a byte-identical-when-empty guarantee (D-02).
    */
   expose: ExposedMethod[];
+  /**
+   * Phase 36 — `$provide('key', value)` statements in source order; `[]` when no
+   * `$provide` call. Multiple distinct keys are all collected (unlike single-
+   * `$expose`). Each emitter branches on `provides.length === 0 &&
+   * injects.length === 0` for a byte-identical-when-empty guarantee (D-5).
+   */
+  provides: ProvideDecl[];
+  /**
+   * Phase 36 — `const x = $inject('key', fallback?)` binders in source order;
+   * `[]` when no `$inject` call. `localBinding` is the `const` name the injected
+   * value binds to. Empty-case byte-identity is gated jointly with `provides`.
+   */
+  injects: InjectDecl[];
   /** D-19: ordered + paired. Each $onMount/$onUnmount/$onUpdate is one node. */
   lifecycle: LifecycleHook[];
   /**
@@ -489,6 +502,45 @@ export interface LifecycleHook {
 export interface ExposedMethod {
   type: 'ExposedMethod';
   name: string;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 36 ($provide) — one node per top-level `$provide('key', value)`
+ * statement, in source order. `key` is the (string-literal) context key;
+ * `valueExpr` is the 2nd argument expression carried through to per-target
+ * emit (`provide('key', value)` / `setContext` / `<C.Provider value={…}>` /
+ * `providers:[{ provide: rozieToken('key'), useFactory: () => value }]` /
+ * `ContextProvider … setValue(value)`). Multiple distinct keys are allowed.
+ * `sourceLoc` points at the `$provide(...)` call so emitters + diagnostics map
+ * back to source. Validated by `runContextValidator` (ROZ129/ROZ131).
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface ProvideDecl {
+  type: 'ProvideDecl';
+  key: string;
+  /** The 2nd argument to `$provide('key', value)`. */
+  valueExpr: Expression;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 36 ($inject) — one node per `const x = $inject('key', fallback?)`
+ * binder, in source order. `key` is the (string-literal) context key;
+ * `localBinding` is the `const` name (`const theme = $inject('theme')` →
+ * `'theme'`) the injected value binds to in every target's setup scope;
+ * `fallbackExpr` is the optional 2nd argument used when no provider is found.
+ * `sourceLoc` points at the `$inject(...)` call. Validated by
+ * `runContextValidator` (ROZ130/ROZ132).
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface InjectDecl {
+  type: 'InjectDecl';
+  key: string;
+  localBinding: string;
+  fallbackExpr?: Expression;
   sourceLoc: SourceLoc;
 }
 

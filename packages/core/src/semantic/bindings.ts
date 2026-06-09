@@ -41,6 +41,10 @@ export function createEmptyBindings(): BindingsTable {
     emits: new Set(),
     expose: [],
     exposeCalls: [],
+    provides: [],
+    injects: [],
+    provideCalls: [],
+    injectCalls: [],
     lifecycle: [],
     watchers: [],
   };

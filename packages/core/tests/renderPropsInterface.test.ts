@@ -32,6 +32,8 @@ function emptyIR(name: string): IRComponent {
     watchers: [],
     listeners: [],
     expose: [],
+    provides: [],
+    injects: [],
     setupBody: {
       type: 'SetupBody',
       scriptProgram: {

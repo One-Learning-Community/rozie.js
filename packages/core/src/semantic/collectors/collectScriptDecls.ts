@@ -31,6 +31,8 @@ import type {
   LifecycleHookEntry,
   WatchEntry,
   ExposedMethodEntry,
+  ProvideEntry,
+  InjectEntry,
 } from '../types.js';
 
 /**
@@ -182,6 +184,61 @@ function extractExposeFromExpression(
   return entries;
 }
 
+/**
+ * Phase 36 ($provide) — read a top-level `$provide('key', value)`
+ * ExpressionStatement and return its canonical ProvideEntry. Returns `null`
+ * when the expression is not a `$provide(...)` call OR when the first argument
+ * is not a StringLiteral (malformed key — the VALIDATOR emits ROZ129; the
+ * collector stays silent). The 2nd argument (the provided value) is carried
+ * through verbatim; an absent value yields `null` (skipped — there is nothing
+ * to provide).
+ */
+function extractProvideFromExpression(
+  expr: t.Expression,
+): ProvideEntry | null {
+  if (!t.isCallExpression(expr)) return null;
+  if (!t.isIdentifier(expr.callee)) return null;
+  if (expr.callee.name !== '$provide') return null;
+  const keyArg = expr.arguments[0];
+  if (!keyArg || !t.isStringLiteral(keyArg)) return null;
+  const valueArg = expr.arguments[1];
+  if (!valueArg || !t.isExpression(valueArg)) return null;
+  return {
+    key: keyArg.value,
+    valueExpr: valueArg,
+    sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
+  };
+}
+
+/**
+ * Phase 36 ($inject) — read a `const x = $inject('key', fallback?)` declarator
+ * and return its canonical InjectEntry. Returns `null` when `init` is not an
+ * `$inject(...)` call, when the binding target is not a plain Identifier, OR
+ * when the first argument is not a StringLiteral (malformed key — the VALIDATOR
+ * emits ROZ130; the collector stays silent). The optional 2nd argument is the
+ * fallback expression.
+ */
+function extractInjectFromDeclarator(
+  declarator: t.VariableDeclarator,
+): InjectEntry | null {
+  if (!t.isIdentifier(declarator.id)) return null;
+  const init = declarator.init;
+  if (!init || !t.isCallExpression(init)) return null;
+  if (!t.isIdentifier(init.callee) || init.callee.name !== '$inject') return null;
+  const keyArg = init.arguments[0];
+  if (!keyArg || !t.isStringLiteral(keyArg)) return null;
+  const fallbackArg = init.arguments[1];
+  const entry: InjectEntry = {
+    key: keyArg.value,
+    localBinding: declarator.id.name,
+    sourceLoc: { start: init.start ?? 0, end: init.end ?? 0 },
+  };
+  if (fallbackArg && t.isExpression(fallbackArg)) {
+    entry.fallbackExpr = fallbackArg;
+  }
+  return entry;
+}
+
 export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): void {
   const programBody = script.program.program.body;
 
@@ -193,6 +250,14 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       for (const decl of stmt.declarations) {
         const computed = extractComputedFromDeclarator(decl);
         if (computed) bindings.computeds.set(computed.name, computed);
+        // Phase 36: top-level `const x = $inject('key', fallback?)` binder. Only
+        // a `const`-declared, string-keyed, Identifier-bound form contributes a
+        // canonical InjectEntry; other shapes are validator territory (ROZ130/
+        // ROZ132). Multiple distinct $inject binders are all collected.
+        if (stmt.kind === 'const') {
+          const inject = extractInjectFromDeclarator(decl);
+          if (inject) bindings.injects.push(inject);
+        }
       }
       continue;
     }
@@ -216,6 +281,13 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       if (exposed && bindings.expose.length === 0) {
         bindings.expose.push(...exposed);
       }
+
+      // Phase 36: top-level `$provide('key', value)` statement. Unlike single-
+      // `$expose`, multiple distinct $provide calls ARE allowed — each well-
+      // formed call contributes a ProvideEntry. Malformed forms (non-string key
+      // → ROZ129) are skipped here; the validator owns them.
+      const provided = extractProvideFromExpression(stmt.expression);
+      if (provided) bindings.provides.push(provided);
     }
   }
 
@@ -244,6 +316,34 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
         const atTopLevel =
           t.isExpressionStatement(parent) && t.isProgram(grandparent);
         bindings.exposeCalls.push({ call: path.node, atTopLevel });
+        return;
+      }
+      // Phase 36: record EVERY $provide call site for the context validator.
+      // `$provide` is a STATEMENT sigil — a valid call is the expression of an
+      // ExpressionStatement. Anything else (expression position — assigned,
+      // returned, nested in a larger expression) → ROZ131. ROZ129 (non-string
+      // key) is checked against the call's first argument by the validator.
+      if (callee.name === '$provide') {
+        const parent = path.parent;
+        const isStatement = t.isExpressionStatement(parent);
+        bindings.provideCalls.push({ call: path.node, isStatement });
+        return;
+      }
+      // Phase 36: record EVERY $inject call site for the context validator.
+      // A valid `$inject` is the `init` of a `const` VariableDeclarator
+      // (`const x = $inject('key')`). Anything else (bare statement, assigned to
+      // a non-const, nested in an expression) → ROZ132. ROZ130 (non-string key)
+      // is checked against the call's first argument by the validator.
+      if (callee.name === '$inject') {
+        const parent = path.parent;
+        const grandparent = path.parentPath?.parent;
+        const boundToConst =
+          t.isVariableDeclarator(parent) &&
+          parent.init === path.node &&
+          t.isVariableDeclaration(grandparent) &&
+          grandparent.kind === 'const';
+        bindings.injectCalls.push({ call: path.node, boundToConst });
+        return;
       }
     },
   });

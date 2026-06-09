@@ -159,6 +159,56 @@ export interface ExposeCallSite {
   atTopLevel: boolean;
 }
 
+/**
+ * Phase 36 ($provide) — one entry per well-formed top-level `$provide('key',
+ * value)` statement, in source order. The collector extracts only the canonical
+ * (string-literal key + value-expression) shape; ALL malformed-shape detection
+ * (non-string key → ROZ129, expression-position → ROZ131) is left to
+ * `runContextValidator` (collectors stay silent per the Plan 02-01 contract).
+ * Multiple distinct keys are all collected (unlike single-`$expose`).
+ */
+export interface ProvideEntry {
+  key: string;
+  valueExpr: Expression;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 36 ($inject) — one entry per well-formed `const x = $inject('key',
+ * fallback?)` binder, in source order. The collector extracts only the
+ * canonical shape; malformed forms (non-string key → ROZ130, unbound →
+ * ROZ132) are owned by `runContextValidator`. `localBinding` is the `const`
+ * declarator name; `fallbackExpr` is the optional 2nd argument.
+ */
+export interface InjectEntry {
+  key: string;
+  localBinding: string;
+  fallbackExpr?: Expression;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 36 — every `$provide(...)` call site, recorded for the context
+ * validator. `isStatement` is true iff the call is the expression of an
+ * `ExpressionStatement` (the only valid placement — `$provide` is a statement
+ * sigil); false → ROZ131 (PROVIDE_NOT_STATEMENT).
+ */
+export interface ProvideCallSite {
+  call: CallExpression;
+  isStatement: boolean;
+}
+
+/**
+ * Phase 36 — every `$inject(...)` call site, recorded for the context
+ * validator. `boundToConst` is true iff the call is the `init` of a
+ * `VariableDeclarator` whose enclosing declaration is a `const` (the only valid
+ * placement); false → ROZ132 (INJECT_UNBOUND).
+ */
+export interface InjectCallSite {
+  call: CallExpression;
+  boundToConst: boolean;
+}
+
 export interface BindingsTable {
   props: Map<string, PropDeclEntry>;
   data: Map<string, DataDeclEntry>;
@@ -180,6 +230,26 @@ export interface BindingsTable {
    * duplicate (ROZ119) + nested-scope (ROZ120) checks. `[]` when no `$expose`.
    */
   exposeCalls: ExposeCallSite[];
+  /**
+   * Phase 36 — extracted `$provide('key', value)` statements in source order;
+   * `[]` when no `$provide` call. Multiple distinct keys all collected.
+   */
+  provides: ProvideEntry[];
+  /**
+   * Phase 36 — extracted `const x = $inject('key', fallback?)` binders in
+   * source order; `[]` when no `$inject` call.
+   */
+  injects: InjectEntry[];
+  /**
+   * Phase 36 — every `$provide(...)` call site (incl. expression-position) for
+   * the context validator's ROZ129/ROZ131 checks. `[]` when no `$provide`.
+   */
+  provideCalls: ProvideCallSite[];
+  /**
+   * Phase 36 — every `$inject(...)` call site (incl. unbound) for the context
+   * validator's ROZ130/ROZ132 checks. `[]` when no `$inject`.
+   */
+  injectCalls: InjectCallSite[];
   /** Ordered (source order) per REACT-04. */
   lifecycle: LifecycleHookEntry[];
   /**

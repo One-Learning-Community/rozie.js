@@ -136,7 +136,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
 
   const scriptResult = ast.script
     ? lowerScript(ast.script, bindings, depGraph, diagnostics)
-    : { computed: [], lifecycle: [], watchers: [], setupBody: emptySetupBody(), emits: [], expose: [] };
+    : { computed: [], lifecycle: [], watchers: [], setupBody: emptySetupBody(), emits: [], expose: [], provides: [], injects: [] };
 
   // RefDecl[] sourced from BindingsTable (template-collected refs).
   const refs: RefDecl[] = [];
@@ -186,6 +186,11 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // $expose call. NOT Set-deduped (per-name sourceLoc + source order must
     // survive); every emitter branches on expose.length === 0 (D-02).
     expose: scriptResult.expose,
+    // Phase 36 — $provide('key', value) / const x = $inject('key', f?) decls in
+    // source order; [] when none. Every emitter branches on
+    // provides.length === 0 && injects.length === 0 for byte-identity (D-5).
+    provides: scriptResult.provides,
+    injects: scriptResult.injects,
     lifecycle: scriptResult.lifecycle,
     // Quick plan 260515-u2b — populated from $watch(getter, cb) calls.
     watchers: scriptResult.watchers,

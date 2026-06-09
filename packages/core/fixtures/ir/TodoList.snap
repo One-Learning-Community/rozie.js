@@ -751,6 +751,8 @@
     "remove"
   ],
   "expose": [],
+  "provides": [],
+  "injects": [],
   "lifecycle": [],
   "watchers": [],
   "listeners": [

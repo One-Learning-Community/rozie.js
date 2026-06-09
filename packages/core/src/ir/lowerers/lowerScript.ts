@@ -31,7 +31,10 @@ import type {
   SetupBody,
   SetupAnnotation,
   ExposedMethod,
+  ProvideDecl,
+  InjectDecl,
 } from '../types.js';
+import { lowerContext } from './lowerContext.js';
 
 export interface LowerScriptResult {
   computed: ComputedDecl[];
@@ -42,6 +45,10 @@ export interface LowerScriptResult {
   emits: string[];
   /** Phase 21 — `$expose({...})` names in source order; `[]` when no $expose. */
   expose: ExposedMethod[];
+  /** Phase 36 — `$provide('key', value)` decls in source order; `[]` when none. */
+  provides: ProvideDecl[];
+  /** Phase 36 — `const x = $inject(...)` decls in source order; `[]` when none. */
+  injects: InjectDecl[];
 }
 
 /**
@@ -310,5 +317,19 @@ export function lowerScript(
     sourceLoc: e.sourceLoc,
   }));
 
-  return { computed, lifecycle, watchers, setupBody, emits, expose };
+  // 6. provides / injects — Phase 36. Thin lowerer READS the collected
+  // bindings.provides / bindings.injects (populated by collectScriptDecls) and
+  // produces IR ProvideDecl[] / InjectDecl[] — no AST re-walk.
+  const { provides, injects } = lowerContext(bindings);
+
+  return {
+    computed,
+    lifecycle,
+    watchers,
+    setupBody,
+    emits,
+    expose,
+    provides,
+    injects,
+  };
 }

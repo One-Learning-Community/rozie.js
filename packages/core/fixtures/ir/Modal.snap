@@ -319,6 +319,8 @@
     "close"
   ],
   "expose": [],
+  "provides": [],
+  "injects": [],
   "lifecycle": [
     {
       "type": "LifecycleHook",

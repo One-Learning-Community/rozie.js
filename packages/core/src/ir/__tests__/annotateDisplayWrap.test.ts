@@ -95,6 +95,8 @@ function makeIR(opts: {
     slots: [],
     emits: [],
     expose: [],
+    provides: [],
+    injects: [],
     lifecycle: [],
     watchers: [],
     listeners: [],
