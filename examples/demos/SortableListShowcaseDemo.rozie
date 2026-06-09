@@ -91,7 +91,7 @@ $onMount(() => reset());
       </label>
       <label class="slider-label">
         <span>Swap threshold <span class="note">(remounts)</span></span>
-        <input type="range" min="0" max="1" step="0.1" r-model.number="$data.swapThreshold" />
+        <input type="range" min="0" max="1" step="0.1" r-model="$data.swapThreshold" />
         <span class="value">{{ $data.swapThreshold }}</span>
       </label>
     </div>
@@ -147,7 +147,7 @@ $onMount(() => reset());
       :chosenClass="$data.chosenPreset"
       :filter="$data.filter"
       :forceFallback="$data.forceFallback"
-      :swapThreshold="$data.swapThreshold"
+      :swapThreshold="Number($data.swapThreshold)"
       :cloneable="$data.cloneable"
     >
       <template #default="{ item }">

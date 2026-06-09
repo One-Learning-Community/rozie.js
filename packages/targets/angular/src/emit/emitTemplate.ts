@@ -154,26 +154,48 @@ function detectNgDirectives(template: string): {
  * the reference. Quick task 260520-w18 bug class 6(ii).
  */
 const KNOWN_TEMPLATE_GLOBALS: readonly string[] = [
+  // Namespace globals — used as `Math.round(...)`, `JSON.stringify(...)`.
   'Math',
   'JSON',
+  // Globals usable as a namespace AND as a callable/constructor —
+  // `Number.isInteger(x)` / `Number(x)`, `Array.from(x)` / `Array(3)`,
+  // `Object.keys(x)` / `Object(x)`, `Date.now()` / `new Date()`.
   'Number',
   'Object',
   'Array',
   'Date',
   'String',
   'Boolean',
+  // Bare callable globals — used as `parseInt(x)`, `isNaN(x)`, etc. (call form
+  // only; no namespace member access). These were the residual gap: the call
+  // form `Global(...)` was previously undetected (see detectUsedGlobals).
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'encodeURIComponent',
+  'decodeURIComponent',
 ];
 
 /**
- * Scan an emitted Angular template string for `<Global>.` member-access usage
- * (e.g. `Math.round(...)`). Returns the subset of KNOWN_TEMPLATE_GLOBALS that
- * appear as a namespace, de-duplicated. The regex requires a word boundary
- * before the name so `customMath.x` does not falsely match `Math`.
+ * Scan an emitted Angular template string for a `<Global>` reference used as a
+ * NAMESPACE (`Math.round(...)`) OR as a CALL / constructor (`Number(x)`,
+ * `new Date()`, `parseInt(s)`). Returns the subset of KNOWN_TEMPLATE_GLOBALS
+ * present, de-duplicated. Angular template expressions implicitly bind every
+ * bare identifier to the component instance (`ctx.Number`), so a global is
+ * unreachable unless the component exposes it as a member — emitAngular emits a
+ * `protected readonly <g> = <g>;` field per detected global.
+ *
+ * The lookbehind `(?<![\w$.])` requires a non-identifier, non-`.` char before
+ * the name so `customMath.x` / `e.Number` do not falsely match. The trailing
+ * `[.(]` matches BOTH member access (`Math.`) and call/construct (`Number(`) —
+ * the call form was the SortableListShowcase-angular bug (`Number($data.x)` →
+ * `ctx.Number(...)` → undefined → render abort).
  */
 function detectUsedGlobals(template: string): string[] {
   const found: string[] = [];
   for (const g of KNOWN_TEMPLATE_GLOBALS) {
-    const re = new RegExp(`(?<![\\w$.])${g}\\s*\\.`);
+    const re = new RegExp(`(?<![\\w$.])${g}\\s*[.(]`);
     if (re.test(template)) found.push(g);
   }
   return found;
