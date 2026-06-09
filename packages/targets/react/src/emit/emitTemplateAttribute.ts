@@ -966,8 +966,14 @@ function emitNonClassAttribute(
     // non-primitive value renders portable JSON instead of `[object Object]`.
     // Raw otherwise (SPEC-3).
     if (attr.wrapForDisplay && shouldWrapAttrBinding(attr.name, attr.expression, ctx)) {
-      ctx.collectors.runtime.add('rozieDisplay');
-      return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
+      // 260608-sya — whole-value attribute binding: route through `rozieAttr`
+      // so a nullish value DROPS the attribute (returns `undefined` → JSX omits
+      // it) instead of rendering `attr=""`, matching Vue's `:attr` semantics.
+      // `false` still stringifies (preserves aria-/data- a11y). Interpolated
+      // SEGMENTS below stay on `rozieDisplay` (a null segment in a composed
+      // string is `''`, matching Vue interpolation).
+      ctx.collectors.runtime.add('rozieAttr');
+      return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };
     }
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }

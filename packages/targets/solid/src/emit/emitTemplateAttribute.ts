@@ -640,8 +640,13 @@ function emitNonClassAttribute(
     // (SPEC-3). The wrap sits inside the JSX `{}` so the accessor read stays
     // tracked (A4).
     if (attr.wrapForDisplay && shouldWrapAttrBinding(attr.name, attr.expression, ctx)) {
-      ctx.collectors.runtime.add('rozieDisplay');
-      return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
+      // 260608-sya — whole-value attribute binding: route through `rozieAttr`
+      // so a nullish value DROPS the attribute (returns `undefined` → Solid
+      // skips the setAttribute) instead of rendering `attr=""`, matching Vue's
+      // `:attr` semantics. `false` still stringifies (preserves aria-/data-
+      // a11y). Interpolated SEGMENTS stay on `rozieDisplay`.
+      ctx.collectors.runtime.add('rozieAttr');
+      return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };
     }
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }

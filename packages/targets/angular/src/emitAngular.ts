@@ -396,6 +396,31 @@ const INLINE_DISPLAY_FN = [
 const DISPLAY_CLASS_METHOD =
   'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }';
 
+/**
+ * 260608-sya — inline module-scope `__rozieAttr` for the WHOLE-VALUE
+ * attribute-binding position. Unlike interpolation/text (where nullish → ''),
+ * a nullish bound attribute value must DROP the attribute, matching Vue's
+ * `:attr` binding. Angular's `[attr.x]="null"` removes the attribute. `false`
+ * is NOT dropped (delegates to `__rozieDisplay` → `"false"`), preserving
+ * aria-/data- a11y. Depends on `__rozieDisplay`, so both inline whenever the
+ * display-wrap flag is set (the attr swap sets the same flag). There is no
+ * `@rozie/runtime-angular` package (convention forbids one), so it inlines.
+ */
+const INLINE_ATTR_FN = [
+  'function __rozieAttr(v: unknown): string | null {',
+  '  return v == null ? null : __rozieDisplay(v);',
+  '}',
+].join('\n');
+
+/**
+ * 260608-sya — the delegating class method synthesized into the component body
+ * (same mechanism as `DISPLAY_CLASS_METHOD`). The template calls `rozieAttr(expr)`
+ * against `this`; this forwards to the inlined module-scope `__rozieAttr`.
+ * Gated on `tmplResult.hasDisplayWrap` (the attr swap flips it).
+ */
+const ATTR_CLASS_METHOD =
+  'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
+
 export function emitAngular(
   ir: IRComponent,
   opts: EmitAngularOptions = {},
@@ -726,6 +751,10 @@ export function emitAngular(
     // via the interfaceDecls bucket). Both gated on the same flag so a
     // non-wrapping component stays byte-identical to pre-phase (SPEC-3).
     ...(tmplResult.hasDisplayWrap ? [DISPLAY_CLASS_METHOD] : []),
+    // 260608-sya — the delegating `rozieAttr` class method, synthesized on the
+    // SAME flag (a wrapped whole-value attr binding flips `hasDisplayWrap`).
+    // `__rozieAttr` depends on `__rozieDisplay`, so both inline together.
+    ...(tmplResult.hasDisplayWrap ? [ATTR_CLASS_METHOD] : []),
   ];
 
   // Find the constructor block and splice the listener effects + renderer
@@ -805,8 +834,11 @@ export function emitAngular(
   // `@rozie/runtime-angular` import is emitted (the package does not exist;
   // convention forbids it). When nothing wrapped, the bucket is unchanged so the
   // emitted file is byte-identical to pre-phase (SPEC-3).
+  // 260608-sya — `__rozieAttr` is appended alongside `__rozieDisplay` (it
+  // delegates to it). Both inline only when the display-wrap flag is set, so a
+  // non-wrapping component's module-scope decls stay byte-identical to pre-phase.
   const moduleDecls = tmplResult.hasDisplayWrap
-    ? [...scriptResult.interfaceDecls, INLINE_DISPLAY_FN]
+    ? [...scriptResult.interfaceDecls, INLINE_DISPLAY_FN, INLINE_ATTR_FN]
     : scriptResult.interfaceDecls;
 
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap, userCodeLineOffset } = buildShell({

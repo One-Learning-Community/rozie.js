@@ -1265,8 +1265,16 @@ export function emitSingleAttr(
       attr.wrapForDisplay &&
       shouldWrapAttrBinding(attr.name, attr.expression, ctx, elementTagName)
     ) {
+      // 260608-sya — whole-value attribute binding: route through the
+      // synthesized `rozieAttr` class method (delegating to inline
+      // `__rozieAttr`) so a nullish value DROPS the attribute. Angular's
+      // `[attr.x]="null"` removes the attribute (the `attr.*` binding form that
+      // `resolveBindingName` produces for `aria-`/`data-`), matching Vue's
+      // `:attr` semantics. `false` still stringifies (preserves a11y). The
+      // interpolated-segment branch below stays on `rozieDisplay`. Sets the
+      // same display-wrap flag so both `__rozieDisplay` + `__rozieAttr` inline.
       if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
-      return `[${bindingName}]="rozieDisplay(${expr})"`;
+      return `[${bindingName}]="rozieAttr(${expr})"`;
     }
     return `[${bindingName}]="${expr}"`;
   }

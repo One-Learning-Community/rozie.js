@@ -701,8 +701,15 @@ export function emitSingleAttr(
     // controlled-input props (no wrap). A non-primitive value renders portable
     // JSON; raw otherwise (SPEC-3).
     if (attr.wrapForDisplay && shouldWrapSvelteAttrBinding(attr.name, attr.expression, ctx)) {
-      ctx.runtimeImports?.add('rozieDisplay');
-      return `${outName}={rozieDisplay(${expr})}`;
+      // 260608-sya — whole-value attribute binding (`attr.kind === 'binding'`):
+      // route through `rozieAttr` so a nullish value DROPS the attribute
+      // (returns `undefined` → Svelte 5 omits it) instead of rendering
+      // `attr=""`, matching Vue's `:attr` semantics. `false` still stringifies
+      // (preserves aria-/data- a11y). The interpolated single-segment branch
+      // below stays on `rozieDisplay` — a null segment inside a composed string
+      // is `''`, matching Vue interpolation-in-attr.
+      ctx.runtimeImports?.add('rozieAttr');
+      return `${outName}={rozieAttr(${expr})}`;
     }
     return `${outName}={${expr}}`;
   }

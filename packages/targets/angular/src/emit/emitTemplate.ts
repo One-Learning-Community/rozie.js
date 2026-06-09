@@ -96,6 +96,11 @@ export interface EmitTemplateResult {
    * class method `rozieDisplay(v) { return __rozieDisplay(v); }`. When false,
    * neither is emitted (non-wrapping components byte-identical to pre-phase,
    * SPEC-3). Same boxed-flag plumbing as `hasSpreadBinding`.
+   *
+   * 260608-sya — a wrapped WHOLE-VALUE attribute binding also sets this flag,
+   * and emitAngular additionally inlines `function __rozieAttr(v)` (drop-on-
+   * nullish, delegating to `__rozieDisplay`) + the `rozieAttr` class method on
+   * the same flag.
    */
   hasDisplayWrap: boolean;
   /**

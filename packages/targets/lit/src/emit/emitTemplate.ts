@@ -613,8 +613,16 @@ function emitAttribute(
       attr.name !== 'style' &&
       !bt.isObjectExpression(attr.expression)
     ) {
-      opts?.runtime.add('rozieDisplay');
-      return `${attr.name}=\${rozieDisplay(${expr})}`;
+      // 260608-sya — whole-value generic-attribute binding: route through
+      // `rozieAttr` so a nullish value DROPS the attribute (returns lit's
+      // `nothing` sentinel in an `attr=${...}` binding) instead of rendering
+      // `attr=""`, matching Vue's `:attr` semantics. `false` still stringifies
+      // (preserves aria-/data- a11y). Property/boolean/form bindings above are
+      // already excluded; the interpolated-segment branch below stays on
+      // `rozieDisplay`. `nothing` is supplied by the runtime-lit helper itself,
+      // not this emit site, so no `opts.lit.add('nothing')` is needed here.
+      opts?.runtime.add('rozieAttr');
+      return `${attr.name}=\${rozieAttr(${expr})}`;
     }
     return `${attr.name}=\${${expr}}`;
   }

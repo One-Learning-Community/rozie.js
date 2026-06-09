@@ -132,6 +132,11 @@ export interface EmitNodeCtx {
    * NOTE: Angular cannot call a module-scope free function OR use the `json`
    * pipe (it quotes strings) in a template — so the template calls the CLASS
    * METHOD `rozieDisplay`, never the free `__rozieDisplay`.
+   *
+   * 260608-sya — a wrapped WHOLE-VALUE attribute binding sets this flag too;
+   * emitAngular then also inlines `function __rozieAttr(v)` (drop-on-nullish)
+   * + the delegating `rozieAttr` class method on the same flag. The template
+   * calls the CLASS METHOD `rozieAttr`, never the free `__rozieAttr`.
    */
   hasDisplayWrap?: { value: boolean };
   /**
