@@ -318,6 +318,18 @@ const EXAMPLES = [
   // baselineExists() until the Linux-Docker PNG lands. The BEHAVIORAL coverage
   // (dynamic import, two-way page, Next) lives in pdf.spec.ts and is NOT a pixel cell.
   'PdfViewerScreenshot',
+  // Phase 36 (rete) — FlowCanvasScreenshot is the content-STABLE node-flow-editor
+  // SCREENSHOT cell. `FlowCanvasScreenshotDemo.rozie` renders a fixed 3-node /
+  // 2-connection graph with pan/zoom/selection OFF + fitOnMount OFF (identity
+  // viewport transform → node positions map 1:1 to pixels on every target), via
+  // the VANILLA render layer (no framework render plugin). The graph is pure
+  // DOM + SVG (no canvas/WebGL), so per D-10 all 6 targets diff against the SAME
+  // shared `FlowCanvasScreenshot.png`. The settle (settleExample below) waits for
+  // the 3 node boxes + 2 connection paths to render before clipping. Baseline-
+  // gates to `test.fixme` via `baselineExists()` until the Linux-Docker PNG lands.
+  // The BEHAVIORAL coverage (vanilla render, drag-to-connect anchors, add-node
+  // reconcile, two-way zoom) lives in rete-flow.spec.ts and is NOT a pixel cell.
+  'FlowCanvasScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -710,6 +722,22 @@ async function settleExample(
       )
       .toBe(true);
     // Page rasterized; a short settle absorbs any final reflow before the clip.
+    await page.waitForTimeout(300);
+  }
+  // FlowCanvasScreenshot (Phase 36): the FlowCanvas (Rete.js) wrapper mounts the
+  // editor into a host div on `$onMount`, then the vanilla render pipe fills the
+  // 3 engine node elements (`.rozie-flow-node`) and draws the 2 connection SVG
+  // paths (`.rozie-flow-connection__path`) once the socket-position watcher
+  // reports positions. Both are engine-created DOM (set via `el.className`), so
+  // the classes are literal on every target (NOT CSS-Modules-hashed — the
+  // compiler never sees them). Wait for the full graph before clipping; a short
+  // settle absorbs the final path-redraw reflow. The CSS locator pierces Lit's
+  // open shadow root.
+  if (example === 'FlowCanvasScreenshot') {
+    await expect(page.locator('.rozie-flow-node')).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator('.rozie-flow-connection__path')).toHaveCount(2, {
+      timeout: 10_000,
+    });
     await page.waitForTimeout(300);
   }
 }

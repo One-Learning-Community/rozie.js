@@ -1,0 +1,21 @@
+{
+  "name": "@rozie-ui/rete",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/codegen.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "echo 'no TS sources (the .rozie is codegen-compiled; leaves typecheck the emitted output)'"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "rete": "^2.0.5",
+    "rete-area-plugin": "^2.1.2",
+    "rete-connection-plugin": "^2.0.4",
+    "rete-render-utils": "^2.0.3",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
+  }
+}

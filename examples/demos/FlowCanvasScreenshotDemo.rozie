@@ -1,0 +1,71 @@
+<!--
+  FlowCanvasScreenshotDemo.rozie — CONTENT-STABLE pixel cell for the FlowCanvas
+  (Rete.js) wrapper. The companion of the behavioral FlowCanvasDemo.
+
+  Deterministic, animation-free render for cross-target screenshot parity:
+    - a fixed 3-node / 2-connection graph at fixed positions.
+    - pannable / zoomable / selectable all OFF — no drag affordances, no
+      interaction-state variation.
+    - fitOnMount OFF + zoom pinned to 1 — the viewport transform is identity, so
+      node positions map 1:1 to pixels on every target (no zoomAt animation, no
+      per-target fit rounding).
+    - default node chrome (no `node` slot) so the rendered node bodies are the
+      engine-layer title chrome, identical across targets.
+
+  NOTE (tracked deferral, the canvas/WebGL precedent): the connection SVG paths
+  are drawn from DOM socket positions measured after layout. If a target shows
+  sub-pixel path drift at the human-verify gate, the SCREENSHOT cell for that
+  target is a tracked deferral (like the Chart.js canvas + Lit-MapLibre WebGL
+  cells); the BEHAVIORAL cell (FlowCanvasDemo) remains the correctness gate.
+-->
+
+<rozie name="FlowCanvasScreenshotDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+}
+</components>
+
+<data>
+{
+  nodes: [
+    { id: 'a', label: 'Input',   x: 20,  y: 30,  outputs: [{ key: 'out', label: 'value' }] },
+    { id: 'b', label: 'Process', x: 240, y: 30,  inputs: [{ key: 'in', label: 'in' }], outputs: [{ key: 'out', label: 'out' }] },
+    { id: 'c', label: 'Output',  x: 460, y: 110, inputs: [{ key: 'in', label: 'result' }] },
+  ],
+  connections: [
+    { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+  ],
+}
+</data>
+
+<template>
+<div class="flow-shot">
+  <h3>FlowCanvas — screenshot</h3>
+  <div class="flow-wrap" style="height: 280px">
+    <FlowCanvas
+      :nodes="$data.nodes"
+      :connections="$data.connections"
+      :zoom="1"
+      :pannable="false"
+      :zoomable="false"
+      :selectable="false"
+      :fit-on-mount="false"
+    />
+  </div>
+</div>
+</template>
+
+<style>
+.flow-shot {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.flow-shot h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+</style>
+
+</rozie>

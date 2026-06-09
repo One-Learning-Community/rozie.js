@@ -35,6 +35,7 @@
     "@rozie-ui/fullcalendar-vue": "workspace:*",
     "@rozie-ui/maplibre-vue": "workspace:*",
     "@rozie-ui/pdf-vue": "workspace:*",
+    "@rozie-ui/rete-vue": "workspace:*",
     "@rozie-ui/sortable-list-vue": "workspace:*",
     "@rozie-ui/tiptap-vue": "workspace:*",
     "@rozie/core": "workspace:*",
@@ -51,6 +52,10 @@
     "flatpickr": "^4.6.13",
     "maplibre-gl": "^5.24.0",
     "pdfjs-dist": "^6.0.227",
+    "rete": "^2.0.5",
+    "rete-area-plugin": "^2.1.2",
+    "rete-connection-plugin": "^2.0.4",
+    "rete-render-utils": "^2.0.3",
     "sortablejs": "^1.15.7",
     "vitepress": "^1.5.0",
     "vue": "^3.5.0"

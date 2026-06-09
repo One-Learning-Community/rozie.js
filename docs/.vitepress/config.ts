@@ -175,6 +175,14 @@ export default defineConfig({
             { text: 'PdfViewer — live demo', link: '/guide/pdf-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/rete',
+          items: [
+            { text: 'FlowCanvas — showcase & API', link: '/guide/rete' },
+            { text: 'Node-flow editor comparison', link: '/guide/rete-comparison' },
+            { text: 'FlowCanvas — live demo', link: '/guide/rete-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

@@ -1,0 +1,12 @@
+.rozie-flow-canvas[data-rozie-s-cd396d6a] {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px) 0 0 / 20px 20px,
+    #f7f8fa;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}

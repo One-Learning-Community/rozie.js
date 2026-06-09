@@ -287,6 +287,19 @@ export const EXAMPLES = [
   // was disproven once those cells landed 6/6). Baseline-gates to test.fixme via
   // baselineExists() until the Linux-Docker PNG lands.
   'PdfViewerScreenshot',
+  // FlowCanvas (Rete.js v2) — the node-flow-editor cells. FlowCanvas is the
+  // BEHAVIORAL cell (loader → examples/demos/FlowCanvasDemo.rozie, which imports
+  // ../../packages/ui/rete/src/FlowCanvas.rozie). It drives a config-array
+  // :nodes/:connections graph through a VANILLA render pipe (no framework render
+  // plugin), a two-way r-model:zoom, an "add node" reconcile, and the REACTIVE
+  // multi-instance `node` portal slot — see rete-flow.spec.ts. FlowCanvasScreenshot
+  // is the content-STABLE pixel cell (loader → FlowCanvasScreenshotDemo.rozie): a
+  // fixed graph with pan/zoom/selection off + fitOnMount off (identity transform).
+  // Registered as a host cell; the screenshot baseline is a tracked deferral (the
+  // connection-path sub-pixel + canvas-VR precedent) so it is NOT in matrix.spec.ts
+  // EXAMPLES until a Linux PNG is generated and verified.
+  'FlowCanvas',
+  'FlowCanvasScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -395,6 +408,12 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-pdf-viewer'). Behavioral only — no screenshot cell.
   PdfViewer: 'rozie-pdf-viewer',
   PdfViewerScreenshot: 'rozie-pdf-viewer-screenshot',
+  // FlowCanvas — the lit entry appends '-demo' → tags 'rozie-flow-canvas-demo' /
+  // 'rozie-flow-canvas-screenshot-demo' = kebab of FlowCanvasDemo /
+  // FlowCanvasScreenshotDemo (the wrapper component is name="FlowCanvas" →
+  // 'rozie-flow-canvas').
+  FlowCanvas: 'rozie-flow-canvas',
+  FlowCanvasScreenshot: 'rozie-flow-canvas-screenshot',
 };
 
 export interface HostQuery {
@@ -549,6 +568,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // base64 PDF + fixed page/scale in <script>. No parent props needed.
   PdfViewer: {},
   PdfViewerScreenshot: {},
+  FlowCanvas: {},
+  FlowCanvasScreenshot: {},
 };
 
 /**

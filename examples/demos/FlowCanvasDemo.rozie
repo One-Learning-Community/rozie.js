@@ -1,0 +1,140 @@
+<!--
+  FlowCanvasDemo.rozie — BEHAVIORAL consumer for the FlowCanvas (Rete.js) wrapper.
+
+  The companion of FlowCanvasScreenshotDemo (the content-stable pixel cell). THIS
+  demo drives the config-array graph + the two-way zoom + the reactive node
+  portal slot and asserts the DOM reflects them, across all 6 targets
+  (rete-flow.spec.ts):
+
+    - :nodes / :connections config arrays build the graph; the spec asserts the
+      engine rendered the node boxes (.rozie-flow-node) and a connection path
+      (.rozie-flow-connection__path).
+    - "Add node" pushes a new entry onto $data.nodes → the wrapper's $watch
+      reconciles it into the live editor (no remount); the node-count readout +
+      a new .rozie-flow-node prove the reactive add.
+    - r-model:zoom two-way binds to $data.zoom; "Zoom in" mutates $data.zoom →
+      wrapper $watch → area.zoom → the readout reflects it.
+    - <template #node> fills the REACTIVE MULTI-INSTANCE `node` portal slot with
+      framework-native node chrome (.rozie-demo-node), proving the per-node portal
+      mounts and re-renders in place.
+
+  Container needs explicit height (the wrapper's canvas fills it).
+
+  This is the BEHAVIORAL cell — do NOT add screenshot stabilization here. The
+  content-stable SCREENSHOT cell is the SEPARATE FlowCanvasScreenshotDemo.rozie.
+-->
+
+<rozie name="FlowCanvasDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  nextId: 3,
+  lastConnect: 0,
+  lastMoved: 0,
+  nodes: [
+    { id: 'a', label: 'Source', x: 20,  y: 40,  data: { kind: 'in' },  outputs: [{ key: 'out', label: 'out' }] },
+    { id: 'b', label: 'Filter', x: 260, y: 40,  data: { kind: 'op' },  inputs: [{ key: 'in', label: 'in' }], outputs: [{ key: 'out', label: 'out' }] },
+    { id: 'c', label: 'Sink',   x: 500, y: 120, data: { kind: 'out' }, inputs: [{ key: 'in', label: 'in' }] },
+  ],
+  connections: [
+    { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+  ],
+}
+</data>
+
+<script>
+// Push a new node onto the config array — the wrapper reconciles it live.
+const addNode = () => {
+  const id = 'n' + $data.nextId
+  $data.nextId = $data.nextId + 1
+  $data.nodes = [
+    ...$data.nodes,
+    { id, label: 'Node ' + id, x: 120 + $data.nodes.length * 30, y: 220, data: { kind: 'op' }, inputs: [{ key: 'in' }], outputs: [{ key: 'out' }] },
+  ]
+}
+
+// Drive $data.zoom up — the two-way bind reconciles into the live area.
+const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
+
+// Track graph events for assertion.
+const onConnect = () => { $data.lastConnect = ($data.lastConnect || 0) + 1 }
+const onMoved = () => { $data.lastMoved = ($data.lastMoved || 0) + 1 }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="add-node" @click="addNode">Add node</button>
+    <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
+    <span class="readout" data-testid="readout-count">{{ $data.nodes.length }}</span>
+    <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 340px">
+    <FlowCanvas
+      :nodes="$data.nodes"
+      :connections="$data.connections"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+      @connection-created="onConnect"
+      @node-moved="onMoved"
+    >
+      <template #node="{ node, selected }">
+        <div class="rozie-demo-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
+          <strong>{{ node.label }}</strong>
+        </div>
+      </template>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+.rozie-demo-node {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #111827;
+}
+.rozie-demo-node[data-kind="in"]  strong { color: #047857; }
+.rozie-demo-node[data-kind="out"] strong { color: #b91c1c; }
+.rozie-demo-node.is-selected { background: rgba(59, 130, 246, 0.08); }
+</style>
+
+</rozie>

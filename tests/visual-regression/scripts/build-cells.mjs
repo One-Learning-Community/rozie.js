@@ -125,6 +125,17 @@ const PDF_SRC = resolve(
   'pdf',
   'src',
 );
+// Same packaging move for @rozie-ui/rete: FlowCanvas.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `FlowCanvas.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const RETE_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'rete',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -355,6 +366,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // pdf src always exists post-port — defensive only
   }
   rmSync(resolve(PDF_SRC, 'PdfViewer.ts'), { force: true });
+  // Same sweep for @rozie-ui/rete's package src (FlowCanvasDemo +
+  // FlowCanvasScreenshotDemo compose FlowCanvas via <components>, so the Angular
+  // sub-build emits FlowCanvas.rozie.ts + the FlowCanvas.ts shim here). Leftovers
+  // (the emitted .rozie.ts imports @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(RETE_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(RETE_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // rete src always exists post-port — defensive only
+  }
+  rmSync(resolve(RETE_SRC, 'FlowCanvas.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

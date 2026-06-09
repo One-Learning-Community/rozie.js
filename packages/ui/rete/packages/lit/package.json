@@ -1,0 +1,88 @@
+{
+  "name": "@rozie-ui/rete-lit",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Lit node-based flow/graph editor wrapping Rete.js v2 — one Rozie source compiled to Lit.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "rete",
+    "rete-js",
+    "node-editor",
+    "flow",
+    "graph",
+    "diagram",
+    "nodes",
+    "visual-programming",
+    "lit"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/rete/packages/lit"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-lit": "workspace:*"
+  },
+  "peerDependencies": {
+    "lit": "^3",
+    "@lit-labs/preact-signals": "^1.0.0",
+    "@preact/signals-core": "^1.3.0",
+    "rete": "^2",
+    "rete-area-plugin": "^2",
+    "rete-connection-plugin": "^2",
+    "rete-render-utils": "^2"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": false
+    },
+    "@lit-labs/preact-signals": {
+      "optional": false
+    },
+    "@preact/signals-core": {
+      "optional": false
+    },
+    "rete": {
+      "optional": false
+    },
+    "rete-area-plugin": {
+      "optional": false
+    },
+    "rete-connection-plugin": {
+      "optional": false
+    },
+    "rete-render-utils": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

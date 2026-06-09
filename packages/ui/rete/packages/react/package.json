@@ -1,0 +1,91 @@
+{
+  "name": "@rozie-ui/rete-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic React node-based flow/graph editor wrapping Rete.js v2 — one Rozie source compiled to React.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "rete",
+    "rete-js",
+    "node-editor",
+    "flow",
+    "graph",
+    "diagram",
+    "nodes",
+    "visual-programming",
+    "react"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/rete/packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19",
+    "rete": "^2",
+    "rete-area-plugin": "^2",
+    "rete-connection-plugin": "^2",
+    "rete-render-utils": "^2"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "rete": {
+      "optional": false
+    },
+    "rete-area-plugin": {
+      "optional": false
+    },
+    "rete-connection-plugin": {
+      "optional": false
+    },
+    "rete-render-utils": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ]
+}
