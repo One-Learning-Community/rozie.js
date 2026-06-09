@@ -39,6 +39,7 @@
     "@types/babel__traverse": "^7",
     "@typescript-eslint/parser": "^8.59.1",
     "@lit-labs/preact-signals": "^1.0.0",
+    "@lit/context": "^1.1.6",
     "eslint": "^9",
     "happy-dom": "^15.0.0",
     "lit": "^3.2.0",
