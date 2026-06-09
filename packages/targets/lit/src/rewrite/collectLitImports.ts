@@ -198,3 +198,39 @@ export class RuntimeLitImportCollector {
     return `import { ${sorted.join(', ')} } from '@rozie/runtime-lit';\n`;
   }
 }
+
+/**
+ * Phase 36 (R10) — `@lit/context` value imports for the cross-component context
+ * primitive emit (`emitContext.ts`). `createContext` (identity-on-key, used with
+ * `Symbol.for('rozie:'+key)` for native cross-file identity), `ContextProvider`
+ * (`$provide`), `ContextConsumer` (`$inject`). The import line is emitted ONLY
+ * when the component has at least one `$provide`/`$inject` — keeping non-context
+ * components byte-identical (R12 / D-5). `@lit/context` is a peer dep of
+ * `@rozie/runtime-lit` (devDep of `@rozie/target-lit`).
+ */
+export type LitContextImport =
+  | 'createContext'
+  | 'ContextProvider'
+  | 'ContextConsumer';
+
+export class LitContextImportCollector {
+  private symbols = new Set<LitContextImport>();
+
+  add(name: LitContextImport): void {
+    this.symbols.add(name);
+  }
+
+  has(name: LitContextImport): boolean {
+    return this.symbols.has(name);
+  }
+
+  names(): readonly string[] {
+    return [...this.symbols].sort();
+  }
+
+  render(): string {
+    if (this.symbols.size === 0) return '';
+    const sorted = [...this.symbols].sort();
+    return `import { ${sorted.join(', ')} } from '@lit/context';\n`;
+  }
+}

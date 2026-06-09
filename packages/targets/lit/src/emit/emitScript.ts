@@ -29,12 +29,15 @@ import type {
   LitDecoratorImportCollector,
   PreactSignalsImportCollector,
   RuntimeLitImportCollector,
+  LitContextImportCollector,
+  LitContextImport,
 } from '../rewrite/collectLitImports.js';
 import { rewriteScript, collectMethodNamesFromProgram } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -49,6 +52,13 @@ export interface EmitScriptOpts {
   signals: PreactSignalsImportCollector;
   runtime: RuntimeLitImportCollector;
   lit: LitImportCollector;
+  /**
+   * Phase 36 (R10) — `@lit/context` import collector for the cross-component
+   * context emit. Optional so legacy callers/tests that don't pass it still
+   * compile; emitContext is empty-gated, so an absent collector is only ever
+   * touched when the component actually has `$provide`/`$inject`.
+   */
+  context?: LitContextImportCollector;
   /**
    * Spike 004 — per-component scope hash threaded into `emitPortals` so the
    * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
@@ -95,6 +105,15 @@ export interface EmitScriptResult {
    * `<script>`, so untyped emit is byte-identical.
    */
   hoistedTypeDecls: string[];
+  /**
+   * Phase 36 (R10) — module-scope `const __rozieCtx_<key> =
+   * createContext(Symbol.for('rozie:<key>'));` lines for the context primitive,
+   * one per distinct key. emitLit splices these into its `interfaceDecls`
+   * bucket (module scope, above the class) so a provider and an in-module
+   * consumer share one context object. Empty for a non-context component
+   * (byte-identical, R12 / D-5).
+   */
+  moduleContextDecls: string[];
   /** Source map for user-authored statements (unused in P2 — null). */
   scriptMap: EncodedSourceMap | null;
   /** Number of preamble lines (unused in P2). */
@@ -435,6 +454,37 @@ function partitionScript(program: t.File): PartitionedScript {
       ) {
         continue;
       }
+      // Phase 36 (R10) — a top-level `$provide('k', v)` call is a COMPILE-TIME
+      // directive consumed via `ir.provides` and re-emitted by emitContext as a
+      // `new ContextProvider(this, …)` field. Strip the call here so the bare
+      // `$provide` identifier never leaks into firstUpdated() as an undefined
+      // runtime reference (mirrors the $expose / Angular residual-body strip).
+      if (
+        t.isCallExpression(callExpr) &&
+        t.isIdentifier(callExpr.callee) &&
+        callExpr.callee.name === '$provide'
+      ) {
+        continue;
+      }
+    }
+    // Phase 36 (R10) — a top-level `const x = $inject('k', f?)` binder is a
+    // COMPILE-TIME directive consumed via `ir.injects` and re-emitted by
+    // emitContext as a `new ContextConsumer(this, …)` field + a null-guarded
+    // `get x()` accessor. Strip the declaration here so the bare `$inject`
+    // identifier never leaks into the class body as an undefined ref. Only the
+    // all-`$inject` declaration form is stripped; a mixed declarator flows
+    // through unchanged (ROZ130 forbids mixing in practice).
+    if (t.isVariableDeclaration(stmt)) {
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
     }
     // Quick plan 260515-u2b — top-level $watch call detection.
     if (t.isExpressionStatement(stmt)) {
@@ -1056,6 +1106,26 @@ export function emitScript(
     fieldLines.push(portalsEmit.fieldDecl);
   }
 
+  // Phase 36 (R10) — cross-component context primitive. Read the $provide value
+  // / $inject fallback expressions back from the REWRITTEN program so they carry
+  // the $data.x → this._x.value / $computed getter / $props.x → this.x rewrites.
+  // Empty-gated on ir.provides/injects so non-context components emit nothing new
+  // (R12 / D-5). Provider/Consumer controller fields land alongside the other
+  // class fields; the reactive `setValue` effect registrations (Pattern 5 / D-3)
+  // join the firstUpdated cleanup-push region so they subscribe at first paint
+  // AND tear down on disconnect.
+  const contextEmit = emitContext(ir, rewritten.file);
+  const moduleContextDecls = contextEmit.moduleContextDecls;
+  if (contextEmit.hasContext) {
+    for (const line of contextEmit.fieldLines) fieldLines.push(line);
+    if (opts.context) {
+      for (const sym of contextEmit.litContextImports) {
+        opts.context.add(sym as LitContextImport);
+      }
+    }
+    if (contextEmit.needsEffectImport) opts.signals.add('effect');
+  }
+
   // 6. firstUpdated body: free-statement preamble + cleanup pushes + mount hooks
   //    + watcher effect registrations. Watcher registrations live alongside
   //    cleanup pushes — they MUST fire at first paint so the @lit-labs/preact-signals
@@ -1066,6 +1136,12 @@ export function emitScript(
   if (cleanupPushes.length > 0) mountSegments.push(cleanupPushes.join('\n'));
   if (watcherCleanupPushes.length > 0)
     mountSegments.push(watcherCleanupPushes.join('\n'));
+  // Phase 36 (R10 / Pattern 5) — reactive context `setValue` effect
+  // registrations join the firstUpdated cleanup-push region: they subscribe to
+  // the provided value's signal reads at first paint and tear down on disconnect
+  // via `_disconnectCleanups`. Empty for constant / $props-only provided values.
+  if (contextEmit.setValueEffects.length > 0)
+    mountSegments.push(contextEmit.setValueEffects.join('\n'));
   for (const body of mountBodies) mountSegments.push(body);
 
   const unmountSegments: string[] = [];
@@ -1092,6 +1168,7 @@ export function emitScript(
     attributeChangedBody: attrCallbackLines.join('\n'),
     userImports,
     hoistedTypeDecls,
+    moduleContextDecls,
     scriptMap: null,
     preambleSectionLines: 0,
     diagnostics,

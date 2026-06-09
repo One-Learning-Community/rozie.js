@@ -35,6 +35,7 @@ import {
   LitDecoratorImportCollector,
   PreactSignalsImportCollector,
   RuntimeLitImportCollector,
+  LitContextImportCollector,
 } from './rewrite/collectLitImports.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -75,6 +76,10 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   const decoratorImports = new LitDecoratorImportCollector();
   const signalsImports = new PreactSignalsImportCollector();
   const runtimeImports = new RuntimeLitImportCollector();
+  // Phase 36 (R10) — `@lit/context` imports for the cross-component context
+  // primitive. Rendered ONLY when emitScript's emitContext adds symbols (i.e.
+  // the component has `$provide`/`$inject`) — byte-identical otherwise.
+  const contextImports = new LitContextImportCollector();
 
   // Every Lit class extends SignalWatcher(LitElement); always needs these.
   litImports.add('LitElement');
@@ -117,6 +122,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     signals: signalsImports,
     runtime: runtimeImports,
     lit: litImports,
+    context: contextImports,
     portalScopeHash: scopeHash,
   });
   diagnostics.push(...scriptResult.diagnostics);
@@ -376,6 +382,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     decoratorImports.render(),
     signalsImports.render(),
     runtimeImports.render(),
+    // Phase 36 (R10) — `@lit/context` import line; empty (and thus dropped by
+    // the `.filter` below) when the component has no `$provide`/`$inject`.
+    contextImports.render(),
     // CR-06 fix: read repeatUsed from templateResult instead of module-level singleton.
     templateResult.repeatUsed ? `import { repeat } from 'lit/directives/repeat.js';\n` : '',
     // Quick-task 260518-e2t (Spike 004 Lit subset) — conditional styleMap
@@ -416,6 +425,11 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // for an untyped `<script>`, so untyped emit stays byte-identical.
   const moduleScopeDecls = [
     ...scriptResult.hoistedTypeDecls,
+    // Phase 36 (R10) — module-scope `const __rozieCtx_<key> =
+    // createContext(Symbol.for('rozie:<key>'));` decls. They sit above the class
+    // so a provider + an in-module consumer over the same key share one context
+    // object. Empty (no entries) for a non-context component (byte-identical).
+    ...scriptResult.moduleContextDecls,
     ...slotResult.ctxInterfaces,
   ];
 
