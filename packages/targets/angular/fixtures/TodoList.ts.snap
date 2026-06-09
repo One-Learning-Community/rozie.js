@@ -33,6 +33,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-todo-list',
   standalone: true,
@@ -303,6 +307,8 @@ export class TodoList {
   private _defaultSlot_ctx_3 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default TodoList;

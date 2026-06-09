@@ -26,6 +26,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-sortable-list',
   standalone: true,
@@ -35,7 +39,7 @@ function __rozieDisplay(v: unknown): string {
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       <div class="rozie-sortable-list" #listEl part="list">
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" [attr.data-id]="rozieDisplay(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
@@ -421,6 +425,8 @@ export class SortableList {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default SortableList;

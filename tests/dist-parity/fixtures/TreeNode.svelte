@@ -1,6 +1,6 @@
 <script lang="ts">
 import TreeNode from './TreeNode.svelte';
-import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 interface Props {
   node?: any;
@@ -16,7 +16,7 @@ let __defaultNode = (() => ({
 let { node = __defaultNode, ...__rozieAttrs }: Props = $props();
 </script>
 
-<div {...__rozieAttrs} class={["tree-node", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-a7176a6e><span class="tree-node__label" data-rozie-s-a7176a6e>{rozieDisplay(node.label)}</span>{#if node.children && node.children.length > 0}<ul class="tree-node__children" data-rozie-s-a7176a6e>{#each node.children as child, childIndex (child.id)}<li data-index={rozieDisplay(childIndex)} data-rozie-s-a7176a6e><TreeNode node={child} data-rozie-s-a7176a6e></TreeNode></li>{/each}</ul>{/if}</div>
+<div {...__rozieAttrs} class={["tree-node", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-a7176a6e><span class="tree-node__label" data-rozie-s-a7176a6e>{rozieDisplay(node.label)}</span>{#if node.children && node.children.length > 0}<ul class="tree-node__children" data-rozie-s-a7176a6e>{#each node.children as child, childIndex (child.id)}<li data-index={rozieAttr(childIndex)} data-rozie-s-a7176a6e><TreeNode node={child} data-rozie-s-a7176a6e></TreeNode></li>{/each}</ul>{/if}</div>
 
 <style>
 :global {

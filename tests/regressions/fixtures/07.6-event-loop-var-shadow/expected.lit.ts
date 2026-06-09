@@ -1,7 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-event-loop-var-shadow')
@@ -32,7 +32,7 @@ export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
   render() {
     return html`
 <ul ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a955b18d>
-  ${repeat<any>(this._items.value, (e, _idx) => e.id, (e, _idx) => html`<li key=${rozieDisplay(e.id)} data-rozie-s-a955b18d>
+  ${repeat<any>(this._items.value, (e, _idx) => e.id, (e, _idx) => html`<li key=${rozieAttr(e.id)} data-rozie-s-a955b18d>
     <span data-rozie-s-a955b18d>${rozieDisplay(e.label)}</span>
     
     <button type="button" @click=${($event: Event) => { this.removeItem(e.id); }} data-rozie-s-a955b18d>×</button>

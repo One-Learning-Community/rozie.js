@@ -16,6 +16,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-prop-default-coercion',
   standalone: true,
@@ -191,6 +195,8 @@ export class PropDefaultCoercion {
   protected readonly JSON = JSON;
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default PropDefaultCoercion;

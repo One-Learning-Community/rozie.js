@@ -33,6 +33,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-modal',
   standalone: true,
@@ -41,7 +45,7 @@ function __rozieDisplay(v: unknown): string {
 
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
-      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieDisplay(title() || undefined)" tabindex="-1">
+      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieAttr(title() || undefined)" tabindex="-1">
         @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
           @if ((headerTpl ?? templates()?.['header'])) {
@@ -192,6 +196,8 @@ export class Modal {
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default Modal;

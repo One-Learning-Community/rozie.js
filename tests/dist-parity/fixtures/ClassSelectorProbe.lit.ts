@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-class-selector-probe')
 export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
@@ -41,7 +41,7 @@ export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="panel" data-handle=${rozieDisplay(".panel")} data-grip=${rozieDisplay(this.gripSelector)} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-899140be>
+<div class="panel" data-handle=${rozieAttr(".panel")} data-grip=${rozieAttr(this.gripSelector)} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-899140be>
   <span class="grip" aria-hidden="true" data-rozie-s-899140be>⋮⋮</span>
   ${this._ready.value ? html`<span data-rozie-s-899140be>ready</span>` : nothing}</div>
 `;

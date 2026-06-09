@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { Show, createSignal, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, rozieAttr } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('ClassSelectorProbe-899140be', `.panel[data-rozie-s-899140be] {
   display: block;
@@ -30,7 +30,7 @@ export default function ClassSelectorProbe(_props: ClassSelectorProbeProps): JSX
 
   return (
     <>
-    <div data-handle={rozieDisplay('.panel')} data-grip={rozieDisplay(gripSelector)} {...attrs} class={"panel" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-899140be="">
+    <div data-handle={rozieAttr('.panel')} data-grip={rozieAttr(gripSelector)} {...attrs} class={"panel" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-899140be="">
       <span class={"grip"} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
       {<Show when={ready()}><span data-rozie-s-899140be="">ready</span></Show>}</div>
     </>

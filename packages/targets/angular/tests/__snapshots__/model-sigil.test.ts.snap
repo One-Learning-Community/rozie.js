@@ -20,12 +20,16 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-model-sigil',
   standalone: true,
   template: \`
 
-      <button [title]="rozieDisplay(__title)" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
+      <button [attr.title]="rozieAttr(__title)" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
 
   \`,
   providers: [
@@ -219,6 +223,8 @@ export class ModelSigil {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default ModelSigil;

@@ -16,12 +16,16 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-class-selector-probe',
   standalone: true,
   template: `
 
-    <div class="panel" [attr.data-handle]="rozieDisplay('.panel')" [attr.data-grip]="rozieDisplay(gripSelector)" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="panel" [attr.data-handle]="rozieAttr('.panel')" [attr.data-grip]="rozieAttr(gripSelector)" #rozieSpread_0 #rozieListenersTarget_1>
       <span class="grip" aria-hidden="true">⋮⋮</span>
       @if (ready()) {
     <span>ready</span>
@@ -175,6 +179,8 @@ export class ClassSelectorProbe {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default ClassSelectorProbe;

@@ -16,6 +16,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-badge-grid-styled-scss',
   standalone: true,
@@ -200,6 +204,8 @@ export class BadgeGridStyledScss {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default BadgeGridStyledScss;

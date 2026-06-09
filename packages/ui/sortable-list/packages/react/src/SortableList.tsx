@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './SortableList.css';
 import { useSortableJS } from './internal/useSortableJS';
 
@@ -309,7 +309,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
       <div className={"rozie-sortable-list"} ref={listEl} part="list" data-rozie-s-0af24eae="">
-        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} data-id={rozieDisplay(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
+        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}
       </div>

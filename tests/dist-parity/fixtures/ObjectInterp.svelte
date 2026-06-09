@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 interface Props {
   [key: string]: unknown;
@@ -13,4 +13,4 @@ let obj = $state({
 });
 </script>
 
-<div {...__rozieAttrs} class={["object-interp", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-aca60b6e><p class={`card--${rozieDisplay(obj)}`} data-x={rozieDisplay(obj)} data-rozie-s-aca60b6e>{rozieDisplay(obj)}</p></div>
+<div {...__rozieAttrs} class={["object-interp", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-aca60b6e><p class={`card--${rozieDisplay(obj)}`} data-x={rozieAttr(obj)} data-rozie-s-aca60b6e>{rozieDisplay(obj)}</p></div>

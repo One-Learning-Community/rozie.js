@@ -16,13 +16,17 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-object-interp',
   standalone: true,
   template: `
 
     <div class="object-interp" #rozieSpread_0 #rozieListenersTarget_1>
-      <p [class]="\`card--\${rozieDisplay(obj())}\`" [attr.data-x]="rozieDisplay(obj())">{{ rozieDisplay(obj()) }}</p>
+      <p [class]="\`card--\${rozieDisplay(obj())}\`" [attr.data-x]="rozieAttr(obj())">{{ rozieDisplay(obj()) }}</p>
     </div>
 
   `,
@@ -158,6 +162,8 @@ export class ObjectInterp {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default ObjectInterp;

@@ -16,6 +16,10 @@ function __rozieDisplay(v: unknown): string {
   return String(v);
 }
 
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-tree-node',
   standalone: true,
@@ -27,7 +31,7 @@ function __rozieDisplay(v: unknown): string {
       @if (node().children && node().children.length > 0) {
     <ul class="tree-node__children">
         @for (child of node().children; track child.id; let childIndex = $index) {
-    <li [attr.data-index]="rozieDisplay(childIndex)">
+    <li [attr.data-index]="rozieAttr(childIndex)">
           <rozie-tree-node [node]="child"></rozie-tree-node>
         </li>
     }
@@ -173,6 +177,8 @@ export class TreeNode {
   });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default TreeNode;

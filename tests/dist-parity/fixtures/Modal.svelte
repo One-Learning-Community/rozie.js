@@ -1,5 +1,5 @@
 <script lang="ts">
-import { rozieDisplay } from '@rozie/runtime-svelte';
+import { rozieAttr } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
@@ -88,7 +88,7 @@ $effect(() => {
 });
 </script>
 
-{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }} data-rozie-s-fc45feb2><div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieDisplay(title || undefined)} tabindex="-1" data-rozie-s-fc45feb2>{#if title || header}<header data-rozie-s-fc45feb2>{#if header}{@render header({ close })}{:else}<h2 data-rozie-s-fc45feb2>{title}</h2>{/if}<button class="close-btn" aria-label="Close" onclick={close} data-rozie-s-fc45feb2>×</button></header>{/if}<div class="modal-body" data-rozie-s-fc45feb2>{@render children?.({ close })}</div>{#if footer}<footer data-rozie-s-fc45feb2>{#if footer}{@render footer({ close })}{/if}</footer>{/if}</div></div>{/if}
+{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }} data-rozie-s-fc45feb2><div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieAttr(title || undefined)} tabindex="-1" data-rozie-s-fc45feb2>{#if title || header}<header data-rozie-s-fc45feb2>{#if header}{@render header({ close })}{:else}<h2 data-rozie-s-fc45feb2>{title}</h2>{/if}<button class="close-btn" aria-label="Close" onclick={close} data-rozie-s-fc45feb2>×</button></header>{/if}<div class="modal-body" data-rozie-s-fc45feb2>{@render children?.({ close })}</div>{#if footer}<footer data-rozie-s-fc45feb2>{#if footer}{@render footer({ close })}{/if}</footer>{/if}</div></div>{/if}
 
 <style>
 :global {

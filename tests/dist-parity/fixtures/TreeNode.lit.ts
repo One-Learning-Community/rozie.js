@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-tree-node')
@@ -38,7 +38,7 @@ export default class TreeNode extends SignalWatcher(LitElement) {
 <div class="tree-node" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a7176a6e>
   <span class="tree-node__label" data-rozie-s-a7176a6e>${rozieDisplay(this.node.label)}</span>
   ${this.node.children && this.node.children.length > 0 ? html`<ul class="tree-node__children" data-rozie-s-a7176a6e>
-    ${repeat<any>(this.node.children, (child, childIndex) => child.id, (child, childIndex) => html`<li key=${rozieDisplay(child.id)} data-index=${rozieDisplay(childIndex)} data-rozie-s-a7176a6e>
+    ${repeat<any>(this.node.children, (child, childIndex) => child.id, (child, childIndex) => html`<li key=${rozieAttr(child.id)} data-index=${rozieAttr(childIndex)} data-rozie-s-a7176a6e>
       <rozie-tree-node .node=${child}></rozie-tree-node>
     </li>`)}
   </ul>` : nothing}</div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Modal.css';
 import './Modal.global.css';
 
@@ -89,7 +89,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   return (
     <>
     {(open) && <div className={"modal-backdrop"} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
-      <div ref={dialogEl} className={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieDisplay(props.title || undefined)} tabIndex={-1} data-rozie-s-fc45feb2="">
+      <div ref={dialogEl} className={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieAttr(props.title || undefined)} tabIndex={-1} data-rozie-s-fc45feb2="">
         {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header data-rozie-s-fc45feb2="">
           {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2 data-rozie-s-fc45feb2="">{props.title}</h2>}
           <button className={"close-btn"} aria-label="Close" onClick={close} data-rozie-s-fc45feb2="">×</button>

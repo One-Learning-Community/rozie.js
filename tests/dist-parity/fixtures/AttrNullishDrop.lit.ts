@@ -1,14 +1,12 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-object-interp')
-export default class ObjectInterp extends SignalWatcher(LitElement) {
-  private _obj = signal({
-  a: 1,
-  b: [2, 3]
-});
+@customElement('rozie-attr-nullish-drop')
+export default class AttrNullishDrop extends SignalWatcher(LitElement) {
+  private _cond = signal(false);
+  private _maybeNull = signal(null);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -27,8 +25,8 @@ export default class ObjectInterp extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="object-interp" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-aca60b6e>
-  <p class="card--${rozieDisplay(this._obj.value)}" data-x=${rozieAttr(this._obj.value)} data-rozie-s-aca60b6e>${rozieDisplay(this._obj.value)}</p>
+<div class="attr-nullish-drop" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-f2d28246>
+  <span data-x=${rozieAttr(this._cond.value ? 'v' : null)} aria-expanded=${rozieAttr(this._cond.value ? 'true' : 'false')} title=${rozieAttr(this._maybeNull.value)} data-rozie-s-f2d28246>probe</span>
 </div>
 `;
   }
