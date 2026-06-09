@@ -4884,6 +4884,7 @@
   },
   "inheritAttrs": true,
   "inheritListeners": true,
+  "adoptDocumentStyles": false,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

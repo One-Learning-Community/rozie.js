@@ -117,6 +117,20 @@ export interface IRComponent {
    * lowers to `true` here.
    */
   inheritListeners: boolean;
+  /**
+   * Item 3 (engine-CSS shadow bridge) — `true` when the `<rozie>` envelope
+   * carried `adopt-document-styles`. On a SHADOW-DOM target (Lit) the emitter
+   * clones the document's same-origin stylesheets into the component's shadow
+   * root at first render, so global CSS the consumer imported (an engine's
+   * stylesheet, e.g. cropper.css / maplibre-gl.css) reaches the engine-created
+   * DOM that lives inside the shadow boundary. A NO-OP on the 5 light-DOM
+   * targets — there the engine DOM is in light DOM and the global CSS already
+   * applies, so their emitted output is byte-unchanged.
+   *
+   * Threaded from `BlockMap.rozie.adoptDocumentStyles` in `lower.ts`: an absent
+   * attribute lowers to `false` (opt-in).
+   */
+  adoptDocumentStyles: boolean;
   styles: StyleSection;
   /**
    * Phase 06.2 P1 D-115 — declared via `<components>` block. Empty array

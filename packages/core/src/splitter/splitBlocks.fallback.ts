@@ -153,9 +153,22 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
       // bare present-without-value boolean → force-ON
       safeInterpolation = true;
     }
+    // Item 3: recover the `adopt-document-styles` envelope attribute (same
+    // valued / bare-boolean parse + WR-05 case-insensitive `"false"` as
+    // safe-interpolation). Absent → omit the key → resolves to `false`.
+    let adoptDocumentStyles: boolean | undefined;
+    const adsValued = openTag.match(
+      /\badopt-document-styles\s*=\s*["']([^"']*)["']/i,
+    );
+    if (adsValued) {
+      adoptDocumentStyles = (adsValued[1] ?? '').trim().toLowerCase() !== 'false';
+    } else if (/\badopt-document-styles\b/i.test(openTag)) {
+      adoptDocumentStyles = true;
+    }
     result.rozie = {
       name: rozieMatch[1] ?? 'Anonymous',
       ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+      ...(adoptDocumentStyles !== undefined ? { adoptDocumentStyles } : {}),
       loc: { start: tagStart, end: envelopeEnd },
     };
   } else {

@@ -203,6 +203,13 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // absent attribute (key omitted under exactOptionalPropertyTypes) lowers
     // to the `true` default.
     inheritListeners: ast.blocks.rozie?.inheritListeners ?? true,
+    // Item 3 (engine-CSS shadow bridge) — threaded from the
+    // `<rozie adopt-document-styles>` attribute captured by splitBlocks onto
+    // `BlockMap.rozie.adoptDocumentStyles`. An absent attribute lowers to the
+    // `false` default (opt-in). Only the Lit emitter consumes it (clone
+    // document stylesheets into the shadow root); a no-op on the other 5
+    // targets, so their emitted output is unchanged.
+    adoptDocumentStyles: ast.blocks.rozie?.adoptDocumentStyles ?? false,
     styles,
     // Phase 06.2 P1 D-115 — populated from componentsTable.values() in source-order
     // (Map preserves insertion order per D-129).

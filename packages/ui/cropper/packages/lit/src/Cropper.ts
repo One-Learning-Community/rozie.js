@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 // The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
 // would collide with the component name `Cropper` (the rozie `name`), which the
 // emitters declare as a local `Cropper` class/function across React/Solid/Lit
@@ -59,6 +59,8 @@ private __rozieFirstUpdateDone = false;
   private _rozieTornDown = false;
 
   firstUpdated(): void {
+    adoptDocumentStyles(this);
+
     this._disconnectCleanups.push((() => {
       if (this.instance) this.instance.destroy();
     }));

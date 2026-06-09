@@ -58,7 +58,7 @@
     - `control` — MOUNT-ONCE portal: custom control UI into a custom IControl host.
 -->
 
-<rozie name="MapLibre" inherit-attrs="false" inherit-listeners="false">
+<rozie name="MapLibre" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
 <props>
 {

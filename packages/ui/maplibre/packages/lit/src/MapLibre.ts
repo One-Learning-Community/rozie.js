@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 import maplibregl from 'maplibre-gl';
 
 interface RozieMarkerSlotCtx {
@@ -135,6 +135,8 @@ private _portalContainers = new Set<HTMLElement>();
   }
 
   firstUpdated(): void {
+    adoptDocumentStyles(this);
+
     this._armListeners();
 
     interface ReactivePortalHandle {

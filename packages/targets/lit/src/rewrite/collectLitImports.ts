@@ -125,6 +125,10 @@ export type RuntimeLitImport =
   | 'attachOutsideClickListener'
   | 'injectGlobalStyles'
   | 'adoptConsumerStyles'
+  // Item 3 (engine-CSS shadow bridge) — `adoptDocumentStyles` clones the
+  // document's same-origin stylesheets into the shadow root. Added by emitLit
+  // conditionally when the `<rozie adopt-document-styles>` envelope attr is set.
+  | 'adoptDocumentStyles'
   | 'debounce'
   | 'throttle'
   /**

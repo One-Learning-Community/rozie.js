@@ -62,6 +62,20 @@ export interface BlockMap {
      * `safe-interpolation` attribute.
      */
     safeInterpolation?: boolean;
+    /**
+     * Item 3 (engine-CSS shadow bridge) — the `adopt-document-styles` boolean
+     * attribute on the `<rozie>` tag. When present, a SHADOW-DOM target (Lit)
+     * clones the document's same-origin stylesheets into the component's
+     * shadow root at first render, so global CSS the consumer imported (an
+     * engine's stylesheet, e.g. `cropperjs/dist/cropper.css` /
+     * `maplibre-gl/dist/maplibre-gl.css`) reaches the engine-created DOM that
+     * lives INSIDE the shadow boundary. NO-OP on the 5 light-DOM targets
+     * (React/Vue/Svelte/Angular/Solid) — there the engine DOM is in light DOM
+     * and the global CSS already applies. Absent (key omitted under
+     * `exactOptionalPropertyTypes`) when the tag carried no attribute — treated
+     * as `false` downstream.
+     */
+    adoptDocumentStyles?: boolean;
     loc: SourceLoc;
   };
   props?: BlockEntry;

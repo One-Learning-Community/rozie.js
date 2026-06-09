@@ -877,19 +877,6 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 // .planning/todos/pending/lit-emitter-hoist-pure-literal-component-props.md.
 const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 
-// Cropper (cropperjs v1) — the Lit CropperScreenshot cell ONLY. The crop box
-// mispositions on Lit because the consumer-imported global `cropperjs/dist/cropper.css`
-// does not pierce the wrapper's shadow root, so the absolutely-positioned cropper
-// chrome (.cropper-container / .cropper-canvas / .cropper-crop-box) is unstyled and the
-// box lands at the wrong Y (verified: container/canvas/img at y≈252 but the crop box at
-// y≈532). This is the SAME engine-global-CSS-doesn't-reach-the-Lit-shadow gap maplibre's
-// overlay DOM hit; it needs an engine-CSS-shadow bridge (adoptedStyleSheets), not a
-// per-cell fix. The other 5 targets render the crop box identically (post the cropReady
-// model fix) and bless a shared D-10 `CropperScreenshot.png`. Behavioral coverage is
-// green 6/6 in cropper.spec.ts. Tracked:
-// .planning/todos/pending/lit-engine-global-css-shadow-bridge.md
-const CROPPER_LIT_SCREENSHOT_TODO = new Set<string>(['CropperScreenshot::lit']);
-
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
@@ -909,16 +896,12 @@ for (const example of EXAMPLES) {
     const maplibreLitScreenshotTodo = MAPLIBRE_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
-    const cropperLitScreenshotTodo = CROPPER_LIT_SCREENSHOT_TODO.has(
-      `${example}::${target}`,
-    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
-      maplibreLitScreenshotTodo ||
-      cropperLitScreenshotTodo
+      maplibreLitScreenshotTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {

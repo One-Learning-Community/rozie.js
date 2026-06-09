@@ -159,6 +159,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     runtimeImports.add('rozieListeners');
   }
 
+  // Item 3 (engine-CSS shadow bridge) — register the `adoptDocumentStyles`
+  // import when the `<rozie adopt-document-styles>` envelope attr is set; the
+  // call is emitted into firstUpdated() (composeClassBody). Mirrors the
+  // rozieSpread/rozieListeners conditional-import plumbing.
+  if (ir.adoptDocumentStyles) {
+    runtimeImports.add('adoptDocumentStyles');
+  }
+
   // Plan 14-05 — `$attrs` getter for Lit. Lit has no native template-side
   // `$attrs` proxy (cf. Vue's magic accessor); the consumer's attributes land
   // on the host custom element (`<rozie-foo id="x">`) and we re-project them
@@ -341,6 +349,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
       : '',
     listenerWiringBody: listenerWiring,
     mountHookBody: scriptResult.mountHookBody,
+    adoptDocumentStyles: ir.adoptDocumentStyles,
     disconnectedBody: scriptResult.unmountHookBody,
     slotFillerDisconnectReset: templateResult.slotFillerDisconnectReset.join('\n'),
     updatedBody: composedUpdatedBody,
@@ -484,6 +493,14 @@ interface ComposeClassBodyParts {
   listenerWiringBody: string;
   /** User `$onMount` hook body — mount-once, stays in `firstUpdated()`. */
   mountHookBody: string;
+  /**
+   * Item 3 (engine-CSS shadow bridge) — `true` when `<rozie
+   * adopt-document-styles>` is set. Emits `adoptDocumentStyles(this);` as the
+   * FIRST statement in `firstUpdated()` (before the user $onMount builds the
+   * engine), so the cloned document stylesheets are present when the engine's
+   * shadow DOM is created. `false` → no firstUpdated change (byte-identical).
+   */
+  adoptDocumentStyles: boolean;
   disconnectedBody: string;
   /**
    * Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — per-filler
@@ -577,10 +594,15 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     );
   }
 
-  // firstUpdated(): first-render listener arming + user $onMount hooks (the
-  // latter mount-once — never re-run on reconnect).
-  if (hasListenerWiring || hasMountHook) {
+  // firstUpdated(): first-render document-style adoption + listener arming +
+  // user $onMount hooks (the latter mount-once — never re-run on reconnect).
+  if (hasListenerWiring || hasMountHook || parts.adoptDocumentStyles) {
     const firstUpdatedParts: string[] = [];
+    // Item 3 — adopt document stylesheets into the shadow root FIRST, before
+    // the engine builds its shadow DOM in the $onMount hook, so the engine
+    // chrome is styled the moment it appears.
+    if (parts.adoptDocumentStyles)
+      firstUpdatedParts.push('adoptDocumentStyles(this);');
     if (hasListenerWiring) firstUpdatedParts.push('this._armListeners();');
     if (hasMountHook) firstUpdatedParts.push(parts.mountHookBody);
     sections.push(

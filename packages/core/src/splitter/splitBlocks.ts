@@ -152,6 +152,12 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // force-ON as well as force-OFF (the envelope overrides the global option in
   // BOTH directions), so the parse below treats present/`"true"` as true.
   let savedSafeInterpolationChunks: string[] | null = null;
+  // Item 3 (engine-CSS shadow bridge): holds chunks for the
+  // `adopt-document-styles` attr on the <rozie> tag. Same null-vs-empty
+  // discriminant + PARALLEL-local form as the inherit-* / safe-interpolation
+  // flags. A boolean feature toggle: present (with or without a value, unless
+  // it is the literal `"false"`) → true.
+  let savedAdoptDocumentStylesChunks: string[] | null = null;
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
   // Opaque-block mode: true between the opening and closing tag of a block
@@ -213,6 +219,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         savedInheritAttrsChunks = null;
         savedInheritListenersChunks = null;
         savedSafeInterpolationChunks = null;
+        savedAdoptDocumentStylesChunks = null;
         collectingAttribValue = false;
       },
 
@@ -259,6 +266,14 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           // onattribdata, so the snapshot is `[]` — distinct from `null`
           // (attribute absent).
           savedSafeInterpolationChunks = [...pendingAttribValueChunks];
+        }
+        if (inRozieOpenTag && pendingAttribName === 'adopt-document-styles') {
+          // Item 3: save the `adopt-document-styles` attribute chunks on the
+          // <rozie> tag. Same null-vs-empty discriminant + onopentagend parse
+          // as the inherit-* flags. A present-without-value boolean attribute
+          // (`<rozie adopt-document-styles>`) fires no onattribdata → `[]`,
+          // distinct from `null` (attribute absent).
+          savedAdoptDocumentStylesChunks = [...pendingAttribValueChunks];
         }
         if (inBlockOpenTag && pendingAttribName === 'lang') {
           // Phase 9: save the `lang` attribute chunks for the current block
@@ -349,11 +364,27 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
                 safeInterpolation = raw !== 'false';
               }
               savedSafeInterpolationChunks = null;
+              // Item 3: parse the `adopt-document-styles` attribute. `null`
+              // chunks = attribute absent (omit the key — resolves to `false`
+              // downstream in lower.ts); `"false"` (case-insensitive) → `false`;
+              // everything else (present-without-value `[]`, `"true"`, or any
+              // other value) → `true`. Boolean feature toggle, same WR-05
+              // case-insensitive parse as the inherit-* flags.
+              let adoptDocumentStyles: boolean | undefined;
+              if (savedAdoptDocumentStylesChunks !== null) {
+                const raw = savedAdoptDocumentStylesChunks
+                  .join('')
+                  .trim()
+                  .toLowerCase();
+                adoptDocumentStyles = raw !== 'false';
+              }
+              savedAdoptDocumentStylesChunks = null;
               result.rozie = {
                 name: nameValue,
                 ...(inheritAttrs !== undefined ? { inheritAttrs } : {}),
                 ...(inheritListeners !== undefined ? { inheritListeners } : {}),
                 ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+                ...(adoptDocumentStyles !== undefined ? { adoptDocumentStyles } : {}),
                 // loc start = '<' of <rozie>; loc end is patched at onclosetag time
                 // to include the </rozie> close tag. Use endIndex+1 here as a conservative
                 // initial value; we update it when </rozie> fires.

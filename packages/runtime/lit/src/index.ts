@@ -16,6 +16,7 @@ export { rozieListeners } from './rozieListeners.js';
 export { attachOutsideClickListener } from './attachOutsideClickListener.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
 export { adoptConsumerStyles } from './adoptConsumerStyles.js';
+export { adoptDocumentStyles } from './adoptDocumentStyles.js';
 export { debounce, type DebouncedFn } from './debounce.js';
 export { throttle } from './throttle.js';
 export {

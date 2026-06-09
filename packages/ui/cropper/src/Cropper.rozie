@@ -63,7 +63,7 @@
       settles instead of oscillating.
 -->
 
-<rozie name="Cropper">
+<rozie name="Cropper" adopt-document-styles>
 
 <props>
 {
