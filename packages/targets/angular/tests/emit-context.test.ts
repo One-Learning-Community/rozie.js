@@ -99,7 +99,22 @@ describe('Angular emit — cross-component context ($provide / $inject)', () => 
     expect(diagnostics).toHaveLength(0);
     expect(code).toContain('providers: [');
     expect(code).toContain("provide: rozieToken('theme'),");
-    expect(code).toContain('useFactory: () => (');
+    // Phase 36 fix — a provided value that reads the component instance (the
+    // rewrite turns the state read into `this.color()`) is emitted with a
+    // host-capturing `useFactory` that injects the component via forwardRef and
+    // rewrites the value's `this` to the captured `__rozieCtxHost`. The bare
+    // `useFactory: () => (<value>)` form (which left `this` rebinding inside the
+    // getter -> infinite recursion / no `this` in the static factory) is gone
+    // for `this`-referencing values; `forwardRef` is imported.
+    expect(code).toContain('useFactory: () => {');
+    expect(code).toContain('const __rozieCtxHost = inject(forwardRef(() => ThemeProvider));');
+    expect(code).toMatch(/import \{[^}]*\bforwardRef\b[^}]*\} from '@angular\/core';/);
+    // The value's `this` is rewritten to the captured `__rozieCtxHost`, so a
+    // nested getter never reads the object literal (which would recurse on the
+    // same-named getter -> Maximum call stack). The provided object still
+    // carries the `get color()` accessor (the D-3 live-ref pattern).
+    expect(code).toContain('get color()');
+    expect(code).not.toContain('return this.color()');
     // REQ-31 — NEVER viewProviders for the context token.
     expect(code).not.toContain('viewProviders');
     // The author-side directive must not leak as an undefined runtime ref.

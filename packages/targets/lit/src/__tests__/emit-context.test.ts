@@ -110,8 +110,14 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
     expect(code).toMatch(/import \{[^}]*\bContextProvider\b[^}]*\} from '@lit\/context';/);
     // The author-side directive must NOT leak as an undefined runtime ref.
     expect(code).not.toContain('$provide');
-    // The provided getter picked up the $data.color → this._color.value rewrite.
-    expect(code).toContain('return this._color.value;');
+    // Phase 36 fix — the provided value is wrapped in a host-capturing arrow
+    // IIFE and every `this` rewritten to the captured `__rozieCtxHost`, so a
+    // nested getter reads the ELEMENT (not the object literal — which has no
+    // `_color`, the bug that crashed with "reading value of undefined"). The
+    // getter still carries the $data.color → _color.value signal rewrite.
+    expect(code).toContain('((__rozieCtxHost) => (');
+    expect(code).toContain('return __rozieCtxHost._color.value;');
+    expect(code).toContain('))(this)');
   });
 
   it('provider reactivity (R10 / Pattern 5 / D-3): setValue hooked into effect() on $data dep', () => {
