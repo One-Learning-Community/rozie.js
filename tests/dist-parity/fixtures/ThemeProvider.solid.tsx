@@ -16,7 +16,7 @@ export default function ThemeProvider(_props: ThemeProviderProps): JSX.Element {
   const [local, attrs] = splitProps(_props, ['children']);
   const resolved = () => local.children;
 
-  const __ctx_theme = rozieContext('theme');
+  const __ctx_theme = rozieContext("theme");
   const [color, setColor] = createSignal('red');
 
   // The cycle order. A plain module constant — never reassigned.

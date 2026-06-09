@@ -25,7 +25,7 @@ export default function Tab(_props: TabProps): JSX.Element {
   const _merged = mergeProps({ label: '', index: 0 }, _props);
   const [local, attrs] = splitProps(_merged, ['label', 'index']);
 
-  const tabs = useContext(rozieContext('tabs'));
+  const tabs = useContext(rozieContext("tabs"));
 
   return (
     <>

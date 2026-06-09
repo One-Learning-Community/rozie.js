@@ -4,7 +4,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { ContextConsumer, createContext } from '@lit/context';
 
-const __rozieCtx_tabs = createContext(Symbol.for('rozie:tabs'));
+const __rozieCtx_tabs = createContext(Symbol.for("rozie:tabs"));
 
 @customElement('rozie-tab')
 export default class Tab extends SignalWatcher(LitElement) {

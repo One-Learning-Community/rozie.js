@@ -18,7 +18,7 @@ export default function Tabs(_props: TabsProps): JSX.Element {
   const [local, attrs] = splitProps(_props, ['children']);
   const resolved = () => local.children;
 
-  const __ctx_tabs = rozieContext('tabs');
+  const __ctx_tabs = rozieContext("tabs");
   const [active, setActive] = createSignal(0);
 
   // NOTE: this helper is intentionally NOT named `setActive` — React

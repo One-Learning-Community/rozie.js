@@ -9,7 +9,7 @@ interface ThemeProviderProps {
 }
 
 export default function ThemeProvider(props: ThemeProviderProps): JSX.Element {
-  const __ctx_theme = rozieContext('theme');
+  const __ctx_theme = rozieContext("theme");
   const attrs = props as Record<string, unknown>;
   const [color, setColor] = useState('red');
 

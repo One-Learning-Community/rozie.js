@@ -5,7 +5,7 @@ import './ThemeButton.css';
 interface ThemeButtonProps {}
 
 export default function ThemeButton(props: ThemeButtonProps): JSX.Element {
-  const theme = useContext(rozieContext('theme'));
+  const theme = useContext(rozieContext("theme"));
   const attrs = props as Record<string, unknown>;
 
   return (

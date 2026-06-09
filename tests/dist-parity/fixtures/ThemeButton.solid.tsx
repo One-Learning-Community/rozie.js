@@ -15,7 +15,7 @@ interface ThemeButtonProps {}
 export default function ThemeButton(_props: ThemeButtonProps): JSX.Element {
   const [local, attrs] = splitProps(_props, []);
 
-  const theme = useContext(rozieContext('theme'));
+  const theme = useContext(rozieContext("theme"));
 
   return (
     <>

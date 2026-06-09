@@ -4,7 +4,7 @@ import { SignalWatcher, effect, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 
-const __rozieCtx_theme = createContext(Symbol.for('rozie:theme'));
+const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 
 @customElement('rozie-theme-provider')
 export default class ThemeProvider extends SignalWatcher(LitElement) {

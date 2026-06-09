@@ -9,7 +9,7 @@ interface TabsProps {
 }
 
 export default function Tabs(props: TabsProps): JSX.Element {
-  const __ctx_tabs = rozieContext('tabs');
+  const __ctx_tabs = rozieContext("tabs");
   const attrs = props as Record<string, unknown>;
   const [active, setActive] = useState(0);
 

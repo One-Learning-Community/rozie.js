@@ -8,7 +8,7 @@ interface TabProps {
 }
 
 export default function Tab(_props: TabProps): JSX.Element {
-  const tabs = useContext(rozieContext('tabs'));
+  const tabs = useContext(rozieContext("tabs"));
   const props: Omit<TabProps, 'label' | 'index'> & { label: string; index: number } = {
     ..._props,
     label: _props.label ?? '',
