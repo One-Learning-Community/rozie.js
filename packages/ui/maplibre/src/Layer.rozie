@@ -1,0 +1,94 @@
+<!--
+  Layer.rozie — declarative <Layer> child for @rozie-ui/maplibre (Phase 37 A2
+  probe: a renderless / config-only child + D-05 dual-inject with flat fallback).
+
+  A <Layer> registers a LayerSpecification into the parent <MapLibre>'s
+  `maplibre:layers` registry; the parent's existing applyLayers() reconcile
+  (style-load gated, with beforeId ordering) consumes the registry ∪ the :layers
+  config-array prop. This child adds NO reconcile logic.
+
+  DUAL-INJECT (D-05 nested-with-flat-fallback):
+    - `maplibre:source` — the nearest <Source> ancestor's sub-context, injected
+      WITH a `null` fallback so a flat <Layer source="id"/> (no <Source> parent —
+      background layers, cross-source references) does not crash. (Pitfall 3.)
+    - `maplibre:layers` — the parent layer registry API.
+  The effective source id resolves as: $props.source ?? (srcCtx && srcCtx.id).
+
+  LIT ASYNC EDGE (REQ-30): both injected values may be `undefined` on Lit's first
+  paint — every read is guarded (the Tab.rozie `… && …` idiom).
+
+  Renderless: the <template> is EMPTY — a <Layer> registers a layer and draws
+  nothing of its own (the A2 confirmation that an empty-template child compiles on
+  all 6 targets).
+
+  Per RESEARCH discretion A6: NO new ROZ diagnostic for a flat <Layer> with
+  neither a parent <Source> nor a `source` attr — a runtime-tolerant skip mirrors
+  applyLayers()'s existing `.filter(Boolean)` tolerance.
+
+  ZERO emitter/core change.
+-->
+<rozie name="Layer">
+
+<props>
+{
+  // The MapLibre layer id (required). Sole optionality determinant.
+  id:       { type: String, required: true },
+  // LayerSpecification.type — 'circle' | 'fill' | 'line' | 'symbol' | 'raster' |
+  // 'background' | … (string). default:undefined keeps the merge clean.
+  type:     { type: String, default: undefined },
+  // paint / layout are union objects → no `type:`, default:undefined.
+  paint:    { default: undefined },
+  layout:   { default: undefined },
+  // explicit source id for the flat shape (background/cross-source). When omitted
+  // inside a <Source>, the injected source ctx supplies it.
+  source:   { type: String, default: undefined },
+  // insert this layer BEFORE the layer with this id (applyLayers ordering).
+  beforeId: { type: String, default: undefined },
+}
+</props>
+
+<script>
+// Nearest <Source> ancestor sub-context, with a null fallback for the flat case
+// (D-05 flat <Layer source="id"/> directly under <MapLibre>). The second arg to
+// $inject is the Phase 36 fallback surface.
+const srcCtx = $inject('maplibre:source', null)
+// The parent layer registry API ({ register, update, unregister }).
+const layers = $inject('maplibre:layers')
+
+$onMount(() => {
+  // resolve the effective source id: explicit prop wins, else the nearest
+  // <Source> ancestor's id, else undefined (a sourceless layer e.g. background).
+  const source = $props.source ?? (srcCtx && srcCtx.id)
+  if (layers) {
+    layers.register($props.id, {
+      id: $props.id,
+      type: $props.type,
+      paint: $props.paint,
+      layout: $props.layout,
+      source,
+      beforeId: $props.beforeId,
+    })
+  }
+  return () => {
+    if (layers) layers.unregister($props.id)
+  }
+})
+
+// React to paint / layout / type changes (lazy $watch — post-mount transitions).
+$watch(() => $props.paint, () => {
+  const source = $props.source ?? (srcCtx && srcCtx.id)
+  if (layers) layers.update($props.id, { id: $props.id, type: $props.type, paint: $props.paint, layout: $props.layout, source, beforeId: $props.beforeId })
+})
+$watch(() => $props.layout, () => {
+  const source = $props.source ?? (srcCtx && srcCtx.id)
+  if (layers) layers.update($props.id, { id: $props.id, type: $props.type, paint: $props.paint, layout: $props.layout, source, beforeId: $props.beforeId })
+})
+$watch(() => $props.type, () => {
+  const source = $props.source ?? (srcCtx && srcCtx.id)
+  if (layers) layers.update($props.id, { id: $props.id, type: $props.type, paint: $props.paint, layout: $props.layout, source, beforeId: $props.beforeId })
+})
+</script>
+
+<template></template>
+
+</rozie>
