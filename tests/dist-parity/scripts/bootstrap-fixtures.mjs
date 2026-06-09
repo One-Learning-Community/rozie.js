@@ -213,6 +213,20 @@ const EXAMPLES = [
   // native (`:attr` already drops nullish). Single-file; no sibling .rozie
   // producers — stays OUT of RESOLVER_ROOT.
   'AttrNullishDrop',
+  // Phase 36 (cross-component-context-primitive) R12 — the $provide / $inject
+  // byte fixtures. Five single-file producer leaves: ThemeProvider
+  // ($provide('theme', { get color, cycle })), ThemePassthrough (an unaware
+  // <slot/> middle with ZERO provides/injects — its bytes are the empty-case
+  // byte-identity proof: all 6 emitters early-return, no context machinery),
+  // ThemeButton ($inject('theme')), and the Tabs/Tab showcase pair. The
+  // composer demos (ThemeContextDemo / TabsDemo) live in examples/demos/ and
+  // are VR-only (the 6/6 behavioral cell), NOT dist-parity — same split as
+  // PortalListDemo. Single-file leaves; stay OUT of RESOLVER_ROOT.
+  'ThemeProvider',
+  'ThemePassthrough',
+  'ThemeButton',
+  'Tabs',
+  'Tab',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

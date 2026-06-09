@@ -165,6 +165,25 @@ const EXAMPLES = [
   // runtime ABSENCE proof is the behavioral spec (a byte snapshot can't prove
   // hasAttribute===false). Single-file — stays OUT of RESOLVER_ROOT.
   'AttrNullishDrop',
+  // Phase 36 (cross-component-context-primitive) R12 — the $provide / $inject
+  // byte fixtures. Five single-file producer leaves: ThemeProvider
+  // ($provide('theme', { get color, cycle }) → native key on Vue/Svelte,
+  // Symbol.for on Lit, globalThis-registry rozieContext/rozieToken on
+  // React/Solid/Angular), ThemePassthrough (an unaware <slot/> middle — proves
+  // the empty-case byte-identity gate holds: zero provides/injects → all 6
+  // emitters early-return, no context machinery emitted), ThemeButton
+  // ($inject('theme') deep consumer), and the Tabs/Tab showcase pair (Tabs
+  // provides { get active, setActive, register }; Tab injects + renders
+  // active-aware). The committed per-target bytes pin the emitContext shape
+  // across all four entrypoints. The composer demos (ThemeContextDemo /
+  // TabsDemo) live in examples/demos/ and are VR-only (the 6/6 behavioral
+  // cell), not dist-parity — same split as PortalListDemo. Single-file leaves;
+  // stay OUT of RESOLVER_ROOT.
+  'ThemeProvider',
+  'ThemePassthrough',
+  'ThemeButton',
+  'Tabs',
+  'Tab',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.

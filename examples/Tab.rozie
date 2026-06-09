@@ -1,0 +1,60 @@
+<!--
+  Tab.rozie — the compound-component SHOWCASE consumer (Phase 36, $provide /
+  $inject). Each Tab injects the nearest `Tabs` API, claims its own index at
+  setup via `register()`, renders active-aware (`data-active` + `.is-active`
+  when its index is the parent's `active`), and on click calls
+  `setActive(myIndex)` — driving shared parent state with no prop passed
+  between `Tabs` and `Tab`.
+
+  LIT ASYNC EDGE (REQ-30): the injected `tabs` may be `undefined` on Lit's
+  first paint until the async context-request resolves; the reads are guarded
+  (`tabs && …`) so first paint is clean and the value fills eventually.
+-->
+<rozie name="Tab">
+
+<props>
+{
+  label: { type: String, default: '' }
+}
+</props>
+
+<script>
+const tabs = $inject('tabs')
+
+// Claim a stable index at setup time. Guarded for the Lit async edge — if the
+// context has not resolved yet, fall back to 0 (it re-resolves on connect).
+const myIndex = tabs ? tabs.register() : 0
+</script>
+
+<template>
+<button
+  class="tab"
+  data-tab
+  type="button"
+  role="tab"
+  :data-active="tabs && tabs.active === myIndex"
+  :class="{ 'is-active': tabs && tabs.active === myIndex }"
+  @click="tabs && tabs.setActive(myIndex)"
+>
+  {{ $props.label }}
+</button>
+</template>
+
+<style>
+.tab {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tab.is-active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+</style>
+
+</rozie>

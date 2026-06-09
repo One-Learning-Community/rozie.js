@@ -1,0 +1,47 @@
+<!--
+  ThemeContextDemo.rozie — the composer that proves the no-prop-drill claim
+  (Phase 36, $provide / $inject), productized from Spike 010's mounted
+  `<ThemeProvider><Panel><ThemedButton/></Panel></ThemeProvider>` fixture.
+
+  Three SEPARATELY-COMPILED modules are nested here:
+
+    ThemeProvider   — $provide('theme', { get color, cycle })
+      ThemePassthrough  — renders <slot/>, KNOWS NOTHING about theme
+        ThemeButton   — $inject('theme'), shows color, click → cycle()
+
+  The button shows the injected color even though `ThemePassthrough` never
+  forwards it (inject reached depth through the unaware middle — R11, the
+  cross-file token-identity proof). Clicking cycles the color red→green→blue
+  at depth (reactive round-trip — R13). The `context-behavior.spec.ts`
+  Playwright cell drives exactly this surface across all 6 targets (Angular in
+  a real analogjs build, REQ-31).
+-->
+<rozie name="ThemeContextDemo">
+
+<components>
+{
+  ThemeProvider: '../ThemeProvider.rozie',
+  ThemePassthrough: '../ThemePassthrough.rozie',
+  ThemeButton: '../ThemeButton.rozie',
+}
+</components>
+
+<template>
+<div class="theme-context-demo" data-theme-context-demo>
+  <ThemeProvider>
+    <ThemePassthrough>
+      <ThemeButton />
+    </ThemePassthrough>
+  </ThemeProvider>
+</div>
+</template>
+
+<style>
+.theme-context-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  max-width: 320px;
+}
+</style>
+
+</rozie>

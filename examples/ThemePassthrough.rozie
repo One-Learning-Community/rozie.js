@@ -1,0 +1,30 @@
+<!--
+  ThemePassthrough.rozie — the UNAWARE middle layer (Phase 36, $provide /
+  $inject), productized from Spike 010's `Panel` fixture.
+
+  This component renders its children and KNOWS NOTHING ABOUT THEME — no
+  `$inject`, no `theme` prop, no forwarding. It exists purely to sit between
+  the provider and the deep consumer so the VR cell proves inject reaches the
+  consumer WITHOUT prop-drilling through here (R11 — cross-file token
+  identity through an unaware module). If context required prop-drilling, this
+  component would have to declare + thread a `theme` prop; it deliberately
+  does not.
+-->
+<rozie name="ThemePassthrough">
+
+<template>
+<div class="theme-passthrough" data-theme-passthrough>
+  <slot />
+</div>
+</template>
+
+<style>
+.theme-passthrough {
+  display: block;
+  padding: 0.5rem;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+</style>
+
+</rozie>

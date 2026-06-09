@@ -1,0 +1,64 @@
+<!--
+  ThemeProvider.rozie — the PROVIDER half of the cross-component context
+  primitive (Phase 36, $provide / $inject), productized 1:1 from Spike 010's
+  validated `ThemeProvider` fixture.
+
+  It holds reactive `color` state, exposes a `cycle()` that advances it
+  red -> green -> blue, and publishes BOTH to descendants via
+  `$provide('theme', …)`. Crucially the provided value carries a *getter*
+  (`get color()`), NOT a snapshotted primitive — so any depth-N consumer that
+  reads `theme.color` rides the live reference and re-renders when `cycle()`
+  mutates it (D-3 / REQ-29). Snapshotting `color` here (`{ color }`) would
+  freeze the value at provide-time and the reactive round-trip would be dead.
+
+  ThemeProvider renders only `<slot/>` — it knows nothing about WHO consumes
+  the theme or how deep they sit. That decoupling is the whole point.
+-->
+<rozie name="ThemeProvider">
+
+<data>
+{
+  // Reactive state — the `$data` sigil makes this signal-backed on every
+  // target (React state, Vue ref, Svelte $state, Angular signal, Solid signal,
+  // Lit `this._color.value` preact-signal). A bare top-level `let` would NOT
+  // re-render the React/Solid/Lit provider when mutated only from a handler;
+  // `$data` is the reactive contract this feature rides on. (Confirmed against
+  // Spike 010's validated refs, which used useState/createSignal.)
+  color: 'red'
+}
+</data>
+
+<script>
+// The cycle order. A plain module constant — never reassigned.
+const NEXT = { red: 'green', green: 'blue', blue: 'red' }
+
+const cycle = () => {
+  $data.color = NEXT[$data.color]
+}
+
+// Publish the live theme. The GETTER is load-bearing (D-3 / REQ-29): reading
+// `theme.color` at depth always reflects the current reactive `$data.color`,
+// so clicking through `cycle()` cycles the displayed color at depth (the
+// reactive round-trip). Snapshotting the primitive here (`{ color: $data.color }`)
+// would freeze it at provide-time and kill the round-trip.
+$provide('theme', {
+  get color() {
+    return $data.color
+  },
+  cycle,
+})
+</script>
+
+<template>
+<div class="theme-provider" data-theme-provider>
+  <slot />
+</div>
+</template>
+
+<style>
+.theme-provider {
+  display: block;
+}
+</style>
+
+</rozie>

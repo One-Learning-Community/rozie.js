@@ -545,6 +545,23 @@ export function rewriteScript(
         return;
       }
 
+      // ObjectMethod / ClassMethod key positions (`{ get color() {…} }`,
+      // `{ color() {…} }`, `{ async color() {…} }`) — the key is a NON-COMPUTED
+      // property name, never a reference, so it must NOT be rewritten. Phase 36
+      // ($provide / $inject) surfaced this: a provided value carrying a getter
+      // over a promoted name (`$provide('theme', { get color() { return color },
+      // cycle })`) put the promoted identifier `color`/`cycle` in an
+      // `ObjectMethod.key` slot — without this guard the visitor rewrote the key
+      // to `this.color`, which is an invalid `ObjectMethod` key node and threw
+      // in @babel/generator ("Property key of ObjectMethod expected … got
+      // MemberExpression"). The getter/method BODY is a separate subtree and is
+      // still visited + rewritten normally; only the key position is skipped.
+      if (
+        (parentPath.isObjectMethod() || parentPath.isClassMethod()) &&
+        parentPath.node.key === path.node &&
+        !parentPath.node.computed
+      ) return;
+
       // Skip function parameters that ARE a bare Identifier (e.g.
       // `(editor) => …`). Destructured params (`({ editor }) => …`) are
       // handled by the binding-position / shadowing guards below.

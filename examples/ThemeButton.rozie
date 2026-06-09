@@ -1,0 +1,45 @@
+<!--
+  ThemeButton.rozie — the deep CONSUMER half of the cross-component context
+  primitive (Phase 36, $provide / $inject), productized from Spike 010's
+  `ThemedButton` fixture (renamed — `examples/ThemedButton.rozie` is the
+  Phase 14/15 attribute-fallthrough fixture and is NOT this).
+
+  It injects the nearest provided `'theme'` and renders a button whose label
+  is the live `theme.color`; clicking calls `theme.cycle()`, which mutates
+  the provider's reactive `color` and round-trips back here (the displayed
+  color advances red -> green -> blue). It declares NO theme prop — the value
+  arrives through context, having crossed the unaware `ThemePassthrough`.
+
+  LIT ASYNC EDGE (REQ-30): on Lit, `@lit/context`'s ContextConsumer resolves
+  via an async `context-request` round-trip, so the injected value may be
+  `undefined` on the very first paint until the provider responds. The
+  template guards the read (`theme && theme.color`) so the first paint is a
+  clean empty button rather than a crash; the VR spec asserts EVENTUAL fill
+  (`toBeVisible({ timeout })`) for Lit rather than synchronous presence.
+-->
+<rozie name="ThemeButton">
+
+<script>
+// The nearest provided 'theme'. Reactive at depth: reading `theme.color`
+// rides the provider's live getter, so a provider-side `cycle()` updates this
+// button's label without any prop being passed down.
+const theme = $inject('theme')
+</script>
+
+<template>
+<button class="theme-button" data-theme-button type="button" @click="theme && theme.cycle()">
+  {{ theme && theme.color }}
+</button>
+</template>
+
+<style>
+.theme-button {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+</style>
+
+</rozie>

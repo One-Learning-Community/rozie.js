@@ -1,0 +1,40 @@
+<!--
+  TabsDemo.rozie — the Tabs/Tab compound-component composer (Phase 36,
+  $provide / $inject showcase). Mounts a `Tabs` parent with three `Tab`
+  children; each child injects the shared active-index API and renders
+  active-aware. Clicking a tab calls `setActive(index)` on the injected API,
+  which round-trips through context to re-style every sibling — no prop is
+  passed between `Tabs` and any `Tab`.
+
+  This is the "real-world" half of the D-01 pair (the minimal trio is
+  ThemeContextDemo). The `context-behavior.spec.ts` Tabs assertions drive this
+  surface across all 6 targets.
+-->
+<rozie name="TabsDemo">
+
+<components>
+{
+  Tabs: '../Tabs.rozie',
+  Tab: '../Tab.rozie',
+}
+</components>
+
+<template>
+<div class="tabs-demo" data-tabs-demo>
+  <Tabs>
+    <Tab :label="'One'" />
+    <Tab :label="'Two'" />
+    <Tab :label="'Three'" />
+  </Tabs>
+</div>
+</template>
+
+<style>
+.tabs-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  max-width: 360px;
+}
+</style>
+
+</rozie>

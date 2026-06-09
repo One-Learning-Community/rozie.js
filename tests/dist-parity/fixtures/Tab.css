@@ -1,0 +1,13 @@
+.tab[data-rozie-s-18645a16] {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.tab.is-active[data-rozie-s-18645a16] {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}

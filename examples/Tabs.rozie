@@ -1,0 +1,75 @@
+<!--
+  Tabs.rozie — the compound-component SHOWCASE provider (Phase 36, $provide /
+  $inject). The marketing money-shot: a `Tabs` parent that publishes an
+  active-index API, and `Tab` children that inject it and render active-aware,
+  with NO prop-drilling and NO manual wiring between parent and children.
+
+  Kept deliberately minimal — this is a context demo, not a full a11y tabs
+  widget (no roving tabindex / aria-selected ceremony). The point is that the
+  `Tab` children read + drive shared parent state through context alone.
+
+  D-3 / REQ-29 reactivity rule: the provided value carries a `get active()`
+  GETTER over the reactive `active` state, never a snapshot. A `Tab` reading
+  `tabs.active` rides the live reference, so clicking one tab re-renders the
+  active styling of every sibling at depth.
+-->
+<rozie name="Tabs">
+
+<data>
+{
+  // The active tab's index — reactive ($data → signal-backed on all 6 targets),
+  // so every injected Tab re-renders its active styling when the selection
+  // changes (the reactive round-trip at depth).
+  active: 0,
+  // Registration counter. Children call register() during setup to claim the
+  // next index; kept in $data so it is per-instance-stable across re-renders
+  // (a bare top-level `let` would reset to 0 on every React render).
+  registered: 0
+}
+</data>
+
+<script>
+// Children call register() during their own setup to claim the next index.
+const register = () => {
+  const index = $data.registered
+  $data.registered = index + 1
+  return index
+}
+
+// NOTE: this helper is intentionally NOT named `setActive` — React
+// auto-generates a `setActive` setter for the `$data.active` state field, and a
+// same-named user function collides with it (ROZ524: "already declared" +
+// infinite recursion when `$data.active = v` rewrites to `setActive(v)`). The
+// PROVIDED key is still `setActive` (the consumer-facing API); only the local
+// implementation name differs.
+const selectActive = (index) => {
+  $data.active = index
+}
+
+// Publish the active-index API. `get active()` keeps the read live (D-3 /
+// REQ-29) so every injected Tab updates when the active selection changes —
+// no prop is passed between Tabs and any Tab.
+$provide('tabs', {
+  get active() {
+    return $data.active
+  },
+  setActive: selectActive,
+  register,
+})
+</script>
+
+<template>
+<div class="tabs" data-tabs role="tablist">
+  <slot />
+</div>
+</template>
+
+<style>
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+</style>
+
+</rozie>
