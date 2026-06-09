@@ -14,9 +14,23 @@
   the slot row — which IS subject to CSS-Modules hashing on React.
 
   For full correctness across all 6 targets here we use a `data-*`
-  attribute as the filter selector (`[data-locked]`) instead of a class
-  selector. `data-*` attributes survive every target's class-hashing /
-  scoping / shadow-DOM transformations identically.
+  attribute as the filter selector instead of a class selector. `data-*`
+  attributes survive every target's class-hashing / scoping / shadow-DOM
+  transformations identically.
+
+  EXPLICIT 'true' / 'false' (not 'true' / null): the attribute carries an
+  explicit value and the selector matches on that value (`[data-locked='true']`),
+  rather than a presence selector (`[data-locked]`) over a `… : null` binding.
+  A `:attr="cond ? 'true' : null"` binding only DROPS the attribute on null on
+  Vue (native binding); the other 5 targets route attribute bindings through
+  `rozieDisplay`, which stringifies null to '' (the documented `null → ''`
+  display rule), leaving `data-locked=""` present on the unlocked rows. A
+  presence selector `[data-locked]` then matches those empty-attr rows too —
+  mis-styling unlocked rows AND mis-filtering them out of SortableJS drag on
+  the 5 non-Vue targets. Binding an explicit 'false' + matching on the value
+  sidesteps that gap so all 6 targets render and behave identically. (The
+  underlying nullish-attribute-drop divergence is tracked as an emitter gap:
+  .planning/todos/pending/attr-binding-nullish-should-drop-attribute.md)
 -->
 
 <rozie name="SortableListFilterDemo">
@@ -53,17 +67,17 @@ $onMount(() => reset());
 <div class="sortable-filter-demo">
   <header>
     <h3>Filtered drag — locked items</h3>
-    <p class="hint">Items marked 🔒 cannot be dragged. SortableList's <code>:filter="[data-locked]"</code> prop forwards to SortableJS's filter selector.</p>
+    <p class="hint">Items marked 🔒 cannot be dragged. SortableList's <code>:filter="[data-locked='true']"</code> prop forwards to SortableJS's filter selector.</p>
   </header>
 
   <SortableList
     r-model:items="$data.items"
     itemKey="id"
-    filter="[data-locked]"
+    filter="[data-locked='true']"
     :handle="$classSelector('grip')"
   >
     <template #default="{ item }">
-      <div class="row" :data-locked="item.locked ? 'true' : null">
+      <div class="row" :data-locked="item.locked ? 'true' : 'false'">
         <span class="grip" :class="{ 'grip-disabled': item.locked }" aria-label="Drag handle">⋮⋮</span>
         <span r-if="item.locked" class="lock-icon" aria-label="Locked">🔒</span>
         <span class="label">{{ item.label }}</span>
@@ -106,7 +120,7 @@ header code {
   margin: 0.25rem 0;
 }
 
-.row[data-locked] {
+.row[data-locked="true"] {
   background: #fafafa;
   border-style: dashed;
   color: rgba(0, 0, 0, 0.5);

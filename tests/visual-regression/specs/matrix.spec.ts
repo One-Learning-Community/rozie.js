@@ -890,18 +890,6 @@ const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 // .planning/todos/pending/lit-engine-global-css-shadow-bridge.md
 const CROPPER_LIT_SCREENSHOT_TODO = new Set<string>(['CropperScreenshot::lit']);
 
-// SortableListFilter — the Vue cell ONLY. A stable ~204px (1%) sub-pixel difference
-// on the THREE unlocked item labels (Drafts/Sent/Archive) vs the shared baseline;
-// vue is the lone outlier (react/svelte/angular/solid/lit all match). It is COSMETIC
-// (text kerning/position, not layout or content — the demo renders + drags correctly)
-// and surfaced when the Clone/Filter baselines were blessed under --update without a
-// non-update D-10 verify. NOT yet confirmed as the accepted cross-target text-rendering
-// class (cf. feedback_vr_macos_text_node_kerning) vs a fixable Vue-interpolation /
-// demo difference — gated pending that call rather than asserted as accepted. The base
-// SortableList + SortableListNested cells pass D-10 6/6, so it's Filter-specific.
-// Tracked: .planning/todos/pending/sortablelist-filter-vue-text-divergence.md
-const SORTABLELIST_FILTER_VUE_TODO = new Set<string>(['SortableListFilter::vue']);
-
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
@@ -924,17 +912,13 @@ for (const example of EXAMPLES) {
     const cropperLitScreenshotTodo = CROPPER_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
-    const sortableListFilterVueTodo = SORTABLELIST_FILTER_VUE_TODO.has(
-      `${example}::${target}`,
-    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
       maplibreLitScreenshotTodo ||
-      cropperLitScreenshotTodo ||
-      sortableListFilterVueTodo
+      cropperLitScreenshotTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {
