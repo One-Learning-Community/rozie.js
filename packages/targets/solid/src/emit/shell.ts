@@ -108,6 +108,20 @@ export interface SolidShellParts {
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
   /**
+   * Phase 36 ($provide) — `<__ctx_<key>.Provider value={…}>` open tags,
+   * OUTERMOST key first (nested for multiple keys). When non-empty, the JSX
+   * payload (the `jsxIndented` body ONLY) is wrapped, leaving the `return (`
+   * line + the function close-tail BYTE-UNTOUCHED (payload-only wrap, same
+   * discipline as the React shell). Empty/undefined when no `$provide`.
+   */
+  providerOpen?: string[];
+  /**
+   * Phase 36 ($provide) — `</__ctx_<key>.Provider>` close tags, in REVERSE
+   * order so the nesting balances against `providerOpen`. Empty/undefined when
+   * no `$provide`.
+   */
+  providerClose?: string[];
+  /**
    * Phase 06.1 Plan 01: original `.rozie` source text — anchors the MagicString.
    */
   rozieSource: string;
@@ -324,7 +338,9 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
   moduleParts.push('  return (\n');
-  moduleParts.push(jsxIndented);
+  // Phase 36 ($provide) — payload-only Provider wrap; `return (` and the
+  // function close-tail below are left byte-untouched.
+  moduleParts.push(wrapWithProviders(jsxIndented, parts));
   moduleParts.push('\n  );\n}\n');
 
   const moduleSource = moduleParts.join('');
@@ -463,8 +479,25 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
   ms.append('  return (\n');
-  ms.append(jsxIndented);
+  // Phase 36 ($provide) — payload-only Provider wrap (legacy-path mirror).
+  ms.append(wrapWithProviders(jsxIndented, parts));
   ms.append('\n  );\n}\n');
 
   return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
+}
+
+/**
+ * Phase 36 ($provide) — wrap the already-indented JSX payload in the
+ * `<C.Provider value={…}>` subtree(s). OUTERMOST key first in `providerOpen`,
+ * reverse-order close tags in `providerClose`. Returns `jsxIndented` UNCHANGED
+ * when there are no providers (byte-identity guarantee, D-5) — this is the ONLY
+ * mutation point; `return (` and the function close-tail are never touched.
+ */
+function wrapWithProviders(jsxIndented: string, parts: SolidShellParts): string {
+  const open = parts.providerOpen ?? [];
+  const close = parts.providerClose ?? [];
+  if (open.length === 0) return jsxIndented;
+  const openLines = open.map((tag) => '    ' + tag).join('\n');
+  const closeLines = close.map((tag) => '    ' + tag).join('\n');
+  return openLines + '\n' + jsxIndented + '\n' + closeLines;
 }

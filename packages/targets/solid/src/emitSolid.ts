@@ -251,6 +251,8 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     listenerEffects: listenersResult.code,
     styleInjectStatement: styleResult.injectStatement,
     jsx: templateResult.jsx,
+    providerOpen: scriptResult.providerOpen,
+    providerClose: scriptResult.providerClose,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap: scriptResult.scriptMap,

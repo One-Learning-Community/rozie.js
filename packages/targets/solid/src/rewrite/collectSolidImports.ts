@@ -26,7 +26,10 @@ export type SolidImport =
   | 'Show'
   | 'For'
   | 'children'
-  | 'splitProps';
+  | 'splitProps'
+  // Phase 36 ($inject) — emitted only when ir.injects is non-empty so a
+  // non-context component's `solid-js` import line stays byte-identical (R12/D-5).
+  | 'useContext';
 
 export class SolidImportCollector {
   private symbols = new Set<SolidImport>();
@@ -64,6 +67,11 @@ export type RuntimeSolidImport =
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
   | 'rozieAttr'
+  // Phase 36 ($provide/$inject) — globalThis-backed Solid context registry.
+  // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
+  // non-context component's `@rozie/runtime-solid` import line stays
+  // byte-identical (R12 / D-5).
+  | 'rozieContext'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
   | 'normalizeListeners'

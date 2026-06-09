@@ -21,6 +21,7 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 import { renderType, zeroValueFor } from './emitPropsInterface.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -226,6 +227,19 @@ export interface EmitScriptResult {
    * Null when there are no user statements or no filename was provided.
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Phase 36 ($provide) — `<__ctx_<key>.Provider value={…}>` open tags,
+   * OUTERMOST key first (nested for multiple keys). buildShell wraps ONLY the
+   * `jsxIndented` payload, leaving `return (` + the close-tail byte-untouched.
+   * Empty when the component has no `$provide`.
+   */
+  providerOpen: string[];
+  /**
+   * Phase 36 ($provide) — `</__ctx_<key>.Provider>` close tags, in REVERSE
+   * order so the nesting balances against `providerOpen`. Empty when no
+   * `$provide`.
+   */
+  providerClose: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -286,6 +300,26 @@ export function emitScript(
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
   const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
+
+  // Phase 36 — cross-component context ($provide/$inject). Reads the rewritten
+  // value/fallback expressions from the rewritten program so a provided getter
+  // over `$data.color` picks up the Solid-signal rewrite. Empty-gated (R12/D-5):
+  // `contextEmit.hasContext` is false (and nothing is spliced/wrapped) when the
+  // component has no $provide/$inject — existing fixtures stay byte-identical.
+  // Lead the hookLines with the inject binders + `const __ctx_<key> =
+  // rozieContext('<key>')` decls so the `<__ctx_<key>.Provider>` wrap (spliced
+  // by shell.ts) and any consumer references resolve at the top of the body.
+  const contextEmit = emitContext(
+    ir,
+    { solid: collectors.solidImports, runtime: collectors.runtimeImports },
+    rewriteResult.rewrittenProgram,
+  );
+  if (contextEmit.injectLines.length > 0) {
+    hookLines.push(...contextEmit.injectLines);
+  }
+  if (contextEmit.contextDecls.length > 0) {
+    hookLines.push(...contextEmit.contextDecls);
+  }
 
   // 1. createControllableSignal for model:true props (D-135).
   // 1b. mergeProps call for non-model props with declared defaults.
@@ -547,6 +581,22 @@ export function emitScript(
           d.init.callee.name === '$computed',
       );
       if (allComputed) continue;
+
+      // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
+      // directives consumed via ir.injects and re-emitted by emitContext as
+      // `const x = useContext(rozieContext('k'))[ ?? f]` (led into hookLines).
+      // Strip them from the residual body so the bare `$inject` identifier never
+      // leaks as an undefined runtime ref.
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
     }
     // Skip lifecycle call expressions.
     if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
@@ -561,7 +611,12 @@ export function emitScript(
           // Phase 21 ($expose, REQ-8) — `$expose({...})` is a compile-time
           // directive consumed via `ir.expose`; STRIP it from the residual
           // body or it leaks as an undefined-`$expose` runtime reference.
-          callee.name === '$expose')
+          callee.name === '$expose' ||
+          // Phase 36 — `$provide('k', v)` is consumed via ir.provides and
+          // re-emitted by emitContext as the `<C.Provider value={…}>` JSX wrap
+          // (spliced by shell.ts). Strip the directive so the bare `$provide`
+          // ref never leaks as an undefined-identifier ReferenceError.
+          callee.name === '$provide')
       ) {
         continue;
       }
@@ -605,6 +660,8 @@ export function emitScript(
     mergePropsCall,
     hookSectionLines,
     scriptMap,
+    providerOpen: contextEmit.providerOpen,
+    providerClose: contextEmit.providerClose,
     diagnostics,
   };
 }
