@@ -35,6 +35,17 @@ and is a uniform compile error (**ROZ978**), independent of `safeInterpolation`.
 See [Safe non-primitive interpolation](/guide/features#safe-non-primitive-interpolation-—-objects-render-as-portable-json-never-crash)
 for the full mechanics.
 
+Relatedly, in **attribute position** the targets used to disagree on nullish values: a
+whole-value binding like `:data-locked="$data.locked ? 'true' : null"` (or a plain
+`:title="$data.note"` that is `null`) dropped the attribute on Vue but rendered `attr=""`
+on the other five (they routed through `rozieDisplay`, and `rozieDisplay(null)` is `''`).
+Rozie unifies this too — a nullish bound attribute value now **drops the attribute** on all
+six targets, matching Vue's native `:attr` binding and the web platform (so `[data-locked]`
+presence selectors and `hasAttribute(...)` agree everywhere). The drop predicate is
+`value == null` **only** — `false` still stringifies, so `aria-expanded="false"` /
+`data-x="false"` are preserved. Text/interpolation position is unchanged (`null` → `''`, the
+table above). See [Attribute position — a nullish bound value drops the attribute](/guide/features#attribute-position-—-a-nullish-bound-value-drops-the-attribute).
+
 ## Slot consumer ergonomics
 
 ### React — scoped slots are render-prop function props
