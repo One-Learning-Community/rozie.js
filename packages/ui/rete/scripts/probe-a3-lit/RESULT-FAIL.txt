@@ -1,0 +1,60 @@
+probe server: http://localhost:5173/
+
+── A3 DOM evidence (Lit) ──
+{
+  "hasCanvasShadow": true,
+  "hasEngineBody": true,
+  "engineBodyHTML": "<div class=\"engine-node__body\" data-engine-body=\"n1\"><div data-rozie-ref=\"bodyEl\" data-rozie-s-23c15996=\"\"><!--?lit$904901051$--><slot></slot></div></div>",
+  "bodyElFound": true,
+  "bodyElInEngine": true,
+  "bodyElParentTag": "div",
+  "bodyElParentClass": "engine-node__body",
+  "slotFound": true,
+  "slotAssignedCount": 1,
+  "assignedButtonText": null,
+  "buttonExists": true,
+  "buttonLightDomParent": "rozie-flow-node",
+  "btnInEngineLightTree": false
+}
+
+A3 PROBE FAIL: FlowNode body did NOT teleport into the engine node element on Lit (or its <slot> stopped projecting the <button> after the cross-shadow move).
+{
+  "hasCanvasShadow": true,
+  "hasEngineBody": true,
+  "engineBodyHTML": "<div class=\"engine-node__body\" data-engine-body=\"n1\"><div data-rozie-ref=\"bodyEl\" data-rozie-s-23c15996=\"\"><!--?lit$904901051$--><slot></slot></div></div>",
+  "bodyElFound": true,
+  "bodyElInEngine": true,
+  "bodyElParentTag": "div",
+  "bodyElParentClass": "engine-node__body",
+  "slotFound": true,
+  "slotAssignedCount": 1,
+  "assignedButtonText": null,
+  "buttonExists": true,
+  "buttonLightDomParent": "rozie-flow-node",
+  "btnInEngineLightTree": false
+}
+
+A3 PROBE FAIL: post-teleport click() threw — button not hittable after the DOM move.
+TimeoutError: locator.click: Timeout 3000ms exceeded.
+Call log:
+[2m  - waiting for locator('#body-btn')[22m
+[2m    - locator resolved to <button id="body-btn">BODY</button>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is not visible[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is not visible[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    6 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is not visible[22m
+[2m    - retrying click action[22m
+[2m      - waiting 500ms[22m
+
+
+A3 PROBE FAIL: post-teleport click did NOT fire (clicks stayed at 0).
+screenshot: /Users/serpentblade/work/olc/rozie/tests/visual-regression/.probe-a3-tmp/a3-lit-evidence.png
+
+=== A3 RESULT: FAIL (see evidence above) ===
