@@ -1,0 +1,76 @@
+<!--
+  Source.rozie — declarative <Source> child for @rozie-ui/maplibre (Phase 37 A1
+  probe: a provider-that-also-consumes).
+
+  This is the dogfood of the Phase 36 $provide / $inject context primitive in a
+  real engine wrapper. A <Source> is BOTH:
+    - a CONSUMER — it $injects the parent <MapLibre>'s `maplibre:sources`
+      registry API ({ register, update, unregister }) and registers its source
+      spec on mount, $watch-updates on spec change, and unregisters on cleanup.
+    - a PROVIDER — it $provides a nested `maplibre:source` sub-context (its own
+      id, via a LIVE GETTER — D-3/REQ-29, never a snapshot) so nested <Layer>
+      children auto-bind to this source id.
+
+  The parent's existing applyLayers() reconcile (style-load gated) consumes the
+  registry ∪ the :sources config-array prop; this child adds NO reconcile logic.
+
+  LIT ASYNC EDGE (REQ-30): the injected `sources` may be `undefined` on Lit's
+  first paint until the async context-request resolves — every read is guarded
+  (`sources && …`) so first paint is clean and the value fills eventually (the
+  Tab.rozie idiom).
+
+  Renderless apart from <slot/> — it hosts nested <Layer> children but emits no
+  visible DOM of its own (a config-only child).
+
+  ZERO emitter/core change: this is authored entirely against the shipped
+  primitive (the Phase 35 "NO emitter touch → dist-parity zero-drift" lesson).
+-->
+<rozie name="Source">
+
+<props>
+{
+  // The MapLibre source id (LayerSpecification.source references this string).
+  // required:true is the sole optionality determinant.
+  id:   { type: String, required: true },
+  // The SourceSpecification (geojson / vector / raster / …). No `type:` — it is a
+  // union object, so it emits as `unknown`; the default is therefore `undefined`.
+  spec: { default: undefined },
+}
+</props>
+
+<script>
+// The nearest provided 'maplibre:sources' registry API from <MapLibre>. Guarded
+// everywhere (Lit async first-paint, REQ-30 — the Tab.rozie `tabs && …` idiom).
+const sources = $inject('maplibre:sources')
+
+$onMount(() => {
+  // register this source's spec into the parent registry; the parent's
+  // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
+  if (sources) sources.register($props.id, { id: $props.id, spec: $props.spec })
+  // unregister on unmount so the parent reaps this source (its layers first).
+  return () => {
+    if (sources) sources.unregister($props.id)
+  }
+})
+
+// React to a spec change (lazy $watch — never fires on the initial value, only on
+// post-mount transitions; the right tool when $onMount is too early).
+$watch(() => $props.spec, (v) => {
+  if (sources) sources.update($props.id, { id: $props.id, spec: v })
+})
+
+// Provide a nested sub-context for <Layer> children. The `get id()` is
+// LOAD-BEARING (D-3/REQ-29): a live getter, never a snapshot, so a nested
+// <Layer> reading srcCtx.id rides this source's reactive id.
+$provide('maplibre:source', {
+  get id() {
+    return $props.id
+  },
+})
+</script>
+
+<template>
+<slot />
+</template>
+
+</rozie>
