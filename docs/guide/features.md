@@ -456,6 +456,97 @@ Producer-side only: a consumer grabs the handle with each framework's **native**
 
 The handle methods are typed from your `<script>` function signatures: a `<script lang="ts">` function contributes its real signature to the synthesized `FooHandle`; an untyped function becomes `(...args: any[]) => any`.
 
+## `$provide(key, value)` / `$inject(key, fallback?)` → cross-component context everywhere
+
+Compound components — `Tabs`/`Tab`, `Select`/`Option`, `Accordion`/`Item`, `Form`/`Field` — share a structural problem: a parent has to hand a value to a deep descendant through middle components that know nothing about it. Threading it down as props (prop-drilling) couples every passthrough to a contract it doesn't care about. Every framework already solves this with a context mechanism — Vue `provide`/`inject`, Svelte `setContext`/`getContext`, React/Solid `Context.Provider` + `useContext`, Angular DI `providers` + `inject`, Lit `@lit/context` — but each spells it differently. Rozie gives you one pair of sigils that lowers to each.
+
+Declare the value once in the provider; read it anywhere below, through any unaware passthrough:
+
+```rozie
+<!-- ThemeProvider.rozie — publishes a value -->
+<script>
+let color = 'red'
+const NEXT = { red: 'green', green: 'blue', blue: 'red' }
+const cycle = () => { color = NEXT[color] }
+
+// A getter keeps `color` a LIVE reference — see the rule below.
+$provide('theme', { get color() { return color }, cycle })
+</script>
+<template><slot /></template>
+```
+
+```rozie
+<!-- ThemeButton.rozie — a deep descendant, reached through any passthrough -->
+<script>
+const theme = $inject('theme')
+</script>
+<template>
+  <button @click="theme.cycle()">{{ theme.color }}</button>
+</template>
+```
+
+`ThemeButton` can sit any number of unaware components deep — `<ThemeProvider><Panel><Toolbar><ThemeButton/></Toolbar></Panel></ThemeProvider>` — and still resolve `theme`. The middle components carry no `theme` prop. A click on the button cycles the color and the new value reaches the descendant reactively, in place.
+
+- **`$provide(key, value)`** — a top-level `<script>` **statement**. `key` must be a **string literal** (no runtime-computed keys — see ROZ129). `value` may be reactive: a `$data` field, a `$computed`, an object carrying accessors, or an engine handle. Multiple `$provide` calls are allowed for distinct keys.
+- **`$inject(key, fallback?)`** — an **expression** that must bind a local `const` (`const theme = $inject('theme')` — see ROZ132). `key` is a string literal (ROZ130). It returns the nearest provided value and is usable in setup, template, and reactive contexts. With a `fallback`, the returned type is inferred from it; without one, v1 types the result as `any` (a typed `<context>` declaration block is a later phase).
+
+Each target lowers the pair to its native context idiom. Components with no `$provide`/`$inject` emit byte-for-byte unchanged:
+
+| Target | `$provide('k', v)` | `$inject('k', fallback)` |
+| --- | --- | --- |
+| Vue | `provide('k', v)` (imported from `vue`) | `inject('k', fallback)` |
+| Svelte 5 | `setContext('k', v)` at init | `getContext('k')` |
+| React | the returned JSX is wrapped in `<C.Provider value={v}>` where `C = rozieContext('k')` | `useContext(rozieContext('k'))` |
+| Solid | the returned JSX is wrapped in `<C.Provider value={v}>` where `C = rozieContext('k')` | `useContext(rozieContext('k'))` |
+| Angular | `@Component({ providers: [{ provide: rozieToken('k'), useFactory: () => v }] })` — `providers`, **not** `viewProviders`, so projected (`<ng-content>`) children resolve it | `inject(rozieToken('k'))` |
+| Lit | `new ContextProvider(this, { context: C, initialValue: v })` + `setValue` on change, where `C = createContext(Symbol.for('rozie:k'))` | `new ContextConsumer(this, { context: C, subscribe: true })` |
+
+The key identity is what lets a *separately-compiled* provider and consumer find each other. Vue and Svelte use the literal string key; Lit uses a process-global `Symbol.for('rozie:' + key)`. React, Solid, and Angular back their token in a `globalThis` registry keyed by your string — `rozieContext(key)` dedupes a single `Context` object, `rozieToken(key)` a single Angular `InjectionToken` — so two independently-built modules resolve the *same* token. `rozieContext` ships from `@rozie/runtime-react` and `@rozie/runtime-solid`; Angular emits a tiny inline `globalThis`-backed `rozieToken` helper (no extra peer dependency); Lit consumers add `@lit/context` as a peer dependency.
+
+### Provide a live reference, not a snapshot
+
+This is the one author rule that governs whether context is reactive. **Provide a value that carries live references — a getter, a `$computed` accessor, or a signal — never a snapshotted primitive.** Every target's reactivity rides on the consumer reading through that live reference at the moment it renders. The getter form above is correct:
+
+```rozie
+$provide('theme', { get color() { return color }, cycle })   // ✓ reactive: reads `color` live
+```
+
+A bare primitive is **valid code but non-reactive on every target** — the descendant sees the value frozen at provide time:
+
+```rozie
+$provide('theme', color)   // ⚠ compiles, but the consumer never sees later changes
+```
+
+Both forms compile cleanly — a bare primitive is sometimes exactly what you want (a constant config object), so Rozie does not warn on it. But if you expect a `$inject` consumer to update when the source value changes, the provided value must expose a live accessor. This is the mirror image of [`$snapshot()`](#snapshot-—-crossing-into-untyped-js), which deliberately freezes a value crossing into untyped JS; context wants the opposite.
+
+### The Lit async edge — guard against `undefined` on first paint
+
+Lit is the one documented parity divergence. `@lit/context`'s `ContextConsumer` is event-driven: the consumer fires a `context-request` event that bubbles up to the provider, and the provided value only arrives once that round-trip resolves. On the **first paint, before the element is connected and the request has resolved, the injected value can be `undefined`** — even when a provider exists higher up. The other five targets resolve context synchronously during setup and have no such window.
+
+Author a read that tolerates the gap — optional chaining, an `r-if` guard, or a fallback:
+
+```rozie
+<template>
+  <!-- ✓ survives the first-paint window on Lit; harmless no-op on the other five -->
+  <button @click="theme?.cycle()">{{ theme?.color }}</button>
+</template>
+```
+
+The compiled Lit consumer emits a null-guard for you, but template reads you write by hand should null-guard too. On the five synchronous targets this guard is a no-op; on Lit it is what keeps the first render from throwing.
+
+### Diagnostics
+
+Four compile-time diagnostics catch malformed `$provide`/`$inject` forms (each collected, not thrown — `compile()` reports them all rather than stopping at the first):
+
+| Code | When |
+| --- | --- |
+| `ROZ129` `INVALID_PROVIDE_KEY` | `$provide`'s key is not a string literal (runtime-computed keys are forbidden) |
+| `ROZ130` `INVALID_INJECT_KEY` | `$inject`'s key is not a string literal |
+| `ROZ131` `PROVIDE_NOT_STATEMENT` | `$provide(...)` used in expression position — it must be a top-level `<script>` statement |
+| `ROZ132` `INJECT_UNBOUND` | `$inject(...)` not bound to a `const x = $inject(...)` |
+
+Both `$provide` and `$inject` are reserved identifiers — naming a `<data>` field or `r-for` loop variable after either is `ROZ202`. See the [Diagnostics reference](/reference/diagnostics) for the full code table.
+
 ## Typed `.rozie` imports — per-module declaration sidecars
 
 `import Counter from './Counter.rozie'` is fully typed: the props interface, the `on<Event>?` callbacks, and (when present) the `$expose` handle all flow through to your editor and `tsc`. Rozie does this **without** a `.rozie`-aware TypeScript language plugin — it generates a per-module declaration sidecar.
