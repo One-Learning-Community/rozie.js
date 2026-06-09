@@ -76,7 +76,15 @@ export type AngularCoreImport =
    * post-render phase guarantees the merge wins the last-write race for R6
    * always-merge consumer-style override.
    */
-  | 'afterRenderEffect';
+  | 'afterRenderEffect'
+  /**
+   * Phase 36 ($provide/$inject context primitive): `InjectionToken` — the token
+   * type the inline `globalThis`-backed `rozieToken` helper mints + dedups
+   * (D-1/REQ-28). Added by emitScript whenever the component uses `$provide` or
+   * `$inject` (paired with `inject`). The provider's `useFactory` + the
+   * consumer's `inject(rozieToken('k'))` both resolve against this token.
+   */
+  | 'InjectionToken';
 
 /**
  * Forms-module import kind — separate import line from `@angular/forms`.

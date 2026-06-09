@@ -103,6 +103,18 @@ export interface EmitDecoratorOpts {
    * symmetry with emitScript's gate and to allow future host-binding extension.
    */
   cvaModelProp?: PropDecl | null;
+  /**
+   * Phase 36 ($provide) — the per-key context `providers` ENTRY strings (each a
+   * `{ provide: rozieToken('k'), useFactory: () => v }` literal, 4-space
+   * indented to sit inside `providers: [ ... ]`). When non-empty these are
+   * MERGED with the CVA `NG_VALUE_ACCESSOR` entry into a SINGLE `providers:`
+   * array — emitting two `providers:` keys (one for CVA, one for context) is
+   * invalid object syntax (Pitfall 2 / REQ-31). Uses `providers`, NEVER
+   * `viewProviders` (projected `ng-content` descendants are blind to
+   * viewProviders). Empty `[]` for non-context components keeps the decorator
+   * byte-identical to today (R12).
+   */
+  contextProviderEntries?: readonly string[];
 }
 
 /**
@@ -246,22 +258,48 @@ export function emitDecorator(
     lines.push(`  ],`);
   }
 
-  // Phase 23 (angular-cva-forms-integration) — auto-CVA decorator entries,
-  // gated on the single cvaModelProp. First use of both `providers:` and
-  // `host:` in emitDecorator (verified no prior host-attribute fallthrough emits
-  // a host: entry — the D-05/D-06 spread copies host attributes onto the inner
-  // element, not via a decorator host: map). The host fragment is a fixed pure
-  // method-call literal (T-23-02-AOT: satisfies the AOT pure-expression
-  // constraint, Pitfall 6); the providers literal self-references the emitted
-  // class via forwardRef (the class is in scope of its own decorator).
+  // Phase 23 (angular-cva-forms-integration) + Phase 36 ($provide context) —
+  // a SINGLE merged `providers: [...]` array. Two sources contribute entries:
+  //
+  //   1. the auto-CVA `NG_VALUE_ACCESSOR` entry, gated on cvaModelProp (Phase 23).
+  //      The host fragment is a fixed pure method-call literal (T-23-02-AOT:
+  //      satisfies the AOT pure-expression constraint, Pitfall 6); the entry
+  //      self-references the emitted class via forwardRef (the class is in scope
+  //      of its own decorator).
+  //   2. the context `{ provide: rozieToken('k'), useFactory: () => v }` entries
+  //      (Phase 36 / REQ-9), each already 4-space indented.
+  //
+  // A component with BOTH a CVA model prop AND a `$provide` would otherwise emit
+  // two `providers:` keys → invalid object literal (Pitfall 2). MERGE them into
+  // ONE array. Always `providers`, NEVER `viewProviders` — projected
+  // `ng-content` descendants are blind to viewProviders (REQ-31).
+  const contextEntries = opts.contextProviderEntries ?? [];
+  const providerEntryBlocks: string[] = [];
   if (opts.cvaModelProp != null) {
+    providerEntryBlocks.push(
+      [
+        `    {`,
+        `      provide: NG_VALUE_ACCESSOR,`,
+        `      useExisting: forwardRef(() => ${opts.componentName}),`,
+        `      multi: true,`,
+        `    },`,
+      ].join('\n'),
+    );
+  }
+  for (const entry of contextEntries) {
+    providerEntryBlocks.push(entry);
+  }
+  if (providerEntryBlocks.length > 0) {
     lines.push(`  providers: [`);
-    lines.push(`    {`);
-    lines.push(`      provide: NG_VALUE_ACCESSOR,`);
-    lines.push(`      useExisting: forwardRef(() => ${opts.componentName}),`);
-    lines.push(`      multi: true,`);
-    lines.push(`    },`);
+    for (const block of providerEntryBlocks) {
+      lines.push(block);
+    }
     lines.push(`  ],`);
+  }
+  // The CVA host binding stays gated on cvaModelProp ONLY (a $provide-only
+  // component declares no host map) — byte-identical to today for both the
+  // CVA-only and the no-CVA paths.
+  if (opts.cvaModelProp != null) {
     lines.push(`  host: { '(focusout)': '__rozieCvaOnTouched()' },`);
   }
 

@@ -66,6 +66,7 @@ import {
 } from '../rewrite/collectAngularImports.js';
 import { buildSlotCtx, buildNgTemplateContextGuard } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -680,6 +681,22 @@ export interface EmitScriptResult {
    * constructor header line.
    */
   preambleSectionLines: number;
+  /**
+   * Phase 36 ($provide) — the per-key context `providers` ENTRY strings (each a
+   * `{ provide: rozieToken('k'), useFactory: () => v }` literal, 4-space
+   * indented). emitAngular threads these into `emitDecorator` so they MERGE with
+   * the CVA `NG_VALUE_ACCESSOR` entry into ONE `providers: [...]` array — never
+   * two `providers:` keys (Pitfall 2). Empty `[]` when no `$provide` (byte-
+   * identical decorator for non-context components, R12).
+   */
+  contextProviderEntries: string[];
+  /**
+   * Phase 36 ($provide/$inject) — true when the inline `rozieToken` helper must
+   * be spliced at module scope (and `InjectionToken` imported). emitAngular
+   * appends `INLINE_ROZIE_TOKEN_FN` to the module-scope decls bucket when set.
+   * False for non-context components (no helper emitted, R12).
+   */
+  needsRozieTokenHelper: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -1029,6 +1046,23 @@ export function emitScript(
     }
   }
 
+  // Cross-component context primitive (Phase 36) — emit the `$inject` class
+  // fields + collect the `$provide` providers entries. Empty-gated on
+  // ir.provides/injects so non-context components stay byte-identical (R12).
+  // Mirrors the emitPortals wiring shape above.
+  const contextEmit = emitContext(ir, cloned);
+  const contextProviderEntries: string[] = contextEmit.providerEntries;
+  if (contextEmit.hasContext) {
+    // `inject(rozieToken('k'))` + the inline `rozieToken` helper need both
+    // `inject` and `InjectionToken` from @angular/core. The import Set dedupes
+    // against any inject() the portal/lifecycle machinery already added.
+    imports.add('inject');
+    imports.add('InjectionToken');
+    // The injected value is a class member (`this.theme`) the template + methods
+    // read. Field declarations are emitted as `theme = inject(rozieToken('k'));`.
+    for (const field of contextEmit.injectFields) fieldLines.push(field);
+  }
+
   // When at least one mount hook with paired cleanup landed in ngAfterViewInit,
   // hoist `private __rozieDestroyRef = inject(DestroyRef);` as a class field.
   // inject() is only valid in injection context (constructor body /
@@ -1152,6 +1186,21 @@ export function emitScript(
         );
       if (allComputed) continue;
 
+      // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
+      // directives consumed via ir.injects and re-emitted by emitContext as a
+      // `x = inject(rozieToken('k'));` class field. Strip them from the residual
+      // body so the bare `$inject` identifier never leaks as an undefined ref.
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
+
       // For each declarator that's an arrow/function-expression, emit as a
       // class-level arrow field. Other declarators (e.g., let/const with
       // primitive values) go to the constructor body.
@@ -1256,6 +1305,18 @@ export function emitScript(
         t.isCallExpression(callExpr) &&
         t.isIdentifier(callExpr.callee) &&
         callExpr.callee.name === '$expose'
+      ) {
+        continue;
+      }
+      // Phase 36 — a top-level `$provide('k', v)` call is a COMPILE-TIME
+      // directive consumed via `ir.provides` and re-emitted by emitContext as a
+      // `@Component({ providers: [...] })` entry. Strip the call here so the bare
+      // `$provide` ref never leaks into the constructor as an undefined runtime
+      // reference (mirrors the Vue/Svelte residual-body strip).
+      if (
+        t.isCallExpression(callExpr) &&
+        t.isIdentifier(callExpr.callee) &&
+        callExpr.callee.name === '$provide'
       ) {
         continue;
       }
@@ -1378,6 +1439,8 @@ export function emitScript(
     valueImportNames,
     scriptMap,
     preambleSectionLines,
+    contextProviderEntries,
+    needsRozieTokenHelper: contextEmit.needsTokenHelper,
     diagnostics,
   };
 }

@@ -83,6 +83,7 @@ import * as t from '@babel/types';
 import type { File } from '@babel/types';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
+import { INLINE_ROZIE_TOKEN_FN } from './emit/emitContext.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
 import { emitStyle } from './emit/emitStyle.js';
@@ -656,6 +657,11 @@ export function emitAngular(
     // Phase 23 — gate providers: NG_VALUE_ACCESSOR + host: (focusout) on the
     // single CVA prop. Decorator branches on `cvaModelProp !== null`.
     cvaModelProp,
+    // Phase 36 ($provide) — the per-key context `providers` entries, MERGED with
+    // the CVA entry into a single `providers: [...]` array by emitDecorator
+    // (Pitfall 2). Empty `[]` for non-context components → byte-identical
+    // decorator.
+    contextProviderEntries: scriptResult.contextProviderEntries,
   });
 
   // 7. Compose the class body. Insertion order:
@@ -837,9 +843,18 @@ export function emitAngular(
   // 260608-sya — `__rozieAttr` is appended alongside `__rozieDisplay` (it
   // delegates to it). Both inline only when the display-wrap flag is set, so a
   // non-wrapping component's module-scope decls stay byte-identical to pre-phase.
-  const moduleDecls = tmplResult.hasDisplayWrap
+  // Phase 36 ($provide/$inject) — when the component uses the context primitive,
+  // splice the inline module-scope `rozieToken` helper (the globalThis-backed
+  // InjectionToken dedup, D-1/REQ-28) above the @Component class. No
+  // `@rozie/runtime-angular` import (D-2 — convention forbids one, mirroring the
+  // inline __rozieDisplay/__rozieAttr helpers). Gated on needsRozieTokenHelper so
+  // non-context components emit byte-identically (R12).
+  const baseModuleDecls = tmplResult.hasDisplayWrap
     ? [...scriptResult.interfaceDecls, INLINE_DISPLAY_FN, INLINE_ATTR_FN]
     : scriptResult.interfaceDecls;
+  const moduleDecls = scriptResult.needsRozieTokenHelper
+    ? [...baseModuleDecls, INLINE_ROZIE_TOKEN_FN]
+    : baseModuleDecls;
 
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap, userCodeLineOffset } = buildShell({
     importLines: imports.render(),
