@@ -49,6 +49,7 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -793,6 +794,21 @@ function emitResidualScriptBody(
             d.init.callee.name === '$computed',
         );
       if (allComputed) continue;
+
+      // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
+      // directives consumed via ir.injects and re-emitted by emitContext as
+      // `const x = inject('k', f?)`. Strip them from the residual body so the
+      // bare `$inject` identifier never leaks as an undefined runtime ref.
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
     }
 
     // Skip ExpressionStatements that are $emit/$computed/$onMount/$onUnmount/$onUpdate
@@ -810,7 +826,11 @@ function emitResidualScriptBody(
           // ir.expose and re-emitted as a `defineExpose({...})` macro (see
           // emitDefineExposeCall). It MUST be stripped from the residual script
           // body — otherwise it leaks as an undefined-`$expose` runtime reference.
-          callee.name === '$expose'
+          callee.name === '$expose' ||
+          // Phase 36 — `$provide('k', v)` is consumed via ir.provides and
+          // re-emitted by emitContext as a native `provide('k', v)` call. Strip
+          // the directive so the bare `$provide` ref never leaks at runtime.
+          callee.name === '$provide'
         ) {
           continue;
         }
@@ -926,6 +946,14 @@ export function emitScript(
   // $onMount callbacks that capture it.
   const portalsEmit = emitPortals(ir, imports, opts.portalScopeHash ?? '');
 
+  // Cross-component context primitive (Phase 36) — emit Vue native
+  // `provide('k', v)` / `const x = inject('k', f?)`. Reads value/fallback
+  // expressions from the CLONED program so `$data`/`$props`/`$refs` inside a
+  // provided value or inject fallback pick up the identifier rewrites above.
+  // Empty-gated: contextEmit.hasContext is false (and nothing is spliced) when
+  // the component has no $provide/$inject — preserving byte-identity (R12/D-5).
+  const contextEmit = emitContext(ir, imports, cloned);
+
   // Quick plan 260515-u2b — $watch emission. Walks the same cloned program
   // and emits one `watch(getter, cb);` per top-level $watch call. Returns the
   // additional consumed indices so emitResidualScriptBody skips them.
@@ -953,6 +981,13 @@ export function emitScript(
   if (dataLines.length > 0) preambleSections.push(dataLines.join('\n'));
   if (refLines.length > 0) preambleSections.push(refLines.join('\n'));
   if (computedLines.length > 0) preambleSections.push(computedLines.join('\n'));
+  // Phase 36 — inject binders (`const x = inject('k', f?)`) join the preamble
+  // AFTER refs/computed and BEFORE the residual body, so user script + the
+  // template can reference the injected `const`. Counted into
+  // preambleSectionLines automatically (source-map offset stays correct).
+  if (contextEmit.injectLines.length > 0) {
+    preambleSections.push(contextEmit.injectLines.join('\n'));
+  }
 
   // Count lines in preamble sections so shell can compute userCodeLineOffset.
   // Each section is joined with '\n\n' between sections; count newlines total.
@@ -974,6 +1009,15 @@ export function emitScript(
   // long as the const exists by the time `onMounted`'s argument is evaluated.
   const sections = [...preambleSections];
   if (residualCode.trim().length > 0) sections.push(residualCode);
+  // Phase 36 — `provide('k', v)` calls emitted AFTER the residual body so a
+  // provided value may reference residual-declared helpers (e.g.
+  // `$provide('theme', { get color() {…}, cycle })` where `cycle` is a residual
+  // `function`/`const`). The provided value carries the live ref/getter, so
+  // descendants read reactive (D-3 / REQ-29). provide() registration order
+  // among setup statements is irrelevant — it only must fire during setup.
+  if (contextEmit.provideLines.length > 0) {
+    sections.push(contextEmit.provideLines.join('\n'));
+  }
   // Portal-slot primitive — emit portal scaffolding BEFORE lifecycle so the
   // `portals` closure is in scope when the user's onMounted callback fires.
   if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
