@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface DefaultCtx {}
@@ -36,12 +36,12 @@ function rozieToken(key: string): InjectionToken<unknown> {
   providers: [
     {
       provide: rozieToken('theme'),
-      useFactory: () => ({
+      useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => ThemeProvider)); return ({
   get color() {
-    return this.color();
+    return __rozieCtxHost.color();
   },
-  cycle: this.cycle
-}),
+  cycle: __rozieCtxHost.cycle
+}); },
     },
   ],
 })

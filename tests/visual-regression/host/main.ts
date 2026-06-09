@@ -300,6 +300,26 @@ export const EXAMPLES = [
   // EXAMPLES until a Linux PNG is generated and verified.
   'FlowCanvas',
   'FlowCanvasScreenshot',
+  // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
+  // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
+  // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
+  // SEPARATELY-COMPILED modules: ThemeProvider $provide('theme', { get color,
+  // cycle }) > ThemePassthrough (an UNAWARE <slot/> middle) > ThemeButton
+  // $inject('theme')). It proves inject reaches the deep consumer THROUGH the
+  // unaware passthrough (R11, cross-file token identity / no-prop-drill) and
+  // the click → red→green→blue reactive round-trip (R13). Tabs is the
+  // compound-component showcase cell (loader → examples/demos/TabsDemo.rozie,
+  // which composes Tabs $provide('tabs', { get active, setActive, register }) +
+  // three injected Tab children). Both are BEHAVIORAL cells covered by
+  // context-behavior.spec.ts (structural assertions + click round-trip, NO
+  // screenshot — macOS/Linux baseline discipline), deliberately NOT in
+  // matrix.spec.ts EXAMPLES. The Angular cell renders + round-trips in the real
+  // analogjs VR build (REQ-31, first-class — content-projection injector
+  // resolution via `providers`). Lit's injected value is async (REQ-30): the
+  // spec waits for eventual fill (toBeVisible({ timeout })), not synchronous
+  // presence.
+  'ThemeContext',
+  'Tabs',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -414,6 +434,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-flow-canvas').
   FlowCanvas: 'rozie-flow-canvas',
   FlowCanvasScreenshot: 'rozie-flow-canvas-screenshot',
+  // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
+  // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
+  // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
+  ThemeContext: 'rozie-theme-context',
+  Tabs: 'rozie-tabs',
 };
 
 export interface HostQuery {
@@ -570,6 +595,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   PdfViewerScreenshot: {},
   FlowCanvas: {},
   FlowCanvasScreenshot: {},
+  // Phase 36 ($provide / $inject) — both context demos are self-contained:
+  // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
+  // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
+  // lives in Tabs' $data.active). No parent-supplied props.
+  ThemeContext: {},
+  Tabs: {},
 };
 
 /**

@@ -100,6 +100,71 @@ function genCode(node: t.Node): string {
  * The PROTOCOL key (the `Symbol.for('rozie:' + <raw key>)` argument) always
  * uses the raw author key verbatim, so cross-file identity is unaffected.
  */
+/**
+ * The host-capture parameter name used to bind the LitElement `this` into the
+ * provided-value object. See `bindProvidedValue`.
+ */
+const HOST_PARAM = '__rozieCtxHost';
+
+/**
+ * Render a `$provide(...)` value so any `this.<member>` it contains (the
+ * rewriteScript output for `$data.x` → `this._x.value`, `$computed` getters,
+ * `$props.x` → `this.x`, methods → `this.cycle`) resolves against the
+ * LitElement HOST, even from inside a nested getter/method/function where a bare
+ * `this` would otherwise rebind to the object literal.
+ *
+ * Phase 36 bug: a provided value carrying a getter — `{ get color() { return
+ * this._color.value }, cycle: this.cycle }` (the D-3 live-reference pattern) —
+ * placed `this._color.value` inside an ObjectMethod body. There, `this` is the
+ * OBJECT, not the element, so `this._color` was `undefined` → "Cannot read
+ * properties of undefined (reading 'value')" at runtime and nothing rendered.
+ *
+ * Fix: wrap the value in a host-capturing arrow IIFE and rewrite EVERY
+ * `ThisExpression` in the value to the captured `__rozieCtxHost` parameter:
+ *
+ *   ((__rozieCtxHost) => ({ get color() { return __rozieCtxHost._color.value },
+ *                           cycle: __rozieCtxHost.cycle }))(this)
+ *
+ * The captured parameter is a plain closure variable, so it reads the element
+ * regardless of `this`-rebinding inside any nested function/getter. When the
+ * value contains no `this` (a constant provide), no wrap is applied — the bare
+ * `genCode` form is returned, preserving byte-identity for that case.
+ */
+function bindProvidedValue(valueArg: t.Expression): string {
+  let sawThis = false;
+  const clone = t.cloneNode(valueArg, /* deep */ true, /* withoutLoc */ false);
+  // Manual recursive walk (no @babel/traverse needed for a detached subtree):
+  // replace every ThisExpression with `__rozieCtxHost`. A ThisExpression has no
+  // children, so a node-replacing visit over the object graph suffices.
+  function walk(node: unknown): unknown {
+    if (!node || typeof node !== 'object') return node;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) node[i] = walk(node[i]);
+      return node;
+    }
+    const n = node as t.Node & Record<string, unknown>;
+    if (n.type === 'ThisExpression') {
+      sawThis = true;
+      return t.identifier(HOST_PARAM);
+    }
+    for (const key of Object.keys(n)) {
+      if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+      const child = n[key];
+      if (child && typeof child === 'object') n[key] = walk(child);
+    }
+    return n;
+  }
+  const rewritten = walk(clone) as t.Expression;
+  const inner = genCode(rewritten);
+  if (!sawThis) {
+    // Constant provide (no element reference) — no host capture needed.
+    return inner;
+  }
+  // Arrow IIFE capturing the host. Parenthesize the object body so `({ … })`
+  // is an expression, not a block.
+  return `((${HOST_PARAM}) => (${inner}))(this)`;
+}
+
 function keyIdent(key: string): string {
   const tail = key.replace(/[^A-Za-z0-9_$]/g, '_');
   return /^[A-Za-z_$]/.test(tail) ? tail : `_${tail}`;
@@ -328,7 +393,10 @@ export function emitContext(
     const ctxConst = ensureModuleCtxDecl(rawKey);
     litContextImports.add('ContextProvider');
     const providerField = `__rozieCtxProvider_${ident}`;
-    const valueCode = genCode(p.valueArg);
+    // Bind the provided value's `this` to the host element (Phase 36 fix) so a
+    // nested getter/method body — e.g. `{ get color() { return
+    // this._color.value } }` — reads the element, not the object literal.
+    const valueCode = bindProvidedValue(p.valueArg);
     fieldLines.push(
       `private ${providerField} = new ContextProvider(this, { context: ${ctxConst}, initialValue: ${valueCode} });`,
     );

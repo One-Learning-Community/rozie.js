@@ -17,14 +17,12 @@ export default class Tabs extends SignalWatcher(LitElement) {
 `;
 
   private _active = signal(0);
-  private _registered = signal(0);
-private __rozieCtxProvider_tabs = new ContextProvider(this, { context: __rozieCtx_tabs, initialValue: {
+private __rozieCtxProvider_tabs = new ContextProvider(this, { context: __rozieCtx_tabs, initialValue: ((__rozieCtxHost) => ({
   get active() {
-    return this._active.value;
+    return __rozieCtxHost._active.value;
   },
-  setActive: this.selectActive,
-  register: this.register
-} });
+  setActive: __rozieCtxHost.selectActive
+}))(this) });
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
@@ -57,13 +55,12 @@ private __rozieCtxProvider_tabs = new ContextProvider(this, { context: __rozieCt
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { void this._active.value; this.__rozieCtxProvider_tabs.setValue({
+    this._disconnectCleanups.push(effect(() => { void this._active.value; this.__rozieCtxProvider_tabs.setValue(((__rozieCtxHost) => ({
       get active() {
-        return this._active.value;
+        return __rozieCtxHost._active.value;
       },
-      setActive: this.selectActive,
-      register: this.register
-    }); }));
+      setActive: __rozieCtxHost.selectActive
+    }))(this)); }));
   }
 
   disconnectedCallback(): void {
@@ -83,12 +80,6 @@ private __rozieCtxProvider_tabs = new ContextProvider(this, { context: __rozieCt
 </div>
 `;
   }
-
-  register = () => {
-  const index = this._registered.value;
-  this._registered.value = index + 1;
-  return index;
-};
 
   selectActive = (index: any) => {
   this._active.value = index;

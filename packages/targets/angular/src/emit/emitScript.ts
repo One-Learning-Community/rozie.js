@@ -1050,7 +1050,7 @@ export function emitScript(
   // fields + collect the `$provide` providers entries. Empty-gated on
   // ir.provides/injects so non-context components stay byte-identical (R12).
   // Mirrors the emitPortals wiring shape above.
-  const contextEmit = emitContext(ir, cloned);
+  const contextEmit = emitContext(ir, cloned, ir.name);
   const contextProviderEntries: string[] = contextEmit.providerEntries;
   if (contextEmit.hasContext) {
     // `inject(rozieToken('k'))` + the inline `rozieToken` helper need both
@@ -1058,6 +1058,11 @@ export function emitScript(
     // against any inject() the portal/lifecycle machinery already added.
     imports.add('inject');
     imports.add('InjectionToken');
+    // Phase 36 — a provided value that reads the component instance emits a
+    // `useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => Foo));
+    // … }` host-capture factory, so `forwardRef` must be imported (deduped
+    // against the CVA `useExisting: forwardRef(() => Foo)` that may also add it).
+    if (contextEmit.needsForwardRef) imports.add('forwardRef');
     // The injected value is a class member (`this.theme`) the template + methods
     // read. Field declarations are emitted as `theme = inject(rozieToken('k'));`.
     for (const field of contextEmit.injectFields) fieldLines.push(field);

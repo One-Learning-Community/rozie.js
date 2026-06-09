@@ -14,16 +14,21 @@
 
 <props>
 {
-  label: { type: String, default: '' }
+  label: { type: String, default: '' },
+  // The tab's stable index, supplied explicitly by the consumer. A
+  // parent-assigned index is per-instance-stable on every target — unlike a
+  // setup-time `register()` counter, which on React (where the setup body
+  // re-runs every render) would hand out a fresh/unstable index each render and
+  // mis-mark the active tab.
+  index: { type: Number, default: 0 }
 }
 </props>
 
 <script>
+// The nearest provided 'tabs' API. Reactive at depth: reading `tabs.active`
+// rides the provider's live getter, so a sibling's setActive() re-renders this
+// tab's active styling with no prop passed between Tabs and any Tab.
 const tabs = $inject('tabs')
-
-// Claim a stable index at setup time. Guarded for the Lit async edge — if the
-// context has not resolved yet, fall back to 0 (it re-resolves on connect).
-const myIndex = tabs ? tabs.register() : 0
 </script>
 
 <template>
@@ -32,9 +37,9 @@ const myIndex = tabs ? tabs.register() : 0
   data-tab
   type="button"
   role="tab"
-  :data-active="tabs && tabs.active === myIndex"
-  :class="{ 'is-active': tabs && tabs.active === myIndex }"
-  @click="tabs && tabs.setActive(myIndex)"
+  :data-active="tabs && tabs.active === $props.index"
+  :class="{ 'is-active': tabs && tabs.active === $props.index }"
+  @click="tabs && tabs.setActive($props.index)"
 >
   {{ $props.label }}
 </button>

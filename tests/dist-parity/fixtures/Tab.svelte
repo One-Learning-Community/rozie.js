@@ -5,19 +5,20 @@ import { getContext } from 'svelte';
 
 interface Props {
   label?: string;
+  index?: number;
   [key: string]: unknown;
 }
 
-let { label = '', ...__rozieAttrs }: Props = $props();
+let {
+  label = '',
+  index = 0,
+  ...__rozieAttrs
+}: Props = $props();
 
 const tabs = getContext('tabs');
-
-// Claim a stable index at setup time. Guarded for the Lit async edge — if the
-// context has not resolved yet, fall back to 0 (it re-resolves on connect).
-const myIndex = tabs ? tabs.register() : 0;
 </script>
 
-<button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === myIndex)} {...__rozieAttrs} class={["tab", { 'is-active': tabs && tabs.active === myIndex }, (__rozieAttrs)?.class]} onclick={($event) => { tabs && tabs.setActive(myIndex); }} use:applyListeners={__rozieAttrs} data-rozie-s-18645a16>{label}</button>
+<button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === index)} {...__rozieAttrs} class={["tab", { 'is-active': tabs && tabs.active === index }, (__rozieAttrs)?.class]} onclick={($event) => { tabs && tabs.setActive(index); }} use:applyListeners={__rozieAttrs} data-rozie-s-18645a16>{label}</button>
 
 <style>
 :global {

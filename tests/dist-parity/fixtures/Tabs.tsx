@@ -12,13 +12,7 @@ export default function Tabs(props: TabsProps): JSX.Element {
   const __ctx_tabs = rozieContext('tabs');
   const attrs = props as Record<string, unknown>;
   const [active, setActive] = useState(0);
-  const [registered, setRegistered] = useState(0);
 
-  function register() {
-    const index = registered;
-    setRegistered(index + 1);
-    return index;
-  }
   function selectActive(index: any) {
     setActive(index);
   }
@@ -28,8 +22,7 @@ export default function Tabs(props: TabsProps): JSX.Element {
   get active() {
     return active;
   },
-  setActive: selectActive,
-  register
+  setActive: selectActive
 }}>
     <>
     <div data-tabs="" role="tablist" {...attrs} className={clsx("tabs", (attrs.className as string | undefined))} data-rozie-s-97e2d32a="">

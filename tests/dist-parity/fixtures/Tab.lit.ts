@@ -25,6 +25,7 @@ export default class Tab extends SignalWatcher(LitElement) {
 `;
 
   @property({ type: String, reflect: true }) label: string = '';
+  @property({ type: Number, reflect: true }) index: number = 0;
 private __rozieCtxConsumer_tabs = new ContextConsumer(this, { context: __rozieCtx_tabs, subscribe: true });
 private get tabs() { return this.__rozieCtxConsumer_tabs.value; }
 
@@ -45,13 +46,11 @@ private get tabs() { return this.__rozieCtxConsumer_tabs.value; }
 
   render() {
     return html`
-<button class="${Object.entries({ "tab": true, 'is-active': this.tabs && this.tabs.active === this.myIndex }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-tab="" type="button" role="tab" data-active=${rozieAttr(this.tabs && this.tabs.active === this.myIndex)} ${rozieSpread(this.$attrs)} @click=${($event: Event) => { this.tabs && this.tabs.setActive(this.myIndex); }} ${rozieListeners(this.$listeners)} data-rozie-s-18645a16>
+<button class="${Object.entries({ "tab": true, 'is-active': this.tabs && this.tabs.active === this.index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-tab="" type="button" role="tab" data-active=${rozieAttr(this.tabs && this.tabs.active === this.index)} ${rozieSpread(this.$attrs)} @click=${($event: Event) => { this.tabs && this.tabs.setActive(this.index); }} ${rozieListeners(this.$listeners)} data-rozie-s-18645a16>
   ${this.label}
 </button>
 `;
   }
-
-  myIndex = this.tabs ? this.tabs.register() : 0;
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
@@ -66,7 +65,7 @@ private get tabs() { return this.__rozieCtxConsumer_tabs.value; }
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['label']);
+    const __skip = new Set<string>(['label', 'index']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface DefaultCtx {}
@@ -38,27 +38,20 @@ function rozieToken(key: string): InjectionToken<unknown> {
   providers: [
     {
       provide: rozieToken('tabs'),
-      useFactory: () => ({
+      useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => Tabs)); return ({
   get active() {
-    return this.active();
+    return __rozieCtxHost.active();
   },
-  setActive: this.selectActive,
-  register: this.register
-}),
+  setActive: __rozieCtxHost.selectActive
+}); },
     },
   ],
 })
 export class Tabs {
   active = signal(0);
-  registered = signal(0);
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
-  register = () => {
-    const index = this.registered();
-    this.registered.set(index + 1);
-    return index;
-  };
   selectActive = (index: any) => {
     this.active.set(index);
   };

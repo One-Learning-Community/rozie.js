@@ -15,12 +15,12 @@ export default class ThemeProvider extends SignalWatcher(LitElement) {
 `;
 
   private _color = signal('red');
-private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieCtx_theme, initialValue: {
+private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieCtx_theme, initialValue: ((__rozieCtxHost) => ({
   get color() {
-    return this._color.value;
+    return __rozieCtxHost._color.value;
   },
-  cycle: this.cycle
-} });
+  cycle: __rozieCtxHost.cycle
+}))(this) });
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
@@ -53,12 +53,12 @@ private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieC
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { void this._color.value; this.__rozieCtxProvider_theme.setValue({
+    this._disconnectCleanups.push(effect(() => { void this._color.value; this.__rozieCtxProvider_theme.setValue(((__rozieCtxHost) => ({
       get color() {
-        return this._color.value;
+        return __rozieCtxHost._color.value;
       },
-      cycle: this.cycle
-    }); }));
+      cycle: __rozieCtxHost.cycle
+    }))(this)); }));
   }
 
   disconnectedCallback(): void {

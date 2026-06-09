@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { children, createSignal, splitProps } from 'solid-js';
+import { createSignal, splitProps } from 'solid-js';
 import { __rozieInjectStyle, rozieContext } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('ThemeProvider-00821bac', `.theme-provider[data-rozie-s-00821bac] {
@@ -14,7 +14,7 @@ interface ThemeProviderProps {
 
 export default function ThemeProvider(_props: ThemeProviderProps): JSX.Element {
   const [local, attrs] = splitProps(_props, ['children']);
-  const resolved = children(() => local.children);
+  const resolved = () => local.children;
 
   const __ctx_theme = rozieContext('theme');
   const [color, setColor] = createSignal('red');

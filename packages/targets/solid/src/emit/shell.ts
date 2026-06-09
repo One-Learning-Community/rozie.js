@@ -277,8 +277,23 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   }
 
   // children() accessor for default slot (D-131).
+  // Phase 36 ($provide) — when this component wraps its body in one or more
+  // `<C.Provider>` (i.e. it has a `$provide`), the default-slot children MUST
+  // instantiate WITHIN the Provider's reactive owner so a descendant's
+  // `useContext` resolves the provided value (Solid context resolution is
+  // owner-tree based). Solid's `children()` helper creates a `createMemo` that
+  // runs EAGERLY under the current (component-body) owner — OUTSIDE the
+  // Provider — so a deep consumer reads the default context (undefined) and
+  // `$inject` returns nothing. Emit a plain lazy thunk instead: `resolved()` is
+  // invoked inside the `<C.Provider>` payload, so `local.children` evaluates in
+  // the Provider's owner and inject reaches depth. (No `children()` import is
+  // needed in that case, but it stays imported harmlessly for the common path.)
   if (parts.hasDefaultSlot) {
-    moduleParts.push('  const resolved = children(() => local.children);\n');
+    moduleParts.push(
+      (parts.providerOpen?.length ?? 0) > 0
+        ? '  const resolved = () => local.children;\n'
+        : '  const resolved = children(() => local.children);\n',
+    );
   }
 
   // Phase 21 ($expose, D-05) — invoke the callback ref once after mount.
@@ -432,8 +447,15 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   }
 
   // children() accessor (D-131).
+  // Phase 36 ($provide) — Provider-wrapped components emit a plain lazy thunk so
+  // the default-slot children instantiate within the `<C.Provider>` owner (see
+  // the moduleParts-path comment above for the full rationale).
   if (parts.hasDefaultSlot) {
-    ms.append('  const resolved = children(() => local.children);\n');
+    ms.append(
+      (parts.providerOpen?.length ?? 0) > 0
+        ? '  const resolved = () => local.children;\n'
+        : '  const resolved = children(() => local.children);\n',
+    );
   }
 
   // Phase 21 ($expose, D-05) — invoke the callback ref once after mount.

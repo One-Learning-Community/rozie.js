@@ -88,7 +88,16 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   // 3. Determine default-slot presence (D-131).
   const hasDefaultSlot = (ir.slots ?? []).some((s) => s.name === '');
-  if (hasDefaultSlot) solidImports.add('children');
+  // Phase 36 ($provide) — a Provider-wrapped component with a default slot emits
+  // a plain lazy thunk (`const resolved = () => local.children`) instead of the
+  // `children(() => …)` memo, so the children instantiate within the
+  // `<C.Provider>` owner and a deep consumer's `useContext` resolves (see
+  // shell.ts). In that case the `children` helper is never called, so it must
+  // NOT be imported — an unused `children` import would trip TS6133 under the
+  // strict leaf typecheck. The provide-side is detected from the IR's
+  // `provides` field (the same `[]`-when-empty gate the emitters branch on).
+  const hasProvides = (ir.provides ?? []).length > 0;
+  if (hasDefaultSlot && !hasProvides) solidImports.add('children');
 
   // 4. Compose component-imports block from ir.components.
   let componentImportsBlock: string | undefined;

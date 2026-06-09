@@ -41,7 +41,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
   imports: [NgClass],
   template: `
 
-    <button class="tab" [ngClass]="{ 'is-active': tabs && tabs.active === myIndex }" data-tab="" type="button" role="tab" [attr.data-active]="rozieAttr(tabs && tabs.active === myIndex)" #rozieSpread_0 (click)="tabs && tabs.setActive(myIndex)" #rozieListenersTarget_1>
+    <button class="tab" [ngClass]="{ 'is-active': tabs && tabs.active === index() }" data-tab="" type="button" role="tab" [attr.data-active]="rozieAttr(tabs && tabs.active === index())" #rozieSpread_0 (click)="tabs && tabs.setActive(index())" #rozieListenersTarget_1>
       {{ label() }}
     </button>
 
@@ -64,9 +64,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
 })
 export class Tab {
   label = input<string>('');
+  index = input<number>(0);
   tabs = inject(rozieToken('tabs'));
-
-  myIndex = this.tabs ? this.tabs.register() : 0;
 
   private __rozieDestroyRef = inject(DestroyRef);
 

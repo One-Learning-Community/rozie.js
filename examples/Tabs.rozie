@@ -20,22 +20,11 @@
   // The active tab's index — reactive ($data → signal-backed on all 6 targets),
   // so every injected Tab re-renders its active styling when the selection
   // changes (the reactive round-trip at depth).
-  active: 0,
-  // Registration counter. Children call register() during setup to claim the
-  // next index; kept in $data so it is per-instance-stable across re-renders
-  // (a bare top-level `let` would reset to 0 on every React render).
-  registered: 0
+  active: 0
 }
 </data>
 
 <script>
-// Children call register() during their own setup to claim the next index.
-const register = () => {
-  const index = $data.registered
-  $data.registered = index + 1
-  return index
-}
-
 // NOTE: this helper is intentionally NOT named `setActive` — React
 // auto-generates a `setActive` setter for the `$data.active` state field, and a
 // same-named user function collides with it (ROZ524: "already declared" +
@@ -48,13 +37,13 @@ const selectActive = (index) => {
 
 // Publish the active-index API. `get active()` keeps the read live (D-3 /
 // REQ-29) so every injected Tab updates when the active selection changes —
-// no prop is passed between Tabs and any Tab.
+// no prop is passed between Tabs and any Tab. The Tab children supply their
+// own stable index explicitly (see Tab.rozie's `index` prop).
 $provide('tabs', {
   get active() {
     return $data.active
   },
   setActive: selectActive,
-  register,
 })
 </script>
 

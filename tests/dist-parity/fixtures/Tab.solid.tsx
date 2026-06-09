@@ -18,21 +18,18 @@ __rozieInjectStyle('Tab-18645a16', `.tab[data-rozie-s-18645a16] {
 
 interface TabProps {
   label?: string;
+  index?: number;
 }
 
 export default function Tab(_props: TabProps): JSX.Element {
-  const _merged = mergeProps({ label: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['label']);
+  const _merged = mergeProps({ label: '', index: 0 }, _props);
+  const [local, attrs] = splitProps(_merged, ['label', 'index']);
 
   const tabs = useContext(rozieContext('tabs'));
 
-  // Claim a stable index at setup time. Guarded for the Lit async edge — if the
-  // context has not resolved yet, fall back to 0 (it re-resolves on connect).
-  const myIndex = tabs ? tabs.register() : 0;
-
   return (
     <>
-    <button classList={{ 'is-active': tabs && tabs.active === myIndex }} data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === myIndex)} {...attrs} class={"tab" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { tabs && tabs.setActive(myIndex); } }, attrs)} data-rozie-s-18645a16="">
+    <button classList={{ 'is-active': tabs && tabs.active === local.index }} data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === local.index)} {...attrs} class={"tab" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { tabs && tabs.setActive(local.index); } }, attrs)} data-rozie-s-18645a16="">
       {local.label}
     </button>
     </>

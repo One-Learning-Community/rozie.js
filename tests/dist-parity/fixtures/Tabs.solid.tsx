@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { children, createSignal, splitProps } from 'solid-js';
+import { createSignal, splitProps } from 'solid-js';
 import { __rozieInjectStyle, rozieContext } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Tabs-97e2d32a', `.tabs[data-rozie-s-97e2d32a] {
@@ -16,18 +16,10 @@ interface TabsProps {
 
 export default function Tabs(_props: TabsProps): JSX.Element {
   const [local, attrs] = splitProps(_props, ['children']);
-  const resolved = children(() => local.children);
+  const resolved = () => local.children;
 
   const __ctx_tabs = rozieContext('tabs');
   const [active, setActive] = createSignal(0);
-  const [registered, setRegistered] = createSignal(0);
-
-  // Children call register() during their own setup to claim the next index.
-  function register() {
-    const index = registered();
-    setRegistered(index + 1);
-    return index;
-  }
 
   // NOTE: this helper is intentionally NOT named `setActive` — React
   // auto-generates a `setActive` setter for the `$data.active` state field, and a
@@ -41,15 +33,15 @@ export default function Tabs(_props: TabsProps): JSX.Element {
 
   // Publish the active-index API. `get active()` keeps the read live (D-3 /
   // REQ-29) so every injected Tab updates when the active selection changes —
-  // no prop is passed between Tabs and any Tab.
+  // no prop is passed between Tabs and any Tab. The Tab children supply their
+  // own stable index explicitly (see Tab.rozie's `index` prop).
 
   return (
     <__ctx_tabs.Provider value={{
   get active() {
     return active();
   },
-  setActive: selectActive,
-  register
+  setActive: selectActive
 }}>
     <>
     <div data-tabs="" role="tablist" {...attrs} class={"tabs" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-97e2d32a="">

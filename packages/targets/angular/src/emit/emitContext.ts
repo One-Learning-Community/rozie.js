@@ -76,6 +76,78 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * The host-capture local name bound inside the Angular `useFactory` when the
+ * provided value references the component instance. See `bindProvidedValue`.
+ */
+const HOST_LOCAL = '__rozieCtxHost';
+
+/**
+ * Render a `$provide(...)` value for Angular's `useFactory`, binding any
+ * `this.<member>` it contains to the component instance.
+ *
+ * Phase 36 bug: the rewrite lowers `$data.color` → `this.color()` (a signal
+ * read), `$props.x` → `this.x()`, methods → `this.cycle`. Emitting the value
+ * verbatim inside `useFactory: () => (<value>)` is doubly wrong: (a) an arrow
+ * factory's `this` is NOT the component (it's the decorator/module scope), and
+ * (b) inside a nested getter `{ get color() { return this.color() } }`, `this`
+ * rebinds to the object literal, so `this.color()` calls the getter itself —
+ * `RangeError: Maximum call stack size exceeded` at runtime, and the projected
+ * consumer's `inject(...)` resolves an exploding value.
+ *
+ * Fix (mirrors the spike's validated Angular ref, which read the component's
+ * signal): capture the component instance via Angular's `inject()` INSIDE the
+ * factory and rewrite EVERY `ThisExpression` in the value to that captured
+ * local. `inject()` is legal in a `useFactory` (it runs in the providing
+ * injector's context) and `forwardRef` defers the not-yet-declared class
+ * reference:
+ *
+ *   useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => Foo));
+ *     return ({ get color() { return __rozieCtxHost.color() }, cycle: __rozieCtxHost.cycle }); }
+ *
+ * When the value contains no `this` (a self-contained constant), the bare
+ * arrow-return form is kept — byte-identical to the pre-fix constant path, and
+ * no `inject`/`forwardRef` is needed.
+ *
+ * @returns `{ factoryBody, needsForwardRef }` — `factoryBody` is the full text
+ *   after `useFactory: ` (either `() => (<value>)` or the inject-capturing block
+ *   form); `needsForwardRef` is true when the block form (and hence a
+ *   `forwardRef` import) is required.
+ */
+function bindProvidedValue(
+  valueArg: t.Expression,
+  componentName: string,
+): { factoryBody: string; needsForwardRef: boolean } {
+  let sawThis = false;
+  const clone = t.cloneNode(valueArg, true, false);
+  function walk(node: unknown): unknown {
+    if (!node || typeof node !== 'object') return node;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) node[i] = walk(node[i]);
+      return node;
+    }
+    const n = node as t.Node & Record<string, unknown>;
+    if (n.type === 'ThisExpression') {
+      sawThis = true;
+      return t.identifier(HOST_LOCAL);
+    }
+    for (const key of Object.keys(n)) {
+      if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+      const child = n[key];
+      if (child && typeof child === 'object') n[key] = walk(child);
+    }
+    return n;
+  }
+  const inner = genCode(walk(clone) as t.Expression);
+  if (!sawThis) {
+    return { factoryBody: `() => (${inner})`, needsForwardRef: false };
+  }
+  return {
+    factoryBody: `() => { const ${HOST_LOCAL} = inject(forwardRef(() => ${componentName})); return (${inner}); }`,
+    needsForwardRef: true,
+  };
+}
+
+/**
  * The inline module-level `rozieToken` helper (D-1 / REQ-28). `globalThis`-backed
  * dedup of an `InjectionToken` keyed by the author's string — the SAME token
  * object is returned in two separately-compiled modules so hierarchical DI
@@ -126,6 +198,13 @@ export interface AngularContextEmit {
    * `InjectionToken` + `inject` to the @angular/core import line.
    */
   needsTokenHelper: boolean;
+  /**
+   * True when at least one provided value references the component instance
+   * (`this`) and is therefore emitted with the `inject(forwardRef(() => Foo))`
+   * host-capture factory form — emitAngular must ensure `forwardRef` is in the
+   * @angular/core import line. False for self-contained constant provides.
+   */
+  needsForwardRef: boolean;
 }
 
 const EMPTY: AngularContextEmit = {
@@ -133,6 +212,7 @@ const EMPTY: AngularContextEmit = {
   injectFields: [],
   providerEntries: [],
   needsTokenHelper: false,
+  needsForwardRef: false,
 };
 
 /**
@@ -204,6 +284,7 @@ function readClonedContext(clonedProgram: t.File): {
 export function emitContext(
   ir: IRComponent,
   clonedProgram: t.File,
+  componentName: string,
 ): AngularContextEmit {
   // R12 / D-5 empty-gate — byte-identical-when-empty for all existing fixtures.
   // The `?? []` tolerates legacy hand-built IRComponent test literals that
@@ -234,18 +315,24 @@ export function emitContext(
   }
 
   const providerEntries: string[] = [];
+  let needsForwardRef = false;
   for (const p of provideValues) {
     const keyCode = genCode(p.keyArg);
-    const valueCode = genCode(p.valueArg);
-    // Per-key providers entry, MERGED with the CVA entry by emitDecorator into a
-    // single `providers: [...]` array (Pitfall 2). 4-space indented to sit
-    // inside the decorator's array. useFactory runs in decorator (static) scope
-    // — the value is authored self-contained (D-3), never `this`-referencing.
+    // Bind the value's `this` (the rewrite's `this.color()` signal reads,
+    // `this.cycle` methods) to the component instance captured via `inject()`
+    // inside the factory (Phase 36 fix). A self-contained constant value keeps
+    // the bare `() => (<value>)` form. MERGED with the CVA entry by
+    // emitDecorator into a single `providers: [...]` array (Pitfall 2).
+    const { factoryBody, needsForwardRef: thisNeeds } = bindProvidedValue(
+      p.valueArg,
+      componentName,
+    );
+    if (thisNeeds) needsForwardRef = true;
     providerEntries.push(
       [
         `    {`,
         `      provide: rozieToken(${keyCode}),`,
-        `      useFactory: () => (${valueCode}),`,
+        `      useFactory: ${factoryBody},`,
         `    },`,
       ].join('\n'),
     );
@@ -256,5 +343,6 @@ export function emitContext(
     injectFields,
     providerEntries,
     needsTokenHelper: true,
+    needsForwardRef,
   };
 }

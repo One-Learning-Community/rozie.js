@@ -1,6 +1,6 @@
 <template>
 
-<button :class="['tab', { 'is-active': tabs && tabs.active === myIndex }]" data-tab="" type="button" role="tab" :data-active="tabs && tabs.active === myIndex" v-bind="$attrs" @click="tabs && tabs.setActive(myIndex)">
+<button :class="['tab', { 'is-active': tabs && tabs.active === props.index }]" data-tab="" type="button" role="tab" :data-active="tabs && tabs.active === props.index" v-bind="$attrs" @click="tabs && tabs.setActive(props.index)">
   {{ props.label }}
 </button>
 
@@ -10,15 +10,11 @@
 import { inject } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ label?: string }>(),
-  { label: '' }
+  defineProps<{ label?: string; index?: number }>(),
+  { label: '', index: 0 }
 );
 
 const tabs = inject('tabs');
-
-// Claim a stable index at setup time. Guarded for the Lit async edge — if the
-// context has not resolved yet, fall back to 0 (it re-resolves on connect).
-const myIndex = tabs ? tabs.register() : 0;
 </script>
 
 <style scoped>
