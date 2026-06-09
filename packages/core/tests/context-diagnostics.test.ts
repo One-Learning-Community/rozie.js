@@ -131,8 +131,34 @@ describe('runContextValidator — ROZ133 PROVIDE_MISSING_VALUE', () => {
   });
 });
 
+describe('runContextValidator — ROZ134 INJECT_MIXED_DECLARATION (WR-02)', () => {
+  it('const x = $inject("k"), y = 5 (mixed) → ROZ134', () => {
+    const { diagnostics } = analyzeSource(
+      consumer(`const theme = $inject('theme'), other = 5`),
+    );
+    const hits = codesOf(diagnostics, 'ROZ134');
+    expect(hits.length, JSON.stringify(diagnostics)).toBe(1);
+    expect(hits[0]!.severity).toBe('error');
+    // The valid-binding path means ROZ132 must NOT also fire (it IS const-bound).
+    expect(codesOf(diagnostics, 'ROZ132')).toEqual([]);
+  });
+
+  it('a sole-declarator const x = $inject("k") → NO ROZ134', () => {
+    const { diagnostics } = analyzeSource(consumer(`const theme = $inject('theme')`));
+    expect(codesOf(diagnostics, 'ROZ134')).toEqual([]);
+  });
+
+  it('a mixed `let` declaration reports ROZ132 only (not ROZ134)', () => {
+    const { diagnostics } = analyzeSource(
+      consumer(`let theme = $inject('theme'), other = 5`),
+    );
+    expect(codesOf(diagnostics, 'ROZ132').length).toBe(1);
+    expect(codesOf(diagnostics, 'ROZ134')).toEqual([]);
+  });
+});
+
 describe('runContextValidator — clean canonical fixture emits no context diagnostics', () => {
-  const CONTEXT_CODES = ['ROZ129', 'ROZ130', 'ROZ131', 'ROZ132', 'ROZ133'];
+  const CONTEXT_CODES = ['ROZ129', 'ROZ130', 'ROZ131', 'ROZ132', 'ROZ133', 'ROZ134'];
 
   it('well-formed ThemeProvider emits none of ROZ129–132', () => {
     const { diagnostics } = analyzeSource(

@@ -300,6 +300,17 @@ export const RozieErrorCode = {
   // has arguments.length < 2 (or arguments[1] is not an expression). ROZ133 is
   // the next free code after ROZ132 in the 100 semantic-binding cluster.
   PROVIDE_MISSING_VALUE: 'ROZ133', // error — $provide(key) called with no value (or a non-expression second argument); $provide(key, value) requires a value.
+  // Phase 36 (code-review WR-02) — a `const x = $inject('k'), y = 5` mixed
+  // declaration: `$inject` is bound to a const but is NOT the sole declarator.
+  // The residual-body strip in every target's emitScript uses a per-STATEMENT
+  // `.every(... $inject)` test, so a mixed declaration fails the test and the
+  // WHOLE statement leaks into the output — the bare `$inject` identifier becomes
+  // an undefined runtime ref, and emitContext separately re-emits `const x =
+  // inject(...)`, double-declaring `x`. Rather than re-emit partial declarations
+  // across five divergent emitters, the mixed shape is forbidden: $inject must be
+  // the sole declarator of its const. Error severity; emitted from
+  // runContextValidator. ROZ134 is the next free code after ROZ133.
+  INJECT_MIXED_DECLARATION: 'ROZ134', // error — $inject(...) shares a `const` declaration with other declarators; it must be the sole declarator (const x = $inject('k')).
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

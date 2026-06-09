@@ -16,6 +16,8 @@
  *                                  (it must be a top-level statement).
  *   ROZ132 INJECT_UNBOUND        — `$inject(...)` not bound to a `const x = …`.
  *   ROZ133 PROVIDE_MISSING_VALUE — `$provide('key')` with no value (CR-02).
+ *   ROZ134 INJECT_MIXED_DECLARATION — `$inject(...)` shares a `const` with
+ *                                  other declarators (WR-02).
  *
  * Mirrors `runExposeValidator` EXACTLY: reads the collected call-site arrays
  * (`bindings.provideCalls` / `bindings.injectCalls`, populated by
@@ -105,6 +107,21 @@ export function runContextValidator(
           '$inject(...) must be bound to a const, e.g. const theme = $inject(\'theme\').',
         loc: locFromNode(site.call),
         hint: "Assign the result to a const: const theme = $inject('theme', fallback?).",
+      });
+    } else if (!site.soleDeclarator) {
+      // ROZ134 — mixed declaration (WR-02). `$inject` is bound to a const but
+      // shares the declaration with other declarators. The per-statement strip
+      // in the emitters would leak the whole statement (bare `$inject` ref +
+      // double-declared binding), so the mixed shape is forbidden. Only checked
+      // when the binding is otherwise valid (boundToConst), so a mixed `let`
+      // reports ROZ132 alone, not both.
+      diagnostics.push({
+        code: RozieErrorCode.INJECT_MIXED_DECLARATION,
+        severity: 'error',
+        message:
+          '$inject(...) must be the sole declarator of its const, not mixed with other declarators in one declaration.',
+        loc: locFromNode(site.call),
+        hint: "Split the declaration: const theme = $inject('theme'); const other = 5;",
       });
     }
 

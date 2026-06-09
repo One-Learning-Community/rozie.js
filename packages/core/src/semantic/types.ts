@@ -203,10 +203,17 @@ export interface ProvideCallSite {
  * validator. `boundToConst` is true iff the call is the `init` of a
  * `VariableDeclarator` whose enclosing declaration is a `const` (the only valid
  * placement); false → ROZ132 (INJECT_UNBOUND).
+ *
+ * `soleDeclarator` is true iff the enclosing `const` declaration has EXACTLY one
+ * declarator. A mixed declaration (`const x = $inject('k'), y = 5`) defeats the
+ * per-statement strip in the emitters (the whole statement leaks, double-
+ * declaring `x` and leaking the bare `$inject` ref) — false → ROZ134
+ * (INJECT_MIXED_DECLARATION). Only meaningful when `boundToConst` is true.
  */
 export interface InjectCallSite {
   call: CallExpression;
   boundToConst: boolean;
+  soleDeclarator: boolean;
 }
 
 export interface BindingsTable {

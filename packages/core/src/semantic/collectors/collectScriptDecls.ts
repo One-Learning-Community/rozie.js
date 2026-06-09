@@ -342,7 +342,13 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
           parent.init === path.node &&
           t.isVariableDeclaration(grandparent) &&
           grandparent.kind === 'const';
-        bindings.injectCalls.push({ call: path.node, boundToConst });
+        // CR-02 WR-02 — record whether this $inject is the SOLE declarator of its
+        // enclosing const. A mixed declaration (`const x = $inject('k'), y = 5`)
+        // defeats the per-statement strip in the emitters → ROZ134.
+        const soleDeclarator =
+          t.isVariableDeclaration(grandparent) &&
+          grandparent.declarations.length === 1;
+        bindings.injectCalls.push({ call: path.node, boundToConst, soleDeclarator });
         return;
       }
     },
