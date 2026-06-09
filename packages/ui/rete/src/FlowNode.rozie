@@ -1,0 +1,100 @@
+<!--
+  FlowNode.rozie — declarative <FlowNode> child for @rozie-ui/rete (Phase 37 A3
+  probe: D-04 body teleport — THE NOVEL PIECE).
+
+  A <FlowNode> is BOTH:
+    - a CONSUMER — it $injects the parent <FlowCanvas>'s `rete:canvas` registry
+      API ({ register, update, unregister, addPort, bodyHostFor, … }), registers
+      its node spec on mount, $watch-updates on x/y/label change, unregisters on
+      cleanup. The parent's existing reconcileNodes() (echo-guarded, sequenced
+      before reconcileConnections) consumes the registry ∪ the :nodes prop.
+    - a PROVIDER — it $provides a nested `rete:node` sub-context (its id via a LIVE
+      GETTER + an addPort verb) so nested <Handle> port children auto-bind to this
+      node's id and side.
+
+  D-04 — BODY TELEPORT (the inline declarative payoff). A <FlowNode>'s default-slot
+  content IS its visible body (e.g. <FlowNode><MyCard/></FlowNode>). The body must
+  appear INSIDE the engine-created node element, NOT orphaned in the FlowNode's own
+  host. Mechanism = DOM RELOCATION of an `r-external`-protected subtree (the
+  Sortable/TipTap discipline, playbook §6.5) into the engine `body` host element,
+  NOT a new portal primitive (a new primitive = emitter change = forbidden):
+    1. the body renders into a <div ref="bodyEl" r-external> the FlowNode owns;
+    2. in $onMount, after register, read the engine body host via the injected
+       canvas (canvas.bodyHostFor(id)) and host.appendChild($refs.bodyEl) — moving
+       the live DOM ($refs only safe in $onMount, ROZ123);
+    3. $reconcileAfterDomMutation() (Lit-load-bearing, no-op on the other 5)
+       reconciles the framework after the cross-boundary move.
+
+  LIT is the D-04 RISK TARGET (FlowCanvas is adopt-document-styles → shadow DOM;
+  relocating into the engine element crosses the shadow boundary). REQ-30: the
+  injected canvas may be undefined on first paint — all reads guarded.
+
+  ZERO emitter/core change.
+-->
+<rozie name="FlowNode">
+
+<props>
+{
+  // The node id (required) — connection source/target + portal keys align to it.
+  id:    { type: String, required: true },
+  // initial position in the area's coordinate space.
+  x:     { type: Number, default: 0 },
+  y:     { type: Number, default: 0 },
+  // optional default-chrome label (when no body slot content is supplied).
+  label: { default: undefined },
+}
+</props>
+
+<script>
+// The nearest provided 'rete:canvas' registry API from <FlowCanvas>. Guarded
+// everywhere (Lit async first-paint, REQ-30 — the Tab.rozie idiom).
+const canvas = $inject('rete:canvas')
+
+$onMount(() => {
+  // register this node's spec; reconcileNodes() builds the engine node, then
+  // exposes its body host element for the D-04 relocation below.
+  if (canvas) canvas.register($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label, inputs: [], outputs: [] })
+
+  // D-04: relocate our own rendered body into the engine-created body host. $refs
+  // is only safe in $onMount (ROZ123); by registration time the engine element
+  // exists, so bodyHostFor(id) returns the engine `body` div.
+  const host = canvas && canvas.bodyHostFor($props.id)
+  if (host && $refs.bodyEl) host.appendChild($refs.bodyEl)
+  // tell the framework the DOM moved — Lit-load-bearing (rebuild reconcile after
+  // the cross-shadow-boundary move), no-op + byte-identical on the other 5.
+  $reconcileAfterDomMutation()
+
+  return () => {
+    if (canvas) canvas.unregister($props.id)
+  }
+})
+
+// React to position / label changes (lazy $watch — post-mount transitions).
+$watch(() => $props.x, () => {
+  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+})
+$watch(() => $props.y, () => {
+  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+})
+$watch(() => $props.label, () => {
+  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+})
+
+// Provide a nested sub-context for <Handle> port children. `get id()` is
+// LOAD-BEARING (D-3/REQ-29 live getter, never a snapshot); addPort forwards to
+// the canvas registry so a <Handle> registers a port against THIS node's id.
+$provide('rete:node', {
+  get id() {
+    return $props.id
+  },
+  addPort: (side, key, label, multiple) => {
+    if (canvas) canvas.addPort($props.id, side, key, label, multiple)
+  },
+})
+</script>
+
+<template>
+<div ref="bodyEl" r-external><slot /></div>
+</template>
+
+</rozie>
