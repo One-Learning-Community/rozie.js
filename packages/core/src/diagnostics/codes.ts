@@ -276,11 +276,25 @@ export const RozieErrorCode = {
   // which lowers to the engineRules bucket and emits unscoped/global across all
   // six targets. ROZ128 is the next free code after ROZ127 in the 100 cluster.
   STYLE_GLOBAL_PSEUDO_FORBIDDEN: 'ROZ128', // error — :global(...) used in <style>; works only on Vue/Svelte, silently dead on React/Solid/Lit. Use :root { ... } for the engine-DOM escape hatch.
+  // Phase 36 ($provide/$inject cross-component context primitive) — four
+  // malformed-form codes in the 100 semantic-binding cluster (D-04 locked names;
+  // ROZ128 was the verified highest used, so ROZ129–132 were free). The context
+  // validator (contextValidator.ts, mirroring runExposeValidator) emits these
+  // collected-not-thrown (D-08) — compile() never throws on malformed
+  // $provide/$inject. Each malformed shape gets its own code so IDE suppressors /
+  // lint-as-code can target it precisely. The `$provide`/`$inject` keys MUST be
+  // string literals (ROZ129/130) — no runtime-computed token keys (ASVS V5,
+  // T-36-01). `$provide` is a statement-only sigil (ROZ131); `$inject` must bind
+  // to a `const x = $inject(...)` (ROZ132).
+  INVALID_PROVIDE_KEY: 'ROZ129', // error — $provide(key, …) key is not a string literal.
+  INVALID_INJECT_KEY: 'ROZ130', // error — $inject(key, …) key is not a string literal.
+  PROVIDE_NOT_STATEMENT: 'ROZ131', // error — $provide(...) used in expression position (must be a top-level statement).
+  INJECT_UNBOUND: 'ROZ132', // error — $inject(...) not bound to a `const x = $inject(...)`.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
-  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
+  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose / $provide / $inject. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
   // 260530: expression-context `++`/`--` on reactive state ($data.<key> or a
   // model:true $props.<key>) where the UpdateExpression's value is CONSUMED
   // (parent is not an ExpressionStatement). Such reads can't be satisfied by a

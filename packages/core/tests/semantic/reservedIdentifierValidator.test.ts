@@ -39,13 +39,14 @@ function roz202(diags: { code: string }[]) {
 }
 
 describe('reservedIdentifierValidator — ROZ202', () => {
-  it('reserved set matches the 12 documented sigils', () => {
+  it('reserved set matches the 14 documented sigils', () => {
     expect([...RESERVED_SIGILS].sort()).toEqual(
       // Phase 14 added `$attrs` — consumer-passed attribute cluster.
       // Phase 15 added `$listeners` — consumer-passed listener cluster.
       // Phase 16 added `$restoreFocus` — keyed-list focus-restoration sigil.
       // Phase 18 added `$model` — producer-side two-way-write sigil.
       // Phase 21 added `$expose` — producer-side imperative-handle sigil.
+      // Phase 36 added `$provide` / `$inject` — cross-component context sigils.
       [
         '$attrs',
         '$data',
@@ -53,14 +54,49 @@ describe('reservedIdentifierValidator — ROZ202', () => {
         '$emit',
         '$event',
         '$expose',
+        '$inject',
         '$listeners',
         '$model',
         '$props',
+        '$provide',
         '$refs',
         '$restoreFocus',
         '$slots',
       ].sort(),
     );
+  });
+
+  it('reserves the Phase 36 context sigils ($provide / $inject)', () => {
+    expect(RESERVED_SIGILS.has('$provide')).toBe(true);
+    expect(RESERVED_SIGILS.has('$inject')).toBe(true);
+  });
+
+  it('flags a <data> field that shadows $provide or $inject (ROZ202)', () => {
+    for (const sigil of ['$provide', '$inject']) {
+      const src = `<rozie name="X">
+<data>{ ${JSON.stringify(sigil)}: 0 }</data>
+<template><div></div></template>
+</rozie>`;
+      const { diagnostics } = analyzeSource(src, `data-${sigil}.rozie`);
+      const hits = roz202(diagnostics);
+      expect(hits.length, `<data> field ${sigil} should emit exactly one ROZ202`).toBe(1);
+      expect(hits[0]!.severity).toBe('error');
+      expect(hits[0]!.message).toContain(sigil);
+    }
+  });
+
+  it('flags an r-for loop variable that shadows $provide or $inject (ROZ202)', () => {
+    for (const sigil of ['$provide', '$inject']) {
+      const src = `<rozie name="X">
+<template>
+<ul><li r-for="${sigil} in items" :key="${sigil}">x</li></ul>
+</template>
+</rozie>`;
+      const { diagnostics } = analyzeSource(src, `rfor-${sigil}.rozie`);
+      const hits = roz202(diagnostics);
+      expect(hits.length, `r-for var ${sigil} should emit exactly one ROZ202`).toBe(1);
+      expect(hits[0]!.message).toContain('r-for loop variable');
+    }
   });
 
   it('flags a <data> field named $event', () => {
