@@ -53,6 +53,7 @@ import {
 import { computeHelperBodyDeps } from './computeHelperDeps.js';
 import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1370,6 +1371,20 @@ export interface EmitScriptResult {
    * Null when no mappable statements exist or no filename was provided.
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Phase 36 ($provide) — `<__ctx_<key>.Provider value={…}>` open tags,
+   * OUTERMOST key first (nested for multiple keys). buildShell wraps ONLY the
+   * `jsxIndented` payload with `providerOpen.join('')` … `providerClose`,
+   * leaving the `return (` line + the `$expose` forwardRef close-tail
+   * BYTE-UNTOUCHED (Pitfall 3). Empty when the component has no `$provide`.
+   */
+  providerOpen: string[];
+  /**
+   * Phase 36 ($provide) — `</__ctx_<key>.Provider>` close tags, in REVERSE
+   * order so the nesting balances against `providerOpen`. Empty when no
+   * `$provide`.
+   */
+  providerClose: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -1472,6 +1487,13 @@ export function emitScript(
   //   - closureBlock   → prepended to the first mount-phase useEffect body
   //   - bulkDispose    → prepended to the first mount-phase useEffect cleanup
   const portalsEmit = emitPortals(ir, collectors, opts.portalScopeHash ?? '');
+
+  // Phase 36 — cross-component context ($provide/$inject). Reads the
+  // rewritten value/fallback expressions from `cloned` so a provided getter
+  // over `$data.color` picks up the React-state rewrite. Empty-gated (R12/D-5):
+  // `contextEmit.hasContext` is false (and nothing is spliced/wrapped) when the
+  // component has no $provide/$inject — existing fixtures stay byte-identical.
+  const contextEmit = emitContext(ir, collectors, cloned);
 
   // 4b. Plan 07.7 follow-up — pre-compute the watched-prop ref-rewrite plan.
   // For each prop X that has a sibling `$watch(() => $props.X, ...)`, we
@@ -1742,6 +1764,18 @@ export function emitScript(
 
   // 5. Build hookSection.
   const hookLines: string[] = [];
+
+  // Phase 36 — cross-component context. `useContext(...)` is a hook and MUST
+  // run at the top of the component body (before any conditional return), so
+  // the inject binders + the `const __ctx_<key> = rozieContext('<key>')`
+  // declarations (referenced by the shell's `<__ctx_<key>.Provider>` wrap) lead
+  // the hookSection. Empty-gated: nothing is pushed when there is no context.
+  if (contextEmit.injectLines.length > 0) {
+    hookLines.push(...contextEmit.injectLines);
+  }
+  if (contextEmit.contextDecls.length > 0) {
+    hookLines.push(...contextEmit.contextDecls);
+  }
 
   if (portalsEmit.hasPortals) {
     hookLines.push(portalsEmit.refDeclLine);
@@ -2693,6 +2727,22 @@ export function emitScript(
             d.init.callee.name === '$computed',
         );
       if (allComputed) continue;
+
+      // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
+      // directives consumed via ir.injects and re-emitted by emitContext as
+      // `const x = useContext(rozieContext('k'))[ ?? f]`. Strip them from the
+      // residual body so the bare `$inject` identifier never leaks as an
+      // undefined runtime ref.
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
     }
     if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
       const callee = stmt.expression.callee;
@@ -2714,6 +2764,13 @@ export function emitScript(
       // call from the body so it never reaches the output (a bare `$expose(...)`
       // would be an undefined-identifier ReferenceError at runtime).
       if (t.isIdentifier(callee) && callee.name === '$expose') {
+        continue;
+      }
+      // Phase 36 — `$provide('k', v)` is a COMPILE-TIME directive consumed via
+      // ir.provides and re-emitted by emitContext as the `<C.Provider value={…}>`
+      // JSX wrap (spliced by shell.ts). Strip the raw call so the bare
+      // `$provide` ref never leaks as an undefined-identifier ReferenceError.
+      if (t.isIdentifier(callee) && callee.name === '$provide') {
         continue;
       }
     }
@@ -2818,6 +2875,8 @@ export function emitScript(
     hasPropsDefaults: defaultedNonModelProps.length > 0,
     hookSectionLines,
     scriptMap,
+    providerOpen: contextEmit.providerOpen,
+    providerClose: contextEmit.providerClose,
     diagnostics,
   };
 }

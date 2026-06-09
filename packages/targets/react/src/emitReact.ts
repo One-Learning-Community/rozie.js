@@ -113,6 +113,8 @@ export function emitReact(
     hasPropsDefaults,
     hookSectionLines,
     scriptMap,
+    providerOpen,
+    providerClose,
     diagnostics: scriptDiags,
   } = emitScript(
     ir,
@@ -292,6 +294,8 @@ export function emitReact(
     exposeNames,
     handleInterface,
     imperativeHandleBlock,
+    providerOpen,
+    providerClose,
   });
 
   const code = ms.toString();

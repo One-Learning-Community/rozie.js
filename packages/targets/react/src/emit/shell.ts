@@ -121,6 +121,22 @@ export interface ShellParts {
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
   /**
+   * Phase 36 ($provide) — `<__ctx_<key>.Provider value={…}>` open tags,
+   * OUTERMOST key first (nested for multiple keys). When non-empty, the JSX
+   * payload (the `jsxIndented` body ONLY) is wrapped:
+   * `providerOpen.join('') + jsxIndented + providerClose.join('')`. The
+   * `return (` line and the `$expose` forwardRef close-tail are left
+   * BYTE-UNTOUCHED (Pitfall 3 — a `$provide`+`$expose` component must still
+   * emit a valid forwardRef). Empty/undefined when no `$provide`.
+   */
+  providerOpen?: string[];
+  /**
+   * Phase 36 ($provide) — `</__ctx_<key>.Provider>` close tags, in REVERSE
+   * order so the nesting balances against `providerOpen`. Empty/undefined when
+   * no `$provide`.
+   */
+  providerClose?: string[];
+  /**
    * Phase 06.1 Plan 01: original `.rozie` source text — anchors the MagicString.
    */
   rozieSource: string;
@@ -353,7 +369,13 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
   moduleParts.push('  return (\n');
-  moduleParts.push(jsxIndented);
+  // Phase 36 ($provide) — wrap ONLY the jsxIndented payload in the
+  // `<C.Provider value={…}>` subtree(s). The `return (` line above and the
+  // `$expose` forwardRef close-tail below are left BYTE-UNTOUCHED so a
+  // component that BOTH `$provide`s AND `$expose`s still closes its forwardRef
+  // correctly (Pitfall 3). Provider tags are indented to the same column as the
+  // payload so the emitted JSX stays well-formed.
+  moduleParts.push(wrapWithProviders(jsxIndented, parts));
   // Phase 21 ($expose) — close the forwardRef call + emit the default export
   // when exposed; otherwise close the plain function declaration byte-for-byte.
   if (hasExpose) {
@@ -502,7 +524,8 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
   ms.append('  return (\n');
-  ms.append(jsxIndented);
+  // Phase 36 ($provide) — payload-only Provider wrap (legacy-path mirror).
+  ms.append(wrapWithProviders(jsxIndented, parts));
   // Phase 21 ($expose) — close forwardRef + default export when exposed.
   if (hasExpose) {
     ms.append('\n  );\n});\n');
@@ -512,4 +535,22 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   }
 
   return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
+}
+
+/**
+ * Phase 36 ($provide) — wrap the already-indented JSX payload in the
+ * `<C.Provider value={…}>` subtree(s). OUTERMOST key first in `providerOpen`,
+ * reverse-order close tags in `providerClose`. Indented to the same 4-space
+ * column as the payload so the JSX is well-formed. Returns `jsxIndented`
+ * UNCHANGED when there are no providers (byte-identity guarantee, D-5) — this
+ * is the ONLY mutation point; `return (` and the forwardRef close-tail are
+ * never touched (Pitfall 3).
+ */
+function wrapWithProviders(jsxIndented: string, parts: ShellParts): string {
+  const open = parts.providerOpen ?? [];
+  const close = parts.providerClose ?? [];
+  if (open.length === 0) return jsxIndented;
+  const openLines = open.map((tag) => '    ' + tag).join('\n');
+  const closeLines = close.map((tag) => '    ' + tag).join('\n');
+  return openLines + '\n' + jsxIndented + '\n' + closeLines;
 }

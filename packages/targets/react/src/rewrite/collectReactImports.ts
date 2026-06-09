@@ -24,7 +24,10 @@ export type ReactImport =
   // Phase 21 ($expose) — emitted only when ir.expose is non-empty so a
   // non-$expose component's `react` import line stays byte-identical (D-03).
   | 'forwardRef'
-  | 'useImperativeHandle';
+  | 'useImperativeHandle'
+  // Phase 36 ($inject) — emitted only when ir.injects is non-empty so a
+  // non-context component's `react` import line stays byte-identical (R12/D-5).
+  | 'useContext';
 
 export class ReactImportCollector {
   private symbols = new Set<ReactImport>();
@@ -85,6 +88,11 @@ export type RuntimeReactImport =
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
   | 'rozieAttr'
+  // Phase 36 ($provide/$inject) — globalThis-backed React context registry.
+  // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
+  // non-context component's `@rozie/runtime-react` import line stays
+  // byte-identical (R12 / D-5).
+  | 'rozieContext'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
   | 'normalizeListeners'
