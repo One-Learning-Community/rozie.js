@@ -115,10 +115,37 @@ const EMPTY: ContextEmit = {
   providerClose: [],
 };
 
-/** Sanitize a context key into a valid JS identifier suffix for `__ctx_<id>`. */
-function ctxIdent(key: string): string {
-  const safe = key.replace(/[^A-Za-z0-9_$]/g, '_');
-  return `__ctx_${safe}`;
+/**
+ * Make an injective context-key → `__ctx_<id>` identifier resolver.
+ *
+ * WR-01 — the bare sanitized suffix is NOT injective: distinct raw keys (`a.b`
+ * and `a-b`, or `theme` and `theme!`) collapse to the same `_`-run suffix and
+ * would mint two `const __ctx_a_b = rozieContext(...)` declarations in one
+ * component body (a JS/TS "already declared" error) while the underlying
+ * `rozieContext('a.b')` ≠ `rozieContext('a-b')` tokens differ. The resolver
+ * disambiguates collisions with a numeric suffix keyed by the RAW key, so the
+ * same raw key always maps to the same identifier and two distinct raw keys
+ * never share one. The fixed `__ctx_` prefix means the leading-digit guard is
+ * unnecessary (the suffix can never start the identifier).
+ */
+function makeCtxIdentResolver(): (rawKey: string) => string {
+  const byRawKey = new Map<string, string>();
+  const used = new Set<string>();
+  return function ctxIdent(rawKey: string): string {
+    const existing = byRawKey.get(rawKey);
+    if (existing !== undefined) return existing;
+    const safe = rawKey.replace(/[^A-Za-z0-9_$]/g, '_');
+    const base = `__ctx_${safe}`;
+    let candidate = base;
+    let n = 2;
+    while (used.has(candidate)) {
+      candidate = `${base}_${n}`;
+      n += 1;
+    }
+    used.add(candidate);
+    byRawKey.set(rawKey, candidate);
+    return candidate;
+  };
 }
 
 /**
@@ -213,12 +240,18 @@ export function emitContext(
   const injectLines: string[] = [];
   const providerOpen: string[] = [];
   const providerClose: string[] = [];
+  // WR-01 — injective raw-key → `__ctx_<id>` resolver (distinct keys never
+  // collapse to a duplicate const name).
+  const ctxIdent = makeCtxIdentResolver();
 
   if (injectBinders.length > 0) {
     collectors.react.add('useContext');
     collectors.runtime.add('rozieContext');
     for (const b of injectBinders) {
-      const read = `useContext(rozieContext('${b.key}'))`;
+      // CR-01: serialize the key via JSON.stringify so apostrophes / backslashes
+      // / newlines in the author key produce valid, correctly-escaped source (and
+      // the SAME token string a provider emits). Never splice the raw `.value`.
+      const read = `useContext(rozieContext(${JSON.stringify(b.key)}))`;
       if (b.fallbackArg) {
         // React's useContext has no native default arg; emit a nullish-coalesce
         // fallback so a missing provider yields the author's default value.
@@ -233,7 +266,9 @@ export function emitContext(
     collectors.runtime.add('rozieContext');
     for (const p of provideValues) {
       const ident = ctxIdent(p.key);
-      contextDecls.push(`const ${ident} = rozieContext('${p.key}');`);
+      // CR-01: JSON.stringify the key (escaping-safe, single source of truth with
+      // the consumer read above).
+      contextDecls.push(`const ${ident} = rozieContext(${JSON.stringify(p.key)});`);
       // Recompute-in-render: the value literal is re-evaluated every render so
       // the Provider's `value` reference changes when component state changes,
       // propagating to consumers that re-read the live getter (R-2 / D-3).

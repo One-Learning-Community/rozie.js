@@ -4,7 +4,7 @@
 // sigils lower to `@lit/context`'s ContextProvider/ContextConsumer controllers:
 //
 //   $provide('theme', { get color() {…}, cycle })
-//     → const __rozieCtx_theme = createContext(Symbol.for('rozie:theme'));
+//     → const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 //       private __rozieCtxProvider_theme = new ContextProvider(this, { … });
 //       + reactive setValue effect (when the value reads $data/$computed signals)
 //   const theme = $inject('theme')
@@ -102,7 +102,8 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
     const { code, diagnostics } = compile(PROVIDER_SRC, 'ThemeProvider.rozie');
     expect((diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error')).toHaveLength(0);
     // Module-scope createContext over the Symbol.for global-registry key (D-1).
-    expect(code).toContain("const __rozieCtx_theme = createContext(Symbol.for('rozie:theme'));");
+    // CR-01: the protocol key is JSON-serialized (double-quoted) for escaping safety.
+    expect(code).toContain('const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));');
     // ContextProvider controller field with initialValue.
     expect(code).toContain('new ContextProvider(this, { context: __rozieCtx_theme, initialValue:');
     // @lit/context imports present.
@@ -133,7 +134,7 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
 
   it('constant provider: initialValue but NO setValue effect (no signal reads)', () => {
     const { code } = compile(CONSTANT_PROVIDER_SRC, 'ConstProvider.rozie');
-    expect(code).toContain("const __rozieCtx_config = createContext(Symbol.for('rozie:config'));");
+    expect(code).toContain('const __rozieCtx_config = createContext(Symbol.for("rozie:config"));');
     expect(code).toContain('new ContextProvider(this, { context: __rozieCtx_config, initialValue:');
     // No reactive re-publish for a constant value.
     expect(code).not.toContain('.setValue(');
@@ -142,7 +143,7 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
   it('consumer: const theme = $inject("theme") → ContextConsumer + null-guarded getter (REQ-30)', () => {
     const { code, diagnostics } = compile(CONSUMER_SRC, 'ThemeButton.rozie');
     expect((diagnostics as { severity?: string }[]).filter((d) => d.severity === 'error')).toHaveLength(0);
-    expect(code).toContain("const __rozieCtx_theme = createContext(Symbol.for('rozie:theme'));");
+    expect(code).toContain('const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));');
     expect(code).toContain('new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });');
     expect(code).toMatch(/import \{[^}]*\bContextConsumer\b[^}]*\} from '@lit\/context';/);
     // REQ-30 null-guard: the read accessor returns `.value` (already T | undefined).
@@ -156,6 +157,69 @@ describe('Lit emit — cross-component context ($provide / $inject)', () => {
     // Fallback form of the null-guard.
     expect(code).toContain('this.__rozieCtxConsumer_theme.value ??');
     expect(code).toContain("color: 'gray'");
+  });
+
+  it("CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer Symbol.for token)", () => {
+    const APOSTROPHE_PROVIDE = `<rozie name="AposProvider">
+<data>
+{ color: 'red' }
+</data>
+<script>
+$provide("it's", { get color() { return $data.color; } });
+</script>
+<template>
+<div><slot></slot></div>
+</template>
+</rozie>`;
+    const APOSTROPHE_CONSUME = `<rozie name="AposConsumer">
+<script>
+const theme = $inject("it's");
+</script>
+<template>
+<button>x</button>
+</template>
+</rozie>`;
+    const provider = compile(APOSTROPHE_PROVIDE, 'AposProvider.rozie').code;
+    const consumer = compile(APOSTROPHE_CONSUME, 'AposConsumer.rozie').code;
+    // The raw apostrophe is NEVER spliced into single-quoted source.
+    expect(provider).not.toContain("Symbol.for('rozie:it's')");
+    // JSON.stringify escapes to a double-quoted literal with the apostrophe intact.
+    expect(provider).toContain('Symbol.for("rozie:it\'s")');
+    expect(consumer).toContain('Symbol.for("rozie:it\'s")');
+    // Provider + consumer emit the SAME Symbol.for token string (cross-file identity).
+    const tokenRe = /Symbol\.for\((".*?")\)/;
+    expect(provider.match(tokenRe)?.[1]).toBe(consumer.match(tokenRe)?.[1]);
+  });
+
+  it('WR-01 — two distinct keys that sanitize alike get distinct member identifiers', () => {
+    const COLLIDE_SRC = `<rozie name="CollideProvider">
+<data>
+{ color: 'red' }
+</data>
+<script>
+$provide('a.b', { get color() { return $data.color; } });
+$provide('a-b', { get color() { return $data.color; } });
+</script>
+<template>
+<div><slot></slot></div>
+</template>
+</rozie>`;
+    const { code } = compile(COLLIDE_SRC, 'CollideProvider.rozie');
+    // Both distinct Symbol.for tokens are present.
+    expect(code).toContain('Symbol.for("rozie:a.b")');
+    expect(code).toContain('Symbol.for("rozie:a-b")');
+    // The two context consts must NOT share a name (no duplicate member).
+    const ctxConsts = [
+      ...code.matchAll(/const (__rozieCtx_[A-Za-z0-9_$]+) = createContext/g),
+    ].map((m) => m[1]);
+    expect(ctxConsts).toHaveLength(2);
+    expect(new Set(ctxConsts).size).toBe(2);
+    // And the provider controller fields are distinct too.
+    const providerFields = [
+      ...code.matchAll(/private (__rozieCtxProvider_[A-Za-z0-9_$]+) =/g),
+    ].map((m) => m[1]);
+    expect(providerFields).toHaveLength(2);
+    expect(new Set(providerFields).size).toBe(2);
   });
 
   it('R12 / D-5 — a component with no $provide/$inject emits ZERO @lit/context text', () => {

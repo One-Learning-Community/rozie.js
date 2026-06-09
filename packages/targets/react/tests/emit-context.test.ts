@@ -115,7 +115,8 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
     const { code, diagnostics } = emitReact(ir, { filename: 'ThemeProvider.rozie' });
     expect(diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
     // The context object is created via the globalThis-backed registry helper.
-    expect(code).toContain("const __ctx_theme = rozieContext('theme');");
+    // CR-01: the key is JSON-serialized (double-quoted) for escaping safety.
+    expect(code).toContain('const __ctx_theme = rozieContext("theme");');
     // `rozieContext` collected into the `@rozie/runtime-react` import line.
     expect(code).toMatch(/import \{[^}]*\brozieContext\b[^}]*\} from '@rozie\/runtime-react';/);
     // The returned JSX is wrapped in the Provider subtree.
@@ -136,7 +137,7 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
     ]);
     const { code, diagnostics } = emitReact(ir, { filename: 'ThemeButton.rozie' });
     expect(diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
-    expect(code).toContain("const theme = useContext(rozieContext('theme'));");
+    expect(code).toContain('const theme = useContext(rozieContext("theme"));');
     expect(code).toMatch(/import \{[^}]*\buseContext\b[^}]*\} from 'react';/);
     expect(code).toMatch(/import \{[^}]*\brozieContext\b[^}]*\} from '@rozie\/runtime-react';/);
     expect(code).not.toContain('$inject');
@@ -145,7 +146,7 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
   it('consumer with fallback: $inject("theme", fb) → useContext(...) ?? fb', () => {
     const ir = lower(CONSUMER_FALLBACK_SRC, 'ThemeButtonFallback.rozie');
     const { code } = emitReact(ir, { filename: 'ThemeButtonFallback.rozie' });
-    expect(code).toContain("const theme = useContext(rozieContext('theme')) ??");
+    expect(code).toContain('const theme = useContext(rozieContext("theme")) ??');
     expect(code).toContain("color: 'gray'");
   });
 
@@ -178,8 +179,8 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
     const ir = lower(MULTI_PROVIDE_SRC, 'MultiProvider.rozie');
     expect(ir.provides.map((p) => p.key)).toEqual(['theme', 'layout']);
     const { code } = emitReact(ir, { filename: 'MultiProvider.rozie' });
-    expect(code).toContain("const __ctx_theme = rozieContext('theme');");
-    expect(code).toContain("const __ctx_layout = rozieContext('layout');");
+    expect(code).toContain('const __ctx_theme = rozieContext("theme");');
+    expect(code).toContain('const __ctx_layout = rozieContext("layout");');
     // OUTERMOST key first in the open tags; reverse order on the close tags.
     const openTheme = code.indexOf('<__ctx_theme.Provider');
     const openLayout = code.indexOf('<__ctx_layout.Provider');
@@ -188,6 +189,72 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
     // theme opens before layout (outer first); layout closes before theme.
     expect(openTheme).toBeLessThan(openLayout);
     expect(closeLayout).toBeLessThan(closeTheme);
+  });
+
+  it("CR-01 — a key containing an apostrophe is JSON-escaped (valid source + matching provider/consumer token)", () => {
+    const APOSTROPHE_PROVIDE = `<rozie name="AposProvider">
+<data>
+{ color: 'red' }
+</data>
+<script>
+$provide("it's", { get color() { return $data.color; } });
+</script>
+<template>
+<div><slot></slot></div>
+</template>
+</rozie>`;
+    const APOSTROPHE_CONSUME = `<rozie name="AposConsumer">
+<script>
+const theme = $inject("it's");
+</script>
+<template>
+<button>{{ theme.color }}</button>
+</template>
+</rozie>`;
+    const provider = emitReact(lower(APOSTROPHE_PROVIDE, 'AposProvider.rozie'), {
+      filename: 'AposProvider.rozie',
+    }).code;
+    const consumer = emitReact(lower(APOSTROPHE_CONSUME, 'AposConsumer.rozie'), {
+      filename: 'AposConsumer.rozie',
+    }).code;
+    // The raw apostrophe is NEVER spliced into single-quoted source.
+    expect(provider).not.toContain("rozieContext('it's')");
+    // JSON.stringify escapes to a double-quoted literal with the apostrophe intact.
+    expect(provider).toContain('rozieContext("it\'s")');
+    expect(consumer).toContain('rozieContext("it\'s")');
+    // Provider + consumer emit the SAME token string (cross-file identity holds).
+    const tokenRe = /rozieContext\((".*?")\)/;
+    const provTok = provider.match(tokenRe)?.[1];
+    const consTok = consumer.match(tokenRe)?.[1];
+    expect(provTok).toBeDefined();
+    expect(provTok).toBe(consTok);
+  });
+
+  it('WR-01 — two distinct keys that sanitize alike get distinct const identifiers', () => {
+    const COLLIDE_SRC = `<rozie name="CollideProvider">
+<data>
+{ color: 'red' }
+</data>
+<script>
+$provide('a.b', { get color() { return $data.color; } });
+$provide('a-b', { get color() { return $data.color; } });
+</script>
+<template>
+<div><slot></slot></div>
+</template>
+</rozie>`;
+    const { code } = emitReact(lower(COLLIDE_SRC, 'CollideProvider.rozie'), {
+      filename: 'CollideProvider.rozie',
+    });
+    // Both distinct tokens are present (JSON-serialized, double-quoted per CR-01).
+    expect(code).toContain('rozieContext("a.b")');
+    expect(code).toContain('rozieContext("a-b")');
+    // The two context consts must NOT share a name (no duplicate declaration).
+    const declMatches = [...code.matchAll(/const (__ctx_[A-Za-z0-9_$]+) = rozieContext/g)].map(
+      (m) => m[1],
+    );
+    expect(declMatches).toHaveLength(2);
+    expect(new Set(declMatches).size).toBe(2);
   });
 
   it('R12 / D-5 — a component with no $provide/$inject emits ZERO context text', () => {

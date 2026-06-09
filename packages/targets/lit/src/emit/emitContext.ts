@@ -92,15 +92,6 @@ function genCode(node: t.Node): string {
 }
 
 /**
- * Sanitize an author context key into the identifier-tail used for the
- * generated `__rozieCtx_<tail>` / `__rozieCtxProvider_<tail>` /
- * `__rozieCtxConsumer_<tail>` member + local names. Keys are string literals
- * (ROZ129/ROZ130 enforce that upstream), but they may contain characters
- * illegal in a JS identifier (`-`, `.`, `:`, …) — replace each run with `_`.
- * The PROTOCOL key (the `Symbol.for('rozie:' + <raw key>)` argument) always
- * uses the raw author key verbatim, so cross-file identity is unaffected.
- */
-/**
  * The host-capture parameter name used to bind the LitElement `this` into the
  * provided-value object. See `bindProvidedValue`.
  */
@@ -165,9 +156,43 @@ function bindProvidedValue(valueArg: t.Expression): string {
   return `((${HOST_PARAM}) => (${inner}))(this)`;
 }
 
-function keyIdent(key: string): string {
-  const tail = key.replace(/[^A-Za-z0-9_$]/g, '_');
-  return /^[A-Za-z_$]/.test(tail) ? tail : `_${tail}`;
+/**
+ * Sanitize an author context key into the identifier-tail used for the
+ * generated `__rozieCtx_<tail>` / `__rozieCtxProvider_<tail>` /
+ * `__rozieCtxConsumer_<tail>` member + local names. Keys are string literals
+ * (ROZ129/ROZ130 enforce that upstream), but they may contain characters
+ * illegal in a JS identifier (`-`, `.`, `:`, …) — replace each run with `_`.
+ * The PROTOCOL key (the `Symbol.for('rozie:' + <raw key>)` argument) always
+ * uses the raw author key verbatim, so cross-file identity is unaffected.
+ *
+ * WR-01 — the bare sanitized tail is NOT injective: distinct raw keys (`a.b`
+ * and `a-b`, or `theme` and `theme!`) collapse to the same `_`-run tail and
+ * would mint two `__rozieCtxProvider_*` / `__rozieCtx_*` members with the same
+ * name (a "duplicate member" TS error) while the underlying `Symbol.for` tokens
+ * differ. The injective resolver below disambiguates collisions with a numeric
+ * suffix keyed by the RAW key, so the same raw key always maps to the same
+ * identifier and two distinct raw keys never share one.
+ */
+function makeKeyIdentResolver(): (rawKey: string) => string {
+  // raw key → assigned identifier tail (stable per raw key).
+  const byRawKey = new Map<string, string>();
+  // assigned identifier tails already in use (collision detection).
+  const used = new Set<string>();
+  return function keyIdent(rawKey: string): string {
+    const existing = byRawKey.get(rawKey);
+    if (existing !== undefined) return existing;
+    const sanitized = rawKey.replace(/[^A-Za-z0-9_$]/g, '_');
+    const base = /^[A-Za-z_$]/.test(sanitized) ? sanitized : `_${sanitized}`;
+    let candidate = base;
+    let n = 2;
+    while (used.has(candidate)) {
+      candidate = `${base}_${n}`;
+      n += 1;
+    }
+    used.add(candidate);
+    byRawKey.set(rawKey, candidate);
+    return candidate;
+  };
 }
 
 export interface LitContextEmit {
@@ -366,6 +391,10 @@ export function emitContext(
   // an in-module consumer over the same key share the const).
   const ctxDeclEmitted = new Set<string>();
   let needsEffectImport = false;
+  // WR-01 — an injective raw-key → identifier-tail resolver: same raw key maps
+  // to the same tail (so provider + consumer agree), distinct raw keys never
+  // collide (a `_N` suffix disambiguates `a.b` vs `a-b`).
+  const keyIdent = makeKeyIdentResolver();
 
   function ensureModuleCtxDecl(rawKey: string): string {
     const ident = `__rozieCtx_${keyIdent(rawKey)}`;
@@ -374,8 +403,12 @@ export function emitContext(
       litContextImports.add('createContext');
       // Symbol.for(...) carries cross-file identity natively (D-1) — createContext
       // is identity-on-key so the context object IS the global-registry symbol.
+      // CR-01: JSON.stringify the protocol key so apostrophes / backslashes /
+      // newlines in the author key produce a valid, correctly-escaped string
+      // literal (the Symbol.for registry keys on the exact runtime string, which
+      // JSON.stringify preserves byte-for-byte).
       moduleContextDecls.push(
-        `const ${ident} = createContext(Symbol.for('rozie:${rawKey}'));`,
+        `const ${ident} = createContext(Symbol.for(${JSON.stringify('rozie:' + rawKey)}));`,
       );
     }
     return ident;
