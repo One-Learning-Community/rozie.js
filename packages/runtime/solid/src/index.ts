@@ -30,3 +30,4 @@ export { normalizeListeners, SOLID_LISTENER_KEY_MAP } from './normalizeListeners
 export { mergeListeners } from './mergeListeners.js';
 export { __rozieInjectStyle } from './injectStyle.js';
 export { rozieDisplay } from './rozieDisplay.js';
+export { rozieAttr } from './rozieAttr.js';

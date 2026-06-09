@@ -27,6 +27,7 @@ export {
 } from './keyFilter.js';
 export { clsx } from './clsx.js';
 export { rozieDisplay } from './rozieDisplay.js';
+export { rozieAttr } from './rozieAttr.js';
 export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';
 export { normalizeAttrs, REACT_ATTR_KEY_MAP } from './normalizeAttrs.js';
 export { normalizeListeners, REACT_LISTENER_KEY_MAP } from './normalizeListeners.js';

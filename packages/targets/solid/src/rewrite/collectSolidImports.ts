@@ -60,6 +60,10 @@ export type RuntimeSolidImport =
   // primitive-only component's `@rozie/runtime-solid` import line stays
   // byte-identical to pre-phase (SPEC-3).
   | 'rozieDisplay'
+  // 260608-sya — attribute-position display helper (nullish DROPS the
+  // attribute, matching Vue's `:attr` semantics). Added by the attribute
+  // emitter ONLY on the wrapped whole-value generic-attr binding branch.
+  | 'rozieAttr'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
   | 'normalizeListeners'

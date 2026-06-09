@@ -167,7 +167,15 @@ export type RuntimeLitImport =
    * pre-phase (SPEC-3). A non-primitive value renders portable pretty-printed
    * JSON instead of lit-html's `[object Object]` auto-coercion.
    */
-  | 'rozieDisplay';
+  | 'rozieDisplay'
+  /**
+   * 260608-sya — attribute-position display helper, shipped from
+   * `@rozie/runtime-lit`. Added by the attribute emitter ONLY on the wrapped
+   * whole-value generic-attr binding branch. Returns lit's `nothing` sentinel
+   * on a nullish value so the attribute is DROPPED (matching Vue's `:attr`
+   * binding), instead of rendering `attr=""`.
+   */
+  | 'rozieAttr';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();
