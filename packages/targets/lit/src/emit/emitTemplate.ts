@@ -149,6 +149,19 @@ export interface EmitTemplateOpts {
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
     /**
+     * Item 1 (pure-literal component-prop hoist) — per-instance class-field
+     * declarations (`private _rozieLit0 = [-77, 37.5];`) for inline
+     * Array/Object literals bound to a child component/self-tag prop. Hoisting
+     * them to a render-stable per-instance field (NOT a shared module const —
+     * an engine that mutates a passed prop in place would otherwise cross-
+     * contaminate instances) lets lit-html dedup the binding by reference, so a
+     * `model:true` child's reference-equality change guard doesn't re-dispatch
+     * every render (the MapLibre-lit infinite-loop class). emitLit splices these
+     * alongside the other field decls. The index in `_rozieLit${n}` is the
+     * push order (deterministic per template walk → byte-stable output).
+     */
+    hoistedLiteralFieldDecls: string[];
+    /**
      * `r-external` engine-wrapper marker — set true when at least one
      * `TemplateElementIR` with `isExternal === true` was emitted. emitLit
      * reads this off `EmitTemplateResult` and conditionally adds
@@ -253,6 +266,14 @@ export interface EmitTemplateResult {
    * other field declarations so the wrapper identity is stable across renders.
    */
   debouncedFieldDecls: string[];
+  /**
+   * Item 1 (pure-literal component-prop hoist) — per-instance class-field
+   * declarations for inline Array/Object literals bound to a child component
+   * prop, hoisted to render-stable fields so lit-html dedups the binding
+   * (breaks the `model:true` reference-equality re-dispatch loop). emitLit
+   * splices these into the class body alongside the other field decls.
+   */
+  hoistedLiteralFieldDecls: string[];
   /**
    * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
    * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`).
@@ -381,6 +402,63 @@ function isPlainObjectLiteral(obj: bt.ObjectExpression): boolean {
   return true;
 }
 
+/**
+ * Item 1 (pure-literal component-prop hoist) — true for an expression that is a
+ * compile-time constant with NO reactive parts: a primitive literal, or an
+ * Array/Object literal whose every element/value is itself a pure literal (and
+ * whose object keys are non-computed). FALSE for anything containing an
+ * Identifier, MemberExpression, CallExpression, template-with-expressions,
+ * spread, etc. — those must re-evaluate each render.
+ *
+ * Only Array/Object literals are HOISTED (see emitAttribute): a fresh array/
+ * object literal re-evaluated every render is a new reference each pass, which
+ * on the Lit target re-triggers a `model:true` child's reference-equality
+ * change guard → re-dispatch → SignalWatcher re-entrancy → infinite render
+ * loop. Bare primitive literals are dedup'd by value by lit-html already, so
+ * they need no hoist.
+ */
+function isPureLiteral(node: bt.Node): boolean {
+  if (
+    bt.isNumericLiteral(node) ||
+    bt.isStringLiteral(node) ||
+    bt.isBooleanLiteral(node) ||
+    bt.isNullLiteral(node) ||
+    bt.isBigIntLiteral(node)
+  ) {
+    return true;
+  }
+  // A signed numeric literal parses as a UnaryExpression (`-77` → `-`/NumericLit).
+  // Treat a constant unary on a pure-literal argument as pure (`-`, `+`, `~`
+  // are arithmetic on a constant; `!`/`void` on a constant are also constant).
+  if (
+    bt.isUnaryExpression(node) &&
+    node.prefix &&
+    (node.operator === '-' ||
+      node.operator === '+' ||
+      node.operator === '~' ||
+      node.operator === '!' ||
+      node.operator === 'void') &&
+    isPureLiteral(node.argument)
+  ) {
+    return true;
+  }
+  if (bt.isArrayExpression(node)) {
+    return node.elements.every(
+      (el) => el !== null && !bt.isSpreadElement(el) && isPureLiteral(el),
+    );
+  }
+  if (bt.isObjectExpression(node)) {
+    return node.properties.every(
+      (prop) =>
+        bt.isObjectProperty(prop) &&
+        !prop.computed &&
+        bt.isExpression(prop.value) &&
+        isPureLiteral(prop.value),
+    );
+  }
+  return false;
+}
+
 function emitAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
@@ -484,6 +562,30 @@ function emitAttribute(
       const propName = attr.name.includes('-')
         ? attr.name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase())
         : attr.name;
+      // Item 1 — hoist an inline Array/Object literal bound to a child prop to a
+      // per-instance, render-stable class field. Re-evaluated inline (`.center=
+      // ${[-77, 37.5]}`), the literal is a fresh reference every render, which
+      // a `model:true` child's `Object.is` change guard treats as a new value →
+      // re-dispatch → SignalWatcher re-entrancy → infinite loop. A field read
+      // (`.center=${this._rozieLit0}`) is reference-stable so lit-html dedups
+      // it. Scoped to Array/Object literals: bare primitive literals are already
+      // value-dedup'd by lit-html. PER-INSTANCE (not a shared module const) so
+      // an engine mutating a passed prop in place can't cross-contaminate
+      // instances (the other 5 targets get a fresh value per render → per
+      // instance). The field is declared in the class body via emitLit.
+      if (
+        opts?._state &&
+        (bt.isArrayExpression(attr.expression) ||
+          bt.isObjectExpression(attr.expression)) &&
+        isPureLiteral(attr.expression)
+      ) {
+        const idx = opts._state.hoistedLiteralFieldDecls.length;
+        const fieldName = `_rozieLit${idx}`;
+        opts._state.hoistedLiteralFieldDecls.push(
+          `  private ${fieldName} = ${expr};`,
+        );
+        return `.${propName}=\${this.${fieldName}}`;
+      }
       return `.${propName}=\${${expr}}`;
     }
 
@@ -1826,6 +1928,7 @@ export function emitTemplate(
     unsafeHtmlUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
+    hoistedLiteralFieldDecls: [] as string[],
     slotFillerClassFields: [] as string[],
     slotFillerUpdatedBody: [] as string[],
     slotFillerDisconnectReset: [] as string[],
@@ -1853,6 +1956,7 @@ export function emitTemplate(
       keyedUsed: state.keyedUsed,
       unsafeHtmlUsed: state.unsafeHtmlUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
+      hoistedLiteralFieldDecls: state.hoistedLiteralFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
       slotFillerDisconnectReset: state.slotFillerDisconnectReset,
@@ -1877,6 +1981,7 @@ export function emitTemplate(
     keyedUsed: state.keyedUsed,
     unsafeHtmlUsed: state.unsafeHtmlUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
+    hoistedLiteralFieldDecls: state.hoistedLiteralFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,
     slotFillerDisconnectReset: state.slotFillerDisconnectReset,

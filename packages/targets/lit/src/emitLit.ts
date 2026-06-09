@@ -326,6 +326,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
     debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
+    hoistedLiteralFieldDecls: templateResult.hoistedLiteralFieldDecls.join('\n'),
     slotFillerClassFields: templateResult.slotFillerClassFields
       .map((f) => '  ' + f)
       .join('\n'),
@@ -470,6 +471,14 @@ interface ComposeClassBodyParts {
    */
   debouncedFieldDecls: string;
   /**
+   * Item 1 (pure-literal component-prop hoist) — per-instance class-field
+   * declarations for inline Array/Object literals bound to a child component
+   * prop, hoisted to render-stable fields (breaks the Lit `model:true`
+   * reference-equality re-dispatch loop). Empty string when none were hoisted
+   * (byte-identical to pre-change output).
+   */
+  hoistedLiteralFieldDecls: string;
+  /**
    * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
    * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`). Spliced
    * in alongside the other field decls so firstUpdated()'s
@@ -533,6 +542,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.debouncedFieldDecls.trim().length > 0) {
     sections.push(parts.debouncedFieldDecls);
+  }
+  if (parts.hoistedLiteralFieldDecls.trim().length > 0) {
+    sections.push(parts.hoistedLiteralFieldDecls);
   }
   if (parts.slotFillerClassFields.trim().length > 0) {
     sections.push(parts.slotFillerClassFields);
