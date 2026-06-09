@@ -36,6 +36,7 @@ import { runRForKeyValidator } from './validators/rForKeyValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 import { runListenerElementValidator } from './validators/listenerElementValidator.js';
 import { runExposeValidator } from './validators/exposeValidator.js';
+import { runContextValidator } from './validators/contextValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
@@ -65,6 +66,9 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // Phase 21 — $expose methods-only validation (ROZ115–ROZ120). Reads
   // bindings.exposeCalls; emits at most one diagnostic per offending site.
   runExposeValidator(ast, bindings, diagnostics);
+  // Phase 36 — $provide/$inject context validation (ROZ129–ROZ132). Reads
+  // bindings.provideCalls/injectCalls (collected-not-thrown, D-08). NEVER throws.
+  runContextValidator(bindings, diagnostics);
   // Quick 260601-l2u — ROZ122: reject empty/whitespace-only $emit event names (script + template + listeners). No binding dependency.
   runEmitNameValidator(ast, diagnostics);
   // Quick 260602-dv1 — ROZ123: $refs read in a pre-mount eval position ($computed body / $watch getter / template binding/interpolation/r-if/r-show/r-for-iterable expr). No binding dependency.
