@@ -46,6 +46,7 @@ import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewr
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
+import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -970,6 +971,22 @@ function emitResidualScriptBody(
             d.init.callee.name === '$computed',
         );
       if (allComputed) continue;
+
+      // Phase 36 (REQ-32 / R6) — `const x = $inject('k', f?)` binders are
+      // COMPILE-TIME directives consumed via ir.injects and re-emitted by
+      // emitContext as `const x = getContext('k')[ ?? f]` in the preamble (init
+      // scope). Strip them from the residual body so the bare `$inject`
+      // identifier never leaks as an undefined runtime ref.
+      const allInject =
+        stmt.declarations.length > 0 &&
+        stmt.declarations.every(
+          (d) =>
+            d.init &&
+            t.isCallExpression(d.init) &&
+            t.isIdentifier(d.init.callee) &&
+            d.init.callee.name === '$inject',
+        );
+      if (allInject) continue;
     }
 
     // Skip lifecycle ExpressionStatements (defensive; should already be in consumed).
@@ -988,7 +1005,12 @@ function emitResidualScriptBody(
           // instance export). The `$expose(...)` call itself MUST be stripped
           // from the residual body — otherwise it leaks as an undefined-`$expose`
           // runtime reference. Mirrors the Vue + React strip.
-          callee.name === '$expose'
+          callee.name === '$expose' ||
+          // Phase 36 (REQ-32 / R6) — `$provide('k', v)` is consumed via
+          // ir.provides and re-emitted by emitContext as a native init-scope
+          // `setContext('k', v)` call. Strip the directive so the bare
+          // `$provide` ref never leaks at runtime. Mirrors the Vue strip.
+          callee.name === '$provide'
         ) {
           continue;
         }
@@ -1157,6 +1179,16 @@ export function emitScript(
     needsUntrack,
   } = emitWatcherHooks(cloned);
   for (const idx of watcherConsumed) consumedIndices.add(idx);
+
+  // Cross-component context primitive (Phase 36 / REQ-32) — emit Svelte native
+  // `setContext('k', v)` / `const x = getContext('k')[ ?? f]`. Reads
+  // value/fallback expressions from the CLONED program so `$data`/`$props`/
+  // `$refs` inside a provided value or inject fallback pick up the identifier
+  // rewrites above. Empty-gated: contextEmit.hasContext is false (and nothing
+  // is spliced) when the component has no $provide/$inject — preserving
+  // byte-identity (R12/D-5).
+  const contextEmit = emitContext(ir, cloned);
+
   // Phase 21 Plan 04 (REQ-6) — the set of `$expose`d names; drives both the
   // `$expose(...)` call strip and the `export ` instance-export prefix in
   // emitResidualScriptBody. Empty set → byte-identical residual body.
@@ -1175,6 +1207,9 @@ export function emitScript(
   // ($props/$state/$derived/$effect/$bindable) need no import.
   const valueImports = new Set<string>([...lifecycleRuntimeImports]);
   if (needsUntrack) valueImports.add('untrack');
+  // Phase 36 (REQ-32) — `setContext`/`getContext` join the single `'svelte'`
+  // value-import line. Empty when the component has no $provide/$inject.
+  for (const sym of contextEmit.svelteImports) valueImports.add(sym);
   if (valueImports.size > 0) {
     const sorted = [...valueImports].sort();
     importLines.push(`import { ${sorted.join(', ')} } from 'svelte';`);
@@ -1186,6 +1221,14 @@ export function emitScript(
   if (propsBlock) preambleSections.push(propsBlock);
   if (stateLines.length > 0) preambleSections.push(stateLines.join('\n'));
   if (refLines.length > 0) preambleSections.push(refLines.join('\n'));
+  // Phase 36 (REQ-32) — inject binders (`const x = getContext('k')[ ?? f]`)
+  // join the preamble AFTER refs and BEFORE the residual body, landing in
+  // component INIT scope (where `$state`/`$derived` declarations live) so user
+  // script + the template can reference the injected `const`. Counted into
+  // preambleSectionLines automatically (source-map offset stays correct).
+  if (contextEmit.injectLines.length > 0) {
+    preambleSections.push(contextEmit.injectLines.join('\n'));
+  }
 
   // Count lines in preamble sections so shell can compute userCodeLineOffset.
   // Each section is joined with '\n\n' between sections; count newlines total.
@@ -1205,6 +1248,17 @@ export function emitScript(
   // arrows) are visible to subsequent $derived / $effect references.
   const sections = [...preambleSections];
   if (residualCode.trim().length > 0) sections.push(residualCode);
+  // Phase 36 (REQ-32) — `setContext('k', v)` calls emitted AFTER the residual
+  // body so a provided value may reference residual-declared helpers (e.g.
+  // `$provide('theme', { get color() {…}, cycle })` where `cycle` is a residual
+  // `function`/`const`). CRITICAL: this is still component INIT scope — emitted
+  // BEFORE the portal/lifecycle (`onMount`/`$effect`) blocks below, NEVER
+  // inside a lifecycle callback, or Svelte throws "called outside component
+  // initialization". The provided value carries the live getter/`$state`, so
+  // descendants read reactive (D-3 / REQ-29).
+  if (contextEmit.provideLines.length > 0) {
+    sections.push(contextEmit.provideLines.join('\n'));
+  }
   // Portal-slot primitive — emit portal scaffolding before lifecycle so the
   // `portals` closure is in scope when user $onMount callbacks fire.
   if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
