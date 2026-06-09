@@ -8,13 +8,14 @@
  *   - `const x = $inject('key', fallback?)` — an EXPRESSION bound to a `const`
  *     that reads the nearest provided value for `key` (or `fallback`).
  *
- * This validator enforces the four locked malformed-form rules (D-04). Each
+ * This validator enforces the locked malformed-form rules (D-04 + CR-02). Each
  * gets one distinct code:
  *   ROZ129 INVALID_PROVIDE_KEY   — `$provide` first arg is not a string literal.
  *   ROZ130 INVALID_INJECT_KEY    — `$inject` first arg is not a string literal.
  *   ROZ131 PROVIDE_NOT_STATEMENT — `$provide(...)` used in expression position
  *                                  (it must be a top-level statement).
  *   ROZ132 INJECT_UNBOUND        — `$inject(...)` not bound to a `const x = …`.
+ *   ROZ133 PROVIDE_MISSING_VALUE — `$provide('key')` with no value (CR-02).
  *
  * Mirrors `runExposeValidator` EXACTLY: reads the collected call-site arrays
  * (`bindings.provideCalls` / `bindings.injectCalls`, populated by
@@ -73,6 +74,22 @@ export function runContextValidator(
           "$provide(key, value) requires a string-literal key, e.g. $provide('theme', value). Dynamic/computed keys are not supported.",
         loc: locFromNode(keyArg ?? site.call),
         hint: 'Pass a string-literal context key as the first argument.',
+      });
+    }
+
+    // ROZ133 — missing value (CR-02). A `$provide('key')` with no value (or a
+    // non-expression 2nd argument, e.g. a spread) is silently dropped by the
+    // collector — nothing is provided and every descendant $inject resolves to
+    // fallback/undefined. Make the silent failure a loud compile error.
+    const valueArg = site.call.arguments[1];
+    if (!valueArg || !t.isExpression(valueArg)) {
+      diagnostics.push({
+        code: RozieErrorCode.PROVIDE_MISSING_VALUE,
+        severity: 'error',
+        message:
+          '$provide(key, value) requires a value as the second argument.',
+        loc: locFromNode(site.call),
+        hint: "Pass the value to publish: $provide('theme', value).",
       });
     }
   }

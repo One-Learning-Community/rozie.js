@@ -108,8 +108,31 @@ describe('runContextValidator — ROZ132 INJECT_UNBOUND', () => {
   });
 });
 
+describe('runContextValidator — ROZ133 PROVIDE_MISSING_VALUE', () => {
+  it('$provide("theme") with no value → ROZ133', () => {
+    const { diagnostics } = analyzeSource(provider(`$provide('theme')`));
+    const hits = codesOf(diagnostics, 'ROZ133');
+    expect(hits.length, JSON.stringify(diagnostics)).toBe(1);
+    expect(hits[0]!.severity).toBe('error');
+    expect(hits[0]!.loc.end).toBeGreaterThan(hits[0]!.loc.start);
+  });
+
+  it('$provide("theme", value) with a value → NO ROZ133', () => {
+    const { diagnostics } = analyzeSource(
+      provider(`$provide('theme', { color: $data.color })`),
+    );
+    expect(codesOf(diagnostics, 'ROZ133')).toEqual([]);
+  });
+
+  it('a non-string key with no value still reports ROZ133 (independent of ROZ129)', () => {
+    const { diagnostics } = analyzeSource(provider(`$provide(123)`));
+    expect(codesOf(diagnostics, 'ROZ133').length).toBe(1);
+    expect(codesOf(diagnostics, 'ROZ129').length).toBe(1);
+  });
+});
+
 describe('runContextValidator — clean canonical fixture emits no context diagnostics', () => {
-  const CONTEXT_CODES = ['ROZ129', 'ROZ130', 'ROZ131', 'ROZ132'];
+  const CONTEXT_CODES = ['ROZ129', 'ROZ130', 'ROZ131', 'ROZ132', 'ROZ133'];
 
   it('well-formed ThemeProvider emits none of ROZ129–132', () => {
     const { diagnostics } = analyzeSource(

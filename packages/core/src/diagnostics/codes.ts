@@ -290,6 +290,16 @@ export const RozieErrorCode = {
   INVALID_INJECT_KEY: 'ROZ130', // error — $inject(key, …) key is not a string literal.
   PROVIDE_NOT_STATEMENT: 'ROZ131', // error — $provide(...) used in expression position (must be a top-level statement).
   INJECT_UNBOUND: 'ROZ132', // error — $inject(...) not bound to a `const x = $inject(...)`.
+  // Phase 36 (code-review CR-02) — a `$provide('key')` call with no value (or a
+  // non-expression second argument). The collector silently drops a valueless
+  // $provide (no ProvideEntry, no emit), so an author who forgot the value got a
+  // clean compile that provided nothing — every descendant $inject('key') then
+  // resolved to fallback/undefined with zero indication why. This is the exact
+  // "silent compile failure" anti-pattern ROZ977 outlaws. Error severity; emitted
+  // from runContextValidator alongside ROZ129/ROZ131 when a $provide call site
+  // has arguments.length < 2 (or arguments[1] is not an expression). ROZ133 is
+  // the next free code after ROZ132 in the 100 semantic-binding cluster.
+  PROVIDE_MISSING_VALUE: 'ROZ133', // error — $provide(key) called with no value (or a non-expression second argument); $provide(key, value) requires a value.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
