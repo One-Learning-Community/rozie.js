@@ -1,0 +1,53 @@
+<!--
+  AttrNullishDrop.rozie — quick-task 260608-sya
+
+  Nullish attribute-binding DROP parity fixture. Pins the cross-framework
+  behavior that a WHOLE-VALUE one-way attribute binding whose value is
+  null/undefined DROPS the attribute (no `attr=""`) on the five non-Vue
+  targets, matching Vue's native `:attr` semantics (`patchAttr`: value == null
+  → removeAttribute). Three positions:
+
+    (1) :data-x="$data.cond ? 'v' : null"
+        → a ConditionalExpression with a `null` branch (wrapForDisplay=true).
+          DROPS when cond is false. Routes through rozieAttr (returns the
+          per-target drop sentinel: undefined on JSX targets, lit `nothing`,
+          Angular [attr.x]="null"). Vue native `:data-x="cond ? 'v' : undefined"`.
+
+    (2) :aria-expanded="$data.cond ? 'true' : 'false'"
+        → the value is NEVER nullish; the `false` STRING must STAY. Proves the
+          drop predicate is `v == null` ONLY — `false`/`'false'` stringify and
+          survive (a11y: aria-expanded="false" carries semantic meaning).
+
+    (3) :title="$data.maybeNull"  (maybeNull: null)
+        → a plain untyped $data member (wrapForDisplay=true). DROPS — proves the
+          fix is not ternary-specific: any nullish wrapped attr value drops.
+
+  Drop sentinels are verified at runtime by the behavioral absence spec
+  (tests/vr/specs/attr-nullish-drop.spec.ts): hasAttribute('data-x') === false
+  and getAttribute('aria-expanded') === 'false' across the matrix. The dist-
+  parity byte gate (this fixture, registered in bootstrap-fixtures.mjs +
+  parity.test.ts) pins the rozieAttr(...) emit shape across all six targets:
+  the five non-Vue targets emit rozieAttr; Vue stays native. Single-file; no
+  sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+-->
+
+<rozie name="AttrNullishDrop">
+
+<data>
+{
+  cond: false,
+  maybeNull: null,
+}
+</data>
+
+<template>
+<div class="attr-nullish-drop">
+  <span
+    :data-x="$data.cond ? 'v' : null"
+    :aria-expanded="$data.cond ? 'true' : 'false'"
+    :title="$data.maybeNull"
+  >probe</span>
+</div>
+</template>
+
+</rozie>

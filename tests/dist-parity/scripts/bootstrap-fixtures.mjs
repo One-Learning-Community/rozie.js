@@ -202,6 +202,17 @@ const EXAMPLES = [
   // styles AND injectGlobalStyles; no target carries a scoped copy. Single-file;
   // no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
   'EngineDomEscape',
+  // 260608-sya (attr-binding-nullish-drop) — the nullish attribute-binding DROP
+  // parity fixture. Three whole-value attribute bindings on a generic element:
+  // (1) `:data-x="cond ? 'v' : null"` DROPS when false, (2)
+  // `:aria-expanded="cond ? 'true' : 'false'"` STAYS "false" (never nullish),
+  // (3) `:title="$data.maybeNull"` (null) DROPS — proving the fix is not
+  // ternary-specific. Registering it here makes the bootstrap compile() it
+  // across all six targets: the five non-Vue targets route the wrapped whole-
+  // value binding through `rozieAttr` (drop sentinel on `v == null`), Vue stays
+  // native (`:attr` already drops nullish). Single-file; no sibling .rozie
+  // producers — stays OUT of RESOLVER_ROOT.
+  'AttrNullishDrop',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

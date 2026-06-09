@@ -692,6 +692,14 @@ Rozie closes that gap. A non-provably-primitive interpolation is wrapped in an i
 
 The helper is **crash-safe**: a circular structure or a `BigInt`-bearing object (which would throw inside `JSON.stringify`) degrades to `String(value)` rather than re-introducing a render exception.
 
+### Attribute position — a nullish bound value drops the attribute
+
+The table above is the **text / interpolation** rule: in a text node or interpolated string, `null` / `undefined` become the empty string `''` (matching Vue's `toDisplayString`). In **attribute-binding position** the rule is different, because the web platform itself treats a missing attribute and an empty one differently (`[data-locked]` presence selectors, `hasAttribute('aria-busy')`, SortableJS's `filter: '[data-locked]'`).
+
+A whole-value one-way attribute binding (`:data-locked="$data.locked ? 'true' : null"`, or a plain `:title="$data.note"` that is `null`) whose value is **nullish** now **drops the attribute entirely** — matching Vue's native `:attr` binding and the web platform — instead of rendering `attr=""`. Non-null values still stringify, so a value of `false` renders the literal `aria-expanded="false"` / `data-x="false"` (the drop predicate is `value == null` **only**, never `false`, so a11y-meaningful and presence-selector values survive). This is **not** a contradiction with the text rule above — text position and attribute position are different positions with different platform semantics.
+
+The mechanics mirror `rozieDisplay`: the wrapped whole-value attribute branch routes through an internal `rozieAttr` helper (React / Solid / Svelte return `undefined` to omit the attribute, Lit returns its `nothing` sentinel, Angular's `[attr.x]="null"` removes it). Interpolated attribute **segments** (<span v-pre>`:title="note-{{ $data.id }}"`</span>) stay on the text rule — a nullish segment inside a composed string is still `''`, exactly as Vue interpolates. Vue needs no change; its native `:attr` binding already drops nullish.
+
 ### Only non-primitives are wrapped — primitives stay byte-identical
 
 The wrap is **gated**, decided once at compile time. An interpolation the compiler can *prove* is primitive emits exactly as it did before — raw, zero overhead, byte-for-byte identical output. Provably-primitive cases include: a prop declared `String` / `Number` / `Boolean`, a `$data` field initialized to a primitive literal, `.length`, `typeof x`, comparisons (`a > b`, `a === b`), `!x`, `String(...)` / `Number(...)`, string concatenations, and logical chains whose operands are all primitive (`$props.a && $props.b`). When the compiler can't prove primitiveness (a bare method call, an untyped prop, a member of an untyped object), it wraps — the safe default, since a false *raw* is the crash and a false *wrap* is merely a stringified primitive.

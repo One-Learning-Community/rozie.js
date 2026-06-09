@@ -155,6 +155,16 @@ const EXAMPLES = [
   // SKIPPED for this fixture). Single-file; no sibling .rozie producers — stays
   // OUT of RESOLVER_ROOT.
   'ObjectInterp',
+  // 260608-sya (attr-binding-nullish-drop) — nullish attribute-binding DROP
+  // parity fixture. Three whole-value attribute bindings: a `cond ? 'v' : null`
+  // ternary that DROPS data-x when false, an `aria-expanded` ternary that STAYS
+  // "false" (never nullish — the drop predicate is `v == null` only), and a
+  // plain `:title="$data.maybeNull"` (null) that DROPS. The committed per-target
+  // bytes pin the `rozieAttr(...)` emit shape (drop sentinel) across all four
+  // entrypoints — five non-Vue targets emit rozieAttr, Vue stays native. The
+  // runtime ABSENCE proof is the behavioral spec (a byte snapshot can't prove
+  // hasAttribute===false). Single-file — stays OUT of RESOLVER_ROOT.
+  'AttrNullishDrop',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
