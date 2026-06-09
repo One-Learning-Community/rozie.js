@@ -196,6 +196,11 @@ export const EXAMPLES = [
   // `content` prop has a non-empty static-HTML default, so the cell renders raw
   // HTML (the bold "safe") without a parent supplying props.
   'RHtml',
+  // quick-task 260608-sya — nullish attribute-binding DROP parity fixture. Base
+  // example; loader resolves to examples/AttrNullishDrop.rozie (no demo). Self-
+  // contained ($data only), so no parent props. The attr-nullish-drop.spec.ts
+  // behavioral spec asserts the dropped attrs are ABSENT at runtime.
+  'AttrNullishDrop',
   // Phase 30 (chartjs) — ChartScreenshot is the content-STABLE multi-type
   // SCREENSHOT demo. Loader resolves to examples/demos/ChartScreenshotDemo.rozie
   // (which imports ../../packages/ui/chartjs/src/Chart.rozie). It renders a grid
@@ -358,6 +363,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 24 — kebab tag for the r-html fixture (matches the Lit-emitted
   // @customElement('rozie-r-html') in RHtml.lit.ts).
   RHtml: 'rozie-r-html',
+  // quick-task 260608-sya — kebab tag for the nullish-attr-drop fixture
+  // (matches @customElement('rozie-attr-nullish-drop') in AttrNullishDrop.lit.ts).
+  AttrNullishDrop: 'rozie-attr-nullish-drop',
   // Phase 30 (chartjs) — the lit entry appends '-demo' → tags
   // 'rozie-chart-screenshot-demo' / 'rozie-chart-behavior-demo' = kebab of
   // ChartScreenshotDemo / ChartBehaviorDemo.
@@ -505,6 +513,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // non-empty static-HTML default ('<strong>safe</strong>'), so no parent props
   // are needed for the cell to render visible raw HTML.
   RHtml: {},
+  // quick-task 260608-sya — AttrNullishDrop is self-contained ($data cond/maybeNull);
+  // no parent-supplied props needed for the cell to render the probe <span>.
+  AttrNullishDrop: {},
   // Phase 30 (chartjs) — both Chart demos are self-contained: ChartScreenshot
   // hardcodes its 3 datasets in <script>; ChartBehavior carries chartType +
   // clickCount in <data>. No parent-supplied props.

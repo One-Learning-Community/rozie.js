@@ -95,11 +95,15 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
 
     // Attribute now binds to the getter, not an inline ternary. Phase 26
     // (SPEC-4): `accept` is an Array-typed (`any` element) ternary value, not
-    // provably primitive, so the binding additionally wraps the getter read in
-    // the synthesized `rozieDisplay` class method — matching React's landed
-    // `accept={rozieDisplay(...)}` cross-target behavior. The double-read
-    // getter hoist (`__accept`) is unaffected; the wrap composes over it.
-    expect(template).toContain('[accept]="rozieDisplay(__accept)"');
+    // provably primitive, so the binding wraps the getter read. As of quick-task
+    // 260608-sya the whole-value attribute branch routes through the synthesized
+    // `rozieAttr` class method via the `[attr.NAME]` binding form: a nullish
+    // value (`accept = allowedFileTypes ? … : null`) DROPS the attribute
+    // (`[attr.accept]="null"` → ɵɵattribute removeAttribute), matching Vue's
+    // `:attr` semantics — instead of the property binding `[accept]="null"` which
+    // renders `accept="null"`. Non-null still stringifies via the inner
+    // `__rozieDisplay`. The double-read getter hoist (`__accept`) is unaffected.
+    expect(template).toContain('[attr.accept]="rozieAttr(__accept)"');
 
     // The getter exists, reads the signal exactly once into a local, and
     // performs the guard-and-use against the narrowed local.

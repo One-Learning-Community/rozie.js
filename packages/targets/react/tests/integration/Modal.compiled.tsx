@@ -9,7 +9,7 @@
 // an emitter change, audit this file against the new .snap and update by hand.
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { rozieAttr, useControllableState } from '@rozie/runtime-react';
 
 const styles: Record<string, string> = new Proxy({}, { get: (_t, k) => String(k) });
 
@@ -103,7 +103,7 @@ export default function Modal(props: ModalProps): JSX.Element | null {
         className={styles['modal-dialog']}
         role="dialog"
         aria-modal="true"
-        aria-label={rozieDisplay(props.title || undefined)}
+        aria-label={rozieAttr(props.title || undefined)}
         tabIndex={-1}
       >
         {(props.title || props.renderHeader) && (

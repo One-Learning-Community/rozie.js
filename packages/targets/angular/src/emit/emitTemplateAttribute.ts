@@ -485,6 +485,14 @@ function shouldWrapAttrBinding(
   ) {
     return false;
   }
+  // `:style` is a structural binding, not display text — Angular's `[style]=`
+  // property binding accepts a string-or-object directly (v9+), so a dynamic
+  // `:style` emits native `[style]="<expr>"` with no helper. Mirrors the
+  // React/Solid/Svelte `shouldWrapAttrBinding` style exclusion (260608-sya — this
+  // was the lone Angular omission; without it `:style` wrongly routed through the
+  // display-wrap branch, and the nullish-drop `[attr.*]` forcing then mangled it
+  // to `[attr.style]`). `:class` never reaches here — it has its own merge path.
+  if (name === 'style') return false;
   if (t.isObjectExpression(expr)) return false;
   return true;
 }
@@ -1267,14 +1275,28 @@ export function emitSingleAttr(
     ) {
       // 260608-sya — whole-value attribute binding: route through the
       // synthesized `rozieAttr` class method (delegating to inline
-      // `__rozieAttr`) so a nullish value DROPS the attribute. Angular's
-      // `[attr.x]="null"` removes the attribute (the `attr.*` binding form that
-      // `resolveBindingName` produces for `aria-`/`data-`), matching Vue's
+      // `__rozieAttr`) so a nullish value DROPS the attribute, matching Vue's
       // `:attr` semantics. `false` still stringifies (preserves a11y). The
       // interpolated-segment branch below stays on `rozieDisplay`. Sets the
       // same display-wrap flag so both `__rozieDisplay` + `__rozieAttr` inline.
+      //
+      // The drop MUST use the `[attr.NAME]` binding form (ɵɵattribute →
+      // removeAttribute on null). A PROPERTY binding `[title]="null"` does NOT
+      // drop — Angular's renderer does `el.title = null`, which the DOM coerces
+      // to the string "null" (renders `title="null"`, worse than `title=""`).
+      // `resolveBindingName` already returns `attr.*` for aria-/data-; force it
+      // here for property-bindable names (title/id/alt/href/placeholder/…) too,
+      // so every wrapped generic attribute drops uniformly. This branch is
+      // HTML-host-only (shouldWrapAttrBinding excludes component/self tags), so
+      // forcing the attribute form is always correct here — it also matches
+      // Vue's setAttribute-based `patchAttr` for these positions. `expr` is left
+      // computed with the original `bindingName` (its only effect is the
+      // hoisted double-read accessor name), so the expression stays identical.
       if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
-      return `[${bindingName}]="rozieAttr(${expr})"`;
+      const attrDropName = bindingName.startsWith('attr.')
+        ? bindingName
+        : `attr.${attr.name}`;
+      return `[${attrDropName}]="rozieAttr(${expr})"`;
     }
     return `[${bindingName}]="${expr}"`;
   }

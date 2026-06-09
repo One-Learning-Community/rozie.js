@@ -89,15 +89,18 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     expect(template).toContain("$event.key !== 'Escape'");
   });
 
-  it('Test 6: Modal `:aria-label="$props.title || undefined"` emits aria-label={rozieDisplay(title || undefined)}', () => {
+  it('Test 6: Modal `:aria-label="$props.title || undefined"` emits aria-label={rozieAttr(title || undefined)}', () => {
     const { template, diagnostics } = emitTemplate(lowerExample('Modal'), REGISTRY);
     expect(diagnostics).toEqual([]);
     // The Modal :aria-label binding rewrites $props.title → title. Phase 26
     // (D-06/SPEC-4): a LogicalExpression (`||`) attribute binding on an HTML
-    // host wraps in `rozieDisplay` (wrap-when-unsure — `||` returns an operand,
-    // Pitfall 5), so the bound value renders portable JSON rather than risking
-    // an `[object Object]` attribute. `rozieDisplay(undefined)` → '' (empty).
-    expect(template).toMatch(/aria-label=\{rozieDisplay\(title \|\| undefined\)\}/);
+    // host wraps (wrap-when-unsure — `||` returns an operand, Pitfall 5). As of
+    // quick-task 260608-sya the WHOLE-VALUE attribute branch routes through
+    // `rozieAttr` (not `rozieDisplay`): a nullish value DROPS the attribute
+    // (`rozieAttr(undefined)` → `undefined` → Svelte 5 omits it), matching Vue's
+    // `:attr` semantics, instead of rendering `aria-label=""`. Non-null values
+    // still stringify via the inner `rozieDisplay`.
+    expect(template).toMatch(/aria-label=\{rozieAttr\(title \|\| undefined\)\}/);
   });
 
   it('Test 7: TodoList `:class="{ done: item.done }"` emits class={...} (binding form)', () => {
