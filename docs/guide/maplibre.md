@@ -205,7 +205,7 @@ The four camera props (`center` / `zoom` / `bearing` / `pitch`) are **two-way** 
 | `touchPitch` | `Boolean` | `true` | | Toggle two-finger touch pitch. Live-reconciled. |
 | `markers` | `Array` | `[]` | | The marker data that drives the reactive multi-instance `marker` slot — one entry per marker (`{ lng, lat, id?, anchor?, offset?, draggable?, ... }`). One portal handle mounts per entry; changing the array reconciles markers keep / update / dispose with no remount. Only meaningful when the `marker` slot is filled. |
 | `popups` | `Array` | `[]` | | The popup data that drives the reactive multi-instance `popup` slot — one entry per popup (`{ lng, lat, id?, anchor?, offset?, closeButton?, closeOnClick?, ... }`). One portal handle mounts per entry. Only meaningful when the `popup` slot is filled. |
-| `sources` | `Array` | `[]` | | Declarative [GeoJSON / vector / raster sources](https://maplibre.org/maplibre-style-spec/sources/) — `[{ id, spec }]` (or a bare `SourceSpecification` carrying an `id`). Reconciled into the live style (add / `setData` / remove) once the style has loaded. The config-prop authoring shape for sources (see [What Rozie defers](/guide/maplibre-comparison#what-rozie-defers)). |
+| `sources` | `Array` | `[]` | | Declarative [GeoJSON / vector / raster sources](https://maplibre.org/maplibre-style-spec/sources/) — `[{ id, spec }]` (or a bare `SourceSpecification` carrying an `id`). Reconciled into the live style (add / `setData` / remove) once the style has loaded. The config-array authoring shape for sources; declarative [`<Source>` / `<Layer>` children](#declarative-source-layer-children) are the alternative shape (both feed the same registry). |
 | `layers` | `Array` | `[]` | | Declarative [layers](https://maplibre.org/maplibre-style-spec/layers/) — `LayerSpecification[]` (each with an `id`). Reconciled into the live style (add / `setPaintProperty` / `setLayoutProperty` / remove) once the style has loaded; `beforeId` controls draw order. |
 | `interactiveLayerIds` | `Array` | `[]` | | Layer ids whose feature `mouseenter` / `mouseleave` fire the `@mouseenter` / `@mouseleave` events (populating `e.features`). Registered / unregistered per id on change. |
 | `controls` | `Array` | `[]` | | Standard map controls — strings (`'navigation'` / `'geolocate'` / `'scale'` / `'fullscreen'` / `'attribution'`) or `{ type, position?, options? }` objects. Reconciled (remove-all + re-add) on change. |
@@ -452,7 +452,24 @@ const layers = ref([
 </template>
 ```
 
-> The `:sources` / `:layers` **config-prop** shape is Rozie v1's authoring model. Declarative `<Source>` / `<Layer>` *children* (as react-map-gl / vue-maplibre-gl offer) need a cross-component context primitive Rozie defers — same `addSource` / `addLayer` runtime, different authoring shape. See [What Rozie defers](/guide/maplibre-comparison#what-rozie-defers).
+### Declarative `<Source>` / `<Layer>` children {#declarative-source-layer-children}
+
+Sources and layers can also be authored as **declarative child components** — `<Source>` and `<Layer>` nested under `<MapLibre>`, the authoring shape the big-framework wrappers (`react-map-gl`, `vue-maplibre-gl`, `svelte-maplibre-gl`, `ngx-maplibre-gl`) are known for. Both shapes are supported, side by side with the `:sources` / `:layers` config arrays above:
+
+```html
+<MapLibre :center="[-74.25, 40.35]" :zoom="9">
+  <Source id="pts" :spec="geojson">
+    <Layer id="circles" type="circle" :paint="{ 'circle-radius': 5 }" />
+  </Source>
+  <Layer id="bg" type="background" :paint="{ 'background-color': '#eef' }" />
+</MapLibre>
+```
+
+- **Nested `<Source><Layer/></Source>` auto-binds** the layer to its parent source via injected context — no `source` attr needed.
+- **Flat `<Layer source="id" />`** directly under `<MapLibre>` also works, for background layers (no source) and cross-source references.
+- **Both shapes coexist with `:sources` / `:layers`.** A config array and declarative children feed the **same id-keyed registry** through the same style-load-gated `addSource` / `addLayer` reconcile; on an id collision the declarative child wins (last-writer-wins, matching the engine's own reconcile).
+
+`<Source>` takes `id` (required) plus `:spec` (the `SourceSpecification`); `<Layer>` takes `id` (required), `type`, `:paint` / `:layout`, an optional `source` (for the flat shape), and `beforeId` for draw order. This dogfoods Rozie's own [`$provide` / `$inject` cross-component context primitive](/guide/features) — the map provides the registry, each child injects it and registers on mount / updates on prop change / unregisters on unmount. The big incumbents still ship deeper component catalogs (see the [comparison page](/guide/maplibre-comparison#declarative-children)) — Rozie's declarative children are a curated subset that works identically on all six targets.
 
 ### Hit-testing layer features
 
