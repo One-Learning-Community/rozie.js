@@ -290,7 +290,10 @@ const applyLayers = () => {
   // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
   // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
   const mergeById = (arr: any, reg: any) => {
-    const out = [];
+    // out seeded from the (any-typed) input so strict tsc infers any[] not never[]
+    // (untyped <script> can't use a TS `: any[]`/`as any[]` annotation; .slice(0,0)
+    //  yields an empty array with identical runtime behavior to `const out = []`).
+    const out = (Array.isArray(arr) ? arr : []).slice(0, 0);
     const idx = new Map();
     for (const e of (Array.isArray(arr) ? arr : []) as any) {
       if (!e || !e.id) {
