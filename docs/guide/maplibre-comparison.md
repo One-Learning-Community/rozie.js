@@ -31,7 +31,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | **Popups** (framework component) | ✅ `<Popup>` | ✅ `MglPopup` | ✅ `mgl-popup` | ✅ `<Popup>` | ⚠️ | ❌ | ✅ `popup` reactive portal slot (all 6) |
 | Custom control (framework component) | ✅ `useControl` | ✅ `MglCustomControl` | ✅ control directives | ✅ | ⚠️ | ❌ | ✅ `control` mount-once portal slot (all 6) |
 | Standard controls | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ `:controls` prop (all 6) |
-| Sources / layers | ✅ `<Source>` / `<Layer>` | ✅ `MglGeoJSONSource` / `Mgl…Layer` | ✅ source / layer directives | ✅ `<Source>` / `<Layer>` | ⚠️ | ❌ | ⚠️ **`:sources` / `:layers` config props** (see below) |
+| Sources / layers | ✅ `<Source>` / `<Layer>` | ✅ `MglGeoJSONSource` / `Mgl…Layer` | ✅ source / layer directives | ✅ `<Source>` / `<Layer>` | ⚠️ | ❌ | ✅ `<Source>` / `<Layer>` children **and** `:sources` / `:layers` config props (see below) |
 | Interactive-layer hover (`features`) | ✅ `interactiveLayerIds` | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ `:interactiveLayerIds` + `@mouseenter`/`@mouseleave` |
 | Imperative handle (`getMap` etc.) | ✅ `useMap` / ref | ✅ `useMap` | ✅ `MapService` / ref | ✅ | ⚠️ | hand-roll | ✅ uniform 8-verb `$expose` |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
@@ -46,11 +46,28 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **A uniform 8-verb imperative handle** (`getMap` / `flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `getCenter` / `getZoom` / `resize`) grabbed with each framework's native ref — versus "however this wrapper happens to expose the `Map`" (a hook, a service, a ref, a directive input).
 - **`getMap()` is always one hop from the raw engine**, so the full MapLibre API is reachable on any target when the curated surface doesn't cover something.
 
+## Declarative `<Source>` / `<Layer>` children — now supported {#declarative-children}
+
+Declarative `<Source>` / `<Layer>` children are **now supported on all six targets, alongside the `:sources` / `:layers` config-array props** — the authoring shape the big-framework wrappers (`react-map-gl`, `vue-maplibre-gl`, `svelte-maplibre-gl`, `ngx-maplibre-gl`) are known for.
+
+```html
+<MapLibre :center="[0, 0]" :zoom="2">
+  <Source id="pts" :spec="geojson">
+    <Layer id="circles" type="circle" :paint="paint" />
+  </Source>
+  <Layer id="bg" type="background" :paint="bgPaint" />
+</MapLibre>
+```
+
+- **Nested `<Source><Layer/></Source>` auto-binds** the layer to its parent source via injected context — no `source` attr needed.
+- **Flat `<Layer source="id" />`** directly under `<MapLibre>` also works, for background layers (no source) and cross-source references.
+- **Both shapes coexist with `:sources` / `:layers`.** When a consumer supplies both a config array and declarative children, both feed the **same id-keyed registry**; on an id collision the declarative child wins (last-writer-wins, matching the engine's own reconcile). It is the **same `addSource` / `addLayer` runtime** and the same style-load-gated reconcile — the children just register into it.
+
+This was built by dogfooding Rozie's own cross-component context primitive (`$provide` / `$inject`): the map provides an id-keyed registry, and each `<Source>` / `<Layer>` child injects it, registers on mount, updates on prop change, and unregisters on unmount. Verified behaviorally across all six targets (including the Angular real-build).
+
 ## What Rozie defers {#what-rozie-defers}
 
 This page concedes where the standalone wrappers are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's own roadmap.
-
-- **Declarative `<Source>` / `<Layer>` *children*.** `react-map-gl`, `vue-maplibre-gl`, `svelte-maplibre-gl`, and `ngx-maplibre-gl` all let you compose data sources and styled layers as **child components / directives** inside the map — `<Source><Layer /></Source>` and friends. Rozie v1 takes a different authoring shape: the **`:sources` / `:layers` config props** (MapLibre's own source / layer specs, reconciled into the live style after load). It is the **same `addSource` / `addLayer` runtime** and reaches the same result, but the authoring model is a config array, not nested children. True declarative source / layer children need a **cross-component context primitive** (a parent map providing context to descendant `<Source>` / `<Layer>` elements) that Rozie deliberately defers — it's a meaningful compiler primitive, not a quick wrapper feature. Until then, `:sources` / `:layers` cover the same ground in config form.
 
 - **Big-framework depth on the home framework.** `react-map-gl` (vis.gl, OpenJS-foundation-backed), `vue-maplibre-gl`, `svelte-maplibre-gl` (MIERUNE), and the official `ngx-maplibre-gl` are mature, multi-year libraries with deep component catalogs (terrain, globe / projection, geocoding integrations, draw plugins, and the full declarative children model). On their own framework, they expose more surface than Rozie's curated prop set. Rozie's value is **not** "more than react-map-gl on React" — it's the **same idiomatic component on all six frameworks from one source**, with the underserved **Solid and Lit** getting a first-class wrapper they otherwise lack. For anything outside the curated surface, `getMap()` hands you the raw engine on every target.
 
@@ -58,7 +75,7 @@ This page concedes where the standalone wrappers are genuinely ahead — that's 
 
 ## Try it
 
-The [`@rozie-ui/maplibre` showcase + API reference](/guide/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, the `:sources` / `:layers` passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
+The [`@rozie-ui/maplibre` showcase + API reference](/guide/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, both the `<Source>` / `<Layer>` declarative children and the `:sources` / `:layers` config-array passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
 
 ## Cross-references
 

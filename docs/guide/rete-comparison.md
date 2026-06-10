@@ -37,6 +37,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Two-way zoom binding | ⚠️ controlled | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `r-model:zoom` (echo-guarded) |
 | Graph events (moved / connected / picked) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 7 structured events |
 | Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform 12-verb `$expose` |
+| Declarative graph children (`<FlowNode>` / `<Handle>` / `<Connection>`) | ✅ JSX children | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ children **and** `:nodes` / `:connections` config props |
 | Config-array graph (`:nodes` / `:connections`) | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ reconciled live, no remount |
 | MiniMap / Background / Controls | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ deferred (see below) |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
@@ -50,11 +51,36 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **A uniform 12-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `addConnection` / `removeConnection` / `clear` / `zoomToFit` / `zoomTo` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
 - **`getEditor()` / `getArea()` are always one hop from the raw engine**, so the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) is reachable on any target when the curated surface doesn't cover something.
 
+## Declarative `<FlowNode>` / `<Handle>` / `<Connection>` children — now supported {#declarative-children}
+
+Declarative graph children are **now supported on all six targets, alongside the `:nodes` / `:connections` config-array props**. The vocabulary follows Rete's own model, not React Flow's: `<FlowNode>` is a node, `<Handle>` is a **port / socket** (nested inside its node), and `<Connection>` is an **edge** (a flat child of the canvas, since an edge spans two nodes and can't nest inside one).
+
+```html
+<FlowCanvas>
+  <FlowNode id="a" :x="40" :y="60">
+    <template #body><MyCard /></template>
+    <Handle side="output" port="out" />
+  </FlowNode>
+  <FlowNode id="b" :x="320" :y="60">
+    <template #body><MyCard /></template>
+    <Handle side="input" port="in" />
+  </FlowNode>
+  <Connection source="a" target="b" sourceOutput="out" targetInput="in" />
+</FlowCanvas>
+```
+
+- **`<Handle>` nests inside `<FlowNode>`** and auto-binds to its node via injected context (no `nodeId` to wire by hand).
+- **`<Connection>` is a flat child** of `<FlowCanvas>` referencing source / target node ids + handle keys.
+- **Both shapes coexist with `:nodes` / `:connections`.** A config array and declarative children feed the **same id-keyed registry**; on an id collision the declarative child wins (last-writer-wins). It is the **same `addNode` / `addConnection` runtime** — children just register into the engine's existing reconcile.
+
+**Why the node body is a named `#body` slot, not bare children.** A FlowNode's visual body has to *teleport* into the node element the Rete engine creates — it doesn't render in the normal component tree. Rozie mounts that body through a portal (`$portals.body`), which gives it a fresh framework render-root inside the engine-owned host. But a portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming config children (`<Handle>` / `<Connection>`, which stay in the normal child position) is therefore the robust cross-framework shape: the body teleports, the config children keep their tree scope and inject correctly. Verified behaviorally across all six targets (including the Angular real-build).
+
+This was built by dogfooding Rozie's own cross-component context primitive (`$provide` / `$inject`): the canvas provides an id-keyed registry, and each child injects it. (A general `$portals.default` capability also exists for default-slot portals — but `<FlowNode>` deliberately uses the named `#body` slot for the tree-scope reason above; it does **not** rely on the bare default slot.)
+
 ## What Rozie defers {#what-rozie-defers}
 
 This page concedes where the standalone libraries are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's roadmap.
 
-- **Declarative `<Node>` / `<Edge>` *children*.** React Flow et al. let you compose a graph as JSX/children with per-type node components registered up front. Rozie v1 takes a different authoring shape: the **`:nodes` / `:connections` config-array props** (reconciled into the live editor), with per-node bodies supplied through the `node` slot. It is the **same `addNode` / `addConnection` runtime** and reaches the same result, but the authoring model is a config array, not nested children. True declarative graph children — deeply-nested `<Node>`/`<Handle>` elements reading shared graph state (selection, viewport, neighbors) without prop-drilling — need a **cross-component context primitive** that Rozie deliberately defers (the same primitive MapLibre's `:sources` / `:layers` deferral is waiting on). The wrap-a-vanilla-engine strategy sidesteps it entirely: the **engine** owns the store, and node bodies reach it through portal scope.
 - **MiniMap / Background variants / NodeToolbar / NodeResizer.** React Flow ships these as first-class components. `FlowCanvas` v1 covers the canvas + nodes + sockets + connections + a dotted background; the second-tier chrome is on the roadmap (config-prop first, the MapLibre stance).
 - **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
 - **`@rozie-ui/rete` is `0.1.0`.** The surface (13 props / 7 events / 12-verb handle / `node` reactive slot) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
