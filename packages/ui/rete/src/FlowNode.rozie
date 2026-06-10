@@ -1,35 +1,41 @@
 <!--
-  FlowNode.rozie — declarative <FlowNode> child for @rozie-ui/rete (Phase 37 A3
-  probe: D-04 body teleport — THE NOVEL PIECE).
+  FlowNode.rozie — declarative <FlowNode> child for @rozie-ui/rete (Phase 37,
+  D-04 RESOLVED — the render-callback body path).
 
   A <FlowNode> is BOTH:
     - a CONSUMER — it $injects the parent <FlowCanvas>'s `rete:canvas` registry
       API ({ register, update, unregister, addPort, bodyHostFor, … }), registers
       its node spec on mount, $watch-updates on x/y/label change, unregisters on
       cleanup. The parent's existing reconcileNodes() (echo-guarded, sequenced
-      before reconcileConnections) consumes the registry ∪ the :nodes prop.
+      before reconcileConnections) consumes (registry ∪ the :nodes prop).
     - a PROVIDER — it $provides a nested `rete:node` sub-context (its id via a LIVE
       GETTER + an addPort verb) so nested <Handle> port children auto-bind to this
       node's id and side.
 
-  D-04 — BODY TELEPORT (the inline declarative payoff). A <FlowNode>'s default-slot
-  content IS its visible body (e.g. <FlowNode><MyCard/></FlowNode>). The body must
-  appear INSIDE the engine-created node element, NOT orphaned in the FlowNode's own
-  host. Mechanism = DOM RELOCATION of an `r-external`-protected subtree (the
-  Sortable/TipTap discipline, playbook §6.5) into the engine `body` host element,
-  NOT a new portal primitive (a new primitive = emitter change = forbidden):
-    1. the body renders into a <div ref="bodyEl" r-external> the FlowNode owns;
-    2. in $onMount, after register, read the engine body host via the injected
-       canvas (canvas.bodyHostFor(id)) and host.appendChild($refs.bodyEl) — moving
-       the live DOM ($refs only safe in $onMount, ROZ123);
-    3. $reconcileAfterDomMutation() (Lit-load-bearing, no-op on the other 5)
-       reconciles the framework after the cross-boundary move.
+  D-04 — BODY via RENDER-CALLBACK (NOT inline slot relocation). The Wave-0 A3 Lit
+  probe PROVED the original plan (the FlowNode relocates its OWN shadow-DOM
+  <slot>-containing subtree into the engine element via r-external + appendChild) is
+  UNVIABLE on Lit: moving a Shadow-DOM <slot> across the shadow boundary re-homes it
+  to the provider host and orphans the real children (renders 0×0, click dead — a
+  Web Components spec property, not an emitter bug). The project chose (CONTEXT D-04
+  RESOLVED, RESEARCH §Pattern 3 fallback) a UNIFORM render-callback path on all 6:
 
-  LIT is the D-04 RISK TARGET (FlowCanvas is adopt-document-styles → shadow DOM;
-  relocating into the engine element crosses the shadow boundary). REQ-30: the
-  injected canvas may be undefined on first paint — all reads guarded.
+    1. The <FlowNode> renders its default-slot body NORMALLY inside its own host —
+       no slot relocation, so Lit's shadow <slot> keeps projecting its children.
+    2. It registers a `renderBody(host)` callback in its node spec. The PARENT
+       (<FlowCanvas>) invokes it from the PARENT's own render scope (renderNode),
+       appending the FlowNode's OWN HOST element ($el — on Lit `this`, the
+       <rozie-flow-node> custom element whose shadow root + slot projection stay
+       intact when moved) into the engine `body` host div. This reuses the shipped
+       reactive-multi-instance $portals.node host discipline (known-good on Lit 6/6).
+    3. The authoring entry point stays <FlowNode id="…"><MyCard/></FlowNode> — the
+       inline-markup ergonomic is retained; only the under-the-hood render path
+       differs (the parent projects the body, the child does not relocate its slot).
 
-  ZERO emitter/core change.
+  $el is captured in $onMount (ROZ123 — $el/$refs only safe there) into a
+  module-scope `any` binder so the parent-invoked renderBody closure can reach it.
+  REQ-30: the injected canvas may be undefined on Lit first paint — all reads
+  guarded. ZERO emitter/core change.
 -->
 <rozie name="FlowNode">
 
@@ -50,34 +56,57 @@
 // everywhere (Lit async first-paint, REQ-30 — the Tab.rozie idiom).
 const canvas = $inject('rete:canvas')
 
-$onMount(() => {
-  // register this node's spec; reconcileNodes() builds the engine node, then
-  // exposes its body host element for the D-04 relocation below.
-  if (canvas) canvas.register($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label, inputs: [], outputs: [] })
+// $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
+// STRICT BUNDLED-LEAF tsc rejects on `.register(...)` (TS2339). The .rozie-native
+// fix is the null-let → `any` typeNeutralize idiom: alias the injected API through
+// a MODULE-SCOPE `let cv = null` (typeNeutralize types it `any`). Module-scope (not
+// hook-local) so the alias is in scope from the Solid teardown — which the Solid
+// emitter hoists into a sibling onCleanup() OUTSIDE the mount closure (the MapLibre
+// Source/Layer lesson). ZERO emitter change.
+let cv = null
+cv = canvas
 
-  // D-04: relocate our own rendered body into the engine-created body host. $refs
-  // is only safe in $onMount (ROZ123); by registration time the engine element
-  // exists, so bodyHostFor(id) returns the engine `body` div.
-  const host = canvas && canvas.bodyHostFor($props.id)
-  if (host && $refs.bodyEl) host.appendChild($refs.bodyEl)
-  // tell the framework the DOM moved — Lit-load-bearing (rebuild reconcile after
-  // the cross-shadow-boundary move), no-op + byte-identical on the other 5.
-  $reconcileAfterDomMutation()
+// The FlowNode's own host element, captured at mount ($el only safe in $onMount,
+// ROZ123). The parent-invoked renderBody closure appends THIS into the engine
+// `body` host — moving the host preserves Lit shadow projection of the slot body.
+// Module-scope `any` so it survives into the parent's later render-scope call.
+let hostEl = null
+
+$onMount(() => {
+  hostEl = $el
+  // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
+  // builds the engine node, then renderNode invokes renderBody(body) — projecting
+  // this FlowNode's body into the engine element from the PARENT's render scope.
+  if (cv) {
+    cv.register($props.id, {
+      id: $props.id,
+      x: $props.x,
+      y: $props.y,
+      label: $props.label,
+      inputs: [],
+      outputs: [],
+      // D-04 render-callback: the parent calls this with the engine body host div.
+      renderBody: (host) => {
+        if (host && hostEl) host.appendChild(hostEl)
+      },
+    })
+  }
 
   return () => {
-    if (canvas) canvas.unregister($props.id)
+    if (cv) cv.unregister($props.id)
   }
 })
 
-// React to position / label changes (lazy $watch — post-mount transitions).
+// React to position / label changes (lazy $watch — post-mount transitions). The
+// renderBody callback is re-supplied so a re-register keeps projecting the body.
 $watch(() => $props.x, () => {
-  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+  if (cv) cv.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label, renderBody: (host) => { if (host && hostEl) host.appendChild(hostEl) } })
 })
 $watch(() => $props.y, () => {
-  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+  if (cv) cv.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label, renderBody: (host) => { if (host && hostEl) host.appendChild(hostEl) } })
 })
 $watch(() => $props.label, () => {
-  if (canvas) canvas.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label })
+  if (cv) cv.update($props.id, { id: $props.id, x: $props.x, y: $props.y, label: $props.label, renderBody: (host) => { if (host && hostEl) host.appendChild(hostEl) } })
 })
 
 // Provide a nested sub-context for <Handle> port children. `get id()` is
@@ -88,13 +117,21 @@ $provide('rete:node', {
     return $props.id
   },
   addPort: (side, key, label, multiple) => {
-    if (canvas) canvas.addPort($props.id, side, key, label, multiple)
+    if (cv) cv.addPort($props.id, side, key, label, multiple)
   },
 })
 </script>
 
 <template>
-<div ref="bodyEl" r-external><slot /></div>
+<!--
+  Single root element so $el resolves to it (the IR lowerRootElementRef pass needs
+  a single real-element root; a bare <slot/> root is fragment-like and $el stays
+  unresolved). On light-DOM targets $el is THIS div — the parent moves it into the
+  engine body, relocating the rendered slot content. On Lit $el is `this` (the host
+  custom element) — moving the host preserves the shadow <slot> projection (the
+  Wave-0 A3 fix). The class is a hook for the consumer; it carries no layout.
+-->
+<div class="rozie-flow-node-host"><slot /></div>
 </template>
 
 </rozie>
