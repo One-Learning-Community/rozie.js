@@ -102,6 +102,18 @@ export const RozieErrorCode = {
   // indented syntax to `postcss.parse` would otherwise surface as a confusing
   // ROZ080. The `lang="less"` case carries a Less-aware deferral hint (D-03).
   STYLE_UNRECOGNIZED_LANG: 'ROZ087',
+  // Phase 38 (D-01..D-05): a plain SCOPED <style> rule whose subject class/tag
+  // is used EXCLUSIVELY inside portal-slot fill content (a `<template #body>` /
+  // `#node` / `<slot portal>` fill, incl. $portals.default). That content
+  // teleports into the wrapper component's shadow root on Lit, where the
+  // consumer's `[data-rozie-s-*]` scope attribute is absent, so the scoped rule
+  // silently never applies (the 5 light-DOM targets are one document,
+  // attribute-hashed, and are unaffected — it looks fine there). The fix is to
+  // move the rule into a `:root { }` engine-DOM block (the Phase 34 escape
+  // hatch, adopted into the wrapper's shadow root) so it reaches the teleported
+  // content on all six targets; `:global()` is forbidden (ROZ128).
+  // warning — output is correct on 5/6 targets, so this is collected not thrown.
+  STYLE_SCOPED_RULE_TARGETS_PORTAL_CONTENT: 'ROZ088',
 
   // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
 
