@@ -1,6 +1,7 @@
 <!--
-  Layer.rozie — declarative <Layer> child for @rozie-ui/maplibre (Phase 37 A2
-  probe: a renderless / config-only child + D-05 dual-inject with flat fallback).
+  Layer.rozie — declarative <Layer> child for @rozie-ui/maplibre (Phase 37; A2
+  Wave-0 probe shape, now finalized: a renderless / config-only child + D-05
+  dual-inject with flat fallback).
 
   A <Layer> registers a LayerSpecification into the parent <MapLibre>'s
   `maplibre:layers` registry; the parent's existing applyLayers() reconcile

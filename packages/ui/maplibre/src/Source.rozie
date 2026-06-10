@@ -1,6 +1,6 @@
 <!--
-  Source.rozie — declarative <Source> child for @rozie-ui/maplibre (Phase 37 A1
-  probe: a provider-that-also-consumes).
+  Source.rozie — declarative <Source> child for @rozie-ui/maplibre (Phase 37; A1
+  Wave-0 probe shape, now finalized against the locked MapLibre.rozie registry).
 
   This is the dogfood of the Phase 36 $provide / $inject context primitive in a
   real engine wrapper. A <Source> is BOTH:
