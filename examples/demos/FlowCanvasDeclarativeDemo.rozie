@@ -125,7 +125,11 @@ const checkUnion = () => {
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
     <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
     <span class="readout" data-testid="readout-node-count">{{ $data.nodeCount }}</span>
-    <span class="readout" data-testid="readout-imp-present">{{ $data.impPresent }}</span>
+    <!-- String(...) is REQUIRED: a bare boolean interpolation `{{ $data.impPresent }}`
+         renders EMPTY on React/Solid (JSX does not render boolean children — true/false
+         are skipped), while Vue/Svelte/Angular/Lit print "true"/"false". Coercing to a
+         string makes the readout uniform across all 6. -->
+    <span class="readout" data-testid="readout-imp-present">{{ String($data.impPresent) }}</span>
   </div>
 
   <div class="flow-wrap" style="height: 340px">

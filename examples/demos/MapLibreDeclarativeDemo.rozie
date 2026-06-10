@@ -116,12 +116,16 @@ const OFFLINE_STYLE = {
 // optional chain no-ops and the readout stays 0 (the Angular cell asserts the DOM
 // children render instead — see maplibre-map.spec.ts).
 const checkUnion = () => {
-  const map = $refs.map?.getMap?.()
-  if (!map) return
+  // NOTE: the local MUST NOT be named `map` — a local `const map` collides with the
+  // `$refs.map` ref binding on the React/Svelte emitters (both lower to the same
+  // `map` identifier → `const map = map.current...` → a TDZ "Cannot access 'map'
+  // before initialization" that crashes the whole demo render). Name it `liveMap`.
+  const liveMap = $refs.map?.getMap?.()
+  if (!liveMap) return
   const wantLayers = ['arr-pts', 'circles', 'bg']
   const wantSources = ['arr', 'pts']
-  $data.unionLayers = wantLayers.filter((id) => !!map.getLayer(id)).length
-  $data.unionSources = wantSources.filter((id) => !!map.getSource(id)).length
+  $data.unionLayers = wantLayers.filter((id) => !!liveMap.getLayer(id)).length
+  $data.unionSources = wantSources.filter((id) => !!liveMap.getSource(id)).length
 }
 </script>
 
