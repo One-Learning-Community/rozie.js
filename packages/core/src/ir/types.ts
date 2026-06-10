@@ -344,6 +344,30 @@ export interface SlotDecl {
 }
 
 /**
+ * portalKey — Phase 37 ($portals.default).
+ *
+ * The EFFECTIVE portal key for a portal slot: the slot's authored `name`, or the
+ * reserved string `"default"` when the slot is the DEFAULT (unnamed) slot
+ * (`name === ''`). This single source of truth is used by every target emitter
+ * for the `$portals.<key>` closure object KEY, so a default portal slot is
+ * addressable as `$portals.default` (the broken `$portals['']` shape is never
+ * emitted).
+ *
+ * GATED: this returns `"default"` ONLY for `name === ''`. Every NAMED portal
+ * slot returns its bare name unchanged, so existing constructs (the 3 shipped
+ * portal slots, all fixtures) emit byte-identically.
+ *
+ * `"default"` is a RESERVED portal key — `validateDefaultPortalCollision`
+ * (ROZ979) errors if a component declares BOTH a default portal slot AND a slot
+ * literally `name="default"`, since both would key `$portals.default`.
+ *
+ * @experimental — added in Phase 37
+ */
+export function portalKey(slot: SlotDecl): string {
+  return slot.name === '' ? 'default' : slot.name;
+}
+
+/**
  * SlotFillerDecl — Phase 07.2.
  *
  * Attached to `TemplateElementIR.slotFillers` when the element is

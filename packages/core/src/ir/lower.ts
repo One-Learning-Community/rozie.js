@@ -46,6 +46,7 @@ import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
+import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
@@ -266,6 +267,14 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // @rozie/unplugin. Local-IR-only (ir.slots vs ir.props) — no resolver/cache.
   // Collected-not-thrown (D-08): pushes ROZ127; never mutates `ir`.
   validateSlotPropCollision(ir, diagnostics);
+
+  // Phase 37 ($portals.default) — a DEFAULT portal slot (`<slot portal />`)
+  // reserves the portal key "default" (`$portals.default`). A component that
+  // ALSO declares a slot literally `name="default"` would key the SAME closure
+  // entry — a silent shadow. Hard ERROR (ROZ979). Wired into this SAME chokepoint
+  // so it fires for BOTH compile() AND @rozie/unplugin. Local-IR-only (ir.slots);
+  // collected-not-thrown (D-08): pushes ROZ979; never mutates `ir`.
+  validateDefaultPortalCollision(ir, diagnostics);
 
   // Phase 26 (D-06/D-07) — resolve the wrap/raw `rozieDisplay` gate ONCE per
   // interpolation + attribute/class binding. Runs HERE in lowerToIR (not

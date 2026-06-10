@@ -610,6 +610,22 @@ export const RozieErrorCode = {
   // safeInterpolation flag — D-14) replaces that with a uniform compile error +
   // a member-access hint. SPEC-5, extended by CONTEXT D-04/D-05.
   BARE_OBJECT_SIGIL:                  'ROZ978', // error — bare $props/$data/$refs/$slots used as a whole-object value (not a member access). No portable representation in v1.
+
+  // ---- Phase 37 $portals.default — ROZ979 ----
+  // A component declares BOTH a DEFAULT portal slot (`<slot portal />`, whose
+  // effective portal key is the reserved string `"default"` per `portalKey()`)
+  // AND a slot literally `name="default"`. Both would key the SAME `$portals`
+  // closure entry (`$portals.default`), so one silently shadows the other — a
+  // collision invisible at compile time. `"default"` is RESERVED as the
+  // default-portal key, so the literal `name="default"` slot is forbidden when a
+  // default portal slot is present. Detected by the IR-level
+  // `validateDefaultPortalCollision` validator (collected-not-thrown, D-08),
+  // wired into `lowerToIR` so it fires for BOTH `compile()` AND `@rozie/unplugin`.
+  // Error severity; dual code-frame (primary at the `name="default"` slot,
+  // `related[]` at the default portal slot). Remediation: rename the
+  // `name="default"` slot. Mirrors ROZ127 (validateSlotPropCollision). ROZ979 is
+  // the next free code after ROZ978.
+  DEFAULT_PORTAL_NAME_RESERVED: 'ROZ979', // error — a default portal slot (`<slot portal />`) and a slot `name="default"` both key `$portals.default`; "default" is the reserved default-portal key.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
