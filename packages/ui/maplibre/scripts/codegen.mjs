@@ -51,17 +51,24 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/maplibre
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
-const SRC = resolve(ROOT, 'src/MapLibre.rozie');
-const FILENAME = 'MapLibre.rozie';
 
-/** Per-target leaf dir + emitted filename (build mode is informational). */
+// Phase 37: the package now ships the parent <MapLibre> PLUS the declarative
+// <Source>/<Layer> children (the dogfood of the Phase 36 $provide/$inject
+// primitive). Codegen compiles each sibling .rozie source into all 6 leaves (the
+// chartjs multi-variant precedent). MapLibre MUST be FIRST — it owns the
+// handle-manifest + docs-table validation gates (the renderless children have no
+// $expose / docs page); the children are pure additions.
+const PARENT = 'MapLibre';
+const COMPONENTS = [PARENT, 'Source', 'Layer'];
+
+/** Per-target leaf dir + emitted file extension (build mode is informational). */
 const TARGETS = {
-  react: { dir: 'react', file: 'MapLibre.tsx', build: 'tsdown' },
-  vue: { dir: 'vue', file: 'MapLibre.vue', build: 'source' },
-  svelte: { dir: 'svelte', file: 'MapLibre.svelte', build: 'source' },
-  angular: { dir: 'angular', file: 'MapLibre.ts', build: 'source' },
-  solid: { dir: 'solid', file: 'MapLibre.tsx', build: 'tsdown' },
-  lit: { dir: 'lit', file: 'MapLibre.ts', build: 'tsdown' },
+  react: { dir: 'react', ext: 'tsx', build: 'tsdown' },
+  vue: { dir: 'vue', ext: 'vue', build: 'source' },
+  svelte: { dir: 'svelte', ext: 'svelte', build: 'source' },
+  angular: { dir: 'angular', ext: 'ts', build: 'source' },
+  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown' },
+  lit: { dir: 'lit', ext: 'ts', build: 'tsdown' },
 };
 
 function leafPkgName(dir) {
@@ -71,10 +78,15 @@ function leafPkgName(dir) {
 }
 
 function main() {
-  const source = readFileSync(SRC, 'utf8');
+  // Read every component source once. Keyed by component name.
+  const sources = Object.fromEntries(
+    COMPONENTS.map((name) => [name, readFileSync(resolve(ROOT, `src/${name}.rozie`), 'utf8')]),
+  );
 
-  // (2) parse + lower ONCE for the doc tables.
-  const { ast } = parse(source, { filename: FILENAME });
+  // (2) parse + lower the PARENT ONCE for the doc tables + handle manifest. The
+  // renderless <Source>/<Layer> children have no $expose and no docs page, so the
+  // handle-manifest + docs-table validation gates apply to MapLibre only.
+  const { ast } = parse(sources[PARENT], { filename: `${PARENT}.rozie` });
   const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
 
   // Keep the hand-kept handle manifest in lockstep with ir.expose (Phase 21).
@@ -86,76 +98,71 @@ function main() {
     }
   }
 
-  // (3)(4) per-target emit + README.
+  // (3)(4) per-target emit + README. Outer loop = target; inner loop = component.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
-    const errs = r.diagnostics.filter((d) => d.severity === 'error');
-    if (errs.length) {
-      throw new Error(
-        `codegen ${target}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
-          errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
-      );
-    }
-
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
 
-    // MapLibre's 6 emits compile strict-tsc-clean as-authored (verified across
-    // all leaves), so there is NO per-leaf type-aid `code.replace(...)` patch
-    // (the CodeMirror `themeExt`/`langExt`/`buildMarkers` `: any` analogs). Emit
-    // the compiled code verbatim.
-    const code = r.code;
+    // Compile each sibling component into this leaf. The SCOPE FENCE throw is
+    // applied to EACH compile — an error means a mis-wired codegen/authoring path,
+    // NEVER an emitter edit (escalate as a compiler gap instead).
+    for (const componentName of COMPONENTS) {
+      const filename = `${componentName}.rozie`;
+      const r = compile(sources[componentName], { target, filename });
+      const errs = r.diagnostics.filter((d) => d.severity === 'error');
+      if (errs.length) {
+        throw new Error(
+          `codegen ${target} ${componentName}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
+            errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
+        );
+      }
 
-    writeFileSync(resolve(leafSrc, cfg.file), code);
+      // MapLibre's emits compile strict-tsc-clean as-authored (verified across all
+      // leaves); the renderless children likewise. There is NO per-leaf type-aid
+      // `code.replace(...)` patch. Emit the compiled code verbatim.
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
 
-    // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
-    // DEFAULT export, so the barrel re-exports the default under the named
-    // `MapLibre` the READMEs/consumers import (an `export *` would NOT forward
-    // a default).
+      // React-only sidecars, per component. The renderless children emit no CSS
+      // and no synthesized handle type — the `if (r.css)` / `if (r.types)` guards
+      // already handle absence; the global-css cleanup removes a stale sidecar if
+      // a component carries no nested-:root engine rules.
+      if (target === 'react') {
+        if (r.css) writeFileSync(resolve(leafSrc, `${componentName}.css`), r.css);
+        const globalCssPath = resolve(leafSrc, `${componentName}.global.css`);
+        if (r.globalCss) {
+          writeFileSync(globalCssPath, r.globalCss);
+        } else if (existsSync(globalCssPath)) {
+          rmSync(globalCssPath);
+        }
+        if (r.types) writeFileSync(resolve(leafSrc, `${componentName}.d.ts`), r.types);
+      }
+    }
+
+    // Bundled leaves (tsdown) entry on src/index.ts. Each component is a DEFAULT
+    // export, so the multi-export barrel re-exports every component's default under
+    // its named export (an `export *` would NOT forward a default). The PARENT
+    // also re-exports the package default + the `MapLibreHandle` type (React/Solid
+    // emit `export interface MapLibreHandle` in the .tsx; Lit's handle is the
+    // custom element itself, so it gets no named type).
     if (cfg.build === 'tsdown') {
-      // React AND Solid: re-export the named `MapLibreHandle` type directly from
-      // the component module. The React/Solid emitters emit the synthesized
-      // handle interface as `export interface MapLibreHandle` in the .tsx itself
-      // (Phase 21 REQ-10 follow-up), so consumers can
-      // `import type { MapLibreHandle }` and the barrel forwards it verbatim — no
-      // ComponentRef derivation, no module-private caveat. Lit gets no named
-      // type: its handle is the custom element itself, so the plain barrel is
-      // correct there.
-      const barrel =
+      const childExports = COMPONENTS.filter((n) => n !== PARENT)
+        .map((n) => `export { default as ${n} } from './${n}';\n`)
+        .join('');
+      const parentBlock =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as MapLibre } from './MapLibre';\n` +
-            `export { default } from './MapLibre';\n\n` +
-            `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+            `export { default } from './MapLibre';\n` +
+            childExports +
+            `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { MapLibreHandle } from './MapLibre';\n`
-          : `export { default as MapLibre } from './MapLibre';\nexport { default } from './MapLibre';\n`;
-      writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
+          : `export { default as MapLibre } from './MapLibre';\nexport { default } from './MapLibre';\n` +
+            childExports;
+      writeFileSync(resolve(leafSrc, 'index.ts'), parentBlock);
     }
 
-    // React-only sidecars.
-    if (target === 'react') {
-      if (r.css) writeFileSync(resolve(leafSrc, 'MapLibre.css'), r.css);
-      // The React emitter routes nested-`:root` engine rules (the `.rozie-maplibre-*`
-      // escape-hatch styles, Phase 34) into `r.globalCss` and emits a sibling
-      // `import './MapLibre.global.css';` side effect in the `.tsx`. Write the
-      // sidecar whenever it is present so that import resolves; without it the
-      // regenerated leaf imports a non-existent file.
-      // WR-03 — keep the sidecar in lockstep with the emit. If a future .rozie
-      // edit removes all nested-:root engine rules, r.globalCss becomes null and
-      // the emitted .tsx drops its `import './MapLibre.global.css'`. Without this
-      // cleanup the previously-written (committed) sidecar would linger on disk —
-      // a stale, unreferenced CSS file shipped in the tarball.
-      const globalCssPath = resolve(leafSrc, 'MapLibre.global.css');
-      if (r.globalCss) {
-        writeFileSync(globalCssPath, r.globalCss);
-      } else if (existsSync(globalCssPath)) {
-        rmSync(globalCssPath);
-      }
-      if (r.types) writeFileSync(resolve(leafSrc, 'MapLibre.d.ts'), r.types);
-    }
-
-    // (4) README from the single IR parse.
+    // (4) README from the single PARENT IR parse.
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
@@ -166,7 +173,8 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .global.css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
+    const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓`);
   }
 
   // (5) ENFORCE docs props-table validation: the IR-derivable structural columns
@@ -216,7 +224,9 @@ function main() {
     );
   }
 
-  console.log('codegen: done — 6 targets emitted, 6 READMEs rendered, 6 LICENSEs vendored.');
+  console.log(
+    `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), 6 READMEs rendered, 6 LICENSEs vendored.`,
+  );
 }
 
 main();
