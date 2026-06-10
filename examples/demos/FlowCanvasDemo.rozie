@@ -78,9 +78,17 @@ const onMoved = () => { $data.lastMoved = ($data.lastMoved || 0) + 1 }
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
     <span class="readout" data-testid="readout-count">{{ $data.nodes.length }}</span>
     <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+    <span class="readout" data-testid="readout-connect">{{ $data.lastConnect }}</span>
   </div>
 
-  <div class="flow-wrap" style="height: 340px">
+  <!--
+    Explicit width: the VR host mounts at `width: max-content`, so a width-auto
+    flow-wrap collapses to ~236px and the canvas (overflow:hidden) clips every node
+    past the first — making the Filter/Sink sockets geometrically present but
+    un-hittable (elementsFromPoint returns nothing), which would break the
+    drag-to-connect drop. A fixed width keeps all node sockets on-canvas + hittable.
+  -->
+  <div class="flow-wrap" style="height: 340px; width: 720px">
     <FlowCanvas
       :nodes="$data.nodes"
       :connections="$data.connections"
