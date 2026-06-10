@@ -346,8 +346,28 @@ const applyLayers = () => {
     if (!instance.getLayer(l.id)) {
       const needsSource = l.type !== 'background';
       if (needsSource && (l.source == null || !instance.getSource(l.source))) continue;
+      // Build a CLEAN LayerSpecification: a declarative <Layer> registry spec carries
+      // a `beforeId` (not a LayerSpecification key — it is the addLayer 2nd arg) and
+      // explicit `source: undefined` / `layout: undefined` keys (the prop defaults).
+      // MapLibre v5 rejects a background layer that has ANY `source` key, and an
+      // undefined `layout` — so emit only the keys MapLibre expects (the config-array
+      // path is unaffected: those specs are already clean, this just re-emits them).
+      // null-let → typeNeutralize `any` so the dynamic key assignments below
+      // type-check on the strict bundled leaves (the `let x = null` idiom).
+      let clean: any = null;
+      clean = {
+        id: l.id,
+        type: l.type
+      };
+      if (needsSource) clean.source = l.source;
+      if (l.paint != null) clean.paint = l.paint;
+      if (l.layout != null) clean.layout = l.layout;
+      if (l.sourceLayer != null) clean['source-layer'] = l.sourceLayer;
+      if (l.filter != null) clean.filter = l.filter;
+      if (l.minzoom != null) clean.minzoom = l.minzoom;
+      if (l.maxzoom != null) clean.maxzoom = l.maxzoom;
       try {
-        instance.addLayer($state.snapshot(l), l.beforeId);
+        instance.addLayer($state.snapshot(clean), l.beforeId);
       } catch (e: any) {
         // surfaced via the `error` emit path; skip so later layers still apply.
       }

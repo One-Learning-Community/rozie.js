@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, onUpdated, provide, watch } from 'vue';
+import { inject, onBeforeUnmount, onMounted, provide, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ id: string; spec?: unknown }>(),
@@ -62,10 +62,9 @@ onMounted(() => {
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
-onUpdated(() => {
-  if (didRegister) return;
-  const live = sources;
-  if (live == null) return;
+
+watch(() => sources, (live: any) => {
+  if (didRegister || live == null) return;
   reg = live;
   didRegister = true;
   reg.register(props.id, {
@@ -73,7 +72,6 @@ onUpdated(() => {
     spec: props.spec
   });
 });
-
 watch(() => props.spec, (v: any) => {
   if (reg) reg.update(props.id, {
     id: props.id,

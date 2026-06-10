@@ -76,15 +76,12 @@ $onMount(() => {
 })
 
 // LIT ASYNC CONTEXT (REQ-30): the injected `maplibre:sources` registry is event-
-// driven on Lit and may resolve AFTER $onMount. $onUpdate lowers to Lit's updated(),
-// which re-runs when the ContextConsumer(subscribe:true) re-publishes the resolved
-// registry — we then register once. Reads the LIVE injected `sources` (on Lit the
-// ContextConsumer getter; on the 5 sync targets the stable value already registered
-// in $onMount, so `didRegister` short-circuits this to a no-op there).
-$onUpdate(() => {
-  if (didRegister) return
-  const live = sources
-  if (live == null) return
+// driven on Lit and may resolve AFTER $onMount. A lazy $watch on the injected
+// registry fires on the post-mount transition (undefined → registry) and registers
+// once. On the 5 sync targets the registry is present at mount (already registered
+// in $onMount, `didRegister` guards), so this never fires — the Lit-only path.
+$watch(() => sources, (live) => {
+  if (didRegister || live == null) return
   reg = live
   didRegister = true
   reg.register($props.id, { id: $props.id, spec: $props.spec })

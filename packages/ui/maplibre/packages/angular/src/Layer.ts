@@ -34,6 +34,7 @@ export class Layer {
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
 
   constructor() {
     this.reg = this.layers;
@@ -44,24 +45,12 @@ export class Layer {
     // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
     // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
     // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
-    effect(() => () => {
-      const __id = this.id();
-      const live = this.layers;
-      if (!live) return;
-      if (!this.reg) this.reg = live;
-      const src = this.resolveSource();
-      if (!this.didRegister) {
-        this.didRegister = true;
-        this.appliedSource = src;
-        this.reg.register(__id, this.buildSpec());
-        return;
-      }
-      if (src != null && src !== this.appliedSource) {
-        this.appliedSource = src;
-        this.reg.update(__id, this.buildSpec());
-      }
-    });
-    effect(() => { const __watchVal = (() => this.paint())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.resolveSource())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((src: any) => {
+      if (!this.reg || src == null || src === this.appliedSource) return;
+      this.appliedSource = src;
+      this.reg.update(this.id(), this.buildSpec());
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.paint())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
         id: __id,
@@ -72,7 +61,7 @@ export class Layer {
         beforeId: this.beforeId()
       });
     })(); }); });
-    effect(() => { const __watchVal = (() => this.layout())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.layout())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
         id: __id,
@@ -83,7 +72,7 @@ export class Layer {
         beforeId: this.beforeId()
       });
     })(); }); });
-    effect(() => { const __watchVal = (() => this.type())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.type())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
         id: __id,

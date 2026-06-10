@@ -1,6 +1,6 @@
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { ContextConsumer, createContext } from '@lit/context';
 
 const __rozieCtx_maplibre_source = createContext(Symbol.for("rozie:maplibre:source"));
@@ -15,6 +15,7 @@ export default class Layer extends SignalWatcher(LitElement) {
   @property({ type: Object }) layout: unknown = undefined;
   @property({ type: String, reflect: true }) source: string = undefined;
   @property({ type: String, reflect: true }) beforeId: string = undefined;
+private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_maplibre_source = new ContextConsumer(this, { context: __rozieCtx_maplibre_source, subscribe: true });
 private get srcCtx() { return this.__rozieCtxConsumer_maplibre_source.value ?? null; }
@@ -39,6 +40,12 @@ private get layers() { return this.__rozieCtxConsumer_maplibre_layers.value; }
     this._disconnectCleanups.push((() => {
       if (this.reg) this.reg.unregister(this.id);
     }));
+
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.resolveSource())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((src: any) => {
+      if (!this.reg || src == null || src === this.appliedSource) return;
+      this.appliedSource = src;
+      this.reg.update(this.id, this.buildSpec());
+    })(__watchVal); }); }));
 
     if (this.reg) {
       this.didRegister = true;
@@ -79,21 +86,6 @@ private get layers() { return this.__rozieCtxConsumer_maplibre_layers.value; }
       });
     })(); }
     this.__rozieFirstUpdateDone = true;
-
-    const live = this.layers;
-    if (!live) return;
-    if (!this.reg) this.reg = live;
-    const src = this.resolveSource();
-    if (!this.didRegister) {
-      this.didRegister = true;
-      this.appliedSource = src;
-      this.reg.register(this.id, this.buildSpec());
-      return;
-    }
-    if (src != null && src !== this.appliedSource) {
-      this.appliedSource = src;
-      this.reg.update(this.id, this.buildSpec());
-    }
   }
 
   disconnectedCallback(): void {

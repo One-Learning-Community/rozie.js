@@ -32,6 +32,7 @@ export default function Layer(_props: LayerProps): JSX.Element {
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
 
   reg.current = layers;
   let ctx: any = null;
@@ -63,32 +64,12 @@ export default function Layer(_props: LayerProps): JSX.Element {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const live = layers;
-    if (!live) return;
-    if (!reg.current) reg.current = live;
-    const src = resolveSource();
-    if (!didRegister.current) {
-      didRegister.current = true;
-      appliedSource.current = src;
-      reg.current.register(props.id, buildSpec());
-      return;
-    }
-    if (src != null && src !== appliedSource.current) {
-      appliedSource.current = src;
-      reg.current.update(props.id, buildSpec());
-    }
-  }, [appliedSource, buildSpec, didRegister, layers, props.id, reg, resolveSource]);
-  useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
-    if (reg.current) reg.current.update(props.id, {
-      id: props.id,
-      type: props.type,
-      paint: props.paint,
-      layout: props.layout,
-      source: resolveSource(),
-      beforeId: props.beforeId
-    });
-  }, [props.paint]); // eslint-disable-line react-hooks/exhaustive-deps
+    const src = resolveSource();
+    if (!reg.current || src == null || src === appliedSource.current) return;
+    appliedSource.current = src;
+    reg.current.update(props.id, buildSpec());
+  }, [resolveSource]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
     if (reg.current) reg.current.update(props.id, {
@@ -99,9 +80,20 @@ export default function Layer(_props: LayerProps): JSX.Element {
       source: resolveSource(),
       beforeId: props.beforeId
     });
-  }, [props.layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.paint]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
+    if (reg.current) reg.current.update(props.id, {
+      id: props.id,
+      type: props.type,
+      paint: props.paint,
+      layout: props.layout,
+      source: resolveSource(),
+      beforeId: props.beforeId
+    });
+  }, [props.layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     if (reg.current) reg.current.update(props.id, {
       id: props.id,
       type: props.type,

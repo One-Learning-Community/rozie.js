@@ -45,25 +45,24 @@ export class Source {
   sources = inject(rozieToken('maplibre:sources'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
 
   constructor() {
     this.reg = this.sources;
 
     // idempotency flag so the $onMount register and the late-context $onUpdate path
     // (Lit async, REQ-30) never double-register the source.
-    effect(() => () => {
+    effect(() => { const __watchVal = (() => this.sources)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((live: any) => {
       const __id = this.id();
-      if (this.didRegister) return;
-      const live = this.sources;
-      if (live == null) return;
+      if (this.didRegister || live == null) return;
       this.reg = live;
       this.didRegister = true;
       this.reg.register(__id, {
         id: __id,
         spec: this.spec()
       });
-    });
-    effect(() => { const __watchVal = (() => this.spec())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.spec())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
         id: __id,

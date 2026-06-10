@@ -26,6 +26,7 @@ export default function Source(_props: SourceProps): JSX.Element {
   const _specRef = useRef(props.spec);
   _specRef.current = props.spec;
   const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
 
   reg.current = sources;
 
@@ -50,18 +51,18 @@ export default function Source(_props: SourceProps): JSX.Element {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (didRegister.current) return;
+    if (_watch0First.current) { _watch0First.current = false; return; }
     const live = sources;
-    if (live == null) return;
+    if (didRegister.current || live == null) return;
     reg.current = live;
     didRegister.current = true;
     reg.current.register(props.id, {
       id: props.id,
-      spec: _specRef.current
+      spec: props.spec
     });
-  }, [didRegister, props.id, reg, sources]);
+  }, [sources]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch0First.current) { _watch0First.current = false; return; }
+    if (_watch1First.current) { _watch1First.current = false; return; }
     const v = props.spec;
     if (reg.current) reg.current.update(props.id, {
       id: props.id,

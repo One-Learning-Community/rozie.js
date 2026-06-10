@@ -82,36 +82,15 @@ onMount(() => {
     if (reg) reg.unregister(id);
   };
 });
-$effect(() => (() => {
-  const live = layers;
-  if (!live) return;
-  if (!reg) reg = live;
-  const src = resolveSource();
-  if (!didRegister) {
-    didRegister = true;
-    appliedSource = src;
-    reg.register(id, buildSpec());
-    return;
-  }
-  if (src != null && src !== appliedSource) {
-    appliedSource = src;
-    reg.update(id, buildSpec());
-  }
-})());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => paint)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
-  if (reg) reg.update(id, {
-    id: id,
-    type: type,
-    paint: paint,
-    layout: layout,
-    source: resolveSource(),
-    beforeId: beforeId
-  });
-})(); }); });
+$effect(() => { const __watchVal = (() => resolveSource())(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((src: any) => {
+  if (!reg || src == null || src === appliedSource) return;
+  appliedSource = src;
+  reg.update(id, buildSpec());
+})(__watchVal); }); });
 let __rozieWatchInitial_1 = true;
-$effect(() => { (() => layout)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+$effect(() => { (() => paint)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
   if (reg) reg.update(id, {
     id: id,
     type: type,
@@ -122,7 +101,18 @@ $effect(() => { (() => layout)(); untrack(() => { if (__rozieWatchInitial_1) { _
   });
 })(); }); });
 let __rozieWatchInitial_2 = true;
-$effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
+$effect(() => { (() => layout)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
+  if (reg) reg.update(id, {
+    id: id,
+    type: type,
+    paint: paint,
+    layout: layout,
+    source: resolveSource(),
+    beforeId: beforeId
+  });
+})(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
   if (reg) reg.update(id, {
     id: id,
     type: type,

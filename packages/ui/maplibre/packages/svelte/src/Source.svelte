@@ -64,20 +64,19 @@ onMount(() => {
     if (reg) reg.unregister(id);
   };
 });
-$effect(() => (() => {
-  if (didRegister) return;
-  const live = sources;
-  if (live == null) return;
+
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => sources)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((live: any) => {
+  if (didRegister || live == null) return;
   reg = live;
   didRegister = true;
   reg.register(id, {
     id: id,
     spec: spec
   });
-})());
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => spec)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
+})(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { const __watchVal = (() => spec)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => {
   if (reg) reg.update(id, {
     id: id,
     spec: v

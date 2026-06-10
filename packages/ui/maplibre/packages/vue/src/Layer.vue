@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, onUpdated, watch } from 'vue';
+import { inject, onBeforeUnmount, onMounted, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ id: string; type?: string; paint?: unknown; layout?: unknown; source?: string; beforeId?: string }>(),
@@ -73,23 +73,12 @@ onMounted(() => {
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
-onUpdated(() => {
-  const live = layers;
-  if (!live) return;
-  if (!reg) reg = live;
-  const src = resolveSource();
-  if (!didRegister) {
-    didRegister = true;
-    appliedSource = src;
-    reg.register(props.id, buildSpec());
-    return;
-  }
-  if (src != null && src !== appliedSource) {
-    appliedSource = src;
-    reg.update(props.id, buildSpec());
-  }
-});
 
+watch(() => resolveSource(), (src: any) => {
+  if (!reg || src == null || src === appliedSource) return;
+  appliedSource = src;
+  reg.update(props.id, buildSpec());
+});
 watch(() => props.paint, () => {
   if (reg) reg.update(props.id, {
     id: props.id,

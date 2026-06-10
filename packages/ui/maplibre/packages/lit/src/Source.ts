@@ -1,6 +1,6 @@
 import { LitElement, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context';
 
 const __rozieCtx_maplibre_source = createContext(Symbol.for("rozie:maplibre:source"));
@@ -11,6 +11,7 @@ const __rozieCtx_maplibre_sources = createContext(Symbol.for("rozie:maplibre:sou
 export default class Source extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) id!: string;
   @property({ type: Object }) spec: unknown = undefined;
+private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxProvider_maplibre_source = new ContextProvider(this, { context: __rozieCtx_maplibre_source, initialValue: ((__rozieCtxHost) => ({
   get id() {
@@ -60,6 +61,16 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
       if (this.reg) this.reg.unregister(this.id);
     }));
 
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.sources)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((live: any) => {
+      if (this.didRegister || live == null) return;
+      this.reg = live;
+      this.didRegister = true;
+      this.reg.register(this.id, {
+        id: this.id,
+        spec: this.spec
+      });
+    })(__watchVal); }); }));
+
     // register this source's spec into the parent registry; the parent's
     // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
     // On Lit the injected sources registry may still be undefined here (async
@@ -82,16 +93,6 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
       });
     })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
-
-    if (this.didRegister) return;
-    const live = this.sources;
-    if (live == null) return;
-    this.reg = live;
-    this.didRegister = true;
-    this.reg.register(this.id, {
-      id: this.id,
-      spec: this.spec
-    });
   }
 
   disconnectedCallback(): void {

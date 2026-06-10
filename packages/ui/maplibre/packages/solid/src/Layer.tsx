@@ -30,22 +30,11 @@ export default function Layer(_props: LayerProps): JSX.Element {
     if (reg) reg.unregister(local.id);
   });
   });
-  createEffect(() => {
-    const live = layers;
-    if (!live) return;
-    if (!reg) reg = live;
-    const src = resolveSource();
-    if (!didRegister) {
-      didRegister = true;
-      appliedSource = src;
-      reg.register(local.id, buildSpec());
-      return;
-    }
-    if (src != null && src !== appliedSource) {
-      appliedSource = src;
-      reg.update(local.id, buildSpec());
-    }
-  });
+  createEffect(on(() => (() => resolveSource())(), (v) => untrack(() => ((src: any) => {
+    if (!reg || src == null || src === appliedSource) return;
+    appliedSource = src;
+    reg.update(local.id, buildSpec());
+  })(v)), { defer: true }));
   createEffect(on(() => (() => local.paint)(), (v) => untrack(() => (() => {
     if (reg) reg.update(local.id, {
       id: local.id,

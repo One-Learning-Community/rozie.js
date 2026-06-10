@@ -106,27 +106,18 @@ $onMount(() => {
 })
 
 // Re-register when the nested <Source> context resolves to a source id we have not
-// applied yet — the parent <Source> mounted AFTER this <Layer> child (child-before-
-// parent on React/Vue/Svelte/Angular) or the Lit context resolved async (REQ-30).
-// $onUpdate lowers to each target's update phase (Lit updated() re-runs when the
-// ContextConsumer re-publishes). Also covers the late `maplibre:layers` registry on
-// Lit (register if $onMount was skipped). Idempotent upsert; only fires while the
-// resolved source differs from what we last registered, so it settles in one tick.
-$onUpdate(() => {
-  const live = layers
-  if (!live) return
-  if (!reg) reg = live
-  const src = resolveSource()
-  if (!didRegister) {
-    didRegister = true
-    appliedSource = src
-    reg.register($props.id, buildSpec())
-    return
-  }
-  if (src != null && src !== appliedSource) {
-    appliedSource = src
-    reg.update($props.id, buildSpec())
-  }
+// applied yet — on Lit the injected source ctx is event-driven and resolves AFTER
+// $onMount (REQ-30), so the mount registration used source:undefined. A lazy $watch
+// on the resolved source id fires on the post-mount transition (null → 'pts') and
+// re-registers with the correct source. Change-gated (src !== appliedSource) so it
+// writes at most once per real change — no reactive write-loop. On React/Vue/Svelte/
+// Solid/Angular the source ctx is already present at mount (the parent <Source>'s
+// provide runs during setup, before the child's mount), so this lazy $watch never
+// fires there — a no-op, the Lit-only resilience path.
+$watch(() => resolveSource(), (src) => {
+  if (!reg || src == null || src === appliedSource) return
+  appliedSource = src
+  reg.update($props.id, buildSpec())
 })
 
 // React to paint / layout / type changes (lazy $watch — post-mount transitions).

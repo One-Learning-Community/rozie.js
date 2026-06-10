@@ -37,17 +37,15 @@ export default function Source(_props: SourceProps): JSX.Element {
     if (reg) reg.unregister(local.id);
   });
   });
-  createEffect(() => {
-    if (didRegister) return;
-    const live = sources;
-    if (live == null) return;
+  createEffect(on(() => (() => sources)(), (v) => untrack(() => ((live: any) => {
+    if (didRegister || live == null) return;
     reg = live;
     didRegister = true;
     reg.register(local.id, {
       id: local.id,
       spec: local.spec
     });
-  });
+  })(v)), { defer: true }));
   createEffect(on(() => (() => local.spec)(), (v) => untrack(() => ((v: any) => {
     if (reg) reg.update(local.id, {
       id: local.id,
