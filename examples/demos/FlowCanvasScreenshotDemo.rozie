@@ -17,6 +17,14 @@
   sub-pixel path drift at the human-verify gate, the SCREENSHOT cell for that
   target is a tracked deferral (like the Chart.js canvas + Lit-MapLibre WebGL
   cells); the BEHAVIORAL cell (FlowCanvasDemo) remains the correctness gate.
+
+  EXPLICIT WIDTH (260610-jrk continuation): the VR host mounts at
+  `width: max-content`, so a width-auto flow-wrap collapsed the
+  `overflow:hidden` canvas to ~236px — nodes b (x=240) and c (x=460) rendered
+  off-canvas and the intended fixed 3-node / 2-connection graph never actually
+  showed (the old baseline was a single clipped node with no edges). A fixed
+  width keeps all 3 nodes + both drawn bezier connections on-canvas so the pixel
+  cell DEMONSTRATES the feature it guards.
 -->
 
 <rozie name="FlowCanvasScreenshotDemo">
@@ -44,7 +52,7 @@
 <template>
 <div class="flow-shot">
   <h3>FlowCanvas — screenshot</h3>
-  <div class="flow-wrap" style="height: 280px">
+  <div class="flow-wrap" style="width: 720px; height: 280px">
     <FlowCanvas
       :nodes="$data.nodes"
       :connections="$data.connections"
@@ -63,7 +71,7 @@
   font-family: system-ui, -apple-system, sans-serif;
   color: #1a1a1a;
   padding: 1rem;
-  max-width: 720px;
+  max-width: 760px;
 }
 .flow-shot h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 </style>
