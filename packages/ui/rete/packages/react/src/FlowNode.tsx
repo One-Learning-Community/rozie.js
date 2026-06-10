@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, rozieContext } from '@rozie/runtime-react';
 
@@ -27,12 +27,7 @@ export default function FlowNode(_props: FlowNodeProps): JSX.Element {
   })();
   const hostEl = useRef<any>(null);
   const cv = useRef<any>(null);
-  const _labelRef = useRef(props.label);
-  _labelRef.current = props.label;
-  const _xRef = useRef(props.x);
-  _xRef.current = props.x;
-  const _yRef = useRef(props.y);
-  _yRef.current = props.y;
+  const registered = useRef(false);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
@@ -44,30 +39,42 @@ export default function FlowNode(_props: FlowNodeProps): JSX.Element {
   // ROZ123). The parent-invoked renderBody closure appends THIS into the engine
   // `body` host — moving the host preserves Lit shadow projection of the slot body.
   // Module-scope `any` so it survives into the parent's later render-scope call.
+  const buildSpec = useCallback(() => ({
+    id: props.id,
+    x: props.x,
+    y: props.y,
+    label: props.label,
+    inputs: [],
+    outputs: [],
+    // D-04 render-callback: the parent calls this with the engine body host div.
+    renderBody: (host: any) => {
+      if (host && hostEl.current) host.appendChild(hostEl.current);
+    }
+  }), [props.id, props.label, props.x, props.y]);
 
   useEffect(() => {
     hostEl.current = __rozieRoot.current;
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
-    if (cv.current) {
-      cv.current.register(props.id, {
-        id: props.id,
-        x: _xRef.current,
-        y: _yRef.current,
-        label: _labelRef.current,
-        inputs: [],
-        outputs: [],
-        // D-04 render-callback: the parent calls this with the engine body host div.
-        renderBody: (host: any) => {
-          if (host && hostEl.current) host.appendChild(hostEl.current);
-        }
-      });
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
+    if (cv.current && !registered.current) {
+      registered.current = true;
+      cv.current.register(props.id, buildSpec());
     }
     return () => {
       if (cv.current) cv.current.unregister(props.id);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (registered.current) return;
+    const live = canvas;
+    if (live == null) return;
+    cv.current = live;
+    registered.current = true;
+    cv.current.register(props.id, buildSpec());
+  }, [buildSpec, canvas, cv, props.id, registered]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     if (cv.current) cv.current.update(props.id, {

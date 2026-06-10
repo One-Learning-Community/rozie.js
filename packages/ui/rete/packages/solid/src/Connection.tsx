@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { mergeProps, onCleanup, onMount, splitProps, useContext } from 'solid-js';
+import { createEffect, mergeProps, onCleanup, onMount, splitProps, useContext } from 'solid-js';
 import { rozieContext } from '@rozie/runtime-solid';
 
 interface ConnectionProps {
@@ -18,20 +18,26 @@ export default function Connection(_props: ConnectionProps): JSX.Element {
   onMount(() => {
     const _cleanup = (() => {
     connId = edgeId();
-    if (cv) {
-      cv.registerConnection(connId, {
-        id: connId,
-        source: local.source,
-        sourceOutput: local.sourceOutput,
-        target: local.target,
-        targetInput: local.targetInput
-      });
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    if (cv && !registered) {
+      registered = true;
+      cv.registerConnection(connId, buildConn());
     }
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
     if (cv) cv.unregisterConnection(connId);
   });
+  });
+  createEffect(() => {
+    if (registered) return;
+    const live = canvas;
+    if (live == null) return;
+    cv = live;
+    if (connId == null) connId = edgeId();
+    registered = true;
+    cv.registerConnection(connId, buildConn());
   });
 
   // $inject is typed `unknown` (Phase 36 D-4); alias through a MODULE-SCOPE null-let
@@ -55,6 +61,19 @@ export default function Connection(_props: ConnectionProps): JSX.Element {
   // mount closure — can still reach it to unregisterConnection (the MapLibre Source/
   // Layer teardown-hoist lesson). null until mount.
   let connId: any = null;
+
+  // idempotency flag so the $onMount register and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-register the connection.
+  let registered = false;
+  function buildConn() {
+    return {
+      id: connId,
+      source: local.source,
+      sourceOutput: local.sourceOutput,
+      target: local.target,
+      targetInput: local.targetInput
+    };
+  }
 
   return (
     null

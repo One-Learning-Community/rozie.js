@@ -72,29 +72,61 @@ cv = canvas
 // Module-scope `any` so it survives into the parent's later render-scope call.
 let hostEl = null
 
+// idempotency flag so a reactive late-context registration (Lit async first
+// paint, REQ-30) and the $onMount registration never double-register the node.
+let registered = false
+
+// the canvas spec builder — shared by the $onMount register and the late-context
+// $watch below. Reads `cv` (the `any` alias) at CALL time so the late Lit value
+// is picked up. registerInto(api) takes the freshly-resolved live API so the
+// reactive path doesn't depend on the stale setup-time alias.
+const buildSpec = () => ({
+  id: $props.id,
+  x: $props.x,
+  y: $props.y,
+  label: $props.label,
+  inputs: [],
+  outputs: [],
+  // D-04 render-callback: the parent calls this with the engine body host div.
+  renderBody: (host) => {
+    if (host && hostEl) host.appendChild(hostEl)
+  },
+})
+
 $onMount(() => {
   hostEl = $el
   // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
   // builds the engine node, then renderNode invokes renderBody(body) — projecting
   // this FlowNode's body into the engine element from the PARENT's render scope.
-  if (cv) {
-    cv.register($props.id, {
-      id: $props.id,
-      x: $props.x,
-      y: $props.y,
-      label: $props.label,
-      inputs: [],
-      outputs: [],
-      // D-04 render-callback: the parent calls this with the engine body host div.
-      renderBody: (host) => {
-        if (host && hostEl) host.appendChild(hostEl)
-      },
-    })
+  // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+  // the $watch below performs the registration once the value arrives.
+  if (cv && !registered) {
+    registered = true
+    cv.register($props.id, buildSpec())
   }
 
   return () => {
     if (cv) cv.unregister($props.id)
   }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected `rete:canvas` is event-driven on Lit
+// and may resolve AFTER $onMount, so the imperative register above is skipped on
+// first paint. $onUpdate lowers to Lit's updated(), which re-runs when the
+// ContextConsumer(subscribe:true) re-publishes the now-resolved canvas API — at
+// which point we register exactly once. Reads the LIVE injected `canvas` (on Lit
+// `canvas` lowers to the ContextConsumer getter; on the 5 sync targets it is the
+// stable value already registered in $onMount, so `registered` short-circuits this
+// to a no-op there — the Lit-only resilience path). A $watch over the inject would
+// NOT fire on Lit (its effect()/changedProperties routes don't observe the @lit/
+// context value), so the lifecycle hook is the correct mechanism.
+$onUpdate(() => {
+  if (registered) return
+  const live = canvas
+  if (live == null) return
+  cv = live
+  registered = true
+  cv.register($props.id, buildSpec())
 })
 
 // React to position / label changes (lazy $watch — post-mount transitions). The

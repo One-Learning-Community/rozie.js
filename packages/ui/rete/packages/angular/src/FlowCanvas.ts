@@ -140,6 +140,13 @@ function rozieToken(key: string): InjectionToken<unknown> {
     {
       provide: rozieToken('rete:canvas'),
       useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => FlowCanvas)); return ({
+  // A node registers its base spec (inputs/outputs empty). Any ports a nested
+  // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
+  // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
+  // — NOT inline here, because on React the parent register and the child addPort
+  // are batched into one commit, so a closure read of $data.pendingPorts inside
+  // register would be stale (still {}). The reactive flush runs AFTER state settles
+  // on every target, so the merge sees the buffered ports.
   register: (id: any, spec: any) => {
     __rozieCtxHost.nodeReg.set({
       ...__rozieCtxHost.nodeReg(),
@@ -178,22 +185,27 @@ function rozieToken(key: string): InjectionToken<unknown> {
   addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
     if (id == null || key == null) return;
     const cur = __rozieCtxHost.nodeReg()[id];
-    if (!cur) return;
-    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
-    if (list.some((p: any) => p && p.key === key)) return;
-    list.push({
-      key,
-      label,
-      multiple
-    });
-    const next = side === 'input' ? {
-      ...cur,
-      inputs: list
-    } : {
-      ...cur,
-      outputs: list
-    };
-    __rozieCtxHost.nodeReg.set({
+    if (!cur) {
+      // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
+      // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
+      // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
+      // doesn't double-buffer.
+      const bucket = Array.isArray(__rozieCtxHost.pendingPorts()[id]) ? __rozieCtxHost.pendingPorts()[id].slice() : [];
+      if (bucket.some((p: any) => p && p.side === side && p.key === key)) return;
+      bucket.push({
+        side,
+        key,
+        label,
+        multiple
+      });
+      __rozieCtxHost.pendingPorts.set({
+        ...__rozieCtxHost.pendingPorts(),
+        [id]: bucket
+      });
+      return;
+    }
+    const next = __rozieCtxHost.applyPortToSpec(cur, side, key, label, multiple);
+    if (next !== cur) __rozieCtxHost.nodeReg.set({
       ...__rozieCtxHost.nodeReg(),
       [id]: next
     });
@@ -229,6 +241,7 @@ export class FlowCanvas {
   fitOnMount = input<boolean>(true);
   nodeReg = signal({});
   connReg = signal({});
+  pendingPorts = signal({});
   canvasEl = viewChild<ElementRef<HTMLDivElement>>('canvasEl');
   nodeAction = output<unknown>({ alias: 'node-action' });
   connectionCreated = output<unknown>({ alias: 'connection-created' });
@@ -249,6 +262,7 @@ export class FlowCanvas {
   private __rozieWatchInitial_2 = true;
   private __rozieWatchInitial_3 = true;
   private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.nodes())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
@@ -258,6 +272,7 @@ export class FlowCanvas {
       if (this.reconcileConnections) this.reconcileConnections();
     })(); }); });
     effect(() => { const __watchVal = (() => this.nodeReg())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      this.flushPendingPorts();
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
@@ -267,7 +282,10 @@ export class FlowCanvas {
     effect(() => { const __watchVal = (() => this.connReg())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       if (this.reconcileConnections) this.reconcileConnections();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.pendingPorts())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+      this.flushPendingPorts();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
       if (v === this.area.area.transform.k) return;
       this.programmatic++;
@@ -783,6 +801,25 @@ export class FlowCanvas {
               y: spec.y || 0
             });
           } else {
+            // Sync any ports the spec gained AFTER the node was first built — a
+            // nested <Handle>'s addPort can land after reconcileNodes already created
+            // the node (React batches the parent register + child addPort into one
+            // commit, so the first reconcile builds the node sans ports; the flushed
+            // ports arrive on a later tick). buildNode only runs for NEW nodes, so add
+            // the missing inputs/outputs onto the live instance here, then re-render.
+            let portsAdded = false;
+            const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
+            const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
+            for (const inp of wantIn as any) {
+              if (!inp || inp.key == null || node.inputs[inp.key]) continue;
+              node.addInput(inp.key, new ClassicPreset.Input(this.SOCKET, inp.label, inp.multiple === true));
+              portsAdded = true;
+            }
+            for (const out of wantOut as any) {
+              if (!out || out.key == null || node.outputs[out.key]) continue;
+              node.addOutput(out.key, new ClassicPreset.Output(this.SOCKET, out.label, out.multiple !== false));
+              portsAdded = true;
+            }
             const view = this.area.nodeViews.get(spec.id);
             if (view && spec.x != null && spec.y != null && (view.position.x !== spec.x || view.position.y !== spec.y)) {
               await this.area.translate(spec.id, {
@@ -790,7 +827,28 @@ export class FlowCanvas {
                 y: spec.y
               });
             }
+            if (portsAdded) {
+              // renderNode's in-place branch deliberately leaves existing sockets
+              // untouched; to render the NEW sockets, drop this node's render entry so
+              // area.update takes the fresh-build path (re-runs buildSocketRow + re-
+              // emits the socket render signals the ConnectionPlugin/watcher need). The
+              // D-04 body host is re-projected by renderBody (appendChild re-moves the
+              // same host element — idempotent).
+              const entry = this.nodeEntries.get(spec.id);
+              if (entry) {
+                if (entry.handle) entry.handle.dispose();
+                for (const d of entry.socketDisposers as any) {
+                  try {
+                    d();
+                  } catch (e: any) {}
+                }
+                this.nodeEntries.delete(spec.id);
+              }
+            }
             await this.area.update('node', spec.id);
+            // a port change must re-run connections — an edge that was skipped because
+            // its endpoint port didn't exist yet can now be drawn.
+            if (portsAdded && this.reconcileConnections) await this.reconcileConnections();
           }
         }
         // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
@@ -856,6 +914,15 @@ export class FlowCanvas {
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
+          // DEFENSIVE: the referenced output/input ports must exist on the live node
+          // instances before addConnection (Rete throws "source node doesn't have
+          // output with a key out" otherwise, aborting the loop). A declarative
+          // <Connection> may register before the nested <Handle>s have flushed their
+          // ports into the node (child-before-parent mount order); skip until the
+          // ports exist — reconcileNodes re-runs reconcileConnections after a node-
+          // registry change (incl. a Handle addPort), so the edge lands on a later tick.
+          if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
+          if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
           conn.id = spec.id;
           this.connInstances.set(spec.id, conn);
@@ -963,6 +1030,51 @@ export class FlowCanvas {
       node.addOutput(out.key, new ClassicPreset.Output(this.SOCKET, out.label, out.multiple !== false));
     }
     return node;
+  };
+  applyPortToSpec = (spec: any, side: any, key: any, label: any, multiple: any) => {
+    if (!spec || key == null) return spec;
+    const list = side === 'input' ? Array.isArray(spec.inputs) ? spec.inputs.slice() : [] : Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return spec;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    return side === 'input' ? {
+      ...spec,
+      inputs: list
+    } : {
+      ...spec,
+      outputs: list
+    };
+  };
+  flushPendingPorts = () => {
+    const pend = this.pendingPorts();
+    let pendingChanged = false;
+    let nodeChanged = false;
+    const nextPend = {
+      ...pend
+    };
+    let nextReg = this.nodeReg();
+    for (const id in pend) {
+      const bucket = pend[id];
+      if (!Array.isArray(bucket) || !bucket.length) continue;
+      const cur = nextReg[id];
+      if (!cur) continue;
+      let merged = cur;
+      for (const p of bucket as any) merged = this.applyPortToSpec(merged, p.side, p.key, p.label, p.multiple);
+      if (merged !== cur) {
+        nextReg = {
+          ...nextReg,
+          [id]: merged
+        };
+        nodeChanged = true;
+      }
+      delete nextPend[id];
+      pendingChanged = true;
+    }
+    if (nodeChanged) this.nodeReg.set(nextReg);
+    if (pendingChanged) this.pendingPorts.set(nextPend);
   };
   getEditor = () => {
     return this.editor;

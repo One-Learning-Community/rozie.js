@@ -62,6 +62,14 @@ export class FlowNode {
     // ROZ123). The parent-invoked renderBody closure appends THIS into the engine
     // `body` host — moving the host preserves Lit shadow projection of the slot body.
     // Module-scope `any` so it survives into the parent's later render-scope call.
+    effect(() => () => {
+      if (this.registered) return;
+      const live = this.canvas;
+      if (live == null) return;
+      this.cv = live;
+      this.registered = true;
+      this.cv.register(this.id(), this.buildSpec());
+    });
     effect(() => { const __watchVal = (() => this.x())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       const __id = this.id();
       if (this.cv) this.cv.update(__id, {
@@ -101,35 +109,41 @@ export class FlowNode {
   }
 
   ngAfterViewInit() {
-    const __id = this.id();
     this.hostEl = this.__rozieRoot()?.nativeElement;
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
-    if (this.cv) {
-      this.cv.register(__id, {
-        id: __id,
-        x: this.x(),
-        y: this.y(),
-        label: this.label(),
-        inputs: [],
-        outputs: [],
-        // D-04 render-callback: the parent calls this with the engine body host div.
-        renderBody: (host: any) => {
-          if (host && this.hostEl) host.appendChild(this.hostEl);
-        }
-      });
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
+    if (this.cv && !this.registered) {
+      this.registered = true;
+      this.cv.register(this.id(), this.buildSpec());
     }
     this.__rozieDestroyRef.onDestroy(() => {
-      if (this.cv) this.cv.unregister(__id);
+      if (this.cv) this.cv.unregister(this.id());
     });
   }
 
   cv: any = null;
   hostEl: any = null;
+  registered = false;
+  buildSpec = () => ({
+    id: this.id(),
+    x: this.x(),
+    y: this.y(),
+    label: this.label(),
+    inputs: [],
+    outputs: [],
+    // D-04 render-callback: the parent calls this with the engine body host div.
+    renderBody: (host: any) => {
+      if (host && this.hostEl) host.appendChild(this.hostEl);
+    }
+  });
 
   static ngTemplateContextGuard(
     _dir: FlowNode,

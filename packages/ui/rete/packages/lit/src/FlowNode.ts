@@ -73,22 +73,16 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
-    if (this.cv) {
-      this.cv.register(this.id, {
-        id: this.id,
-        x: this.x,
-        y: this.y,
-        label: this.label,
-        inputs: [],
-        outputs: [],
-        // D-04 render-callback: the parent calls this with the engine body host div.
-        renderBody: (host: any) => {
-          if (host && this.hostEl) host.appendChild(this.hostEl);
-        }
-      });
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
+    if (this.cv && !this.registered) {
+      this.registered = true;
+      this.cv.register(this.id, this.buildSpec());
     }
   }
 
@@ -127,6 +121,13 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
       });
     })(); }
     this.__rozieFirstUpdateDone = true;
+
+    if (this.registered) return;
+    const live = this.canvas;
+    if (live == null) return;
+    this.cv = live;
+    this.registered = true;
+    this.cv.register(this.id, this.buildSpec());
   }
 
   disconnectedCallback(): void {
@@ -149,6 +150,21 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
   cv: any = null;
 
   hostEl: any = null;
+
+  registered = false;
+
+  buildSpec = () => ({
+  id: this.id,
+  x: this.x,
+  y: this.y,
+  label: this.label,
+  inputs: [],
+  outputs: [],
+  // D-04 render-callback: the parent calls this with the engine body host div.
+  renderBody: (host: any) => {
+    if (host && this.hostEl) host.appendChild(this.hostEl);
+  }
+});
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

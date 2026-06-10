@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
+import { inject, onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ id: string; x?: number; y?: number; label?: unknown }>(),
@@ -41,6 +41,33 @@ cv = canvas;
 // Module-scope `any` so it survives into the parent's later render-scope call.
 let hostEl: any = null;
 
+// idempotency flag so a reactive late-context registration (Lit async first
+// paint, REQ-30) and the $onMount registration never double-register the node.
+// idempotency flag so a reactive late-context registration (Lit async first
+// paint, REQ-30) and the $onMount registration never double-register the node.
+let registered = false;
+
+// the canvas spec builder — shared by the $onMount register and the late-context
+// $watch below. Reads `cv` (the `any` alias) at CALL time so the late Lit value
+// is picked up. registerInto(api) takes the freshly-resolved live API so the
+// reactive path doesn't depend on the stale setup-time alias.
+// the canvas spec builder — shared by the $onMount register and the late-context
+// $watch below. Reads `cv` (the `any` alias) at CALL time so the late Lit value
+// is picked up. registerInto(api) takes the freshly-resolved live API so the
+// reactive path doesn't depend on the stale setup-time alias.
+const buildSpec = () => ({
+  id: props.id,
+  x: props.x,
+  y: props.y,
+  label: props.label,
+  inputs: [],
+  outputs: [],
+  // D-04 render-callback: the parent calls this with the engine body host div.
+  renderBody: (host: any) => {
+    if (host && hostEl) host.appendChild(hostEl);
+  }
+});
+
 provide('rete:node', {
   get id() {
     return props.id;
@@ -56,25 +83,25 @@ onMounted(() => {
   // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
   // builds the engine node, then renderNode invokes renderBody(body) — projecting
   // this FlowNode's body into the engine element from the PARENT's render scope.
-  if (cv) {
-    cv.register(props.id, {
-      id: props.id,
-      x: props.x,
-      y: props.y,
-      label: props.label,
-      inputs: [],
-      outputs: [],
-      // D-04 render-callback: the parent calls this with the engine body host div.
-      renderBody: (host: any) => {
-        if (host && hostEl) host.appendChild(hostEl);
-      }
-    });
+  // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+  // the $watch below performs the registration once the value arrives.
+  if (cv && !registered) {
+    registered = true;
+    cv.register(props.id, buildSpec());
   }
   _cleanup_0 = () => {
     if (cv) cv.unregister(props.id);
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
+onUpdated(() => {
+  if (registered) return;
+  const live = canvas;
+  if (live == null) return;
+  cv = live;
+  registered = true;
+  cv.register(props.id, buildSpec());
+});
 
 watch(() => props.x, () => {
   if (cv) cv.update(props.id, {

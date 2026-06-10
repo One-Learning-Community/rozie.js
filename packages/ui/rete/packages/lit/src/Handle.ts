@@ -22,9 +22,27 @@ private get node() { return this.__rozieCtxConsumer_rete_node.value; }
   firstUpdated(): void {
     this.nd = this.node;
 
+    // idempotency flag so the $onMount addPort and the late-context $onUpdate path
+    // (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+    // de-duped, so this is belt-and-suspenders.)
+
     // register this port against the enclosing node's id+side; the parent's
-    // reconcileNodes re-runs buildNode with the updated input/output spec.
-    if (this.nd) this.nd.addPort(this.side, this.port, this.label, this.multiple);
+    // reconcileNodes re-runs buildNode with the updated input/output spec. On Lit
+    // the injected node ctx may still be undefined here (async context, REQ-30) —
+    // the $onUpdate below adds the port once it resolves.
+    if (this.nd && !this.added) {
+      this.added = true;
+      this.nd.addPort(this.side, this.port, this.label, this.multiple);
+    }
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.added) return;
+    const live = this.node;
+    if (live == null) return;
+    this.nd = live;
+    this.added = true;
+    this.nd.addPort(this.side, this.port, this.label, this.multiple);
   }
 
   disconnectedCallback(): void {
@@ -42,4 +60,6 @@ private get node() { return this.__rozieCtxConsumer_rete_node.value; }
   }
 
   nd: any = null;
+
+  added = false;
 }

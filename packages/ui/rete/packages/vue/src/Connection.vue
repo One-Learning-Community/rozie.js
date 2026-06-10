@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted } from 'vue';
+import { inject, onBeforeUnmount, onMounted, onUpdated } from 'vue';
 
 const props = withDefaults(
   defineProps<{ id?: string; source: string; sourceOutput?: string; target: string; targetInput?: string }>(),
@@ -40,21 +40,40 @@ const edgeId = () => {
 // Layer teardown-hoist lesson). null until mount.
 let connId: any = null;
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the connection.
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the connection.
+let registered = false;
+const buildConn = () => ({
+  id: connId,
+  source: props.source,
+  sourceOutput: props.sourceOutput,
+  target: props.target,
+  targetInput: props.targetInput
+});
+
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
   connId = edgeId();
-  if (cv) {
-    cv.registerConnection(connId, {
-      id: connId,
-      source: props.source,
-      sourceOutput: props.sourceOutput,
-      target: props.target,
-      targetInput: props.targetInput
-    });
+  // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+  // the $onUpdate below registers once it resolves.
+  if (cv && !registered) {
+    registered = true;
+    cv.registerConnection(connId, buildConn());
   }
   _cleanup_0 = () => {
     if (cv) cv.unregisterConnection(connId);
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
+onUpdated(() => {
+  if (registered) return;
+  const live = canvas;
+  if (live == null) return;
+  cv = live;
+  if (connId == null) connId = edgeId();
+  registered = true;
+  cv.registerConnection(connId, buildConn());
+});
 </script>

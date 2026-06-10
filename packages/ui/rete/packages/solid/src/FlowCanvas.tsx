@@ -150,6 +150,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
   const [nodeReg, setNodeReg] = createSignal({});
   const [connReg, setConnReg] = createSignal({});
+  const [pendingPorts, setPendingPorts] = createSignal({});
   interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;
@@ -603,6 +604,25 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
               y: spec.y || 0
             });
           } else {
+            // Sync any ports the spec gained AFTER the node was first built — a
+            // nested <Handle>'s addPort can land after reconcileNodes already created
+            // the node (React batches the parent register + child addPort into one
+            // commit, so the first reconcile builds the node sans ports; the flushed
+            // ports arrive on a later tick). buildNode only runs for NEW nodes, so add
+            // the missing inputs/outputs onto the live instance here, then re-render.
+            let portsAdded = false;
+            const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
+            const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
+            for (const inp of wantIn as any) {
+              if (!inp || inp.key == null || node.inputs[inp.key]) continue;
+              node.addInput(inp.key, new ClassicPreset.Input(SOCKET, inp.label, inp.multiple === true));
+              portsAdded = true;
+            }
+            for (const out of wantOut as any) {
+              if (!out || out.key == null || node.outputs[out.key]) continue;
+              node.addOutput(out.key, new ClassicPreset.Output(SOCKET, out.label, out.multiple !== false));
+              portsAdded = true;
+            }
             const view = area.nodeViews.get(spec.id);
             if (view && spec.x != null && spec.y != null && (view.position.x !== spec.x || view.position.y !== spec.y)) {
               await area.translate(spec.id, {
@@ -610,7 +630,28 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
                 y: spec.y
               });
             }
+            if (portsAdded) {
+              // renderNode's in-place branch deliberately leaves existing sockets
+              // untouched; to render the NEW sockets, drop this node's render entry so
+              // area.update takes the fresh-build path (re-runs buildSocketRow + re-
+              // emits the socket render signals the ConnectionPlugin/watcher need). The
+              // D-04 body host is re-projected by renderBody (appendChild re-moves the
+              // same host element — idempotent).
+              const entry = nodeEntries.get(spec.id);
+              if (entry) {
+                if (entry.handle) entry.handle.dispose();
+                for (const d of entry.socketDisposers as any) {
+                  try {
+                    d();
+                  } catch (e: any) {}
+                }
+                nodeEntries.delete(spec.id);
+              }
+            }
             await area.update('node', spec.id);
+            // a port change must re-run connections — an edge that was skipped because
+            // its endpoint port didn't exist yet can now be drawn.
+            if (portsAdded && reconcileConnections) await reconcileConnections();
           }
         }
         // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
@@ -674,6 +715,15 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
           const sourceNode = nodeInstances.get(spec.source);
           const targetNode = nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
+          // DEFENSIVE: the referenced output/input ports must exist on the live node
+          // instances before addConnection (Rete throws "source node doesn't have
+          // output with a key out" otherwise, aborting the loop). A declarative
+          // <Connection> may register before the nested <Handle>s have flushed their
+          // ports into the node (child-before-parent mount order); skip until the
+          // ports exist — reconcileNodes re-runs reconcileConnections after a node-
+          // registry change (incl. a Handle addPort), so the edge lands on a later tick.
+          if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
+          if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
           conn.id = spec.id;
           connInstances.set(spec.id, conn);
@@ -745,6 +795,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     if (reconcileConnections) reconcileConnections();
   })()), { defer: true }));
   createEffect(on(() => (() => nodeReg())(), (v) => untrack(() => (() => {
+    flushPendingPorts();
     if (reconcileNodes) {
       Promise.resolve(reconcileNodes()).then(() => {
         if (reconcileConnections) reconcileConnections();
@@ -753,6 +804,9 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   })()), { defer: true }));
   createEffect(on(() => (() => connReg())(), (v) => untrack(() => (() => {
     if (reconcileConnections) reconcileConnections();
+  })()), { defer: true }));
+  createEffect(on(() => (() => pendingPorts())(), (v) => untrack(() => (() => {
+    flushPendingPorts();
   })()), { defer: true }));
   createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
     if (!area || typeof v !== 'number') return;
@@ -869,7 +923,70 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   //                                              then re-reconcile (feeds buildNode)
   //   bodyHostFor(id)                          → the engine `body` host div (D-04
   //                                              render-callback target, see below)
-
+  // Apply a single buffered/live port onto a node spec (whole-object replacement of
+  // the spec's inputs/outputs). Returns the next spec, or the same spec if the port
+  // is already present (idempotent — a re-fired register/late context must not dup).
+  function applyPortToSpec(spec: any, side: any, key: any, label: any, multiple: any) {
+    if (!spec || key == null) return spec;
+    const list = side === 'input' ? Array.isArray(spec.inputs) ? spec.inputs.slice() : [] : Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return spec;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    return side === 'input' ? {
+      ...spec,
+      inputs: list
+    } : {
+      ...spec,
+      outputs: list
+    };
+  }
+  // ─── reconcile prop changes into the live graph (no remount) ─────────────────
+  // Both the config-array props AND the declarative-children registries drive the
+  // SAME reconcilers (which read both sources internally). Nodes reconcile feeds
+  // connections (a new <Connection> may reference a node a sibling <FlowNode> just
+  // registered), so a node-registry change also re-runs connections — preserving the
+  // node→connection sequencing the engine requires.
+  // Flush buffered <Handle> ports into their node spec once the node has registered.
+  // Runs reactively (after state settles on every target — critical on React, where a
+  // child <Handle>'s addPort and its parent <FlowNode>'s register are batched into ONE
+  // commit, so the ports can't be folded in synchronously during register). For each
+  // node present in nodeReg that has pending ports, merge them into the node spec
+  // (idempotent) and clear the bucket — both whole-object replacements, so nodeReg's
+  // watch re-runs reconcile with the ported node. Triggered by BOTH pendingPorts (a
+  // new buffered port) AND nodeReg (a node just registered while ports were pending),
+  // since either side can arrive last. Settles in one extra tick; no-op when there is
+  // nothing to flush, so the empty-registry config-array path is unaffected.
+  function flushPendingPorts() {
+    const pend = pendingPorts();
+    let pendingChanged = false;
+    let nodeChanged = false;
+    const nextPend = {
+      ...pend
+    };
+    let nextReg = nodeReg();
+    for (const id in pend) {
+      const bucket = pend[id];
+      if (!Array.isArray(bucket) || !bucket.length) continue;
+      const cur = nextReg[id];
+      if (!cur) continue;
+      let merged = cur;
+      for (const p of bucket as any) merged = applyPortToSpec(merged, p.side, p.key, p.label, p.multiple);
+      if (merged !== cur) {
+        nextReg = {
+          ...nextReg,
+          [id]: merged
+        };
+        nodeChanged = true;
+      }
+      delete nextPend[id];
+      pendingChanged = true;
+    }
+    if (nodeChanged) setNodeReg(nextReg);
+    if (pendingChanged) setPendingPorts(nextPend);
+  }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision discipline (ROZ121/ROZ524/Lit-lifecycle):
   //   - NO `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom`
@@ -1009,6 +1126,13 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
 
   return (
     <__ctx_rete_canvas.Provider value={{
+  // A node registers its base spec (inputs/outputs empty). Any ports a nested
+  // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
+  // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
+  // — NOT inline here, because on React the parent register and the child addPort
+  // are batched into one commit, so a closure read of $data.pendingPorts inside
+  // register would be stale (still {}). The reactive flush runs AFTER state settles
+  // on every target, so the merge sees the buffered ports.
   register: (id: any, spec: any) => {
     setNodeReg({
       ...nodeReg(),
@@ -1047,22 +1171,27 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
     if (id == null || key == null) return;
     const cur = nodeReg()[id];
-    if (!cur) return;
-    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
-    if (list.some((p: any) => p && p.key === key)) return;
-    list.push({
-      key,
-      label,
-      multiple
-    });
-    const next = side === 'input' ? {
-      ...cur,
-      inputs: list
-    } : {
-      ...cur,
-      outputs: list
-    };
-    setNodeReg({
+    if (!cur) {
+      // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
+      // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
+      // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
+      // doesn't double-buffer.
+      const bucket = Array.isArray(pendingPorts()[id]) ? pendingPorts()[id].slice() : [];
+      if (bucket.some((p: any) => p && p.side === side && p.key === key)) return;
+      bucket.push({
+        side,
+        key,
+        label,
+        multiple
+      });
+      setPendingPorts({
+        ...pendingPorts(),
+        [id]: bucket
+      });
+      return;
+    }
+    const next = applyPortToSpec(cur, side, key, label, multiple);
+    if (next !== cur) setNodeReg({
       ...nodeReg(),
       [id]: next
     });

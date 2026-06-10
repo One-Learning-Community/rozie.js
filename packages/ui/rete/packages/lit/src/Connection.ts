@@ -31,15 +31,24 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     }));
 
     this.connId = this.edgeId();
-    if (this.cv) {
-      this.cv.registerConnection(this.connId, {
-        id: this.connId,
-        source: this.source,
-        sourceOutput: this.sourceOutput,
-        target: this.target,
-        targetInput: this.targetInput
-      });
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    if (this.cv && !this.registered) {
+      this.registered = true;
+      this.cv.registerConnection(this.connId, this.buildConn());
     }
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.registered) return;
+    const live = this.canvas;
+    if (live == null) return;
+    this.cv = live;
+    if (this.connId == null) this.connId = this.edgeId();
+    this.registered = true;
+    this.cv.registerConnection(this.connId, this.buildConn());
   }
 
   disconnectedCallback(): void {
@@ -66,4 +75,14 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
 };
 
   connId: any = null;
+
+  registered = false;
+
+  buildConn = () => ({
+  id: this.connId,
+  source: this.source,
+  sourceOutput: this.sourceOutput,
+  target: this.target,
+  targetInput: this.targetInput
+});
 }

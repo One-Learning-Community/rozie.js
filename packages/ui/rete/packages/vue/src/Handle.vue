@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onMounted } from 'vue';
+import { inject, onMounted, onUpdated } from 'vue';
 
 const props = withDefaults(
   defineProps<{ side?: string; port: string; label?: unknown; multiple?: unknown }>(),
@@ -20,9 +20,30 @@ const node = inject('rete:node');
 let nd: any = null;
 nd = node;
 
+// idempotency flag so the $onMount addPort and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+// de-duped, so this is belt-and-suspenders.)
+// idempotency flag so the $onMount addPort and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+// de-duped, so this is belt-and-suspenders.)
+let added = false;
+
 onMounted(() => {
   // register this port against the enclosing node's id+side; the parent's
-  // reconcileNodes re-runs buildNode with the updated input/output spec.
-  if (nd) nd.addPort(props.side, props.port, props.label, props.multiple);
+  // reconcileNodes re-runs buildNode with the updated input/output spec. On Lit
+  // the injected node ctx may still be undefined here (async context, REQ-30) —
+  // the $onUpdate below adds the port once it resolves.
+  if (nd && !added) {
+    added = true;
+    nd.addPort(props.side, props.port, props.label, props.multiple);
+  }
+});
+onUpdated(() => {
+  if (added) return;
+  const live = node;
+  if (live == null) return;
+  nd = live;
+  added = true;
+  nd.addPort(props.side, props.port, props.label, props.multiple);
 });
 </script>

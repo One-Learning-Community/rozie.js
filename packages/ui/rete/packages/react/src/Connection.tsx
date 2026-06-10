@@ -24,6 +24,7 @@ export default function Connection(_props: ConnectionProps): JSX.Element {
   })();
   const connId = useRef<any>(null);
   const cv = useRef<any>(null);
+  const registered = useRef(false);
 
   cv.current = canvas;
 
@@ -35,22 +36,35 @@ export default function Connection(_props: ConnectionProps): JSX.Element {
     const tgtIn = props.targetInput != null ? props.targetInput : 'in';
     return `${props.source}:${srcOut}->${props.target}:${tgtIn}`;
   }, [props.id, props.source, props.sourceOutput, props.target, props.targetInput]);
+  const buildConn = useCallback(() => ({
+    id: connId.current,
+    source: props.source,
+    sourceOutput: props.sourceOutput,
+    target: props.target,
+    targetInput: props.targetInput
+  }), [props.source, props.sourceOutput, props.target, props.targetInput]);
 
   useEffect(() => {
     connId.current = edgeId();
-    if (cv.current) {
-      cv.current.registerConnection(connId.current, {
-        id: connId.current,
-        source: props.source,
-        sourceOutput: props.sourceOutput,
-        target: props.target,
-        targetInput: props.targetInput
-      });
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    if (cv.current && !registered.current) {
+      registered.current = true;
+      cv.current.registerConnection(connId.current, buildConn());
     }
     return () => {
       if (cv.current) cv.current.unregisterConnection(connId.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (registered.current) return;
+    const live = canvas;
+    if (live == null) return;
+    cv.current = live;
+    if (connId.current == null) connId.current = edgeId();
+    registered.current = true;
+    cv.current.registerConnection(connId.current, buildConn());
+  }, [buildConn, canvas, connId, cv, edgeId, registered]);
 
   return (
     null

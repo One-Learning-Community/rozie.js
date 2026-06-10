@@ -27,11 +27,32 @@ const node = getContext('rete:node');
 let nd: any = null;
 nd = node;
 
+// idempotency flag so the $onMount addPort and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+// de-duped, so this is belt-and-suspenders.)
+// idempotency flag so the $onMount addPort and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+// de-duped, so this is belt-and-suspenders.)
+let added = false;
+
 onMount(() => {
   // register this port against the enclosing node's id+side; the parent's
-  // reconcileNodes re-runs buildNode with the updated input/output spec.
-  if (nd) nd.addPort(side, port, label, multiple);
+  // reconcileNodes re-runs buildNode with the updated input/output spec. On Lit
+  // the injected node ctx may still be undefined here (async context, REQ-30) —
+  // the $onUpdate below adds the port once it resolves.
+  if (nd && !added) {
+    added = true;
+    nd.addPort(side, port, label, multiple);
+  }
 });
+$effect(() => (() => {
+  if (added) return;
+  const live = node;
+  if (live == null) return;
+  nd = live;
+  added = true;
+  nd.addPort(side, port, label, multiple);
+})());
 </script>
 
 <!-- empty template -->

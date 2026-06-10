@@ -35,18 +35,26 @@ export class Connection {
 
     // Effective edge id: explicit prop wins, else the source:out->target:in default
     // (mirrors reconcileConnections so collision dedup is consistent).
+    effect(() => () => {
+      if (this.registered) return;
+      const live = this.canvas;
+      if (live == null) return;
+      this.cv = live;
+      if (this.connId == null) this.connId = this.edgeId();
+      this.registered = true;
+      this.cv.registerConnection(this.connId, this.buildConn());
+    });
   }
 
   ngAfterViewInit() {
     this.connId = this.edgeId();
-    if (this.cv) {
-      this.cv.registerConnection(this.connId, {
-        id: this.connId,
-        source: this.source(),
-        sourceOutput: this.sourceOutput(),
-        target: this.target(),
-        targetInput: this.targetInput()
-      });
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+    // the $onUpdate below registers once it resolves.
+    if (this.cv && !this.registered) {
+      this.registered = true;
+      this.cv.registerConnection(this.connId, this.buildConn());
     }
     this.__rozieDestroyRef.onDestroy(() => {
       if (this.cv) this.cv.unregisterConnection(this.connId);
@@ -64,6 +72,14 @@ export class Connection {
     return `${this.source()}:${srcOut}->${this.target()}:${tgtIn}`;
   };
   connId: any = null;
+  registered = false;
+  buildConn = () => ({
+    id: this.connId,
+    source: this.source(),
+    sourceOutput: this.sourceOutput(),
+    target: this.target(),
+    targetInput: this.targetInput()
+  });
 }
 
 export default Connection;

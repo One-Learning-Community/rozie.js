@@ -65,20 +65,46 @@ const edgeId = () => {
 // Layer teardown-hoist lesson). null until mount.
 let connId = null
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the connection.
+let registered = false
+
+const buildConn = () => ({
+  id: connId,
+  source: $props.source,
+  sourceOutput: $props.sourceOutput,
+  target: $props.target,
+  targetInput: $props.targetInput,
+})
+
 $onMount(() => {
   connId = edgeId()
-  if (cv) {
-    cv.registerConnection(connId, {
-      id: connId,
-      source: $props.source,
-      sourceOutput: $props.sourceOutput,
-      target: $props.target,
-      targetInput: $props.targetInput,
-    })
+  // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+  // the $onUpdate below registers once it resolves.
+  if (cv && !registered) {
+    registered = true
+    cv.registerConnection(connId, buildConn())
   }
   return () => {
     if (cv) cv.unregisterConnection(connId)
   }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected `rete:canvas` is event-driven on Lit and
+// may resolve AFTER $onMount. $onUpdate lowers to Lit's updated(), which re-runs when
+// the ContextConsumer(subscribe:true) re-publishes the resolved canvas API — we then
+// register once. Reads the LIVE injected `canvas` (on Lit the ContextConsumer getter;
+// on the 5 sync targets the stable value already registered in $onMount, so
+// `registered` short-circuits this to a no-op there). A $watch over the inject would
+// NOT fire on Lit, so the lifecycle hook is the correct mechanism.
+$onUpdate(() => {
+  if (registered) return
+  const live = canvas
+  if (live == null) return
+  cv = live
+  if (connId == null) connId = edgeId()
+  registered = true
+  cv.registerConnection(connId, buildConn())
 })
 </script>
 

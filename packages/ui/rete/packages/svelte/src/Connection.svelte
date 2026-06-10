@@ -49,21 +49,40 @@ const edgeId = () => {
 // Layer teardown-hoist lesson). null until mount.
 let connId: any = null;
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the connection.
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the connection.
+let registered = false;
+const buildConn = () => ({
+  id: connId,
+  source: source,
+  sourceOutput: sourceOutput,
+  target: target,
+  targetInput: targetInput
+});
+
 onMount(() => {
   connId = edgeId();
-  if (cv) {
-    cv.registerConnection(connId, {
-      id: connId,
-      source: source,
-      sourceOutput: sourceOutput,
-      target: target,
-      targetInput: targetInput
-    });
+  // On Lit the injected canvas may still be undefined here (async context, REQ-30);
+  // the $onUpdate below registers once it resolves.
+  if (cv && !registered) {
+    registered = true;
+    cv.registerConnection(connId, buildConn());
   }
   return () => {
     if (cv) cv.unregisterConnection(connId);
   };
 });
+$effect(() => (() => {
+  if (registered) return;
+  const live = canvas;
+  if (live == null) return;
+  cv = live;
+  if (connId == null) connId = edgeId();
+  registered = true;
+  cv.registerConnection(connId, buildConn());
+})());
 </script>
 
 <!-- empty template -->

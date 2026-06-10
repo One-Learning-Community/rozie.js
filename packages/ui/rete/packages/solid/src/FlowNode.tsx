@@ -25,25 +25,25 @@ export default function FlowNode(_props: FlowNodeProps): JSX.Element {
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
     // builds the engine node, then renderNode invokes renderBody(body) — projecting
     // this FlowNode's body into the engine element from the PARENT's render scope.
-    if (cv) {
-      cv.register(local.id, {
-        id: local.id,
-        x: local.x,
-        y: local.y,
-        label: local.label,
-        inputs: [],
-        outputs: [],
-        // D-04 render-callback: the parent calls this with the engine body host div.
-        renderBody: (host: any) => {
-          if (host && hostEl) host.appendChild(hostEl);
-        }
-      });
+    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
+    // the $watch below performs the registration once the value arrives.
+    if (cv && !registered) {
+      registered = true;
+      cv.register(local.id, buildSpec());
     }
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
     if (cv) cv.unregister(local.id);
   });
+  });
+  createEffect(() => {
+    if (registered) return;
+    const live = canvas;
+    if (live == null) return;
+    cv = live;
+    registered = true;
+    cv.register(local.id, buildSpec());
   });
   createEffect(on(() => (() => local.x)(), (v) => untrack(() => (() => {
     if (cv) cv.update(local.id, {
@@ -95,6 +95,29 @@ export default function FlowNode(_props: FlowNodeProps): JSX.Element {
   // `body` host — moving the host preserves Lit shadow projection of the slot body.
   // Module-scope `any` so it survives into the parent's later render-scope call.
   let hostEl: any = null;
+
+  // idempotency flag so a reactive late-context registration (Lit async first
+  // paint, REQ-30) and the $onMount registration never double-register the node.
+  let registered = false;
+
+  // the canvas spec builder — shared by the $onMount register and the late-context
+  // $watch below. Reads `cv` (the `any` alias) at CALL time so the late Lit value
+  // is picked up. registerInto(api) takes the freshly-resolved live API so the
+  // reactive path doesn't depend on the stale setup-time alias.
+  function buildSpec() {
+    return {
+      id: local.id,
+      x: local.x,
+      y: local.y,
+      label: local.label,
+      inputs: [],
+      outputs: [],
+      // D-04 render-callback: the parent calls this with the engine body host div.
+      renderBody: (host: any) => {
+        if (host && hostEl) host.appendChild(hostEl);
+      }
+    };
+  }
 
   return (
     <__ctx_rete_node.Provider value={{

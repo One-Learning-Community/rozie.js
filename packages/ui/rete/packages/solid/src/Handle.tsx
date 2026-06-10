@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { mergeProps, onMount, splitProps, useContext } from 'solid-js';
+import { createEffect, mergeProps, onMount, splitProps, useContext } from 'solid-js';
 import { rozieContext } from '@rozie/runtime-solid';
 
 interface HandleProps {
@@ -16,8 +16,21 @@ export default function Handle(_props: HandleProps): JSX.Element {
   const node = useContext(rozieContext("rete:node"));
   onMount(() => {
     // register this port against the enclosing node's id+side; the parent's
-    // reconcileNodes re-runs buildNode with the updated input/output spec.
-    if (nd) nd.addPort(local.side, local.port, local.label, local.multiple);
+    // reconcileNodes re-runs buildNode with the updated input/output spec. On Lit
+    // the injected node ctx may still be undefined here (async context, REQ-30) —
+    // the $onUpdate below adds the port once it resolves.
+    if (nd && !added) {
+      added = true;
+      nd.addPort(local.side, local.port, local.label, local.multiple);
+    }
+  });
+  createEffect(() => {
+    if (added) return;
+    const live = node;
+    if (live == null) return;
+    nd = live;
+    added = true;
+    nd.addPort(local.side, local.port, local.label, local.multiple);
   });
 
   // $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
@@ -27,6 +40,11 @@ export default function Handle(_props: HandleProps): JSX.Element {
   // lesson). ZERO emitter change.
   let nd: any = null;
   nd = node;
+
+  // idempotency flag so the $onMount addPort and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-add the port. (FlowCanvas.addPort is also
+  // de-duped, so this is belt-and-suspenders.)
+  let added = false;
 
   return (
     null
