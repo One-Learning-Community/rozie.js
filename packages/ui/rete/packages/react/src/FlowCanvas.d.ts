@@ -26,6 +26,7 @@ export interface FlowCanvasProps {
   onTranslated?: (...args: unknown[]) => void;
   onContextMenu?: (...args: unknown[]) => void;
   renderNode?: (params: { node: () => void; selected: () => void; emit: () => void }) => ReactNode;
+  children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

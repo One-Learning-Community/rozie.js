@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, InjectionToken, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -22,6 +22,22 @@ interface NodeCtx {
   emit: any;
 }
 
+interface DefaultCtx {}
+
+const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
+  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
+    string,
+    InjectionToken<unknown>
+  >;
+function rozieToken(key: string): InjectionToken<unknown> {
+  let token = __rozieTokenRegistry.get(key);
+  if (!token) {
+    token = new InjectionToken<unknown>('rozie:' + key);
+    __rozieTokenRegistry.set(key, token);
+  }
+  return token;
+}
+
 @Component({
   selector: 'rozie-flow-canvas',
   standalone: true,
@@ -31,6 +47,8 @@ interface NodeCtx {
     <div class="rozie-flow-canvas" #canvasEl></div>
 
 
+
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
@@ -119,6 +137,79 @@ interface NodeCtx {
       useExisting: forwardRef(() => FlowCanvas),
       multi: true,
     },
+    {
+      provide: rozieToken('rete:canvas'),
+      useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => FlowCanvas)); return ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost.nodeReg.set({
+      ...__rozieCtxHost.nodeReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost.nodeReg.set({
+      ...__rozieCtxHost.nodeReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost.nodeReg()
+    };
+    delete n[id];
+    __rozieCtxHost.nodeReg.set(n);
+  },
+  registerConnection: (id: any, spec: any) => {
+    __rozieCtxHost.connReg.set({
+      ...__rozieCtxHost.connReg(),
+      [id]: spec
+    });
+  },
+  unregisterConnection: (id: any) => {
+    const c = {
+      ...__rozieCtxHost.connReg()
+    };
+    delete c[id];
+    __rozieCtxHost.connReg.set(c);
+  },
+  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
+    if (id == null || key == null) return;
+    const cur = __rozieCtxHost.nodeReg()[id];
+    if (!cur) return;
+    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    const next = side === 'input' ? {
+      ...cur,
+      inputs: list
+    } : {
+      ...cur,
+      outputs: list
+    };
+    __rozieCtxHost.nodeReg.set({
+      ...__rozieCtxHost.nodeReg(),
+      [id]: next
+    });
+  },
+  // D-04 render-callback target. Returns the engine-created body host div for a
+  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+  // registered spec carries a renderBody(host) callback that the PARENT invokes
+  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+  // body is projected by the parent reusing the $portals.node host discipline.
+  bodyHostFor: (id: any) => {
+    const entry = __rozieCtxHost.nodeEntries.get(id);
+    return entry ? entry.body : null;
+  }
+}); },
+    },
   ],
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
@@ -136,6 +227,8 @@ export class FlowCanvas {
   accumulateOnCtrl = input<boolean>(true);
   curvature = input<number>(0.3);
   fitOnMount = input<boolean>(true);
+  nodeReg = signal({});
+  connReg = signal({});
   canvasEl = viewChild<ElementRef<HTMLDivElement>>('canvasEl');
   nodeAction = output<unknown>({ alias: 'node-action' });
   connectionCreated = output<unknown>({ alias: 'connection-created' });
@@ -145,6 +238,7 @@ export class FlowCanvas {
   translated = output<unknown>();
   contextMenu = output<unknown>({ alias: 'context-menu' });
   @ContentChild('node', { read: TemplateRef }) nodeTpl?: TemplateRef<NodeCtx>;
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
@@ -153,15 +247,27 @@ export class FlowCanvas {
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
 
   constructor() {
-    effect(() => { const __watchVal = (() => this.nodes())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
-      if (this.reconcileNodes) this.reconcileNodes(v);
-    })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.connections())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => {
-      if (this.reconcileConnections) this.reconcileConnections(v);
-    })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.nodes())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      if (this.reconcileNodes) this.reconcileNodes();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.connections())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      if (this.reconcileConnections) this.reconcileConnections();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.nodeReg())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      if (this.reconcileNodes) {
+        Promise.resolve(this.reconcileNodes()).then(() => {
+          if (this.reconcileConnections) this.reconcileConnections();
+        });
+      }
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.connReg())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      if (this.reconcileConnections) this.reconcileConnections();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
       if (v === this.area.area.transform.k) return;
       this.programmatic++;
@@ -205,6 +311,8 @@ export class FlowCanvas {
     const container = this.canvasEl()?.nativeElement;
     this.lastPropNodeIds = [];
     this.lastPropConnIds = [];
+    this.lastRegistryNodeIds = [];
+    this.lastRegistryConnIds = [];
     this.editor = new NodeEditor();
     this.area = new AreaPlugin(container);
     this.connectionPlugin = new ConnectionPlugin();
@@ -374,9 +482,22 @@ export class FlowCanvas {
         body,
         handle: null,
         titleEl: null,
+        bodyMoved: false,
         emit,
         socketDisposers
       };
+      if (typeof meta.renderBody === 'function') {
+        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
+        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
+        // PARENT projects the body here from its own render scope: the child's
+        // registered renderBody(host) appends the child's host element (its $el,
+        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
+        // must exist before the callback runs (bodyHostFor reads it), so register first.
+        this.nodeEntries.set(id, entry);
+        meta.renderBody(body);
+        entry.bodyMoved = true;
+        return;
+      }
       if ((this.nodeTpl ?? this.templates()?.['node'])) {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline).
@@ -574,17 +695,83 @@ export class FlowCanvas {
       return context;
     });
 
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    this.reconcileNodes = async (list: any) => {
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      const regIds = [];
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || e.id == null) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || e.id == null) continue;
+        regIds.push(e.id);
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return {
+        merged: out,
+        regIds
+      };
+    };
+
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    this.reconcileNodes = async () => {
+      const __nodes = this.nodes();
       if (!this.editor || !this.area) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(__nodes) ? __nodes : [];
+      const {
+        merged,
+        regIds
+      } = mergeById(propArr, this.nodeReg());
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of arr as any) {
+        for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
           this.nodeMeta.set(spec.id, spec);
           let node = this.nodeInstances.get(spec.id);
           if (!node) {
@@ -606,9 +793,10 @@ export class FlowCanvas {
             await this.area.update('node', spec.id);
           }
         }
-        // remove dropped PROP-managed nodes (+ their connections) — imperatively
-        // added nodes (never in lastPropNodeIds) survive.
-        for (const id of this.lastPropNodeIds as any) {
+        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
+        // — imperatively added nodes (in NEITHER provenance set) survive.
+        const tracked = new Set([...this.lastPropNodeIds, ...this.lastRegistryNodeIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && this.nodeInstances.has(id)) {
             for (const c of this.editor.getConnections() as any) {
               if (c.source === id || c.target === id) await this.editor.removeConnection(c.id);
@@ -618,39 +806,70 @@ export class FlowCanvas {
             this.nodeMeta.delete(id);
           }
         }
-        this.lastPropNodeIds = want;
+        this.lastPropNodeIds = propWant;
+        this.lastRegistryNodeIds = regIds;
       } finally {
         this.programmatic--;
       }
     };
-    this.reconcileConnections = async (list: any) => {
+    this.reconcileConnections = async () => {
+      const __connections = this.connections();
+      const __connReg = this.connReg();
       if (!this.editor) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(__connections) ? __connections : [];
+      // Normalize both sources to the same id-defaulting before the union so a
+      // collision between a config-array edge and a <Connection> child dedups
+      // correctly (the registry entry wins, D-02).
+      const norm = (spec: any) => {
+        if (!spec || spec.source == null || spec.target == null) return null;
+        const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
+        const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
+        const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+        return {
+          id,
+          source: spec.source,
+          sourceOutput: srcOut,
+          target: spec.target,
+          targetInput: tgtIn
+        };
+      };
+      const normProps = propArr.map(norm).filter(Boolean);
+      const normReg = {};
+      for (const k in __connReg) {
+        const n = norm(__connReg[k]);
+        if (n) normReg[k] = n;
+      }
+      const {
+        merged,
+        regIds
+      } = mergeById(normProps, normReg);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of arr as any) {
-          if (!spec || spec.source == null || spec.target == null) continue;
-          const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
-          const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
-          const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
-          want.push(id);
-          if (this.connInstances.has(id)) continue;
+        for (const spec of merged as any) {
+          if (!spec || spec.id == null) continue;
+          want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
+          if (this.connInstances.has(spec.id)) continue;
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
-          const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
-          conn.id = id;
-          this.connInstances.set(id, conn);
+          const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
+          conn.id = spec.id;
+          this.connInstances.set(spec.id, conn);
           await this.editor.addConnection(conn);
         }
-        for (const id of this.lastPropConnIds as any) {
+        const tracked = new Set([...this.lastPropConnIds, ...this.lastRegistryConnIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && this.connInstances.has(id)) {
             await this.editor.removeConnection(id);
             this.connInstances.delete(id);
           }
         }
-        this.lastPropConnIds = want;
+        this.lastPropConnIds = propWant;
+        this.lastRegistryConnIds = regIds;
       } finally {
         this.programmatic--;
       }
@@ -661,8 +880,8 @@ export class FlowCanvas {
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
     ;
     (async () => {
-      await this.reconcileNodes(this.nodes());
-      await this.reconcileConnections(this.connections());
+      await this.reconcileNodes();
+      await this.reconcileConnections();
       if (typeof this.zoom() === 'number' && this.zoom() !== 1) {
         this.programmatic++;
         try {
@@ -718,6 +937,8 @@ export class FlowCanvas {
   connEntries = new Map();
   lastPropNodeIds: any = null;
   lastPropConnIds: any = null;
+  lastRegistryNodeIds: any = null;
+  lastRegistryConnIds: any = null;
   programmatic = 0;
   reconcileNodes: any = null;
   reconcileConnections: any = null;
@@ -893,7 +1114,7 @@ export class FlowCanvas {
   static ngTemplateContextGuard(
     _dir: FlowCanvas,
     _ctx: unknown,
-  ): _ctx is NodeCtx {
+  ): _ctx is NodeCtx | DefaultCtx {
     return true;
   }
 }

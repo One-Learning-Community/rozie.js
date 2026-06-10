@@ -105,3 +105,4 @@ const editor = flow.current?.getEditor();
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| (default) |  |

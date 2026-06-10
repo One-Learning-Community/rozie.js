@@ -109,3 +109,4 @@ export class DemoComponent {
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| (default) |  |

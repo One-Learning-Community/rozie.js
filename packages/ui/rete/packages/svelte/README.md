@@ -100,3 +100,4 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| (default) |  |

@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
-import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieContext } from '@rozie/runtime-solid';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -119,6 +119,8 @@ interface FlowCanvasProps {
   onTranslated?: (...args: unknown[]) => void;
   onContextMenu?: (...args: unknown[]) => void;
   nodeSlot?: (ctx: () => NodeSlotCtx) => JSX.Element;
+  // D-131: default slot resolved via children() at body top
+  children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: FlowCanvasHandle) => void;
 }
@@ -140,10 +142,14 @@ export interface FlowCanvasHandle {
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const _merged = mergeProps({ nodes: (() => [])(), connections: (() => [])(), pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true }, _props);
-  const [local, attrs] = splitProps(_merged, ['nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'children', 'ref']);
+  const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }); });
 
+  const __ctx_rete_canvas = rozieContext("rete:canvas");
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
+  const [nodeReg, setNodeReg] = createSignal({});
+  const [connReg, setConnReg] = createSignal({});
   interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;
@@ -178,6 +184,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     const container = canvasElRef;
     lastPropNodeIds = [];
     lastPropConnIds = [];
+    lastRegistryNodeIds = [];
+    lastRegistryConnIds = [];
     editor = new NodeEditor();
     area = new AreaPlugin(container);
     connectionPlugin = new ConnectionPlugin();
@@ -317,9 +325,22 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         body,
         handle: null,
         titleEl: null,
+        bodyMoved: false,
         emit,
         socketDisposers
       };
+      if (typeof meta.renderBody === 'function') {
+        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
+        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
+        // PARENT projects the body here from its own render scope: the child's
+        // registered renderBody(host) appends the child's host element (its $el,
+        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
+        // must exist before the callback runs (bodyHostFor reads it), so register first.
+        nodeEntries.set(id, entry);
+        meta.renderBody(body);
+        entry.bodyMoved = true;
+        return;
+      }
       if ((_props.nodeSlot ?? _props.slots?.["node"])) {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline).
@@ -510,16 +531,67 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       return context;
     });
 
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    reconcileNodes = async (list: any) => {
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      const regIds = [];
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || e.id == null) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || e.id == null) continue;
+        regIds.push(e.id);
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return {
+        merged: out,
+        regIds
+      };
+    };
+
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    reconcileNodes = async () => {
       if (!editor || !area) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(local.nodes) ? local.nodes : [];
+      const {
+        merged,
+        regIds
+      } = mergeById(propArr, nodeReg());
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       programmatic++;
       try {
-        for (const spec of arr as any) {
+        for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
           nodeMeta.set(spec.id, spec);
           let node = nodeInstances.get(spec.id);
           if (!node) {
@@ -541,9 +613,10 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
             await area.update('node', spec.id);
           }
         }
-        // remove dropped PROP-managed nodes (+ their connections) — imperatively
-        // added nodes (never in lastPropNodeIds) survive.
-        for (const id of lastPropNodeIds as any) {
+        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
+        // — imperatively added nodes (in NEITHER provenance set) survive.
+        const tracked = new Set([...lastPropNodeIds, ...lastRegistryNodeIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && nodeInstances.has(id)) {
             for (const c of editor.getConnections() as any) {
               if (c.source === id || c.target === id) await editor.removeConnection(c.id);
@@ -553,39 +626,68 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
             nodeMeta.delete(id);
           }
         }
-        lastPropNodeIds = want;
+        lastPropNodeIds = propWant;
+        lastRegistryNodeIds = regIds;
       } finally {
         programmatic--;
       }
     };
-    reconcileConnections = async (list: any) => {
+    reconcileConnections = async () => {
       if (!editor) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(local.connections) ? local.connections : [];
+      // Normalize both sources to the same id-defaulting before the union so a
+      // collision between a config-array edge and a <Connection> child dedups
+      // correctly (the registry entry wins, D-02).
+      const norm = (spec: any) => {
+        if (!spec || spec.source == null || spec.target == null) return null;
+        const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
+        const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
+        const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+        return {
+          id,
+          source: spec.source,
+          sourceOutput: srcOut,
+          target: spec.target,
+          targetInput: tgtIn
+        };
+      };
+      const normProps = propArr.map(norm).filter(Boolean);
+      const normReg = {};
+      for (const k in connReg()) {
+        const n = norm(connReg()[k]);
+        if (n) normReg[k] = n;
+      }
+      const {
+        merged,
+        regIds
+      } = mergeById(normProps, normReg);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       programmatic++;
       try {
-        for (const spec of arr as any) {
-          if (!spec || spec.source == null || spec.target == null) continue;
-          const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
-          const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
-          const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
-          want.push(id);
-          if (connInstances.has(id)) continue;
+        for (const spec of merged as any) {
+          if (!spec || spec.id == null) continue;
+          want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
+          if (connInstances.has(spec.id)) continue;
           const sourceNode = nodeInstances.get(spec.source);
           const targetNode = nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
-          const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
-          conn.id = id;
-          connInstances.set(id, conn);
+          const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
+          conn.id = spec.id;
+          connInstances.set(spec.id, conn);
           await editor.addConnection(conn);
         }
-        for (const id of lastPropConnIds as any) {
+        const tracked = new Set([...lastPropConnIds, ...lastRegistryConnIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && connInstances.has(id)) {
             await editor.removeConnection(id);
             connInstances.delete(id);
           }
         }
-        lastPropConnIds = want;
+        lastPropConnIds = propWant;
+        lastRegistryConnIds = regIds;
       } finally {
         programmatic--;
       }
@@ -596,8 +698,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
   ;
     (async () => {
-      await reconcileNodes(local.nodes);
-      await reconcileConnections(local.connections);
+      await reconcileNodes();
+      await reconcileConnections();
       if (typeof zoom() === 'number' && zoom() !== 1) {
         programmatic++;
         try {
@@ -636,12 +738,22 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     if (area) area.destroy();
   });
   });
-  createEffect(on(() => (() => local.nodes)(), (v) => untrack(() => ((v: any) => {
-    if (reconcileNodes) reconcileNodes(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.connections)(), (v) => untrack(() => ((v: any) => {
-    if (reconcileConnections) reconcileConnections(v);
-  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.nodes)(), (v) => untrack(() => (() => {
+    if (reconcileNodes) reconcileNodes();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.connections)(), (v) => untrack(() => (() => {
+    if (reconcileConnections) reconcileConnections();
+  })()), { defer: true }));
+  createEffect(on(() => (() => nodeReg())(), (v) => untrack(() => (() => {
+    if (reconcileNodes) {
+      Promise.resolve(reconcileNodes()).then(() => {
+        if (reconcileConnections) reconcileConnections();
+      });
+    }
+  })()), { defer: true }));
+  createEffect(on(() => (() => connReg())(), (v) => untrack(() => (() => {
+    if (reconcileConnections) reconcileConnections();
+  })()), { defer: true }));
   createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
     if (!area || typeof v !== 'number') return;
     if (v === area.area.transform.k) return;
@@ -693,6 +805,15 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   let lastPropNodeIds: any = null;
   let lastPropConnIds: any = null;
 
+  // ids last applied FROM THE DECLARATIVE-CHILDREN REGISTRY — a SEPARATE provenance
+  // set from lastPropNodeIds/lastPropConnIds (D37-08). reconcile reaps prop-managed
+  // AND registry-managed entities by their OWN provenance, but an imperative $expose
+  // addNode/addConnection appears in NEITHER set and so survives every reconcile
+  // (the power-user escape hatch stays alive). Folding registry ids into
+  // lastPropNodeIds would let an imperative add be reaped on the next registry tick.
+  let lastRegistryNodeIds: any = null;
+  let lastRegistryConnIds: any = null;
+
   // Re-entrant suppression counter: while > 0 the editor/area event handlers skip
   // echoing back into $emit / $model (our own programmatic add/remove/translate/
   // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
@@ -735,6 +856,20 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     }
     return node;
   }
+
+  // ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+  // The register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … })
+  // shape, productized for the canvas. CRITICAL reactive-write discipline (D-3,
+  // Pitfall 1): every mutation WHOLE-OBJECT-REPLACES the registry so the watched
+  // $data.nodeReg/$data.connReg reference changes exactly once per call — a bare
+  // in-place $data.nodeReg[id] = spec is silent on React/Solid/Angular/Lit.
+  //   register/update/unregister               → node registry (<FlowNode>)
+  //   registerConnection/unregisterConnection  → connection registry (<Connection>)
+  //   addPort(id, side, key, label, multiple)  → mutate a node spec's inputs/outputs
+  //                                              then re-reconcile (feeds buildNode)
+  //   bodyHostFor(id)                          → the engine `body` host div (D-04
+  //                                              render-callback target, see below)
+
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision discipline (ROZ121/ROZ524/Lit-lifecycle):
   //   - NO `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom`
@@ -873,10 +1008,83 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   }
 
   return (
+    <__ctx_rete_canvas.Provider value={{
+  register: (id: any, spec: any) => {
+    setNodeReg({
+      ...nodeReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    setNodeReg({
+      ...nodeReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...nodeReg()
+    };
+    delete n[id];
+    setNodeReg(n);
+  },
+  registerConnection: (id: any, spec: any) => {
+    setConnReg({
+      ...connReg(),
+      [id]: spec
+    });
+  },
+  unregisterConnection: (id: any) => {
+    const c = {
+      ...connReg()
+    };
+    delete c[id];
+    setConnReg(c);
+  },
+  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
+    if (id == null || key == null) return;
+    const cur = nodeReg()[id];
+    if (!cur) return;
+    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    const next = side === 'input' ? {
+      ...cur,
+      inputs: list
+    } : {
+      ...cur,
+      outputs: list
+    };
+    setNodeReg({
+      ...nodeReg(),
+      [id]: next
+    });
+  },
+  // D-04 render-callback target. Returns the engine-created body host div for a
+  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+  // registered spec carries a renderBody(host) callback that the PARENT invokes
+  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+  // body is projected by the parent reusing the $portals.node host discipline.
+  bodyHostFor: (id: any) => {
+    const entry = nodeEntries.get(id);
+    return entry ? entry.body : null;
+  }
+}}>
     <>
     <div class={"rozie-flow-canvas"} ref={(el) => { canvasElRef = el as HTMLElement; }} data-rozie-s-cd396d6a="" />
 
 
+
+    {resolved()}
     </>
+    </__ctx_rete_canvas.Provider>
   );
 }

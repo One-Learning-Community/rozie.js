@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { ContextProvider, createContext } from '@lit/context';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -14,6 +15,8 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // lit leaf tsc; routing every engine call through an `any` instance is the
 // .rozie-native fix (no lang="ts", no codegen type-aid). These are top-level lets
 // referenced from hooks → React auto-hoists each to a useRef. ──
+
+const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
 
 interface RozieNodeSlotCtx {
   node: unknown;
@@ -117,14 +120,90 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) accumulateOnCtrl: boolean = true;
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
+  private _nodeReg = signal({});
+  private _connReg = signal({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
 private __rozieWatchInitial_2 = true;
+private __rozieWatchInitial_3 = true;
+private __rozieWatchInitial_4 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __rozieCtx_rete_canvas, initialValue: ((__rozieCtxHost) => ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost._nodeReg.value = {
+      ...__rozieCtxHost._nodeReg.value,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost._nodeReg.value = {
+      ...__rozieCtxHost._nodeReg.value,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost._nodeReg.value
+    };
+    delete n[id];
+    __rozieCtxHost._nodeReg.value = n;
+  },
+  registerConnection: (id: any, spec: any) => {
+    __rozieCtxHost._connReg.value = {
+      ...__rozieCtxHost._connReg.value,
+      [id]: spec
+    };
+  },
+  unregisterConnection: (id: any) => {
+    const c = {
+      ...__rozieCtxHost._connReg.value
+    };
+    delete c[id];
+    __rozieCtxHost._connReg.value = c;
+  },
+  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
+    if (id == null || key == null) return;
+    const cur = __rozieCtxHost._nodeReg.value[id];
+    if (!cur) return;
+    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    const next = side === 'input' ? {
+      ...cur,
+      inputs: list
+    } : {
+      ...cur,
+      outputs: list
+    };
+    __rozieCtxHost._nodeReg.value = {
+      ...__rozieCtxHost._nodeReg.value,
+      [id]: next
+    };
+  },
+  // D-04 render-callback target. Returns the engine-created body host div for a
+  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+  // registered spec carries a renderBody(host) callback that the PARENT invokes
+  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+  // body is projected by the parent reusing the $portals.node host discipline.
+  bodyHostFor: (id: any) => {
+    const entry = __rozieCtxHost.nodeEntries.get(id);
+    return entry ? entry.body : null;
+  }
+}))(this) });
 
   @state() private _hasSlotNode = false;
   @queryAssignedElements({ slot: 'node', flatten: true }) private _slotNodeElements!: Element[];
   @property({ attribute: false }) node?: (scope: { node: unknown; selected: unknown; emit: unknown }) => unknown;
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -142,11 +221,23 @@ private _portalContainers = new Set<HTMLElement>();
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotNode = Array.from(this.children).some((el) => el.getAttribute('slot') === 'node');
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -196,7 +287,17 @@ private _portalContainers = new Set<HTMLElement>();
       if (this.area) this.area.destroy();
     }));
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.zoom)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._nodeReg.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      if (this.reconcileNodes) {
+        Promise.resolve(this.reconcileNodes()).then(() => {
+          if (this.reconcileConnections) this.reconcileConnections();
+        });
+      }
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._connReg.value)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      if (this.reconcileConnections) this.reconcileConnections();
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.zoom)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
       if (v === this.area.area.transform.k) return;
       this.programmatic++;
@@ -205,9 +306,82 @@ private _portalContainers = new Set<HTMLElement>();
       });
     })(__watchVal); }); }));
 
+    this._disconnectCleanups.push(effect(() => { void this._nodeReg.value; void this._connReg.value; this.__rozieCtxProvider_rete_canvas.setValue(((__rozieCtxHost) => ({
+      register: (id: any, spec: any) => {
+        __rozieCtxHost._nodeReg.value = {
+          ...__rozieCtxHost._nodeReg.value,
+          [id]: spec
+        };
+      },
+      update: (id: any, spec: any) => {
+        __rozieCtxHost._nodeReg.value = {
+          ...__rozieCtxHost._nodeReg.value,
+          [id]: spec
+        };
+      },
+      unregister: (id: any) => {
+        const n = {
+          ...__rozieCtxHost._nodeReg.value
+        };
+        delete n[id];
+        __rozieCtxHost._nodeReg.value = n;
+      },
+      registerConnection: (id: any, spec: any) => {
+        __rozieCtxHost._connReg.value = {
+          ...__rozieCtxHost._connReg.value,
+          [id]: spec
+        };
+      },
+      unregisterConnection: (id: any) => {
+        const c = {
+          ...__rozieCtxHost._connReg.value
+        };
+        delete c[id];
+        __rozieCtxHost._connReg.value = c;
+      },
+      // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+      // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+      // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+      addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
+        if (id == null || key == null) return;
+        const cur = __rozieCtxHost._nodeReg.value[id];
+        if (!cur) return;
+        const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
+        if (list.some((p: any) => p && p.key === key)) return;
+        list.push({
+          key,
+          label,
+          multiple
+        });
+        const next = side === 'input' ? {
+          ...cur,
+          inputs: list
+        } : {
+          ...cur,
+          outputs: list
+        };
+        __rozieCtxHost._nodeReg.value = {
+          ...__rozieCtxHost._nodeReg.value,
+          [id]: next
+        };
+      },
+      // D-04 render-callback target. Returns the engine-created body host div for a
+      // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+      // registered spec carries a renderBody(host) callback that the PARENT invokes
+      // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+      // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+      // body is projected by the parent reusing the $portals.node host discipline.
+      bodyHostFor: (id: any) => {
+        const entry = __rozieCtxHost.nodeEntries.get(id);
+        return entry ? entry.body : null;
+      }
+    }))(this)); }));
+
     const container = this._refCanvasEl;
     this.lastPropNodeIds = [];
     this.lastPropConnIds = [];
+    this.lastRegistryNodeIds = [];
+    this.lastRegistryConnIds = [];
     this.editor = new NodeEditor();
     this.area = new AreaPlugin(container);
     this.connectionPlugin = new ConnectionPlugin();
@@ -381,9 +555,22 @@ private _portalContainers = new Set<HTMLElement>();
         body,
         handle: null,
         titleEl: null,
+        bodyMoved: false,
         emit,
         socketDisposers
       };
+      if (typeof meta.renderBody === 'function') {
+        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
+        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
+        // PARENT projects the body here from its own render scope: the child's
+        // registered renderBody(host) appends the child's host element (its $el,
+        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
+        // must exist before the callback runs (bodyHostFor reads it), so register first.
+        this.nodeEntries.set(id, entry);
+        meta.renderBody(body);
+        entry.bodyMoved = true;
+        return;
+      }
       if (this.node !== undefined) {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline).
@@ -604,17 +791,82 @@ private _portalContainers = new Set<HTMLElement>();
       return context;
     });
 
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    this.reconcileNodes = async (list: any) => {
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      const regIds = [];
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || e.id == null) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || e.id == null) continue;
+        regIds.push(e.id);
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return {
+        merged: out,
+        regIds
+      };
+    };
+
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    this.reconcileNodes = async () => {
       if (!this.editor || !this.area) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(this.nodes) ? this.nodes : [];
+      const {
+        merged,
+        regIds
+      } = mergeById(propArr, this._nodeReg.value);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of arr as any) {
+        for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
           this.nodeMeta.set(spec.id, spec);
           let node = this.nodeInstances.get(spec.id);
           if (!node) {
@@ -636,9 +888,10 @@ private _portalContainers = new Set<HTMLElement>();
             await this.area.update('node', spec.id);
           }
         }
-        // remove dropped PROP-managed nodes (+ their connections) — imperatively
-        // added nodes (never in lastPropNodeIds) survive.
-        for (const id of this.lastPropNodeIds as any) {
+        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
+        // — imperatively added nodes (in NEITHER provenance set) survive.
+        const tracked = new Set([...this.lastPropNodeIds, ...this.lastRegistryNodeIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && this.nodeInstances.has(id)) {
             for (const c of this.editor.getConnections() as any) {
               if (c.source === id || c.target === id) await this.editor.removeConnection(c.id);
@@ -648,39 +901,68 @@ private _portalContainers = new Set<HTMLElement>();
             this.nodeMeta.delete(id);
           }
         }
-        this.lastPropNodeIds = want;
+        this.lastPropNodeIds = propWant;
+        this.lastRegistryNodeIds = regIds;
       } finally {
         this.programmatic--;
       }
     };
-    this.reconcileConnections = async (list: any) => {
+    this.reconcileConnections = async () => {
       if (!this.editor) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(this.connections) ? this.connections : [];
+      // Normalize both sources to the same id-defaulting before the union so a
+      // collision between a config-array edge and a <Connection> child dedups
+      // correctly (the registry entry wins, D-02).
+      const norm = (spec: any) => {
+        if (!spec || spec.source == null || spec.target == null) return null;
+        const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
+        const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
+        const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+        return {
+          id,
+          source: spec.source,
+          sourceOutput: srcOut,
+          target: spec.target,
+          targetInput: tgtIn
+        };
+      };
+      const normProps = propArr.map(norm).filter(Boolean);
+      const normReg = {};
+      for (const k in this._connReg.value) {
+        const n = norm(this._connReg.value[k]);
+        if (n) normReg[k] = n;
+      }
+      const {
+        merged,
+        regIds
+      } = mergeById(normProps, normReg);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of arr as any) {
-          if (!spec || spec.source == null || spec.target == null) continue;
-          const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
-          const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
-          const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
-          want.push(id);
-          if (this.connInstances.has(id)) continue;
+        for (const spec of merged as any) {
+          if (!spec || spec.id == null) continue;
+          want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
+          if (this.connInstances.has(spec.id)) continue;
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
-          const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
-          conn.id = id;
-          this.connInstances.set(id, conn);
+          const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
+          conn.id = spec.id;
+          this.connInstances.set(spec.id, conn);
           await this.editor.addConnection(conn);
         }
-        for (const id of this.lastPropConnIds as any) {
+        const tracked = new Set([...this.lastPropConnIds, ...this.lastRegistryConnIds]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && this.connInstances.has(id)) {
             await this.editor.removeConnection(id);
             this.connInstances.delete(id);
           }
         }
-        this.lastPropConnIds = want;
+        this.lastPropConnIds = propWant;
+        this.lastRegistryConnIds = regIds;
       } finally {
         this.programmatic--;
       }
@@ -691,8 +973,8 @@ private _portalContainers = new Set<HTMLElement>();
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
     ;
     (async () => {
-      await this.reconcileNodes(this.nodes);
-      await this.reconcileConnections(this.connections);
+      await this.reconcileNodes();
+      await this.reconcileConnections();
       if (typeof this.zoom === 'number' && this.zoom !== 1) {
         this.programmatic++;
         try {
@@ -717,12 +999,12 @@ private _portalContainers = new Set<HTMLElement>();
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('nodes'))) { const __watchVal = (() => this.nodes)(); ((v: any) => {
-      if (this.reconcileNodes) this.reconcileNodes(v);
-    })(__watchVal); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('connections'))) { const __watchVal = (() => this.connections)(); ((v: any) => {
-      if (this.reconcileConnections) this.reconcileConnections(v);
-    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('nodes'))) { const __watchVal = (() => this.nodes)(); (() => {
+      if (this.reconcileNodes) this.reconcileNodes();
+    })(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('connections'))) { const __watchVal = (() => this.connections)(); (() => {
+      if (this.reconcileConnections) this.reconcileConnections();
+    })(); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -748,6 +1030,8 @@ private _portalContainers = new Set<HTMLElement>();
 <div class="rozie-flow-canvas" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a></div>
 
 <slot name="node"></slot>
+
+<slot></slot>
 `;
   }
 
@@ -778,6 +1062,10 @@ private _portalContainers = new Set<HTMLElement>();
   lastPropNodeIds: any = null;
 
   lastPropConnIds: any = null;
+
+  lastRegistryNodeIds: any = null;
+
+  lastRegistryConnIds: any = null;
 
   programmatic = 0;
 

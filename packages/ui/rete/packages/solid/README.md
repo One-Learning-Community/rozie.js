@@ -104,3 +104,4 @@ const editor = handle?.getEditor();
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| (default) |  |

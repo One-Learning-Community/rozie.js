@@ -103,6 +103,21 @@
 }
 </props>
 
+<data>
+{
+  // Declarative-children registries (Phase 37 — the dogfood of the Phase 36
+  // $provide/$inject primitive). Each is a reactive id→spec map that the $provide
+  // register-API WHOLE-OBJECT-REPLACES on every mutation (never an in-place
+  // $data.nodeReg[id] = spec — that is silent on React/Solid/Angular/Lit because
+  // $watch change-detection is reference equality). The existing reconcileNodes/
+  // reconcileConnections run off (registry ∪ config-array) — zero new reconcile
+  // logic, the empty-registry path is byte-identical to the config-array-only path
+  // shipped today ((∅ ∪ props) === props, the dist-parity zero-drift guarantee).
+  nodeReg: {},
+  connReg: {}
+}
+</data>
+
 <script>
 import { NodeEditor, ClassicPreset, Scope } from 'rete'
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin'
@@ -150,6 +165,15 @@ const connEntries = new Map()
 let lastPropNodeIds = null
 let lastPropConnIds = null
 
+// ids last applied FROM THE DECLARATIVE-CHILDREN REGISTRY — a SEPARATE provenance
+// set from lastPropNodeIds/lastPropConnIds (D37-08). reconcile reaps prop-managed
+// AND registry-managed entities by their OWN provenance, but an imperative $expose
+// addNode/addConnection appears in NEITHER set and so survives every reconcile
+// (the power-user escape hatch stays alive). Folding registry ids into
+// lastPropNodeIds would let an imperative add be reaped on the next registry tick.
+let lastRegistryNodeIds = null
+let lastRegistryConnIds = null
+
 // Re-entrant suppression counter: while > 0 the editor/area event handlers skip
 // echoing back into $emit / $model (our own programmatic add/remove/translate/
 // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
@@ -191,11 +215,58 @@ const buildNode = (spec) => {
   return node
 }
 
+// ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+// The register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … })
+// shape, productized for the canvas. CRITICAL reactive-write discipline (D-3,
+// Pitfall 1): every mutation WHOLE-OBJECT-REPLACES the registry so the watched
+// $data.nodeReg/$data.connReg reference changes exactly once per call — a bare
+// in-place $data.nodeReg[id] = spec is silent on React/Solid/Angular/Lit.
+//   register/update/unregister               → node registry (<FlowNode>)
+//   registerConnection/unregisterConnection  → connection registry (<Connection>)
+//   addPort(id, side, key, label, multiple)  → mutate a node spec's inputs/outputs
+//                                              then re-reconcile (feeds buildNode)
+//   bodyHostFor(id)                          → the engine `body` host div (D-04
+//                                              render-callback target, see below)
+$provide('rete:canvas', {
+  register: (id, spec) => { $data.nodeReg = { ...$data.nodeReg, [id]: spec } },
+  update: (id, spec) => { $data.nodeReg = { ...$data.nodeReg, [id]: spec } },
+  unregister: (id) => { const n = { ...$data.nodeReg }; delete n[id]; $data.nodeReg = n },
+  registerConnection: (id, spec) => { $data.connReg = { ...$data.connReg, [id]: spec } },
+  unregisterConnection: (id) => { const c = { ...$data.connReg }; delete c[id]; $data.connReg = c },
+  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  addPort: (id, side, key, label, multiple) => {
+    if (id == null || key == null) return
+    const cur = $data.nodeReg[id]
+    if (!cur) return
+    const list = side === 'input'
+      ? (Array.isArray(cur.inputs) ? cur.inputs.slice() : [])
+      : (Array.isArray(cur.outputs) ? cur.outputs.slice() : [])
+    if (list.some((p) => p && p.key === key)) return
+    list.push({ key, label, multiple })
+    const next = side === 'input' ? { ...cur, inputs: list } : { ...cur, outputs: list }
+    $data.nodeReg = { ...$data.nodeReg, [id]: next }
+  },
+  // D-04 render-callback target. Returns the engine-created body host div for a
+  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+  // registered spec carries a renderBody(host) callback that the PARENT invokes
+  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+  // body is projected by the parent reusing the $portals.node host discipline.
+  bodyHostFor: (id) => {
+    const entry = nodeEntries.get(id)
+    return entry ? entry.body : null
+  },
+})
+
 $onMount(() => {
   const container = $refs.canvasEl
 
   lastPropNodeIds = []
   lastPropConnIds = []
+  lastRegistryNodeIds = []
+  lastRegistryConnIds = []
 
   editor = new NodeEditor()
   area = new AreaPlugin(container)
@@ -319,7 +390,20 @@ $onMount(() => {
     // can raise a custom event carrying its id (e.g. a delete button).
     const emit = (name, detail) => $emit('node-action', { id, name, detail })
 
-    const entry = { element, box, body, handle: null, titleEl: null, emit, socketDisposers }
+    const entry = { element, box, body, handle: null, titleEl: null, bodyMoved: false, emit, socketDisposers }
+
+    if (typeof meta.renderBody === 'function') {
+      // D-04 render-callback path (declarative <FlowNode> child). The child cannot
+      // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
+      // PARENT projects the body here from its own render scope: the child's
+      // registered renderBody(host) appends the child's host element (its $el,
+      // shadow root + slot projection intact) into the engine `body` div. nodeEntries
+      // must exist before the callback runs (bodyHostFor reads it), so register first.
+      nodeEntries.set(id, entry)
+      meta.renderBody(body)
+      entry.bodyMoved = true
+      return
+    }
 
     if ($slots.node) {
       // reactive multi-instance portal — one handle per node, re-rendered in
@@ -460,16 +544,51 @@ $onMount(() => {
     return context
   })
 
-  // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-  reconcileNodes = async (list) => {
+  // Union the config-array prop with the declarative-children registry by id
+  // (D-02 last-writer-wins: the registry — children — overrides the config-array
+  // on id collision; array entries first in array order, then registry entries in
+  // registration order). The empty-registry path returns exactly the config array
+  // (dedup-by-id of an array with no registry overrides is the array itself), so
+  // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+  // Returns the merged list AND the set of ids contributed by the registry, so the
+  // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+  const mergeById = (arr, reg) => {
+    const out = []
+    const idx = new Map()
+    const regIds = []
+    for (const e of (Array.isArray(arr) ? arr : [])) {
+      if (!e || e.id == null) continue
+      if (idx.has(e.id)) { out[idx.get(e.id)] = e } else { idx.set(e.id, out.length); out.push(e) }
+    }
+    for (const id in reg) {
+      const e = reg[id]
+      if (!e || e.id == null) continue
+      regIds.push(e.id)
+      if (idx.has(e.id)) { out[idx.get(e.id)] = e } else { idx.set(e.id, out.length); out.push(e) }
+    }
+    return { merged: out, regIds }
+  }
+
+  // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+  // The reconcilers read BOTH sources internally (config-array $props + the
+  // declarative-children registry) so a single function serves the node/connection
+  // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+  // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+  // reaper removes a dropped id only if it was previously managed by EITHER source;
+  // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+  reconcileNodes = async () => {
     if (!editor || !area) return
-    const arr = Array.isArray(list) ? list : []
+    const propArr = Array.isArray($props.nodes) ? $props.nodes : []
+    const { merged, regIds } = mergeById(propArr, $data.nodeReg)
+    const regWant = new Set(regIds)
+    const propWant = []
     const want = []
     programmatic++
     try {
-      for (const spec of arr) {
+      for (const spec of merged) {
         if (!spec || spec.id == null) continue
         want.push(spec.id)
+        if (!regWant.has(spec.id)) propWant.push(spec.id)
         nodeMeta.set(spec.id, spec)
         let node = nodeInstances.get(spec.id)
         if (!node) {
@@ -485,9 +604,10 @@ $onMount(() => {
           await area.update('node', spec.id)
         }
       }
-      // remove dropped PROP-managed nodes (+ their connections) — imperatively
-      // added nodes (never in lastPropNodeIds) survive.
-      for (const id of lastPropNodeIds) {
+      // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
+      // — imperatively added nodes (in NEITHER provenance set) survive.
+      const tracked = new Set([...lastPropNodeIds, ...lastRegistryNodeIds])
+      for (const id of tracked) {
         if (!want.includes(id) && nodeInstances.has(id)) {
           for (const c of editor.getConnections()) {
             if (c.source === id || c.target === id) await editor.removeConnection(c.id)
@@ -497,40 +617,57 @@ $onMount(() => {
           nodeMeta.delete(id)
         }
       }
-      lastPropNodeIds = want
+      lastPropNodeIds = propWant
+      lastRegistryNodeIds = regIds
     } finally {
       programmatic--
     }
   }
 
-  reconcileConnections = async (list) => {
+  reconcileConnections = async () => {
     if (!editor) return
-    const arr = Array.isArray(list) ? list : []
+    const propArr = Array.isArray($props.connections) ? $props.connections : []
+    // Normalize both sources to the same id-defaulting before the union so a
+    // collision between a config-array edge and a <Connection> child dedups
+    // correctly (the registry entry wins, D-02).
+    const norm = (spec) => {
+      if (!spec || spec.source == null || spec.target == null) return null
+      const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out'
+      const tgtIn = spec.targetInput != null ? spec.targetInput : 'in'
+      const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`
+      return { id, source: spec.source, sourceOutput: srcOut, target: spec.target, targetInput: tgtIn }
+    }
+    const normProps = propArr.map(norm).filter(Boolean)
+    const normReg = {}
+    for (const k in $data.connReg) { const n = norm($data.connReg[k]); if (n) normReg[k] = n }
+    const { merged, regIds } = mergeById(normProps, normReg)
+    const regWant = new Set(regIds)
+    const propWant = []
     const want = []
     programmatic++
     try {
-      for (const spec of arr) {
-        if (!spec || spec.source == null || spec.target == null) continue
-        const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out'
-        const tgtIn = spec.targetInput != null ? spec.targetInput : 'in'
-        const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`
-        want.push(id)
-        if (connInstances.has(id)) continue
+      for (const spec of merged) {
+        if (!spec || spec.id == null) continue
+        want.push(spec.id)
+        if (!regWant.has(spec.id)) propWant.push(spec.id)
+        if (connInstances.has(spec.id)) continue
         const sourceNode = nodeInstances.get(spec.source)
         const targetNode = nodeInstances.get(spec.target)
         if (!sourceNode || !targetNode) continue
-        const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn)
-        conn.id = id
-        connInstances.set(id, conn)
+        const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput)
+        conn.id = spec.id
+        connInstances.set(spec.id, conn)
         await editor.addConnection(conn)
       }
-      for (const id of lastPropConnIds) {
+      const tracked = new Set([...lastPropConnIds, ...lastRegistryConnIds])
+      for (const id of tracked) {
         if (!want.includes(id) && connInstances.has(id)) {
           await editor.removeConnection(id)
           connInstances.delete(id)
         }
       }
-      lastPropConnIds = want
+      lastPropConnIds = propWant
+      lastRegistryConnIds = regIds
     } finally {
       programmatic--
     }
@@ -540,8 +677,8 @@ $onMount(() => {
   // node instances), then optional fit. Sequenced via an async IIFE so the
   // $onMount-returned teardown stays synchronous. ──────────────────────────────
   ;(async () => {
-    await reconcileNodes($props.nodes)
-    await reconcileConnections($props.connections)
+    await reconcileNodes()
+    await reconcileConnections()
     if (typeof $props.zoom === 'number' && $props.zoom !== 1) {
       programmatic++
       try { await area.area.zoom($props.zoom) } finally { programmatic-- }
@@ -566,8 +703,19 @@ $onMount(() => {
 })
 
 // ─── reconcile prop changes into the live graph (no remount) ─────────────────
-$watch(() => $props.nodes, (v) => { if (reconcileNodes) reconcileNodes(v) })
-$watch(() => $props.connections, (v) => { if (reconcileConnections) reconcileConnections(v) })
+// Both the config-array props AND the declarative-children registries drive the
+// SAME reconcilers (which read both sources internally). Nodes reconcile feeds
+// connections (a new <Connection> may reference a node a sibling <FlowNode> just
+// registered), so a node-registry change also re-runs connections — preserving the
+// node→connection sequencing the engine requires.
+$watch(() => $props.nodes, () => { if (reconcileNodes) reconcileNodes() })
+$watch(() => $props.connections, () => { if (reconcileConnections) reconcileConnections() })
+$watch(() => $data.nodeReg, () => {
+  if (reconcileNodes) {
+    Promise.resolve(reconcileNodes()).then(() => { if (reconcileConnections) reconcileConnections() })
+  }
+})
+$watch(() => $data.connReg, () => { if (reconcileConnections) reconcileConnections() })
 
 $watch(() => $props.zoom, (v) => {
   if (!area || typeof v !== 'number') return
@@ -687,6 +835,14 @@ $expose({
   changes. ROZ127-clean: slot `node` (singular) ≠ prop `nodes` (plural).
 -->
 <slot name="node" portal reactive :params="['node', 'selected', 'emit']" />
+<!--
+  default slot — hosts the declarative <FlowNode>/<Connection> children (Phase 37).
+  They are renderless apart from <FlowNode>'s body, which the parent projects into
+  the engine node element via the renderBody render-callback (D-04, see renderNode);
+  each child's $onMount register-call feeds (registry ∪ props) reconcile. Distinct
+  slot name from the `node` portal slot — they coexist.
+-->
+<slot />
 </template>
 
 <style>

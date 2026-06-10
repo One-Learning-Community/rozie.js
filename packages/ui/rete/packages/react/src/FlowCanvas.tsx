@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { useControllableState } from '@rozie/runtime-react';
+import { rozieContext, useControllableState } from '@rozie/runtime-react';
 import './FlowCanvas.css';
 import './FlowCanvas.global.css';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
@@ -44,6 +44,7 @@ interface FlowCanvasProps {
   onTranslated?: (...args: any[]) => void;
   onContextMenu?: (...args: any[]) => void;
   renderNode?: (ctx: NodeCtx) => ReactNode;
+  children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -63,6 +64,7 @@ export interface FlowCanvasHandle {
 }
 
 const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(_props: FlowCanvasProps, ref): JSX.Element {
+  const __ctx_rete_canvas = rozieContext("rete:canvas");
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultNodes = useState(() => (() => [])())[0];
   const __defaultConnections = useState(() => (() => [])())[0];
@@ -85,6 +87,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   _renderNodeRef.current = props.renderNode;
   const lastPropNodeIds = useRef<any>(null);
   const lastPropConnIds = useRef<any>(null);
+  const lastRegistryNodeIds = useRef<any>(null);
+  const lastRegistryConnIds = useRef<any>(null);
   const editor = useRef<any>(null);
   const area = useRef<any>(null);
   const connectionPlugin = useRef<any>(null);
@@ -105,10 +109,18 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   _nodesRef.current = props.nodes;
   const _zoomRef = useRef(zoom);
   _zoomRef.current = zoom;
+  const [nodeReg, setNodeReg] = useState({});
+  const [connReg, setConnReg] = useState({});
+  const _connRegRef = useRef(connReg);
+  _connRegRef.current = connReg;
+  const _nodeRegRef = useRef(nodeReg);
+  _nodeRegRef.current = nodeReg;
   const canvasEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
+  const _watch4First = useRef(true);
 
   // One Socket shared by every port (Rete sockets gate compatibility by identity;
   // a single socket = "anything connects to anything", the common editor default).
@@ -318,6 +330,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     const container = canvasEl.current;
     lastPropNodeIds.current = [];
     lastPropConnIds.current = [];
+    lastRegistryNodeIds.current = [];
+    lastRegistryConnIds.current = [];
     editor.current = new NodeEditor();
     area.current = new AreaPlugin(container);
     connectionPlugin.current = new ConnectionPlugin();
@@ -457,9 +471,22 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         body,
         handle: null,
         titleEl: null,
+        bodyMoved: false,
         emit,
         socketDisposers
       };
+      if (typeof meta.renderBody === 'function') {
+        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
+        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
+        // PARENT projects the body here from its own render scope: the child's
+        // registered renderBody(host) appends the child's host element (its $el,
+        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
+        // must exist before the callback runs (bodyHostFor reads it), so register first.
+        nodeEntries.set(id, entry);
+        meta.renderBody(body);
+        entry.bodyMoved = true;
+        return;
+      }
       if ((props.renderNode ?? props.slots?.["node"])) {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline).
@@ -650,16 +677,67 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       return context;
     });
 
-    // ─── prop reconcilers (bridged to the top-level $watch) ────────────────────
-    reconcileNodes.current = async (list: any) => {
+    // Union the config-array prop with the declarative-children registry by id
+    // (D-02 last-writer-wins: the registry — children — overrides the config-array
+    // on id collision; array entries first in array order, then registry entries in
+    // registration order). The empty-registry path returns exactly the config array
+    // (dedup-by-id of an array with no registry overrides is the array itself), so
+    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
+    // Returns the merged list AND the set of ids contributed by the registry, so the
+    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      const regIds = [];
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || e.id == null) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || e.id == null) continue;
+        regIds.push(e.id);
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return {
+        merged: out,
+        regIds
+      };
+    };
+
+    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
+    // The reconcilers read BOTH sources internally (config-array $props + the
+    // declarative-children registry) so a single function serves the node/connection
+    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
+    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
+    // reaper removes a dropped id only if it was previously managed by EITHER source;
+    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    reconcileNodes.current = async () => {
       if (!editor.current || !area.current) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(_nodesRef.current) ? _nodesRef.current : [];
+      const {
+        merged,
+        regIds
+      } = mergeById(propArr, _nodeRegRef.current);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       programmatic.current++;
       try {
-        for (const spec of arr as any) {
+        for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
           nodeMeta.set(spec.id, spec);
           let node = nodeInstances.get(spec.id);
           if (!node) {
@@ -681,9 +759,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             await area.current.update('node', spec.id);
           }
         }
-        // remove dropped PROP-managed nodes (+ their connections) — imperatively
-        // added nodes (never in lastPropNodeIds) survive.
-        for (const id of lastPropNodeIds.current as any) {
+        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
+        // — imperatively added nodes (in NEITHER provenance set) survive.
+        const tracked = new Set([...lastPropNodeIds.current, ...lastRegistryNodeIds.current]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && nodeInstances.has(id)) {
             for (const c of editor.current.getConnections() as any) {
               if (c.source === id || c.target === id) await editor.current.removeConnection(c.id);
@@ -693,39 +772,68 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             nodeMeta.delete(id);
           }
         }
-        lastPropNodeIds.current = want;
+        lastPropNodeIds.current = propWant;
+        lastRegistryNodeIds.current = regIds;
       } finally {
         programmatic.current--;
       }
     };
-    reconcileConnections.current = async (list: any) => {
+    reconcileConnections.current = async () => {
       if (!editor.current) return;
-      const arr = Array.isArray(list) ? list : [];
+      const propArr = Array.isArray(_connectionsRef.current) ? _connectionsRef.current : [];
+      // Normalize both sources to the same id-defaulting before the union so a
+      // collision between a config-array edge and a <Connection> child dedups
+      // correctly (the registry entry wins, D-02).
+      const norm = (spec: any) => {
+        if (!spec || spec.source == null || spec.target == null) return null;
+        const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
+        const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
+        const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+        return {
+          id,
+          source: spec.source,
+          sourceOutput: srcOut,
+          target: spec.target,
+          targetInput: tgtIn
+        };
+      };
+      const normProps = propArr.map(norm).filter(Boolean);
+      const normReg = {};
+      for (const k in _connRegRef.current) {
+        const n = norm(_connRegRef.current[k]);
+        if (n) normReg[k] = n;
+      }
+      const {
+        merged,
+        regIds
+      } = mergeById(normProps, normReg);
+      const regWant = new Set(regIds);
+      const propWant = [];
       const want = [];
       programmatic.current++;
       try {
-        for (const spec of arr as any) {
-          if (!spec || spec.source == null || spec.target == null) continue;
-          const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
-          const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
-          const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
-          want.push(id);
-          if (connInstances.has(id)) continue;
+        for (const spec of merged as any) {
+          if (!spec || spec.id == null) continue;
+          want.push(spec.id);
+          if (!regWant.has(spec.id)) propWant.push(spec.id);
+          if (connInstances.has(spec.id)) continue;
           const sourceNode = nodeInstances.get(spec.source);
           const targetNode = nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
-          const conn = new ClassicPreset.Connection(sourceNode, srcOut, targetNode, tgtIn);
-          conn.id = id;
-          connInstances.set(id, conn);
+          const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
+          conn.id = spec.id;
+          connInstances.set(spec.id, conn);
           await editor.current.addConnection(conn);
         }
-        for (const id of lastPropConnIds.current as any) {
+        const tracked = new Set([...lastPropConnIds.current, ...lastRegistryConnIds.current]);
+        for (const id of tracked as any) {
           if (!want.includes(id) && connInstances.has(id)) {
             await editor.current.removeConnection(id);
             connInstances.delete(id);
           }
         }
-        lastPropConnIds.current = want;
+        lastPropConnIds.current = propWant;
+        lastRegistryConnIds.current = regIds;
       } finally {
         programmatic.current--;
       }
@@ -736,8 +844,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
     ;
     (async () => {
-      await reconcileNodes.current(_nodesRef.current);
-      await reconcileConnections.current(_connectionsRef.current);
+      await reconcileNodes.current();
+      await reconcileConnections.current();
       if (typeof _zoomRef.current === 'number' && _zoomRef.current !== 1) {
         programmatic.current++;
         try {
@@ -778,16 +886,26 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
-    const v = props.nodes;
-    if (reconcileNodes.current) reconcileNodes.current(v);
+    if (reconcileNodes.current) reconcileNodes.current();
   }, [props.nodes]);
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    const v = props.connections;
-    if (reconcileConnections.current) reconcileConnections.current(v);
+    if (reconcileConnections.current) reconcileConnections.current();
   }, [props.connections]);
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
+    if (reconcileNodes.current) {
+      Promise.resolve(reconcileNodes.current()).then(() => {
+        if (reconcileConnections.current) reconcileConnections.current();
+      });
+    }
+  }, [nodeReg]);
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
+    if (reconcileConnections.current) reconcileConnections.current();
+  }, [connReg]);
+  useEffect(() => {
+    if (_watch4First.current) { _watch4First.current = false; return; }
     const v = zoom;
     if (!area.current || typeof v !== 'number') return;
     if (v === area.current.area.transform.k) return;
@@ -800,11 +918,84 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   useImperativeHandle(ref, () => ({ getEditor, getArea, addNode, removeNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
+    <__ctx_rete_canvas.Provider value={{
+  register: (id: any, spec: any) => {
+    setNodeReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  update: (id: any, spec: any) => {
+    setNodeReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...nodeReg
+    };
+    delete n[id];
+    setNodeReg(n);
+  },
+  registerConnection: (id: any, spec: any) => {
+    setConnReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  unregisterConnection: (id: any) => {
+    const c = {
+      ...connReg
+    };
+    delete c[id];
+    setConnReg(c);
+  },
+  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
+  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
+  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
+    if (id == null || key == null) return;
+    const cur = nodeReg[id];
+    if (!cur) return;
+    const list = side === 'input' ? Array.isArray(cur.inputs) ? cur.inputs.slice() : [] : Array.isArray(cur.outputs) ? cur.outputs.slice() : [];
+    if (list.some((p: any) => p && p.key === key)) return;
+    list.push({
+      key,
+      label,
+      multiple
+    });
+    const next = side === 'input' ? {
+      ...cur,
+      inputs: list
+    } : {
+      ...cur,
+      outputs: list
+    };
+    setNodeReg(prev => ({
+      ...prev,
+      [id]: next
+    }));
+  },
+  // D-04 render-callback target. Returns the engine-created body host div for a
+  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
+  // registered spec carries a renderBody(host) callback that the PARENT invokes
+  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
+  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
+  // body is projected by the parent reusing the $portals.node host discipline.
+  bodyHostFor: (id: any) => {
+    const entry = nodeEntries.get(id);
+    return entry ? entry.body : null;
+  }
+}}>
     <>
     <div className={"rozie-flow-canvas"} ref={canvasEl} data-rozie-s-cd396d6a="" />
 
 
+
+    {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </>
+    </__ctx_rete_canvas.Provider>
   );
 });
 export default FlowCanvas;

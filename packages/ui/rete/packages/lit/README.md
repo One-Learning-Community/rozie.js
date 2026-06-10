@@ -92,3 +92,4 @@ const editor = el.getEditor();
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| (default) |  |
