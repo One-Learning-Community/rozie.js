@@ -385,15 +385,24 @@ for (const target of TARGETS) {
         timeout: 10_000,
       });
     }
-    // …and after release the rubber-band preview is torn down, so the drawn-path
-    // count settles back to the committed config-array edges (a→b, b→c) — the
-    // transient preview pseudo no longer inflates the count. We assert the committed
-    // edges persist (≥2) rather than an exact 3: the freshly drag-created a→c edge
-    // exists in the editor model (the event fired) but the rendering of a connection
-    // created *during* a drag gesture is a separate Rete connection-view lifecycle
-    // concern, independent of the preview-line fix under test here.
+    // PERSISTENCE PROOF (260610-jrk continuation): after release the rubber-band
+    // pseudo is torn down, but the freshly drag-created a→c edge is a REAL
+    // connection that renders and PERSISTS with a non-empty `d` — so the drawn-path
+    // count settles to EXACTLY 3 (a→b, b→c committed + a→c drag-created). This
+    // upgrades the earlier soft `≥2` (which a vanishing a→c would have passed) to a
+    // strict `=3` that fails if the drag-created edge does not keep a drawn path.
+    //
+    // Why this is now assertable: the DOM evidence in the 260610-jrk continuation
+    // (an instrumented `area.addPipe` trace) proved the a→c connection IS created
+    // (`connectioncreated`, programmatic=0) AND rendered with a real bezier `d`. The
+    // earlier "doesn't persist" reading was a misdiagnosis — Sink's input was a
+    // single-connection input (ClassicPreset `multiple:false` default), so dropping
+    // a→c onto c's already-occupied input correctly EVICTED b→c (`connectionremoved`
+    // for e2), leaving the count at 2 even though a→c persisted. Sink's input is now
+    // `multiple: true` in FlowCanvasDemo, so a→c ADDS a third edge instead of
+    // replacing b→c — making the persistence directly countable.
     await expect
       .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-      .toBeGreaterThanOrEqual(2);
+      .toBe(3);
   });
 }

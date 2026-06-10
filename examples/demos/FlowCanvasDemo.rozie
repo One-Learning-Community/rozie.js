@@ -41,7 +41,15 @@
   nodes: [
     { id: 'a', label: 'Source', x: 20,  y: 40,  data: { kind: 'in' },  outputs: [{ key: 'out', label: 'out' }] },
     { id: 'b', label: 'Filter', x: 260, y: 40,  data: { kind: 'op' },  inputs: [{ key: 'in', label: 'in' }], outputs: [{ key: 'out', label: 'out' }] },
-    { id: 'c', label: 'Sink',   x: 500, y: 120, data: { kind: 'out' }, inputs: [{ key: 'in', label: 'in' }] },
+    // Sink's input is `multiple: true` so a drag-created a→c edge ADDS a third
+    // connection (a→b, b→c, a→c) instead of REPLACING the existing b→c. Rete's
+    // ClassicPreset single-input (multiple:false, the default) holds exactly one
+    // connection, so dropping a→c onto an already-occupied single input correctly
+    // evicts b→c — leaving the edge count at 2 and masking the fact that the new
+    // a→c edge DID persist. A multiple input lets the drag spec assert the
+    // drag-created edge persists as an exact 3rd drawn path (the persistence
+    // proof) rather than a soft ≥2.
+    { id: 'c', label: 'Sink',   x: 500, y: 120, data: { kind: 'out' }, inputs: [{ key: 'in', label: 'in', multiple: true }] },
   ],
   connections: [
     { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
