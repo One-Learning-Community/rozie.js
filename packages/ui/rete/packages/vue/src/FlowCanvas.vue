@@ -587,7 +587,7 @@ onMounted(() => {
     if (!context || typeof context !== 'object' || !('type' in context)) return context;
     if (context.type === 'render') {
       const data = context.data;
-      if (data.type === 'node') renderNode(data.element, data.payload);else if (data.type === 'connection') renderConnection(data.element, data.payload);
+      if (data.type === 'node') renderNode(data.element, data.payload);else if (data.type === 'connection') renderConnection(data.element, data.payload, data.start, data.end);
       // data.type === 'socket' (our own re-emitted signals) falls through
       // untouched so the ConnectionPlugin + socketWatcher consume them.
     } else if (context.type === 'unmount') {
@@ -745,10 +745,35 @@ onMounted(() => {
   };
 
   // ── connection renderer ──
-  // Mounts an <svg><path> and redraws it whenever either endpoint socket moves.
-  const renderConnection = (element: any, connection: any) => {
+  // Mounts an <svg><path> and redraws it whenever either endpoint socket moves
+  // (real connection) OR the dragged pointer moves (user drag-to-connect pseudo).
+  //
+  // A USER DRAG renders a *pseudo-connection* (rete-connection-plugin): the render
+  // signal carries a literal pointer coordinate (`endPointer`/`data.end` when
+  // dragging FROM an output, `startPointer`/`data.start` when dragging FROM an
+  // input) alongside a payload with ONE DANGLING endpoint — `target:''`/
+  // `targetInput:''` (output-side drag) or `source:''`/`sourceOutput:''`
+  // (input-side drag). The dangling side has no socket to watch, so its coordinate
+  // MUST come from the pointer; the live side stays watcher-driven. The
+  // ConnectionPlugin re-emits this render on EVERY pointermove with a fresh pointer
+  // — so the same pseudo element is re-rendered repeatedly and the dangling
+  // coordinate must update in place (no SVG rebuild, no listener re-subscribe).
+  const renderConnection = (element: any, connection: any, startPointer: any, endPointer: any) => {
     const id = connection.id;
-    if (connEntries.has(id) && connEntries.get(id).element === element) return;
+    // A side is dangling when its node id OR its port key is empty/nullish.
+    const srcDangling = !connection.source || !connection.sourceOutput;
+    const tgtDangling = !connection.target || !connection.targetInput;
+
+    // RE-RENDER of the SAME element (the pseudo on each pointermove): do NOT rebuild
+    // the SVG or re-subscribe listeners (would leak) — just update the dangling
+    // side's coordinate and redraw. This replaces the old unconditional early-return
+    // that froze the preview line. For a REAL connection updatePointer is a no-op,
+    // so a re-render of a committed edge is byte-for-byte the old early-return.
+    const prev = connEntries.get(id);
+    if (prev && prev.element === element) {
+      prev.updatePointer(startPointer, endPointer);
+      return;
+    }
     element.innerHTML = '';
     element.classList.add('rozie-flow-connection');
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -764,16 +789,52 @@ onMounted(() => {
       if (!start || !end) return;
       path.setAttribute('d', classicConnectionPath([start, end], curvature));
     };
-    const un1 = socketWatcher.listen(connection.source, 'output', connection.sourceOutput, (p: any) => {
+
+    // Seed the DANGLING side's coordinate from the pointer FIRST — socketWatcher
+    // .listen() synchronously replays the current socket snapshot on subscribe, so
+    // seeding before subscribing the live side means redraw() already has the
+    // dangling coordinate and the preview line draws immediately on the first render.
+    if (srcDangling && startPointer) start = startPointer;
+    if (tgtDangling && endPointer) end = endPointer;
+
+    // LIVE endpoints stay watcher-driven (exactly as before the fix — committed
+    // connections behave byte-for-byte). DANGLING endpoints subscribe NO listener
+    // (it would never fire — there is no socket); their coordinate is the pointer.
+    let un1: any = null;
+    let un2: any = null;
+    if (!srcDangling) un1 = socketWatcher.listen(connection.source, 'output', connection.sourceOutput, (p: any) => {
       start = p;
       redraw();
     });
-    const un2 = socketWatcher.listen(connection.target, 'input', connection.targetInput, (p: any) => {
+    if (!tgtDangling) un2 = socketWatcher.listen(connection.target, 'input', connection.targetInput, (p: any) => {
       end = p;
       redraw();
     });
+
+    // Update only the DANGLING side(s) from a fresh pointer on each subsequent
+    // render call. For a REAL connection (neither side dangling) this is a no-op,
+    // so committed connections never have a pointer override and keep behaving
+    // exactly as before.
+    const updatePointer = (sp: any, ep: any) => {
+      let moved = false;
+      if (srcDangling && sp) {
+        start = sp;
+        moved = true;
+      }
+      if (tgtDangling && ep) {
+        end = ep;
+        moved = true;
+      }
+      if (moved) redraw();
+    };
+
+    // Draw once now: a pseudo seeded with an initial pointer (+ its live side
+    // already replayed) draws immediately; a real connection whose sockets are
+    // already known also draws (idempotent — same `d` the listeners just set).
+    redraw();
     connEntries.set(id, {
       element,
+      updatePointer,
       dispose: () => {
         try {
           un1 && un1();
