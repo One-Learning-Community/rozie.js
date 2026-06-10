@@ -1,5 +1,11 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, EmbeddedViewRef, InjectionToken, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+
+interface BodyCtx {
+  $implicit: { id: any; label: any };
+  id: any;
+  label: any;
+}
 
 interface DefaultCtx {}
 
@@ -24,8 +30,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
   template: `
 
 
-    <div class="rozie-flow-node-host" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
 
+
+    <div class="rozie-flow-node-children" style="display:none"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
+    <ng-container #rozie_portalAnchor></ng-container>
   `,
   providers: [
     {
@@ -46,9 +54,12 @@ export class FlowNode {
   x = input<number>(0);
   y = input<number>(0);
   label = input<unknown>(undefined);
-  __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
+  @ContentChild('body', { read: TemplateRef }) bodyTpl?: TemplateRef<BodyCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private _portalViews = new Set<EmbeddedViewRef<unknown>>();
+  private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
+  private _bodyTpl = contentChild('body', { read: TemplateRef });
   canvas = inject(rozieToken('rete:canvas'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -58,10 +69,9 @@ export class FlowNode {
   constructor() {
     this.cv = this.canvas;
 
-    // The FlowNode's own host element, captured at mount ($el only safe in $onMount,
-    // ROZ123). The parent-invoked renderBody closure appends THIS into the engine
-    // `body` host — moving the host preserves Lit shadow projection of the slot body.
-    // Module-scope `any` so it survives into the parent's later render-scope call.
+    // The live $portals.body handle ({ dispose }) returned by the parent-invoked
+    // renderBody callback. Module-scope `any` so the teardown — which the Solid emitter
+    // hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose it.
     effect(() => () => {
       if (this.registered) return;
       const live = this.canvas;
@@ -71,66 +81,90 @@ export class FlowNode {
       this.cv.register(this.id(), this.buildSpec());
     });
     effect(() => { const __watchVal = (() => this.x())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
-      const __id = this.id();
-      if (this.cv) this.cv.update(__id, {
-        id: __id,
-        x: this.x(),
-        y: this.y(),
-        label: this.label(),
-        renderBody: (host: any) => {
-          if (host && this.hostEl) host.appendChild(this.hostEl);
-        }
-      });
+      if (this.cv) this.cv.update(this.id(), this.buildSpec());
     })(); }); });
     effect(() => { const __watchVal = (() => this.y())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      const __id = this.id();
-      if (this.cv) this.cv.update(__id, {
-        id: __id,
-        x: this.x(),
-        y: this.y(),
-        label: this.label(),
-        renderBody: (host: any) => {
-          if (host && this.hostEl) host.appendChild(this.hostEl);
-        }
-      });
+      if (this.cv) this.cv.update(this.id(), this.buildSpec());
     })(); }); });
     effect(() => { const __watchVal = (() => this.label())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
-      const __id = this.id();
-      if (this.cv) this.cv.update(__id, {
-        id: __id,
-        x: this.x(),
-        y: this.y(),
-        label: this.label(),
-        renderBody: (host: any) => {
-          if (host && this.hostEl) host.appendChild(this.hostEl);
-        }
-      });
+      if (this.cv) this.cv.update(this.id(), this.buildSpec());
     })(); }); });
   }
 
   ngAfterViewInit() {
-    this.hostEl = this.__rozieRoot()?.nativeElement;
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
+    const portals = {
+      body: (container: HTMLElement, scope: { id: unknown; label: unknown }): ReactivePortalHandle => {
+        const tpl = this._bodyTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-body', '23c15996');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
+        };
+      },
+    };
+    // The body-mount closure — captures the mount-scoped `portals` local. Disposes a
+    // prior handle first so a re-fired renderBody (e.g. ports changed → fresh node
+    // build) does not stack portal roots into the same engine host.
+    this.mountBody = (host: any) => {
+      if (!host) return;
+      if (this.bodyHandle && this.bodyHandle.dispose) {
+        try {
+          this.bodyHandle.dispose();
+        } catch (e: any) {}
+      }
+      this.bodyHandle = portals.body(host, {
+        id: this.id(),
+        label: this.label()
+      });
+    };
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
-    // builds the engine node, then renderNode invokes renderBody(body) — projecting
-    // this FlowNode's body into the engine element from the PARENT's render scope.
+    // builds the engine node, then renderNode invokes renderBody(body) — at which point
+    // the FlowNode mounts its own body portal into the engine `body` host.
     // On Lit the injected canvas may still be undefined here (REQ-30 async context);
-    // the $watch below performs the registration once the value arrives.
+    // the $onUpdate below performs the registration once the value arrives.
     // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
-    // builds the engine node, then renderNode invokes renderBody(body) — projecting
-    // this FlowNode's body into the engine element from the PARENT's render scope.
+    // builds the engine node, then renderNode invokes renderBody(body) — at which point
+    // the FlowNode mounts its own body portal into the engine `body` host.
     // On Lit the injected canvas may still be undefined here (REQ-30 async context);
-    // the $watch below performs the registration once the value arrives.
+    // the $onUpdate below performs the registration once the value arrives.
     if (this.cv && !this.registered) {
       this.registered = true;
       this.cv.register(this.id(), this.buildSpec());
     }
     this.__rozieDestroyRef.onDestroy(() => {
+      if (this.bodyHandle && this.bodyHandle.dispose) {
+        try {
+          this.bodyHandle.dispose();
+        } catch (e: any) {}
+      }
       if (this.cv) this.cv.unregister(this.id());
+    });
+    this.__rozieDestroyRef.onDestroy(() => {
+      for (const view of this._portalViews) view.destroy();
+      this._portalViews.clear();
     });
   }
 
   cv: any = null;
-  hostEl: any = null;
+  bodyHandle: any = null;
+  mountBody: any = null;
   registered = false;
   buildSpec = () => ({
     id: this.id(),
@@ -139,140 +173,32 @@ export class FlowNode {
     label: this.label(),
     inputs: [],
     outputs: [],
-    // D-04 render-callback: the parent calls this with the engine body host div.
+    // D-04 render-callback: the parent hands the engine body host; delegate to the
+    // mountBody closure (defined inside $onMount so it can see the emitter's mount-
+    // scoped `portals` local). Until $onMount has run, mountBody is null — but the
+    // parent only invokes renderBody AFTER reconcileNodes (post-register, post-mount),
+    // so mountBody is always set by then.
     renderBody: (host: any) => {
-      if (host && this.hostEl) host.appendChild(this.hostEl);
+      // try/catch so a per-target portal-render hiccup (e.g. a Lit lit-html
+      // "cannot find node" when re-rendering into an engine-owned host that the area
+      // re-created) can NEVER abort the parent's reconcileNodes loop — a thrown
+      // renderBody would propagate out of area.update/addNode and stop the whole graph
+      // from building (cfg renders, the declarative nodes don't). The body simply
+      // re-mounts on the next reconcile tick if a single attempt fails.
+      if (host && this.mountBody) {
+        try {
+          this.mountBody(host);
+        } catch (e: any) {}
+      }
     }
   });
 
   static ngTemplateContextGuard(
     _dir: FlowNode,
     _ctx: unknown,
-  ): _ctx is DefaultCtx {
+  ): _ctx is BodyCtx | DefaultCtx {
     return true;
   }
-
-  private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
-
-  private __rozieApplyAttrs = (() => {
-    const renderer = inject(Renderer2);
-    const prevKeysByElement = new WeakMap<HTMLElement, string[]>();
-    const prevClassTokensByElement = new WeakMap<HTMLElement, string[]>();
-    const prevStylePropsByElement = new WeakMap<HTMLElement, string[]>();
-    const parseClassTokens = (value: unknown): string[] => {
-      if (typeof value !== 'string') return [];
-      const out: string[] = [];
-      for (const tok of value.split(/\s+/)) {
-        if (tok.length > 0) out.push(tok);
-      }
-      return out;
-    };
-    const parseStyleDecls = (value: unknown): Array<[string, string]> => {
-      if (typeof value !== 'string') return [];
-      const out: Array<[string, string]> = [];
-      for (const decl of value.split(';')) {
-        const colon = decl.indexOf(':');
-        if (colon < 0) continue;
-        const prop = decl.slice(0, colon).trim();
-        const val = decl.slice(colon + 1).trim();
-        if (prop.length > 0) out.push([prop, val]);
-      }
-      return out;
-    };
-    const applyClassMerge = (el: HTMLElement, value: unknown) => {
-      const next = parseClassTokens(value);
-      const prev = prevClassTokensByElement.get(el) ?? [];
-      const nextSet = new Set(next);
-      for (const tok of prev) {
-        if (!nextSet.has(tok)) el.classList.remove(tok);
-      }
-      for (const tok of next) el.classList.add(tok);
-      prevClassTokensByElement.set(el, next);
-    };
-    const applyStyleMerge = (el: HTMLElement, value: unknown) => {
-      const next = parseStyleDecls(value);
-      const prev = prevStylePropsByElement.get(el) ?? [];
-      const nextProps = next.map(([p]) => p);
-      const nextSet = new Set(nextProps);
-      for (const prop of prev) {
-        if (!nextSet.has(prop)) el.style.removeProperty(prop);
-      }
-      for (const [prop, val] of next) el.style.setProperty(prop, val, 'important');
-      prevStylePropsByElement.set(el, nextProps);
-    };
-    return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {
-      const safeObj: Record<string, unknown> = obj ?? {};
-      const prevKeys = prevKeysByElement.get(el) ?? [];
-      for (const k of prevKeys) {
-        if (k === 'class' || k === 'style') continue;
-        if (!(k in safeObj)) renderer.removeAttribute(el, k);
-      }
-      if (!('class' in safeObj) && prevClassTokensByElement.has(el)) {
-        applyClassMerge(el, '');
-      }
-      if (!('style' in safeObj) && prevStylePropsByElement.has(el)) {
-        applyStyleMerge(el, '');
-      }
-      for (const [k, v] of Object.entries(safeObj)) {
-        if (k === 'class') {
-          applyClassMerge(el, v);
-        } else if (k === 'style') {
-          applyStyleMerge(el, v);
-        } else if (v === null || v === false) {
-          renderer.removeAttribute(el, k);
-        } else {
-          renderer.setAttribute(el, k, String(v));
-        }
-      }
-      prevKeysByElement.set(el, Object.keys(safeObj));
-    };
-  })();
-
-  private __rozieGetHostAttrs = (() => {
-    const host = inject(ElementRef);
-    return () => {
-      const el = host.nativeElement as HTMLElement;
-      const out: Record<string, unknown> = {};
-      for (const a of Array.from(el.attributes)) out[a.name] = a.value;
-      return out;
-    };
-  })();
-
-  private __rozieSpread_0_effect = afterRenderEffect(() => {
-    const el = this.rozieSpread_0()?.nativeElement;
-    if (!el) return;
-    this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
-  });
-
-  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
-
-  private __rozieListenersRenderer = inject(Renderer2);
-
-  private __rozieListenersDisposers_1: Array<() => void> = [];
-
-  private __rozieListenersDestroyRegistered_1 = false;
-
-  private __rozieListenersEffect_1 = effect(() => {
-    const el = this.rozieListenersTarget_1()?.nativeElement;
-    if (!el) return;
-    for (const off of this.__rozieListenersDisposers_1) off();
-    this.__rozieListenersDisposers_1 = [];
-    const obj: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      if (typeof v !== 'function') continue;
-      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
-      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
-      this.__rozieListenersDisposers_1.push(dispose);
-    }
-    if (!this.__rozieListenersDestroyRegistered_1) {
-      this.__rozieListenersDestroyRegistered_1 = true;
-      this.__rozieDestroyRef.onDestroy(() => {
-        for (const off of this.__rozieListenersDisposers_1) off();
-        this.__rozieListenersDisposers_1 = [];
-      });
-    }
-  });
 }
 
 export default FlowNode;

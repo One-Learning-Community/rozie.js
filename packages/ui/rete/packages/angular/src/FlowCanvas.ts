@@ -756,6 +756,8 @@ export class FlowCanvas {
     // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
     // reaper removes a dropped id only if it was previously managed by EITHER source;
     // an imperative $expose addNode (in NEITHER set) survives (D37-08).
+    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
+    // guard so two passes never race the engine (the Lit "cannot find node" fix).
     // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
     // The reconcilers read BOTH sources internally (config-array $props + the
     // declarative-children registry) so a single function serves the node/connection
@@ -763,7 +765,9 @@ export class FlowCanvas {
     // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
     // reaper removes a dropped id only if it was previously managed by EITHER source;
     // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    this.reconcileNodes = async () => {
+    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
+    // guard so two passes never race the engine (the Lit "cannot find node" fix).
+    const reconcileNodesPass = async () => {
       const __nodes = this.nodes();
       if (!this.editor || !this.area) return;
       const propArr = Array.isArray(__nodes) ? __nodes : [];
@@ -861,6 +865,30 @@ export class FlowCanvas {
         this.lastRegistryNodeIds = regIds;
       } finally {
         this.programmatic--;
+      }
+    };
+
+    // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
+    // return — the in-flight pass loops until no further request is pending. Serializing
+    // overlapping reconciles is what stops the Lit async-context cascade from racing the
+    // engine into "cannot find node" (which otherwise aborts the declarative graph build).
+    // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
+    // return — the in-flight pass loops until no further request is pending. Serializing
+    // overlapping reconciles is what stops the Lit async-context cascade from racing the
+    // engine into "cannot find node" (which otherwise aborts the declarative graph build).
+    this.reconcileNodes = async () => {
+      if (this.reconcileNodesRunning) {
+        this.reconcileNodesPending = true;
+        return;
+      }
+      this.reconcileNodesRunning = true;
+      try {
+        do {
+          this.reconcileNodesPending = false;
+          await reconcileNodesPass();
+        } while (this.reconcileNodesPending);
+      } finally {
+        this.reconcileNodesRunning = false;
       }
     };
     this.reconcileConnections = async () => {
@@ -1002,6 +1030,8 @@ export class FlowCanvas {
   programmatic = 0;
   reconcileNodes: any = null;
   reconcileConnections: any = null;
+  reconcileNodesRunning = false;
+  reconcileNodesPending = false;
   serializeConn = (c: any) => ({
     id: c.id,
     source: c.source,

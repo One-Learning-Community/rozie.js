@@ -96,8 +96,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const renderScope = useRef<any>(null);
   const selector = useRef<any>(null);
   const programmatic = useRef(0);
-  const reconcileNodes = useRef<any>(null);
   const reconcileConnections = useRef<any>(null);
+  const reconcileNodes = useRef<any>(null);
+  const reconcileNodesRunning = useRef(false);
+  const reconcileNodesPending = useRef(false);
   const [zoom, setZoom] = useControllableState({
     value: props.zoom,
     defaultValue: props.defaultZoom ?? 1,
@@ -746,7 +748,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
     // reaper removes a dropped id only if it was previously managed by EITHER source;
     // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    reconcileNodes.current = async () => {
+    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
+    // guard so two passes never race the engine (the Lit "cannot find node" fix).
+    const reconcileNodesPass = async () => {
       if (!editor.current || !area.current) return;
       const propArr = Array.isArray(_nodesRef.current) ? _nodesRef.current : [];
       const {
@@ -843,6 +847,26 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         lastRegistryNodeIds.current = regIds;
       } finally {
         programmatic.current--;
+      }
+    };
+
+    // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
+    // return — the in-flight pass loops until no further request is pending. Serializing
+    // overlapping reconciles is what stops the Lit async-context cascade from racing the
+    // engine into "cannot find node" (which otherwise aborts the declarative graph build).
+    reconcileNodes.current = async () => {
+      if (reconcileNodesRunning.current) {
+        reconcileNodesPending.current = true;
+        return;
+      }
+      reconcileNodesRunning.current = true;
+      try {
+        do {
+          reconcileNodesPending.current = false;
+          await reconcileNodesPass();
+        } while (reconcileNodesPending.current);
+      } finally {
+        reconcileNodesRunning.current = false;
       }
     };
     reconcileConnections.current = async () => {

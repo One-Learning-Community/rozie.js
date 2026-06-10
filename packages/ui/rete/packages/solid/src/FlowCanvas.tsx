@@ -577,7 +577,9 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
     // reaper removes a dropped id only if it was previously managed by EITHER source;
     // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    reconcileNodes = async () => {
+    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
+    // guard so two passes never race the engine (the Lit "cannot find node" fix).
+    const reconcileNodesPass = async () => {
       if (!editor || !area) return;
       const propArr = Array.isArray(local.nodes) ? local.nodes : [];
       const {
@@ -674,6 +676,26 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         lastRegistryNodeIds = regIds;
       } finally {
         programmatic--;
+      }
+    };
+
+    // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
+    // return — the in-flight pass loops until no further request is pending. Serializing
+    // overlapping reconciles is what stops the Lit async-context cascade from racing the
+    // engine into "cannot find node" (which otherwise aborts the declarative graph build).
+    reconcileNodes = async () => {
+      if (reconcileNodesRunning) {
+        reconcileNodesPending = true;
+        return;
+      }
+      reconcileNodesRunning = true;
+      try {
+        do {
+          reconcileNodesPending = false;
+          await reconcileNodesPass();
+        } while (reconcileNodesPending);
+      } finally {
+        reconcileNodesRunning = false;
       }
     };
     reconcileConnections = async () => {
@@ -886,6 +908,21 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   // call them.
   let reconcileNodes: any = null;
   let reconcileConnections: any = null;
+
+  // Re-entrancy guard for reconcileNodes. The declarative-children path can fire the
+  // node reconcile RE-ENTRANTLY on async-context targets (Lit): a <FlowNode>'s
+  // $onMount register starts reconcile #1, and its late-context $onUpdate registration
+  // (REQ-30) — or the registry $watch the register triggers — starts reconcile #2 while
+  // #1's awaits (editor.addNode / area.translate / area.update) are still pending. Two
+  // overlapping reconciles racing the same engine throw Rete's "cannot find node" (one
+  // updates/translates a node-view the other just rebuilt), which aborts the whole graph
+  // build (only the config-array `cfg` node survives on Lit). This flag serializes them:
+  // a reconcile requested while one is running sets a "run again" bit and returns; the
+  // in-flight reconcile re-runs once it finishes, so every registry mutation is folded
+  // into a fresh non-overlapping pass. The config-array-only path never re-enters (props
+  // change once per tick), so this is byte-transparent to its behavior.
+  let reconcileNodesRunning = false;
+  let reconcileNodesPending = false;
 
   // ── pure helpers (no sigils → safe at top level) ──
   function serializeConn(c: any) {

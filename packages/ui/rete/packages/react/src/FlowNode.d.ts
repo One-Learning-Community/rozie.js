@@ -5,6 +5,7 @@ export interface FlowNodeProps {
   x?: number;
   y?: number;
   label?: unknown;
+  renderBody?: (params: { id: () => void; label: () => void }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

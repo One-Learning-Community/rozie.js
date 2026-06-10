@@ -121,20 +121,22 @@ for (const target of TARGETS) {
 
 /**
  * Phase 37 — declarative `<FlowNode>` / `<Handle>` / `<Connection>` children +
- * the D-04 render-callback body + the D-02 union + the D37-08 provenance.
+ * the D-04 $portals body + the D-02 union + the D37-08 provenance.
  *
  * `examples/demos/FlowCanvasDeclarativeDemo.rozie` feeds ONE `<FlowCanvas>` BOTH a
  * config-array (`:nodes` → `cfg`) AND declarative children: `<FlowNode id="a">`
- * with an INLINE body (`.demo-card`) + a nested output `<Handle>`, an r-for-gated
- * `<FlowNode id="b">` (the unmount-reap vehicle) + nested in/out `<Handle>`s, and
- * a flat `<Connection source="a" target="b"/>`. It proves:
+ * with an INLINE `<template #body>` (`.demo-card`) + a nested output `<Handle>`, an
+ * r-for-gated `<FlowNode id="b">` (the unmount-reap vehicle) + nested in/out
+ * `<Handle>`s, and a flat `<Connection source="a" target="b"/>`. It proves:
  *
- *   1. **D-04 render-callback body (esp. Lit).** The `<FlowNode>` renders its slot
- *      body inside its own host; the PARENT projects that host element (its `$el`)
- *      into the engine `body` div — `.rozie-flow-node-host` carrying the
- *      `[data-testid=card-a]` body text appears INSIDE a `.rozie-flow-node`. The
- *      Wave-0 A3 Lit-safe path (moving the host, not a shadow `<slot>`) is the
- *      reason this must be VR-proven on all 6, especially Lit.
+ *   1. **D-04 body via $portals (esp. Lit).** Each `<FlowNode>` mounts its `#body`
+ *      portal slot DIRECTLY into the engine `.rozie-flow-node__body` host via the
+ *      shipped reactive-portal machinery (`$portals.body` → React createRoot+flushSync
+ *      / Vue render / Svelte mount / Solid accessor / Angular ViewContainerRef / Lit
+ *      render) — the SAME mechanism the config-array `#node` slot uses, which is
+ *      6/6-green. NO framework-owned DOM is relocated (the abandoned `$el`-move path
+ *      threw on react removeChild / angular @for / lit lit-html). The body text
+ *      (`[data-testid=card-a]`) appears INSIDE a `.rozie-flow-node__body`.
  *   2. **Nested `<Handle>` ports.** The Handles addPort() into the node spec, so
  *      `buildSocketRow` renders `[data-testid=socket]` sockets.
  *   3. **Flat `<Connection>`.** A `.rozie-flow-connection__path` draws between the
@@ -172,12 +174,13 @@ for (const target of TARGETS) {
       })
       .toBeGreaterThanOrEqual(3);
 
-    // ---- 2. D-04 render-callback body renders INSIDE the engine node (esp. Lit) ----
-    // The FlowNode's own host (`.rozie-flow-node-host`) carrying its inline body
-    // is projected into the engine `.rozie-flow-node__body` by the PARENT. Assert
-    // the inline body text is visible — the make-or-break render-callback proof.
+    // ---- 2. D-04 body renders INSIDE the engine node via $portals (esp. Lit) ----
+    // The FlowNode mounts its `#body` portal slot directly into the engine
+    // `.rozie-flow-node__body` host (the 6/6-green reactive-portal machinery, no DOM
+    // relocation). Assert the inline body text is visible inside an engine node — the
+    // make-or-break body-projection proof.
     await expect(
-      page.locator('.rozie-flow-node-host').first(),
+      page.locator('.rozie-flow-node .rozie-flow-node__body').first(),
     ).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('card-a').first()).toBeVisible({
       timeout: 10_000,
@@ -198,22 +201,25 @@ for (const target of TARGETS) {
 
     // ---- 5. D-02 union + D37-08 provenance via the $expose handle ----
     if (target === 'angular') {
-      // Angular ref is the host element (no getNodes). Assert the DOM-level union:
-      // toggling b off reaps a node box; adding the imperative node restores one.
+      // Angular's component `ref` resolves to the host ELEMENT, not the $expose
+      // instance handle (the documented Angular ref edge — see the spec preamble), so
+      // the imperative `addNode()` / `getNodes()` paths are not reachable via the ref
+      // here. We therefore assert the parts that DO exercise the same union+reconcile
+      // on Angular at the DOM level:
+      //   • D-02 union: cfg (config-array) + a + b (declarative) = 3 engine node boxes.
+      //   • D37-08 registry-managed reap: toggling b off unmounts the declarative
+      //     <FlowNode id="b">, whose registry-managed engine node is reaped (3 → 2).
+      // The "imperative $expose node SURVIVES the reap" half of D37-08 is proven on
+      // the 5 ref-resolving targets below (where getNodes()/addNode() are reachable);
+      // it cannot be triggered through Angular's host-element ref.
       const before = await page.locator('.rozie-flow-node').count();
+      expect(before).toBeGreaterThanOrEqual(3);
       await page.getByTestId('toggle-b').click();
       await expect
         .poll(async () => page.locator('.rozie-flow-node').count(), {
           timeout: 10_000,
         })
         .toBeLessThan(before);
-      await page.getByTestId('add-imperative').click();
-      // imp survives even after b is reaped — node count climbs back.
-      await expect
-        .poll(async () => page.locator('.rozie-flow-node').count(), {
-          timeout: 10_000,
-        })
-        .toBeGreaterThanOrEqual(before);
       return;
     }
 
