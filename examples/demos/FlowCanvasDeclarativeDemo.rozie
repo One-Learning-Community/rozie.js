@@ -1,0 +1,171 @@
+<!--
+  FlowCanvasDeclarativeDemo.rozie — BEHAVIORAL consumer for the Phase 37
+  declarative <FlowNode> / <Handle> / <Connection> children (the Phase 36
+  $provide/$inject dogfood in the Rete.js node-graph wrapper).
+
+  This is the SEPARATE declarative-variant cell (D-08): the existing config-array
+  FlowCanvasDemo.rozie / FlowCanvasScreenshotDemo.rozie stay byte-identical (D-5);
+  we do NOT bolt children onto them. Behavioral-only — NO new pixel-screenshot
+  baseline.
+
+  It proves, on the SAME canvas, all four Phase-37 claims (rete-flow.spec.ts):
+
+    - D-04 RENDER-CALLBACK BODY (esp. Lit). <FlowNode id="a"> has an INLINE body
+      (`.demo-card`). The FlowNode renders its slot body inside its own host, then
+      the PARENT projects that host element (its $el) into the engine `body` div
+      from the parent render scope (the Wave-0 A3 Lit-safe path — moving the host,
+      not a shadow <slot>, preserves projection). The spec asserts the inline body
+      text renders inside the engine node element on ALL 6.
+
+    - NESTED <Handle> ports. Each <FlowNode> nests a <Handle> (output on `a`,
+      input on `b`); the Handle injects the rete:node ctx and addPort()s, so the
+      parent's buildSocketRow renders a [data-testid=socket].
+
+    - FLAT <Connection>. <Connection source="a" target="b"/> is a flat child of
+      <FlowCanvas> (an edge spans two nodes, cannot nest); it draws a
+      .rozie-flow-connection__path between the declarative nodes.
+
+    - D-02 UNION-MERGE. A config-array :nodes (the `cfg` node) is supplied WITH the
+      declarative children; the canvas unions ALL of them (the spec asserts the
+      merged node count via the $expose getEditor handle: cfg + a + b + the
+      imperative node).
+
+    - D37-08 PROVENANCE. A button empties an r-for array that UNMOUNTS the
+      declarative <FlowNode id="b"> → its registry-managed node is REAPED by
+      reconcileNodes. A second button drives the $expose addNode() to add an
+      IMPERATIVE node (`imp`) — which is in NEITHER provenance set, so it SURVIVES
+      every reconcile (incl. the one triggered by b's unmount). The spec proves:
+      child reaped, imperative survives.
+
+  NOTE — node `b` is rendered via r-for over a single-element `$data.bNodes` array
+  (toggle = empty the array) rather than r-if directly on the <FlowNode>. r-if on
+  a component tag that carries loose default-slot children mis-aligns the
+  AST↔IR child index in extractSlotFillers (a compiler crash, surfaced + logged to
+  deferred-items.md during 37-03); r-for over the same loose-children component
+  compiles clean on all 6 and is the natural "list of declarative children" shape
+  anyway, so it is the unmount vehicle here.
+
+  Container needs explicit height (the wrapper's canvas fills it). Reuses the
+  config-array demo's two-way r-model:zoom + :fit-on-mount="false" structure.
+-->
+
+<rozie name="FlowCanvasDeclarativeDemo">
+
+<components>
+{
+  FlowCanvas:  '../../packages/ui/rete/src/FlowCanvas.rozie',
+  FlowNode:    '../../packages/ui/rete/src/FlowNode.rozie',
+  Handle:      '../../packages/ui/rete/src/Handle.rozie',
+  Connection:  '../../packages/ui/rete/src/Connection.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // r-for array driving the declarative <FlowNode id="b"> (D37-08 unmount-reap
+  // proof — emptying this reaps b's registry-managed node). Single element so the
+  // toggle is on/off.
+  bNodes: [{ id: 'b' }],
+  // tracks whether the imperative $expose node has been added.
+  impAdded: false,
+  // CONFIG-ARRAY side of the D-02 union — one node supplied as a prop, alongside
+  // the declarative <FlowNode> children below. Both feed the same registry.
+  cfgNodes: [
+    { id: 'cfg', label: 'Config', x: 40, y: 220, data: { kind: 'op' }, inputs: [{ key: 'in', label: 'in' }] },
+  ],
+}
+</data>
+
+<script>
+// Toggle the declarative <FlowNode id="b"> off — emptying the r-for array unmounts
+// it, so its registry-managed node is reaped by reconcileNodes (D37-08:
+// child-managed entity reaped on unmount).
+const toggleB = () => { $data.bNodes = $data.bNodes.length ? [] : [{ id: 'b' }] }
+
+// Add an IMPERATIVE node via the $expose handle (grabbed via ref="flow"). It is
+// tracked in NEITHER the prop nor the registry provenance set, so it SURVIVES
+// every reconcile — including the one triggered by toggling b off (D37-08).
+const addImperative = () => {
+  $refs.flow?.addNode?.({ id: 'imp', label: 'Imperative', x: 280, y: 220, inputs: [{ key: 'in' }] })
+  $data.impAdded = true
+}
+
+// Drive $data.zoom up — the two-way bind reconciles into the live area.
+const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
+</script>
+
+<template>
+<div class="flow-declarative-demo">
+  <h3>FlowCanvas — declarative + mixed</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="toggle-b" @click="toggleB">Toggle B</button>
+    <button type="button" data-testid="add-imperative" @click="addImperative">Add imperative</button>
+    <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
+    <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 340px">
+    <FlowCanvas
+      ref="flow"
+      :nodes="$data.cfgNodes"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <!-- D-04: declarative node with an INLINE body + a nested output Handle. -->
+      <FlowNode id="a" :x="40" :y="60">
+        <div class="demo-card" data-testid="card-a">Source card</div>
+        <Handle side="output" port="out" />
+      </FlowNode>
+      <!-- D37-08: r-for over a single-element array; emptying it reaps b's registry node. -->
+      <FlowNode r-for="bn in $data.bNodes" :key="bn.id" :id="bn.id" :x="280" :y="60">
+        <div class="demo-card" data-testid="card-b">Filter card</div>
+        <Handle side="input" port="in" />
+        <Handle side="output" port="out" />
+      </FlowNode>
+      <!-- FLAT edge between the two declarative nodes. -->
+      <Connection source="a" sourceOutput="out" target="b" targetInput="in" />
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-declarative-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-declarative-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+.demo-card {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+</style>
+
+</rozie>

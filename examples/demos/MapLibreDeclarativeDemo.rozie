@@ -1,0 +1,140 @@
+<!--
+  MapLibreDeclarativeDemo.rozie — BEHAVIORAL consumer for the Phase 37 declarative
+  <Source> / <Layer> children (the Phase 36 $provide/$inject dogfood in a real
+  engine wrapper).
+
+  This is the SEPARATE declarative-variant cell (D-08): the existing config-array
+  MapLibreDemo.rozie / MapLibreScreenshotDemo.rozie stay byte-identical (D-5); we
+  do NOT bolt children onto them. Behavioral-only — NO new pixel-screenshot
+  baseline (the engine output equals the config-array path, so behavioral parity
+  covers correctness).
+
+  It proves the D-02 UNION-MERGE: one <MapLibre> is fed BOTH a config-array
+  (:sources / :layers) AND declarative children on the SAME map. The map must end
+  up with ALL the entities — the array source/layer, the nested <Source>/<Layer>,
+  and the flat background <Layer> — keyed by id in the parent's registry-∪-props
+  reconcile (maplibre-map.spec.ts asserts each layer/source via the $expose getMap
+  handle). It also proves:
+    - NESTED shape: <Source id="pts"><Layer id="circles"/></Source> — the inner
+      <Layer> auto-binds to the `pts` source via the injected maplibre:source ctx.
+    - FLAT-fallback shape: <Layer id="bg" type="background"/> directly under
+      <MapLibre> (no <Source> parent — a background layer).
+
+  Network-free (the OFFLINE_STYLE — Docker/CI has NO network) copied verbatim from
+  MapLibreDemo.rozie so the WebGL canvas has deterministic colored content.
+
+  Container needs explicit height (the wrapper's host fills it).
+-->
+
+<rozie name="MapLibreDeclarativeDemo">
+
+<components>
+{
+  MapLibre: '../../packages/ui/maplibre/src/MapLibre.rozie',
+  Source:   '../../packages/ui/maplibre/src/Source.rozie',
+  Layer:    '../../packages/ui/maplibre/src/Layer.rozie',
+}
+</components>
+
+<data>
+{
+  // CONFIG-ARRAY side of the D-02 union — a source + a layer supplied as props.
+  // The declarative <Source>/<Layer> children below feed the SAME registry; the
+  // map must union ALL of them.
+  arraySources: [
+    {
+      id: 'arr',
+      spec: {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature', properties: {},
+            geometry: { type: 'Point', coordinates: [-76, 39] },
+          }],
+        },
+      },
+    },
+  ],
+  arrayLayers: [
+    { id: 'arr-pts', type: 'circle', source: 'arr', paint: { 'circle-radius': 6, 'circle-color': '#16a34a' } },
+  ],
+  // DECLARATIVE side — the geojson + paint for the nested <Source>/<Layer>.
+  geojson: {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature', properties: {},
+        geometry: { type: 'Point', coordinates: [-78, 38] },
+      }],
+    },
+  },
+  circlePaint: { 'circle-radius': 7, 'circle-color': '#dc2626' },
+}
+</data>
+
+<script>
+import 'maplibre-gl/dist/maplibre-gl.css'
+
+// Network-free style — Docker/CI has NO network, so the wrapper's default
+// demotiles URL would fail. A solid background + a colored GeoJSON polygon
+// (fill + line) gives the WebGL canvas deterministic colored content.
+// (Copied verbatim from MapLibreDemo.rozie:51-75.)
+const OFFLINE_STYLE = {
+  version: 8,
+  sources: {
+    demo: {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature', properties: {},
+          geometry: { type: 'Polygon', coordinates: [[[-80, 40], [-74, 40], [-74, 35], [-80, 35], [-80, 40]]] },
+        }],
+      },
+    },
+  },
+  layers: [
+    { id: 'base-bg', type: 'background', paint: { 'background-color': '#e5e3df' } },
+    { id: 'fill',    type: 'fill', source: 'demo', paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.6 } },
+    { id: 'line',    type: 'line', source: 'demo', paint: { 'line-color': '#0050a0', 'line-width': 2 } },
+  ],
+}
+</script>
+
+<template>
+<div class="maplibre-declarative-demo">
+  <h3>MapLibre — declarative + mixed</h3>
+
+  <div class="map-wrap" style="height: 320px">
+    <MapLibre
+      ref="map"
+      :map-style="OFFLINE_STYLE"
+      :center="[-77, 38.5]"
+      :zoom="4"
+      :sources="$data.arraySources"
+      :layers="$data.arrayLayers"
+    >
+      <!-- NESTED: the inner <Layer> auto-binds to the `pts` source via context. -->
+      <Source id="pts" :spec="$data.geojson">
+        <Layer id="circles" type="circle" :paint="$data.circlePaint" />
+      </Source>
+      <!-- FLAT fallback: a background layer with no <Source> parent. -->
+      <Layer id="bg" type="background" :paint="{ 'background-color': '#eef2ff' }" :beforeId="'fill'" />
+    </MapLibre>
+  </div>
+</div>
+</template>
+
+<style>
+.maplibre-declarative-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.maplibre-declarative-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+</style>
+
+</rozie>
