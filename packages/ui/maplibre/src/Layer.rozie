@@ -70,24 +70,62 @@ let ctx = null
 ctx = srcCtx
 
 // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
-// else undefined (a sourceless layer e.g. background). `ctx` is the `any` alias so
-// the `.id` read type-checks on the strict bundled leaves.
+// else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
+// at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
+// on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
+// the `any` alias so the `.id` read type-checks on the strict bundled leaves.
 const resolveSource = () => $props.source ?? (ctx && ctx.id)
 
+// The last source id we registered with. A nested <Layer> may register on mount
+// (React/Vue/Svelte/Angular) BEFORE its <Source> parent has mounted, so its
+// injected source ctx is null and resolveSource() yields undefined — registering a
+// non-background layer with no source, which applyLayers can't add. When the source
+// ctx resolves we re-register with the now-correct source id (idempotent upsert in
+// the parent registry). null = not yet registered.
+let appliedSource = null
+let didRegister = false
+
+const buildSpec = () => ({
+  id: $props.id,
+  type: $props.type,
+  paint: $props.paint,
+  layout: $props.layout,
+  source: resolveSource(),
+  beforeId: $props.beforeId,
+})
+
 $onMount(() => {
-  const source = resolveSource()
   if (reg) {
-    reg.register($props.id, {
-      id: $props.id,
-      type: $props.type,
-      paint: $props.paint,
-      layout: $props.layout,
-      source,
-      beforeId: $props.beforeId,
-    })
+    didRegister = true
+    appliedSource = resolveSource()
+    reg.register($props.id, buildSpec())
   }
   return () => {
     if (reg) reg.unregister($props.id)
+  }
+})
+
+// Re-register when the nested <Source> context resolves to a source id we have not
+// applied yet — the parent <Source> mounted AFTER this <Layer> child (child-before-
+// parent on React/Vue/Svelte/Angular) or the Lit context resolved async (REQ-30).
+// $onUpdate lowers to each target's update phase (Lit updated() re-runs when the
+// ContextConsumer re-publishes). Also covers the late `maplibre:layers` registry on
+// Lit (register if $onMount was skipped). Idempotent upsert; only fires while the
+// resolved source differs from what we last registered, so it settles in one tick.
+$onUpdate(() => {
+  const live = layers
+  if (!live) return
+  if (!reg) reg = live
+  const src = resolveSource()
+  if (!didRegister) {
+    didRegister = true
+    appliedSource = src
+    reg.register($props.id, buildSpec())
+    return
+  }
+  if (src != null && src !== appliedSource) {
+    appliedSource = src
+    reg.update($props.id, buildSpec())
   }
 })
 

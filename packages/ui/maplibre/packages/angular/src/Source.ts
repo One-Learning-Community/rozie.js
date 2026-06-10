@@ -48,6 +48,21 @@ export class Source {
 
   constructor() {
     this.reg = this.sources;
+
+    // idempotency flag so the $onMount register and the late-context $onUpdate path
+    // (Lit async, REQ-30) never double-register the source.
+    effect(() => () => {
+      const __id = this.id();
+      if (this.didRegister) return;
+      const live = this.sources;
+      if (live == null) return;
+      this.reg = live;
+      this.didRegister = true;
+      this.reg.register(__id, {
+        id: __id,
+        spec: this.spec()
+      });
+    });
     effect(() => { const __watchVal = (() => this.spec())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
@@ -61,10 +76,15 @@ export class Source {
     const __id = this.id();
     // register this source's spec into the parent registry; the parent's
     // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-    if (this.reg) this.reg.register(__id, {
-      id: __id,
-      spec: this.spec()
-    });
+    // On Lit the injected sources registry may still be undefined here (async
+    // context, REQ-30) — the $onUpdate below registers once it resolves.
+    if (this.reg && !this.didRegister) {
+      this.didRegister = true;
+      this.reg.register(__id, {
+        id: __id,
+        spec: this.spec()
+      });
+    }
     // unregister on unmount so the parent reaps this source (its layers first).
     this.__rozieDestroyRef.onDestroy(() => {
       if (this.reg) this.reg.unregister(__id);
@@ -72,6 +92,7 @@ export class Source {
   }
 
   reg: any = null;
+  didRegister = false;
 
   static ngTemplateContextGuard(
     _dir: Source,

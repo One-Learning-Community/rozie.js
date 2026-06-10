@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, provide, watch } from 'vue';
+import { inject, onBeforeUnmount, onMounted, onUpdated, provide, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ id: string; spec?: unknown }>(),
@@ -31,6 +31,12 @@ const sources = inject('maplibre:sources');
 let reg: any = null;
 reg = sources;
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the source.
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the source.
+let didRegister = false;
+
 provide('maplibre:source', {
   get id() {
     return props.id;
@@ -41,16 +47,32 @@ let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
   // register this source's spec into the parent registry; the parent's
   // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-  if (reg) reg.register(props.id, {
-    id: props.id,
-    spec: props.spec
-  });
+  // On Lit the injected sources registry may still be undefined here (async
+  // context, REQ-30) — the $onUpdate below registers once it resolves.
+  if (reg && !didRegister) {
+    didRegister = true;
+    reg.register(props.id, {
+      id: props.id,
+      spec: props.spec
+    });
+  }
   // unregister on unmount so the parent reaps this source (its layers first).
   _cleanup_0 = () => {
     if (reg) reg.unregister(props.id);
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
+onUpdated(() => {
+  if (didRegister) return;
+  const live = sources;
+  if (live == null) return;
+  reg = live;
+  didRegister = true;
+  reg.register(props.id, {
+    id: props.id,
+    spec: props.spec
+  });
+});
 
 watch(() => props.spec, (v: any) => {
   if (reg) reg.update(props.id, {

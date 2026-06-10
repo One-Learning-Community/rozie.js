@@ -21,16 +21,32 @@ export default function Source(_props: SourceProps): JSX.Element {
     const _cleanup = (() => {
     // register this source's spec into the parent registry; the parent's
     // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-    if (reg) reg.register(local.id, {
-      id: local.id,
-      spec: local.spec
-    });
+    // On Lit the injected sources registry may still be undefined here (async
+    // context, REQ-30) — the $onUpdate below registers once it resolves.
+    if (reg && !didRegister) {
+      didRegister = true;
+      reg.register(local.id, {
+        id: local.id,
+        spec: local.spec
+      });
+    }
     // unregister on unmount so the parent reaps this source (its layers first).
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
     if (reg) reg.unregister(local.id);
   });
+  });
+  createEffect(() => {
+    if (didRegister) return;
+    const live = sources;
+    if (live == null) return;
+    reg = live;
+    didRegister = true;
+    reg.register(local.id, {
+      id: local.id,
+      spec: local.spec
+    });
   });
   createEffect(on(() => (() => local.spec)(), (v) => untrack(() => ((v: any) => {
     if (reg) reg.update(local.id, {
@@ -51,6 +67,10 @@ export default function Source(_props: SourceProps): JSX.Element {
   // that benign. ZERO emitter change (the Phase 35 NO-emitter-touch lesson).
   let reg: any = null;
   reg = sources;
+
+  // idempotency flag so the $onMount register and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-register the source.
+  let didRegister = false;
 
   return (
     <__ctx_maplibre_source.Provider value={{

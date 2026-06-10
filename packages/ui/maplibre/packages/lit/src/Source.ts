@@ -53,16 +53,24 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
 
     this.reg = this.sources;
 
+    // idempotency flag so the $onMount register and the late-context $onUpdate path
+    // (Lit async, REQ-30) never double-register the source.
+
     this._disconnectCleanups.push((() => {
       if (this.reg) this.reg.unregister(this.id);
     }));
 
     // register this source's spec into the parent registry; the parent's
     // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-    if (this.reg) this.reg.register(this.id, {
-      id: this.id,
-      spec: this.spec
-    });
+    // On Lit the injected sources registry may still be undefined here (async
+    // context, REQ-30) — the $onUpdate below registers once it resolves.
+    if (this.reg && !this.didRegister) {
+      this.didRegister = true;
+      this.reg.register(this.id, {
+        id: this.id,
+        spec: this.spec
+      });
+    }
     // unregister on unmount so the parent reaps this source (its layers first).
   }
 
@@ -74,6 +82,16 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
       });
     })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
+
+    if (this.didRegister) return;
+    const live = this.sources;
+    if (live == null) return;
+    this.reg = live;
+    this.didRegister = true;
+    this.reg.register(this.id, {
+      id: this.id,
+      spec: this.spec
+    });
   }
 
   disconnectedCallback(): void {
@@ -93,4 +111,6 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
   }
 
   reg: any = null;
+
+  didRegister = false;
 }

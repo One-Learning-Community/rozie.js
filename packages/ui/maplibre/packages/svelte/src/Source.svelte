@@ -35,6 +35,12 @@ const sources = getContext('maplibre:sources');
 let reg: any = null;
 reg = sources;
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the source.
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the source.
+let didRegister = false;
+
 setContext('maplibre:source', {
   get id() {
     return id;
@@ -44,15 +50,31 @@ setContext('maplibre:source', {
 onMount(() => {
   // register this source's spec into the parent registry; the parent's
   // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-  if (reg) reg.register(id, {
-    id: id,
-    spec: spec
-  });
+  // On Lit the injected sources registry may still be undefined here (async
+  // context, REQ-30) — the $onUpdate below registers once it resolves.
+  if (reg && !didRegister) {
+    didRegister = true;
+    reg.register(id, {
+      id: id,
+      spec: spec
+    });
+  }
   // unregister on unmount so the parent reaps this source (its layers first).
   return () => {
     if (reg) reg.unregister(id);
   };
 });
+$effect(() => (() => {
+  if (didRegister) return;
+  const live = sources;
+  if (live == null) return;
+  reg = live;
+  didRegister = true;
+  reg.register(id, {
+    id: id,
+    spec: spec
+  });
+})());
 
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => spec)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {

@@ -19,22 +19,32 @@ export default function Layer(_props: LayerProps): JSX.Element {
   const layers = useContext(rozieContext("maplibre:layers"));
   onMount(() => {
     const _cleanup = (() => {
-    const source = resolveSource();
     if (reg) {
-      reg.register(local.id, {
-        id: local.id,
-        type: local.type,
-        paint: local.paint,
-        layout: local.layout,
-        source,
-        beforeId: local.beforeId
-      });
+      didRegister = true;
+      appliedSource = resolveSource();
+      reg.register(local.id, buildSpec());
     }
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
     if (reg) reg.unregister(local.id);
   });
+  });
+  createEffect(() => {
+    const live = layers;
+    if (!live) return;
+    if (!reg) reg = live;
+    const src = resolveSource();
+    if (!didRegister) {
+      didRegister = true;
+      appliedSource = src;
+      reg.register(local.id, buildSpec());
+      return;
+    }
+    if (src != null && src !== appliedSource) {
+      appliedSource = src;
+      reg.update(local.id, buildSpec());
+    }
   });
   createEffect(on(() => (() => local.paint)(), (v) => untrack(() => (() => {
     if (reg) reg.update(local.id, {
@@ -81,10 +91,31 @@ export default function Layer(_props: LayerProps): JSX.Element {
   ctx = srcCtx;
 
   // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
-  // else undefined (a sourceless layer e.g. background). `ctx` is the `any` alias so
-  // the `.id` read type-checks on the strict bundled leaves.
+  // else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
+  // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
+  // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
+  // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
   function resolveSource() {
     return local.source ?? (ctx && ctx.id);
+  }
+
+  // The last source id we registered with. A nested <Layer> may register on mount
+  // (React/Vue/Svelte/Angular) BEFORE its <Source> parent has mounted, so its
+  // injected source ctx is null and resolveSource() yields undefined — registering a
+  // non-background layer with no source, which applyLayers can't add. When the source
+  // ctx resolves we re-register with the now-correct source id (idempotent upsert in
+  // the parent registry). null = not yet registered.
+  let appliedSource: any = null;
+  let didRegister = false;
+  function buildSpec() {
+    return {
+      id: local.id,
+      type: local.type,
+      paint: local.paint,
+      layout: local.layout,
+      source: resolveSource(),
+      beforeId: local.beforeId
+    };
   }
 
   return (

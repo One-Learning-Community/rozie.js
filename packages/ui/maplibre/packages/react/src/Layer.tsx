@@ -27,12 +27,8 @@ export default function Layer(_props: LayerProps): JSX.Element {
     return rest;
   })();
   const reg = useRef<any>(null);
-  const _layoutRef = useRef(props.layout);
-  _layoutRef.current = props.layout;
-  const _paintRef = useRef(props.paint);
-  _paintRef.current = props.paint;
-  const _typeRef = useRef(props.type);
-  _typeRef.current = props.type;
+  const didRegister = useRef(false);
+  const appliedSource = useRef<any>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
@@ -42,26 +38,46 @@ export default function Layer(_props: LayerProps): JSX.Element {
   ctx = srcCtx;
 
   // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
-  // else undefined (a sourceless layer e.g. background). `ctx` is the `any` alias so
-  // the `.id` read type-checks on the strict bundled leaves.
+  // else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
+  // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
+  // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
+  // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
   const resolveSource = useCallback(() => props.source ?? (ctx && ctx.id), [props.source]);
+  const buildSpec = useCallback(() => ({
+    id: props.id,
+    type: props.type,
+    paint: props.paint,
+    layout: props.layout,
+    source: resolveSource(),
+    beforeId: props.beforeId
+  }), [props.beforeId, props.id, props.layout, props.paint, props.type, resolveSource]);
 
   useEffect(() => {
-    const source = resolveSource();
     if (reg.current) {
-      reg.current.register(props.id, {
-        id: props.id,
-        type: _typeRef.current,
-        paint: _paintRef.current,
-        layout: _layoutRef.current,
-        source,
-        beforeId: props.beforeId
-      });
+      didRegister.current = true;
+      appliedSource.current = resolveSource();
+      reg.current.register(props.id, buildSpec());
     }
     return () => {
       if (reg.current) reg.current.unregister(props.id);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const live = layers;
+    if (!live) return;
+    if (!reg.current) reg.current = live;
+    const src = resolveSource();
+    if (!didRegister.current) {
+      didRegister.current = true;
+      appliedSource.current = src;
+      reg.current.register(props.id, buildSpec());
+      return;
+    }
+    if (src != null && src !== appliedSource.current) {
+      appliedSource.current = src;
+      reg.current.update(props.id, buildSpec());
+    }
+  }, [appliedSource, buildSpec, didRegister, layers, props.id, reg, resolveSource]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     if (reg.current) reg.current.update(props.id, {

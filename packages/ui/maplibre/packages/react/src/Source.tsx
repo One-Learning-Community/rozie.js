@@ -22,24 +22,44 @@ export default function Source(_props: SourceProps): JSX.Element {
     return rest;
   })();
   const reg = useRef<any>(null);
+  const didRegister = useRef(false);
   const _specRef = useRef(props.spec);
   _specRef.current = props.spec;
   const _watch0First = useRef(true);
 
   reg.current = sources;
 
+  // idempotency flag so the $onMount register and the late-context $onUpdate path
+  // (Lit async, REQ-30) never double-register the source.
+
   useEffect(() => {
     // register this source's spec into the parent registry; the parent's
     // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-    if (reg.current) reg.current.register(props.id, {
-      id: props.id,
-      spec: _specRef.current
-    });
+    // On Lit the injected sources registry may still be undefined here (async
+    // context, REQ-30) — the $onUpdate below registers once it resolves.
+    if (reg.current && !didRegister.current) {
+      didRegister.current = true;
+      reg.current.register(props.id, {
+        id: props.id,
+        spec: _specRef.current
+      });
+    }
     // unregister on unmount so the parent reaps this source (its layers first).
     return () => {
       if (reg.current) reg.current.unregister(props.id);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (didRegister.current) return;
+    const live = sources;
+    if (live == null) return;
+    reg.current = live;
+    didRegister.current = true;
+    reg.current.register(props.id, {
+      id: props.id,
+      spec: _specRef.current
+    });
+  }, [didRegister, props.id, reg, sources]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const v = props.spec;

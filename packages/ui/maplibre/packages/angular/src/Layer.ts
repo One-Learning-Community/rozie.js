@@ -40,8 +40,27 @@ export class Layer {
     this.ctx = this.srcCtx;
 
     // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
-    // else undefined (a sourceless layer e.g. background). `ctx` is the `any` alias so
-    // the `.id` read type-checks on the strict bundled leaves.
+    // else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
+    // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
+    // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
+    // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
+    effect(() => () => {
+      const __id = this.id();
+      const live = this.layers;
+      if (!live) return;
+      if (!this.reg) this.reg = live;
+      const src = this.resolveSource();
+      if (!this.didRegister) {
+        this.didRegister = true;
+        this.appliedSource = src;
+        this.reg.register(__id, this.buildSpec());
+        return;
+      }
+      if (src != null && src !== this.appliedSource) {
+        this.appliedSource = src;
+        this.reg.update(__id, this.buildSpec());
+      }
+    });
     effect(() => { const __watchVal = (() => this.paint())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       const __id = this.id();
       if (this.reg) this.reg.update(__id, {
@@ -78,26 +97,29 @@ export class Layer {
   }
 
   ngAfterViewInit() {
-    const __id = this.id();
-    const source = this.resolveSource();
     if (this.reg) {
-      this.reg.register(__id, {
-        id: __id,
-        type: this.type(),
-        paint: this.paint(),
-        layout: this.layout(),
-        source: this.source(),
-        beforeId: this.beforeId()
-      });
+      this.didRegister = true;
+      this.appliedSource = this.resolveSource();
+      this.reg.register(this.id(), this.buildSpec());
     }
     this.__rozieDestroyRef.onDestroy(() => {
-      if (this.reg) this.reg.unregister(__id);
+      if (this.reg) this.reg.unregister(this.id());
     });
   }
 
   reg: any = null;
   ctx: any = null;
   resolveSource = () => this.source() ?? (this.ctx && this.ctx.id);
+  appliedSource: any = null;
+  didRegister = false;
+  buildSpec = () => ({
+    id: this.id(),
+    type: this.type(),
+    paint: this.paint(),
+    layout: this.layout(),
+    source: this.resolveSource(),
+    beforeId: this.beforeId()
+  });
 }
 
 export default Layer;

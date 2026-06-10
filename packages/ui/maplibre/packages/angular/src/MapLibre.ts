@@ -748,11 +748,25 @@ export class MapLibre {
       const existing = this.instance.getSource(s.id);
       if (!existing) this.instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
     }
-    // 3. add/update layers
+    // 3. add/update layers. DEFENSIVE: a non-background layer whose `source` is not
+    // (yet) present in the engine is SKIPPED rather than added — a declarative
+    // <Layer> may register before its <Source> parent has supplied the source id
+    // (child-before-parent mount order on React/Vue/Svelte/Angular), in which case
+    // addLayer would throw "source ... doesn't exist" / read null `.type` and abort
+    // the whole loop (dropping later layers like `bg`). The <Layer> re-registers with
+    // the resolved source on $onUpdate, re-running this reconcile, so the layer lands
+    // on the next tick. Background layers need no source. addLayer is wrapped so any
+    // single malformed spec can't abort the rest of the loop either.
     for (const l of mergedLayers as any) {
       if (!l || !l.id) continue;
       if (!this.instance.getLayer(l.id)) {
-        this.instance.addLayer(l, l.beforeId);
+        const needsSource = l.type !== 'background';
+        if (needsSource && (l.source == null || !this.instance.getSource(l.source))) continue;
+        try {
+          this.instance.addLayer(l, l.beforeId);
+        } catch (e: any) {
+          // surfaced via the `error` emit path; skip so later layers still apply.
+        }
       } else {
         if (l.paint) for (const k in l.paint) this.instance.setPaintProperty(l.id, k, l.paint[k]);
         if (l.layout) for (const k in l.layout) this.instance.setLayoutProperty(l.id, k, l.layout[k]);

@@ -56,14 +56,38 @@ const sources = $inject('maplibre:sources')
 let reg = null
 reg = sources
 
+// idempotency flag so the $onMount register and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-register the source.
+let didRegister = false
+
 $onMount(() => {
   // register this source's spec into the parent registry; the parent's
   // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-  if (reg) reg.register($props.id, { id: $props.id, spec: $props.spec })
+  // On Lit the injected sources registry may still be undefined here (async
+  // context, REQ-30) — the $onUpdate below registers once it resolves.
+  if (reg && !didRegister) {
+    didRegister = true
+    reg.register($props.id, { id: $props.id, spec: $props.spec })
+  }
   // unregister on unmount so the parent reaps this source (its layers first).
   return () => {
     if (reg) reg.unregister($props.id)
   }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected `maplibre:sources` registry is event-
+// driven on Lit and may resolve AFTER $onMount. $onUpdate lowers to Lit's updated(),
+// which re-runs when the ContextConsumer(subscribe:true) re-publishes the resolved
+// registry — we then register once. Reads the LIVE injected `sources` (on Lit the
+// ContextConsumer getter; on the 5 sync targets the stable value already registered
+// in $onMount, so `didRegister` short-circuits this to a no-op there).
+$onUpdate(() => {
+  if (didRegister) return
+  const live = sources
+  if (live == null) return
+  reg = live
+  didRegister = true
+  reg.register($props.id, { id: $props.id, spec: $props.spec })
 })
 
 // React to a spec change (lazy $watch — never fires on the initial value, only on
