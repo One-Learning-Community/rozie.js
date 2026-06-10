@@ -86,6 +86,18 @@ packages/ui/sortable-list/src/SortableList.ts
 # disk-cache is already covered by the global `*.rozie.ts` rule above.)
 packages/ui/flatpickr/src/Flatpickr.ts
 
+# Phase 37 — @rozie-ui/maplibre + @rozie-ui/rete gained MULTIPLE compound-
+# component .rozie sources in their package src dirs (MapLibre + Source + Layer;
+# FlowCanvas + FlowNode + Handle + Connection). When a consumer composes them via
+# <components> (the declarative demos), the Angular prebuild emits a transient
+# `// @rozie-cross-rozie-shim` re-export `<Name>.ts` next to EACH .rozie source.
+# These are regenerated build artefacts — never commit. The ONLY legitimate
+# tracked files in these two src dirs are `.rozie` sources (the leaf `.ts` outputs
+# live under packages/<target>/src/), so a dir-wide `*.ts` glob safely ignores
+# only the shims and auto-covers future sibling children (vs. a per-file entry).
+packages/ui/maplibre/src/*.ts
+packages/ui/rete/src/*.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/
