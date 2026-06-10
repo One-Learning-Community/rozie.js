@@ -38,7 +38,10 @@ const EXPECT = {
     'node-action', 'connection-created', 'connection-removed', 'node-picked',
     'node-moved', 'translated', 'context-menu',
   ],
-  slots: ['node'],
+  // 'node' = the reactive multi-instance portal slot (config-array #node path);
+  // '' = the default slot that hosts the Phase 37 declarative <FlowNode>/<Connection>
+  // children (added in 37-02). Both coexist.
+  slots: ['', 'node'],
   expose: [
     'getEditor', 'getArea', 'addNode', 'removeNode', 'addConnection',
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'getNodes',

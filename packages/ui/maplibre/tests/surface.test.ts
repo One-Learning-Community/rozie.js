@@ -42,7 +42,10 @@ const EXPECT = {
     'styledata', 'sourcedata', 'moveend', 'zoomend', 'rotateend', 'pitchend',
     'mouseenter', 'mouseleave',
   ],
-  slots: ['marker', 'popup', 'control'],
+  // marker/popup/control = the reactive portal slots (config-array path); '' = the
+  // default slot that hosts the Phase 37 declarative <Source>/<Layer> children (added
+  // in 37-01). All coexist.
+  slots: ['', 'marker', 'popup', 'control'],
   expose: ['getMap', 'flyTo', 'easeTo', 'jumpTo', 'fitBounds', 'getCenter', 'getZoom', 'resize'],
 } as const;
 
