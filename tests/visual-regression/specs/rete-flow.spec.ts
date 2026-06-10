@@ -118,3 +118,145 @@ for (const target of TARGETS) {
     await expect(zoomReadout).not.toHaveText('1', { timeout: 5_000 });
   });
 }
+
+/**
+ * Phase 37 — declarative `<FlowNode>` / `<Handle>` / `<Connection>` children +
+ * the D-04 render-callback body + the D-02 union + the D37-08 provenance.
+ *
+ * `examples/demos/FlowCanvasDeclarativeDemo.rozie` feeds ONE `<FlowCanvas>` BOTH a
+ * config-array (`:nodes` → `cfg`) AND declarative children: `<FlowNode id="a">`
+ * with an INLINE body (`.demo-card`) + a nested output `<Handle>`, an r-for-gated
+ * `<FlowNode id="b">` (the unmount-reap vehicle) + nested in/out `<Handle>`s, and
+ * a flat `<Connection source="a" target="b"/>`. It proves:
+ *
+ *   1. **D-04 render-callback body (esp. Lit).** The `<FlowNode>` renders its slot
+ *      body inside its own host; the PARENT projects that host element (its `$el`)
+ *      into the engine `body` div — `.rozie-flow-node-host` carrying the
+ *      `[data-testid=card-a]` body text appears INSIDE a `.rozie-flow-node`. The
+ *      Wave-0 A3 Lit-safe path (moving the host, not a shadow `<slot>`) is the
+ *      reason this must be VR-proven on all 6, especially Lit.
+ *   2. **Nested `<Handle>` ports.** The Handles addPort() into the node spec, so
+ *      `buildSocketRow` renders `[data-testid=socket]` sockets.
+ *   3. **Flat `<Connection>`.** A `.rozie-flow-connection__path` draws between the
+ *      declarative nodes.
+ *   4. **D-02 union.** The merged node set (cfg + a + b) reaches the engine; with
+ *      the imperative add it is cfg + a + b + imp = 4, read via `$expose getNodes()`.
+ *   5. **D37-08 provenance.** Toggling b off reaps its registry-managed node while
+ *      the imperative `imp` node (in NEITHER provenance set) SURVIVES.
+ *
+ * Behavioral-only — NO new pixel baseline (D-08). Angular's component `ref` is the
+ * host element (no `getNodes`), so its union/provenance readouts stay `0`/`false`;
+ * for Angular we assert the rendered `.rozie-flow-node` DOM count instead (the
+ * union still feeds the SAME reconcile, and the 5 ref-resolving targets prove the
+ * merged-count + provenance via the handle).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-declarative [${target}]: <FlowNode> inline body (D-04) + nested <Handle> + flat <Connection> + D-02 union + D37-08 provenance`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasDeclarative&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    // ---- 1. mount + the declarative + config-array nodes render ----
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // cfg (config-array) + a + b (declarative) = 3 node boxes.
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+
+    // ---- 2. D-04 render-callback body renders INSIDE the engine node (esp. Lit) ----
+    // The FlowNode's own host (`.rozie-flow-node-host`) carrying its inline body
+    // is projected into the engine `.rozie-flow-node__body` by the PARENT. Assert
+    // the inline body text is visible — the make-or-break render-callback proof.
+    await expect(
+      page.locator('.rozie-flow-node-host').first(),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('card-a').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('card-a').first()).toHaveText('Source card');
+
+    // ---- 3. nested <Handle> ports render sockets ----
+    await expect
+      .poll(async () => page.getByTestId('socket').count(), { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    // ---- 4. flat <Connection> draws an edge between the declarative nodes ----
+    await expect
+      .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    // ---- 5. D-02 union + D37-08 provenance via the $expose handle ----
+    if (target === 'angular') {
+      // Angular ref is the host element (no getNodes). Assert the DOM-level union:
+      // toggling b off reaps a node box; adding the imperative node restores one.
+      const before = await page.locator('.rozie-flow-node').count();
+      await page.getByTestId('toggle-b').click();
+      await expect
+        .poll(async () => page.locator('.rozie-flow-node').count(), {
+          timeout: 10_000,
+        })
+        .toBeLessThan(before);
+      await page.getByTestId('add-imperative').click();
+      // imp survives even after b is reaped — node count climbs back.
+      await expect
+        .poll(async () => page.locator('.rozie-flow-node').count(), {
+          timeout: 10_000,
+        })
+        .toBeGreaterThanOrEqual(before);
+      return;
+    }
+
+    const countReadout = mount.getByTestId('readout-node-count');
+    const impReadout = mount.getByTestId('readout-imp-present');
+
+    // D-02 union: cfg + a + b = 3 nodes in the live engine.
+    await expect
+      .poll(
+        async () => {
+          await mount.getByTestId('check-union').click();
+          return Number((await countReadout.textContent())?.trim() ?? '0');
+        },
+        { timeout: 15_000, intervals: [300, 600, 1200] },
+      )
+      .toBe(3);
+
+    // Add the imperative node → union is now 4; imp present.
+    await mount.getByTestId('add-imperative').click();
+    await expect
+      .poll(
+        async () => {
+          await mount.getByTestId('check-union').click();
+          return Number((await countReadout.textContent())?.trim() ?? '0');
+        },
+        { timeout: 10_000, intervals: [300, 600, 1200] },
+      )
+      .toBe(4);
+    await expect(impReadout).toHaveText('true');
+
+    // D37-08: toggle b off → its registry-managed node is reaped (4 → 3), but the
+    // imperative `imp` node (in NEITHER provenance set) SURVIVES the reconcile.
+    await mount.getByTestId('toggle-b').click();
+    await expect
+      .poll(
+        async () => {
+          await mount.getByTestId('check-union').click();
+          return Number((await countReadout.textContent())?.trim() ?? '0');
+        },
+        { timeout: 10_000, intervals: [300, 600, 1200] },
+      )
+      .toBe(3);
+    // imp survived the reap — the provenance distinction proof.
+    await expect(impReadout).toHaveText('true');
+  });
+}

@@ -71,6 +71,10 @@
     },
   },
   circlePaint: { 'circle-radius': 7, 'circle-color': '#dc2626' },
+  // D-02 union readout — the count of the demo's expected entities the engine
+  // actually has after reconcile (filled by checkUnion via the $expose getMap()).
+  unionLayers: 0,
+  unionSources: 0,
 }
 </data>
 
@@ -101,11 +105,35 @@ const OFFLINE_STYLE = {
     { id: 'line',    type: 'line', source: 'demo', paint: { 'line-color': '#0050a0', 'line-width': 2 } },
   ],
 }
+
+// D-02 union proof — read the LIVE engine via the $expose getMap() handle and
+// count how many of the demo's expected entities (config-array + declarative)
+// actually reached the map. Expected layers: 'arr-pts' (config-array) + 'circles'
+// (nested declarative) + 'bg' (flat declarative) = 3. Expected sources: 'arr'
+// (config-array) + 'pts' (nested declarative) = 2. If the union-merge dropped any
+// (no registry-∪-props reconcile), the counts fall short — the behavioral D37-04
+// assertion. On Angular the component ref is the host element (no getMap), so the
+// optional chain no-ops and the readout stays 0 (the Angular cell asserts the DOM
+// children render instead — see maplibre-map.spec.ts).
+const checkUnion = () => {
+  const map = $refs.map?.getMap?.()
+  if (!map) return
+  const wantLayers = ['arr-pts', 'circles', 'bg']
+  const wantSources = ['arr', 'pts']
+  $data.unionLayers = wantLayers.filter((id) => !!map.getLayer(id)).length
+  $data.unionSources = wantSources.filter((id) => !!map.getSource(id)).length
+}
 </script>
 
 <template>
 <div class="maplibre-declarative-demo">
   <h3>MapLibre — declarative + mixed</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="check-union" @click="checkUnion">Check union</button>
+    <span class="readout" data-testid="readout-union-layers">{{ $data.unionLayers }}</span>
+    <span class="readout" data-testid="readout-union-sources">{{ $data.unionSources }}</span>
+  </div>
 
   <div class="map-wrap" style="height: 320px">
     <MapLibre
@@ -135,6 +163,26 @@ const OFFLINE_STYLE = {
   max-width: 720px;
 }
 .maplibre-declarative-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
 </style>
 
 </rozie>

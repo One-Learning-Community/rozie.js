@@ -113,3 +113,66 @@ for (const target of TARGETS) {
       .toBeGreaterThan(4);
   });
 }
+
+/**
+ * Phase 37 — declarative `<Source>` / `<Layer>` children + the D-02 union-merge.
+ *
+ * `examples/demos/MapLibreDeclarativeDemo.rozie` feeds ONE `<MapLibre>` BOTH a
+ * config-array (`:sources` / `:layers`) AND declarative children — a nested
+ * `<Source id="pts"><Layer id="circles"/></Source>` + a flat background
+ * `<Layer id="bg"/>`. The parent's `applyLayers()` reconcile runs off
+ * (registry ∪ config-array props), so ALL of them must reach the live engine:
+ *   - layers: `arr-pts` (config-array) + `circles` (nested) + `bg` (flat) = 3
+ *   - sources: `arr` (config-array) + `pts` (nested) = 2
+ *
+ * The demo's "Check union" button reads the LIVE map via the `$expose getMap()`
+ * handle and writes how many of those expected entities the engine actually has
+ * into two readouts — the behavioral D37-04 union-merge assertion (NO new pixel
+ * baseline, D-08).
+ *
+ * Angular's component `ref` is the host element (no `getMap`), so its readout
+ * stays `0`; on Angular we assert the declarative children rendered the map
+ * (`.maplibregl-canvas`) instead — the union still feeds the SAME reconcile, and
+ * the 5 ref-resolving targets prove the merged entity count.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`maplibre-declarative [${target}]: nested + flat children union-merge with config-array (D-02 / D37-04)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=MapLibreDeclarative&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    // ---- 1. mount (the declarative children fed the same engine path) ----
+    const mapRoot = page.locator('.maplibregl-map').first();
+    await expect(mapRoot).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.maplibregl-canvas').first()).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // ---- 2. D-02 union via the $expose getMap() handle (5 ref-resolving) ----
+    // Angular's ref is the host element (no getMap) → readout stays 0; assert the
+    // engine mounted (done above) for it and skip the count.
+    if (target !== 'angular') {
+      const layersReadout = mount.getByTestId('readout-union-layers');
+      const sourcesReadout = mount.getByTestId('readout-union-sources');
+      await expect(layersReadout).toHaveText('0');
+      // Click after the style has loaded — applyLayers() is style-load gated, so
+      // poll until all 3 layers + 2 sources are present in the live engine.
+      await expect
+        .poll(
+          async () => {
+            await mount.getByTestId('check-union').click();
+            return Number((await layersReadout.textContent())?.trim() ?? '0');
+          },
+          { timeout: 15_000, intervals: [300, 600, 1200, 2000] },
+        )
+        .toBe(3);
+      await expect(sourcesReadout).toHaveText('2');
+    }
+  });
+}

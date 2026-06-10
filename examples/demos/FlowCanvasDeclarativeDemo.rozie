@@ -69,6 +69,10 @@
   bNodes: [{ id: 'b' }],
   // tracks whether the imperative $expose node has been added.
   impAdded: false,
+  // D-02 union + D37-08 provenance readout — the live merged node count + whether
+  // the imperative `imp` node is present, read via the $expose getNodes() handle.
+  nodeCount: 0,
+  impPresent: false,
   // CONFIG-ARRAY side of the D-02 union — one node supplied as a prop, alongside
   // the declarative <FlowNode> children below. Both feed the same registry.
   cfgNodes: [
@@ -93,6 +97,21 @@ const addImperative = () => {
 
 // Drive $data.zoom up — the two-way bind reconciles into the live area.
 const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
+
+// D-02 union + D37-08 provenance proof — read the LIVE engine via the $expose
+// getNodes() handle. The merged node set is (config-array ∪ declarative-children ∪
+// imperative): 'cfg' (config-array :nodes) + 'a' + 'b' (declarative <FlowNode>) +
+// 'imp' (imperative $expose addNode, once added). After toggling b off, b's
+// registry-managed node is reaped but 'imp' (in NEITHER provenance set) survives.
+// On Angular the component ref is the host element (no getNodes), so the optional
+// chain no-ops and the readout stays 0 (the Angular cell asserts the rendered
+// .rozie-flow-node DOM instead — see rete-flow.spec.ts).
+const checkUnion = () => {
+  const nodes = $refs.flow?.getNodes?.()
+  if (!nodes) return
+  $data.nodeCount = nodes.length
+  $data.impPresent = nodes.some((n) => n.id === 'imp')
+}
 </script>
 
 <template>
@@ -102,8 +121,11 @@ const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 10
   <div class="controls">
     <button type="button" data-testid="toggle-b" @click="toggleB">Toggle B</button>
     <button type="button" data-testid="add-imperative" @click="addImperative">Add imperative</button>
+    <button type="button" data-testid="check-union" @click="checkUnion">Check union</button>
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
     <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+    <span class="readout" data-testid="readout-node-count">{{ $data.nodeCount }}</span>
+    <span class="readout" data-testid="readout-imp-present">{{ $data.impPresent }}</span>
   </div>
 
   <div class="flow-wrap" style="height: 340px">
