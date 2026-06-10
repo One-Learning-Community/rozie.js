@@ -257,6 +257,18 @@ export const EXAMPLES = [
   // matrix.spec.ts (auto-fixme until the Linux PNG lands).
   'MapLibre',
   'MapLibreScreenshot',
+  // Phase 37 (declarative-children dogfood) — MapLibreDeclarative is the
+  // BEHAVIORAL declarative-variant cell (loader → MapLibreDeclarativeDemo.rozie,
+  // which imports ../../packages/ui/maplibre/src/{MapLibre,Source,Layer}.rozie).
+  // It feeds ONE <MapLibre> BOTH a config-array (:sources/:layers) AND declarative
+  // children — a nested <Source><Layer/></Source> + a flat background <Layer> — to
+  // prove the D-02 union-merge (registry ∪ props, registry-overrides-array on id
+  // collision). Behavioral-only, NO new pixel baseline (D-08): the engine output
+  // equals the config-array path, so maplibre-map.spec.ts asserts each layer/source
+  // via the $expose getMap() handle (D37-04 union entity count). Built for all 6
+  // targets but NOT a matrix.spec.ts screenshot cell. The existing config-array
+  // 'MapLibre'/'MapLibreScreenshot' cells stay byte-identical (D-5).
+  'MapLibreDeclarative',
   // Cropper (Cropper.js v1) — the image-cropper image+overlay cells. Cropper is
   // the BEHAVIORAL cell (loader → examples/demos/CropperDemo.rozie, which imports
   // ../../packages/ui/cropper/src/Cropper.rozie). It binds r-model:data (the crop
@@ -300,6 +312,21 @@ export const EXAMPLES = [
   // EXAMPLES until a Linux PNG is generated and verified.
   'FlowCanvas',
   'FlowCanvasScreenshot',
+  // Phase 37 (declarative-children dogfood) — FlowCanvasDeclarative is the
+  // BEHAVIORAL declarative-variant cell (loader → FlowCanvasDeclarativeDemo.rozie,
+  // which imports ../../packages/ui/rete/src/{FlowCanvas,FlowNode,Handle,Connection}
+  // .rozie). It feeds ONE <FlowCanvas> BOTH a config-array (:nodes) AND declarative
+  // children — <FlowNode> with an INLINE body (D-04 render-callback, the Lit proof:
+  // the parent projects the FlowNode's own host element into the engine `body` div),
+  // nested <Handle> ports, and a flat <Connection> edge. It proves the D-02
+  // union-merge (registry ∪ props) and the D37-08 provenance (an r-for unmount-
+  // toggle reaps node `b`'s registry-managed node while an $expose imperative add
+  // survives). Behavioral-only, NO new pixel baseline (D-08): rete-flow.spec.ts
+  // asserts the inline body renders inside the engine node, the merged node count,
+  // and the reap/survive provenance. Built for all 6 targets but NOT a
+  // matrix.spec.ts screenshot cell. The existing 'FlowCanvas'/'FlowCanvasScreenshot'
+  // cells stay byte-identical (D-5).
+  'FlowCanvasDeclarative',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -419,6 +446,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // MapLibreDemo / MapLibreScreenshotDemo.
   MapLibre: 'rozie-map-libre',
   MapLibreScreenshot: 'rozie-map-libre-screenshot',
+  // Phase 37 — the lit entry appends '-demo' → tag
+  // 'rozie-map-libre-declarative-demo' = kebab of MapLibreDeclarativeDemo.
+  MapLibreDeclarative: 'rozie-map-libre-declarative',
   // Cropper — the lit entry appends '-demo' → tags 'rozie-cropper-demo' /
   // 'rozie-cropper-screenshot-demo' = kebab of CropperDemo / CropperScreenshotDemo.
   Cropper: 'rozie-cropper',
@@ -434,6 +464,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-flow-canvas').
   FlowCanvas: 'rozie-flow-canvas',
   FlowCanvasScreenshot: 'rozie-flow-canvas-screenshot',
+  // Phase 37 — the lit entry appends '-demo' → tag
+  // 'rozie-flow-canvas-declarative-demo' = kebab of FlowCanvasDeclarativeDemo.
+  FlowCanvasDeclarative: 'rozie-flow-canvas-declarative',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -583,6 +616,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // CodeMirror precedent. No parent props needed.
   MapLibre: {},
   MapLibreScreenshot: {},
+  // Phase 37 — MapLibreDeclarativeDemo is self-contained: it seeds its
+  // arraySources/arrayLayers/geojson/circlePaint in <data> and the OFFLINE_STYLE
+  // in <script>, and passes center/zoom as static attrs (not r-model). No parent
+  // props needed.
+  MapLibreDeclarative: {},
   // Cropper — both demos are self-contained: CropperDemo seeds box:undefined in
   // <data> and the SVG data URL + SAMPLE in <script>; CropperScreenshotDemo
   // hardcodes the SVG data URL + FIXED_BOX in <script>. No parent props needed.
@@ -595,6 +633,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   PdfViewerScreenshot: {},
   FlowCanvas: {},
   FlowCanvasScreenshot: {},
+  // Phase 37 — FlowCanvasDeclarativeDemo is self-contained: it seeds
+  // zoom/bNodes/impAdded/cfgNodes in <data> and binds zoom via r-model internally
+  // (not parent-supplied), so no MODEL_PROPS entry (the FlowCanvas/CodeMirror
+  // precedent). No parent props needed.
+  FlowCanvasDeclarative: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
