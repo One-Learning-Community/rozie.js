@@ -57,6 +57,7 @@ import { threadParamTypes } from './ir/threadParamTypes.js';
 // threadParamTypes so any producer IR fetched for paramTypes threading is
 // already cached (lookup-order-independent, but threading errors fire first).
 import { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
+import { validatePortalScopedStyle } from './ir/validatePortalScopedStyle.js';
 // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
 // For `<style lang="scss">` the six emitStyle.ts files slice rule bodies at byte
 // offsets that index the COMPILED CSS (built by parseStyle, Plan 10-03); the
@@ -301,6 +302,14 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     opts.resolver ??
     new ProducerResolver({ root: opts.resolverRoot ?? process.cwd() });
   threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, acc);
+
+  // 2.55. Phase 38 — flag scoped <style> rules whose subject class/tag is used
+  // EXCLUSIVELY in portal-fill content (ROZ088, collected warning). MUST run
+  // AFTER threadParamTypes: `filler.isPortal` is set only there, so wiring it
+  // earlier (e.g. inside lowerToIR) would see isPortal undefined everywhere and
+  // warn on nothing (silent false negative). Reads the already-threaded IR — no
+  // cache/resolver of its own. severity: 'warning' passes the :error gate below.
+  validatePortalScopedStyle(ir, acc);
 
   // 2.6. Phase 07.3 — validate consumer-side two-way bindings (r-model:propName=).
   // Pasted-line pattern after threadParamTypes (per 07.3-RESEARCH §A5 — runs

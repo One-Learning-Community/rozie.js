@@ -201,7 +201,17 @@ function walk(
         tagBucket.add(node.tagName);
       }
 
-      for (const child of node.children) walk(child, inPortal, b);
+      // A `<template #X>` slot-fill directive is preserved in BOTH `children`
+      // (the raw directive element) AND the matching `slotFillers[].body`. Walk
+      // the directive's content ONLY via `slotFillers` (with the right portal
+      // flag) — walking the `<template>` child too would double-count its
+      // classes as NON-portal and defeat the D-01 exclusivity test.
+      for (const child of node.children) {
+        if (child.type === 'TemplateElement' && child.tagName === 'template') {
+          continue;
+        }
+        walk(child, inPortal, b);
+      }
 
       if (node.slotFillers) {
         for (const f of node.slotFillers) {
@@ -258,6 +268,11 @@ function findNamingFiller(
         }
       }
       for (const child of node.children) {
+        // Skip `<template #X>` slot-fill directive children — their content is
+        // walked via `slotFillers` below (mirrors `walk`).
+        if (child.type === 'TemplateElement' && child.tagName === 'template') {
+          continue;
+        }
         const hit = findNamingFiller(child, subjectClasses, subjectTag);
         if (hit) return hit;
       }
