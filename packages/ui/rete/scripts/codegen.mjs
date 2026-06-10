@@ -24,17 +24,25 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/rete
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
-const SRC = resolve(ROOT, 'src/FlowCanvas.rozie');
-const FILENAME = 'FlowCanvas.rozie';
 
-/** Per-target leaf dir + emitted filename (build mode is informational). */
+// Phase 37: the package now ships the parent <FlowCanvas> PLUS the declarative
+// <FlowNode>/<Handle>/<Connection> children (the dogfood of the Phase 36
+// $provide/$inject primitive). Codegen compiles each sibling .rozie source into
+// all 6 leaves (the chartjs / maplibre multi-component precedent). FlowCanvas MUST
+// be FIRST — it owns the handle-manifest + docs-table validation gates (the
+// renderless / render-callback children have no $expose / docs page); the children
+// are pure additions.
+const PARENT = 'FlowCanvas';
+const COMPONENTS = [PARENT, 'FlowNode', 'Handle', 'Connection'];
+
+/** Per-target leaf dir + emitted file extension (build mode is informational). */
 const TARGETS = {
-  react: { dir: 'react', file: 'FlowCanvas.tsx', build: 'tsdown' },
-  vue: { dir: 'vue', file: 'FlowCanvas.vue', build: 'source' },
-  svelte: { dir: 'svelte', file: 'FlowCanvas.svelte', build: 'source' },
-  angular: { dir: 'angular', file: 'FlowCanvas.ts', build: 'source' },
-  solid: { dir: 'solid', file: 'FlowCanvas.tsx', build: 'tsdown' },
-  lit: { dir: 'lit', file: 'FlowCanvas.ts', build: 'tsdown' },
+  react: { dir: 'react', ext: 'tsx', build: 'tsdown' },
+  vue: { dir: 'vue', ext: 'vue', build: 'source' },
+  svelte: { dir: 'svelte', ext: 'svelte', build: 'source' },
+  angular: { dir: 'angular', ext: 'ts', build: 'source' },
+  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown' },
+  lit: { dir: 'lit', ext: 'ts', build: 'tsdown' },
 };
 
 function leafPkgName(dir) {
@@ -44,10 +52,16 @@ function leafPkgName(dir) {
 }
 
 function main() {
-  const source = readFileSync(SRC, 'utf8');
+  // Read every component source once. Keyed by component name.
+  const sources = Object.fromEntries(
+    COMPONENTS.map((name) => [name, readFileSync(resolve(ROOT, `src/${name}.rozie`), 'utf8')]),
+  );
 
-  // parse + lower ONCE for the doc tables.
-  const { ast } = parse(source, { filename: FILENAME });
+  // parse + lower the PARENT ONCE for the doc tables + handle manifest. The
+  // render-callback <FlowNode> + renderless <Handle>/<Connection> children have no
+  // $expose and no docs page, so the handle-manifest + docs-table validation gates
+  // apply to FlowCanvas only.
+  const { ast } = parse(sources[PARENT], { filename: `${PARENT}.rozie` });
   const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
 
   // Keep the hand-kept handle manifest in lockstep with ir.expose (Phase 21).
@@ -59,58 +73,71 @@ function main() {
     }
   }
 
+  // per-target emit + README. Outer loop = target; inner loop = component.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
-    const errs = r.diagnostics.filter((d) => d.severity === 'error');
-    if (errs.length) {
-      throw new Error(
-        `codegen ${target}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
-          errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
-      );
-    }
-
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
 
-    // FlowCanvas.rozie's 6 emits compile strict-tsc-clean as-authored (the engine
-    // calls route through null-let `any` instances), so there is NO per-leaf
-    // type-aid `code.replace(...)` patch. If a future emit shape needs one, ADD it
-    // as a fail-loud token-anchored replace (the CodeMirror pattern) — do NOT edit
-    // the emitter (SCOPE FENCE).
-    const code = r.code;
-    writeFileSync(resolve(leafSrc, cfg.file), code);
+    // Compile each sibling component into this leaf. The SCOPE FENCE throw is
+    // applied to EACH compile — an error means a mis-wired codegen/authoring path,
+    // NEVER an emitter edit (escalate as a compiler gap instead).
+    for (const componentName of COMPONENTS) {
+      const filename = `${componentName}.rozie`;
+      const r = compile(sources[componentName], { target, filename });
+      const errs = r.diagnostics.filter((d) => d.severity === 'error');
+      if (errs.length) {
+        throw new Error(
+          `codegen ${target} ${componentName}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
+            errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
+        );
+      }
 
-    // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
-    // DEFAULT export, so the barrel re-exports the default under the named
-    // `FlowCanvas` the READMEs/consumers import. React AND Solid also forward the
-    // synthesized `FlowCanvasHandle` type emitted into the .tsx.
+      // FlowCanvas's 6 emits compile strict-tsc-clean as-authored (the engine calls
+      // route through null-let `any` instances); the children likewise (their
+      // $inject results are routed through null-let `any` aliases). There is NO
+      // per-leaf type-aid `code.replace(...)` patch. Emit the compiled code verbatim.
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
+
+      // React-only sidecars, per component. The render-callback / renderless
+      // children emit no CSS and no synthesized handle type — the `if (r.css)` /
+      // `if (r.types)` guards already handle absence; the global-css cleanup removes
+      // a stale sidecar if a component carries no nested-:root engine rules.
+      if (target === 'react') {
+        if (r.css) writeFileSync(resolve(leafSrc, `${componentName}.css`), r.css);
+        const globalCssPath = resolve(leafSrc, `${componentName}.global.css`);
+        if (r.globalCss) {
+          writeFileSync(globalCssPath, r.globalCss);
+        } else if (existsSync(globalCssPath)) {
+          rmSync(globalCssPath);
+        }
+        if (r.types) writeFileSync(resolve(leafSrc, `${componentName}.d.ts`), r.types);
+      }
+    }
+
+    // Bundled leaves (tsdown) entry on src/index.ts. Each component is a DEFAULT
+    // export, so the multi-export barrel re-exports every component's default under
+    // its named export (an `export *` would NOT forward a default). The PARENT also
+    // re-exports the package default + the `FlowCanvasHandle` type (React/Solid emit
+    // it in the .tsx).
     if (cfg.build === 'tsdown') {
+      const childExports = COMPONENTS.filter((n) => n !== PARENT)
+        .map((n) => `export { default as ${n} } from './${n}';\n`)
+        .join('');
       const barrel =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as FlowCanvas } from './FlowCanvas';\n` +
-            `export { default } from './FlowCanvas';\n\n` +
-            `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+            `export { default } from './FlowCanvas';\n` +
+            childExports +
+            `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
             `export type { FlowCanvasHandle } from './FlowCanvas';\n`
-          : `export { default as FlowCanvas } from './FlowCanvas';\nexport { default } from './FlowCanvas';\n`;
+          : `export { default as FlowCanvas } from './FlowCanvas';\nexport { default } from './FlowCanvas';\n` +
+            childExports;
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
-    // React-only sidecars (scoped CSS + the :root engine-DOM escape-hatch CSS +
-    // the synthesized handle .d.ts).
-    if (target === 'react') {
-      if (r.css) writeFileSync(resolve(leafSrc, 'FlowCanvas.css'), r.css);
-      const globalCssPath = resolve(leafSrc, 'FlowCanvas.global.css');
-      if (r.globalCss) {
-        writeFileSync(globalCssPath, r.globalCss);
-      } else if (existsSync(globalCssPath)) {
-        rmSync(globalCssPath);
-      }
-      if (r.types) writeFileSync(resolve(leafSrc, 'FlowCanvas.d.ts'), r.types);
-    }
-
-    // README from the single IR parse.
+    // README from the single PARENT IR parse.
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
@@ -118,7 +145,8 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .global.css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
+    const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓`);
   }
 
   // ENFORCE docs props-table validation against docs/guide/rete.md (the
@@ -154,7 +182,9 @@ function main() {
     );
   }
 
-  console.log('codegen: done — 6 targets emitted, 6 READMEs rendered, 6 LICENSEs vendored.');
+  console.log(
+    `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), 6 READMEs rendered, 6 LICENSEs vendored.`,
+  );
 }
 
 main();

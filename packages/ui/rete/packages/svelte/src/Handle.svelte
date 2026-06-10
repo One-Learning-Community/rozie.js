@@ -1,0 +1,37 @@
+<script lang="ts">
+import { getContext, onMount } from 'svelte';
+
+interface Props {
+  side?: string;
+  port: string;
+  label?: unknown;
+  multiple?: unknown;
+  [key: string]: unknown;
+}
+
+let {
+  side = 'output',
+  port,
+  label = undefined,
+  multiple = undefined,
+  ...__rozieAttrs
+}: Props = $props();
+
+const node = getContext('rete:node');
+
+// $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
+// rejects on `.addPort(...)` (TS2339). The .rozie-native fix is the null-let → `any`
+// typeNeutralize idiom: alias through a MODULE-SCOPE `let nd = null` so it is in
+// scope from the Solid hoisted onCleanup teardown (the MapLibre Source/Layer
+// lesson). ZERO emitter change.
+let nd: any = null;
+nd = node;
+
+onMount(() => {
+  // register this port against the enclosing node's id+side; the parent's
+  // reconcileNodes re-runs buildNode with the updated input/output spec.
+  if (nd) nd.addPort(side, port, label, multiple);
+});
+</script>
+
+<!-- empty template -->
