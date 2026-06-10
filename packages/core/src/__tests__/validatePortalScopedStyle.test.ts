@@ -21,7 +21,7 @@
 //
 // The POSITIVE case is asserted FIRST so a silent producer/threading failure
 // can't make the negatives pass vacuously.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -386,6 +386,40 @@ describe('validatePortalScopedStyle [Phase 38] — edge cases', () => {
     );
     expect(run(ir)).toHaveLength(1);
   });
+
+  // ---- WR-01 regression: comma/group TAG selector order-independence. ------
+  // A `strong, em { }` group selector where the portal-exclusive tag (`strong`)
+  // is listed FIRST must still flag. The pre-fix code kept only the LAST tag
+  // sub-selector (`em`, NOT portal-exclusive) and silently never fired — an
+  // order-dependent false negative. `subject.tags` now accumulates BOTH.
+  // `em` is rendered in non-portal content so it is NOT portal-exclusive, which
+  // is exactly the asymmetry that exposed the last-wins bug.
+  it('(C3 / WR-01) comma TAG selector with the portal-exclusive tag listed FIRST (`strong, em`) → flags', () => {
+    const ir = stubIR(
+      el('div', [], [
+        el('em'), // non-portal `em` → `em` is NOT portal-exclusive
+        component('FlowNode', [
+          // `strong` appears ONLY inside the portal fill → portal-exclusive.
+          filler('body', [el('strong')], { isPortal: true }),
+        ]),
+      ]),
+      [rule('strong, em')],
+    );
+    expect(run(ir)).toHaveLength(1);
+  });
+
+  it('(C4 / WR-01) reversed comma TAG selector (`em, strong`) still flags → order-independent', () => {
+    const ir = stubIR(
+      el('div', [], [
+        el('em'), // non-portal `em` → `em` is NOT portal-exclusive
+        component('FlowNode', [
+          filler('body', [el('strong')], { isPortal: true }),
+        ]),
+      ]),
+      [rule('em, strong')],
+    );
+    expect(run(ir)).toHaveLength(1);
+  });
 });
 
 // ===========================================================================
@@ -497,8 +531,18 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     return flagged.sort();
   }
 
+  // IN-01: compile the whole demo corpus ONCE for the block. E1 and E2 both
+  // read this shared result instead of independently re-running
+  // `flaggedCorpusFiles()` — halving the compile count and the documented
+  // cold-build race-flake surface.
+  let cachedFlagged: string[];
+
+  beforeAll(() => {
+    cachedFlagged = flaggedCorpusFiles();
+  });
+
   it('(E1) the ROZ088-flagged corpus set EXACTLY equals the pinned pre-fix baseline', () => {
-    const flagged = flaggedCorpusFiles();
+    const flagged = cachedFlagged;
 
     const unexpected = flagged.filter((f) => !EXPECTED_ROZ088_FILES.includes(f));
     const missing = EXPECTED_ROZ088_FILES.filter((f) => !flagged.includes(f));
@@ -523,8 +567,7 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
   });
 
   it('(E2) FlowCanvasDemo (the SPEC live-positive) IS flagged; FlowCanvasDeclarativeDemo (the live-negative) is NOT', () => {
-    const flagged = flaggedCorpusFiles();
-    expect(flagged).toContain(basename(POS_PATH)); // FlowCanvasDemo.rozie
-    expect(flagged).not.toContain(basename(NEG_PATH)); // FlowCanvasDeclarativeDemo.rozie
+    expect(cachedFlagged).toContain(basename(POS_PATH)); // FlowCanvasDemo.rozie
+    expect(cachedFlagged).not.toContain(basename(NEG_PATH)); // FlowCanvasDeclarativeDemo.rozie
   });
 });

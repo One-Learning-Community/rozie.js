@@ -64,14 +64,19 @@ const CLASS_TOKEN_IN_SELECTOR = /\.([A-Za-z_-][A-Za-z0-9_-]*)/g;
 const OUT_OF_SCOPE_SELECTOR = /[\s>+~#[:]/;
 
 /**
- * The subject of a single combinator-free compound selector.
+ * The subject of a raw selector, accumulated across comma sub-selectors.
  *   - `classes` — bare `.x` (and `.a.b` compound) tokens.
- *   - `tag`     — a leading bare tag identifier (`el`, `el.x`).
- * A sub-selector with any combinator/id/attribute/pseudo yields `null` (skip).
+ *   - `tags`    — leading bare tag identifiers (`el`, `el.x`).
+ * A sub-selector with any combinator/id/attribute/pseudo contributes nothing.
+ *
+ * Both are `Set<string>` so a comma/group selector like `strong, em { }`
+ * accumulates EVERY in-scope tag subject (`strong` AND `em`) rather than
+ * keeping only the last — a plain `tag` assignment dropped all but the final
+ * sub-selector, an order-dependent false negative (WR-01).
  */
 interface Subject {
   classes: Set<string>;
-  tag: string | null;
+  tags: Set<string>;
 }
 
 /**
@@ -86,7 +91,7 @@ interface Subject {
  * Defensive: a malformed selector yields an empty subject rather than throwing.
  */
 function extractSubject(selector: unknown): Subject {
-  const subject: Subject = { classes: new Set(), tag: null };
+  const subject: Subject = { classes: new Set(), tags: new Set() };
   if (typeof selector !== 'string') return subject;
 
   for (const raw of selector.split(',')) {
@@ -102,10 +107,12 @@ function extractSubject(selector: unknown): Subject {
 
     // A leading bare tag identifier (the compound does not start with `.`).
     // e.g. `strong` → tag 'strong'; `el.x` → tag 'el' + class 'x'.
+    // Accumulate (not overwrite) so each comma sub-selector's tag is kept —
+    // `strong, em` contributes BOTH 'strong' and 'em' (WR-01).
     if (!sub.startsWith('.')) {
       const lead = sub.match(/^([A-Za-z_-][A-Za-z0-9_-]*)/);
       if (lead && lead[1] && VALID_CLASS_TOKEN.test(lead[1])) {
-        subject.tag = lead[1];
+        subject.tags.add(lead[1]);
       }
     }
   }
@@ -253,7 +260,7 @@ function walk(
 function findNamingFiller(
   node: TemplateNode | null,
   subjectClasses: Set<string>,
-  subjectTag: string | null,
+  subjectTags: Set<string>,
 ): { slotName: string; childTag: string } | null {
   if (node === null) return null;
 
@@ -262,7 +269,7 @@ function findNamingFiller(
       if (node.slotFillers) {
         for (const f of node.slotFillers) {
           if (f.isDynamic || f.isPortal !== true) continue;
-          if (fillerUsesSubject(f, subjectClasses, subjectTag)) {
+          if (fillerUsesSubject(f, subjectClasses, subjectTags)) {
             return { slotName: f.name, childTag: node.tagName };
           }
         }
@@ -273,13 +280,13 @@ function findNamingFiller(
         if (child.type === 'TemplateElement' && child.tagName === 'template') {
           continue;
         }
-        const hit = findNamingFiller(child, subjectClasses, subjectTag);
+        const hit = findNamingFiller(child, subjectClasses, subjectTags);
         if (hit) return hit;
       }
       if (node.slotFillers) {
         for (const f of node.slotFillers) {
           for (const child of f.body) {
-            const hit = findNamingFiller(child, subjectClasses, subjectTag);
+            const hit = findNamingFiller(child, subjectClasses, subjectTags);
             if (hit) return hit;
           }
         }
@@ -290,26 +297,26 @@ function findNamingFiller(
     case 'TemplateMatch':
       for (const branch of node.branches) {
         for (const child of branch.body) {
-          const hit = findNamingFiller(child, subjectClasses, subjectTag);
+          const hit = findNamingFiller(child, subjectClasses, subjectTags);
           if (hit) return hit;
         }
       }
       break;
     case 'TemplateLoop':
       for (const child of node.body) {
-        const hit = findNamingFiller(child, subjectClasses, subjectTag);
+        const hit = findNamingFiller(child, subjectClasses, subjectTags);
         if (hit) return hit;
       }
       break;
     case 'TemplateSlotInvocation':
       for (const child of node.fallback) {
-        const hit = findNamingFiller(child, subjectClasses, subjectTag);
+        const hit = findNamingFiller(child, subjectClasses, subjectTags);
         if (hit) return hit;
       }
       break;
     case 'TemplateFragment':
       for (const child of node.children) {
-        const hit = findNamingFiller(child, subjectClasses, subjectTag);
+        const hit = findNamingFiller(child, subjectClasses, subjectTags);
         if (hit) return hit;
       }
       break;
@@ -324,7 +331,7 @@ function findNamingFiller(
 function fillerUsesSubject(
   f: SlotFillerDecl,
   subjectClasses: Set<string>,
-  subjectTag: string | null,
+  subjectTags: Set<string>,
 ): boolean {
   let found = false;
   const b: Buckets = {
@@ -337,7 +344,9 @@ function fillerUsesSubject(
   for (const c of subjectClasses) {
     if (b.portalClasses.has(c)) found = true;
   }
-  if (subjectTag && b.portalTags.has(subjectTag)) found = true;
+  for (const tg of subjectTags) {
+    if (b.portalTags.has(tg)) found = true;
+  }
   return found;
 }
 
@@ -388,23 +397,29 @@ export function validatePortalScopedStyle(
     const subject = extractSubject(rule?.selector);
 
     // A subject matches when ANY of its class tokens is a portal-exclusive
-    // class, OR its tag is a portal-exclusive tag (class-vs-class, tag-vs-tag).
+    // class, OR ANY of its tags is a portal-exclusive tag (class-vs-class,
+    // tag-vs-tag). Tags accumulate across comma sub-selectors (WR-01): a
+    // `strong, em` rule fires when EITHER `strong` or `em` is portal-exclusive,
+    // regardless of their order in the selector.
     const matchedClasses = new Set<string>();
     for (const c of subject.classes) {
       if (portalExclusiveClasses.has(c)) matchedClasses.add(c);
     }
-    const matchedTag =
-      subject.tag !== null && portalExclusiveTags.has(subject.tag)
-        ? subject.tag
-        : null;
+    const matchedTags = new Set<string>();
+    for (const tg of subject.tags) {
+      if (portalExclusiveTags.has(tg)) matchedTags.add(tg);
+    }
 
-    if (matchedClasses.size === 0 && matchedTag === null) continue;
+    if (matchedClasses.size === 0 && matchedTags.size === 0) continue;
 
     // Per-rule dedup is free (one push per scoped rule).
-    const naming = findNamingFiller(ir.template, matchedClasses, matchedTag);
+    const naming = findNamingFiller(ir.template, matchedClasses, matchedTags);
+    // Label the offending subject: prefer a matched tag, else the matched
+    // class compound. `[...set][0]` is deterministic (insertion order = the
+    // order the tags appear left-to-right in the selector).
     const subjectLabel =
-      matchedTag !== null
-        ? `\`${matchedTag}\``
+      matchedTags.size > 0
+        ? `\`${[...matchedTags][0]}\``
         : `\`.${[...matchedClasses].join('.')}\``;
     const where = naming
       ? `the \`${naming.slotName || '(default)'}\` portal slot of \`<${naming.childTag}>\``
