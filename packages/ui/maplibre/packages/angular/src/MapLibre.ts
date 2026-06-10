@@ -1,7 +1,9 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, InjectionToken, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 import maplibregl from 'maplibre-gl';
+
+interface DefaultCtx {}
 
 interface MarkerCtx {
   $implicit: { marker: any; index: any };
@@ -20,6 +22,20 @@ interface ControlCtx {
   map: any;
 }
 
+const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
+  ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
+    string,
+    InjectionToken<unknown>
+  >;
+function rozieToken(key: string): InjectionToken<unknown> {
+  let token = __rozieTokenRegistry.get(key);
+  if (!token) {
+    token = new InjectionToken<unknown>('rozie:' + key);
+    __rozieTokenRegistry.set(key, token);
+  }
+  return token;
+}
+
 @Component({
   selector: 'rozie-map-libre',
   standalone: true,
@@ -27,6 +43,8 @@ interface ControlCtx {
   template: `
 
     <div class="rozie-maplibre" #containerEl></div>
+
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
 
 
 
@@ -53,6 +71,56 @@ interface ControlCtx {
         flex-direction: column;
       }
   `],
+  providers: [
+    {
+      provide: rozieToken('maplibre:sources'),
+      useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => MapLibre)); return ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost.sourceReg.set({
+      ...__rozieCtxHost.sourceReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost.sourceReg.set({
+      ...__rozieCtxHost.sourceReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost.sourceReg()
+    };
+    delete n[id];
+    __rozieCtxHost.sourceReg.set(n);
+  }
+}); },
+    },
+    {
+      provide: rozieToken('maplibre:layers'),
+      useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => MapLibre)); return ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost.layerReg.set({
+      ...__rozieCtxHost.layerReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost.layerReg.set({
+      ...__rozieCtxHost.layerReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost.layerReg()
+    };
+    delete n[id];
+    __rozieCtxHost.layerReg.set(n);
+  }
+}); },
+    },
+  ],
 })
 export class MapLibre {
   center = model<any[]>((() => [0, 0])());
@@ -80,6 +148,8 @@ export class MapLibre {
   interactiveLayerIds = input<any[]>((() => [])());
   controls = input<any[]>((() => [])());
   options = input<Record<string, any>>((() => ({}))());
+  sourceReg = signal({});
+  layerReg = signal({});
   containerEl = viewChild<ElementRef<HTMLDivElement>>('containerEl');
   load = output<unknown>();
   idle = output<unknown>();
@@ -101,6 +171,7 @@ export class MapLibre {
   pitchend = output<unknown>();
   mouseenter = output<unknown>();
   mouseleave = output<unknown>();
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('marker', { read: TemplateRef }) markerTpl?: TemplateRef<MarkerCtx>;
   @ContentChild('popup', { read: TemplateRef }) popupTpl?: TemplateRef<PopupCtx>;
   @ContentChild('control', { read: TemplateRef }) controlTpl?: TemplateRef<ControlCtx>;
@@ -133,6 +204,8 @@ export class MapLibre {
   private __rozieWatchInitial_19 = true;
   private __rozieWatchInitial_20 = true;
   private __rozieWatchInitial_21 = true;
+  private __rozieWatchInitial_22 = true;
+  private __rozieWatchInitial_23 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.center())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
@@ -191,18 +264,20 @@ export class MapLibre {
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.sources())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.applyLayers())(); }); });
     effect(() => { const __watchVal = (() => this.layers())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => this.applyLayers())(); }); });
-    effect(() => { const __watchVal = (() => this.interactiveLayerIds())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.sourceReg())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => this.applyLayers())(); }); });
+    effect(() => { const __watchVal = (() => this.layerReg())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => this.applyLayers())(); }); });
+    effect(() => { const __watchVal = (() => this.interactiveLayerIds())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } ((v: any) => {
       if (this.reconcileInteractive) this.reconcileInteractive(v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.controls())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => this.applyControls())(); }); });
-    effect(() => { const __watchVal = (() => this.dragPan())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.dragRotate())(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.scrollZoom())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.doubleClickZoom())(); untracked(() => { if (this.__rozieWatchInitial_17) { this.__rozieWatchInitial_17 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.boxZoom())(); untracked(() => { if (this.__rozieWatchInitial_18) { this.__rozieWatchInitial_18 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.keyboard())(); untracked(() => { if (this.__rozieWatchInitial_19) { this.__rozieWatchInitial_19 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.touchZoomRotate())(); untracked(() => { if (this.__rozieWatchInitial_20) { this.__rozieWatchInitial_20 = false; return; } (() => this.applyInteractionToggles())(); }); });
-    effect(() => { const __watchVal = (() => this.touchPitch())(); untracked(() => { if (this.__rozieWatchInitial_21) { this.__rozieWatchInitial_21 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.controls())(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => this.applyControls())(); }); });
+    effect(() => { const __watchVal = (() => this.dragPan())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.dragRotate())(); untracked(() => { if (this.__rozieWatchInitial_17) { this.__rozieWatchInitial_17 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.scrollZoom())(); untracked(() => { if (this.__rozieWatchInitial_18) { this.__rozieWatchInitial_18 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.doubleClickZoom())(); untracked(() => { if (this.__rozieWatchInitial_19) { this.__rozieWatchInitial_19 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.boxZoom())(); untracked(() => { if (this.__rozieWatchInitial_20) { this.__rozieWatchInitial_20 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.keyboard())(); untracked(() => { if (this.__rozieWatchInitial_21) { this.__rozieWatchInitial_21 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.touchZoomRotate())(); untracked(() => { if (this.__rozieWatchInitial_22) { this.__rozieWatchInitial_22 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.touchPitch())(); untracked(() => { if (this.__rozieWatchInitial_23) { this.__rozieWatchInitial_23 = false; return; } (() => this.applyInteractionToggles())(); }); });
   }
 
   ngAfterViewInit() {
@@ -618,25 +693,63 @@ export class MapLibre {
     set('touchPitch', this.touchPitch());
   };
   applyLayers = () => {
-    const __layers = this.layers();
-    const __sources = this.sources();
     if (!this.instance || !this.instance.isStyleLoaded()) return;
-    const wantLayerIds = __layers.map((l: any) => l && l.id).filter(Boolean);
-    const wantSourceIds = __sources.map((s: any) => s && s.id).filter(Boolean);
+
+    // ─── union the config-array props with the declarative-children registry ────
+    // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+    // the LAST writer and overrides the config-array on id collision. Ordering: array
+    // entries first in array order, then registry entries in registration order —
+    // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+    // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+    // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+    // registries empty, mergeById returns exactly the config array (dedup by id of
+    // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+    // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || !e.id) {
+          out.push(e);
+          continue;
+        }
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || !e.id) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return out;
+    };
+    const mergedSources = mergeById(this.sources(), this.sourceReg());
+    const mergedLayers = mergeById(this.layers(), this.layerReg());
+    const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+    const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
     // 1. drop removed layers
     for (const id of this.appliedLayerIds as any) {
       if (!wantLayerIds.includes(id) && this.instance.getLayer(id)) this.instance.removeLayer(id);
     }
     // 2. add/update sources
-    for (const s of __sources as any) {
+    for (const s of mergedSources as any) {
       if (!s || !s.id) continue;
       const spec = s.spec || s;
       const existing = this.instance.getSource(s.id);
       if (!existing) this.instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
     }
     // 3. add/update layers
-    for (const l of __layers as any) {
+    for (const l of mergedLayers as any) {
       if (!l || !l.id) continue;
       if (!this.instance.getLayer(l.id)) {
         this.instance.addLayer(l, l.beforeId);
@@ -682,7 +795,7 @@ export class MapLibre {
   static ngTemplateContextGuard(
     _dir: MapLibre,
     _ctx: unknown,
-  ): _ctx is MarkerCtx | PopupCtx | ControlCtx {
+  ): _ctx is DefaultCtx | MarkerCtx | PopupCtx | ControlCtx {
     return true;
   }
 }

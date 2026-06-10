@@ -126,6 +126,7 @@ const map = ref();         // template ref
 
 | Slot | Params |
 | --- | --- |
+| (default) |  |
 | marker | marker, index |
 | popup | popup, index |
 | control | map |

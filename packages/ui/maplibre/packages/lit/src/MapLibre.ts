@@ -1,8 +1,13 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { ContextProvider, createContext } from '@lit/context';
 import maplibregl from 'maplibre-gl';
+
+const __rozieCtx_maplibre_sources = createContext(Symbol.for("rozie:maplibre:sources"));
+
+const __rozieCtx_maplibre_layers = createContext(Symbol.for("rozie:maplibre:layers"));
 
 interface RozieMarkerSlotCtx {
   marker: unknown;
@@ -67,14 +72,62 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   @property({ type: Array }) interactiveLayerIds: any[] = [];
   @property({ type: Array }) controls: any[] = [];
   @property({ type: Object }) options: any = {};
+  private _sourceReg = signal({});
+  private _layerReg = signal({});
   @query('[data-rozie-ref="containerEl"]') private _refContainerEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_2 = true;
 private __rozieWatchInitial_3 = true;
+private __rozieWatchInitial_12 = true;
+private __rozieWatchInitial_13 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
+private __rozieCtxProvider_maplibre_sources = new ContextProvider(this, { context: __rozieCtx_maplibre_sources, initialValue: ((__rozieCtxHost) => ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost._sourceReg.value = {
+      ...__rozieCtxHost._sourceReg.value,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost._sourceReg.value = {
+      ...__rozieCtxHost._sourceReg.value,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost._sourceReg.value
+    };
+    delete n[id];
+    __rozieCtxHost._sourceReg.value = n;
+  }
+}))(this) });
+private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context: __rozieCtx_maplibre_layers, initialValue: ((__rozieCtxHost) => ({
+  register: (id: any, spec: any) => {
+    __rozieCtxHost._layerReg.value = {
+      ...__rozieCtxHost._layerReg.value,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    __rozieCtxHost._layerReg.value = {
+      ...__rozieCtxHost._layerReg.value,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...__rozieCtxHost._layerReg.value
+    };
+    delete n[id];
+    __rozieCtxHost._layerReg.value = n;
+  }
+}))(this) });
 
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotMarker = false;
   @queryAssignedElements({ slot: 'marker', flatten: true }) private _slotMarkerElements!: Element[];
   @property({ attribute: false }) marker?: (scope: { marker: unknown; index: unknown }) => unknown;
@@ -91,6 +144,17 @@ private _portalContainers = new Set<HTMLElement>();
   private _rozieTornDown = false;
 
   private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="marker"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -127,6 +191,7 @@ private _portalContainers = new Set<HTMLElement>();
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotMarker = Array.from(this.children).some((el) => el.getAttribute('slot') === 'marker');
     this._hasSlotPopup = Array.from(this.children).some((el) => el.getAttribute('slot') === 'popup');
     this._hasSlotControl = Array.from(this.children).some((el) => el.getAttribute('slot') === 'control');
@@ -239,6 +304,51 @@ private _portalContainers = new Set<HTMLElement>();
         animate: false
       }, this.PROGRAMMATIC);
     })(__watchVal); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._sourceReg.value)(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => this.applyLayers())(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._layerReg.value)(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => this.applyLayers())(); }); }));
+
+    this._disconnectCleanups.push(effect(() => { void this._sourceReg.value; this.__rozieCtxProvider_maplibre_sources.setValue(((__rozieCtxHost) => ({
+      register: (id: any, spec: any) => {
+        __rozieCtxHost._sourceReg.value = {
+          ...__rozieCtxHost._sourceReg.value,
+          [id]: spec
+        };
+      },
+      update: (id: any, spec: any) => {
+        __rozieCtxHost._sourceReg.value = {
+          ...__rozieCtxHost._sourceReg.value,
+          [id]: spec
+        };
+      },
+      unregister: (id: any) => {
+        const n = {
+          ...__rozieCtxHost._sourceReg.value
+        };
+        delete n[id];
+        __rozieCtxHost._sourceReg.value = n;
+      }
+    }))(this)); }));
+    this._disconnectCleanups.push(effect(() => { void this._layerReg.value; this.__rozieCtxProvider_maplibre_layers.setValue(((__rozieCtxHost) => ({
+      register: (id: any, spec: any) => {
+        __rozieCtxHost._layerReg.value = {
+          ...__rozieCtxHost._layerReg.value,
+          [id]: spec
+        };
+      },
+      update: (id: any, spec: any) => {
+        __rozieCtxHost._layerReg.value = {
+          ...__rozieCtxHost._layerReg.value,
+          [id]: spec
+        };
+      },
+      unregister: (id: any) => {
+        const n = {
+          ...__rozieCtxHost._layerReg.value
+        };
+        delete n[id];
+        __rozieCtxHost._layerReg.value = n;
+      }
+    }))(this)); }));
 
     const el = this._refContainerEl;
 
@@ -649,6 +759,8 @@ private _portalContainers = new Set<HTMLElement>();
     return html`
 <div class="rozie-maplibre" data-rozie-ref="containerEl" data-rozie-s-f1ee1082></div>
 
+<slot></slot>
+
 <slot name="marker"></slot>
 
 <slot name="popup"></slot>
@@ -745,22 +857,62 @@ private _portalContainers = new Set<HTMLElement>();
 
   applyLayers = () => {
   if (!this.instance || !this.instance.isStyleLoaded()) return;
-  const wantLayerIds = this.layers.map((l: any) => l && l.id).filter(Boolean);
-  const wantSourceIds = this.sources.map((s: any) => s && s.id).filter(Boolean);
+
+  // ─── union the config-array props with the declarative-children registry ────
+  // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+  // the LAST writer and overrides the config-array on id collision. Ordering: array
+  // entries first in array order, then registry entries in registration order —
+  // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+  // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+  // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+  // registries empty, mergeById returns exactly the config array (dedup by id of
+  // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+  // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+  const mergeById = (arr: any, reg: any) => {
+    const out = [];
+    const idx = new Map();
+    for (const e of (Array.isArray(arr) ? arr : []) as any) {
+      if (!e || !e.id) {
+        out.push(e);
+        continue;
+      }
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    for (const id in reg) {
+      const e = reg[id];
+      if (!e || !e.id) continue;
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    return out;
+  };
+  const mergedSources = mergeById(this.sources, this._sourceReg.value);
+  const mergedLayers = mergeById(this.layers, this._layerReg.value);
+  const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+  const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
   // 1. drop removed layers
   for (const id of this.appliedLayerIds as any) {
     if (!wantLayerIds.includes(id) && this.instance.getLayer(id)) this.instance.removeLayer(id);
   }
   // 2. add/update sources
-  for (const s of this.sources as any) {
+  for (const s of mergedSources as any) {
     if (!s || !s.id) continue;
     const spec = s.spec || s;
     const existing = this.instance.getSource(s.id);
     if (!existing) this.instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
   }
   // 3. add/update layers
-  for (const l of this.layers as any) {
+  for (const l of mergedLayers as any) {
     if (!l || !l.id) continue;
     if (!this.instance.getLayer(l.id)) {
       this.instance.addLayer(l, l.beforeId);

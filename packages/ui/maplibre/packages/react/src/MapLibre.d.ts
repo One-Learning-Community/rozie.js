@@ -56,6 +56,7 @@ export interface MapLibreProps {
   onPitchend?: (...args: unknown[]) => void;
   onMouseenter?: (...args: unknown[]) => void;
   onMouseleave?: (...args: unknown[]) => void;
+  children?: ReactNode;
   renderMarker?: (params: { marker: () => void; index: () => void }) => ReactNode;
   renderPopup?: (params: { popup: () => void; index: () => void }) => ReactNode;
   renderControl?: (params: { map: () => void }) => ReactNode;

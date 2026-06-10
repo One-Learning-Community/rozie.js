@@ -2,6 +2,8 @@
 
 <div class="rozie-maplibre" ref="containerElRef"></div>
 
+<slot></slot>
+
 
 
 
@@ -11,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ mapStyle?: unknown; minZoom?: number; maxZoom?: number; maxBounds?: unknown; bounds?: unknown; fitBoundsOptions?: Record<string, any>; dragPan?: boolean; dragRotate?: boolean; scrollZoom?: boolean; doubleClickZoom?: boolean; boxZoom?: boolean; keyboard?: boolean; touchZoomRotate?: boolean; touchPitch?: boolean; markers?: any[]; popups?: any[]; sources?: any[]; layers?: any[]; interactiveLayerIds?: any[]; controls?: any[]; options?: Record<string, any> }>(),
@@ -47,12 +49,16 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  default(props: {  }): any;
   marker(props: { marker: any; index: any }): any;
   popup(props: { popup: any; index: any }): any;
   control(props: { map: any }): any;
 }>();
 
 const slots = useSlots();
+
+const sourceReg = ref({});
+const layerReg = ref({});
 
 const containerElRef = ref<HTMLElement>();
 
@@ -85,11 +91,18 @@ const PROGRAMMATIC = {
 // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
 const markerEntries = new Map();
 const popupEntries = new Map();
-// standard-control instances (so a controls-prop change can remove + re-add) and
-// the mount-once custom-control portal dispose. controlInstances is a null-let
-// (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
-// infers `never[]` under the strict framework-typecheck harness and rejects the
-// `any` control instances pushed into it.
+
+// ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+// Publish the source/layer register-API the <Source>/<Layer> children $inject and
+// self-register into. EVERY method uses WHOLE-OBJECT REPLACEMENT (spread / clone-
+// and-delete) so the watched $data.sourceReg/$data.layerReg reference changes once
+// per mutation and the parent $watch fires on all 6 targets (D-3 / Pitfall 1 — an
+// in-place `$data.sourceReg[id] = spec` is silent on React/Solid/Angular/Lit). The
+// register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … }) shape;
+// register/update share a body (both upsert by id). The values feed the SAME
+// applyLayers() reconcile + appliedSourceIds/appliedLayerIds provenance as the
+// config-array props, so registry-managed sources/layers are reaped on unregister
+// exactly like prop-managed ones (D37-08).
 // standard-control instances (so a controls-prop change can remove + re-add) and
 // the mount-once custom-control portal dispose. controlInstances is a null-let
 // (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
@@ -197,22 +210,62 @@ const applyInteractionToggles = () => {
 // sources (after their layers are gone).
 const applyLayers = () => {
   if (!instance || !instance.isStyleLoaded()) return;
-  const wantLayerIds = props.layers.map((l: any) => l && l.id).filter(Boolean);
-  const wantSourceIds = props.sources.map((s: any) => s && s.id).filter(Boolean);
+
+  // ─── union the config-array props with the declarative-children registry ────
+  // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+  // the LAST writer and overrides the config-array on id collision. Ordering: array
+  // entries first in array order, then registry entries in registration order —
+  // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+  // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+  // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+  // registries empty, mergeById returns exactly the config array (dedup by id of
+  // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+  // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+  const mergeById = (arr: any, reg: any) => {
+    const out = [];
+    const idx = new Map();
+    for (const e of (Array.isArray(arr) ? arr : []) as any) {
+      if (!e || !e.id) {
+        out.push(e);
+        continue;
+      }
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    for (const id in reg) {
+      const e = reg[id];
+      if (!e || !e.id) continue;
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    return out;
+  };
+  const mergedSources = mergeById(props.sources, sourceReg.value);
+  const mergedLayers = mergeById(props.layers, layerReg.value);
+  const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+  const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
   // 1. drop removed layers
   for (const id of appliedLayerIds as any) {
     if (!wantLayerIds.includes(id) && instance.getLayer(id)) instance.removeLayer(id);
   }
   // 2. add/update sources
-  for (const s of props.sources as any) {
+  for (const s of mergedSources as any) {
     if (!s || !s.id) continue;
     const spec = s.spec || s;
     const existing = instance.getSource(s.id);
     if (!existing) instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
   }
   // 3. add/update layers
-  for (const l of props.layers as any) {
+  for (const l of mergedLayers as any) {
     if (!l || !l.id) continue;
     if (!instance.getLayer(l.id)) {
       instance.addLayer(l, l.beforeId);
@@ -262,6 +315,49 @@ function getZoom() {
 function resize() {
   if (instance) instance.resize();
 }
+
+provide('maplibre:sources', {
+  register: (id: any, spec: any) => {
+    sourceReg.value = {
+      ...sourceReg.value,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    sourceReg.value = {
+      ...sourceReg.value,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...sourceReg.value
+    };
+    delete n[id];
+    sourceReg.value = n;
+  }
+});
+provide('maplibre:layers', {
+  register: (id: any, spec: any) => {
+    layerReg.value = {
+      ...layerReg.value,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    layerReg.value = {
+      ...layerReg.value,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...layerReg.value
+    };
+    delete n[id];
+    layerReg.value = n;
+  }
+});
 
 interface ReactivePortalHandle {
   update(scope: unknown): void;
@@ -638,6 +734,8 @@ watch(() => props.popups, (v: any) => {
 });
 watch(() => props.sources, () => applyLayers());
 watch(() => props.layers, () => applyLayers());
+watch(() => sourceReg.value, () => applyLayers());
+watch(() => layerReg.value, () => applyLayers());
 watch(() => props.interactiveLayerIds, (v: any) => {
   if (reconcileInteractive) reconcileInteractive(v);
 });

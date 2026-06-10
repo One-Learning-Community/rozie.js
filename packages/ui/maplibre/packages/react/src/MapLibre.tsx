@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { useControllableState } from '@rozie/runtime-react';
+import { rozieContext, useControllableState } from '@rozie/runtime-react';
 import './MapLibre.css';
 import './MapLibre.global.css';
 import maplibregl from 'maplibre-gl';
@@ -67,6 +67,7 @@ interface MapLibreProps {
   onPitchend?: (...args: any[]) => void;
   onMouseenter?: (...args: any[]) => void;
   onMouseleave?: (...args: any[]) => void;
+  children?: ReactNode;
   renderMarker?: (ctx: MarkerCtx) => ReactNode;
   renderPopup?: (ctx: PopupCtx) => ReactNode;
   renderControl?: (ctx: ControlCtx) => ReactNode;
@@ -85,6 +86,8 @@ export interface MapLibreHandle {
 }
 
 const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_props: MapLibreProps, ref): JSX.Element {
+  const __ctx_maplibre_sources = rozieContext("maplibre:sources");
+  const __ctx_maplibre_layers = rozieContext("maplibre:layers");
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultFitBoundsOptions = useState(() => (() => ({}))())[0];
   const __defaultMarkers = useState(() => (() => [])())[0];
@@ -191,6 +194,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _pitchRef.current = pitch;
   const _zoomRef = useRef(zoom);
   _zoomRef.current = zoom;
+  const [sourceReg, setSourceReg] = useState({});
+  const [layerReg, setLayerReg] = useState({});
   const containerEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
@@ -214,6 +219,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const _watch19First = useRef(true);
   const _watch20First = useRef(true);
   const _watch21First = useRef(true);
+  const _watch22First = useRef(true);
+  const _watch23First = useRef(true);
 
   const DEFAULT_STYLE = useMemo(() => 'https://demotiles.maplibre.org/style.json', []);
   // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
@@ -283,22 +290,62 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   }, [props.boxZoom, props.doubleClickZoom, props.dragPan, props.dragRotate, props.keyboard, props.scrollZoom, props.touchPitch, props.touchZoomRotate]);
   const applyLayers = useCallback(() => {
     if (!instance.current || !instance.current.isStyleLoaded()) return;
-    const wantLayerIds = props.layers.map((l: any) => l && l.id).filter(Boolean);
-    const wantSourceIds = props.sources.map((s: any) => s && s.id).filter(Boolean);
+
+    // ─── union the config-array props with the declarative-children registry ────
+    // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+    // the LAST writer and overrides the config-array on id collision. Ordering: array
+    // entries first in array order, then registry entries in registration order —
+    // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+    // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+    // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+    // registries empty, mergeById returns exactly the config array (dedup by id of
+    // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+    // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || !e.id) {
+          out.push(e);
+          continue;
+        }
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || !e.id) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return out;
+    };
+    const mergedSources = mergeById(props.sources, sourceReg);
+    const mergedLayers = mergeById(props.layers, layerReg);
+    const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+    const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
     // 1. drop removed layers
     for (const id of appliedLayerIds.current as any) {
       if (!wantLayerIds.includes(id) && instance.current.getLayer(id)) instance.current.removeLayer(id);
     }
     // 2. add/update sources
-    for (const s of props.sources as any) {
+    for (const s of mergedSources as any) {
       if (!s || !s.id) continue;
       const spec = s.spec || s;
       const existing = instance.current.getSource(s.id);
       if (!existing) instance.current.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
     }
     // 3. add/update layers
-    for (const l of props.layers as any) {
+    for (const l of mergedLayers as any) {
       if (!l || !l.id) continue;
       if (!instance.current.getLayer(l.id)) {
         instance.current.addLayer(l, l.beforeId);
@@ -313,7 +360,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     }
     appliedLayerIds.current = wantLayerIds;
     appliedSourceIds.current = wantSourceIds;
-  }, [props.layers, props.sources]);
+  }, [layerReg, props.layers, props.sources, sourceReg]);
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
   // 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
   // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
@@ -747,51 +794,103 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   }, [props.layers]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch12First.current) { _watch12First.current = false; return; }
+    applyLayers();
+  }, [sourceReg]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch13First.current) { _watch13First.current = false; return; }
+    applyLayers();
+  }, [layerReg]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch14First.current) { _watch14First.current = false; return; }
     const v = props.interactiveLayerIds;
     if (reconcileInteractive.current) reconcileInteractive.current(v);
   }, [props.interactiveLayerIds]);
   useEffect(() => {
-    if (_watch13First.current) { _watch13First.current = false; return; }
+    if (_watch15First.current) { _watch15First.current = false; return; }
     applyControls();
   }, [props.controls]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch14First.current) { _watch14First.current = false; return; }
+    if (_watch16First.current) { _watch16First.current = false; return; }
     applyInteractionToggles();
   }, [props.dragPan]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch15First.current) { _watch15First.current = false; return; }
+    if (_watch17First.current) { _watch17First.current = false; return; }
     applyInteractionToggles();
   }, [props.dragRotate]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch16First.current) { _watch16First.current = false; return; }
+    if (_watch18First.current) { _watch18First.current = false; return; }
     applyInteractionToggles();
   }, [props.scrollZoom]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch17First.current) { _watch17First.current = false; return; }
+    if (_watch19First.current) { _watch19First.current = false; return; }
     applyInteractionToggles();
   }, [props.doubleClickZoom]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch18First.current) { _watch18First.current = false; return; }
+    if (_watch20First.current) { _watch20First.current = false; return; }
     applyInteractionToggles();
   }, [props.boxZoom]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch19First.current) { _watch19First.current = false; return; }
+    if (_watch21First.current) { _watch21First.current = false; return; }
     applyInteractionToggles();
   }, [props.keyboard]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch20First.current) { _watch20First.current = false; return; }
+    if (_watch22First.current) { _watch22First.current = false; return; }
     applyInteractionToggles();
   }, [props.touchZoomRotate]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch21First.current) { _watch21First.current = false; return; }
+    if (_watch23First.current) { _watch23First.current = false; return; }
     applyInteractionToggles();
   }, [props.touchPitch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useImperativeHandle(ref, () => ({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
+    <__ctx_maplibre_sources.Provider value={{
+  register: (id: any, spec: any) => {
+    setSourceReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  update: (id: any, spec: any) => {
+    setSourceReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...sourceReg
+    };
+    delete n[id];
+    setSourceReg(n);
+  }
+}}>
+    <__ctx_maplibre_layers.Provider value={{
+  register: (id: any, spec: any) => {
+    setLayerReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  update: (id: any, spec: any) => {
+    setLayerReg(prev => ({
+      ...prev,
+      [id]: spec
+    }));
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...layerReg
+    };
+    delete n[id];
+    setLayerReg(n);
+  }
+}}>
     <>
     <div className={"rozie-maplibre"} ref={containerEl} data-rozie-s-f1ee1082="" />
+
+    {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
 
 
 
@@ -799,6 +898,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
 
 
     </>
+    </__ctx_maplibre_layers.Provider>
+    </__ctx_maplibre_sources.Provider>
   );
 });
 export default MapLibre;

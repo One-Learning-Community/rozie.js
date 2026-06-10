@@ -3,7 +3,7 @@ import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
 import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
 import PortalHostReactive from '@rozie/runtime-svelte/PortalHostReactive.svelte';
-import { onMount, untrack } from 'svelte';
+import { onMount, setContext, untrack } from 'svelte';
 
 interface Props {
   center?: any[];
@@ -31,6 +31,7 @@ interface Props {
   interactiveLayerIds?: any[];
   controls?: any[];
   options?: any;
+  children?: Snippet;
   marker?: Snippet<[{ marker: any; index: any }]>;
   popup?: Snippet<[{ popup: any; index: any }]>;
   control?: Snippet<[{ map: any }]>;
@@ -92,6 +93,7 @@ let {
   interactiveLayerIds = __defaultInteractiveLayerIds,
   controls = __defaultControls,
   options = __defaultOptions,
+  children: __childrenProp,
   marker: __markerProp,
   popup: __popupProp,
   control: __controlProp,
@@ -118,9 +120,13 @@ let {
   onmouseleave
 }: Props = $props();
 
+const children = $derived(__childrenProp ?? snippets?.children);
 const marker = $derived(__markerProp ?? snippets?.marker);
 const popup = $derived(__popupProp ?? snippets?.popup);
 const control = $derived(__controlProp ?? snippets?.control);
+
+let sourceReg = $state({});
+let layerReg = $state({});
 
 let containerEl = $state<HTMLElement | undefined>(undefined);
 
@@ -153,11 +159,18 @@ const PROGRAMMATIC = {
 // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
 const markerEntries = new Map();
 const popupEntries = new Map();
-// standard-control instances (so a controls-prop change can remove + re-add) and
-// the mount-once custom-control portal dispose. controlInstances is a null-let
-// (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
-// infers `never[]` under the strict framework-typecheck harness and rejects the
-// `any` control instances pushed into it.
+
+// ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+// Publish the source/layer register-API the <Source>/<Layer> children $inject and
+// self-register into. EVERY method uses WHOLE-OBJECT REPLACEMENT (spread / clone-
+// and-delete) so the watched $data.sourceReg/$data.layerReg reference changes once
+// per mutation and the parent $watch fires on all 6 targets (D-3 / Pitfall 1 — an
+// in-place `$data.sourceReg[id] = spec` is silent on React/Solid/Angular/Lit). The
+// register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … }) shape;
+// register/update share a body (both upsert by id). The values feed the SAME
+// applyLayers() reconcile + appliedSourceIds/appliedLayerIds provenance as the
+// config-array props, so registry-managed sources/layers are reaped on unregister
+// exactly like prop-managed ones (D37-08).
 // standard-control instances (so a controls-prop change can remove + re-add) and
 // the mount-once custom-control portal dispose. controlInstances is a null-let
 // (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
@@ -265,22 +278,62 @@ const applyInteractionToggles = () => {
 // sources (after their layers are gone).
 const applyLayers = () => {
   if (!instance || !instance.isStyleLoaded()) return;
-  const wantLayerIds = layers.map((l: any) => l && l.id).filter(Boolean);
-  const wantSourceIds = sources.map((s: any) => s && s.id).filter(Boolean);
+
+  // ─── union the config-array props with the declarative-children registry ────
+  // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+  // the LAST writer and overrides the config-array on id collision. Ordering: array
+  // entries first in array order, then registry entries in registration order —
+  // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+  // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+  // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+  // registries empty, mergeById returns exactly the config array (dedup by id of
+  // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+  // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+  const mergeById = (arr: any, reg: any) => {
+    const out = [];
+    const idx = new Map();
+    for (const e of (Array.isArray(arr) ? arr : []) as any) {
+      if (!e || !e.id) {
+        out.push(e);
+        continue;
+      }
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    for (const id in reg) {
+      const e = reg[id];
+      if (!e || !e.id) continue;
+      if (idx.has(e.id)) {
+        out[idx.get(e.id)] = e;
+      } else {
+        idx.set(e.id, out.length);
+        out.push(e);
+      }
+    }
+    return out;
+  };
+  const mergedSources = mergeById(sources, sourceReg);
+  const mergedLayers = mergeById(layers, layerReg);
+  const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+  const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
   // 1. drop removed layers
   for (const id of appliedLayerIds as any) {
     if (!wantLayerIds.includes(id) && instance.getLayer(id)) instance.removeLayer(id);
   }
   // 2. add/update sources
-  for (const s of sources as any) {
+  for (const s of mergedSources as any) {
     if (!s || !s.id) continue;
     const spec = s.spec || s;
     const existing = instance.getSource(s.id);
     if (!existing) instance.addSource(s.id, $state.snapshot(spec));else if (spec.type === 'geojson' && spec.data) existing.setData($state.snapshot(spec.data));
   }
   // 3. add/update layers
-  for (const l of layers as any) {
+  for (const l of mergedLayers as any) {
     if (!l || !l.id) continue;
     if (!instance.getLayer(l.id)) {
       instance.addLayer($state.snapshot(l), l.beforeId);
@@ -330,6 +383,49 @@ export function getZoom() {
 export function resize() {
   if (instance) instance.resize();
 }
+
+setContext('maplibre:sources', {
+  register: (id: any, spec: any) => {
+    sourceReg = {
+      ...sourceReg,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    sourceReg = {
+      ...sourceReg,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...sourceReg
+    };
+    delete n[id];
+    sourceReg = n;
+  }
+});
+setContext('maplibre:layers', {
+  register: (id: any, spec: any) => {
+    layerReg = {
+      ...layerReg,
+      [id]: spec
+    };
+  },
+  update: (id: any, spec: any) => {
+    layerReg = {
+      ...layerReg,
+      [id]: spec
+    };
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...layerReg
+    };
+    delete n[id];
+    layerReg = n;
+  }
+});
 
 interface ReactivePortalHandle {
   update(scope: unknown): void;
@@ -714,30 +810,34 @@ $effect(() => { (() => sources)(); untrack(() => { if (__rozieWatchInitial_10) {
 let __rozieWatchInitial_11 = true;
 $effect(() => { (() => layers)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => applyLayers())(); }); });
 let __rozieWatchInitial_12 = true;
-$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } ((v: any) => {
+$effect(() => { (() => sourceReg)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_13 = true;
+$effect(() => { (() => layerReg)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_14 = true;
+$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } ((v: any) => {
   if (reconcileInteractive) reconcileInteractive(v);
 })(__watchVal); }); });
-let __rozieWatchInitial_13 = true;
-$effect(() => { (() => controls)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => applyControls())(); }); });
-let __rozieWatchInitial_14 = true;
-$effect(() => { (() => dragPan)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_15 = true;
-$effect(() => { (() => dragRotate)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => controls)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => applyControls())(); }); });
 let __rozieWatchInitial_16 = true;
-$effect(() => { (() => scrollZoom)(); untrack(() => { if (__rozieWatchInitial_16) { __rozieWatchInitial_16 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => dragPan)(); untrack(() => { if (__rozieWatchInitial_16) { __rozieWatchInitial_16 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_17 = true;
-$effect(() => { (() => doubleClickZoom)(); untrack(() => { if (__rozieWatchInitial_17) { __rozieWatchInitial_17 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => dragRotate)(); untrack(() => { if (__rozieWatchInitial_17) { __rozieWatchInitial_17 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_18 = true;
-$effect(() => { (() => boxZoom)(); untrack(() => { if (__rozieWatchInitial_18) { __rozieWatchInitial_18 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => scrollZoom)(); untrack(() => { if (__rozieWatchInitial_18) { __rozieWatchInitial_18 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_19 = true;
-$effect(() => { (() => keyboard)(); untrack(() => { if (__rozieWatchInitial_19) { __rozieWatchInitial_19 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => doubleClickZoom)(); untrack(() => { if (__rozieWatchInitial_19) { __rozieWatchInitial_19 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_20 = true;
-$effect(() => { (() => touchZoomRotate)(); untrack(() => { if (__rozieWatchInitial_20) { __rozieWatchInitial_20 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => boxZoom)(); untrack(() => { if (__rozieWatchInitial_20) { __rozieWatchInitial_20 = false; return; } (() => applyInteractionToggles())(); }); });
 let __rozieWatchInitial_21 = true;
-$effect(() => { (() => touchPitch)(); untrack(() => { if (__rozieWatchInitial_21) { __rozieWatchInitial_21 = false; return; } (() => applyInteractionToggles())(); }); });
+$effect(() => { (() => keyboard)(); untrack(() => { if (__rozieWatchInitial_21) { __rozieWatchInitial_21 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_22 = true;
+$effect(() => { (() => touchZoomRotate)(); untrack(() => { if (__rozieWatchInitial_22) { __rozieWatchInitial_22 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_23 = true;
+$effect(() => { (() => touchPitch)(); untrack(() => { if (__rozieWatchInitial_23) { __rozieWatchInitial_23 = false; return; } (() => applyInteractionToggles())(); }); });
 </script>
 
-<div class="rozie-maplibre" bind:this={containerEl} data-rozie-s-f1ee1082></div>
+<div class="rozie-maplibre" bind:this={containerEl} data-rozie-s-f1ee1082></div>{@render children?.()}
 
 <style>
 :global {

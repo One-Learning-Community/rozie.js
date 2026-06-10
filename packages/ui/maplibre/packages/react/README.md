@@ -125,6 +125,7 @@ const raw = map.current?.getMap();
 
 | Slot | Params |
 | --- | --- |
+| (default) |  |
 | marker | marker, index |
 | popup | popup, index |
 | control | map |

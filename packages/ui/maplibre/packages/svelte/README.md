@@ -120,6 +120,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
+| (default) |  |
 | marker | marker, index |
 | popup | popup, index |
 | control | map |

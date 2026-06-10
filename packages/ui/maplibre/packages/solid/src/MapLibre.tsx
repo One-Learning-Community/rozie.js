@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
-import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieContext } from '@rozie/runtime-solid';
 import maplibregl from 'maplibre-gl';
 
 __rozieInjectStyle('MapLibre-f1ee1082', `.rozie-maplibre[data-rozie-s-f1ee1082] {
@@ -80,6 +80,8 @@ interface MapLibreProps {
   onPitchend?: (...args: unknown[]) => void;
   onMouseenter?: (...args: unknown[]) => void;
   onMouseleave?: (...args: unknown[]) => void;
+  // D-131: default slot resolved via children() at body top
+  children?: JSX.Element;
   markerSlot?: (ctx: () => MarkerSlotCtx) => JSX.Element;
   popupSlot?: (ctx: () => PopupSlotCtx) => JSX.Element;
   controlSlot?: (ctx: ControlSlotCtx) => JSX.Element;
@@ -100,13 +102,18 @@ export interface MapLibreHandle {
 
 export default function MapLibre(_props: MapLibreProps): JSX.Element {
   const _merged = mergeProps({ mapStyle: undefined, minZoom: 0, maxZoom: 22, maxBounds: undefined, bounds: undefined, fitBoundsOptions: (() => ({}))(), dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: (() => [])(), popups: (() => [])(), sources: (() => [])(), layers: (() => [])(), interactiveLayerIds: (() => [])(), controls: (() => [])(), options: (() => ({}))() }, _props);
-  const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'children', 'ref']);
+  const resolved = () => local.children;
   onMount(() => { local.ref?.({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }); });
 
+  const __ctx_maplibre_sources = rozieContext("maplibre:sources");
+  const __ctx_maplibre_layers = rozieContext("maplibre:layers");
   const [center, setCenter] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'center', (() => [0, 0])());
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
   const [bearing, setBearing] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'bearing', 0);
   const [pitch, setPitch] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'pitch', 0);
+  const [sourceReg, setSourceReg] = createSignal({});
+  const [layerReg, setLayerReg] = createSignal({});
   interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;
@@ -474,6 +481,8 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   })(v)), { defer: true }));
   createEffect(on(() => (() => local.sources)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
   createEffect(on(() => (() => local.layers)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => sourceReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => layerReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
   createEffect(on(() => (() => local.interactiveLayerIds)(), (v) => untrack(() => ((v: any) => {
     if (reconcileInteractive) reconcileInteractive(v);
   })(v)), { defer: true }));
@@ -507,6 +516,19 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
   const markerEntries = new Map();
   const popupEntries = new Map();
+
+  // ─── declarative-children registry (Phase 37 $provide/$inject dogfood) ───────
+  // Publish the source/layer register-API the <Source>/<Layer> children $inject and
+  // self-register into. EVERY method uses WHOLE-OBJECT REPLACEMENT (spread / clone-
+  // and-delete) so the watched $data.sourceReg/$data.layerReg reference changes once
+  // per mutation and the parent $watch fires on all 6 targets (D-3 / Pitfall 1 — an
+  // in-place `$data.sourceReg[id] = spec` is silent on React/Solid/Angular/Lit). The
+  // register surface mirrors the SHIPPED Tabs.rozie $provide('tabs', { … }) shape;
+  // register/update share a body (both upsert by id). The values feed the SAME
+  // applyLayers() reconcile + appliedSourceIds/appliedLayerIds provenance as the
+  // config-array props, so registry-managed sources/layers are reaped on unregister
+  // exactly like prop-managed ones (D37-08).
+
   // standard-control instances (so a controls-prop change can remove + re-add) and
   // the mount-once custom-control portal dispose. controlInstances is a null-let
   // (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
@@ -601,22 +623,62 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   // sources (after their layers are gone).
   function applyLayers() {
     if (!instance || !instance.isStyleLoaded()) return;
-    const wantLayerIds = local.layers.map((l: any) => l && l.id).filter(Boolean);
-    const wantSourceIds = local.sources.map((s: any) => s && s.id).filter(Boolean);
+
+    // ─── union the config-array props with the declarative-children registry ────
+    // (registry ∪ props), keyed by id. D-02: the registry (declarative children) is
+    // the LAST writer and overrides the config-array on id collision. Ordering: array
+    // entries first in array order, then registry entries in registration order —
+    // `[...$props.layers, ...registryLayers]` — each still honoring its explicit
+    // `beforeId` (the existing applyLayers ordering contract, REUSED unchanged,
+    // RESEARCH OQ3). The empty-registry path is byte-equivalent to today: with both
+    // registries empty, mergeById returns exactly the config array (dedup by id of
+    // an array with no registry overrides is the array itself), so (∅ ∪ props) ===
+    // props in behavior — the dist-parity zero-drift guarantee (RESEARCH A3).
+    const mergeById = (arr: any, reg: any) => {
+      const out = [];
+      const idx = new Map();
+      for (const e of (Array.isArray(arr) ? arr : []) as any) {
+        if (!e || !e.id) {
+          out.push(e);
+          continue;
+        }
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      for (const id in reg) {
+        const e = reg[id];
+        if (!e || !e.id) continue;
+        if (idx.has(e.id)) {
+          out[idx.get(e.id)] = e;
+        } else {
+          idx.set(e.id, out.length);
+          out.push(e);
+        }
+      }
+      return out;
+    };
+    const mergedSources = mergeById(local.sources, sourceReg());
+    const mergedLayers = mergeById(local.layers, layerReg());
+    const wantLayerIds = mergedLayers.map((l: any) => l && l.id).filter(Boolean);
+    const wantSourceIds = mergedSources.map((s: any) => s && s.id).filter(Boolean);
 
     // 1. drop removed layers
     for (const id of appliedLayerIds as any) {
       if (!wantLayerIds.includes(id) && instance.getLayer(id)) instance.removeLayer(id);
     }
     // 2. add/update sources
-    for (const s of local.sources as any) {
+    for (const s of mergedSources as any) {
       if (!s || !s.id) continue;
       const spec = s.spec || s;
       const existing = instance.getSource(s.id);
       if (!existing) instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
     }
     // 3. add/update layers
-    for (const l of local.layers as any) {
+    for (const l of mergedLayers as any) {
       if (!l || !l.id) continue;
       if (!instance.getLayer(l.id)) {
         instance.addLayer(l, l.beforeId);
@@ -668,8 +730,52 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   }
 
   return (
+    <__ctx_maplibre_sources.Provider value={{
+  register: (id: any, spec: any) => {
+    setSourceReg({
+      ...sourceReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    setSourceReg({
+      ...sourceReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...sourceReg()
+    };
+    delete n[id];
+    setSourceReg(n);
+  }
+}}>
+    <__ctx_maplibre_layers.Provider value={{
+  register: (id: any, spec: any) => {
+    setLayerReg({
+      ...layerReg(),
+      [id]: spec
+    });
+  },
+  update: (id: any, spec: any) => {
+    setLayerReg({
+      ...layerReg(),
+      [id]: spec
+    });
+  },
+  unregister: (id: any) => {
+    const n = {
+      ...layerReg()
+    };
+    delete n[id];
+    setLayerReg(n);
+  }
+}}>
     <>
     <div class={"rozie-maplibre"} ref={(el) => { containerElRef = el as HTMLElement; }} data-rozie-s-f1ee1082="" />
+
+    {resolved()}
 
 
 
@@ -677,5 +783,7 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
 
 
     </>
+    </__ctx_maplibre_layers.Provider>
+    </__ctx_maplibre_sources.Provider>
   );
 }
