@@ -192,4 +192,44 @@ describe('emitPortals — React', () => {
     expect(result.closureBlock).toContain('flushSync(() => root.render(slot(scope)));');
     expect(result.closureBlock).toContain('return () => {');
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, sources props.children', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir, newCollectors());
+    expect(result.hasPortals).toBe(true);
+    // Closure object KEY is the reserved `default`, never the empty string.
+    expect(result.closureBlock).toContain('default: (container');
+    expect(result.closureBlock).not.toContain("'': (container");
+    // Source is props.children (no render<Pascal> prop for the default slot).
+    expect(result.rendererRefLines).toContain('_renderDefaultRef = useRef(props.children)');
+    expect(result.closureBlock).toContain("_renderDefaultRef.current ?? props.slots?.['default']");
+    // Default content may be a ReactNode (not a fn) — guard is `== null`,
+    // render is the typeof-function branch.
+    expect(result.closureBlock).toContain('if (slot == null) return () => {};');
+    expect(result.closureBlock).toContain("typeof slot === 'function'");
+    // portalSlotNames carries the effective key `default` (drives dep filtering).
+    expect(result.portalSlotNames).toEqual(new Set(['default']));
+  });
+
+  it('reactive DEFAULT portal slot → { update, dispose } keyed `default`', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir, newCollectors());
+    expect(result.closureBlock).toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).toContain('default: (container');
+    expect(result.closureBlock).toContain('ReactivePortalHandle => {');
+    expect(result.closureBlock).toContain('if (slot == null) return { update() {}, dispose() {} };');
+    expect(result.portalSlotNames).toEqual(new Set(['default']));
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir, newCollectors());
+    // No `default`-keyed shapes leak into a named-only component.
+    expect(result.closureBlock).toContain('item: (container');
+    expect(result.closureBlock).not.toContain('default: (container');
+    expect(result.closureBlock).toContain("if (typeof slot !== 'function') return () => {};");
+    expect(result.rendererRefLines).toContain('props.renderItem');
+    expect(result.portalSlotNames).toEqual(new Set(['item']));
+  });
 });

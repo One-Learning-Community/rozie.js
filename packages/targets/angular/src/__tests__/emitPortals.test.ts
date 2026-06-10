@@ -167,4 +167,28 @@ describe('emitPortals — Angular', () => {
     expect(result.closureBlock).toContain('view.destroy();');
     expect(result.closureBlock).toContain('return () => {');
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, queries the `defaultSlot` ref', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir);
+    expect(result.hasPortals).toBe(true);
+    expect(result.closureBlock).toContain('default: (container');
+    expect(result.closureBlock).not.toContain("'': (container");
+    // Default slot queries the synthetic `defaultSlot` content-projection ref
+    // into `_defaultTpl` (the same ref the non-portal default slot uses).
+    expect(result.fieldDecls.some((l) => l.includes("contentChild('defaultSlot'"))).toBe(true);
+    expect(result.fieldDecls.some((l) => l.includes('_defaultTpl'))).toBe(true);
+    expect(result.closureBlock).toContain('this._defaultTpl()');
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).toContain('item: (container');
+    expect(result.fieldDecls.some((l) => l.includes("contentChild('item'"))).toBe(true);
+    expect(result.fieldDecls.some((l) => l.includes('_itemTpl'))).toBe(true);
+    expect(result.closureBlock).not.toContain('default: (container');
+    expect(result.fieldDecls.some((l) => l.includes("contentChild('defaultSlot'"))).toBe(false);
+  });
 });

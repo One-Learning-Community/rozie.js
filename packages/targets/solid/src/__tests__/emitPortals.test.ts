@@ -159,4 +159,25 @@ describe('emitPortals — Solid', () => {
     expect(result.setupLines).toContain('return () => {');
     expect(result.needsCreateSignal).toBe(false);
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, sources _props.children', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir);
+    expect(result.hasPortals).toBe(true);
+    expect(result.setupLines).toContain('default: (container');
+    expect(result.setupLines).not.toContain("'': (container");
+    // Solid sources its built-in children prop for the default slot.
+    expect(result.setupLines).toContain("const slot = _props.children ?? _props.slots?.['default'];");
+    expect(result.setupLines).toContain('if (slot == null) return () => {};');
+    expect(result.setupLines).toContain("typeof slot === 'function'");
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).toContain('item: (container');
+    expect(result.setupLines).toContain("const slot = _props.itemSlot ?? _props.slots?.['item'];");
+    expect(result.setupLines).not.toContain('default: (container');
+  });
 });

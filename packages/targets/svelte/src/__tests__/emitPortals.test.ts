@@ -207,4 +207,24 @@ describe('emitPortals — Svelte', () => {
     expect(result.extraImports).toContain("import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';");
     expect(result.extraImports).not.toContain('PortalHostReactive');
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, snippet sources `children`', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir);
+    expect(result.hasPortals).toBe(true);
+    expect(result.setupLines).toContain('default: (container');
+    expect(result.setupLines).not.toContain("'': (container");
+    // The default slot's content is the `children` snippet (Svelte 5 magic prop).
+    expect(result.setupLines).toContain('if (!children)');
+    expect(result.setupLines).toContain('snippet: children');
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).toContain('item: (container');
+    expect(result.setupLines).toContain('snippet: item');
+    expect(result.setupLines).not.toContain('default: (container');
+  });
 });

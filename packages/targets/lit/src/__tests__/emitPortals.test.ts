@@ -202,4 +202,24 @@ describe('emitPortals — Lit', () => {
     expect(result.closureBlock).toContain('render(tpl(scope), container);');
     expect(result.closureBlock).toContain('return () => {');
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, reads __rozieDefaultSlot__', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir);
+    expect(result.hasPortals).toBe(true);
+    expect(result.closureBlock).toContain('default: (container');
+    expect(result.closureBlock).not.toContain("'': (container");
+    // The default slot's content comes from the __rozieDefaultSlot__ sentinel
+    // member (the same sentinel the non-portal default slot uses).
+    expect(result.closureBlock).toContain('const tpl = this.__rozieDefaultSlot__;');
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).toContain('item: (container');
+    expect(result.closureBlock).toContain('const tpl = this.item;');
+    expect(result.closureBlock).not.toContain('default: (container');
+  });
 });

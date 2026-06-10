@@ -152,4 +152,22 @@ describe('emitPortals — Vue', () => {
     expect(result.setupLines).toContain('const vnode = h(Fragment, null, slotFn(scope));');
     expect(result.setupLines).toContain('return () => {');
   });
+
+  // ── Phase 37 — $portals.default (DEFAULT portal slot) ─────────────────────
+  it('DEFAULT portal slot → closure key `default`, sources slots.default', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('', ['id', 'label'])] });
+    const result = emitPortals(ir, new VueImportCollector());
+    expect(result.hasPortals).toBe(true);
+    expect(result.setupLines).toContain('default: (container');
+    expect(result.setupLines).not.toContain("'': (container");
+    expect(result.setupLines).toContain('const slotFn = slots.default;');
+  });
+
+  it('GATE: a NAMED portal slot is byte-unaffected by the default-portal feature', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('item', ['item'])] });
+    const result = emitPortals(ir, new VueImportCollector());
+    expect(result.setupLines).toContain('item: (container');
+    expect(result.setupLines).toContain('const slotFn = slots.item;');
+    expect(result.setupLines).not.toContain('default: (container');
+  });
 });

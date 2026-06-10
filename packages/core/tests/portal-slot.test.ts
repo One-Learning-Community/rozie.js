@@ -158,4 +158,74 @@ describe('portal-slot primitive — Spike 003', () => {
       });
     },
   );
+
+  // ---- Phase 37 — $portals.default (DEFAULT portal slot) ----
+
+  it('lowerSlots: an UNNAMED <slot portal /> lowers with name="" + isPortal=true', () => {
+    const withDefaultPortal = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot portal reactive :params="[\'arg\']" /></div>',
+    );
+    const parseRes = parse(withDefaultPortal);
+    expect(parseRes.ast).not.toBeNull();
+    const { ir } = lowerToIR(parseRes.ast!, { modifierRegistry: createDefaultRegistry() });
+    expect(ir).not.toBeNull();
+    const def = ir!.slots.find((s) => s.name === '');
+    expect(def).toBeDefined();
+    expect(def!.isPortal).toBe(true);
+    expect(def!.isReactive).toBe(true);
+    expect(def!.portalParamNames).toEqual(['arg']);
+  });
+
+  it('validateDefaultPortalCollision: a default portal slot + a name="default" slot is a ROZ979 ERROR', () => {
+    const collision = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot portal :params="[\'arg\']" /><slot name="default" /></div>',
+    );
+    const result = compile(collision, { target: 'react', filename: '/virtual/PortalDemo.rozie' });
+    const roz979 = result.diagnostics.filter((d) => d.code === 'ROZ979');
+    expect(roz979.length).toBe(1);
+    expect(roz979[0]!.severity).toBe('error');
+  });
+
+  it('a name="default" slot WITHOUT a default portal slot is fine (no ROZ979)', () => {
+    const noCollision = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot name="default" portal :params="[\'arg\']" /></div>',
+    );
+    const result = compile(noCollision, { target: 'react', filename: '/virtual/PortalDemo.rozie' });
+    expect(result.diagnostics.filter((d) => d.code === 'ROZ979')).toEqual([]);
+  });
+
+  describe.each<CompileTarget>(['react', 'vue', 'svelte', 'angular', 'solid', 'lit'])(
+    '$portals.default compiles cleanly to %s',
+    (target) => {
+      // Author the DEFAULT (unnamed) portal slot + a script that invokes
+      // `$portals.default(node, …)`. The closure key MUST be `default` (not '').
+      const DEFAULT_SOURCE = SOURCE.replace(
+        '$portals.event(node, { arg })',
+        '$portals.default(node, { arg })',
+      ).replace(
+        '<div class="demo" />',
+        '<div class="demo"><slot portal reactive :params="[\'arg\']" /></div>',
+      );
+
+      it('emits `default:` closure key + `portals.default(` rewrite, zero errors', () => {
+        const result = compile(DEFAULT_SOURCE, {
+          target,
+          filename: '/virtual/PortalDemo.rozie',
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        expect(result.code).toContain('const portals = {');
+        // The closure object KEY is the reserved `default`, NOT the empty string.
+        expect(result.code).toContain('default: (container');
+        // The script-side `$portals.default(...)` rewrote to `portals.default(...)`.
+        expect(result.code).toContain('portals.default(node,');
+        // The broken empty-key shapes must NEVER appear.
+        expect(result.code).not.toContain("portals['']");
+        expect(result.code).not.toMatch(/\n\s*: \(container/);
+      });
+    },
+  );
 });
