@@ -624,8 +624,32 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         col.appendChild(row);
 
         // LOAD-BEARING: announce the socket to the rest of the area's child plugins.
+        // 'render' lets the ConnectionPlugin register the socket as a drag anchor.
         this.area.emit({
           type: 'render',
+          data: {
+            type: 'socket',
+            side,
+            key,
+            nodeId: reteNode.id,
+            element: socketEl,
+            payload: {
+              socket: port.socket
+            }
+          }
+        });
+        // ALSO LOAD-BEARING (the socket-position contract): getDOMSocketPosition
+        // measures + stores a socket's DOM position ONLY on a 'rendered' socket signal
+        // — that is the render-plugin lifecycle's post-mount phase (an official render
+        // plugin emits 'rendered' after the framework commits the socket element). Our
+        // vanilla pipe creates the socket DOM synchronously and has already appended it
+        // under the engine node-view element by this point, so we fire 'rendered' right
+        // after 'render'. WITHOUT IT the position store stays permanently empty, every
+        // socketWatcher.listen() callback reads back null, and NO connection path —
+        // committed OR the drag-to-connect preview — is ever drawn (redraw()'s
+        // `if (!start || !end) return` guard never passes).
+        this.area.emit({
+          type: 'rendered',
           data: {
             type: 'socket',
             side,
