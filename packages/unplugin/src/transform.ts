@@ -46,6 +46,14 @@ import type { BlockMap } from '../../core/src/ast/types.js';
 // would then fail on every consumer-scoped-fill cell.
 import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
 import { validateTwoWayBindings } from '../../core/src/ir/validateTwoWayBindings.js';
+// Phase 38 — ROZ088 portal-scoped-style Lit diagnostic. `@rozie/unplugin` does
+// NOT call `compile()`; each per-target pipeline threads + validates inline, so
+// this pass must be invoked at every pipeline site (mirrors how compile.ts wires
+// it after threadParamTypes — see compile.ts:312). Missing a site means the
+// warning fires in compile()/CLI/tests but NOT in a real Vite/Rollup build. The
+// pass reads only the already-threaded `filler.isPortal`, so it needs no
+// IRCache/ProducerResolver of its own — call it directly with `(ir, acc)`.
+import { validatePortalScopedStyle } from '../../core/src/ir/validatePortalScopedStyle.js';
 // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
 // `@rozie/unplugin` does NOT call `compile()`; each per-target pipeline parses
 // and emits independently, so every parse-then-emit site must call this helper
@@ -778,6 +786,10 @@ function runRoziePipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -854,6 +866,10 @@ function runReactPipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -927,6 +943,10 @@ function runSveltePipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -1002,6 +1022,10 @@ function runSolidPipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -1076,6 +1100,10 @@ function runLitPipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -1161,6 +1189,10 @@ function runAngularPipeline(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -1472,6 +1504,10 @@ function runAngularEmitForDisk(
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
   validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
+  // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
+  // so `filler.isPortal` is populated; reads no cache/resolver.
+  validatePortalScopedStyle(ir, threadDiags);
   const threadError = threadDiags.find((d) => d.severity === 'error');
   if (threadError) {
     throw new Error(`[${threadError.code}] ${threadError.message}`);

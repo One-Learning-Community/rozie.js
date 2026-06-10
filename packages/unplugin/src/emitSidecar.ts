@@ -155,6 +155,12 @@ export function renderSidecar(
   const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: getRegistry() });
   if (!ir || irDiags.some((d) => d.severity === 'error')) return null;
 
+  // Phase 38 — ROZ088 portal-scoped-style is intentionally NOT run here. The
+  // sidecar path is a type-declaration render (`renderTypesFor`) that does not
+  // call `threadParamTypes`, so `filler.isPortal` is never populated and the
+  // pass would warn on nothing. The diagnostic fires on the emit pipelines
+  // (transform.ts, which threads first) and in `compile()` — this `.d.rozie.ts`
+  // generation path neither emits CSS nor surfaces warnings to the build.
   const body = renderTypesFor(target, ir);
   const header = `${SIDECAR_HEADER_PREFIX}${sidecarSourceHash(source)}\n`;
   return header + body + (body.endsWith('\n') ? '' : '\n');
