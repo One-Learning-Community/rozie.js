@@ -23,6 +23,7 @@ import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import type { File, Program, Expression, Statement } from '@babel/types';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import { cloneScriptProgram } from './cloneProgram.js';
@@ -244,7 +245,7 @@ export function rewriteScript(
       .map((s) => s.name),
   );
   const portalSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+    ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
   );
   const methodNames =
     opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);

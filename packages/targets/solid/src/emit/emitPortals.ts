@@ -17,6 +17,7 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
 /**
@@ -46,10 +47,27 @@ const REACTIVE_HANDLE_INTERFACE_SOLID =
   '}';
 
 /** Build the per-slot method body for the portals closure. */
+/**
+ * Phase 37 — Solid slot-content source + render expressions.
+ *
+ * Named portal slots source `_props.<name>Slot ?? _props.slots?.['<name>']`
+ * (render-prop functions) and render `slot(scope)`. The DEFAULT portal slot
+ * sources Solid's built-in `_props.children` (with the `_props.slots?.['default']`
+ * conformance fallback); children may be a node OR a render fn, so render
+ * directly when it is not a function.
+ */
+function solidSlotSource(slot: SlotDecl): string {
+  const key = portalKey(slot);
+  if (slot.name === '') {
+    return `_props.children ?? _props.slots?.['default']`;
+  }
+  return `_props.${key}Slot ?? _props.slots?.['${key}']`;
+}
+
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
-  const slotName = slot.name;
-  const slotProp = slotName + 'Slot';
+  const slotName = portalKey(slot);
+  const isDefault = slot.name === '';
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -61,12 +79,19 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   // Mirrors emitSlotInvocation.ts's `_props.${slotFieldName}` shape. The
   // merge with the dynamic-name `slots?:` map (`_props.slots?.['name']`)
   // matches Phase 07.3.2's invocation-site convention.
+  // Default portal slot: source is `_props.children` (a node OR a render fn).
+  const guard = isDefault
+    ? `    if (slot == null) return () => {};\n`
+    : `    if (typeof slot !== 'function') return () => {};\n`;
+  const renderExpr = isDefault
+    ? `(typeof slot === 'function' ? (slot as (s: unknown) => unknown)(scope) : slot) as import('solid-js').JSX.Element`
+    : `slot(scope)`;
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    const slot = _props.${slotProp} ?? _props.slots?.['${slotName}'];\n` +
-    `    if (typeof slot !== 'function') return () => {};\n` +
+    `    const slot = ${solidSlotSource(slot)};\n` +
+    guard +
     setAttrLine(slotName, scopeHash) +
-    `    const dispose = render(() => slot(scope), container);\n` +
+    `    const dispose = render(() => ${renderExpr}, container);\n` +
     `    portalDisposers.add(dispose);\n` +
     `    return () => {\n` +
     `      dispose();\n` +
@@ -90,17 +115,26 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
  * solid.reactive-portal.tsx.
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
-  const slotName = slot.name;
-  const slotProp = slotName + 'Slot';
+  const slotName = portalKey(slot);
+  const isDefault = slot.name === '';
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
       ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
       : 'unknown';
+  const guard = isDefault
+    ? `    if (slot == null) return { update() {}, dispose() {} };\n`
+    : `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n`;
+  // Default portal slot: `_props.children` is usually a plain node — render it
+  // directly inside the reactive root (reads of the scope signal still re-track
+  // when children is a render fn). Named slots pass the scope-signal accessor.
+  const renderExpr = isDefault
+    ? `(typeof slot === 'function' ? (slot as (s: unknown) => unknown)(scopeSig as unknown as (() => ${scopeType})) : slot) as import('solid-js').JSX.Element`
+    : `slot(scopeSig as unknown as (() => ${scopeType}))`;
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
-    `    const slot = _props.${slotProp} ?? _props.slots?.['${slotName}'];\n` +
-    `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n` +
+    `    const slot = ${solidSlotSource(slot)};\n` +
+    guard +
     setAttrLine(slotName, scopeHash) +
     `    const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });\n` +
     // Phase 33 / REQ-26 — pass the scope SIGNAL ACCESSOR to the consumer slot,
@@ -112,7 +146,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
     // (the foreign-slot accessor limitation). `slot` is typed `(s) => Element`;
     // the accessor is the `s` the consumer invokes. Matches Spike 009's proven
     // `mountSolidChip(dom, scope)` where the chip reads `scope().label`.
-    `    const dispose = render(() => slot(scopeSig as unknown as (() => ${scopeType})), container);\n` +
+    `    const dispose = render(() => ${renderExpr}, container);\n` +
     `    portalDisposers.add(dispose);\n` +
     `    return {\n` +
     `      update: (s: unknown): void => {\n` +

@@ -32,6 +32,7 @@ import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
@@ -166,7 +167,7 @@ export function rewriteRozieIdentifiers(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const portalSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+    ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
   );
 
   // Phase 06.1 P2 (D-104/D-106): build name → IR-primitive lookups so synthesized

@@ -22,6 +22,7 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 
@@ -54,14 +55,14 @@ const REACTIVE_HANDLE_INTERFACE_SVELTE =
 
 function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash, ir);
-  const slotName = slot.name;
-  // The closure object KEY stays the bare slot name: the script-side
-  // `$portals.<slotName>(...)` call is rewritten to `portals.<slotName>(...)`,
-  // so the key must match the slot name. Only the READS of the merged
-  // consumer-supplied snippet (`if (!<merge>)` guard + `snippet: <merge>`) use
-  // the collision-gated identifier — which differs from the slot name only when
-  // a same-named prop forced a `Slot` suffix on the `$derived` merge.
-  const mergeName = portalSlotMergeName(slotName, ir);
+  // The closure object KEY is the EFFECTIVE portal key (`default` for the
+  // unnamed default portal slot; the bare name otherwise): the script-side
+  // `$portals.<key>(...)` call is rewritten to `portals.<key>(...)`. Only the
+  // READS of the merged consumer-supplied snippet (`if (!<merge>)` guard +
+  // `snippet: <merge>`) use the merge identifier — the `children` snippet for
+  // the default slot, else the collision-gated bare/`Slot`-suffixed name.
+  const slotName = portalKey(slot);
+  const mergeName = portalSlotMergeName(slot.name, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -96,8 +97,8 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): st
  * teardown, unchanged). Mirrors spike 007 svelte.reactive-portal.md.
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
-  const slotName = slot.name;
-  const mergeName = portalSlotMergeName(slotName, ir);
+  const slotName = portalKey(slot);
+  const mergeName = portalSlotMergeName(slot.name, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0

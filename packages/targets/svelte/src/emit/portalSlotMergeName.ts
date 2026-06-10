@@ -44,15 +44,18 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 /**
  * Return the Svelte top-level identifier for a slot's `$derived` merge.
- * Suffixes with `Slot` iff the bare slot name collides with a declared
- * `<props>` entry; otherwise returns the bare name (the default-slot
- * `children` mapping is computed by the caller and passed in already).
+ *
+ * The DEFAULT slot (`''`) maps to the `children` snippet (Svelte 5's built-in
+ * default-slot magic prop) — Phase 37 ($portals.default) reads the default
+ * portal slot's content from this `children` identifier. Named slots suffix with
+ * `Slot` iff the bare slot name collides with a declared `<props>` entry;
+ * otherwise the bare name.
  */
 export function portalSlotMergeName(slotKey: string, ir: IRComponent): string {
   // The default slot maps to `children`, which can never collide with a prop
   // (a prop named `children` would be its own pre-existing collision surface
-  // outside this concern). Guard defensively anyway.
-  if (slotKey === '' || slotKey === 'children') return slotKey;
+  // outside this concern). Phase 37: a default PORTAL slot reads `children`.
+  if (slotKey === '' || slotKey === 'children') return 'children';
   const collides = (ir.props ?? []).some((p) => p.name === slotKey);
   return collides ? slotKey + 'Slot' : slotKey;
 }

@@ -24,18 +24,22 @@
  *   - emitPortals.ts   (the `$portals` closure key + `this.<member>` read)
  *
  * Default slot (name === '') is handled by the `__rozieDefaultSlot__` sentinel
- * mapping elsewhere and never reaches this helper with an empty name in the
- * collision check (a prop can't be named '').
+ * (the SAME sentinel emitSlotDecl/emitTemplate use for the non-portal default
+ * slot). Phase 37 ($portals.default): a DEFAULT portal slot reads its content
+ * from `this.__rozieDefaultSlot__`, so this helper returns that sentinel for
+ * the empty name (the closure object KEY is the effective portalKey `default`,
+ * computed by the caller via `portalKey()`).
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 /**
  * Return the Lit class-member identifier for a portal/scoped slot's
- * function-prop bridge. Suffixes with `Slot` iff the bare slot name collides
- * with a declared `<props>` entry; otherwise returns the bare name unchanged.
+ * function-prop bridge. The DEFAULT slot (`name === ''`) maps to the
+ * `__rozieDefaultSlot__` sentinel member. Otherwise suffixes with `Slot` iff the
+ * bare slot name collides with a declared `<props>` entry; else the bare name.
  */
 export function portalSlotMemberName(slotName: string, ir: IRComponent): string {
-  if (slotName === '') return slotName;
+  if (slotName === '') return '__rozieDefaultSlot__';
   const collides = (ir.props ?? []).some((p) => p.name === slotName);
   return collides ? slotName + 'Slot' : slotName;
 }

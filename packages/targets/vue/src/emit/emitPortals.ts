@@ -26,6 +26,7 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import type { VueImportCollector } from '../rewrite/collectVueImports.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
@@ -62,7 +63,10 @@ const REACTIVE_HANDLE_INTERFACE_VUE =
 /** Build the per-slot method body for the portals closure. */
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
-  const slotName = slot.name;
+  // Phase 37: the closure KEY and the `slots.<name>` source both use the
+  // effective portal key — `default` for the DEFAULT (unnamed) portal slot, so
+  // `slots.default` (Vue's built-in default slot fn) is the content source.
+  const slotName = portalKey(slot);
   const paramNames = slot.portalParamNames ?? [];
   // Scope type from portalParamNames; falls back to `unknown` when omitted.
   const scopeType =
@@ -104,7 +108,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
  * 007 vue.reactive-portal.ts.
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
-  const slotName = slot.name;
+  const slotName = portalKey(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0

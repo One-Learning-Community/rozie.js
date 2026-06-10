@@ -27,7 +27,25 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+
+/**
+ * Phase 37 — the Angular `contentChild` template-ref query NAME for a portal
+ * slot. Named slots query their bare name; the DEFAULT (unnamed) portal slot
+ * queries the synthetic `defaultSlot` ref — the SAME ref the non-portal default
+ * slot uses (emitSlotInvocation's `#defaultSlot` / the `<ng-template #defaultSlot>`
+ * wrap in emitTemplateNode). The closure object KEY is the effective portalKey
+ * (`default`); the class field name uses the portalKey too (`_defaultTpl`).
+ */
+function angularTplRefName(slot: SlotDecl): string {
+  return slot.name === '' ? 'defaultSlot' : slot.name;
+}
+
+/** The class field identifier holding a portal slot's TemplateRef query. */
+function angularTplField(slot: SlotDecl): string {
+  return `_${portalKey(slot)}Tpl`;
+}
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -57,8 +75,8 @@ const REACTIVE_HANDLE_INTERFACE_ANGULAR =
 
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
-  const slotName = slot.name;
-  const tplField = `_${slotName}Tpl`;
+  const slotName = portalKey(slot);
+  const tplField = angularTplField(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -94,8 +112,8 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
  * angular.reactive-portal.ts.
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
-  const slotName = slot.name;
-  const tplField = `_${slotName}Tpl`;
+  const slotName = portalKey(slot);
+  const tplField = angularTplField(slot);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -166,8 +184,11 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
     `private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });`,
   );
   for (const slot of portals) {
+    // Phase 37: the default portal slot queries the synthetic `defaultSlot` ref
+    // (the same ref the non-portal default slot uses) and stores it in
+    // `_defaultTpl`; named slots query their bare name into `_<name>Tpl`.
     fieldDecls.push(
-      `private _${slot.name}Tpl = contentChild('${slot.name}', { read: TemplateRef });`,
+      `private ${angularTplField(slot)} = contentChild('${angularTplRefName(slot)}', { read: TemplateRef });`,
     );
   }
 

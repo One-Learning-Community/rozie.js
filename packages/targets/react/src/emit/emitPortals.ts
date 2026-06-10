@@ -32,6 +32,7 @@
  * cellRenderer callback (FullCalendar's render-flow already does this).
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -71,20 +72,32 @@ function pascalCase(name: string): string {
 
 /** Per-slot identifier triple — derived once and reused across emit helpers. */
 interface SlotIds {
-  /** Original slot name as authored in `<slot name="X" portal />`. */
+  /**
+   * Effective portal key — the authored slot name, or `'default'` for the
+   * default (unnamed) portal slot (Phase 37 `$portals.default`). This is the
+   * `portals` closure object KEY.
+   */
   slotName: string;
   /** React-side render-prop name: `render<Pascal>`. */
   renderProp: string;
   /** Internal stable ref identifier: `_render<Pascal>Ref`. */
   refIdent: string;
+  /** True for the default (unnamed) portal slot — sources `props.children`. */
+  isDefault: boolean;
 }
 
 function slotIdsFor(slot: SlotDecl): SlotIds {
-  const pascal = pascalCase(slot.name);
+  // Phase 37: the default portal slot keys `'default'` (portalKey) and sources
+  // `props.children`, NOT a `render<Pascal>` prop. The ref/renderProp names use
+  // the Pascal of the EFFECTIVE key so the default's stable ref is
+  // `_renderDefaultRef` over `props.children` (kept for the stale-free pattern).
+  const key = portalKey(slot);
+  const pascal = pascalCase(key);
   return {
-    slotName: slot.name,
+    slotName: key,
     renderProp: 'render' + pascal,
     refIdent: '_render' + pascal + 'Ref',
+    isDefault: slot.name === '',
   };
 }
 
@@ -104,9 +117,42 @@ function slotIdsFor(slot: SlotDecl): SlotIds {
  * `<Wrapper slots={{ X: fn }} />` consumer shape used by per-target
  * conformance tests.
  */
+/**
+ * Phase 37 — the slot-content source expression for the portal method body.
+ *
+ * Named portal slots read the consumer-supplied renderer via the stable ref
+ * (`<refIdent>.current ?? props.slots?.['<name>']`). The DEFAULT portal slot has
+ * NO `render<Pascal>` prop — its content is React's built-in `children` prop
+ * (`props.children`), with the `props.slots?.['default']` map entry as the
+ * conformance-test fallback. `_renderDefaultRef.current` still indirects
+ * `props.children` so the stale-free read pattern is preserved uniformly.
+ */
+function slotSourceExpr(ids: SlotIds): string {
+  return `${ids.refIdent}.current ?? props.slots?.['${ids.slotName}']`;
+}
+
+/**
+ * Phase 37 — the render expression for a portal slot's content.
+ *
+ * Named portal slots are render-prop FUNCTIONS — `slot(scope)`. The DEFAULT
+ * portal slot's content is `props.children`, which may be a plain ReactNode
+ * (`<FlowNode><MyCard/></FlowNode>`) OR a render function (a consumer passing a
+ * function child). The default emit therefore renders the node directly when it
+ * is not a function, and invokes it with scope when it is — handling both
+ * authoring shapes. The `slot` local already holds the (children-or-fn) value.
+ */
+function slotRenderExpr(isDefault: boolean): string {
+  // Default content is `props.children` (ReactNode) OR a render fn — the result
+  // is cast to ReactNode so React's `root.render` accepts it under strict tsc.
+  return isDefault
+    ? `(typeof slot === 'function' ? (slot as (s: unknown) => unknown)(scope) : slot) as import('react').ReactNode`
+    : `slot(scope)`;
+}
+
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
-  const { slotName, refIdent } = slotIdsFor(slot);
+  const ids = slotIdsFor(slot);
+  const { slotName, isDefault } = ids;
   const paramNames = slot.portalParamNames ?? [];
   // Scope type: `{ arg: unknown; ... }` from portalParamNames, or `unknown`
   // when no names declared.
@@ -114,10 +160,16 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
     paramNames.length > 0
       ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
       : 'unknown';
+  // Default portal slot: source is `props.children` (a ReactNode OR a render
+  // fn), guarded by `== null` (a JSX node is not a function). Named slots keep
+  // the `typeof slot !== 'function'` render-prop guard byte-identically.
+  const guard = isDefault
+    ? `    if (slot == null) return () => {};\n`
+    : `    if (typeof slot !== 'function') return () => {};\n`;
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    const slot = ${refIdent}.current ?? props.slots?.['${slotName}'];\n` +
-    `    if (typeof slot !== 'function') return () => {};\n` +
+    `    const slot = ${slotSourceExpr(ids)};\n` +
+    guard +
     setAttrLine(slotName, scopeHash) +
     `    const root = createRoot(container);\n` +
     // flushSync forces React to commit the portal render synchronously
@@ -131,7 +183,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
     // flushSync turns the schedule into a synchronous flush — the portal
     // is painted before \`eventContent\` returns to FullCalendar, so the
     // engine never observes an unmounted-but-attached portal node.
-    `    flushSync(() => root.render(slot(scope)));\n` +
+    `    flushSync(() => root.render(${slotRenderExpr(isDefault)}));\n` +
     `    portalRoots.current.add(root);\n` +
     `    return () => {\n` +
     `      root.unmount();\n` +
@@ -152,16 +204,28 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
  * mount-once teardown, unchanged). Mirrors spike 007 react.reactive-portal.tsx.
  */
 function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
-  const { slotName, refIdent } = slotIdsFor(slot);
+  const ids = slotIdsFor(slot);
+  const { slotName, isDefault } = ids;
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
       ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
       : 'unknown';
+  // Default portal slot sources `props.children` (ReactNode or render fn); named
+  // slots keep the render-prop function guard byte-identically.
+  const guard = isDefault
+    ? `    if (slot == null) return { update() {}, dispose() {} };\n`
+    : `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n`;
+  // For the default slot, `s` (the update scope) is unused when children is a
+  // plain ReactNode — render the node directly; when it is a render fn, invoke
+  // it with `s` so an in-place update re-projects with the new scope.
+  const renderS = isDefault
+    ? `(typeof slot === 'function' ? (slot as (x: unknown) => unknown)(s) : slot) as import('react').ReactNode`
+    : `slot(s)`;
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
-    `    const slot = ${refIdent}.current ?? props.slots?.['${slotName}'];\n` +
-    `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n` +
+    `    const slot = ${slotSourceExpr(ids)};\n` +
+    guard +
     setAttrLine(slotName, scopeHash) +
     `    const root = createRoot(container);\n` +
     // renderScope/update take the SAME `scopeType` the outer method does — the
@@ -170,7 +234,7 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
     // (Phase 33 dogfood: the TipTap nodeView slot is the first typed-param
     // reactive portal; `slot(s)` with `s: unknown` is not assignable to it).
     `    const renderScope = (s: ${scopeType}): void => {\n` +
-    `      flushSync(() => root.render(slot(s)));\n` +
+    `      flushSync(() => root.render(${renderS}));\n` +
     `    };\n` +
     `    renderScope(scope);\n` +
     `    portalRoots.current.add(root);\n` +
@@ -263,10 +327,13 @@ export function emitPortals(
   // `useEffectEvent` RFC.
   const rendererRefLines = portals
     .map((slot) => {
-      const { renderProp, refIdent } = slotIdsFor(slot);
+      const { renderProp, refIdent, isDefault } = slotIdsFor(slot);
+      // Default portal slot indirects React's built-in `props.children` (there
+      // is no `render<Pascal>` prop); named slots indirect their render prop.
+      const source = isDefault ? 'props.children' : `props.${renderProp}`;
       return (
-        `const ${refIdent} = useRef(props.${renderProp});\n` +
-        `${refIdent}.current = props.${renderProp};`
+        `const ${refIdent} = useRef(${source});\n` +
+        `${refIdent}.current = ${source};`
       );
     })
     .join('\n');
@@ -284,7 +351,7 @@ export function emitPortals(
     'for (const root of portalRoots.current) root.unmount();\n' +
     'portalRoots.current.clear();';
 
-  const portalSlotNames = new Set(portals.map((s) => s.name));
+  const portalSlotNames = new Set(portals.map((s) => portalKey(s)));
 
   return {
     hasPortals: true,

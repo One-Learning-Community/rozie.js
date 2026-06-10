@@ -39,6 +39,7 @@ import _traverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
@@ -616,7 +617,7 @@ export function rewriteRozieIdentifiers(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
   const portalSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+    ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
   );
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const emits = new Set(ir.emits);
