@@ -36,12 +36,42 @@ Rete ships **no stylesheet** — every node, socket, and connection is styled by
 
 ## Authoring model
 
-The graph is driven by two **config-array props** — `nodes` and `connections` — not declarative `<Node>` / `<Handle>` children. (Declarative children would need a cross-component context primitive Rozie deliberately defers; here the engine owns the store and `FlowCanvas` is a thin view over it, exactly the proven engine-wrapper pattern — the same `:sources` / `:layers` shape MapLibre uses.)
+The graph can be authored two ways — via **config-array props** (`nodes` / `connections`) or via **declarative child components** (`<FlowNode>` / `<Handle>` / `<Connection>`). Both are fully supported, and when both are supplied on the same canvas they **union-merge by id (last-writer-wins)** into the same engine registry. The engine still owns the store and reconciles the live graph either way; pick whichever shape suits the consumer.
+
+### Config-array props
 
 - **`nodes`** — `[{ id, label?, x, y, inputs?, outputs?, data? }]`. `inputs`/`outputs` are `[{ key, label?, multiple? }]`; `key` is the socket id used by connections. `data` is an opaque payload handed to the `node` slot scope.
 - **`connections`** — `[{ id?, source, sourceOutput?, target, targetInput? }]`. `source`/`target` are node ids; `sourceOutput`/`targetInput` default to `'out'`/`'in'`.
 
 The engine owns pan/zoom/drag/drag-to-connect; changing the arrays reconciles the live graph (add / move / remove) with no remount. User-drawn connections fire `@connection-created`; dragged nodes fire `@node-moved`.
+
+### Declarative children
+
+The declarative shape follows **Rete's own vocabulary**, not React Flow's: `<FlowNode>` is a node, `<Handle>` is a **port / socket** (nested inside its node — *not* an edge), and `<Connection>` is an **edge** (a flat child of the canvas, since an edge spans two nodes and cannot nest inside one):
+
+```html
+<FlowCanvas>
+  <FlowNode id="a" :x="40" :y="60">
+    <template #body><MyCard /></template>
+    <Handle side="output" port="out" />
+  </FlowNode>
+  <FlowNode id="b" :x="320" :y="60">
+    <template #body><MyCard /></template>
+    <Handle side="input" port="in" />
+  </FlowNode>
+  <Connection source="a" target="b" sourceOutput="out" targetInput="in" />
+</FlowCanvas>
+```
+
+- **`<FlowNode>`** — `id` (required) plus `:x` / `:y` (position) and an optional `label`. Its visible body is authored via a **named `#body` slot**, not bare children.
+- **`<Handle>`** — `side` (`'input'` | `'output'`) + `port` (the socket key), optional `label` / `multiple`. Nests inside its `<FlowNode>` and auto-binds to that node via injected context (no `nodeId` to wire by hand).
+- **`<Connection>`** — `source` / `target` (node ids) + optional `sourceOutput` / `targetInput` (handle keys, default `'out'` / `'in'`). A flat child of `<FlowCanvas>`.
+
+Children feed the **same id-keyed registry** the config arrays do, through the same `addNode` / `addConnection` reconcile — so a config array and declarative children coexist, and on an id collision the declarative child wins (last-writer-wins).
+
+**Why the node body is a named `#body` slot, not bare children.** A FlowNode's visible body has to *teleport* into the node element the Rete engine creates — it does not render in the normal component tree. Rozie mounts it through a portal, which gives it a fresh render-root inside the engine-owned host. A portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming config children (`<Handle>` / `<Connection>`, which stay in the normal child position) is therefore the correct cross-framework shape — so the body must be the `#body` slot, not a bare default-slot child.
+
+The declarative shape **dogfoods Rozie's own cross-component context primitive** (`$provide` / `$inject`): `<FlowCanvas>` provides an id-keyed registry, and each child injects it.
 
 ## Quick start
 
