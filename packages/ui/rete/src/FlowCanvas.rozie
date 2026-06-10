@@ -115,15 +115,20 @@
   // shipped today ((∅ ∪ props) === props, the dist-parity zero-drift guarantee).
   nodeReg: {},
   connReg: {},
-  // Buffer for <Handle> addPort() calls that arrive BEFORE their <FlowNode>
-  // parent has registered its node entry. On React/Vue/Svelte/Angular a child's
-  // mount hook fires BEFORE its parent's (child-before-parent mount order), so a
-  // nested <Handle>'s addPort() runs while $data.nodeReg[id] is still absent —
-  // it would silently drop. We buffer those ports here keyed by nodeId and FLUSH
-  // them when the node finally registers (Solid/Lit mount parent-first or async,
-  // but the buffer is harmless there — it just stays empty). Whole-object-replaced
-  // like the other registries so the watch reference changes once per mutation.
-  pendingPorts: {}
+  // SEPARATE port registry — a FLAT map keyed by a UNIQUE per-port key
+  // (`nodeId::side::key`) → { nodeId, side, key, label, multiple }. A nested
+  // <Handle>'s addPort() runs in its OWN mount hook, which on React/Vue/Svelte/
+  // Angular fires BEFORE its parent <FlowNode>.register() (child-before-parent mount
+  // order). Storing ports HERE (not in the node spec) makes registration ORDER-
+  // INDEPENDENT and target-agnostic: reconcileNodes reads (node spec inputs/outputs
+  // ∪ the portReg entries for that node) on EVERY run. CRITICAL — the key is the
+  // FULL per-port id, NOT the nodeId: two <Handle>s of the SAME node addPort in one
+  // React commit, and a read-modify-write of a `portReg[nodeId]` ARRAY would clobber
+  // (the emitter lowers `$data.portReg = {...$data.portReg, [k]: v}` to a functional
+  // `setPortReg(prev => ({...prev, [k]: v}))`, which is concurrency-safe ONLY when
+  // the keys differ). A unique per-port key makes each Handle's write independent.
+  // Empty by default → the config-array-only path is byte-identical (D-01).
+  portReg: {}
 }
 </data>
 
@@ -236,27 +241,33 @@ const buildNode = (spec) => {
 //                                              then re-reconcile (feeds buildNode)
 //   bodyHostFor(id)                          → the engine `body` host div (D-04
 //                                              render-callback target, see below)
-// Apply a single buffered/live port onto a node spec (whole-object replacement of
-// the spec's inputs/outputs). Returns the next spec, or the same spec if the port
-// is already present (idempotent — a re-fired register/late context must not dup).
-const applyPortToSpec = (spec, side, key, label, multiple) => {
-  if (!spec || key == null) return spec
-  const list = side === 'input'
-    ? (Array.isArray(spec.inputs) ? spec.inputs.slice() : [])
-    : (Array.isArray(spec.outputs) ? spec.outputs.slice() : [])
-  if (list.some((p) => p && p.key === key)) return spec
-  list.push({ key, label, multiple })
-  return side === 'input' ? { ...spec, inputs: list } : { ...spec, outputs: list }
+// Merge the declarative-port registry (the flat portReg entries belonging to this
+// node id) into a node spec's inputs/outputs. Returns a spec whose inputs/outputs
+// are (spec.inputs ∪ portReg input ports) and (spec.outputs ∪ portReg output ports),
+// deduped by key. Pure (no $data write) so reconcileNodes can call it on every run
+// regardless of the order the node vs its <Handle> ports registered. Returns the
+// SAME spec when there are no extra ports for this node (keeps the config-array path
+// allocation-free / byte-equivalent).
+const mergePortsIntoSpec = (spec, portMap) => {
+  if (!spec || !portMap) return spec
+  const inputs = Array.isArray(spec.inputs) ? spec.inputs.slice() : []
+  const outputs = Array.isArray(spec.outputs) ? spec.outputs.slice() : []
+  let changed = false
+  for (const k in portMap) {
+    const p = portMap[k]
+    if (!p || p.key == null || p.nodeId !== spec.id) continue
+    if (p.side === 'input') {
+      if (inputs.some((q) => q && q.key === p.key)) continue
+      inputs.push({ key: p.key, label: p.label, multiple: p.multiple }); changed = true
+    } else {
+      if (outputs.some((q) => q && q.key === p.key)) continue
+      outputs.push({ key: p.key, label: p.label, multiple: p.multiple }); changed = true
+    }
+  }
+  return changed ? { ...spec, inputs, outputs } : spec
 }
 
 $provide('rete:canvas', {
-  // A node registers its base spec (inputs/outputs empty). Any ports a nested
-  // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
-  // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
-  // — NOT inline here, because on React the parent register and the child addPort
-  // are batched into one commit, so a closure read of $data.pendingPorts inside
-  // register would be stale (still {}). The reactive flush runs AFTER state settles
-  // on every target, so the merge sees the buffered ports.
   register: (id, spec) => { $data.nodeReg = { ...$data.nodeReg, [id]: spec } },
   update: (id, spec) => { $data.nodeReg = { ...$data.nodeReg, [id]: spec } },
   unregister: (id) => { const n = { ...$data.nodeReg }; delete n[id]; $data.nodeReg = n },
@@ -265,22 +276,18 @@ $provide('rete:canvas', {
   // A <Handle> registers a port against THIS node's id+side. Mutate the registered
   // node spec's inputs/outputs (whole-object replacement of the node entry) so the
   // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  // A <Handle> registers a port against its node's id+side. We store it in the flat
+  // portReg under a UNIQUE per-port key so registration is order-independent AND
+  // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+  // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
+  // both (an array read-modify-write under one nodeId key would clobber). reconcile
+  // Nodes merges the node's portReg entries into its spec on every run regardless of
+  // mount order. The unique key also makes a re-fired addPort (late Lit context)
+  // idempotent — it overwrites the same key with the same value.
   addPort: (id, side, key, label, multiple) => {
     if (id == null || key == null) return
-    const cur = $data.nodeReg[id]
-    if (!cur) {
-      // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
-      // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
-      // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
-      // doesn't double-buffer.
-      const bucket = Array.isArray($data.pendingPorts[id]) ? $data.pendingPorts[id].slice() : []
-      if (bucket.some((p) => p && p.side === side && p.key === key)) return
-      bucket.push({ side, key, label, multiple })
-      $data.pendingPorts = { ...$data.pendingPorts, [id]: bucket }
-      return
-    }
-    const next = applyPortToSpec(cur, side, key, label, multiple)
-    if (next !== cur) $data.nodeReg = { ...$data.nodeReg, [id]: next }
+    const portKey = id + '::' + side + '::' + key
+    $data.portReg = { ...$data.portReg, [portKey]: { nodeId: id, side, key, label, multiple } }
   },
   // D-04 render-callback target. Returns the engine-created body host div for a
   // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
@@ -619,8 +626,12 @@ $onMount(() => {
     const want = []
     programmatic++
     try {
-      for (const spec of merged) {
-        if (!spec || spec.id == null) continue
+      for (const rawSpec of merged) {
+        if (!rawSpec || rawSpec.id == null) continue
+        // Merge the declarative <Handle> ports (portReg) into this node's spec on
+        // EVERY run — order-independent: whether the node or its ports registered
+        // last, the reconcile triggered by either sees both (D37 mount-order fix).
+        const spec = mergePortsIntoSpec(rawSpec, $data.portReg)
         want.push(spec.id)
         if (!regWant.has(spec.id)) propWant.push(spec.id)
         nodeMeta.set(spec.id, spec)
@@ -633,10 +644,9 @@ $onMount(() => {
         } else {
           // Sync any ports the spec gained AFTER the node was first built — a
           // nested <Handle>'s addPort can land after reconcileNodes already created
-          // the node (React batches the parent register + child addPort into one
-          // commit, so the first reconcile builds the node sans ports; the flushed
-          // ports arrive on a later tick). buildNode only runs for NEW nodes, so add
-          // the missing inputs/outputs onto the live instance here, then re-render.
+          // the node (the node registered before its ports on some targets).
+          // buildNode only runs for NEW nodes, so add the missing inputs/outputs
+          // onto the live instance here, then re-render.
           let portsAdded = false
           const wantIn = Array.isArray(spec.inputs) ? spec.inputs : []
           const wantOut = Array.isArray(spec.outputs) ? spec.outputs : []
@@ -786,48 +796,24 @@ $onMount(() => {
 // SAME reconcilers (which read both sources internally). Nodes reconcile feeds
 // connections (a new <Connection> may reference a node a sibling <FlowNode> just
 // registered), so a node-registry change also re-runs connections — preserving the
-// node→connection sequencing the engine requires.
-// Flush buffered <Handle> ports into their node spec once the node has registered.
-// Runs reactively (after state settles on every target — critical on React, where a
-// child <Handle>'s addPort and its parent <FlowNode>'s register are batched into ONE
-// commit, so the ports can't be folded in synchronously during register). For each
-// node present in nodeReg that has pending ports, merge them into the node spec
-// (idempotent) and clear the bucket — both whole-object replacements, so nodeReg's
-// watch re-runs reconcile with the ported node. Triggered by BOTH pendingPorts (a
-// new buffered port) AND nodeReg (a node just registered while ports were pending),
-// since either side can arrive last. Settles in one extra tick; no-op when there is
-// nothing to flush, so the empty-registry config-array path is unaffected.
-const flushPendingPorts = () => {
-  const pend = $data.pendingPorts
-  let pendingChanged = false
-  let nodeChanged = false
-  const nextPend = { ...pend }
-  let nextReg = $data.nodeReg
-  for (const id in pend) {
-    const bucket = pend[id]
-    if (!Array.isArray(bucket) || !bucket.length) continue
-    const cur = nextReg[id]
-    if (!cur) continue
-    let merged = cur
-    for (const p of bucket) merged = applyPortToSpec(merged, p.side, p.key, p.label, p.multiple)
-    if (merged !== cur) { nextReg = { ...nextReg, [id]: merged }; nodeChanged = true }
-    delete nextPend[id]
-    pendingChanged = true
-  }
-  if (nodeChanged) $data.nodeReg = nextReg
-  if (pendingChanged) $data.pendingPorts = nextPend
-}
-
+// node→connection sequencing the engine requires. The declarative <Handle> port
+// registry (portReg) ALSO drives the node reconcile — reconcileNodes merges
+// portReg[id] into each node spec on every run, so a port that registered before OR
+// after its node lands either way (the mount-order fix); a port-registry change then
+// re-runs connections too (a skipped edge whose endpoint port just appeared draws).
 $watch(() => $props.nodes, () => { if (reconcileNodes) reconcileNodes() })
 $watch(() => $props.connections, () => { if (reconcileConnections) reconcileConnections() })
 $watch(() => $data.nodeReg, () => {
-  flushPendingPorts()
   if (reconcileNodes) {
     Promise.resolve(reconcileNodes()).then(() => { if (reconcileConnections) reconcileConnections() })
   }
 })
 $watch(() => $data.connReg, () => { if (reconcileConnections) reconcileConnections() })
-$watch(() => $data.pendingPorts, () => { flushPendingPorts() })
+$watch(() => $data.portReg, () => {
+  if (reconcileNodes) {
+    Promise.resolve(reconcileNodes()).then(() => { if (reconcileConnections) reconcileConnections() })
+  }
+})
 
 $watch(() => $props.zoom, (v) => {
   if (!area || typeof v !== 'number') return

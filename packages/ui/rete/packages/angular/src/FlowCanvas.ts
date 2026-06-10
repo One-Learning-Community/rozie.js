@@ -140,13 +140,6 @@ function rozieToken(key: string): InjectionToken<unknown> {
     {
       provide: rozieToken('rete:canvas'),
       useFactory: () => { const __rozieCtxHost = inject(forwardRef(() => FlowCanvas)); return ({
-  // A node registers its base spec (inputs/outputs empty). Any ports a nested
-  // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
-  // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
-  // — NOT inline here, because on React the parent register and the child addPort
-  // are batched into one commit, so a closure read of $data.pendingPorts inside
-  // register would be stale (still {}). The reactive flush runs AFTER state settles
-  // on every target, so the merge sees the buffered ports.
   register: (id: any, spec: any) => {
     __rozieCtxHost.nodeReg.set({
       ...__rozieCtxHost.nodeReg(),
@@ -182,32 +175,26 @@ function rozieToken(key: string): InjectionToken<unknown> {
   // A <Handle> registers a port against THIS node's id+side. Mutate the registered
   // node spec's inputs/outputs (whole-object replacement of the node entry) so the
   // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  // A <Handle> registers a port against its node's id+side. We store it in the flat
+  // portReg under a UNIQUE per-port key so registration is order-independent AND
+  // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+  // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
+  // both (an array read-modify-write under one nodeId key would clobber). reconcile
+  // Nodes merges the node's portReg entries into its spec on every run regardless of
+  // mount order. The unique key also makes a re-fired addPort (late Lit context)
+  // idempotent — it overwrites the same key with the same value.
   addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
     if (id == null || key == null) return;
-    const cur = __rozieCtxHost.nodeReg()[id];
-    if (!cur) {
-      // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
-      // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
-      // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
-      // doesn't double-buffer.
-      const bucket = Array.isArray(__rozieCtxHost.pendingPorts()[id]) ? __rozieCtxHost.pendingPorts()[id].slice() : [];
-      if (bucket.some((p: any) => p && p.side === side && p.key === key)) return;
-      bucket.push({
+    const portKey = id + '::' + side + '::' + key;
+    __rozieCtxHost.portReg.set({
+      ...__rozieCtxHost.portReg(),
+      [portKey]: {
+        nodeId: id,
         side,
         key,
         label,
         multiple
-      });
-      __rozieCtxHost.pendingPorts.set({
-        ...__rozieCtxHost.pendingPorts(),
-        [id]: bucket
-      });
-      return;
-    }
-    const next = __rozieCtxHost.applyPortToSpec(cur, side, key, label, multiple);
-    if (next !== cur) __rozieCtxHost.nodeReg.set({
-      ...__rozieCtxHost.nodeReg(),
-      [id]: next
+      }
     });
   },
   // D-04 render-callback target. Returns the engine-created body host div for a
@@ -241,7 +228,7 @@ export class FlowCanvas {
   fitOnMount = input<boolean>(true);
   nodeReg = signal({});
   connReg = signal({});
-  pendingPorts = signal({});
+  portReg = signal({});
   canvasEl = viewChild<ElementRef<HTMLDivElement>>('canvasEl');
   nodeAction = output<unknown>({ alias: 'node-action' });
   connectionCreated = output<unknown>({ alias: 'connection-created' });
@@ -272,7 +259,6 @@ export class FlowCanvas {
       if (this.reconcileConnections) this.reconcileConnections();
     })(); }); });
     effect(() => { const __watchVal = (() => this.nodeReg())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
-      this.flushPendingPorts();
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
@@ -282,8 +268,12 @@ export class FlowCanvas {
     effect(() => { const __watchVal = (() => this.connReg())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       if (this.reconcileConnections) this.reconcileConnections();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.pendingPorts())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
-      this.flushPendingPorts();
+    effect(() => { const __watchVal = (() => this.portReg())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+      if (this.reconcileNodes) {
+        Promise.resolve(this.reconcileNodes()).then(() => {
+          if (this.reconcileConnections) this.reconcileConnections();
+        });
+      }
     })(); }); });
     effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
@@ -786,8 +776,12 @@ export class FlowCanvas {
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of merged as any) {
-          if (!spec || spec.id == null) continue;
+        for (const rawSpec of merged as any) {
+          if (!rawSpec || rawSpec.id == null) continue;
+          // Merge the declarative <Handle> ports (portReg) into this node's spec on
+          // EVERY run — order-independent: whether the node or its ports registered
+          // last, the reconcile triggered by either sees both (D37 mount-order fix).
+          const spec = this.mergePortsIntoSpec(rawSpec, this.portReg());
           want.push(spec.id);
           if (!regWant.has(spec.id)) propWant.push(spec.id);
           this.nodeMeta.set(spec.id, spec);
@@ -803,10 +797,9 @@ export class FlowCanvas {
           } else {
             // Sync any ports the spec gained AFTER the node was first built — a
             // nested <Handle>'s addPort can land after reconcileNodes already created
-            // the node (React batches the parent register + child addPort into one
-            // commit, so the first reconcile builds the node sans ports; the flushed
-            // ports arrive on a later tick). buildNode only runs for NEW nodes, so add
-            // the missing inputs/outputs onto the live instance here, then re-render.
+            // the node (the node registered before its ports on some targets).
+            // buildNode only runs for NEW nodes, so add the missing inputs/outputs
+            // onto the live instance here, then re-render.
             let portsAdded = false;
             const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
             const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
@@ -1031,50 +1024,37 @@ export class FlowCanvas {
     }
     return node;
   };
-  applyPortToSpec = (spec: any, side: any, key: any, label: any, multiple: any) => {
-    if (!spec || key == null) return spec;
-    const list = side === 'input' ? Array.isArray(spec.inputs) ? spec.inputs.slice() : [] : Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
-    if (list.some((p: any) => p && p.key === key)) return spec;
-    list.push({
-      key,
-      label,
-      multiple
-    });
-    return side === 'input' ? {
-      ...spec,
-      inputs: list
-    } : {
-      ...spec,
-      outputs: list
-    };
-  };
-  flushPendingPorts = () => {
-    const pend = this.pendingPorts();
-    let pendingChanged = false;
-    let nodeChanged = false;
-    const nextPend = {
-      ...pend
-    };
-    let nextReg = this.nodeReg();
-    for (const id in pend) {
-      const bucket = pend[id];
-      if (!Array.isArray(bucket) || !bucket.length) continue;
-      const cur = nextReg[id];
-      if (!cur) continue;
-      let merged = cur;
-      for (const p of bucket as any) merged = this.applyPortToSpec(merged, p.side, p.key, p.label, p.multiple);
-      if (merged !== cur) {
-        nextReg = {
-          ...nextReg,
-          [id]: merged
-        };
-        nodeChanged = true;
+  mergePortsIntoSpec = (spec: any, portMap: any) => {
+    if (!spec || !portMap) return spec;
+    const inputs = Array.isArray(spec.inputs) ? spec.inputs.slice() : [];
+    const outputs = Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
+    let changed = false;
+    for (const k in portMap) {
+      const p = portMap[k];
+      if (!p || p.key == null || p.nodeId !== spec.id) continue;
+      if (p.side === 'input') {
+        if (inputs.some((q: any) => q && q.key === p.key)) continue;
+        inputs.push({
+          key: p.key,
+          label: p.label,
+          multiple: p.multiple
+        });
+        changed = true;
+      } else {
+        if (outputs.some((q: any) => q && q.key === p.key)) continue;
+        outputs.push({
+          key: p.key,
+          label: p.label,
+          multiple: p.multiple
+        });
+        changed = true;
       }
-      delete nextPend[id];
-      pendingChanged = true;
     }
-    if (nodeChanged) this.nodeReg.set(nextReg);
-    if (pendingChanged) this.pendingPorts.set(nextPend);
+    return changed ? {
+      ...spec,
+      inputs,
+      outputs
+    } : spec;
   };
   getEditor = () => {
     return this.editor;

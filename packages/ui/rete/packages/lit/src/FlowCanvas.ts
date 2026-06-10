@@ -122,7 +122,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
   private _nodeReg = signal({});
   private _connReg = signal({});
-  private _pendingPorts = signal({});
+  private _portReg = signal({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
 private __rozieWatchInitial_2 = true;
 private __rozieWatchInitial_3 = true;
@@ -131,13 +131,6 @@ private __rozieWatchInitial_5 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __rozieCtx_rete_canvas, initialValue: ((__rozieCtxHost) => ({
-  // A node registers its base spec (inputs/outputs empty). Any ports a nested
-  // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
-  // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
-  // — NOT inline here, because on React the parent register and the child addPort
-  // are batched into one commit, so a closure read of $data.pendingPorts inside
-  // register would be stale (still {}). The reactive flush runs AFTER state settles
-  // on every target, so the merge sees the buffered ports.
   register: (id: any, spec: any) => {
     __rozieCtxHost._nodeReg.value = {
       ...__rozieCtxHost._nodeReg.value,
@@ -173,32 +166,26 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   // A <Handle> registers a port against THIS node's id+side. Mutate the registered
   // node spec's inputs/outputs (whole-object replacement of the node entry) so the
   // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+  // A <Handle> registers a port against its node's id+side. We store it in the flat
+  // portReg under a UNIQUE per-port key so registration is order-independent AND
+  // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+  // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
+  // both (an array read-modify-write under one nodeId key would clobber). reconcile
+  // Nodes merges the node's portReg entries into its spec on every run regardless of
+  // mount order. The unique key also makes a re-fired addPort (late Lit context)
+  // idempotent — it overwrites the same key with the same value.
   addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
     if (id == null || key == null) return;
-    const cur = __rozieCtxHost._nodeReg.value[id];
-    if (!cur) {
-      // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
-      // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
-      // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
-      // doesn't double-buffer.
-      const bucket = Array.isArray(__rozieCtxHost._pendingPorts.value[id]) ? __rozieCtxHost._pendingPorts.value[id].slice() : [];
-      if (bucket.some((p: any) => p && p.side === side && p.key === key)) return;
-      bucket.push({
+    const portKey = id + '::' + side + '::' + key;
+    __rozieCtxHost._portReg.value = {
+      ...__rozieCtxHost._portReg.value,
+      [portKey]: {
+        nodeId: id,
         side,
         key,
         label,
         multiple
-      });
-      __rozieCtxHost._pendingPorts.value = {
-        ...__rozieCtxHost._pendingPorts.value,
-        [id]: bucket
-      };
-      return;
-    }
-    const next = __rozieCtxHost.applyPortToSpec(cur, side, key, label, multiple);
-    if (next !== cur) __rozieCtxHost._nodeReg.value = {
-      ...__rozieCtxHost._nodeReg.value,
-      [id]: next
+      }
     };
   },
   // D-04 render-callback target. Returns the engine-created body host div for a
@@ -302,7 +289,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     }));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._nodeReg.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
-      this.flushPendingPorts();
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
@@ -312,8 +298,12 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._connReg.value)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       if (this.reconcileConnections) this.reconcileConnections();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._pendingPorts.value)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
-      this.flushPendingPorts();
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._portReg.value)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+      if (this.reconcileNodes) {
+        Promise.resolve(this.reconcileNodes()).then(() => {
+          if (this.reconcileConnections) this.reconcileConnections();
+        });
+      }
     })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.zoom)(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
@@ -324,14 +314,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       });
     })(__watchVal); }); }));
 
-    this._disconnectCleanups.push(effect(() => { void this._nodeReg.value; void this._connReg.value; void this._pendingPorts.value; this.__rozieCtxProvider_rete_canvas.setValue(((__rozieCtxHost) => ({
-      // A node registers its base spec (inputs/outputs empty). Any ports a nested
-      // <Handle> buffered BEFORE this node existed (child-before-parent mount order on
-      // React/Vue/Svelte/Angular) are folded in by the flushPendingPorts $watch below
-      // — NOT inline here, because on React the parent register and the child addPort
-      // are batched into one commit, so a closure read of $data.pendingPorts inside
-      // register would be stale (still {}). The reactive flush runs AFTER state settles
-      // on every target, so the merge sees the buffered ports.
+    this._disconnectCleanups.push(effect(() => { void this._nodeReg.value; void this._connReg.value; void this._portReg.value; this.__rozieCtxProvider_rete_canvas.setValue(((__rozieCtxHost) => ({
       register: (id: any, spec: any) => {
         __rozieCtxHost._nodeReg.value = {
           ...__rozieCtxHost._nodeReg.value,
@@ -367,32 +350,26 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       // A <Handle> registers a port against THIS node's id+side. Mutate the registered
       // node spec's inputs/outputs (whole-object replacement of the node entry) so the
       // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
+      // A <Handle> registers a port against its node's id+side. We store it in the flat
+      // portReg under a UNIQUE per-port key so registration is order-independent AND
+      // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+      // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
+      // both (an array read-modify-write under one nodeId key would clobber). reconcile
+      // Nodes merges the node's portReg entries into its spec on every run regardless of
+      // mount order. The unique key also makes a re-fired addPort (late Lit context)
+      // idempotent — it overwrites the same key with the same value.
       addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
         if (id == null || key == null) return;
-        const cur = __rozieCtxHost._nodeReg.value[id];
-        if (!cur) {
-          // The <FlowNode> hasn't registered yet (child <Handle> mounted before its
-          // parent on React/Vue/Svelte/Angular). Buffer the port; register() folds it
-          // in when the node arrives. De-dup so a re-fired addPort (late Lit context)
-          // doesn't double-buffer.
-          const bucket = Array.isArray(__rozieCtxHost._pendingPorts.value[id]) ? __rozieCtxHost._pendingPorts.value[id].slice() : [];
-          if (bucket.some((p: any) => p && p.side === side && p.key === key)) return;
-          bucket.push({
+        const portKey = id + '::' + side + '::' + key;
+        __rozieCtxHost._portReg.value = {
+          ...__rozieCtxHost._portReg.value,
+          [portKey]: {
+            nodeId: id,
             side,
             key,
             label,
             multiple
-          });
-          __rozieCtxHost._pendingPorts.value = {
-            ...__rozieCtxHost._pendingPorts.value,
-            [id]: bucket
-          };
-          return;
-        }
-        const next = __rozieCtxHost.applyPortToSpec(cur, side, key, label, multiple);
-        if (next !== cur) __rozieCtxHost._nodeReg.value = {
-          ...__rozieCtxHost._nodeReg.value,
-          [id]: next
+          }
         };
       },
       // D-04 render-callback target. Returns the engine-created body host div for a
@@ -893,8 +870,12 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       const want = [];
       this.programmatic++;
       try {
-        for (const spec of merged as any) {
-          if (!spec || spec.id == null) continue;
+        for (const rawSpec of merged as any) {
+          if (!rawSpec || rawSpec.id == null) continue;
+          // Merge the declarative <Handle> ports (portReg) into this node's spec on
+          // EVERY run — order-independent: whether the node or its ports registered
+          // last, the reconcile triggered by either sees both (D37 mount-order fix).
+          const spec = this.mergePortsIntoSpec(rawSpec, this._portReg.value);
           want.push(spec.id);
           if (!regWant.has(spec.id)) propWant.push(spec.id);
           this.nodeMeta.set(spec.id, spec);
@@ -910,10 +891,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           } else {
             // Sync any ports the spec gained AFTER the node was first built — a
             // nested <Handle>'s addPort can land after reconcileNodes already created
-            // the node (React batches the parent register + child addPort into one
-            // commit, so the first reconcile builds the node sans ports; the flushed
-            // ports arrive on a later tick). buildNode only runs for NEW nodes, so add
-            // the missing inputs/outputs onto the live instance here, then re-render.
+            // the node (the node registered before its ports on some targets).
+            // buildNode only runs for NEW nodes, so add the missing inputs/outputs
+            // onto the live instance here, then re-render.
             let portsAdded = false;
             const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
             const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
@@ -1176,51 +1156,37 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   return node;
 };
 
-  applyPortToSpec = (spec: any, side: any, key: any, label: any, multiple: any) => {
-  if (!spec || key == null) return spec;
-  const list = side === 'input' ? Array.isArray(spec.inputs) ? spec.inputs.slice() : [] : Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
-  if (list.some((p: any) => p && p.key === key)) return spec;
-  list.push({
-    key,
-    label,
-    multiple
-  });
-  return side === 'input' ? {
-    ...spec,
-    inputs: list
-  } : {
-    ...spec,
-    outputs: list
-  };
-};
-
-  flushPendingPorts = () => {
-  const pend = this._pendingPorts.value;
-  let pendingChanged = false;
-  let nodeChanged = false;
-  const nextPend = {
-    ...pend
-  };
-  let nextReg = this._nodeReg.value;
-  for (const id in pend) {
-    const bucket = pend[id];
-    if (!Array.isArray(bucket) || !bucket.length) continue;
-    const cur = nextReg[id];
-    if (!cur) continue;
-    let merged = cur;
-    for (const p of bucket as any) merged = this.applyPortToSpec(merged, p.side, p.key, p.label, p.multiple);
-    if (merged !== cur) {
-      nextReg = {
-        ...nextReg,
-        [id]: merged
-      };
-      nodeChanged = true;
+  mergePortsIntoSpec = (spec: any, portMap: any) => {
+  if (!spec || !portMap) return spec;
+  const inputs = Array.isArray(spec.inputs) ? spec.inputs.slice() : [];
+  const outputs = Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
+  let changed = false;
+  for (const k in portMap) {
+    const p = portMap[k];
+    if (!p || p.key == null || p.nodeId !== spec.id) continue;
+    if (p.side === 'input') {
+      if (inputs.some((q: any) => q && q.key === p.key)) continue;
+      inputs.push({
+        key: p.key,
+        label: p.label,
+        multiple: p.multiple
+      });
+      changed = true;
+    } else {
+      if (outputs.some((q: any) => q && q.key === p.key)) continue;
+      outputs.push({
+        key: p.key,
+        label: p.label,
+        multiple: p.multiple
+      });
+      changed = true;
     }
-    delete nextPend[id];
-    pendingChanged = true;
   }
-  if (nodeChanged) this._nodeReg.value = nextReg;
-  if (pendingChanged) this._pendingPorts.value = nextPend;
+  return changed ? {
+    ...spec,
+    inputs,
+    outputs
+  } : spec;
 };
 
   getEditor() {
