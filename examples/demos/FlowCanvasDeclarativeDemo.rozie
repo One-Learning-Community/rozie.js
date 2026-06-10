@@ -192,12 +192,25 @@ const checkUnion = () => {
   font-size: 0.875rem;
   min-width: 2ch;
 }
-.demo-card {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #111827;
-  white-space: nowrap;
+
+:root {
+  /* Phase-34 engine-DOM escape hatch: the #body card teleports (via $portals.body
+     / the renderBody render-callback) into the engine node element INSIDE
+     <rozie-flow-canvas>'s shadow root, so on Lit it can't be reached by a plain
+     scoped rule (no [data-rozie-s-*] attr crosses the shadow boundary). :root emits
+     document-level CSS that FlowCanvas's `adopt-document-styles` adopts into its
+     shadow root. Mirrors how FlowCanvas styles its own .rozie-flow-node chrome.
+     NOT :global() — that is a ROZ128 hard error; nested :root is the sanctioned tool.
+     A bare `.demo-card` (the consumer's own class on the teleported fragment)
+     suffices — no .rozie-flow-canvas ancestor prefix is required, since the class
+     lives directly on the projected card element. */
+  .demo-card {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+  }
 }
 </style>
 
