@@ -22,8 +22,8 @@
 // The POSITIVE case is asserted FIRST so a silent producer/threading failure
 // can't make the negatives pass vacuously.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseExpression } from '@babel/parser';
 import { compile } from '../compile.js';
@@ -416,5 +416,115 @@ describe('validatePortalScopedStyle [Phase 38] — live validation through compi
       resolverRoot: REPO_ROOT,
     });
     expect(neg.diagnostics.filter((d) => d.code === ROZ088)).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// (E) REPO-WIDE AUDIT — compile every demo in examples/demos/ through
+// compile() (target:'lit', filename + resolverRoot=repo root so producer
+// resolution threads filler.isPortal) and assert the set of ROZ088-flagged
+// files exactly equals a pinned baseline.
+//
+// ─── PRE-FIX BASELINE (Wave 2 of Phase 38) ─────────────────────────────────
+// This baseline encodes the CURRENT pre-fix reality, NOT the desired end
+// state. The ROZ088 pass is CORRECT: each of these 12 files has a plain scoped
+// `<style>` rule whose subject is portal-exclusive — a genuine latent Lit
+// shadow-DOM styling bug invisible to every behavioral/typecheck/screenshot
+// gate. Plan 38-02 is the emit-neutral DIAGNOSTIC deliverable; it does NOT fix
+// any demo `.rozie` (D-02). The fixes are a SEPARATE Wave 3 effort (proper
+// plan→execute→verify→human-pixel-gate cycle), tracked in
+// `.planning/todos/pending/portal-scoped-style-lit-wave3-fixes.md`.
+//
+//   - FlowCanvasDemo is the SPEC's named live-POSITIVE (D1 above); it is a
+//     member of the expected set.
+//   - FlowCanvasDeclarativeDemo is the SPEC's named live-NEGATIVE (already
+//     fixed to `:root {}` in quick task 260610-e6p, D2 above); it MUST NOT be
+//     a member.
+//   - 11 of these 12 are slated for fix in Wave 3 (convert the portal-content
+//     scoped rules to the `:root {}` escape hatch + `adopt-document-styles`,
+//     then rebless Lit pixel baselines under human /compare.html review).
+//   - PortalListStyledDemo is the one genuinely AMBIGUOUS case: it carries
+//     `@portal item { ... }` LAYOUT rules (escape-hatched, safe) AND plain
+//     scoped COSMETIC rules (.row/.swatch/.id/.label) whose cosmetics WOULD
+//     drop on Lit. It stays flagged and is cataloged "confirm intentional vs
+//     bug" in the Wave 3 todo — NOT fixed here.
+//
+// After Wave 3 lands, the EXPECTED set reduces accordingly and this baseline
+// must be tightened in lockstep (remove each fixed file). The assertion fails
+// loudly on BOTH a NEW unexpected positive (a freshly-introduced latent bug,
+// or a precision regression in the pass) AND an unexpected DISAPPEARANCE (a
+// file silently stopped flagging — e.g. a threading regression making the pass
+// vacuous, or an out-of-band fix that didn't update this baseline).
+// ===========================================================================
+
+describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
+  // Sorted basenames of every demo currently flagged by ROZ088 (the pre-fix
+  // baseline — empirically derived, see header comment). Keep sorted.
+  const EXPECTED_ROZ088_FILES = [
+    'ChartBehaviorDemo.rozie',
+    'CodeMirrorDemo.rozie',
+    'FlowCanvasDemo.rozie',
+    'FullCalendarAllSlotsDemo.rozie',
+    'FullCalendarDemo.rozie',
+    'FullCalendarSlotsDemo.rozie',
+    'MapLibreDemo.rozie',
+    'PortalListDemo.rozie',
+    'PortalListStyledDemo.rozie',
+    'TipTapBubbleMenuDemo.rozie',
+    'TipTapNodeViewDemo.rozie',
+    'TipTapNodeViewScreenshotDemo.rozie',
+  ];
+
+  const DEMOS_DIR = resolve(REPO_ROOT, 'examples/demos');
+
+  /** Compile every examples/demos/*.rozie and return the sorted set of files that flag ≥1 ROZ088. */
+  function flaggedCorpusFiles(): string[] {
+    const flagged: string[] = [];
+    const demoFiles = readdirSync(DEMOS_DIR)
+      .filter((f) => f.endsWith('.rozie'))
+      .sort();
+    for (const f of demoFiles) {
+      const p = resolve(DEMOS_DIR, f);
+      // resolverRoot=repo root + absolute filename so consumer demos with
+      // <components> imports to the @rozie-ui producers thread filler.isPortal.
+      const res = compile(readFileSync(p, 'utf8'), {
+        target: 'lit',
+        filename: p,
+        resolverRoot: REPO_ROOT,
+      });
+      if (res.diagnostics.some((d) => d.code === ROZ088)) flagged.push(f);
+    }
+    return flagged.sort();
+  }
+
+  it('(E1) the ROZ088-flagged corpus set EXACTLY equals the pinned pre-fix baseline', () => {
+    const flagged = flaggedCorpusFiles();
+
+    const unexpected = flagged.filter((f) => !EXPECTED_ROZ088_FILES.includes(f));
+    const missing = EXPECTED_ROZ088_FILES.filter((f) => !flagged.includes(f));
+
+    // Surface BOTH directions loudly (no silent allow-list).
+    expect(
+      unexpected,
+      `NEW unexpected ROZ088 positive(s) in the demo corpus: ${unexpected.join(
+        ', ',
+      )}. Each is either a real latent Lit shadow-DOM styling bug (log it to .planning/todos/) ` +
+        `or a precision regression in validatePortalScopedStyle. Do NOT silently allow-list — triage it.`,
+    ).toEqual([]);
+    expect(
+      missing,
+      `Expected ROZ088 positive(s) DISAPPEARED from the demo corpus: ${missing.join(
+        ', ',
+      )}. Either the pass regressed (threading went vacuous) or a demo was fixed out-of-band ` +
+        `without tightening EXPECTED_ROZ088_FILES. Update the baseline in lockstep with any Wave 3 fix.`,
+    ).toEqual([]);
+
+    expect(flagged).toEqual(EXPECTED_ROZ088_FILES);
+  });
+
+  it('(E2) FlowCanvasDemo (the SPEC live-positive) IS flagged; FlowCanvasDeclarativeDemo (the live-negative) is NOT', () => {
+    const flagged = flaggedCorpusFiles();
+    expect(flagged).toContain(basename(POS_PATH)); // FlowCanvasDemo.rozie
+    expect(flagged).not.toContain(basename(NEG_PATH)); // FlowCanvasDeclarativeDemo.rozie
   });
 });
