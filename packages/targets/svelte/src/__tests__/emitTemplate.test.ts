@@ -196,3 +196,58 @@ describe('part= passthrough (SPEC-R3/R4b)', () => {
     expect(template).toContain('part="body"');
   });
 });
+
+describe('hyphenated child-component @event → producer-matching callback prop (debug svelte-emit-async-callback)', () => {
+  function lowerInline(source: string, name = 'EventConsumer'): IRComponent {
+    const result = parse(source, { filename: `${name}.rozie` });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  // Consumer binds a child-component custom event with a HYPHEN
+  // (`@connection-created`), a non-hyphenated custom event (`@nodepicked`),
+  // and a native DOM event (`@click`) on a plain element. The producer's
+  // `$emit` lowering normalizes event-prop names with `svelteCallbackPropName`
+  // (hyphens stripped), so the consumer-side prop name MUST agree:
+  //   `@connection-created` → `onconnectioncreated`  (NOT `onconnection-created`)
+  //   `@nodepicked`         → `onnodepicked`
+  // Native `@click` on the <button> must remain the plain `onclick` DOM-event
+  // handler name — the normalizer is a no-op there and Svelte's native event
+  // semantics are untouched.
+  const CONSUMER = `<rozie name="EventConsumer">
+<components>
+{
+  FlowCanvas: './FlowCanvas.rozie',
+}
+</components>
+<template>
+<div>
+  <FlowCanvas @connection-created="onConnect" @nodepicked="onPick" />
+  <button @click="onClick">x</button>
+</div>
+</template>
+<script>
+function onConnect() {}
+function onPick() {}
+function onClick() {}
+</script>
+</rozie>
+`;
+
+  it('emits onconnectioncreated (hyphen stripped) for a hyphenated child-component @event', () => {
+    const { template, diagnostics } = emitTemplate(lowerInline(CONSUMER), REGISTRY);
+    expect(diagnostics).toEqual([]);
+    // Producer-matching prop name (hyphens stripped) — agrees with the Svelte
+    // producer's svelteCallbackPropName-normalized destructure.
+    expect(template).toContain('onconnectioncreated={onConnect}');
+    // Regression guard: the OLD ad-hoc `on${eventName.toLowerCase()}` produced
+    // this hyphenated (and therefore never-bound) prop name.
+    expect(template).not.toContain('onconnection-created');
+    // Non-hyphenated custom event is unchanged.
+    expect(template).toContain('onnodepicked={onPick}');
+    // Native DOM event on a plain element keeps the plain lowercase name.
+    expect(template).toContain('onclick={onClick}');
+  });
+});

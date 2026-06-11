@@ -39,7 +39,7 @@ import {
   emitListenerSpread,
   findRHtml,
 } from './emitTemplateAttribute.js';
-import { emitTemplateEvent } from './emitTemplateEvent.js';
+import { emitTemplateEvent, svelteEventAttrName } from './emitTemplateEvent.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
 import {
@@ -280,13 +280,17 @@ function listenerFromLiteralKey(
  * `@click="f1" r-on="{ click: f2 }"` produces a single
  * `onclick={($event) => { f1($event); f2($event); }}` dispatcher.
  */
-function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
+function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean): string {
   if (events.length === 0) return '';
 
-  // Group by lowercase event name (the Svelte attribute name).
+  // Group by the emitted Svelte attribute name. For a child-component custom
+  // event this strips hyphens via svelteCallbackPropName so the consumer prop
+  // name agrees with the producer's `$emit` lowering; for native DOM events it
+  // is the plain lowercase `on<event>` name. Grouping on the FINAL attribute
+  // name (not the raw event) keeps multi-listener merge + emission consistent.
   const groups = new Map<string, Listener[]>();
   for (const ev of events) {
-    const key = ev.event.toLowerCase();
+    const key = svelteEventAttrName(ev.event, isComponent);
     const list = groups.get(key) ?? [];
     list.push(ev);
     groups.set(key, list);
@@ -301,6 +305,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         ir: ctx.ir,
         registry: ctx.registry,
         injectionCounter: ctx.injectionCounter,
+        isComponent,
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -316,6 +321,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         ir: ctx.ir,
         registry: ctx.registry,
         injectionCounter: ctx.injectionCounter,
+        isComponent,
       });
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
       for (const d of result.diagnostics) ctx.diagnostics.push(d);
@@ -343,7 +349,9 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
       handlerBodies.push(`(() => { (${inner})($event); })();`);
     }
 
-    const merged = `on${eventName}={($event) => { ${handlerBodies.join(' ')} }}`;
+    // `eventName` is the grouping key = the final Svelte attr name (already
+    // `on...` and hyphen-stripped for components via svelteEventAttrName).
+    const merged = `${eventName}={($event) => { ${handlerBodies.join(' ')} }}`;
     out.push(merged);
   }
 
@@ -433,7 +441,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     }
   }
   const allEvents: Listener[] = [...node.events, ...syntheticEvents];
-  const eventText = emitEvents(allEvents, ctx);
+  const isComponentTag = node.tagKind !== 'html';
+  const eventText = emitEvents(allEvents, ctx, isComponentTag);
 
   // Dynamic spreads → one `use:applyListeners={<expr>}` action per spread.
   // Each routes through `emitListenerSpread` which collects the

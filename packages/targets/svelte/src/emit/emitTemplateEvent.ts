@@ -43,6 +43,7 @@ import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseMod
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 
 export interface EmitEventCtx {
@@ -50,6 +51,37 @@ export interface EmitEventCtx {
   registry: ModifierRegistry;
   /** Per-component counter so suffix names are stable + collision-free. */
   injectionCounter?: { next: number };
+  /**
+   * True when the listener target is a child-component invocation
+   * (`tagKind === 'component' | 'self'`), false for a native HTML element.
+   *
+   * Custom-event names reach a child component as a callback PROP
+   * (`onconnectioncreated={...}`), whose name MUST agree with the producer's
+   * `$emit` lowering — which normalizes via `svelteCallbackPropName`
+   * (hyphens stripped). A hyphenated `@connection-created` therefore has to
+   * compose `onconnectioncreated`, NOT `onconnection-created`, or the
+   * producer's callback prop is never bound (silent no-op). Native DOM events
+   * (`onclick`, `oninput`) are non-hyphenated, so the normalizer is a no-op
+   * for them; we keep the plain lowercase path for HTML elements to leave
+   * Svelte's native `on<event>` DOM-event semantics untouched.
+   */
+  isComponent?: boolean;
+}
+
+/**
+ * Compose the Svelte 5 event-prop attribute name for a listener.
+ *
+ * - Child-component custom event → use the shared `svelteCallbackPropName`
+ *   so the consumer's callback-prop name agrees with the producer's `$emit`
+ *   lowering (hyphens stripped: `connection-created` → `onconnectioncreated`).
+ * - Native DOM element event → plain `on<event>` lowercase (Svelte's native
+ *   event handler name; never hyphen-stripped, though native events are not
+ *   hyphenated in practice).
+ */
+export function svelteEventAttrName(eventName: string, isComponent: boolean): string {
+  return isComponent
+    ? svelteCallbackPropName(eventName)
+    : `on${eventName.toLowerCase()}`;
 }
 
 export interface EmitTemplateEventResult {
@@ -297,7 +329,14 @@ export function emitTemplateEvent(
 
   // Compose the handler attribute. Naming convention: lowercase Svelte 5
   // event-prop name = `on${eventName}`. NO `on:` prefix (Pitfall 4).
-  const attrName = `on${eventName.toLowerCase()}`;
+  //
+  // For a child-component custom event the prop name MUST match the producer's
+  // `$emit` lowering (which strips hyphens via svelteCallbackPropName), so a
+  // hyphenated `@connection-created` composes `onconnectioncreated` — agreeing
+  // with the producer's destructured `onconnectioncreated` prop. Native DOM
+  // events keep the plain lowercase `on<event>` form (helper is a no-op since
+  // DOM event names are not hyphenated). See EmitEventCtx.isComponent.
+  const attrName = svelteEventAttrName(eventName, ctx.isComponent === true);
 
   let attrValue: string;
   if (inlineGuards.length === 0 && handlerKind === 'identifier') {

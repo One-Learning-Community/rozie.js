@@ -368,23 +368,20 @@ for (const target of TARGETS) {
     // `connection-created` event. The demo's `@connection-created="onConnect"`
     // increments `$data.lastConnect`, surfaced via readout-connect → '1'.
     //
-    // SVELTE CAVEAT (documented per-target gap, not part of this fix): on Svelte the
-    // connection IS created and the wrapper's `$emit('connection-created', …)` fires
-    // (verified), but the consumer's `@connection-created` handler is not invoked when
-    // the event originates from an async ENGINE callback (the Rete pointerup pipe),
-    // so the readout stays '0'. This is a Svelte custom-event-from-engine-callback
-    // emitter-parity concern — config-array connections are added under the wrapper's
-    // `programmatic` guard, so `connection-created` had never actually fired in any
-    // prior test on any target, which is why the gap surfaces only now. It is
-    // orthogonal to the drag-to-connect preview line proven above (mid-drag ≥3, which
-    // passes on all 6 targets) and would require an emitter change to close, so it is
-    // tracked separately rather than asserted here. The 5 other targets assert the
-    // full commit round-trip.
-    if (target !== 'svelte') {
-      await expect(page.getByTestId('readout-connect')).toHaveText('1', {
-        timeout: 10_000,
-      });
-    }
+    // Asserted on ALL 6 targets (debug svelte-emit-async-callback, 2026-06-11). The
+    // earlier Svelte exemption was NOT an async-from-engine-callback gap as first
+    // suspected — the root cause was a Svelte producer/consumer event-name
+    // normalization mismatch: the consumer-side child-component @event binding kept
+    // hyphens (`onconnection-created`) while the producer's `$emit` lowering strips
+    // them (`onconnectioncreated`), so the callback prop was never bound and
+    // `onconnectioncreated?.(…)` silently no-oped. The non-hyphenated `nodepicked`
+    // from the SAME async pipe always round-tripped, which falsified the async
+    // hypothesis. Fixed in packages/targets/svelte by composing the consumer prop
+    // name with the shared svelteCallbackPropName normalizer. The full commit
+    // round-trip is now asserted on Svelte too.
+    await expect(page.getByTestId('readout-connect')).toHaveText('1', {
+      timeout: 10_000,
+    });
     // PERSISTENCE PROOF (260610-jrk continuation): after release the rubber-band
     // pseudo is torn down, but the freshly drag-created a→c edge is a REAL
     // connection that renders and PERSISTS with a non-empty `d` — so the drawn-path
