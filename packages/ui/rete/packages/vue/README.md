@@ -44,8 +44,8 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
-| `nodes` | `Array` | `[]` |  |  |
-| `connections` | `Array` | `[]` |  |  |
+| `graph` | `Object` | `{…}` | ✓ |  |
+| `validateTypes` | `Boolean` | `true` |  |  |
 | `zoom` | `Number` | `1` | ✓ |  |
 | `pannable` | `Boolean` | `true` |  |  |
 | `zoomable` | `Boolean` | `true` |  |  |

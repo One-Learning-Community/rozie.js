@@ -3,8 +3,10 @@ import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
 export interface FlowCanvasProps {
-  nodes?: unknown[];
-  connections?: unknown[];
+  graph?: Record<string, unknown>;
+  defaultGraph?: Record<string, unknown>;
+  onGraphChange?: (next: Record<string, unknown>) => void;
+  validateTypes?: boolean;
   zoom?: number;
   defaultZoom?: number;
   onZoomChange?: (next: number) => void;

@@ -41,8 +41,8 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
-| `nodes` | `Array` | `[]` |  |  |
-| `connections` | `Array` | `[]` |  |  |
+| `graph` | `Object` | `{…}` | ✓ |  |
+| `validateTypes` | `Boolean` | `true` |  |  |
 | `zoom` | `Number` | `1` | ✓ |  |
 | `pannable` | `Boolean` | `true` |  |  |
 | `zoomable` | `Boolean` | `true` |  |  |

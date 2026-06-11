@@ -21,8 +21,10 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 interface NodeCtx { node: any; selected: any; emit: any; }
 
 interface FlowCanvasProps {
-  nodes?: any[];
-  connections?: any[];
+  graph?: Record<string, any>;
+  defaultGraph?: Record<string, any>;
+  onGraphChange?: (graph: Record<string, any>) => void;
+  validateTypes?: boolean;
   zoom?: number;
   defaultZoom?: number;
   onZoomChange?: (zoom: number) => void;
@@ -68,12 +70,9 @@ export interface FlowCanvasHandle {
 const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(_props: FlowCanvasProps, ref): JSX.Element {
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const portalRoots = useRef<Set<Root>>(new Set());
-  const __defaultNodes = useState(() => (() => [])())[0];
-  const __defaultConnections = useState(() => (() => [])())[0];
-  const props: Omit<FlowCanvasProps, 'nodes' | 'connections' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'canConnect'> & { nodes: any[]; connections: any[]; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; canConnect: ((...args: any[]) => any) | null } = {
+  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'canConnect'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; canConnect: ((...args: any[]) => any) | null } = {
     ..._props,
-    nodes: _props.nodes ?? __defaultNodes,
-    connections: _props.connections ?? __defaultConnections,
+    validateTypes: _props.validateTypes ?? true,
     pannable: _props.pannable ?? true,
     zoomable: _props.zoomable ?? true,
     selectable: _props.selectable ?? true,
@@ -90,8 +89,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   _renderNodeRef.current = props.renderNode;
   const lastPropNodeIds = useRef<any>(null);
   const lastPropConnIds = useRef<any>(null);
-  const lastRegistryNodeIds = useRef<any>(null);
-  const lastRegistryConnIds = useRef<any>(null);
   const editor = useRef<any>(null);
   const area = useRef<any>(null);
   const connectionPlugin = useRef<any>(null);
@@ -103,33 +100,35 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const reconcileNodes = useRef<any>(null);
   const reconcileNodesRunning = useRef(false);
   const reconcileNodesPending = useRef(false);
+  const dragFlushRaf = useRef(0);
+  const [graph, setGraph] = useControllableState({
+    value: props.graph,
+    defaultValue: props.defaultGraph ?? (() => ({
+    nodes: [],
+    connections: []
+  }))(),
+    onValueChange: props.onGraphChange,
+  });
   const [zoom, setZoom] = useControllableState({
     value: props.zoom,
     defaultValue: props.defaultZoom ?? 1,
     onValueChange: props.onZoomChange,
   });
-  const _connectionsRef = useRef(props.connections);
-  _connectionsRef.current = props.connections;
-  const _nodesRef = useRef(props.nodes);
-  _nodesRef.current = props.nodes;
+  const _graphRef = useRef(graph);
+  _graphRef.current = graph;
   const _zoomRef = useRef(zoom);
   _zoomRef.current = zoom;
-  const [nodeReg, setNodeReg] = useState({});
-  const [connReg, setConnReg] = useState({});
+  const [typeReg, setTypeReg] = useState({});
   const [portReg, setPortReg] = useState({});
-  const _connRegRef = useRef(connReg);
-  _connRegRef.current = connReg;
-  const _nodeRegRef = useRef(nodeReg);
-  _nodeRegRef.current = nodeReg;
   const _portRegRef = useRef(portReg);
   _portRegRef.current = portReg;
+  const _typeRegRef = useRef(typeReg);
+  _typeRegRef.current = typeReg;
   const canvasEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
   const _watch3First = useRef(true);
-  const _watch4First = useRef(true);
-  const _watch5First = useRef(true);
 
   const SOCKET = useMemo(() => new ClassicPreset.Socket('flow'), []);
   const nodeInstances = useMemo(() => new Map(), []);
@@ -137,6 +136,67 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const connInstances = useMemo(() => new Map(), []);
   const nodeEntries = useMemo(() => new Map(), []);
   const connEntries = useMemo(() => new Map(), []);
+  const pendingDragPositions = useMemo(() => new Map(), []);
+  function currentGraph() {
+    return graph || {
+      nodes: [],
+      connections: []
+    };
+  }
+  function flushDragWriteBack() {
+    dragFlushRaf.current = 0;
+    if (programmatic.current) {
+      pendingDragPositions.clear();
+      return;
+    }
+    if (pendingDragPositions.size === 0) return;
+    const g = currentGraph();
+    const nodes = (g.nodes || []).map((n: any) => {
+      const p = n && n.id != null ? pendingDragPositions.get(n.id) : null;
+      return p ? {
+        ...n,
+        x: p.x,
+        y: p.y
+      } : n;
+    });
+    pendingDragPositions.clear();
+    setGraph({
+      ...g,
+      nodes
+    });
+  }
+  const scheduleDragFlush = useCallback(() => {
+    if (dragFlushRaf.current) return;
+    if (typeof requestAnimationFrame === 'function') {
+      dragFlushRaf.current = requestAnimationFrame(flushDragWriteBack);
+    } else {
+      dragFlushRaf.current = 1;
+      Promise.resolve().then(flushDragWriteBack);
+    }
+  }, [flushDragWriteBack]);
+  const writeBackConnectionCreated = useCallback((c: any) => {
+    if (programmatic.current) return;
+    const g = currentGraph();
+    const conn = {
+      id: c.id,
+      source: c.source,
+      sourceOutput: c.sourceOutput,
+      target: c.target,
+      targetInput: c.targetInput
+    };
+    setGraph({
+      ...g,
+      connections: [...(g.connections || []), conn]
+    });
+  }, [currentGraph, setGraph]);
+  const writeBackConnectionRemoved = useCallback((id: any) => {
+    if (programmatic.current) return;
+    const g = currentGraph();
+    setGraph({
+      ...g,
+      connections: (g.connections || []).filter((e: any) => e && e.id !== id)
+    });
+  }, [currentGraph, setGraph]);
   const serializeConn = useCallback((c: any) => ({
     id: c.id,
     source: c.source,
@@ -144,11 +204,39 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     target: c.target,
     targetInput: c.targetInput
   }), []);
-  const buildNode = useCallback((spec: any) => {
-    const node = new ClassicPreset.Node(spec.label != null ? String(spec.label) : '');
+  const portSchemaForType = useCallback((type: any, portReg: any) => {
+    const inputs = [];
+    const outputs = [];
+    if (type == null || !portReg) return {
+      inputs,
+      outputs
+    };
+    const prefix = type + '::';
+    for (const k in portReg) {
+      if (k.indexOf(prefix) !== 0) continue;
+      const p = portReg[k];
+      if (!p || p.key == null) continue;
+      const entry = {
+        key: p.key,
+        label: p.label,
+        multiple: p.multiple,
+        portType: p.portType
+      };
+      if (p.side === 'input') inputs.push(entry);else outputs.push(entry);
+    }
+    return {
+      inputs,
+      outputs
+    };
+  }, [portReg]);
+  const buildNode = useCallback((spec: any, portReg: any) => {
+    const label = spec.data && spec.data.label != null ? String(spec.data.label) : '';
+    const node = new ClassicPreset.Node(label);
     node.id = spec.id;
-    const inputs = Array.isArray(spec.inputs) ? spec.inputs : [];
-    const outputs = Array.isArray(spec.outputs) ? spec.outputs : [];
+    const {
+      inputs,
+      outputs
+    } = portSchemaForType(spec.type, portReg);
     for (const inp of inputs as any) {
       if (!inp || inp.key == null) continue;
       node.addInput(inp.key, new ClassicPreset.Input(SOCKET, inp.label, inp.multiple === true));
@@ -158,39 +246,13 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       node.addOutput(out.key, new ClassicPreset.Output(SOCKET, out.label, out.multiple !== false));
     }
     return node;
-  }, []);
-  const mergePortsIntoSpec = useCallback((spec: any, portMap: any) => {
-    if (!spec || !portMap) return spec;
-    const inputs = Array.isArray(spec.inputs) ? spec.inputs.slice() : [];
-    const outputs = Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
-    let changed = false;
-    for (const k in portMap) {
-      const p = portMap[k];
-      if (!p || p.key == null || p.nodeId !== spec.id) continue;
-      if (p.side === 'input') {
-        if (inputs.some((q: any) => q && q.key === p.key)) continue;
-        inputs.push({
-          key: p.key,
-          label: p.label,
-          multiple: p.multiple
-        });
-        changed = true;
-      } else {
-        if (outputs.some((q: any) => q && q.key === p.key)) continue;
-        outputs.push({
-          key: p.key,
-          label: p.label,
-          multiple: p.multiple
-        });
-        changed = true;
-      }
-    }
-    return changed ? {
-      ...spec,
-      inputs,
-      outputs
-    } : spec;
-  }, []);
+  }, [portReg, portSchemaForType]);
+  const portTypeOf = useCallback((nodeId: any, side: any, key: any) => {
+    const meta = nodeMeta.get(nodeId);
+    if (!meta || meta.type == null || key == null) return null;
+    const entry = portReg[meta.type + '::' + side + '::' + key];
+    return entry ? entry.portType : null;
+  }, [portReg]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision discipline (ROZ121/ROZ524/Lit-lifecycle):
   //   - NO `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom`
@@ -209,7 +271,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }
   async function addNode(spec: any) {
     if (!editor.current || !spec || spec.id == null) return null;
-    const node = buildNode(spec);
+    const node = buildNode(spec, portReg);
     nodeInstances.set(spec.id, node);
     nodeMeta.set(spec.id, spec);
     programmatic.current++;
@@ -359,8 +421,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     const container = canvasEl.current;
     lastPropNodeIds.current = [];
     lastPropConnIds.current = [];
-    lastRegistryNodeIds.current = [];
-    lastRegistryConnIds.current = [];
     editor.current = new NodeEditor();
     area.current = new AreaPlugin(container);
     connectionPlugin.current = new ConnectionPlugin();
@@ -450,10 +510,13 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       const id = reteNode.id;
       const meta = nodeMeta.get(id) || {
         id,
-        label: reteNode.label
+        type: undefined,
+        data: {}
       };
       const existing = nodeEntries.get(id);
       const selected = reteNode.selected === true;
+      // default-chrome fallback label (only when a node's type has no #body template).
+      const chromeLabel = meta.data && meta.data.label != null ? String(meta.data.label) : meta.type != null ? String(meta.type) : '';
       if (existing && existing.element === element) {
         // in-place update — refresh chrome + reactive portal scope, leave sockets.
         existing.box.classList.toggle('is-selected', selected);
@@ -464,7 +527,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             emit: existing.emit
           });
         } else if (existing.titleEl) {
-          existing.titleEl.textContent = meta.label != null ? String(meta.label) : '';
+          existing.titleEl.textContent = chromeLabel;
         }
         return;
       }
@@ -499,36 +562,50 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         box,
         body,
         handle: null,
+        bodyHandle: null,
         titleEl: null,
         bodyMoved: false,
         emit,
         socketDisposers
       };
-      if (typeof meta.renderBody === 'function') {
-        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
-        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
-        // PARENT projects the body here from its own render scope: the child's
-        // registered renderBody(host) appends the child's host element (its $el,
-        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
-        // must exist before the callback runs (bodyHostFor reads it), so register first.
+
+      // ── RENDER-BY-TYPE: select the body by `node.type` ──────────────────────────
+      // 1) the node's TYPE template (typeReg[type].bodyRenderer) — the primary path
+      //    (41-03 <NodeType><template #body>); 2) the low-level `#node` portal slot
+      //    (consumer switches on node.type itself — escape hatch); 3) default chrome.
+      const typeSpec = meta.type != null ? _typeRegRef.current[meta.type] : null;
+      if (typeSpec && typeof typeSpec.bodyRenderer === 'function') {
+        // RENDER-BY-TYPE callback path. The <NodeType> cannot relocate its OWN <slot>
+        // across the Lit shadow boundary (Wave-0 A3), so the PARENT projects the body
+        // here from its own render scope: the type's registered bodyRenderer(host, scope)
+        // mounts the type's `#body` portal INTO the engine `body` div (a FRESH render
+        // root per node — no framework DOM relocation, the Phase-37 D-04 trap avoided).
+        // nodeEntries must exist before the callback runs (bodyHostFor reads it), so
+        // register first. The graph node's `data` flows in as scope → one template per
+        // type renders every instance of that type.
         nodeEntries.set(id, entry);
-        meta.renderBody(body);
+        entry.bodyHandle = typeSpec.bodyRenderer(body, {
+          node: meta,
+          selected,
+          emit
+        });
         entry.bodyMoved = true;
         return;
       }
       if ((props.renderNode ?? props.slots?.["node"])) {
         // reactive multi-instance portal — one handle per node, re-rendered in
-        // place on meta change (the MapLibre marker discipline).
+        // place on meta change (the MapLibre marker discipline). Low-level escape
+        // hatch: the consumer switches on node.type inside the single `#node` slot.
         entry.handle = portals.node(body, {
           node: meta,
           selected,
           emit
         });
       } else {
-        // default chrome: a title bar.
+        // default chrome: a title bar (the type name / data.label).
         const title = document.createElement('div');
         title.className = 'rozie-flow-node__title';
-        title.textContent = meta.label != null ? String(meta.label) : '';
+        title.textContent = chromeLabel;
         body.appendChild(title);
         entry.titleEl = title;
       }
@@ -715,6 +792,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       for (const [id, entry] of nodeEntries as any) {
         if (entry.element === element) {
           if (entry.handle) entry.handle.dispose();
+          if (entry.bodyHandle && entry.bodyHandle.dispose) {
+            try {
+              entry.bodyHandle.dispose();
+            } catch (e: any) {}
+          }
           for (const d of entry.socketDisposers as any) {
             try {
               d();
@@ -733,17 +815,22 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       }
     };
 
-    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
-    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
-    // returns false. The falsy emit result makes editor.addConnection return false
-    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
-    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
-    // imperative addConnection, and config-array reconcile uniformly (all three route
-    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
-    // captured at mount) so a reactive prop change takes effect on the next attempt.
-    // Registered before the connectioncreated-forwarding pipe so it halts the chain
-    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
-    // addConnection before connectioncreated is ever emitted).
+    // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
+    // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
+    // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
+    //   1. AUTOMATIC typed validation (`:validate-types`, default ON, D3 option a):
+    //      resolve src/tgt port TYPE from the per-TYPE port schema (via each endpoint
+    //      node's `type`); if both are non-null and UNEQUAL → reject. A null on either
+    //      side (untyped port / unknown type) imposes no constraint → allow.
+    //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
+    //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
+    // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
+    // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
+    // are PURE (no $data write / engine call) — reads only. The block (return undefined)
+    // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
+    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
+    // user-facing rejection — mirrors connection-created/connection-removed).
     editor.current.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreate') {
@@ -756,11 +843,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           target: c.target,
           targetInput: c.targetInput
         };
+        // 1. AUTOMATIC typed validation (default ON; opt out via :validate-types="false").
+        if (props.validateTypes !== false) {
+          const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
+          const tgtType = portTypeOf(c.target, 'input', c.targetInput);
+          if (srcType != null && tgtType != null && srcType !== tgtType) {
+            if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected(conn);
+            return undefined; // ← CANCEL: type mismatch
+          }
+        }
+        // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof props.canConnect === 'function' && props.canConnect(conn) === false) {
-          // Echo-guard the EMIT only (mirrors connection-created/connection-removed) so a
-          // programmatic reconcile that the rule would reject doesn't surface as a
-          // user-facing rejection. The block (return undefined) stays UNCONDITIONAL so the
-          // rule is enforced on every path.
           if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected(conn);
           return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
         }
@@ -773,14 +866,23 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreated') {
         // keep engine truth in sync so reconcile diffs correctly — a user-drawn
-        // connection (auto id) must register here or the next props pass re-adds it.
+        // connection (auto id) must register here or the next graph pass re-adds it.
         connInstances.set(context.data.id, context.data);
-        if (!programmatic.current) props.onConnectionCreated && props.onConnectionCreated(serializeConn(context.data));
+        if (!programmatic.current) {
+          // WRITE-BACK: append the new connection into a fresh graph object (D4).
+          writeBackConnectionCreated(context.data);
+          // keep the discrete event too (back-compat).
+          props.onConnectionCreated && props.onConnectionCreated(serializeConn(context.data));
+        }
       } else if (context.type === 'connectionremoved') {
         connInstances.delete(context.data.id);
-        if (!programmatic.current) props.onConnectionRemoved && props.onConnectionRemoved({
-          id: context.data.id
-        });
+        if (!programmatic.current) {
+          // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
+          writeBackConnectionRemoved(context.data.id);
+          props.onConnectionRemoved && props.onConnectionRemoved({
+            id: context.data.id
+          });
+        }
       }
       return context;
     });
@@ -799,6 +901,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             meta.x = pos.x;
             meta.y = pos.y;
           }
+          // WRITE-BACK (coalesced): accumulate the latest position for this node and
+          // flush ONE fresh graph object per animation frame (Pitfall 2 — the drag
+          // storm). The discrete `node-moved` emit stays per-translate (back-compat).
+          pendingDragPositions.set(id, {
+            x: pos.x,
+            y: pos.y
+          });
+          scheduleDragFlush();
           props.onNodeMoved && props.onNodeMoved({
             id,
             x: pos.x,
@@ -826,77 +936,27 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       return context;
     });
 
-    // Union the config-array prop with the declarative-children registry by id
-    // (D-02 last-writer-wins: the registry — children — overrides the config-array
-    // on id collision; array entries first in array order, then registry entries in
-    // registration order). The empty-registry path returns exactly the config array
-    // (dedup-by-id of an array with no registry overrides is the array itself), so
-    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
-    // Returns the merged list AND the set of ids contributed by the registry, so the
-    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
-    const mergeById = (arr: any, reg: any) => {
-      const out = [];
-      const idx = new Map();
-      const regIds = [];
-      for (const e of (Array.isArray(arr) ? arr : []) as any) {
-        if (!e || e.id == null) continue;
-        if (idx.has(e.id)) {
-          out[idx.get(e.id)] = e;
-        } else {
-          idx.set(e.id, out.length);
-          out.push(e);
-        }
-      }
-      for (const id in reg) {
-        const e = reg[id];
-        if (!e || e.id == null) continue;
-        regIds.push(e.id);
-        if (idx.has(e.id)) {
-          out[idx.get(e.id)] = e;
-        } else {
-          idx.set(e.id, out.length);
-          out.push(e);
-        }
-      }
-      return {
-        merged: out,
-        regIds
-      };
-    };
-
-    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
-    // The reconcilers read BOTH sources internally (config-array $props + the
-    // declarative-children registry) so a single function serves the node/connection
-    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
-    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
-    // reaper removes a dropped id only if it was previously managed by EITHER source;
-    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
-    // guard so two passes never race the engine (the Lit "cannot find node" fix).
+    // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
+    // Nodes come ONLY from `$props.graph.nodes` (the single source of truth, D1/D2);
+    // sockets come from each node's TYPE port schema (portReg keyed `type::side::key`).
+    // A port-schema change ($data.portReg, when a <Port> registers late on Lit) ALSO
+    // drives this reconcile so a node whose type just gained ports re-renders. An
+    // imperative $expose addNode (provenance NOT in lastPropNodeIds) survives the reaper.
+    // Wrapped by reconcileNodes (below) with a re-entrancy guard so two passes never
+    // race the engine (the Lit "cannot find node" fix).
     const reconcileNodesPass = async () => {
       if (!editor.current || !area.current) return;
-      const propArr = Array.isArray(_nodesRef.current) ? _nodesRef.current : [];
-      const {
-        merged,
-        regIds
-      } = mergeById(propArr, _nodeRegRef.current);
-      const regWant = new Set(regIds);
-      const propWant = [];
+      const graphNodes = Array.isArray(_graphRef.current && _graphRef.current.nodes) ? _graphRef.current.nodes : [];
       const want = [];
       programmatic.current++;
       try {
-        for (const rawSpec of merged as any) {
-          if (!rawSpec || rawSpec.id == null) continue;
-          // Merge the declarative <Handle> ports (portReg) into this node's spec on
-          // EVERY run — order-independent: whether the node or its ports registered
-          // last, the reconcile triggered by either sees both (D37 mount-order fix).
-          const spec = mergePortsIntoSpec(rawSpec, _portRegRef.current);
+        for (const spec of graphNodes as any) {
+          if (!spec || spec.id == null) continue;
           want.push(spec.id);
-          if (!regWant.has(spec.id)) propWant.push(spec.id);
           nodeMeta.set(spec.id, spec);
           let node = nodeInstances.get(spec.id);
           if (!node) {
-            node = buildNode(spec);
+            node = buildNode(spec, _portRegRef.current);
             nodeInstances.set(spec.id, node);
             await editor.current.addNode(node);
             await area.current.translate(spec.id, {
@@ -904,14 +964,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
               y: spec.y || 0
             });
           } else {
-            // Sync any ports the spec gained AFTER the node was first built — a
-            // nested <Handle>'s addPort can land after reconcileNodes already created
-            // the node (the node registered before its ports on some targets).
-            // buildNode only runs for NEW nodes, so add the missing inputs/outputs
-            // onto the live instance here, then re-render.
+            // Sync any ports this node's TYPE gained AFTER the node was first built —
+            // a nested <Port>'s addTypePort can land after reconcileNodes already
+            // created the node (the node registered before its ports on some targets,
+            // or a <Port> registered late on Lit). buildNode only runs for NEW nodes,
+            // so add the missing inputs/outputs onto the live instance here from the
+            // TYPE schema, then re-render.
             let portsAdded = false;
-            const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
-            const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
+            const {
+              inputs: wantIn,
+              outputs: wantOut
+            } = portSchemaForType(spec.type, _portRegRef.current);
             for (const inp of wantIn as any) {
               if (!inp || inp.key == null || node.inputs[inp.key]) continue;
               node.addInput(inp.key, new ClassicPreset.Input(SOCKET, inp.label, inp.multiple === true));
@@ -934,11 +997,16 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
               // untouched; to render the NEW sockets, drop this node's render entry so
               // area.update takes the fresh-build path (re-runs buildSocketRow + re-
               // emits the socket render signals the ConnectionPlugin/watcher need). The
-              // D-04 body host is re-projected by renderBody (appendChild re-moves the
-              // same host element — idempotent).
+              // render-by-type body host is re-projected by the type's bodyRenderer
+              // (mounts a fresh portal root into the same host — idempotent).
               const entry = nodeEntries.get(spec.id);
               if (entry) {
                 if (entry.handle) entry.handle.dispose();
+                if (entry.bodyHandle && entry.bodyHandle.dispose) {
+                  try {
+                    entry.bodyHandle.dispose();
+                  } catch (e: any) {}
+                }
                 for (const d of entry.socketDisposers as any) {
                   try {
                     d();
@@ -953,9 +1021,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             if (portsAdded && reconcileConnections.current) await reconcileConnections.current();
           }
         }
-        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
-        // — imperatively added nodes (in NEITHER provenance set) survive.
-        const tracked = new Set([...lastPropNodeIds.current, ...lastRegistryNodeIds.current]);
+        // remove dropped GRAPH-managed nodes (+ their connections) — imperatively added
+        // nodes (NOT in lastPropNodeIds) survive (the power-user escape hatch).
+        const tracked = new Set(lastPropNodeIds.current);
         for (const id of tracked as any) {
           if (!want.includes(id) && nodeInstances.has(id)) {
             for (const c of editor.current.getConnections() as any) {
@@ -966,8 +1034,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             nodeMeta.delete(id);
           }
         }
-        lastPropNodeIds.current = propWant;
-        lastRegistryNodeIds.current = regIds;
+        lastPropNodeIds.current = want;
       } finally {
         programmatic.current--;
       }
@@ -994,10 +1061,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     };
     reconcileConnections.current = async () => {
       if (!editor.current) return;
-      const propArr = Array.isArray(_connectionsRef.current) ? _connectionsRef.current : [];
-      // Normalize both sources to the same id-defaulting before the union so a
-      // collision between a config-array edge and a <Connection> child dedups
-      // correctly (the registry entry wins, D-02).
+      // Edges come ONLY from the bound graph's `connections` (the single source of
+      // truth — declarative <Connection> children are gone). Normalize id-defaulting
+      // (a connection authored without an id gets a stable derived id) so an edge the
+      // canvas wrote back (carrying the engine id) and a hand-authored edge dedup.
+      const graphConns = Array.isArray(_graphRef.current && _graphRef.current.connections) ? _graphRef.current.connections : [];
       const norm = (spec: any) => {
         if (!spec || spec.source == null || spec.target == null) return null;
         const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
@@ -1011,36 +1079,23 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           targetInput: tgtIn
         };
       };
-      const normProps = propArr.map(norm).filter(Boolean);
-      const normReg = {};
-      for (const k in _connRegRef.current) {
-        const n = norm(_connRegRef.current[k]);
-        if (n) normReg[k] = n;
-      }
-      const {
-        merged,
-        regIds
-      } = mergeById(normProps, normReg);
-      const regWant = new Set(regIds);
-      const propWant = [];
+      const merged = graphConns.map(norm).filter(Boolean);
       const want = [];
       programmatic.current++;
       try {
         for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
-          if (!regWant.has(spec.id)) propWant.push(spec.id);
           if (connInstances.has(spec.id)) continue;
           const sourceNode = nodeInstances.get(spec.source);
           const targetNode = nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
           // DEFENSIVE: the referenced output/input ports must exist on the live node
           // instances before addConnection (Rete throws "source node doesn't have
-          // output with a key out" otherwise, aborting the loop). A declarative
-          // <Connection> may register before the nested <Handle>s have flushed their
-          // ports into the node (child-before-parent mount order); skip until the
-          // ports exist — reconcileNodes re-runs reconcileConnections after a node-
-          // registry change (incl. a Handle addPort), so the edge lands on a later tick.
+          // output with a key out" otherwise, aborting the loop). An edge may reference
+          // a port the node's TYPE schema has not flushed yet (a <Port> registered
+          // after the <NodeType>); skip until the ports exist — reconcileNodes re-runs
+          // reconcileConnections after a port-schema change, so the edge lands later.
           if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
           if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
@@ -1048,15 +1103,15 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           connInstances.set(spec.id, conn);
           await editor.current.addConnection(conn);
         }
-        const tracked = new Set([...lastPropConnIds.current, ...lastRegistryConnIds.current]);
+        // remove dropped GRAPH-managed edges — imperatively added edges survive.
+        const tracked = new Set(lastPropConnIds.current);
         for (const id of tracked as any) {
           if (!want.includes(id) && connInstances.has(id)) {
             await editor.current.removeConnection(id);
             connInstances.delete(id);
           }
         }
-        lastPropConnIds.current = propWant;
-        lastRegistryConnIds.current = regIds;
+        lastPropConnIds.current = want;
       } finally {
         programmatic.current--;
       }
@@ -1093,8 +1148,20 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
+      if (dragFlushRaf.current && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(dragFlushRaf.current);
+        } catch (e: any) {}
+      }
+      dragFlushRaf.current = 0;
+      pendingDragPositions.clear();
       for (const [, entry] of nodeEntries as any) {
         if (entry.handle) entry.handle.dispose();
+        if (entry.bodyHandle && entry.bodyHandle.dispose) {
+          try {
+            entry.bodyHandle.dispose();
+          } catch (e: any) {}
+        }
         for (const d of entry.socketDisposers as any) {
           try {
             d();
@@ -1109,26 +1176,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
-    if (reconcileNodes.current) reconcileNodes.current();
-  }, [props.nodes]);
-  useEffect(() => {
-    if (_watch1First.current) { _watch1First.current = false; return; }
-    if (reconcileConnections.current) reconcileConnections.current();
-  }, [props.connections]);
-  useEffect(() => {
-    if (_watch2First.current) { _watch2First.current = false; return; }
     if (reconcileNodes.current) {
       Promise.resolve(reconcileNodes.current()).then(() => {
         if (reconcileConnections.current) reconcileConnections.current();
       });
     }
-  }, [nodeReg]);
+  }, [graph]);
   useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
-    if (reconcileConnections.current) reconcileConnections.current();
-  }, [connReg]);
-  useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch1First.current) { _watch1First.current = false; return; }
     if (reconcileNodes.current) {
       Promise.resolve(reconcileNodes.current()).then(() => {
         if (reconcileConnections.current) reconcileConnections.current();
@@ -1136,7 +1191,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
   }, [portReg]);
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch2First.current) { _watch2First.current = false; return; }
+    if (reconcileNodes.current) reconcileNodes.current();
+  }, [typeReg]);
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     const v = zoom;
     if (!area.current || typeof v !== 'number') return;
     if (v === area.current.area.transform.k) return;
@@ -1150,71 +1209,54 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
 
   return (
     <__ctx_rete_canvas.Provider value={{
-  register: (id: any, spec: any) => {
-    setNodeReg(prev => ({
+  // Register/replace a node TYPE template. `spec` carries an optional
+  // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
+  // node of this type into the engine body host, see renderNode). Whole-object replace.
+  registerType: (type: any, spec: any) => {
+    if (type != null) setTypeReg(prev => ({
       ...prev,
-      [id]: spec
+      [type]: spec
     }));
   },
-  update: (id: any, spec: any) => {
-    setNodeReg(prev => ({
-      ...prev,
-      [id]: spec
-    }));
-  },
-  unregister: (id: any) => {
-    const n = {
-      ...nodeReg
+  // Drop a type on <NodeType> unmount (whole-object replace).
+  unregisterType: (type: any) => {
+    const t = {
+      ...typeReg
     };
-    delete n[id];
-    setNodeReg(n);
+    delete t[type];
+    setTypeReg(t);
   },
-  registerConnection: (id: any, spec: any) => {
-    setConnReg(prev => ({
-      ...prev,
-      [id]: spec
-    }));
-  },
-  unregisterConnection: (id: any) => {
-    const c = {
-      ...connReg
-    };
-    delete c[id];
-    setConnReg(c);
-  },
-  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
-  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
-  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
-  // A <Handle> registers a port against its node's id+side. We store it in the flat
-  // portReg under a UNIQUE per-port key so registration is order-independent AND
-  // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+  // A <Port> registers a port against its TYPE + side. Stored in the flat portReg
+  // under a UNIQUE per-port key `type::side::key` so registration is order-independent
+  // AND concurrency-safe: two <Port>s of the same type addTypePort in one React commit,
   // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
-  // both (an array read-modify-write under one nodeId key would clobber). reconcile
-  // Nodes merges the node's portReg entries into its spec on every run regardless of
-  // mount order. The unique key also makes a re-fired addPort (late Lit context)
-  // idempotent — it overwrites the same key with the same value.
-  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
-    if (id == null || key == null) return;
-    const portKey = id + '::' + side + '::' + key;
+  // both (an array read-modify-write under one type key would clobber). buildNode reads
+  // the type's portReg entries on every run regardless of mount order. The unique key
+  // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
+  // `side` is derived by <Port> from which of out=/in= is set (out⇒'output', in⇒'input');
+  // `portType` carries the port type that drives validate-types + the typed-port color.
+  addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
+    if (type == null || key == null) return;
+    const portKey = type + '::' + side + '::' + key;
     setPortReg(prev => ({
       ...prev,
       [portKey]: {
-        nodeId: id,
+        type,
         side,
         key,
+        portType,
         label,
         multiple
       }
     }));
   },
-  // D-04 render-callback target. Returns the engine-created body host div for a
-  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
-  // registered spec carries a renderBody(host) callback that the PARENT invokes
-  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
-  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
-  // body is projected by the parent reusing the $portals.node host discipline.
-  bodyHostFor: (id: any) => {
-    const entry = nodeEntries.get(id);
+  // Render-by-type callback target. Returns the engine-created body host div for a
+  // graph node (nodeEntries.get(nodeId).body). The render-by-type projection mounts
+  // the node's TYPE template `#body` INTO this host via $portals — the Wave-0 A3
+  // finding (a Lit child cannot relocate its own shadow <slot> across the boundary),
+  // so the body is projected by the parent reusing the $portals host discipline.
+  bodyHostFor: (nodeId: any) => {
+    const entry = nodeEntries.get(nodeId);
     return entry ? entry.body : null;
   }
 }}>

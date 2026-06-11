@@ -119,8 +119,15 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   }
 `;
 
-  @property({ type: Array }) nodes: any[] = [];
-  @property({ type: Array }) connections: any[] = [];
+  @property({ type: Object, attribute: 'graph' }) _graph_attr: any = {
+  nodes: [],
+  connections: []
+};
+  private _graphControllable = createLitControllableProperty<any>({ host: this, eventName: 'graph-change', defaultValue: {
+  nodes: [],
+  connections: []
+}, initialControlledValue: undefined });
+  @property({ type: Boolean, reflect: true }) validateTypes: boolean = true;
   @property({ type: Number, attribute: 'zoom' }) _zoom_attr: number = 1;
   private _zoomControllable = createLitControllableProperty<number>({ host: this, eventName: 'zoom-change', defaultValue: 1, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) pannable: boolean = true;
@@ -134,82 +141,63 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
   @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
-  private _nodeReg = signal({});
-  private _connReg = signal({});
+  private _typeReg = signal({});
   private _portReg = signal({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
+private __rozieWatchInitial_0 = true;
+private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_2 = true;
 private __rozieWatchInitial_3 = true;
-private __rozieWatchInitial_4 = true;
-private __rozieWatchInitial_5 = true;
-private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __rozieCtx_rete_canvas, initialValue: ((__rozieCtxHost) => ({
-  register: (id: any, spec: any) => {
-    __rozieCtxHost._nodeReg.value = {
-      ...__rozieCtxHost._nodeReg.value,
-      [id]: spec
+  // Register/replace a node TYPE template. `spec` carries an optional
+  // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
+  // node of this type into the engine body host, see renderNode). Whole-object replace.
+  registerType: (type: any, spec: any) => {
+    if (type != null) __rozieCtxHost._typeReg.value = {
+      ...__rozieCtxHost._typeReg.value,
+      [type]: spec
     };
   },
-  update: (id: any, spec: any) => {
-    __rozieCtxHost._nodeReg.value = {
-      ...__rozieCtxHost._nodeReg.value,
-      [id]: spec
+  // Drop a type on <NodeType> unmount (whole-object replace).
+  unregisterType: (type: any) => {
+    const t = {
+      ...__rozieCtxHost._typeReg.value
     };
+    delete t[type];
+    __rozieCtxHost._typeReg.value = t;
   },
-  unregister: (id: any) => {
-    const n = {
-      ...__rozieCtxHost._nodeReg.value
-    };
-    delete n[id];
-    __rozieCtxHost._nodeReg.value = n;
-  },
-  registerConnection: (id: any, spec: any) => {
-    __rozieCtxHost._connReg.value = {
-      ...__rozieCtxHost._connReg.value,
-      [id]: spec
-    };
-  },
-  unregisterConnection: (id: any) => {
-    const c = {
-      ...__rozieCtxHost._connReg.value
-    };
-    delete c[id];
-    __rozieCtxHost._connReg.value = c;
-  },
-  // A <Handle> registers a port against THIS node's id+side. Mutate the registered
-  // node spec's inputs/outputs (whole-object replacement of the node entry) so the
-  // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
-  // A <Handle> registers a port against its node's id+side. We store it in the flat
-  // portReg under a UNIQUE per-port key so registration is order-independent AND
-  // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+  // A <Port> registers a port against its TYPE + side. Stored in the flat portReg
+  // under a UNIQUE per-port key `type::side::key` so registration is order-independent
+  // AND concurrency-safe: two <Port>s of the same type addTypePort in one React commit,
   // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
-  // both (an array read-modify-write under one nodeId key would clobber). reconcile
-  // Nodes merges the node's portReg entries into its spec on every run regardless of
-  // mount order. The unique key also makes a re-fired addPort (late Lit context)
-  // idempotent — it overwrites the same key with the same value.
-  addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
-    if (id == null || key == null) return;
-    const portKey = id + '::' + side + '::' + key;
+  // both (an array read-modify-write under one type key would clobber). buildNode reads
+  // the type's portReg entries on every run regardless of mount order. The unique key
+  // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
+  // `side` is derived by <Port> from which of out=/in= is set (out⇒'output', in⇒'input');
+  // `portType` carries the port type that drives validate-types + the typed-port color.
+  addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
+    if (type == null || key == null) return;
+    const portKey = type + '::' + side + '::' + key;
     __rozieCtxHost._portReg.value = {
       ...__rozieCtxHost._portReg.value,
       [portKey]: {
-        nodeId: id,
+        type,
         side,
         key,
+        portType,
         label,
         multiple
       }
     };
   },
-  // D-04 render-callback target. Returns the engine-created body host div for a
-  // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
-  // registered spec carries a renderBody(host) callback that the PARENT invokes
-  // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
-  // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
-  // body is projected by the parent reusing the $portals.node host discipline.
-  bodyHostFor: (id: any) => {
-    const entry = __rozieCtxHost.nodeEntries.get(id);
+  // Render-by-type callback target. Returns the engine-created body host div for a
+  // graph node (nodeEntries.get(nodeId).body). The render-by-type projection mounts
+  // the node's TYPE template `#body` INTO this host via $portals — the Wave-0 A3
+  // finding (a Lit child cannot relocate its own shadow <slot> across the boundary),
+  // so the body is projected by the parent reusing the $portals host discipline.
+  bodyHostFor: (nodeId: any) => {
+    const entry = __rozieCtxHost.nodeEntries.get(nodeId);
     return entry ? entry.body : null;
   }
 }))(this) });
@@ -288,8 +276,20 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     };
 
     this._disconnectCleanups.push((() => {
+      if (this.dragFlushRaf && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(this.dragFlushRaf);
+        } catch (e: any) {}
+      }
+      this.dragFlushRaf = 0;
+      this.pendingDragPositions.clear();
       for (const [, entry] of this.nodeEntries as any) {
         if (entry.handle) entry.handle.dispose();
+        if (entry.bodyHandle && entry.bodyHandle.dispose) {
+          try {
+            entry.bodyHandle.dispose();
+          } catch (e: any) {}
+        }
         for (const d of entry.socketDisposers as any) {
           try {
             d();
@@ -302,24 +302,24 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       if (this.area) this.area.destroy();
     }));
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._nodeReg.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.graph)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
         });
       }
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._connReg.value)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
-      if (this.reconcileConnections) this.reconcileConnections();
-    })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._portReg.value)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._portReg.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
         });
       }
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.zoom)(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._typeReg.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      if (this.reconcileNodes) this.reconcileNodes();
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.zoom)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
       if (!this.area || typeof v !== 'number') return;
       if (v === this.area.area.transform.k) return;
       this.programmatic++;
@@ -328,72 +328,55 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       });
     })(__watchVal); }); }));
 
-    this._disconnectCleanups.push(effect(() => { void this._nodeReg.value; void this._connReg.value; void this._portReg.value; this.__rozieCtxProvider_rete_canvas.setValue(((__rozieCtxHost) => ({
-      register: (id: any, spec: any) => {
-        __rozieCtxHost._nodeReg.value = {
-          ...__rozieCtxHost._nodeReg.value,
-          [id]: spec
+    this._disconnectCleanups.push(effect(() => { void this._typeReg.value; void this._portReg.value; this.__rozieCtxProvider_rete_canvas.setValue(((__rozieCtxHost) => ({
+      // Register/replace a node TYPE template. `spec` carries an optional
+      // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
+      // node of this type into the engine body host, see renderNode). Whole-object replace.
+      registerType: (type: any, spec: any) => {
+        if (type != null) __rozieCtxHost._typeReg.value = {
+          ...__rozieCtxHost._typeReg.value,
+          [type]: spec
         };
       },
-      update: (id: any, spec: any) => {
-        __rozieCtxHost._nodeReg.value = {
-          ...__rozieCtxHost._nodeReg.value,
-          [id]: spec
+      // Drop a type on <NodeType> unmount (whole-object replace).
+      unregisterType: (type: any) => {
+        const t = {
+          ...__rozieCtxHost._typeReg.value
         };
+        delete t[type];
+        __rozieCtxHost._typeReg.value = t;
       },
-      unregister: (id: any) => {
-        const n = {
-          ...__rozieCtxHost._nodeReg.value
-        };
-        delete n[id];
-        __rozieCtxHost._nodeReg.value = n;
-      },
-      registerConnection: (id: any, spec: any) => {
-        __rozieCtxHost._connReg.value = {
-          ...__rozieCtxHost._connReg.value,
-          [id]: spec
-        };
-      },
-      unregisterConnection: (id: any) => {
-        const c = {
-          ...__rozieCtxHost._connReg.value
-        };
-        delete c[id];
-        __rozieCtxHost._connReg.value = c;
-      },
-      // A <Handle> registers a port against THIS node's id+side. Mutate the registered
-      // node spec's inputs/outputs (whole-object replacement of the node entry) so the
-      // node $watch refires and reconcileNodes re-runs buildNode with the new port set.
-      // A <Handle> registers a port against its node's id+side. We store it in the flat
-      // portReg under a UNIQUE per-port key so registration is order-independent AND
-      // concurrency-safe: two <Handle>s of the same node addPort in one React commit,
+      // A <Port> registers a port against its TYPE + side. Stored in the flat portReg
+      // under a UNIQUE per-port key `type::side::key` so registration is order-independent
+      // AND concurrency-safe: two <Port>s of the same type addTypePort in one React commit,
       // and a pure `{ ...portReg, [uniqueKey]: port }` write (functional setState) merges
-      // both (an array read-modify-write under one nodeId key would clobber). reconcile
-      // Nodes merges the node's portReg entries into its spec on every run regardless of
-      // mount order. The unique key also makes a re-fired addPort (late Lit context)
-      // idempotent — it overwrites the same key with the same value.
-      addPort: (id: any, side: any, key: any, label: any, multiple: any) => {
-        if (id == null || key == null) return;
-        const portKey = id + '::' + side + '::' + key;
+      // both (an array read-modify-write under one type key would clobber). buildNode reads
+      // the type's portReg entries on every run regardless of mount order. The unique key
+      // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
+      // `side` is derived by <Port> from which of out=/in= is set (out⇒'output', in⇒'input');
+      // `portType` carries the port type that drives validate-types + the typed-port color.
+      addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
+        if (type == null || key == null) return;
+        const portKey = type + '::' + side + '::' + key;
         __rozieCtxHost._portReg.value = {
           ...__rozieCtxHost._portReg.value,
           [portKey]: {
-            nodeId: id,
+            type,
             side,
             key,
+            portType,
             label,
             multiple
           }
         };
       },
-      // D-04 render-callback target. Returns the engine-created body host div for a
-      // registry node (FlowCanvas.rozie nodeEntries.get(id).body). A <FlowNode>'s
-      // registered spec carries a renderBody(host) callback that the PARENT invokes
-      // from its own render scope (see renderNode) — the Wave-0 A3 finding: a Lit
-      // <FlowNode> cannot relocate its own shadow <slot> across the boundary, so the
-      // body is projected by the parent reusing the $portals.node host discipline.
-      bodyHostFor: (id: any) => {
-        const entry = __rozieCtxHost.nodeEntries.get(id);
+      // Render-by-type callback target. Returns the engine-created body host div for a
+      // graph node (nodeEntries.get(nodeId).body). The render-by-type projection mounts
+      // the node's TYPE template `#body` INTO this host via $portals — the Wave-0 A3
+      // finding (a Lit child cannot relocate its own shadow <slot> across the boundary),
+      // so the body is projected by the parent reusing the $portals host discipline.
+      bodyHostFor: (nodeId: any) => {
+        const entry = __rozieCtxHost.nodeEntries.get(nodeId);
         return entry ? entry.body : null;
       }
     }))(this)); }));
@@ -401,8 +384,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     const container = this._refCanvasEl;
     this.lastPropNodeIds = [];
     this.lastPropConnIds = [];
-    this.lastRegistryNodeIds = [];
-    this.lastRegistryConnIds = [];
     this.editor = new NodeEditor();
     this.area = new AreaPlugin(container);
     this.connectionPlugin = new ConnectionPlugin();
@@ -522,10 +503,13 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       const id = reteNode.id;
       const meta = this.nodeMeta.get(id) || {
         id,
-        label: reteNode.label
+        type: undefined,
+        data: {}
       };
       const existing = this.nodeEntries.get(id);
       const selected = reteNode.selected === true;
+      // default-chrome fallback label (only when a node's type has no #body template).
+      const chromeLabel = meta.data && meta.data.label != null ? String(meta.data.label) : meta.type != null ? String(meta.type) : '';
       if (existing && existing.element === element) {
         // in-place update — refresh chrome + reactive portal scope, leave sockets.
         existing.box.classList.toggle('is-selected', selected);
@@ -536,7 +520,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             emit: existing.emit
           });
         } else if (existing.titleEl) {
-          existing.titleEl.textContent = meta.label != null ? String(meta.label) : '';
+          existing.titleEl.textContent = chromeLabel;
         }
         return;
       }
@@ -575,36 +559,50 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         box,
         body,
         handle: null,
+        bodyHandle: null,
         titleEl: null,
         bodyMoved: false,
         emit,
         socketDisposers
       };
-      if (typeof meta.renderBody === 'function') {
-        // D-04 render-callback path (declarative <FlowNode> child). The child cannot
-        // relocate its OWN <slot> across the Lit shadow boundary (Wave-0 A3), so the
-        // PARENT projects the body here from its own render scope: the child's
-        // registered renderBody(host) appends the child's host element (its $el,
-        // shadow root + slot projection intact) into the engine `body` div. nodeEntries
-        // must exist before the callback runs (bodyHostFor reads it), so register first.
+
+      // ── RENDER-BY-TYPE: select the body by `node.type` ──────────────────────────
+      // 1) the node's TYPE template (typeReg[type].bodyRenderer) — the primary path
+      //    (41-03 <NodeType><template #body>); 2) the low-level `#node` portal slot
+      //    (consumer switches on node.type itself — escape hatch); 3) default chrome.
+      const typeSpec = meta.type != null ? this._typeReg.value[meta.type] : null;
+      if (typeSpec && typeof typeSpec.bodyRenderer === 'function') {
+        // RENDER-BY-TYPE callback path. The <NodeType> cannot relocate its OWN <slot>
+        // across the Lit shadow boundary (Wave-0 A3), so the PARENT projects the body
+        // here from its own render scope: the type's registered bodyRenderer(host, scope)
+        // mounts the type's `#body` portal INTO the engine `body` div (a FRESH render
+        // root per node — no framework DOM relocation, the Phase-37 D-04 trap avoided).
+        // nodeEntries must exist before the callback runs (bodyHostFor reads it), so
+        // register first. The graph node's `data` flows in as scope → one template per
+        // type renders every instance of that type.
         this.nodeEntries.set(id, entry);
-        meta.renderBody(body);
+        entry.bodyHandle = typeSpec.bodyRenderer(body, {
+          node: meta,
+          selected,
+          emit
+        });
         entry.bodyMoved = true;
         return;
       }
       if (this.node !== undefined) {
         // reactive multi-instance portal — one handle per node, re-rendered in
-        // place on meta change (the MapLibre marker discipline).
+        // place on meta change (the MapLibre marker discipline). Low-level escape
+        // hatch: the consumer switches on node.type inside the single `#node` slot.
         entry.handle = portals.node(body, {
           node: meta,
           selected,
           emit
         });
       } else {
-        // default chrome: a title bar.
+        // default chrome: a title bar (the type name / data.label).
         const title = document.createElement('div');
         title.className = 'rozie-flow-node__title';
-        title.textContent = meta.label != null ? String(meta.label) : '';
+        title.textContent = chromeLabel;
         body.appendChild(title);
         entry.titleEl = title;
       }
@@ -808,6 +806,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       for (const [id, entry] of this.nodeEntries as any) {
         if (entry.element === element) {
           if (entry.handle) entry.handle.dispose();
+          if (entry.bodyHandle && entry.bodyHandle.dispose) {
+            try {
+              entry.bodyHandle.dispose();
+            } catch (e: any) {}
+          }
           for (const d of entry.socketDisposers as any) {
             try {
               d();
@@ -826,28 +829,38 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
     };
 
-    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
-    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
-    // returns false. The falsy emit result makes editor.addConnection return false
-    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
-    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
-    // imperative addConnection, and config-array reconcile uniformly (all three route
-    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
-    // captured at mount) so a reactive prop change takes effect on the next attempt.
-    // Registered before the connectioncreated-forwarding pipe so it halts the chain
-    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
-    // addConnection before connectioncreated is ever emitted).
-    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
-    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
-    // returns false. The falsy emit result makes editor.addConnection return false
-    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
-    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
-    // imperative addConnection, and config-array reconcile uniformly (all three route
-    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
-    // captured at mount) so a reactive prop change takes effect on the next attempt.
-    // Registered before the connectioncreated-forwarding pipe so it halts the chain
-    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
-    // addConnection before connectioncreated is ever emitted).
+    // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
+    // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
+    // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
+    //   1. AUTOMATIC typed validation (`:validate-types`, default ON, D3 option a):
+    //      resolve src/tgt port TYPE from the per-TYPE port schema (via each endpoint
+    //      node's `type`); if both are non-null and UNEQUAL → reject. A null on either
+    //      side (untyped port / unknown type) imposes no constraint → allow.
+    //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
+    //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
+    // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
+    // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
+    // are PURE (no $data write / engine call) — reads only. The block (return undefined)
+    // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
+    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
+    // user-facing rejection — mirrors connection-created/connection-removed).
+    // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
+    // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
+    // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
+    //   1. AUTOMATIC typed validation (`:validate-types`, default ON, D3 option a):
+    //      resolve src/tgt port TYPE from the per-TYPE port schema (via each endpoint
+    //      node's `type`); if both are non-null and UNEQUAL → reject. A null on either
+    //      side (untyped port / unknown type) imposes no constraint → allow.
+    //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
+    //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
+    // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
+    // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
+    // are PURE (no $data write / engine call) — reads only. The block (return undefined)
+    // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
+    // echo-guarded (a programmatic reconcile the rule would reject must not surface as a
+    // user-facing rejection — mirrors connection-created/connection-removed).
     this.editor.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreate') {
@@ -860,11 +873,21 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           target: c.target,
           targetInput: c.targetInput
         };
+        // 1. AUTOMATIC typed validation (default ON; opt out via :validate-types="false").
+        if (this.validateTypes !== false) {
+          const srcType = this.portTypeOf(c.source, 'output', c.sourceOutput);
+          const tgtType = this.portTypeOf(c.target, 'input', c.targetInput);
+          if (srcType != null && tgtType != null && srcType !== tgtType) {
+            if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-rejected", {
+              detail: conn,
+              bubbles: true,
+              composed: true
+            }));
+            return undefined; // ← CANCEL: type mismatch
+          }
+        }
+        // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof this.canConnect === 'function' && this.canConnect(conn) === false) {
-          // Echo-guard the EMIT only (mirrors connection-created/connection-removed) so a
-          // programmatic reconcile that the rule would reject doesn't surface as a
-          // user-facing rejection. The block (return undefined) stays UNCONDITIONAL so the
-          // rule is enforced on every path.
           if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-rejected", {
             detail: conn,
             bubbles: true,
@@ -882,22 +905,31 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreated') {
         // keep engine truth in sync so reconcile diffs correctly — a user-drawn
-        // connection (auto id) must register here or the next props pass re-adds it.
+        // connection (auto id) must register here or the next graph pass re-adds it.
         this.connInstances.set(context.data.id, context.data);
-        if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-created", {
-          detail: this.serializeConn(context.data),
-          bubbles: true,
-          composed: true
-        }));
+        if (!this.programmatic) {
+          // WRITE-BACK: append the new connection into a fresh graph object (D4).
+          this.writeBackConnectionCreated(context.data);
+          // keep the discrete event too (back-compat).
+          this.dispatchEvent(new CustomEvent("connection-created", {
+            detail: this.serializeConn(context.data),
+            bubbles: true,
+            composed: true
+          }));
+        }
       } else if (context.type === 'connectionremoved') {
         this.connInstances.delete(context.data.id);
-        if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-removed", {
-          detail: {
-            id: context.data.id
-          },
-          bubbles: true,
-          composed: true
-        }));
+        if (!this.programmatic) {
+          // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
+          this.writeBackConnectionRemoved(context.data.id);
+          this.dispatchEvent(new CustomEvent("connection-removed", {
+            detail: {
+              id: context.data.id
+            },
+            bubbles: true,
+            composed: true
+          }));
+        }
       }
       return context;
     });
@@ -920,6 +952,14 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             meta.x = pos.x;
             meta.y = pos.y;
           }
+          // WRITE-BACK (coalesced): accumulate the latest position for this node and
+          // flush ONE fresh graph object per animation frame (Pitfall 2 — the drag
+          // storm). The discrete `node-moved` emit stays per-translate (back-compat).
+          this.pendingDragPositions.set(id, {
+            x: pos.x,
+            y: pos.y
+          });
+          this.scheduleDragFlush();
           this.dispatchEvent(new CustomEvent("node-moved", {
             detail: {
               id,
@@ -959,94 +999,35 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return context;
     });
 
-    // Union the config-array prop with the declarative-children registry by id
-    // (D-02 last-writer-wins: the registry — children — overrides the config-array
-    // on id collision; array entries first in array order, then registry entries in
-    // registration order). The empty-registry path returns exactly the config array
-    // (dedup-by-id of an array with no registry overrides is the array itself), so
-    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
-    // Returns the merged list AND the set of ids contributed by the registry, so the
-    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
-    // Union the config-array prop with the declarative-children registry by id
-    // (D-02 last-writer-wins: the registry — children — overrides the config-array
-    // on id collision; array entries first in array order, then registry entries in
-    // registration order). The empty-registry path returns exactly the config array
-    // (dedup-by-id of an array with no registry overrides is the array itself), so
-    // (∅ ∪ props) === props in behavior — the dist-parity zero-drift guarantee.
-    // Returns the merged list AND the set of ids contributed by the registry, so the
-    // reaper can track prop-managed vs registry-managed provenance SEPARATELY.
-    const mergeById = (arr: any, reg: any) => {
-      const out = [];
-      const idx = new Map();
-      const regIds = [];
-      for (const e of (Array.isArray(arr) ? arr : []) as any) {
-        if (!e || e.id == null) continue;
-        if (idx.has(e.id)) {
-          out[idx.get(e.id)] = e;
-        } else {
-          idx.set(e.id, out.length);
-          out.push(e);
-        }
-      }
-      for (const id in reg) {
-        const e = reg[id];
-        if (!e || e.id == null) continue;
-        regIds.push(e.id);
-        if (idx.has(e.id)) {
-          out[idx.get(e.id)] = e;
-        } else {
-          idx.set(e.id, out.length);
-          out.push(e);
-        }
-      }
-      return {
-        merged: out,
-        regIds
-      };
-    };
-
-    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
-    // The reconcilers read BOTH sources internally (config-array $props + the
-    // declarative-children registry) so a single function serves the node/connection
-    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
-    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
-    // reaper removes a dropped id only if it was previously managed by EITHER source;
-    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
-    // guard so two passes never race the engine (the Lit "cannot find node" fix).
-    // ─── reconcilers off (registry ∪ props), bridged to the top-level $watch ──────
-    // The reconcilers read BOTH sources internally (config-array $props + the
-    // declarative-children registry) so a single function serves the node/connection
-    // $watch AND the registry $watch. Provenance is split: prop-contributed ids land
-    // in lastPropNodeIds, registry-contributed ids in lastRegistryNodeIds — the
-    // reaper removes a dropped id only if it was previously managed by EITHER source;
-    // an imperative $expose addNode (in NEITHER set) survives (D37-08).
-    // The actual reconcile pass — wrapped by reconcileNodes (below) with a re-entrancy
-    // guard so two passes never race the engine (the Lit "cannot find node" fix).
+    // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
+    // Nodes come ONLY from `$props.graph.nodes` (the single source of truth, D1/D2);
+    // sockets come from each node's TYPE port schema (portReg keyed `type::side::key`).
+    // A port-schema change ($data.portReg, when a <Port> registers late on Lit) ALSO
+    // drives this reconcile so a node whose type just gained ports re-renders. An
+    // imperative $expose addNode (provenance NOT in lastPropNodeIds) survives the reaper.
+    // Wrapped by reconcileNodes (below) with a re-entrancy guard so two passes never
+    // race the engine (the Lit "cannot find node" fix).
+    // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
+    // Nodes come ONLY from `$props.graph.nodes` (the single source of truth, D1/D2);
+    // sockets come from each node's TYPE port schema (portReg keyed `type::side::key`).
+    // A port-schema change ($data.portReg, when a <Port> registers late on Lit) ALSO
+    // drives this reconcile so a node whose type just gained ports re-renders. An
+    // imperative $expose addNode (provenance NOT in lastPropNodeIds) survives the reaper.
+    // Wrapped by reconcileNodes (below) with a re-entrancy guard so two passes never
+    // race the engine (the Lit "cannot find node" fix).
     const reconcileNodesPass = async () => {
       if (!this.editor || !this.area) return;
-      const propArr = Array.isArray(this.nodes) ? this.nodes : [];
-      const {
-        merged,
-        regIds
-      } = mergeById(propArr, this._nodeReg.value);
-      const regWant = new Set(regIds);
-      const propWant = [];
+      const graphNodes = Array.isArray(this.graph && this.graph.nodes) ? this.graph.nodes : [];
       const want = [];
       this.programmatic++;
       try {
-        for (const rawSpec of merged as any) {
-          if (!rawSpec || rawSpec.id == null) continue;
-          // Merge the declarative <Handle> ports (portReg) into this node's spec on
-          // EVERY run — order-independent: whether the node or its ports registered
-          // last, the reconcile triggered by either sees both (D37 mount-order fix).
-          const spec = this.mergePortsIntoSpec(rawSpec, this._portReg.value);
+        for (const spec of graphNodes as any) {
+          if (!spec || spec.id == null) continue;
           want.push(spec.id);
-          if (!regWant.has(spec.id)) propWant.push(spec.id);
           this.nodeMeta.set(spec.id, spec);
           let node = this.nodeInstances.get(spec.id);
           if (!node) {
-            node = this.buildNode(spec);
+            node = this.buildNode(spec, this._portReg.value);
             this.nodeInstances.set(spec.id, node);
             await this.editor.addNode(node);
             await this.area.translate(spec.id, {
@@ -1054,14 +1035,17 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
               y: spec.y || 0
             });
           } else {
-            // Sync any ports the spec gained AFTER the node was first built — a
-            // nested <Handle>'s addPort can land after reconcileNodes already created
-            // the node (the node registered before its ports on some targets).
-            // buildNode only runs for NEW nodes, so add the missing inputs/outputs
-            // onto the live instance here, then re-render.
+            // Sync any ports this node's TYPE gained AFTER the node was first built —
+            // a nested <Port>'s addTypePort can land after reconcileNodes already
+            // created the node (the node registered before its ports on some targets,
+            // or a <Port> registered late on Lit). buildNode only runs for NEW nodes,
+            // so add the missing inputs/outputs onto the live instance here from the
+            // TYPE schema, then re-render.
             let portsAdded = false;
-            const wantIn = Array.isArray(spec.inputs) ? spec.inputs : [];
-            const wantOut = Array.isArray(spec.outputs) ? spec.outputs : [];
+            const {
+              inputs: wantIn,
+              outputs: wantOut
+            } = this.portSchemaForType(spec.type, this._portReg.value);
             for (const inp of wantIn as any) {
               if (!inp || inp.key == null || node.inputs[inp.key]) continue;
               node.addInput(inp.key, new ClassicPreset.Input(this.SOCKET, inp.label, inp.multiple === true));
@@ -1084,11 +1068,16 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
               // untouched; to render the NEW sockets, drop this node's render entry so
               // area.update takes the fresh-build path (re-runs buildSocketRow + re-
               // emits the socket render signals the ConnectionPlugin/watcher need). The
-              // D-04 body host is re-projected by renderBody (appendChild re-moves the
-              // same host element — idempotent).
+              // render-by-type body host is re-projected by the type's bodyRenderer
+              // (mounts a fresh portal root into the same host — idempotent).
               const entry = this.nodeEntries.get(spec.id);
               if (entry) {
                 if (entry.handle) entry.handle.dispose();
+                if (entry.bodyHandle && entry.bodyHandle.dispose) {
+                  try {
+                    entry.bodyHandle.dispose();
+                  } catch (e: any) {}
+                }
                 for (const d of entry.socketDisposers as any) {
                   try {
                     d();
@@ -1103,9 +1092,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             if (portsAdded && this.reconcileConnections) await this.reconcileConnections();
           }
         }
-        // remove dropped PROP-managed OR REGISTRY-managed nodes (+ their connections)
-        // — imperatively added nodes (in NEITHER provenance set) survive.
-        const tracked = new Set([...this.lastPropNodeIds, ...this.lastRegistryNodeIds]);
+        // remove dropped GRAPH-managed nodes (+ their connections) — imperatively added
+        // nodes (NOT in lastPropNodeIds) survive (the power-user escape hatch).
+        const tracked = new Set(this.lastPropNodeIds);
         for (const id of tracked as any) {
           if (!want.includes(id) && this.nodeInstances.has(id)) {
             for (const c of this.editor.getConnections() as any) {
@@ -1116,8 +1105,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             this.nodeMeta.delete(id);
           }
         }
-        this.lastPropNodeIds = propWant;
-        this.lastRegistryNodeIds = regIds;
+        this.lastPropNodeIds = want;
       } finally {
         this.programmatic--;
       }
@@ -1148,10 +1136,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     };
     this.reconcileConnections = async () => {
       if (!this.editor) return;
-      const propArr = Array.isArray(this.connections) ? this.connections : [];
-      // Normalize both sources to the same id-defaulting before the union so a
-      // collision between a config-array edge and a <Connection> child dedups
-      // correctly (the registry entry wins, D-02).
+      // Edges come ONLY from the bound graph's `connections` (the single source of
+      // truth — declarative <Connection> children are gone). Normalize id-defaulting
+      // (a connection authored without an id gets a stable derived id) so an edge the
+      // canvas wrote back (carrying the engine id) and a hand-authored edge dedup.
+      const graphConns = Array.isArray(this.graph && this.graph.connections) ? this.graph.connections : [];
       const norm = (spec: any) => {
         if (!spec || spec.source == null || spec.target == null) return null;
         const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
@@ -1165,36 +1154,23 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           targetInput: tgtIn
         };
       };
-      const normProps = propArr.map(norm).filter(Boolean);
-      const normReg = {};
-      for (const k in this._connReg.value) {
-        const n = norm(this._connReg.value[k]);
-        if (n) normReg[k] = n;
-      }
-      const {
-        merged,
-        regIds
-      } = mergeById(normProps, normReg);
-      const regWant = new Set(regIds);
-      const propWant = [];
+      const merged = graphConns.map(norm).filter(Boolean);
       const want = [];
       this.programmatic++;
       try {
         for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
-          if (!regWant.has(spec.id)) propWant.push(spec.id);
           if (this.connInstances.has(spec.id)) continue;
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
           // DEFENSIVE: the referenced output/input ports must exist on the live node
           // instances before addConnection (Rete throws "source node doesn't have
-          // output with a key out" otherwise, aborting the loop). A declarative
-          // <Connection> may register before the nested <Handle>s have flushed their
-          // ports into the node (child-before-parent mount order); skip until the
-          // ports exist — reconcileNodes re-runs reconcileConnections after a node-
-          // registry change (incl. a Handle addPort), so the edge lands on a later tick.
+          // output with a key out" otherwise, aborting the loop). An edge may reference
+          // a port the node's TYPE schema has not flushed yet (a <Port> registered
+          // after the <NodeType>); skip until the ports exist — reconcileNodes re-runs
+          // reconcileConnections after a port-schema change, so the edge lands later.
           if (!sourceNode.outputs || !sourceNode.outputs[spec.sourceOutput]) continue;
           if (!targetNode.inputs || !targetNode.inputs[spec.targetInput]) continue;
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
@@ -1202,15 +1178,15 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           this.connInstances.set(spec.id, conn);
           await this.editor.addConnection(conn);
         }
-        const tracked = new Set([...this.lastPropConnIds, ...this.lastRegistryConnIds]);
+        // remove dropped GRAPH-managed edges — imperatively added edges survive.
+        const tracked = new Set(this.lastPropConnIds);
         for (const id of tracked as any) {
           if (!want.includes(id) && this.connInstances.has(id)) {
             await this.editor.removeConnection(id);
             this.connInstances.delete(id);
           }
         }
-        this.lastPropConnIds = propWant;
-        this.lastRegistryConnIds = regIds;
+        this.lastPropConnIds = want;
       } finally {
         this.programmatic--;
       }
@@ -1246,16 +1222,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     })();
   }
 
-  updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('nodes'))) { const __watchVal = (() => this.nodes)(); (() => {
-      if (this.reconcileNodes) this.reconcileNodes();
-    })(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('connections'))) { const __watchVal = (() => this.connections)(); (() => {
-      if (this.reconcileConnections) this.reconcileConnections();
-    })(); }
-    this.__rozieFirstUpdateDone = true;
-  }
-
   disconnectedCallback(): void {
     super.disconnectedCallback();
     queueMicrotask(() => {
@@ -1270,6 +1236,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
+    if (name === 'graph') this._graphControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'zoom') this._zoomControllable.notifyAttributeChange(value === null ? 1 : Number(value));
   }
 
@@ -1311,11 +1278,74 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   lastPropConnIds: any = null;
 
-  lastRegistryNodeIds: any = null;
-
-  lastRegistryConnIds: any = null;
-
   programmatic = 0;
+
+  pendingDragPositions = new Map();
+
+  dragFlushRaf = 0;
+
+  currentGraph = () => this.graph || {
+  nodes: [],
+  connections: []
+};
+
+  flushDragWriteBack = () => {
+  this.dragFlushRaf = 0;
+  if (this.programmatic) {
+    this.pendingDragPositions.clear();
+    return;
+  }
+  if (this.pendingDragPositions.size === 0) return;
+  const g = this.currentGraph();
+  const nodes = (g.nodes || []).map((n: any) => {
+    const p = n && n.id != null ? this.pendingDragPositions.get(n.id) : null;
+    return p ? {
+      ...n,
+      x: p.x,
+      y: p.y
+    } : n;
+  });
+  this.pendingDragPositions.clear();
+  this._graphControllable.write({
+    ...g,
+    nodes
+  });
+};
+
+  scheduleDragFlush = () => {
+  if (this.dragFlushRaf) return;
+  if (typeof requestAnimationFrame === 'function') {
+    this.dragFlushRaf = requestAnimationFrame(this.flushDragWriteBack);
+  } else {
+    this.dragFlushRaf = 1;
+    Promise.resolve().then(this.flushDragWriteBack);
+  }
+};
+
+  writeBackConnectionCreated = (c: any) => {
+  if (this.programmatic) return;
+  const g = this.currentGraph();
+  const conn = {
+    id: c.id,
+    source: c.source,
+    sourceOutput: c.sourceOutput,
+    target: c.target,
+    targetInput: c.targetInput
+  };
+  this._graphControllable.write({
+    ...g,
+    connections: [...(g.connections || []), conn]
+  });
+};
+
+  writeBackConnectionRemoved = (id: any) => {
+  if (this.programmatic) return;
+  const g = this.currentGraph();
+  this._graphControllable.write({
+    ...g,
+    connections: (g.connections || []).filter((e: any) => e && e.id !== id)
+  });
+};
 
   reconcileNodes: any = null;
 
@@ -1333,11 +1363,40 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   targetInput: c.targetInput
 });
 
-  buildNode = (spec: any) => {
-  const node = new ClassicPreset.Node(spec.label != null ? String(spec.label) : '');
+  portSchemaForType = (type: any, portReg: any) => {
+  const inputs = [];
+  const outputs = [];
+  if (type == null || !portReg) return {
+    inputs,
+    outputs
+  };
+  const prefix = type + '::';
+  for (const k in portReg) {
+    if (k.indexOf(prefix) !== 0) continue;
+    const p = portReg[k];
+    if (!p || p.key == null) continue;
+    const entry = {
+      key: p.key,
+      label: p.label,
+      multiple: p.multiple,
+      portType: p.portType
+    };
+    if (p.side === 'input') inputs.push(entry);else outputs.push(entry);
+  }
+  return {
+    inputs,
+    outputs
+  };
+};
+
+  buildNode = (spec: any, portReg: any) => {
+  const label = spec.data && spec.data.label != null ? String(spec.data.label) : '';
+  const node = new ClassicPreset.Node(label);
   node.id = spec.id;
-  const inputs = Array.isArray(spec.inputs) ? spec.inputs : [];
-  const outputs = Array.isArray(spec.outputs) ? spec.outputs : [];
+  const {
+    inputs,
+    outputs
+  } = this.portSchemaForType(spec.type, portReg);
   for (const inp of inputs as any) {
     if (!inp || inp.key == null) continue;
     node.addInput(inp.key, new ClassicPreset.Input(this.SOCKET, inp.label, inp.multiple === true));
@@ -1349,37 +1408,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   return node;
 };
 
-  mergePortsIntoSpec = (spec: any, portMap: any) => {
-  if (!spec || !portMap) return spec;
-  const inputs = Array.isArray(spec.inputs) ? spec.inputs.slice() : [];
-  const outputs = Array.isArray(spec.outputs) ? spec.outputs.slice() : [];
-  let changed = false;
-  for (const k in portMap) {
-    const p = portMap[k];
-    if (!p || p.key == null || p.nodeId !== spec.id) continue;
-    if (p.side === 'input') {
-      if (inputs.some((q: any) => q && q.key === p.key)) continue;
-      inputs.push({
-        key: p.key,
-        label: p.label,
-        multiple: p.multiple
-      });
-      changed = true;
-    } else {
-      if (outputs.some((q: any) => q && q.key === p.key)) continue;
-      outputs.push({
-        key: p.key,
-        label: p.label,
-        multiple: p.multiple
-      });
-      changed = true;
-    }
-  }
-  return changed ? {
-    ...spec,
-    inputs,
-    outputs
-  } : spec;
+  portTypeOf = (nodeId: any, side: any, key: any) => {
+  const meta = this.nodeMeta.get(nodeId);
+  if (!meta || meta.type == null || key == null) return null;
+  const entry = this._portReg.value[meta.type + '::' + side + '::' + key];
+  return entry ? entry.portType : null;
 };
 
   getEditor() {
@@ -1392,7 +1425,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   async addNode(spec: any) {
     if (!this.editor || !spec || spec.id == null) return null;
-    const node = this.buildNode(spec);
+    const node = this.buildNode(spec, this._portReg.value);
     this.nodeInstances.set(spec.id, node);
     this.nodeMeta.set(spec.id, spec);
     this.programmatic++;
@@ -1520,6 +1553,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     } : null;
   }
 
+  get graph(): any { return this._graphControllable.read(); }
+  set graph(v: any) { this._graphControllable.notifyPropertyWrite(v); }
   get zoom(): number { return this._zoomControllable.read(); }
   set zoom(v: number) { this._zoomControllable.notifyPropertyWrite(v); }
 }
