@@ -1,0 +1,118 @@
+<!--
+  Port.rozie — declarative <Port> typed directional port/socket child for
+  @rozie-ui/rete (Phase 41 controlled-graph redesign; repurposed from the Phase-37
+  <Handle>). A <Port> declares ONE typed port on its enclosing <NodeType>; the
+  direction is derived from which of out=/in= is set, NOT a `side` string:
+
+    <NodeType type="source">
+      <Port out="num" type="number" />     ⇒ side 'output', key 'num', portType 'number'
+    </NodeType>
+    <NodeType type="merge">
+      <Port in="num" type="number" multiple />  ⇒ side 'input', key 'num', multiple
+    </NodeType>
+
+  A <Port> injects the nearest <NodeType>'s `rete:nodeType` sub-context and calls its
+  addPort(side, key, portType, label, multiple) verb on mount — which forwards to the
+  canvas registry's addTypePort(type, side, key, portType, …), landing the port in
+  the per-TYPE port schema (portReg keyed `type::side::key`). Every graph node of that
+  type then carries the port (the canvas's buildNode reads the type schema). The Port
+  itself draws nothing — the socket DOM is rendered by the canvas's buildSocketRow.
+
+  `portType` (the `type` prop) drives the canvas's `:validate-types` typed-socket
+  validation (a type-mismatched connection is auto-rejected) — it is NOT socket
+  identity (a single shared Socket gates identity; the portType is the typed layer).
+
+  LIT ASYNC EDGE (REQ-30): the injected nodeType ctx may be `undefined` on Lit's
+  first paint until the async context-request resolves — the read is guarded (the
+  null-let `any` alias + the $onUpdate late-context addPort). Renderless: the
+  <template> is EMPTY. ZERO emitter/core change.
+-->
+<!--
+  inherit-attrs/inherit-listeners are OFF: <Port> is renderless (empty template), so
+  there is no root element for auto-fallthrough to land on. Leaving fallthrough ON
+  ALSO makes the emitter destructure every prop name out of the consumer props to
+  compute $attrs — and `in` is a JS reserved word that cannot be a destructuring
+  binding (`const { in } = props` is a syntax error on React/Solid). Disabling
+  fallthrough suppresses that destructure entirely (the renderless-component shape).
+-->
+<rozie name="Port" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // OUTPUT key — set this (not `in`) to declare an output port. side ⇒ 'output'.
+  out:      { type: String, default: undefined },
+  // INPUT key — set this (not `out`) to declare an input port. side ⇒ 'input'.
+  // (`in` is a JS reserved word as a bare identifier — it is read ONLY as
+  // `$props.in`, NEVER destructured bare.)
+  in:       { type: String, default: undefined },
+  // The PORT TYPE — drives the canvas's typed-socket :validate-types (a type-
+  // mismatched connection is auto-rejected). Optional (an untyped port imposes no
+  // type constraint → connects to anything).
+  type:     { type: String, default: undefined },
+  // optional socket label (defaults to the key in buildSocketRow).
+  label:    { default: undefined },
+  // allow multiple connections into/out of this socket.
+  multiple: { default: undefined },
+}
+</props>
+
+<script>
+// The nearest <NodeType> ancestor's `rete:nodeType` sub-context ({ type, addPort }).
+// NAMED `injectedType`, NOT `nodeType`: on Lit a top-level `const nodeType` lowers
+// to a `private nodeType` class field that SHADOWS the inherited DOM `Node.nodeType`
+// property (type `number`) → TS2416 "not assignable to the same property in base
+// type". (The Embla `scrollTo`→`scrollToIndex` / `slide`→`item` shadow lesson — an
+// expose/local name that collides with an inherited DOM member breaks the Lit leaf.)
+// The `rete:nodeType` CONTEXT KEY (the inject string) is unchanged — only the local.
+const injectedType = $inject('rete:nodeType')
+
+// $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
+// rejects on `.addPort(...)` (TS2339). The .rozie-native fix is the null-let → `any`
+// typeNeutralize idiom: alias through a MODULE-SCOPE `let nt = null` so it is in
+// scope from the Solid hoisted onCleanup teardown (the MapLibre Source/Layer
+// lesson). ZERO emitter change.
+let nt = null
+nt = injectedType
+
+// Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
+// `in` is read ONLY via $props.in (reserved word — never destructured bare). null
+// key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
+const portSide = () => ($props.out != null ? 'output' : 'input')
+const portKey = () => ($props.out != null ? $props.out : $props.in)
+
+// idempotency flag so the $onMount addPort and the late-context $onUpdate path
+// (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —
+// same `type::side::key` key, same value — so this is belt-and-suspenders.)
+let added = false
+
+$onMount(() => {
+  // register this typed port against the enclosing node TYPE's schema; the canvas's
+  // reconcileNodes builds buildNode with the updated input/output spec for every node
+  // of that type. On Lit the injected nodeType ctx may still be undefined here (async
+  // context, REQ-30) — the $onUpdate below adds the port once it resolves.
+  if (nt && !added) {
+    added = true
+    nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple)
+  }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected `rete:nodeType` is event-driven on Lit
+// and may resolve AFTER $onMount. $onUpdate lowers to Lit's updated(), which re-runs
+// when the ContextConsumer(subscribe:true) re-publishes the resolved nodeType ctx —
+// we then addPort once. Reads the LIVE injected `nodeType` (on Lit the ContextConsumer
+// getter; on the 5 sync targets the stable value already used in $onMount, so `added`
+// short-circuits this to a no-op there). A $watch over the inject would NOT fire on
+// Lit, so the lifecycle hook is the correct mechanism.
+$onUpdate(() => {
+  if (added) return
+  const live = injectedType
+  if (live == null) return
+  nt = live
+  added = true
+  nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple)
+})
+</script>
+
+<template></template>
+
+</rozie>

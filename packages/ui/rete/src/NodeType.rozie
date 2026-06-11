@@ -1,0 +1,200 @@
+<!--
+  NodeType.rozie — declarative <NodeType> node-TYPE TEMPLATE child for
+  @rozie-ui/rete (Phase 41 controlled-graph redesign; repurposed from the Phase-37
+  per-INSTANCE <FlowNode>). A <NodeType> declares a node TYPE ONCE — its `#body`
+  template + its nested <Port> port schema — and EVERY graph node whose `type`
+  matches renders that template (render-by-type). It carries NO id/x/y: instance
+  identity + position live in the bound `graph` model, not on the tag.
+
+    <FlowCanvas r-model:graph="$data.graph">
+      <NodeType type="source">
+        <template #body="{ node }">{{ node.data.label }}</template>
+        <Port out="num" type="number" />
+      </NodeType>
+    </FlowCanvas>
+
+  A <NodeType> is BOTH:
+    - a CONSUMER — it $injects the parent <FlowCanvas>'s `rete:canvas` registry
+      API ({ registerType, unregisterType, addTypePort, bodyHostFor }) and
+      registers its TYPE spec (carrying the `#body` render-by-type callback) on
+      mount; unregisters on cleanup.
+    - a PROVIDER — it $provides a nested `rete:nodeType` sub-context (its type via
+      a LIVE GETTER + an addPort verb) so nested <Port> children register their
+      typed ports against THIS type.
+
+  RENDER-BY-TYPE — BODY via $portals (NOT host relocation). The spec carries a
+  `bodyRenderer(host, { node, selected, emit })` → { dispose } callback. When the
+  canvas's renderNode builds a graph node of this type it hands the engine-created
+  `body` host div; the NodeType then mounts ITS OWN `body` portal slot INTO that
+  host via $portals.body(host, scope) — a FRESH framework render root per node,
+  NO framework DOM relocation (the Phase-37 D-04 trap: moving a framework-owned
+  node into a foreign engine element corrupts React commit / Angular @for diff /
+  Lit ChildPart tracking — a framework spec property, not an emitter bug). This
+  REUSES the exact reactive multi-instance portal machinery the canvas `node` slot
+  uses (6/6-green). The graph node flows in as the `node` scope param → ONE
+  template renders every instance of the type.
+
+  REQ-30: the injected canvas may be undefined on Lit first paint — all reads
+  guarded (the null-let `any` alias + the $onUpdate late-context registration).
+  ZERO emitter/core change.
+-->
+<rozie name="NodeType" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The node TYPE id (required) — graph nodes whose `type` matches render this
+  // template + use this type's port schema. NO id/x/y: this is a TEMPLATE, not an
+  // instance (instance identity + position live in the bound `graph` model).
+  type: { type: String, required: true },
+}
+</props>
+
+<script>
+// The nearest provided 'rete:canvas' registry API from <FlowCanvas>. Guarded
+// everywhere (Lit async first-paint, REQ-30 — the Tab.rozie idiom).
+const canvas = $inject('rete:canvas')
+
+// $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
+// STRICT BUNDLED-LEAF tsc rejects on `.registerType(...)` (TS2339). The .rozie-native
+// fix is the null-let → `any` typeNeutralize idiom: alias the injected API through
+// a MODULE-SCOPE `let cv = null` (typeNeutralize types it `any`). Module-scope (not
+// hook-local) so the alias is in scope from the Solid teardown — which the Solid
+// emitter hoists into a sibling onCleanup() OUTSIDE the mount closure (the MapLibre
+// Source/Layer lesson). ZERO emitter change.
+let cv = null
+cv = canvas
+
+// The live $portals.body handle ({ dispose }) returned by the parent-invoked
+// bodyRenderer callback. Module-scope `any` so the teardown — which the Solid
+// emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
+// it. (A NodeType type-template projects ONE body root per graph node; the canvas
+// disposes per-node on node unmount, this is the last-projection handle.)
+let bodyHandle = null
+
+// The body-mount closure, DEFINED INSIDE $onMount (below) so it captures the
+// emitter-synthesized `portals` local — which on React/Angular/Lit is scoped to the
+// mount effect body, NOT visible from a spec callback the canvas invokes later (that
+// escaped scope is exactly why a bare `$portals.body(...)` in the bodyRenderer
+// threw "portals is not defined" on those 3 targets). Stored in a module-scope `any`
+// so the spec's bodyRenderer — invoked by the canvas's renderNode from its own
+// render scope — can delegate to it. ZERO emitter change (just correct scoping).
+let mountBody = null
+
+// idempotency flag so a reactive late-context registration (Lit async first
+// paint, REQ-30) and the $onMount registration never double-register the type.
+let registered = false
+
+// the canvas TYPE spec builder — shared by the $onMount register and the late-context
+// $onUpdate below. The bodyRenderer render-callback is invoked by the canvas's
+// renderNode (per graph node of this type) from the canvas's own render scope with
+// the engine `body` host div + the { node, selected, emit } scope; the NodeType then
+// mounts its OWN `body` portal slot INTO that host via $portals.body — reusing the
+// shipped reactive-portal machinery (6/6 green on the config-array `node` path). NO
+// framework DOM is relocated. Returns { dispose } so the canvas can tear the body
+// projection down on node unmount / port-resync.
+const buildSpec = () => ({
+  type: $props.type,
+  // RENDER-BY-TYPE callback: the canvas hands the engine body host + scope; delegate
+  // to the mountBody closure (defined inside $onMount so it can see the emitter's
+  // mount-scoped `portals` local). Until $onMount has run, mountBody is null — but
+  // the canvas only invokes bodyRenderer AFTER reconcileNodes (post-register,
+  // post-mount), so mountBody is always set by then. Returns the { dispose } handle.
+  bodyRenderer: (host, scope) => {
+    // try/catch so a per-target portal-render hiccup (e.g. a Lit lit-html "cannot
+    // find node" when re-rendering into an engine-owned host the area re-created)
+    // can NEVER abort the canvas's renderNode loop — a thrown bodyRenderer would
+    // propagate out of area.update/addNode and stop the whole graph from building.
+    if (host && mountBody) { try { return mountBody(host, scope) } catch (e) {} }
+    return null
+  },
+})
+
+$onMount(() => {
+  // The body-mount closure — captures the mount-scoped `portals` local. Disposes a
+  // prior handle first so a re-fired bodyRenderer (e.g. ports changed → fresh node
+  // build) does not stack portal roots into the same engine host. Mounts the type's
+  // `#body` slot, scoped with the graph node ({ node, selected, emit }).
+  mountBody = (host, scope) => {
+    if (!host) return null
+    if (bodyHandle && bodyHandle.dispose) { try { bodyHandle.dispose() } catch (e) {} }
+    const s = scope || {}
+    bodyHandle = $portals.body(host, { node: s.node, selected: s.selected, emit: s.emit })
+    return bodyHandle
+  }
+  // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
+  // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
+  // type and projects the body into the engine host. On Lit the injected canvas may
+  // still be undefined here (REQ-30 async context); the $onUpdate below performs the
+  // registration once the value arrives.
+  if (cv && !registered) {
+    registered = true
+    cv.registerType($props.type, buildSpec())
+  }
+
+  return () => {
+    if (bodyHandle && bodyHandle.dispose) { try { bodyHandle.dispose() } catch (e) {} }
+    if (cv) cv.unregisterType($props.type)
+  }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected `rete:canvas` is event-driven on Lit
+// and may resolve AFTER $onMount, so the imperative register above is skipped on
+// first paint. $onUpdate lowers to Lit's updated(), which re-runs when the
+// ContextConsumer(subscribe:true) re-publishes the now-resolved canvas API — at
+// which point we register exactly once. Reads the LIVE injected `canvas` (on Lit
+// `canvas` lowers to the ContextConsumer getter; on the 5 sync targets it is the
+// stable value already registered in $onMount, so `registered` short-circuits this
+// to a no-op there — the Lit-only resilience path). A $watch over the inject would
+// NOT fire on Lit, so the lifecycle hook is the correct mechanism.
+$onUpdate(() => {
+  if (registered) return
+  const live = canvas
+  if (live == null) return
+  cv = live
+  registered = true
+  cv.registerType($props.type, buildSpec())
+})
+
+// React to a type change (lazy $watch — post-mount). Re-registers under the new
+// type (the old type's registration is left for its unmount/GC; a type rename on a
+// live <NodeType> is an edge case — the fresh spec re-projects the body idempotently).
+$watch(() => $props.type, () => {
+  if (cv) cv.registerType($props.type, buildSpec())
+})
+
+// Provide a nested sub-context for <Port> port children. `get type()` is
+// LOAD-BEARING (D-3/REQ-29 live getter, never a snapshot); addPort forwards to the
+// canvas registry's addTypePort so a <Port> registers a typed port against THIS
+// type's schema.
+$provide('rete:nodeType', {
+  get type() {
+    return $props.type
+  },
+  addPort: (side, key, portType, label, multiple) => {
+    if (cv) cv.addTypePort($props.type, side, key, portType, label, multiple)
+  },
+})
+</script>
+
+<template>
+<!--
+  body — REACTIVE MULTI-INSTANCE portal slot (the type's render-by-type TEMPLATE).
+  Declared but NOT rendered inline (the per-target emitters skip portal slots in the
+  normal render). The canvas-invoked bodyRenderer callback mounts it into each graph
+  node's engine `body` host via $portals.body(host, { node, selected, emit }) — the
+  SAME machinery the FlowCanvas `node` slot uses, which is 6/6-green. Nothing is
+  relocated; a fresh framework render root mounts per node directly into the engine
+  element. The `node` scope param is the graph node ({ id, type, x, y, data }).
+-->
+<slot name="body" portal reactive :params="['node', 'selected', 'emit']" />
+<!--
+  default slot — hosts the nested renderless <Port> children. They draw NOTHING of
+  their own (the canvas's buildSocketRow renders the socket DOM), but they MUST be in
+  the component tree so their $onMount fires and addPort()s the typed port against
+  this node TYPE's schema. Wrapped in a 0×0 hidden container so the Ports mount
+  without adding any visible chrome.
+-->
+<div class="rozie-node-type-children" style="display:none"><slot /></div>
+</template>
+
+</rozie>
