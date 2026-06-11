@@ -1,0 +1,49 @@
+<rozie name="Probe">
+<props>{
+  // The single load-bearing unknown of Phase 41: a deep-object two-way model.
+  // Mirrors the planned FlowCanvas `graph` model (41-RESEARCH § Wave-0 probe),
+  // generalized from the shipped `zoom: { type: Number, model: true }`.
+  graph: {
+    type: Object,
+    default: () => ({ nodes: [], connections: [] }),
+    model: true,
+  },
+}</props>
+<data>{
+  // Echo-safety instrumentation: how many times the bound graph transitioned,
+  // and the latest observed node count. Exposed in the template for the harness.
+  watchFires: 0,
+  lastLen: 0,
+}</data>
+<script lang="ts">
+// After a tick, emit a FRESH top-level {nodes,connections} object via $model.
+// IMMUTABLE update (React-Flow applyNodeChanges style) — never $props.graph.nodes.push
+// (silent on React/Solid/Lit/Angular per the per-target write-back table).
+$onMount(() => {
+  const t = setTimeout(() => {
+    const g = $props.graph || { nodes: [], connections: [] }
+    $model.graph = {
+      ...g,
+      nodes: [ ...(g.nodes || []), { id: 'x', x: 1, y: 2 } ],
+    }
+  }, 50)
+  return () => clearTimeout(t)
+})
+
+// Lazy $watch on the bound prop — fires once per transition (reference equality).
+// Counts fires (echo-safety) and records the latest length.
+$watch(() => $props.graph, (g) => {
+  $data.watchFires = $data.watchFires + 1
+  $data.lastLen = ((g && g.nodes) || []).length
+})
+</script>
+<template>
+  <!-- Single root (multi-root + auto-fallthrough = ROZ970/973). Expose the watch
+       instrumentation for the harness to read. The make-or-break readout lives on
+       the CONSUMER (its bound $data.g). -->
+  <span data-testid="probe-root">
+    <span data-testid="probe-watch-fires">{{ $data.watchFires }}</span>
+    <span data-testid="probe-last-len">{{ $data.lastLen }}</span>
+  </span>
+</template>
+</rozie>

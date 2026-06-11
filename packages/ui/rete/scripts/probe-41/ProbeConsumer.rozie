@@ -1,0 +1,33 @@
+<rozie name="ProbeConsumer">
+<components>{ Probe: './Probe.rozie' }</components>
+<data>{
+  // The consumer's source of truth, two-way bound into Probe via r-model:graph.
+  // The make-or-break assertion reads this back through the readout span: after
+  // Probe's fresh-object write-back, $data.g.nodes.length must be 1 on ALL 6.
+  g: { nodes: [], connections: [] },
+  // Stress instrumentation (Step 5): the harness can drive 60 write-backs and
+  // read the converged length here. The button triggers Probe's exposed stress.
+}</data>
+<script lang="ts">
+// Surface a handle so the Playwright harness can drive the 60x drag-frequency
+// stress deterministically (one fresh object per call) and assert convergence.
+// Defined as a top-level const so the expose object carries a real binding.
+const stress = () => {
+  let next = $data.g
+  for (let i = 0; i < 60; i++) {
+    next = { ...next, nodes: [ ...(next.nodes || []), { id: 'n' + i, x: i, y: i } ] }
+    $data.g = next
+  }
+}
+$expose({ stress })
+</script>
+<template>
+  <div data-testid="consumer-root">
+    <!-- Two-way bind the consumer's own $data.g into Probe's graph model. -->
+    <Probe r-model:graph="$data.g" />
+    <!-- THE make-or-break readout: the consumer's bound object, re-bound after
+         Probe's fresh-object $model.graph write-back. Expect '1'. -->
+    <span data-testid="readout-len">{{ $data.g.nodes.length }}</span>
+  </div>
+</template>
+</rozie>

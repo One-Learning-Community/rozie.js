@@ -1,0 +1,5 @@
+# Phase 41 Wave-0 probe build output (throwaway). Source + harness are tracked;
+# per-target bundles + Angular AOT disk-cache artifacts are not.
+dist/
+*.rozie.ts
+node_modules/
