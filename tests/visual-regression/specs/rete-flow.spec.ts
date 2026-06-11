@@ -406,3 +406,162 @@ for (const target of TARGETS) {
       .toBe(3);
   });
 }
+
+/**
+ * Connector / socket vertical-alignment proof (quick-260610-jrk continuation #2).
+ *
+ * THE BUG: connection lines anchored ~14px BELOW each socket, at the node BOTTOM,
+ * instead of on the socket. ROOT CAUSE (DOM-evidence-confirmed): the connection
+ * `<svg>` was `display:inline` (the SVG default), so the 1px-tall SVG sat on the
+ * connection element's TEXT BASELINE. With the engine container's default
+ * line-height that baseline is ~14px below the connection element's top — and the
+ * connection element IS the area-transform origin, so the offset is in screen space
+ * and pushes EVERY endpoint ~14px down. The socket positions reported by
+ * `getDOMSocketPosition` (offsetTop within the node-view) were already correct; the
+ * inline-SVG baseline was the sole vertical drift. FIX: `display:block` on
+ * `.rozie-flow-connection__svg` removes the baseline gap (CSS-only, in FlowCanvas's
+ * scoped `:root {}` engine-DOM block — no script/emitter change).
+ *
+ * THE PROOF (load-bearing — must FAIL pre-fix, PASS post-fix): every drawn
+ * connection path's START and END screen point must sit within tolerance of SOME
+ * socket center VERTICALLY. Pre-fix worst dy ≈ 13.9px (node bottom); post-fix it
+ * collapses to «1px (on the socket). The HORIZONTAL offset is NOT asserted tightly:
+ * `getDOMSocketPosition.calculatePosition` intentionally returns the socket center
+ * shifted 12px OUTWARD (`position.x + 12 * (side==='input' ? -1 : 1)`), so a correct
+ * endpoint is ~12px horizontally from the socket center BY DESIGN — only a loose
+ * sanity bound (≤ 20px) is checked horizontally. Tolerance rationale for the
+ * vertical proof: cross-target sub-pixel kerning / AA / curvature-handle rounding is
+ * « 6px, while the bug's node-bottom offset (~14px) is well outside it. Holds on all
+ * 6 targets — they share the one vanilla render pipe + the same scoped connection CSS.
+ */
+const ALIGN_DY_TOLERANCE_PX = 6;
+const ALIGN_DX_SANITY_PX = 20; // 12px intentional outward offset + AA/rounding slack
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-align [${target}]: connectors sit on the node sockets`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+    // both config-array edges (a→b, b→c) drawn before we measure.
+    await expect
+      .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(2);
+
+    // Give the watcher-driven redraw a moment to settle after mount/fit.
+    await page.waitForTimeout(1200);
+
+    // For every DRAWN path, compute its START + END screen points (via the path's
+    // own getPointAtLength + getScreenCTM, so transforms/zoom are accounted for),
+    // collect every socket's screen-center, and report the worst-case offset of any
+    // endpoint from its NEAREST socket center. The bug-specific signal is VERTICAL
+    // (worstDy): pre-fix ~14px (node bottom), post-fix «1px (on the socket). The
+    // horizontal offset is loose (the lib intentionally shifts the stored position
+    // 12px outward), so worstDx is only sanity-bounded.
+    const result = await page.evaluate(() => {
+      // Deep query across the document AND every open shadow root (Lit renders the
+      // canvas + sockets + connections inside a shadow root; plain querySelectorAll
+      // does NOT pierce shadow DOM, so we recurse). Returns all matches everywhere.
+      const deepQueryAll = (selector: string): Element[] => {
+        const out: Element[] = [];
+        const walk = (root: Document | ShadowRoot) => {
+          out.push(...Array.from(root.querySelectorAll(selector)));
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as HTMLElement).shadowRoot;
+            if (sr) walk(sr);
+          }
+        };
+        walk(document);
+        return out;
+      };
+
+      const sockets = deepQueryAll('.rozie-flow-socket').map((s) => {
+        const r = (s as HTMLElement).getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+
+      const paths = deepQueryAll('.rozie-flow-connection__path').filter(
+        (p) => ((p as SVGPathElement).getAttribute('d') || '').trim().length > 0,
+      ) as SVGPathElement[];
+
+      const screenPoint = (p: SVGPathElement, len: number) => {
+        const pt = p.getPointAtLength(len);
+        const m = p.getScreenCTM();
+        if (!m) return null;
+        return {
+          x: pt.x * m.a + pt.y * m.c + m.e,
+          y: pt.x * m.b + pt.y * m.d + m.f,
+        };
+      };
+
+      let worstDx = 0;
+      let worstDy = 0;
+      const endpoints: Array<{ dx: number; dy: number }> = [];
+      for (const p of paths) {
+        const total = p.getTotalLength();
+        const ends = [screenPoint(p, 0), screenPoint(p, total)];
+        for (const e of ends) {
+          if (!e) continue;
+          // nearest socket center to this endpoint
+          let best = Infinity;
+          let bestDx = Infinity;
+          let bestDy = Infinity;
+          for (const s of sockets) {
+            const dx = Math.abs(e.x - s.x);
+            const dy = Math.abs(e.y - s.y);
+            const d = Math.hypot(dx, dy);
+            if (d < best) {
+              best = d;
+              bestDx = dx;
+              bestDy = dy;
+            }
+          }
+          endpoints.push({ dx: bestDx, dy: bestDy });
+          if (bestDx > worstDx) worstDx = bestDx;
+          if (bestDy > worstDy) worstDy = bestDy;
+        }
+      }
+      return {
+        socketCount: sockets.length,
+        pathCount: paths.length,
+        endpointCount: endpoints.length,
+        worstDx,
+        worstDy,
+        endpoints,
+      };
+    });
+
+    // Sanity: we actually measured drawn edges + sockets.
+    expect(result.socketCount).toBeGreaterThanOrEqual(3);
+    expect(result.pathCount).toBeGreaterThanOrEqual(2);
+    expect(result.endpointCount).toBeGreaterThanOrEqual(4);
+
+    // THE PROOF (vertical): every endpoint sits on a socket center within tolerance
+    // VERTICALLY — pre-fix worstDy ~14px (node bottom), post-fix «1px (on the socket).
+    expect(
+      result.worstDy,
+      `worst vertical endpoint→socket offset ${result.worstDy.toFixed(2)}px (tol ${ALIGN_DY_TOLERANCE_PX}px) — pre-fix ~14px (node bottom); per-endpoint=${JSON.stringify(result.endpoints)}`,
+    ).toBeLessThanOrEqual(ALIGN_DY_TOLERANCE_PX);
+    // SANITY (horizontal): each endpoint terminates near a socket (the lib shifts the
+    // stored position 12px outward by design, so this is a loose bound, not the proof).
+    expect(
+      result.worstDx,
+      `worst horizontal endpoint→socket offset ${result.worstDx.toFixed(2)}px (sanity ${ALIGN_DX_SANITY_PX}px; ~12px is the lib's intentional outward offset); per-endpoint=${JSON.stringify(result.endpoints)}`,
+    ).toBeLessThanOrEqual(ALIGN_DX_SANITY_PX);
+  });
+}
