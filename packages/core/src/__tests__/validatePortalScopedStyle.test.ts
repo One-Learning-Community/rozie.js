@@ -45,11 +45,15 @@ const ROZ088 = RozieErrorCode.STYLE_SCOPED_RULE_TARGETS_PORTAL_CONTENT; // 'ROZ0
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // packages/core/src/__tests__ → repo root is four levels up.
 const REPO_ROOT = resolve(__dirname, '../../../../');
-const POS_PATH = resolve(REPO_ROOT, 'examples/demos/FlowCanvasDemo.rozie');
-const NEG_PATH = resolve(
-  REPO_ROOT,
-  'examples/demos/FlowCanvasDeclarativeDemo.rozie',
-);
+// Named live-POSITIVE / live-NEGATIVE pair (re-anchored in Phase 41).
+// Phase 41 reworked FlowCanvasDemo to the controlled-graph model and styles its
+// portal `.rozie-demo-node` chrome via the `:root {}` escape hatch — so it is now
+// ROZ088-CLEAN (the latent Lit bug is fixed) and serves as the live-NEGATIVE. The
+// former live-negative FlowCanvasDeclarativeDemo was retired in Phase 41. The
+// live-POSITIVE is now PortalListDemo (scoped `.portal-list-demo__*` rules target
+// the portal `#item` fill content — a genuine portal-exclusive scoped-style flag).
+const POS_PATH = resolve(REPO_ROOT, 'examples/demos/PortalListDemo.rozie');
+const NEG_PATH = resolve(REPO_ROOT, 'examples/demos/FlowCanvasDemo.rozie');
 
 const LOC = { start: 0, end: 0 };
 let RULE_LOC_SEQ = 1000;
@@ -428,7 +432,7 @@ describe('validatePortalScopedStyle [Phase 38] — edge cases', () => {
 // ===========================================================================
 
 describe('validatePortalScopedStyle [Phase 38] — live validation through compile()', () => {
-  it('(D1) POSITIVE: FlowCanvasDemo.rozie `.rozie-demo-node` flags, and only portal classes flag', () => {
+  it('(D1) POSITIVE: PortalListDemo.rozie portal `.portal-list-demo__*` rules flag', () => {
     const pos = compile(readFileSync(POS_PATH, 'utf8'), {
       target: 'lit',
       filename: POS_PATH,
@@ -436,14 +440,14 @@ describe('validatePortalScopedStyle [Phase 38] — live validation through compi
     });
     const warns = pos.diagnostics.filter((d) => d.code === ROZ088);
     expect(warns.length).toBeGreaterThanOrEqual(1);
-    expect(warns.some((d) => d.message.includes('rozie-demo-node'))).toBe(true);
-    // The non-portal classes (.flow-demo / .controls / .readout) must NOT flag.
-    expect(
-      warns.some((d) => /\b(flow-demo|controls|readout)\b/.test(d.message)),
-    ).toBe(false);
+    // A portal-exclusive content class (the `__`-BEM children filled into the
+    // `#item` portal slot) is flagged.
+    expect(warns.some((d) => d.message.includes('portal-list-demo__'))).toBe(
+      true,
+    );
   });
 
-  it('(D2) NEGATIVE: FlowCanvasDeclarativeDemo.rozie (.demo-card in :root{}) → 0 ROZ088', () => {
+  it('(D2) NEGATIVE: FlowCanvasDemo.rozie (`.rozie-demo-node` in :root{}, Phase-41 rework) → 0 ROZ088', () => {
     const neg = compile(readFileSync(NEG_PATH, 'utf8'), {
       target: 'lit',
       filename: NEG_PATH,
@@ -461,7 +465,7 @@ describe('validatePortalScopedStyle [Phase 38] — live validation through compi
 //
 // ─── PRE-FIX BASELINE (Wave 2 of Phase 38) ─────────────────────────────────
 // This baseline encodes the CURRENT pre-fix reality, NOT the desired end
-// state. The ROZ088 pass is CORRECT: each of these 12 files has a plain scoped
+// state. The ROZ088 pass is CORRECT: each of these 11 files has a plain scoped
 // `<style>` rule whose subject is portal-exclusive — a genuine latent Lit
 // shadow-DOM styling bug invisible to every behavioral/typecheck/screenshot
 // gate. Plan 38-02 is the emit-neutral DIAGNOSTIC deliverable; it does NOT fix
@@ -469,12 +473,13 @@ describe('validatePortalScopedStyle [Phase 38] — live validation through compi
 // plan→execute→verify→human-pixel-gate cycle), tracked in
 // `.planning/todos/pending/portal-scoped-style-lit-wave3-fixes.md`.
 //
-//   - FlowCanvasDemo is the SPEC's named live-POSITIVE (D1 above); it is a
-//     member of the expected set.
-//   - FlowCanvasDeclarativeDemo is the SPEC's named live-NEGATIVE (already
-//     fixed to `:root {}` in quick task 260610-e6p, D2 above); it MUST NOT be
-//     a member.
-//   - 11 of these 12 are slated for fix in Wave 3 (convert the portal-content
+//   - PortalListDemo is the SPEC's named live-POSITIVE (D1 above); it is a
+//     member of the expected set (re-anchored in Phase 41).
+//   - FlowCanvasDemo is the SPEC's named live-NEGATIVE (Phase 41 reworked it to
+//     style its portal `.rozie-demo-node` chrome via `:root {}`, D2 above); it
+//     MUST NOT be a member. (FlowCanvasDeclarativeDemo, the former negative, was
+//     retired in Phase 41.)
+//   - 10 of these 11 are slated for fix in Wave 3 (convert the portal-content
 //     scoped rules to the `:root {}` escape hatch + `adopt-document-styles`,
 //     then rebless Lit pixel baselines under human /compare.html review).
 //   - PortalListStyledDemo is the one genuinely AMBIGUOUS case: it carries
@@ -497,7 +502,9 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
   const EXPECTED_ROZ088_FILES = [
     'ChartBehaviorDemo.rozie',
     'CodeMirrorDemo.rozie',
-    'FlowCanvasDemo.rozie',
+    // FlowCanvasDemo.rozie REMOVED in Phase 41 — reworked to style its portal
+    // `.rozie-demo-node` chrome via the `:root {}` escape hatch (now ROZ088-clean,
+    // the D2 live-negative). Lockstep tightening per the audit's own contract.
     'FullCalendarAllSlotsDemo.rozie',
     'FullCalendarDemo.rozie',
     'FullCalendarSlotsDemo.rozie',
@@ -566,8 +573,8 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     expect(flagged).toEqual(EXPECTED_ROZ088_FILES);
   });
 
-  it('(E2) FlowCanvasDemo (the SPEC live-positive) IS flagged; FlowCanvasDeclarativeDemo (the live-negative) is NOT', () => {
-    expect(cachedFlagged).toContain(basename(POS_PATH)); // FlowCanvasDemo.rozie
-    expect(cachedFlagged).not.toContain(basename(NEG_PATH)); // FlowCanvasDeclarativeDemo.rozie
+  it('(E2) PortalListDemo (the SPEC live-positive) IS flagged; FlowCanvasDemo (the :root live-negative) is NOT', () => {
+    expect(cachedFlagged).toContain(basename(POS_PATH)); // PortalListDemo.rozie
+    expect(cachedFlagged).not.toContain(basename(NEG_PATH)); // FlowCanvasDemo.rozie
   });
 });
