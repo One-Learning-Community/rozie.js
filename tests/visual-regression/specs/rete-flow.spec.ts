@@ -598,6 +598,21 @@ for (const target of TARGETS) {
  *     • `readout-accepted` reads `1` (connection-created round-tripped — incl. the
  *       Svelte hyphenated-emit path, the 595968e0 live regression).
  *
+ *   REMOVE (cross-target ✕ proof): click the 'Text Source' (txt) node's per-node ✕
+ *   button. The ✕ rides the node id on a `:data-id` attribute bind (accessor-rewritten
+ *   on Solid) and calls a TOP-LEVEL `onRemoveClick` (NOT slot-scope `emit('remove',…)`,
+ *   which is DEAD on Solid — `emit`/`node` are not accessor-rewritten inside @click
+ *   bodies there). `onRemoveClick` reads the id off the DOM dataset and filters it out
+ *   of `$data.nodes`; the wrapper reconciles and reaps the node box. Assert:
+ *     • the `node-count` readout drops 5 → 4 (the config-array write reconciled), AND
+ *     • the rendered `.rozie-flow-node` box count drops by exactly 1, AND
+ *     • the SPECIFIC removed node's box ('Text Source') is GONE (not a count-only
+ *       delta — the load-bearing per-node proof).
+ *   This is the proof the new mechanism works on EVERY target incl. Solid (the prior
+ *   slot-scope-emit ✕ silently no-oped on Solid and was never VR-gated). `txt` is a
+ *   leaf node untouched by the reject/accept drags above, so removing it last cannot
+ *   perturb those assertions.
+ *
  * This is the cross-target proof that the FUNCTION-typed prop invokes identically on
  * all 6 (incl. Lit property binding `.canConnect=${fn}`) and the hyphenated
  * `connection-rejected` round-trips on Svelte (D4). Behavioral-only — NO screenshot.
@@ -693,5 +708,30 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('readout-accepted')).toHaveText('1', {
       timeout: 10_000,
     });
+
+    // ---- REMOVE: the per-node ✕ removes a node on ALL 6 (incl. Solid) ----
+    // The ✕ uses :data-id + a TOP-LEVEL onRemoveClick (NOT slot-scope emit), so it
+    // works on Solid where slot-scope @click bodies are not accessor-rewritten. We
+    // remove the 'Text Source' (txt) LEAF node — untouched by the reject/accept drags
+    // above — so sequencing the removal last cannot disturb those assertions.
+    const nodeCount = page.getByTestId('node-count');
+    await expect(nodeCount).toHaveText('5');
+    const txtNode = page.locator('.rozie-flow-node', { hasText: 'Text Source' });
+    await expect(txtNode).toHaveCount(1);
+    const boxesBefore = await page.locator('.rozie-flow-node').count();
+
+    await page.getByTestId('remove-txt').click();
+
+    // the config-array filter reconciled: the count readout drops by exactly 1 …
+    await expect(nodeCount).toHaveText('4');
+    // … the engine reaps exactly one node box …
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 10_000,
+      })
+      .toBe(boxesBefore - 1);
+    // … and the SPECIFIC removed node's box is gone (not just a count delta — the
+    // load-bearing per-node proof that ✕ removed the RIGHT node on this target).
+    await expect(txtNode).toHaveCount(0);
   });
 }

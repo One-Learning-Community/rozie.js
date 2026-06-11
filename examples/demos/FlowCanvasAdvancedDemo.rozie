@@ -26,17 +26,25 @@
       in plan 40-01) never spuriously update the user-facing readout.
     - ACCEPT round-trip. A same-type drag commits the edge; `@connection-created`
       increments `$data.acceptedCount`.
-    - PER-NODE ✕ action. Each node body (the reactive `#node` portal slot) carries a
-      ✕ button calling the slot-scope `emit('remove', node.id)` → the wrapper raises
-      `node-action { id, name:'remove', detail }` → `onNodeAction` removes the node
-      from `$data.nodes` and the wrapper's reconcile reaps it.
+    - PER-NODE ✕ action (works on ALL 6 incl. Solid). Each node body (the reactive
+      `#node` portal slot) carries a ✕ button. The node id rides on a `:data-id`
+      attribute bind (accessor-rewritten on Solid) and @click calls the TOP-LEVEL
+      `onRemoveClick`, which reads the id back off the DOM dataset and removes the node
+      from `$data.nodes` (reconcile reaps it). It deliberately does NOT route through a
+      slot-scope `emit('remove', node.id)`: slot-scope `emit`/`node` are NOT
+      accessor-rewritten inside an @click body on Solid (the foreign-slot accessor
+      limitation — same root cause as r-if when-conditions), so that path is DEAD on
+      Solid. The `node-action` emit remains a real FlowCanvas capability; this demo
+      just no longer uses it to drive remove. The `rete-flow-advanced` VR cell now
+      asserts ✕ removal across all 6 (node count −1 + the specific node box gone).
     - TWO-WAY zoom (`r-model:zoom`), a `fit` button ($expose `zoomToFit`), and live
       node / connection / accepted / rejected readouts.
 
   Pitfall notes (the rete-port landmines):
-    - #node slot params are EXACTLY `node` / `selected` / `emit`. Do NOT author a
-      local binding that shadows them (Pitfall 4 — the Svelte slot-name/loop-var
-      shadow trap that has bitten this component before).
+    - #node slot params are named EXACTLY `node` / `selected` (the wrapper also offers
+      `emit`, dropped from this demo's destructure since the ✕ no longer uses it). Do
+      NOT author a local binding that shadows them (Pitfall 4 — the Svelte
+      slot-name/loop-var shadow trap that has bitten this component before).
     - The `merge` input is `multiple: true` so a rejected/accepted drag onto it
       never evicts a prior edge (Pitfall 2 — single-input eviction-before-add), so
       the drawn-path count is cleanly assertable.
@@ -119,12 +127,37 @@ const onReject = (c) => {
 // @connection-created handler — a same-type drag committed; bump the count.
 const onConnect = () => { $data.acceptedCount = ($data.acceptedCount || 0) + 1 }
 
-// @node-action handler — the per-node ✕ button raises node-action { id, name, … }.
-// Remove the node from the config array; the wrapper's reconcile reaps it.
-const onNodeAction = (e) => {
-  if (e && e.name === 'remove') {
-    $data.nodes = $data.nodes.filter((n) => n.id !== e.id)
-  }
+// Per-node ✕ removal — a TOP-LEVEL handler (NOT slot-scope). The node id rides on
+// the button's `:data-id` attribute bind (attribute binds ARE accessor-rewritten on
+// Solid; only event-handler / r-if BODIES are not — the foreign-slot accessor
+// limitation), so we read it back off the DOM rather than routing through a slot-scope
+// `emit('remove', node.id)` (which is DEAD on Solid: `emit`/`node` are undefined inside
+// an event-handler body there).
+//
+// Bound on `@pointerup` (NOT @click and NOT @pointerdown) — the trickiest part of
+// making ✕ work on all 6, driven by how Rete + Solid interact:
+//   • @click is swallowed on EVERY target: pressing the ✕ starts a (zero-distance)
+//     Rete node-drag on pointerdown, and the browser does not synthesize a `click`
+//     out of the drag gesture.
+//   • @pointerdown works on 5 targets but is DEAD on Solid: Rete's node-drag handler
+//     (rete-area-plugin `Drag.down`) calls `e.stopPropagation()` during the bubble
+//     phase at the node element. The other 5 attach the listener directly to the
+//     button (fires before the node), but Solid DELEGATES pointerdown to `document`,
+//     so Rete's stopPropagation blocks it from ever reaching Solid's delegated handler.
+//   • @pointerup is the sweet spot: neither `Drag.up` nor the connection plugin stop
+//     pointerup for a non-socket target, so the native event reaches `document` and
+//     Solid's delegated handler fires — AND the direct listener fires on the other 5.
+// We do NOT stopPropagation here: Rete ends its no-op drag on the window-level
+// pointerup, and blocking it would strand the drag state. The node id rides on the
+// `:data-id` attribute bind (accessor-rewritten on Solid; event-handler/r-if BODIES are
+// not — hence we read it off the DOM, not slot-scope `node`). We resolve it via
+// `e.target.closest('[data-id]')` rather than `e.currentTarget`, since on Solid's
+// delegated pointerup `currentTarget` is the delegation root, not the button. Reconcile
+// reaps the removed node from the live editor.
+const onRemoveClick = (e) => {
+  const el = e.target && e.target.closest ? e.target.closest('[data-id]') : null
+  const id = el && el.dataset ? el.dataset.id : undefined
+  if (id != null) $data.nodes = $data.nodes.filter((n) => String(n.id) !== String(id))
 }
 
 // $expose zoomToFit() via the framework ref (best-effort: Angular's ref is the
@@ -180,10 +213,11 @@ const portChip = (portTypes, key) => {
       :fit-on-mount="false"
       @connection-created="onConnect"
       @connection-rejected="onReject"
-      @node-action="onNodeAction"
     >
-      <!-- slot params MUST stay node/selected/emit (Pitfall 4 shadow). -->
-      <template #node="{ node, selected, emit }">
+      <!-- slot params MUST stay named node/selected (Pitfall 4 shadow). `emit` is
+           dropped from the destructure — the ✕ no longer routes through slot-scope
+           emit (it uses a top-level handler + :data-id, see onRemoveClick). -->
+      <template #node="{ node, selected }">
         <div class="adv-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
           <div class="adv-node__head">
             <!-- kind glyph + typed-port chips via {{ }} interp helpers (NOT r-if):
@@ -193,11 +227,22 @@ const portChip = (portTypes, key) => {
                  these render on all 6. See the kindGlyph/portChip note in <script>. -->
             <span class="adv-node__badge">{{ kindGlyph(node.data?.kind) }}</span>
             <strong class="adv-node__label">{{ node.label }}</strong>
+            <!-- ✕ removal works on ALL 6 (incl. Solid): the node id rides on the
+                 `:data-id` attribute bind (accessor-rewritten on Solid) and the handler
+                 is the TOP-LEVEL onRemoveClick — NOT slot-scope `emit`/`node`, which are
+                 not accessor-rewritten inside event-handler bodies on Solid. Fired on
+                 `@pointerup`: @click is swallowed by Rete's node-drag gesture, and
+                 @pointerdown is stopPropagation-blocked at the node element so it never
+                 reaches Solid's DELEGATED pointerdown handler on `document`. Rete does
+                 not stop pointerup for a non-socket target, so it reaches all 6. NO
+                 modifier (no `this.`-less Angular guarded-handler). See the onRemoveClick
+                 note in <script> for the full Rete/Solid-delegation rationale. -->
             <button
               type="button"
               class="adv-node__x"
+              :data-id="node.id"
               :data-testid="'remove-' + node.id"
-              @click="emit('remove', node.id)"
+              @pointerup="onRemoveClick($event)"
             >&#10005;</button>
           </div>
           <div class="adv-node__ports">
