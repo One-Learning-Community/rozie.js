@@ -327,6 +327,21 @@ export const EXAMPLES = [
   // matrix.spec.ts screenshot cell. The existing 'FlowCanvas'/'FlowCanvasScreenshot'
   // cells stay byte-identical (D-5).
   'FlowCanvasDeclarative',
+  // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
+  // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
+  // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
+  // config-array carousel, a two-way r-model:selectedIndex (live readout), a
+  // `next-model` direct-model-write button (the uniform two-way driver) + a `next`
+  // $expose scrollNext() button (structural; no-ops on Angular's host-element ref),
+  // and a real pointer-drag swipe — see embla-carousel.spec.ts. Built for all 6
+  // targets but NOT a screenshot cell — deliberately NOT in matrix.spec.ts EXAMPLES.
+  // CarouselScreenshot is the content-STABLE pixel cell (loader →
+  // examples/demos/CarouselScreenshotDemo.rozie): autoplay OFF + fixed startIndex +
+  // a fixed-pixel-width root + fixed-width solid-color slides, so Embla's
+  // measured-width transform is byte-identical across all 6 — registered in
+  // matrix.spec.ts (auto-fixme until the Linux PNG lands).
+  'Carousel',
+  'CarouselScreenshot',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -467,6 +482,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 37 — the lit entry appends '-demo' → tag
   // 'rozie-flow-canvas-declarative-demo' = kebab of FlowCanvasDeclarativeDemo.
   FlowCanvasDeclarative: 'rozie-flow-canvas-declarative',
+  // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
+  // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
+  // (the wrapper component is name="Carousel" → 'rozie-carousel').
+  Carousel: 'rozie-carousel',
+  CarouselScreenshot: 'rozie-carousel-screenshot',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -638,6 +658,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // (not parent-supplied), so no MODEL_PROPS entry (the FlowCanvas/CodeMirror
   // precedent). No parent props needed.
   FlowCanvasDeclarative: {},
+  // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
+  // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
+  // <script>. CarouselDemo binds selectedIndex via r-model internally (not
+  // parent-supplied), so no MODEL_PROPS entry (the FlowCanvas/MapLibre precedent).
+  // No parent props needed.
+  Carousel: {},
+  CarouselScreenshot: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

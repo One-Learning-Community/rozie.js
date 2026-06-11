@@ -1,0 +1,137 @@
+<!--
+  CarouselDemo.rozie — BEHAVIORAL consumer for the Embla Carousel wrapper.
+
+  The companion of CarouselScreenshotDemo (the content-stable pixel cell). THIS
+  demo drives the two-way `selectedIndex` + a real pointer-drag swipe and asserts
+  the DOM reflects them, across all 6 targets (embla-carousel.spec.ts):
+
+    - :slides is a fixed-width 5-slide config array, autoplay OFF — so the drag
+      math is deterministic and the carousel mounts a real Embla v8 instance.
+    - r-model:selectedIndex two-way binds the snap index to $data.idx; the live
+      `readout-index` proves the bound index round-trips OUT (Embla's `select`
+      event echoes into $model.selectedIndex → readout climbs above 0).
+
+  TWO drive buttons (the Angular-ref-noop lesson, from CropperDemo/FlowCanvasDemo):
+
+    - `data-testid="next"` calls the $expose handle's `scrollNext()` via a ref.
+      STRUCTURAL coverage only: an Angular child-component ref resolves to the
+      HOST ELEMENT, not the instance handle, so a handle-driven action NO-OPS on
+      Angular. The spec does not assert this path uniformly — it is documented
+      coverage for the 5 ref-resolving targets.
+
+    - `data-testid="next-model"` writes $data.idx = $data.idx + 1 DIRECTLY (not
+      via the handle). The UNIFORM two-way driver across all 6: the model write
+      flows into the wrapper → echo-guarded $watch → embla.scrollTo(i) → Embla's
+      `select` echo → $model.selectedIndex → the bound idx climbs. This is the
+      path the behavioral spec asserts on all 6 incl Angular.
+
+  Slides carry FIXED inline widths/content so the pointer-drag swipe is
+  deterministic. This is the BEHAVIORAL cell — do NOT add screenshot
+  stabilization here. The content-stable SCREENSHOT cell is the SEPARATE
+  CarouselScreenshotDemo.rozie.
+-->
+
+<rozie name="CarouselDemo">
+
+<components>
+{
+  Carousel: '../../packages/ui/embla/src/Carousel.rozie',
+}
+</components>
+
+<data>
+{
+  idx: 0,
+}
+</data>
+
+<script>
+// Five fixed-content slides for the config-array mode. Plain strings — the
+// scoped `slide` slot (unfilled here) falls back to {{ slide }}, and each
+// .rozie-embla__slide gets the fixed-width style below so Embla's measured-width
+// drag math is deterministic.
+const SLIDES = ['One', 'Two', 'Three', 'Four', 'Five']
+
+// The UNIFORM two-way driver: write the bound index directly. The model write
+// flows into the wrapper → echo-guarded $watch → embla.scrollTo → the `select`
+// echo updates $data.idx, so the readout climbs. Works on all 6 targets
+// (Angular's child-ref is the host element, so the $expose path below no-ops
+// there — this direct model write is the cross-target path the spec asserts).
+const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1) }
+</script>
+
+<template>
+<div class="carousel-demo">
+  <h3>Carousel — behavioral</h3>
+
+  <div class="controls">
+    <!-- Structural-only ($expose handle; no-ops on Angular's host-element ref) -->
+    <button type="button" data-testid="next" @click="$refs.car && $refs.car.scrollNext()">Next (handle)</button>
+    <!-- The uniform two-way driver (direct model write) -->
+    <button type="button" data-testid="next-model" @click="nextModel">Next (model)</button>
+    <span class="readout" data-testid="readout-index">{{ $data.idx }}</span>
+  </div>
+
+  <Carousel
+    ref="car"
+    :slides="SLIDES"
+    r-model:selectedIndex="$data.idx"
+    :loop="false"
+    :draggable="true"
+  >
+    <template #slide="{ slide, index }">
+      <div class="slide-body" :data-slide-index="index">{{ slide }}</div>
+    </template>
+  </Carousel>
+</div>
+</template>
+
+<style>
+.carousel-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.carousel-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 2ch;
+}
+/* Fixed-width slides → deterministic Embla drag/scroll math. */
+.slide-body {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  background: #0a84ff;
+  border-radius: 8px;
+}
+.slide-body[data-slide-index="1"] { background: #34a853; }
+.slide-body[data-slide-index="2"] { background: #e8714a; }
+.slide-body[data-slide-index="3"] { background: #a142f4; }
+.slide-body[data-slide-index="4"] { background: #fbbc05; color: #1a1a1a; }
+</style>
+
+</rozie>

@@ -4,6 +4,8 @@
 
 One `Carousel.rozie` source compiles to six idiomatic packages — so all six frameworks get the *same* props, events, two-way `selectedIndex`, and imperative handle. Lit consumers get a category-leading Embla wrapper for free; Angular gets a first-party-quality signals wrapper from the same source as the other five.
 
+The full source for `Carousel.rozie` lives in the [`@rozie-ui/embla` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie). See it running in the [live demo](/guide/embla-demo), and how it stacks up against the per-framework wrappers in the [libraries comparison](/guide/embla-comparison).
+
 ## The `@rozie-ui/embla` packages
 
 | Package | Framework | Ships |
@@ -16,6 +18,21 @@ One `Carousel.rozie` source compiles to six idiomatic packages — so all six fr
 | `@rozie-ui/embla-lit` | Lit 3+ | compiled custom element + types |
 
 All six wrap **Embla Carousel v8** (`embla-carousel@^8.6`) plus the **Autoplay plugin** (`embla-carousel-autoplay@^8.6`), both declared as peer dependencies. (Embla v9 is RC-only and renames the whole API surface — it is deliberately not targeted yet.)
+
+## Install
+
+Install the one package for your framework plus the two Embla peer dependencies — no Rozie toolchain, no build-time compile step:
+
+```bash
+# React (also: react-dom)
+npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay
+# Vue
+npm i @rozie-ui/embla-vue embla-carousel embla-carousel-autoplay
+# Svelte / Angular / Solid / Lit — swap the framework package
+npm i @rozie-ui/embla-svelte embla-carousel embla-carousel-autoplay
+```
+
+There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component (see the tip above).
 
 ::: tip No engine CSS to import
 Unlike most engine wrappers, Embla ships **no** stylesheet you must import. The carousel skeleton styles — an `overflow: hidden` viewport, a `display: flex` container, and slide sizing — ship **scoped inside the component**. Slides are plain light-DOM framework children, so the scoped styles reach them on all six targets (including through Lit's shadow root).
@@ -137,3 +154,9 @@ const carousel = ref();
 ## Autoplay
 
 Set `autoplay` to mount the Autoplay plugin; `autoplayDelay` controls the interval. Toggling either at runtime rebuilds the plugin set via `reInit(options, plugins)`. For any other Embla plugin (Fade, Class Names, Wheel Gestures, …), pass it through the `:plugins` escape-hatch array.
+
+## See also
+
+- [Embla — live demo](/guide/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for all six targets.
+- [Embla libraries comparison](/guide/embla-comparison) — how `@rozie-ui/embla` stacks up against `embla-carousel-{react,vue,svelte,solid}`, the Angular community wrapper, and the (absent) Lit story.
+- [`Carousel.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie)

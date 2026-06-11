@@ -183,6 +183,14 @@ export default defineConfig({
             { text: 'FlowCanvas — live demo', link: '/guide/rete-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/embla',
+          items: [
+            { text: 'Embla — showcase & API', link: '/guide/embla' },
+            { text: 'Embla libraries comparison', link: '/guide/embla-comparison' },
+            { text: 'Embla — live demo', link: '/guide/embla-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

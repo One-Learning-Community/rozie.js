@@ -330,6 +330,19 @@ const EXAMPLES = [
   // The BEHAVIORAL coverage (vanilla render, drag-to-connect anchors, add-node
   // reconcile, two-way zoom) lives in rete-flow.spec.ts and is NOT a pixel cell.
   'FlowCanvasScreenshot',
+  // Phase 39 (embla) — CarouselScreenshot is the content-STABLE Embla-carousel
+  // SCREENSHOT cell. `CarouselScreenshotDemo.rozie` renders a 4-slide config-array
+  // carousel with autoplay OFF + fixed startIndex 0 + a fixed-pixel-width (320px)
+  // root + fixed-320px-wide solid-color slides, so Embla's measured-width
+  // `transform: translate3d(Xpx,0,0)` is byte-identical across all 6 targets
+  // (no text-node-dependent sizing, no images, no animation). The carousel is
+  // pure DOM (no canvas/WebGL), so per D-10 all 6 targets diff against the SAME
+  // shared `CarouselScreenshot.png`. The settle (settleExample below) waits for
+  // the viewport + container + ≥3 laid-out slides before clipping. Baseline-gates
+  // to `test.fixme` via `baselineExists()` until the Linux-Docker PNG lands. The
+  // BEHAVIORAL coverage (two-way index, pointer-drag swipe, $expose handle) lives
+  // in embla-carousel.spec.ts and is NOT a pixel cell.
+  'CarouselScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -738,6 +751,54 @@ async function settleExample(
     await expect(page.locator('.rozie-flow-connection__path')).toHaveCount(2, {
       timeout: 10_000,
     });
+    await page.waitForTimeout(300);
+  }
+  // CarouselScreenshot (Phase 39): the Embla wrapper attaches to the viewport on
+  // `$onMount`, then writes `transform: translate3d(Xpx,0,0)` on the container
+  // (X computed from measured slide widths) once the engine lays out. Wait for the
+  // viewport + container + the 4 config-array slides to render, then poll until the
+  // container carries a non-empty inline `transform` (the engine has measured + laid
+  // out), then a short settle. autoplay is OFF + startIndex fixed, so once the
+  // transform is applied the frame is final. The CSS locators pierce Lit's open
+  // shadow root.
+  if (example === 'CarouselScreenshot') {
+    await expect(page.locator('.rozie-embla__viewport').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('.rozie-embla__container').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect
+      .poll(async () => page.locator('.rozie-embla__slide').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+    // Poll until Embla has applied the laid-out transform on the container
+    // (pierces shadow roots for the Lit target).
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const deep = (root: Document | ShadowRoot): HTMLElement | null => {
+              const hit = root.querySelector('.rozie-embla__container') as HTMLElement | null;
+              if (hit) return hit;
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) {
+                  const found = deep(sr);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            const container = deep(document);
+            if (!container) return false;
+            const t = container.style.transform || getComputedStyle(container).transform;
+            return Boolean(t && t !== 'none' && t.trim().length > 0);
+          }),
+        { timeout: 10_000, intervals: [200, 400, 800, 1600] },
+      )
+      .toBe(true);
     await page.waitForTimeout(300);
   }
 }

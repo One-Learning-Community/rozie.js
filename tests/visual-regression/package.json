@@ -51,6 +51,8 @@
     "@uppy/xhr-upload": "^5.2.0",
     "chart.js": "^4.5.1",
     "cropperjs": "^1.6.2",
+    "embla-carousel": "^8.6",
+    "embla-carousel-autoplay": "^8.6",
     "flatpickr": "^4.6.13",
     "leaflet": "^1.9.4",
     "lit": "^3.2.0",

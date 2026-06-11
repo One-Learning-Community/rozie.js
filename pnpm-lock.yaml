@@ -103,6 +103,9 @@ importers:
       '@rozie-ui/cropper-vue':
         specifier: workspace:*
         version: link:../packages/ui/cropper/packages/vue
+      '@rozie-ui/embla-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/embla/packages/vue
       '@rozie-ui/flatpickr-vue':
         specifier: workspace:*
         version: link:../packages/ui/flatpickr/packages/vue
@@ -157,6 +160,12 @@ importers:
       cropperjs:
         specifier: ^1.6.2
         version: 1.6.2
+      embla-carousel:
+        specifier: ^8.6
+        version: 8.6.0
+      embla-carousel-autoplay:
+        specifier: ^8.6
+        version: 8.6.0(embla-carousel@8.6.0)
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13
@@ -3969,6 +3978,12 @@ importers:
       cropperjs:
         specifier: ^1.6.2
         version: 1.6.2
+      embla-carousel:
+        specifier: ^8.6
+        version: 8.6.0
+      embla-carousel-autoplay:
+        specifier: ^8.6
+        version: 8.6.0(embla-carousel@8.6.0)
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13
