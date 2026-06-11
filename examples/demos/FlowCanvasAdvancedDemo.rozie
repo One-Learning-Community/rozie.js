@@ -1,0 +1,274 @@
+<!--
+  FlowCanvasAdvancedDemo.rozie — BEHAVIORAL consumer for the Phase-40
+  `canConnect` connection-validation prop + the `connection-rejected` emit on the
+  FlowCanvas (Rete.js) wrapper.
+
+  This is the typed-data-pipeline advanced demo (D5). It exercises the BREADTH of
+  the FlowCanvas API alongside the new validation gate, and is the cross-target
+  proof (rete-flow.spec.ts `rete-flow-advanced`) that the FUNCTION-typed
+  `:can-connect` prop invokes identically on all 6 (incl. Lit property binding)
+  and that the hyphenated `connection-rejected` emit round-trips on Svelte (D4).
+
+  What it proves:
+    - TYPED SOCKETS via a PURE `canConnect` predicate. Each node carries a port
+      type tag in `data.portTypes` (number / string). `canConnect(c)` resolves the
+      source-output type and the target-input type from `$data.nodes` and returns
+      `srcT === tgtT` (same-type-only). It is a PURE predicate — it does NOT mutate
+      `$data` or call any engine method (the predicate runs synchronously inside
+      Rete's `connectioncreate` signal chain; a write there risks engine
+      re-entrancy — RESEARCH § Anti-Patterns).
+    - REJECT readout via the EMIT, not the predicate. `onReject` (the
+      `@connection-rejected` handler) is the SOLE writer of `$data.lastRejected`;
+      it resolves the attempted types from the rejected-connection payload via the
+      same `typeOf()` helper. Routing the readout through the echo-guarded
+      `connection-rejected` emit (rather than mutating inside `canConnect`) keeps
+      the predicate pure AND means programmatic-reconcile rejections (echo-guarded
+      in plan 40-01) never spuriously update the user-facing readout.
+    - ACCEPT round-trip. A same-type drag commits the edge; `@connection-created`
+      increments `$data.acceptedCount`.
+    - PER-NODE ✕ action. Each node body (the reactive `#node` portal slot) carries a
+      ✕ button calling the slot-scope `emit('remove', node.id)` → the wrapper raises
+      `node-action { id, name:'remove', detail }` → `onNodeAction` removes the node
+      from `$data.nodes` and the wrapper's reconcile reaps it.
+    - TWO-WAY zoom (`r-model:zoom`), a `fit` button ($expose `zoomToFit`), and live
+      node / connection / accepted / rejected readouts.
+
+  Pitfall notes (the rete-port landmines):
+    - #node slot params are EXACTLY `node` / `selected` / `emit`. Do NOT author a
+      local binding that shadows them (Pitfall 4 — the Svelte slot-name/loop-var
+      shadow trap that has bitten this component before).
+    - The `merge` input is `multiple: true` so a rejected/accepted drag onto it
+      never evicts a prior edge (Pitfall 2 — single-input eviction-before-add), so
+      the drawn-path count is cleanly assertable.
+    - Port colors (number = blue / string = green) for the node chrome are styled
+      via the nested `:root {}` engine-DOM escape hatch — plain scoped CSS silently
+      drops on Lit for portal/engine-mounted content (Pitfall 5); `:global()` is a
+      ROZ128 hard error.
+    - The flow-wrap has an explicit width (720px like FlowCanvasDemo): the VR host
+      mounts at `max-content`, so an auto width clips offscreen sockets and the drag
+      gesture cannot hit them.
+
+  BEHAVIORAL cell — NO screenshot stabilization, NO new pixel baseline (Phase 37
+  D-08). The existing FlowCanvasScreenshot stays the pixel gate.
+-->
+
+<rozie name="FlowCanvasAdvancedDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // Last rejected attempt, written ONLY by onReject (the @connection-rejected
+  // handler). Empty until the first cross-type drag is blocked.
+  lastRejected: '',
+  // Count of accepted (same-type) connections, incremented in @connection-created.
+  acceptedCount: 0,
+  // A typed data pipeline. Each node carries a port type tag in data.portTypes
+  // keyed by port key ('out' / 'in') so canConnect can resolve type by node+key.
+  // number = blue, string = green. Start with NO connections so accept/reject
+  // counts begin from a known baseline (drawnCount === 0).
+  nodes: [
+    { id: 'num',   label: 'Number Source', x: 20,  y: 30,  data: { kind: 'source',    portTypes: { out: 'number' } },
+      outputs: [{ key: 'out', label: 'number' }] },
+    { id: 'txt',   label: 'Text Source',   x: 20,  y: 200, data: { kind: 'source',    portTypes: { out: 'string' } },
+      outputs: [{ key: 'out', label: 'string' }] },
+    { id: 'math',  label: 'Math',          x: 280, y: 30,  data: { kind: 'transform', portTypes: { in: 'number', out: 'number' } },
+      inputs: [{ key: 'in', label: 'number' }], outputs: [{ key: 'out', label: 'number' }] },
+    { id: 'fmt',   label: 'Format',        x: 280, y: 200, data: { kind: 'transform', portTypes: { in: 'number', out: 'string' } },
+      inputs: [{ key: 'in', label: 'number' }], outputs: [{ key: 'out', label: 'string' }] },
+    // merge.in is multiple:true — a rejected/accepted drag onto it never evicts a
+    // prior edge (Pitfall 2), so drawn-path counts stay cleanly assertable.
+    { id: 'merge', label: 'Merge',         x: 540, y: 110, data: { kind: 'merge',     portTypes: { in: 'string' } },
+      inputs: [{ key: 'in', label: 'string', multiple: true }] },
+  ],
+  connections: [],
+}
+</data>
+
+<script>
+// Resolve a port's declared type from the demo's own node model. Pure read.
+const typeOf = (nodeId, key) => {
+  const n = $data.nodes.find((x) => x.id === nodeId)
+  return n && n.data && n.data.portTypes ? n.data.portTypes[key] : undefined
+}
+
+// PURE connection-validation predicate (same-type-only). Bound via :can-connect.
+// MUST NOT mutate $data or call any engine method — it runs synchronously inside
+// Rete's connectioncreate signal chain. Returns true to allow, false to reject.
+// The rejected-type readout is set in onReject (NOT here) so the predicate stays
+// pure and reusable for programmatic reconciles.
+const canConnect = (c) => {
+  const srcT = typeOf(c.source, c.sourceOutput)
+  const tgtT = typeOf(c.target, c.targetInput)
+  return srcT != null && srcT === tgtT
+}
+
+// @connection-rejected handler — the SOLE writer of $data.lastRejected. Resolves
+// the attempted types from the rejected payload via the same typeOf() helper.
+const onReject = (c) => {
+  const srcT = typeOf(c.source, c.sourceOutput)
+  const tgtT = typeOf(c.target, c.targetInput)
+  $data.lastRejected = (srcT == null ? '?' : srcT) + ' → ' + (tgtT == null ? '?' : tgtT)
+}
+
+// @connection-created handler — a same-type drag committed; bump the count.
+const onConnect = () => { $data.acceptedCount = ($data.acceptedCount || 0) + 1 }
+
+// @node-action handler — the per-node ✕ button raises node-action { id, name, … }.
+// Remove the node from the config array; the wrapper's reconcile reaps it.
+const onNodeAction = (e) => {
+  if (e && e.name === 'remove') {
+    $data.nodes = $data.nodes.filter((n) => n.id !== e.id)
+  }
+}
+
+// $expose zoomToFit() via the framework ref (best-effort: Angular's ref is the
+// host element, so it no-ops there — the VR cells do not gate fit).
+const fit = () => { $refs.flow?.zoomToFit?.() }
+
+// Drive $data.zoom up — the two-way bind reconciles into the live area.
+const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
+</script>
+
+<template>
+<div class="flow-adv-demo">
+  <h3>FlowCanvas — typed connection validation</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
+    <button type="button" data-testid="fit" @click="fit">Fit</button>
+    <span class="readout" data-testid="node-count">{{ $data.nodes.length }}</span>
+    <span class="readout" data-testid="connection-count">{{ $data.connections.length }}</span>
+    <span class="readout" data-testid="readout-accepted">{{ $data.acceptedCount }}</span>
+    <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+    <span class="readout readout--rejected" data-testid="readout-rejected">{{ $data.lastRejected }}</span>
+  </div>
+
+  <!--
+    Explicit width: the VR host mounts at width:max-content, so a width-auto
+    flow-wrap collapses and the canvas (overflow:hidden) clips every node past the
+    first — making the typed sockets geometrically present but un-hittable. A fixed
+    width keeps all node sockets on-canvas + hittable for the drag-to-connect cell.
+  -->
+  <div class="flow-wrap" style="height: 360px; width: 720px">
+    <FlowCanvas
+      ref="flow"
+      :nodes="$data.nodes"
+      :connections="$data.connections"
+      :can-connect="canConnect"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+      @connection-created="onConnect"
+      @connection-rejected="onReject"
+      @node-action="onNodeAction"
+    >
+      <!-- slot params MUST stay node/selected/emit (Pitfall 4 shadow). -->
+      <template #node="{ node, selected, emit }">
+        <div class="adv-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
+          <div class="adv-node__head">
+            <!-- per-kind chrome glyph (switch on node.data.kind) -->
+            <template r-match="node.data?.kind">
+              <span r-case="'source'" class="adv-node__badge">&#9654;</span>
+              <span r-case="'transform'" class="adv-node__badge">&#8644;</span>
+              <span r-default class="adv-node__badge">&#8853;</span>
+            </template>
+            <strong class="adv-node__label">{{ node.label }}</strong>
+            <button
+              type="button"
+              class="adv-node__x"
+              :data-testid="'remove-' + node.id"
+              @click="emit('remove', node.id)"
+            >&#10005;</button>
+          </div>
+          <div class="adv-node__ports">
+            <span r-if="node.data?.portTypes?.in" class="adv-port" :data-type="node.data?.portTypes?.in">in:{{ node.data?.portTypes?.in }}</span>
+            <span r-if="node.data?.portTypes?.out" class="adv-port" :data-type="node.data?.portTypes?.out">out:{{ node.data?.portTypes?.out }}</span>
+          </div>
+        </div>
+      </template>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-adv-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 800px;
+}
+.flow-adv-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+.controls .readout--rejected { color: #b91c1c; min-width: 8ch; }
+
+:root {
+  /* Phase-34 engine-DOM escape hatch: the #node chrome teleports (via the
+     reactive $portals.node render-callback) into the engine node element INSIDE
+     <rozie-flow-canvas>'s shadow root, so on Lit it cannot be reached by a plain
+     scoped rule (no [data-rozie-s-*] attr crosses the shadow boundary). :root emits
+     document-level CSS that FlowCanvas's `adopt-document-styles` adopts into its
+     shadow root. NOT :global() (ROZ128 hard error). Mirrors FlowCanvasDeclarativeDemo. */
+  .rozie-flow-canvas .adv-node {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    min-width: 7rem;
+  }
+  .rozie-flow-canvas .adv-node__head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .rozie-flow-canvas .adv-node__badge { font-size: 0.75rem; opacity: 0.7; }
+  .rozie-flow-canvas .adv-node__label { flex: 1; white-space: nowrap; }
+  .rozie-flow-canvas .adv-node__x {
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1;
+    padding: 0 0.125rem;
+  }
+  .rozie-flow-canvas .adv-node__x:hover { color: #b91c1c; }
+  .rozie-flow-canvas .adv-node__ports {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  /* typed-port colors — number = blue, string = green */
+  .rozie-flow-canvas .adv-port[data-type="number"] { color: #3b82f6; font-weight: 600; }
+  .rozie-flow-canvas .adv-port[data-type="string"] { color: #10b981; font-weight: 600; }
+  .rozie-flow-canvas .adv-node.is-selected { background: rgba(59, 130, 246, 0.08); }
+}
+</style>
+
+</rozie>
