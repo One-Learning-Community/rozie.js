@@ -186,8 +186,8 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
       <div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
         <div class={"rozie-embla__container"} data-rozie-s-4143c216="">
           
-          <For each={local.slides}>{(slide, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
-            {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide, index: i() }) ?? rozieDisplay(slide)}
+          <For each={local.slides}>{(item, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
+            {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide: item, index: i() }) ?? rozieDisplay(item)}
           </div>}</For>
           
           {resolved()}

@@ -201,8 +201,8 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
       <div className={"rozie-embla__viewport"} ref={viewportEl} data-rozie-s-4143c216="">
         <div className={"rozie-embla__container"} data-rozie-s-4143c216="">
           
-          {props.slides.map((slide, i) => <div key={keyFor(slide, i)} className={"rozie-embla__slide"} data-rozie-s-4143c216="">
-            {(props.renderSlide ?? props.slots?.['slide']) ? ((props.renderSlide ?? props.slots?.['slide']) as Function)({ slide, index: i }) : rozieDisplay(slide)}
+          {props.slides.map((item, i) => <div key={keyFor(item, i)} className={"rozie-embla__slide"} data-rozie-s-4143c216="">
+            {(props.renderSlide ?? props.slots?.['slide']) ? ((props.renderSlide ?? props.slots?.['slide']) as Function)({ slide: item, index: i }) : rozieDisplay(item)}
           </div>)}
           
           {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}

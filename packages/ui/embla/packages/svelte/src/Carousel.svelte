@@ -203,7 +203,7 @@ let __rozieWatchInitial_3 = true;
 $effect(() => { (() => slides.length)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => embla?.reInit(emblaOptionsFromProps()))(); }); });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as slide, i (keyFor(slide, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide}{@render slide({ slide, index: i })}{:else}{rozieDisplay(slide)}{/if}</div>{/each}{@render children?.()}</div></div></div>
+<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide}{@render slide({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}{@render children?.()}</div></div></div>
 
 <style>
 :global {

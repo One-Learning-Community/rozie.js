@@ -4,8 +4,8 @@
   <div class="rozie-embla__viewport" ref="viewportElRef">
     <div class="rozie-embla__container">
       
-      <div v-for="(slide, i) in props.slides" :key="keyFor(slide, i)" class="rozie-embla__slide">
-        <slot name="slide" :slide="slide" :index="i">{{ slide }}</slot>
+      <div v-for="(item, i) in props.slides" :key="keyFor(item, i)" class="rozie-embla__slide">
+        <slot name="slide" :slide="item" :index="i">{{ item }}</slot>
       </div>
       
       <slot></slot>

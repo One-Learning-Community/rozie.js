@@ -201,13 +201,20 @@ $expose({
 <div class="rozie-embla" :class="{ 'rozie-embla--vertical': $props.axis === 'y' }">
   <div class="rozie-embla__viewport" ref="viewportEl">
     <div class="rozie-embla__container">
-      <!-- (a) config-array mode: render slides from $props.slides -->
+      <!-- (a) config-array mode: render slides from $props.slides.
+           NOTE the loop var is `item`, NOT `slide` — a `slide`-named r-for
+           variable shadows the `slide` SLOT (which the Svelte emitter lowers to a
+           top-level `const slide = $derived(__slideProp ?? snippets?.slide)`), so
+           inside `{#each slides as slide}` the `{@render slide(...)}` would render
+           the each-ITEM (a string) instead of the snippet and throw on mount. This
+           is the slot-name == loop-binding shadow collision (the rete `node`→
+           `reteNode` lesson) — keep the iteration variable distinct from any slot. -->
       <div
-        r-for="slide, i in $props.slides"
-        :key="keyFor(slide, i)"
+        r-for="item, i in $props.slides"
+        :key="keyFor(item, i)"
         class="rozie-embla__slide"
       >
-        <slot name="slide" :slide="slide" :index="i">{{ slide }}</slot>
+        <slot name="slide" :slide="item" :index="i">{{ item }}</slot>
       </div>
       <!-- (b) declarative mode: consumer drops slide DOM directly -->
       <slot />
