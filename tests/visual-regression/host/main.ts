@@ -299,45 +299,44 @@ export const EXAMPLES = [
   // was disproven once those cells landed 6/6). Baseline-gates to test.fixme via
   // baselineExists() until the Linux-Docker PNG lands.
   'PdfViewerScreenshot',
-  // FlowCanvas (Rete.js v2) — the node-flow-editor cells. FlowCanvas is the
-  // BEHAVIORAL cell (loader → examples/demos/FlowCanvasDemo.rozie, which imports
-  // ../../packages/ui/rete/src/FlowCanvas.rozie). It drives a config-array
-  // :nodes/:connections graph through a VANILLA render pipe (no framework render
-  // plugin), a two-way r-model:zoom, an "add node" reconcile, and the REACTIVE
-  // multi-instance `node` portal slot — see rete-flow.spec.ts. FlowCanvasScreenshot
-  // is the content-STABLE pixel cell (loader → FlowCanvasScreenshotDemo.rozie): a
-  // fixed graph with pan/zoom/selection off + fitOnMount off (identity transform).
-  // Registered as a host cell; the screenshot baseline is a tracked deferral (the
-  // connection-path sub-pixel + canvas-VR precedent) so it is NOT in matrix.spec.ts
-  // EXAMPLES until a Linux PNG is generated and verified.
+  // FlowCanvas (Rete.js v2) — the node-flow-editor cells (Phase 41 CONTROLLED-GRAPH
+  // redesign). FlowCanvas is the BEHAVIORAL cell (loader →
+  // examples/demos/FlowCanvasDemo.rozie, which imports
+  // ../../packages/ui/rete/src/{FlowCanvas,NodeType,Port}.rozie). It binds ONE
+  // `r-model:graph` controlled graph object as the single source of truth, declares a
+  // single `task` <NodeType> render-by-type template (with input/output <Port>s),
+  // drives a two-way r-model:zoom, an "add node" graph-append reconcile, and proves
+  // the DRAG WRITE-BACK (the canvas rewrites $data.graph.nodes[i].x/y back into the
+  // bound model — the node0-x readout reflects it) — see rete-flow.spec.ts.
+  // FlowCanvasScreenshot is the content-STABLE pixel cell (loader →
+  // FlowCanvasScreenshotDemo.rozie): a fixed controlled graph with
+  // pan/zoom/selection off + fitOnMount off (identity transform) + a minimal
+  // render-by-type body. Registered as a host cell; the screenshot baseline is a
+  // tracked deferral (the connection-path sub-pixel + canvas-VR precedent; the
+  // controlled-model rework also regenerates it in 41-05) so it is NOT in
+  // matrix.spec.ts EXAMPLES until a Linux PNG is generated and verified.
   'FlowCanvas',
   'FlowCanvasScreenshot',
-  // Phase 37 (declarative-children dogfood) — FlowCanvasDeclarative is the
-  // BEHAVIORAL declarative-variant cell (loader → FlowCanvasDeclarativeDemo.rozie,
-  // which imports ../../packages/ui/rete/src/{FlowCanvas,FlowNode,Handle,Connection}
-  // .rozie). It feeds ONE <FlowCanvas> BOTH a config-array (:nodes) AND declarative
-  // children — <FlowNode> with an INLINE body (D-04 render-callback, the Lit proof:
-  // the parent projects the FlowNode's own host element into the engine `body` div),
-  // nested <Handle> ports, and a flat <Connection> edge. It proves the D-02
-  // union-merge (registry ∪ props) and the D37-08 provenance (an r-for unmount-
-  // toggle reaps node `b`'s registry-managed node while an $expose imperative add
-  // survives). Behavioral-only, NO new pixel baseline (D-08): rete-flow.spec.ts
-  // asserts the inline body renders inside the engine node, the merged node count,
-  // and the reap/survive provenance. Built for all 6 targets but NOT a
-  // matrix.spec.ts screenshot cell. The existing 'FlowCanvas'/'FlowCanvasScreenshot'
-  // cells stay byte-identical (D-5).
-  'FlowCanvasDeclarative',
-  // Phase 40 (typed-socket connection validation) — FlowCanvasAdvanced is the
-  // BEHAVIORAL typed-connect cell (loader → examples/demos/FlowCanvasAdvancedDemo
-  // .rozie, which imports ../../packages/ui/rete/src/FlowCanvas.rozie). It exercises
-  // the new function-typed :can-connect prop (same-type-only predicate) + the
-  // @connection-rejected emit: a cross-type drag is REJECTED (no edge drawn, the
-  // readout-rejected text shows the attempted types) and a same-type drag is
-  // ACCEPTED (count climbs, readout-accepted increments) — see rete-flow.spec.ts
-  // (rete-flow-advanced). Also drives the per-node ✕ → node-action remove, two-way
-  // r-model:zoom, and a fit ($expose zoomToFit) button. Built for all 6 targets but
-  // NOT a matrix.spec.ts screenshot cell (behavioral-only, NO new pixel baseline —
-  // Phase 37 D-08; FlowCanvasScreenshot stays the pixel gate).
+  // (FlowCanvasDeclarative RETIRED in 41-04: it consumed the now-removed per-INSTANCE
+  // <FlowNode id>/<Handle side>/<Connection> API + the config-array :nodes union,
+  // which the controlled-graph + <NodeType>/<Port> model supersedes. Its render-by-
+  // type + body-portal proof now lives in the FlowCanvas/FlowCanvasAdvanced cells.
+  // The rete-flow.spec.ts `rete-flow-declarative` cell is removed alongside in 41-05.)
+  // Phase 41 (controlled-graph typed pipeline) — FlowCanvasAdvanced is the BEHAVIORAL
+  // typed-connect cell (loader → examples/demos/FlowCanvasAdvancedDemo.rozie, which
+  // imports ../../packages/ui/rete/src/{FlowCanvas,NodeType,Port}.rozie). It is the
+  // locked-authoring-API proof: ONE `r-model:graph` object + a handful of <NodeType>/
+  // <Port> TYPE TEMPLATES — a `source` type with BOTH a number AND a string OUTPUT
+  // port, and a `merge` type with BOTH a number AND a string INPUT port (Dan's multi-
+  // port ask). It exercises AUTOMATIC :validate-types (a number→string drag is
+  // REJECTED, no edge drawn, the readout-rejected text shows the routed ports), a
+  // `:can-connect` OVERRIDE (a self-loop is rejected IN ADDITION to the typed check),
+  // the DRAG WRITE-BACK (node0-x readout), the per-node ✕ → controlled-graph remove
+  // (@pointerup/:data-id Solid design-around filtering $data.graph.nodes), two-way
+  // r-model:zoom, and a fit ($expose zoomToFit) button — see rete-flow.spec.ts
+  // (rete-flow-advanced). Built for all 6 targets but NOT a matrix.spec.ts screenshot
+  // cell (behavioral-only, NO new pixel baseline; FlowCanvasScreenshot stays the
+  // pixel gate).
   'FlowCanvasAdvanced',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
@@ -491,10 +490,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-flow-canvas').
   FlowCanvas: 'rozie-flow-canvas',
   FlowCanvasScreenshot: 'rozie-flow-canvas-screenshot',
-  // Phase 37 — the lit entry appends '-demo' → tag
-  // 'rozie-flow-canvas-declarative-demo' = kebab of FlowCanvasDeclarativeDemo.
-  FlowCanvasDeclarative: 'rozie-flow-canvas-declarative',
-  // Phase 40 — the lit entry appends '-demo' → tag
+  // (FlowCanvasDeclarative RETIRED in 41-04 — see the EXAMPLES note above.)
+  // Phase 41 — the lit entry appends '-demo' → tag
   // 'rozie-flow-canvas-advanced-demo' = kebab of FlowCanvasAdvancedDemo.
   FlowCanvasAdvanced: 'rozie-flow-canvas-advanced',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
@@ -666,17 +663,18 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // base64 PDF + fixed page/scale in <script>. No parent props needed.
   PdfViewer: {},
   PdfViewerScreenshot: {},
+  // Phase 41 — both FlowCanvas demos are self-contained: they seed the controlled
+  // `graph` (+ zoom / counters) in <data> and bind `r-model:graph` + `r-model:zoom`
+  // INTERNALLY (not parent-supplied), so NO MODEL_PROPS entry (the FlowCanvas/MapLibre
+  // self-binding precedent — the host supplies no parent graph). No parent props.
   FlowCanvas: {},
   FlowCanvasScreenshot: {},
-  // Phase 37 — FlowCanvasDeclarativeDemo is self-contained: it seeds
-  // zoom/bNodes/impAdded/cfgNodes in <data> and binds zoom via r-model internally
-  // (not parent-supplied), so no MODEL_PROPS entry (the FlowCanvas/CodeMirror
-  // precedent). No parent props needed.
-  FlowCanvasDeclarative: {},
-  // Phase 40 — FlowCanvasAdvancedDemo is self-contained: it seeds zoom/lastRejected/
-  // acceptedCount/nodes/connections in <data>, binds the canConnect predicate from its
-  // own <script>, and binds zoom via r-model internally (not parent-supplied), so no
-  // MODEL_PROPS entry (the FlowCanvas/MapLibre precedent). No parent props needed.
+  // (FlowCanvasDeclarative RETIRED in 41-04 — see the EXAMPLES note above.)
+  // Phase 41 — FlowCanvasAdvancedDemo is self-contained: it seeds the controlled
+  // `graph` + zoom/lastRejected/acceptedCount in <data>, declares its <NodeType>/<Port>
+  // type templates + the canConnect override from its own <script>, and binds
+  // r-model:graph + r-model:zoom internally (not parent-supplied), so NO MODEL_PROPS
+  // entry (the FlowCanvas/MapLibre precedent). No parent props needed.
   FlowCanvasAdvanced: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
