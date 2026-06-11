@@ -1,0 +1,230 @@
+<!--
+  Carousel.rozie — cross-framework port of Embla Carousel (v8).
+
+  One source → idiomatic React / Vue / Svelte / Angular / Solid / Lit carousels,
+  each a working Embla v8 instance. Fills a genuine cross-framework gap: Lit has
+  no Embla wrapper at all, Angular's is a single-maintainer community package, and
+  the four official wrappers are four divergent APIs (a hook vs a composable vs an
+  action vs a Solid primitive).
+
+  This is the SortableList pattern, SIMPLIFIED. Like SortableList we own the host,
+  render consumer children inside, attach the vanilla engine to a $refs in
+  $onMount, $watch→reconcile, two-way bind, and $expose the imperative surface.
+  Unlike SortableList, Embla only READS + transforms slide DOM (it sets
+  `transform: translate3d(...)` on the container it owns) — it never reorders the
+  framework's children. So NO r-external, NO $reconcileAfterDomMutation, NO
+  DOM-restore helper, NO $snapshot, NO colocated bridge.
+
+  Two slide-source modes from one component:
+    (a) config array:   <Carousel :slides="items" r-model:selectedIndex="idx" />
+    (b) declarative:    <Carousel><div class="rozie-embla__slide">…</div></Carousel>
+  Embla's native `watchSlides: true` self-reInits on default-slot child add/remove;
+  a $watch on $props.slides.length is the config-array backstop.
+
+  Consumer example (Vue):
+
+    <Carousel
+      :slides="['A', 'B', 'C']"
+      v-model:selectedIndex="idx"
+      :loop="true"
+      @select="(i) => console.log('snap', i)"
+    />
+    <button @click="carousel.scrollNext()">Next</button>
+-->
+
+<rozie name="Carousel">
+
+<props>
+{
+  // Slide data for config-array mode (mode a). Optional — the default <slot/> is
+  // mode b (consumer drops slide DOM directly).
+  slides:         { type: Array,   default: () => [] },
+  // Runtime-updatable Embla options — each is $watch'd → embla.reInit() (Embla has
+  // no per-option setter; reInit is the only update path).
+  loop:           { type: Boolean, default: false },
+  align:          { type: String,  default: 'center' },
+  axis:           { type: String,  default: 'x' },
+  slidesToScroll: { type: Number,  default: 1 },
+  dragFree:       { type: Boolean, default: false },
+  // `draggable` → Embla `watchDrag` (Vue-clarity rename; false disables pointer drag).
+  draggable:      { type: Boolean, default: true },
+  containScroll:  { type: String,  default: 'trimSnaps' },
+  startIndex:     { type: Number,  default: 0 },
+  skipSnaps:      { type: Boolean, default: false },
+  duration:       { type: Number,  default: 25 },
+  direction:      { type: String,  default: 'ltr' },
+  // Autoplay plugin toggle + delay.
+  autoplay:       { type: Boolean, default: false },
+  autoplayDelay:  { type: Number,  default: 4000 },
+  // Escape hatches: extra Embla plugins appended verbatim; raw EmblaOptionsType
+  // spread last (the SortableList ...$props.options precedent).
+  plugins:        { type: Array,   default: () => [] },
+  options:        { type: Object,  default: () => ({}) },
+  // Two-way: the current scroll snap. DISTINCT from the `select` emit (the
+  // MapLibre model⇄emit rule — a model prop must NOT share a name with an emit or
+  // the continuous emit drops on Vue/Angular). Read $props.selectedIndex, write
+  // $model.selectedIndex.
+  selectedIndex:  { type: Number,  default: 0, model: true },
+}
+</props>
+
+<script>
+import EmblaCarousel from 'embla-carousel'
+import Autoplay from 'embla-carousel-autoplay'
+
+// Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
+// useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
+let embla = null
+
+// Stable key for config-array slides — prefer an object id, fall back to value/index.
+const keyFor = (slide, i) => {
+  if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i
+  return slide ?? i
+}
+
+// Map the curated props → an EmblaOptionsType. `draggable` → `watchDrag`. The
+// `...$props.options` escape hatch spreads last so a consumer can override anything.
+//
+// NOTE the null-let return discipline: Embla's EmblaOptionsType narrows the string
+// options to literal unions (align→'start'|'center'|'end', axis→'x'|'y', …). The
+// untyped `String` props are `string`, which does NOT structurally narrow to those
+// unions under strict tsc on the emitted leaves. Building the object into a
+// pre-nulled `let` (auto type-neutralized to `any`) launders the literal so the
+// engine accepts it — the .rozie-native fix (no codegen type-aid, no lang="ts"),
+// the same laundering discipline MapLibre uses for its untyped option object.
+const emblaOptionsFromProps = () => {
+  let opts = null
+  opts = {
+    loop:           $props.loop,
+    align:          $props.align,
+    axis:           $props.axis,
+    slidesToScroll: $props.slidesToScroll,
+    dragFree:       $props.dragFree,
+    watchDrag:      $props.draggable,
+    containScroll:  $props.containScroll,
+    startIndex:     $props.startIndex,
+    skipSnaps:      $props.skipSnaps,
+    duration:       $props.duration,
+    direction:      $props.direction,
+    ...$props.options,
+  }
+  return opts
+}
+
+// Build the plugin array: gate Autoplay behind the `autoplay` prop, then append
+// any consumer-supplied plugins verbatim.
+const emblaPluginsFromProps = () => {
+  const builtins = $props.autoplay ? [Autoplay({ delay: $props.autoplayDelay })] : []
+  return [...builtins, ...$props.plugins]
+}
+
+$onMount(() => {
+  embla = EmblaCarousel($refs.viewportEl, emblaOptionsFromProps(), emblaPluginsFromProps())
+
+  // engine → consumer: on every snap change write the two-way model AND fire the
+  // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+  embla.on('select', () => {
+    const i = embla.selectedScrollSnap()
+    $model.selectedIndex = i
+    $emit('select', i)
+  })
+  embla.on('settle', () => $emit('settle'))
+  embla.on('reInit', () => $emit('reInit'))
+  embla.on('pointerDown', () => $emit('pointer-down'))
+
+  return () => embla?.destroy()
+})
+
+// consumer → engine (echo-guarded, the MapLibre camera precedent): when the bound
+// index changes and differs from the engine's current snap, scroll to it. The
+// guard (i !== selectedScrollSnap()) makes the engine→model echo a no-op, so no
+// feedback loop.
+$watch(() => $props.selectedIndex, (i) => {
+  if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i)
+})
+
+// Reactive options → reInit. Embla has no per-option setter; reInit(opts) is the
+// only update path. The getter returns a stable primitive SIGNATURE string so the
+// watch fires once per actual change (a fresh options object would fire every tick
+// on reference inequality — playbook §4).
+$watch(
+  () => [
+    $props.loop, $props.align, $props.axis, $props.slidesToScroll, $props.dragFree,
+    $props.draggable, $props.containScroll, $props.skipSnaps, $props.duration,
+    $props.direction,
+  ].join('|'),
+  () => embla?.reInit(emblaOptionsFromProps()),
+)
+
+// Toggling autoplay (or its delay, or the plugin array) rebuilds the plugin set —
+// reInit takes a second `plugins` arg.
+$watch(
+  () => `${$props.autoplay}|${$props.autoplayDelay}`,
+  () => embla?.reInit(emblaOptionsFromProps(), emblaPluginsFromProps()),
+)
+
+// Config-array slide-count backstop: Embla's native `watchSlides` self-reInits on
+// default-slot child add/remove, but the config-array (r-for) path needs an
+// explicit length watch so a data-driven slide add/remove recomputes snaps.
+$watch(() => $props.slides.length, () => embla?.reInit(emblaOptionsFromProps()))
+
+// ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
+// 9 verbs, each guarding the pre-mount/destroyed `embla = null`.
+//  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
+//  - getSelectedIndex ≠ the `selectedIndex` model prop (ROZ524-class — avoids any
+//    setter collision on Lit/Angular; it's a method, the prop is the two-way value).
+//  - scrollToIndex ≠ the inherited DOM/LitElement `HTMLElement.scrollTo(x, y)`. A
+//    bare `scrollTo` expose verb becomes a public method on the Lit custom-element
+//    class and its `(index, jump)` signature is INCOMPATIBLE with the inherited
+//    `Element.scrollTo` overloads (TS2416 → the whole class decorator fails to
+//    resolve). This is a NEW collision class: expose-verb shadows an inherited DOM
+//    method on the Lit target. Suffix it (the reInit→reInitCarousel discipline).
+//  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList have no
+//    matching prop, emit, or inherited DOM method — clear.
+function scrollNext(jump)            { if (embla) embla.scrollNext(jump) }
+function scrollPrev(jump)            { if (embla) embla.scrollPrev(jump) }
+function scrollToIndex(index, jump)  { if (embla) embla.scrollTo(index, jump) }
+function reInitCarousel(opts)        { if (embla) embla.reInit(opts ?? emblaOptionsFromProps(), emblaPluginsFromProps()) }
+function canScrollNext()             { return embla ? embla.canScrollNext() : false }
+function canScrollPrev()             { return embla ? embla.canScrollPrev() : false }
+function getSelectedIndex()          { return embla ? embla.selectedScrollSnap() : 0 }
+function scrollSnapList()            { return embla ? embla.scrollSnapList() : [] }
+function getInstance()               { return embla }
+
+$expose({
+  scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev,
+  getSelectedIndex, scrollSnapList, getInstance,
+})
+</script>
+
+<template>
+<div class="rozie-embla" :class="{ 'rozie-embla--vertical': $props.axis === 'y' }">
+  <div class="rozie-embla__viewport" ref="viewportEl">
+    <div class="rozie-embla__container">
+      <!-- (a) config-array mode: render slides from $props.slides -->
+      <div
+        r-for="slide, i in $props.slides"
+        :key="keyFor(slide, i)"
+        class="rozie-embla__slide"
+      >
+        <slot name="slide" :slide="slide" :index="i">{{ slide }}</slot>
+      </div>
+      <!-- (b) declarative mode: consumer drops slide DOM directly -->
+      <slot />
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+.rozie-embla { position: relative; }
+.rozie-embla__viewport { overflow: hidden; }
+.rozie-embla__container { display: flex; }
+.rozie-embla__slide { flex: 0 0 100%; min-width: 0; }
+
+/* Vertical axis: stack slides in a column inside a height-constrained viewport. */
+.rozie-embla--vertical .rozie-embla__container { flex-direction: column; height: 100%; }
+.rozie-embla--vertical .rozie-embla__slide { flex: 0 0 100%; min-height: 0; }
+</style>
+
+</rozie>

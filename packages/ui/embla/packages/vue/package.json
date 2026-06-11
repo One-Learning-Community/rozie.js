@@ -1,0 +1,63 @@
+{
+  "name": "@rozie-ui/embla-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue carousel wrapping Embla Carousel — one Rozie source compiled to Vue.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "embla",
+    "embla-carousel",
+    "carousel",
+    "slider",
+    "slideshow",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/embla/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/Carousel.vue",
+      "types": "./src/Carousel.vue",
+      "default": "./src/Carousel.vue"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "vue": "^3.4",
+    "embla-carousel": "^8.6",
+    "embla-carousel-autoplay": "^8.6"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "embla-carousel": {
+      "optional": false
+    },
+    "embla-carousel-autoplay": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

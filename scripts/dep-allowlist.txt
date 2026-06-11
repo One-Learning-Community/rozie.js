@@ -857,6 +857,8 @@ eastasianwidth
 editorconfig
 ee-first
 electron-to-chromium
+embla-carousel
+embla-carousel-autoplay
 emoji-regex
 emoji-regex-xs
 emojis-list

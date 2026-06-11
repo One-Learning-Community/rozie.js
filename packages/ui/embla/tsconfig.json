@@ -1,0 +1,22 @@
+{
+  // Root tsconfig for @rozie-ui/embla. The package has no first-class TS sources
+  // (src/ holds only Carousel.rozie; the per-framework leaves under packages/
+  // typecheck the codegen-emitted output with their own strict tsconfigs). This
+  // config exists for editor/tooling consistency and excludes the leaf subtree.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "packages"
+  ]
+}

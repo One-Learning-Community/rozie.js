@@ -1,0 +1,6 @@
+.rozie-embla[data-rozie-s-4143c216] { position: relative; }
+.rozie-embla__viewport[data-rozie-s-4143c216] { overflow: hidden; }
+.rozie-embla__container[data-rozie-s-4143c216] { display: flex; }
+.rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-width: 0; }
+.rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__container[data-rozie-s-4143c216] { flex-direction: column; height: 100%; }
+.rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-height: 0; }

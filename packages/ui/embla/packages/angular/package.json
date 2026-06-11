@@ -1,0 +1,67 @@
+{
+  "name": "@rozie-ui/embla-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular carousel wrapping Embla Carousel — one Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "embla",
+    "embla-carousel",
+    "carousel",
+    "slider",
+    "slideshow",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/embla/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/Carousel.ts",
+      "import": "./src/Carousel.ts",
+      "default": "./src/Carousel.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19 || ^20 || ^21",
+    "@angular/common": "^19 || ^20 || ^21",
+    "embla-carousel": "^8.6",
+    "embla-carousel-autoplay": "^8.6"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "embla-carousel": {
+      "optional": false
+    },
+    "embla-carousel-autoplay": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}
