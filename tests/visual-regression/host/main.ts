@@ -327,6 +327,18 @@ export const EXAMPLES = [
   // matrix.spec.ts screenshot cell. The existing 'FlowCanvas'/'FlowCanvasScreenshot'
   // cells stay byte-identical (D-5).
   'FlowCanvasDeclarative',
+  // Phase 40 (typed-socket connection validation) — FlowCanvasAdvanced is the
+  // BEHAVIORAL typed-connect cell (loader → examples/demos/FlowCanvasAdvancedDemo
+  // .rozie, which imports ../../packages/ui/rete/src/FlowCanvas.rozie). It exercises
+  // the new function-typed :can-connect prop (same-type-only predicate) + the
+  // @connection-rejected emit: a cross-type drag is REJECTED (no edge drawn, the
+  // readout-rejected text shows the attempted types) and a same-type drag is
+  // ACCEPTED (count climbs, readout-accepted increments) — see rete-flow.spec.ts
+  // (rete-flow-advanced). Also drives the per-node ✕ → node-action remove, two-way
+  // r-model:zoom, and a fit ($expose zoomToFit) button. Built for all 6 targets but
+  // NOT a matrix.spec.ts screenshot cell (behavioral-only, NO new pixel baseline —
+  // Phase 37 D-08; FlowCanvasScreenshot stays the pixel gate).
+  'FlowCanvasAdvanced',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -482,6 +494,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 37 — the lit entry appends '-demo' → tag
   // 'rozie-flow-canvas-declarative-demo' = kebab of FlowCanvasDeclarativeDemo.
   FlowCanvasDeclarative: 'rozie-flow-canvas-declarative',
+  // Phase 40 — the lit entry appends '-demo' → tag
+  // 'rozie-flow-canvas-advanced-demo' = kebab of FlowCanvasAdvancedDemo.
+  FlowCanvasAdvanced: 'rozie-flow-canvas-advanced',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -658,6 +673,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // (not parent-supplied), so no MODEL_PROPS entry (the FlowCanvas/CodeMirror
   // precedent). No parent props needed.
   FlowCanvasDeclarative: {},
+  // Phase 40 — FlowCanvasAdvancedDemo is self-contained: it seeds zoom/lastRejected/
+  // acceptedCount/nodes/connections in <data>, binds the canConnect predicate from its
+  // own <script>, and binds zoom via r-model internally (not parent-supplied), so no
+  // MODEL_PROPS entry (the FlowCanvas/MapLibre precedent). No parent props needed.
+  FlowCanvasAdvanced: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

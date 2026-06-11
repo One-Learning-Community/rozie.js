@@ -133,6 +133,21 @@ const fit = () => { $refs.flow?.zoomToFit?.() }
 
 // Drive $data.zoom up — the two-way bind reconciles into the live area.
 const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
+
+// #node slot chrome helpers, used via {{ }} interpolation (NOT r-if). The Solid
+// emitter rewrites slot-scope params (node/selected/emit) to the foreign-slot
+// accessor ONLY inside attribute binds + {{ }} interps — NOT inside r-if `when`
+// conditions or @click handler bodies (the documented Solid foreign-slot accessor
+// limitation). An `r-if="node.…"` therefore compiles to `<Show when={node.…}>`
+// with a bare, undefined `node` that throws at render and blanks the WHOLE #node
+// portal fill on Solid. Routing the kind glyph + the typed-port chips through
+// interpolation helpers keeps the switch-on-kind + typed-port chrome portal-safe
+// on all 6 targets.
+const kindGlyph = (kind) => (kind === 'source' ? '▶' : kind === 'transform' ? '⇄' : '⊕')
+const portChip = (portTypes, key) => {
+  const t = portTypes ? portTypes[key] : undefined
+  return t == null ? '' : key + ':' + t
+}
 </script>
 
 <template>
@@ -171,12 +186,12 @@ const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 10
       <template #node="{ node, selected, emit }">
         <div class="adv-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
           <div class="adv-node__head">
-            <!-- per-kind chrome glyph (switch on node.data.kind) -->
-            <template r-match="node.data?.kind">
-              <span r-case="'source'" class="adv-node__badge">&#9654;</span>
-              <span r-case="'transform'" class="adv-node__badge">&#8644;</span>
-              <span r-default class="adv-node__badge">&#8853;</span>
-            </template>
+            <!-- kind glyph + typed-port chips via {{ }} interp helpers (NOT r-if):
+                 r-if / @click slot-scope refs are not accessor-rewritten on Solid
+                 (foreign-slot limitation) and a `<Show when={node.…}>` blanks the
+                 whole portal fill there. Interps + :attr binds ARE rewritten, so
+                 these render on all 6. See the kindGlyph/portChip note in <script>. -->
+            <span class="adv-node__badge">{{ kindGlyph(node.data?.kind) }}</span>
             <strong class="adv-node__label">{{ node.label }}</strong>
             <button
               type="button"
@@ -186,8 +201,8 @@ const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 10
             >&#10005;</button>
           </div>
           <div class="adv-node__ports">
-            <span r-if="node.data?.portTypes?.in" class="adv-port" :data-type="node.data?.portTypes?.in">in:{{ node.data?.portTypes?.in }}</span>
-            <span r-if="node.data?.portTypes?.out" class="adv-port" :data-type="node.data?.portTypes?.out">out:{{ node.data?.portTypes?.out }}</span>
+            <span class="adv-port" :data-type="node.data?.portTypes?.in">{{ portChip(node.data?.portTypes, 'in') }}</span>
+            <span class="adv-port" :data-type="node.data?.portTypes?.out">{{ portChip(node.data?.portTypes, 'out') }}</span>
           </div>
         </div>
       </template>

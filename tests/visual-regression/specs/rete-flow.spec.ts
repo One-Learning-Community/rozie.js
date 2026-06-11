@@ -562,3 +562,136 @@ for (const target of TARGETS) {
     ).toBeLessThanOrEqual(ALIGN_DX_SANITY_PX);
   });
 }
+
+/**
+ * Phase 40 — typed-socket connection validation: the function-typed `:can-connect`
+ * prop + the `connection-rejected` emit (D1–D5).
+ *
+ * `examples/demos/FlowCanvasAdvancedDemo.rozie` is a typed data-pipeline with five
+ * nodes carrying a port type tag in `data.portTypes` (number / string) and a PURE
+ * same-type-only `canConnect` predicate bound via `:can-connect="canConnect"`. The
+ * graph starts with NO connections, so the drawn-path count begins at 0 — a clean
+ * baseline for both the REJECT and ACCEPT deltas.
+ *
+ * Each target runs BOTH gestures sequentially on the SAME graph:
+ *
+ *   REJECT (the novel proof): drag the Number Source's `number` output → the Merge
+ *   node's `string` input (cross-type). The wrapper's editor pipe runs `canConnect`
+ *   at Rete's cancellable `connectioncreate`, gets `false`, emits `connection-rejected`
+ *   and returns `undefined` to CANCEL — so `connectioncreated` never fires, no edge
+ *   commits, and no `.rozie-flow-connection__path` draws. Assert:
+ *     • drawnCount STAYS 0 (no commit), AND
+ *     • `readout-rejected` shows the attempted types text (`number → string`) — the
+ *       demo's `@connection-rejected` handler ran and wrote it. This TEXT assertion
+ *       (not a count) is load-bearing: a count-only check previously masked a totally
+ *       non-rendering feature on this component (project_next_port_rete_flow), and a
+ *       rejected pseudo-path element can exist mid-drag, so element presence is not
+ *       proof. Merge's input is `multiple:true` + empty so a rejected drag never
+ *       evicts a prior edge (Pitfall 2) — the 0-count is unambiguous.
+ *     • `readout-accepted` STAYS 0 (no `connection-created`).
+ *
+ *   ACCEPT (mirrors rete-flow-drag): drag the Number Source's `number` output → the
+ *   Math node's `number` input (same-type). `canConnect` returns true, the edge
+ *   commits, `connectioncreated` fires → `@connection-created` increments
+ *   `$data.acceptedCount`. Assert:
+ *     • drawnCount climbs to EXACTLY 1 (the committed same-type edge), AND
+ *     • `readout-accepted` reads `1` (connection-created round-tripped — incl. the
+ *       Svelte hyphenated-emit path, the 595968e0 live regression).
+ *
+ * This is the cross-target proof that the FUNCTION-typed prop invokes identically on
+ * all 6 (incl. Lit property binding `.canConnect=${fn}`) and the hyphenated
+ * `connection-rejected` round-trips on Svelte (D4). Behavioral-only — NO screenshot.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-advanced [${target}]: typed :can-connect rejects cross-type + accepts same-type`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasAdvanced&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    // ---- setup: canvas + the 5 typed nodes render; baseline drawnCount = 0 ----
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(5);
+
+    // counts DRAWN paths (non-empty `d`), piercing Lit's open shadow root.
+    const drawnCount = async () =>
+      page
+        .locator('.rozie-flow-connection__path')
+        .evaluateAll(
+          (els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0)
+              .length,
+        );
+
+    // no initial connections — the baseline is a clean 0.
+    await expect.poll(drawnCount, { timeout: 10_000 }).toBe(0);
+    await expect(page.getByTestId('readout-accepted')).toHaveText('0');
+
+    // Locate a socket by its node's distinctive label (substring, case-insensitive).
+    // 'Number Source' / 'Math' / 'Merge' are unique node labels (the port type labels
+    // are the bare words 'number'/'string', which never spell these phrases).
+    const socketOf = (label: string, side: 'output' | 'input') =>
+      page
+        .locator('.rozie-flow-node', { hasText: label })
+        .locator(`.rozie-flow-socket--${side}`)
+        .first();
+
+    const center = async (locator: ReturnType<typeof socketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    const drag = async (
+      from: { x: number; y: number },
+      to: { x: number; y: number },
+    ) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, {
+        steps: 8,
+      });
+      await page.mouse.move(to.x, to.y, { steps: 8 });
+      await page.mouse.up();
+    };
+
+    // ---- REJECT: number output → string input (cross-type) is BLOCKED ----
+    const numOut = await center(socketOf('Number Source', 'output'));
+    const mergeIn = await center(socketOf('Merge', 'input'));
+    await drag(numOut, mergeIn);
+
+    // no edge committed — the drawn-path count stays 0.
+    await expect.poll(drawnCount, { timeout: 5_000 }).toBe(0);
+    // the @connection-rejected handler ran and wrote the attempted types (TEXT, not
+    // a count — the load-bearing assertion). The readout reads e.g. 'number → string'.
+    const rejected = page.getByTestId('readout-rejected');
+    await expect(rejected).toContainText('number', { timeout: 10_000 });
+    await expect(rejected).toContainText('string');
+    // no connection-created fired on the rejected drag.
+    await expect(page.getByTestId('readout-accepted')).toHaveText('0');
+
+    // ---- ACCEPT: number output → number input (same-type) COMMITS ----
+    const mathIn = await center(socketOf('Math', 'input'));
+    await drag(numOut, mathIn);
+
+    // the committed same-type edge draws — drawnCount settles to exactly 1.
+    await expect
+      .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(1);
+    // connection-created round-tripped (incl. the Svelte hyphenated-emit path).
+    await expect(page.getByTestId('readout-accepted')).toHaveText('1', {
+      timeout: 10_000,
+    });
+  });
+}
