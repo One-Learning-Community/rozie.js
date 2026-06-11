@@ -36,42 +36,33 @@ Rete ships **no stylesheet** — every node, socket, and connection is styled by
 
 ## Authoring model
 
-The graph can be authored two ways — via **config-array props** (`nodes` / `connections`) or via **declarative child components** (`<FlowNode>` / `<Handle>` / `<Connection>`). Both are fully supported, and when both are supplied on the same canvas they **union-merge by id (last-writer-wins)** into the same engine registry. The engine still owns the store and reconciles the live graph either way; pick whichever shape suits the consumer.
-
-### Config-array props
-
-- **`nodes`** — `[{ id, label?, x, y, inputs?, outputs?, data? }]`. `inputs`/`outputs` are `[{ key, label?, multiple? }]`; `key` is the socket id used by connections. `data` is an opaque payload handed to the `node` slot scope.
-- **`connections`** — `[{ id?, source, sourceOutput?, target, targetInput? }]`. `source`/`target` are node ids; `sourceOutput`/`targetInput` default to `'out'`/`'in'`.
-
-The engine owns pan/zoom/drag/drag-to-connect; changing the arrays reconciles the live graph (add / move / remove) with no remount. User-drawn connections fire `@connection-created`; dragged nodes fire `@node-moved`.
-
-### Declarative children
-
-The declarative shape follows **Rete's own vocabulary**, not React Flow's: `<FlowNode>` is a node, `<Handle>` is a **port / socket** (nested inside its node — *not* an edge), and `<Connection>` is an **edge** (a flat child of the canvas, since an edge spans two nodes and cannot nest inside one):
+`FlowCanvas` follows the **controlled-graph** mental model (the xyflow `nodeTypes` + controlled-state shape, Vue-natural): the consumer binds **one `graph` object** and declares node **TYPE templates**. The canvas is the middleware — it renders each node by its `type`, owns drag / zoom / connect / validation, and **writes back** layout (`x`/`y` on drag) and connections (on connect / disconnect) into the bound `r-model` object so the developer never hand-reconciles.
 
 ```html
-<FlowCanvas>
-  <FlowNode id="a" :x="40" :y="60">
-    <template #body><MyCard /></template>
-    <Handle side="output" port="out" />
-  </FlowNode>
-  <FlowNode id="b" :x="320" :y="60">
-    <template #body><MyCard /></template>
-    <Handle side="input" port="in" />
-  </FlowNode>
-  <Connection source="a" target="b" sourceOutput="out" targetInput="in" />
+<FlowCanvas r-model:graph="$data.graph" :validate-types="true" @connection-rejected="onReject">
+  <NodeType type="source">
+    <template #body="{ node }">{{ node.data.label }}</template>
+    <Port out="num" type="number" />
+    <Port out="str" type="string" />
+  </NodeType>
+  <NodeType type="merge">
+    <template #body="{ node }">Merge</template>
+    <Port in="num" type="number" multiple />
+    <Port in="str" type="string" multiple />
+  </NodeType>
 </FlowCanvas>
 ```
 
-- **`<FlowNode>`** — `id` (required) plus `:x` / `:y` (position) and an optional `label`. Its visible body is authored via a **named `#body` slot**, not bare children.
-- **`<Handle>`** — `side` (`'input'` | `'output'`) + `port` (the socket key), optional `label` / `multiple`. Nests inside its `<FlowNode>` and auto-binds to that node via injected context (no `nodeId` to wire by hand).
-- **`<Connection>`** — `source` / `target` (node ids) + optional `sourceOutput` / `targetInput` (handle keys, default `'out'` / `'in'`). A flat child of `<FlowCanvas>`.
+with `$data.graph = { nodes: [{ id, type, x, y, data }], connections: [{ id?, source, sourceOutput, target, targetInput }] }` — the **single source of truth**. Dragging a node writes a fresh `graph` object (x/y); drawing / removing an edge writes a fresh `graph` object (connections). A type-mismatched connection is auto-rejected (`:validate-types`) and surfaces `@connection-rejected`.
 
-Children feed the **same id-keyed registry** the config arrays do, through the same `addNode` / `addConnection` reconcile — so a config array and declarative children coexist, and on an id collision the declarative child wins (last-writer-wins).
+### Node TYPE templates
 
-**Why the node body is a named `#body` slot, not bare children.** A FlowNode's visible body has to *teleport* into the node element the Rete engine creates — it does not render in the normal component tree. Rozie mounts it through a portal, which gives it a fresh render-root inside the engine-owned host. A portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming config children (`<Handle>` / `<Connection>`, which stay in the normal child position) is therefore the correct cross-framework shape — so the body must be the `#body` slot, not a bare default-slot child.
+- **`<NodeType type="…">`** — declares a node TYPE **once**: its visible body (a named `#body` slot, scoped `{ node, selected, emit }`) plus its port schema (nested `<Port>` children). **Every** graph node whose `type` matches renders this template (render-by-type) and uses its ports. A `<NodeType>` carries **no** `id`/`x`/`y` — instance identity and position live in the bound `graph`, not on the tag.
+- **`<Port out="KEY" type="T" [multiple]>` / `<Port in="KEY" type="T" [multiple]>`** — declares one typed directional port on its enclosing `<NodeType>`. The **direction is derived from which attribute is set** (`out` ⇒ output, `in` ⇒ input), the key is its value, and `type` drives `:validate-types` (a type-mismatched connection is auto-rejected). Optional `label` / `multiple`. Nests inside its `<NodeType>` and auto-binds via injected context (no type to wire by hand).
 
-The declarative shape **dogfoods Rozie's own cross-component context primitive** (`$provide` / `$inject`): `<FlowCanvas>` provides an id-keyed registry, and each child injects it.
+**Why the node body is a named `#body` slot, not bare children.** A node body has to *teleport* into the node element the Rete engine creates — it does not render in the normal component tree. Rozie mounts it through a portal, which gives it a fresh render-root inside the engine-owned host. A portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming `<Port>` children (which stay in the normal child position) is therefore the correct cross-framework shape — so the body must be the `#body` slot, not a bare default-slot child.
+
+The authoring shape **dogfoods Rozie's own cross-component context primitive** (`$provide` / `$inject`): `<FlowCanvas>` provides a per-TYPE registry, `<NodeType>` provides a nested per-type sub-context, and `<Port>` injects it.
 
 ## Quick start
 
@@ -81,25 +72,28 @@ The `zoom` level is two-way bound (bind with `r-model` / `v-model` / `bind:` / `
 
 ```tsx
 import { useState } from 'react';
-import { FlowCanvas } from '@rozie-ui/rete-react';
+import { FlowCanvas, NodeType, Port } from '@rozie-ui/rete-react';
 
 export function Demo() {
-  const [zoom, setZoom] = useState(1);
-  const nodes = [
-    { id: 'a', label: 'Source', x: 0, y: 0, outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink', x: 280, y: 60, inputs: [{ key: 'in' }] },
-  ];
-  const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
+  const [graph, setGraph] = useState({
+    nodes: [
+      { id: 'a', type: 'source', x: 0, y: 0, data: { label: 'Source' } },
+      { id: 'b', type: 'merge', x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  });
   return (
     <div style={{ height: 400 }}>
-      <FlowCanvas
-        nodes={nodes}
-        connections={connections}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        onConnectionCreated={(c) => console.log('connected', c)}
-        onNodeMoved={(e) => console.log('moved', e)}
-      />
+      <FlowCanvas graph={graph} onGraphChange={setGraph} validateTypes>
+        <NodeType type="source">
+          {({ node }) => <div>{node.data.label}</div>}
+          <Port out="num" type="number" />
+        </NodeType>
+        <NodeType type="merge">
+          {({ node }) => <div>{node.data.label}</div>}
+          <Port in="num" type="number" multiple />
+        </NodeType>
+      </FlowCanvas>
     </div>
   );
 }
@@ -110,49 +104,62 @@ export function Demo() {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import FlowCanvas from '@rozie-ui/rete-vue';
+import FlowCanvas, { NodeType, Port } from '@rozie-ui/rete-vue';
 
-const zoom = ref(1);
-const nodes = [
-  { id: 'a', label: 'Source', x: 0, y: 0, outputs: [{ key: 'out' }] },
-  { id: 'b', label: 'Sink', x: 280, y: 60, inputs: [{ key: 'in' }] },
-];
-const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
+const graph = ref({
+  nodes: [
+    { id: 'a', type: 'source', x: 0, y: 0, data: { label: 'Source' } },
+    { id: 'b', type: 'merge', x: 280, y: 60, data: { label: 'Merge' } },
+  ],
+  connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+});
 </script>
 
 <template>
   <div style="height: 400px">
-    <FlowCanvas :nodes="nodes" :connections="connections" v-model:zoom="zoom" @connection-created="onConnect" />
+    <FlowCanvas v-model:graph="graph" :validate-types="true" @connection-rejected="onReject">
+      <NodeType type="source">
+        <template #body="{ node }">{{ node.data.label }}</template>
+        <Port out="num" type="number" />
+      </NodeType>
+      <NodeType type="merge">
+        <template #body="{ node }">{{ node.data.label }}</template>
+        <Port in="num" type="number" multiple />
+      </NodeType>
+    </FlowCanvas>
   </div>
 </template>
 ```
 
-### Custom node bodies — the `node` slot
+### Custom node bodies — the `#body` template
 
-`node` is a **reactive multi-instance portal slot**: one portal handle mounts per node, re-rendered in place as the node's data or selection changes. The fill receives `{ node, selected, emit }` — `node` is your spec entry (with its `data`), `selected` tracks engine selection, and `emit(name, detail)` raises a `@node-action` carrying the node id (e.g. a delete button inside a node). When the slot is unfilled, each node renders default chrome (a title bar) plus its sockets.
+Each `<NodeType>`'s `#body` is a **reactive portal template**: one portal handle mounts per graph node of that type, re-rendered in place as the node's data or selection changes. The scope receives `{ node, selected, emit }` — `node` is the graph node (with its `data`), `selected` tracks engine selection, and `emit(name, detail)` raises a `@node-action` carrying the node id (e.g. a delete button inside a node). When a node's type has no template, it renders default chrome (a title bar) plus its sockets.
 
 ```vue
-<FlowCanvas :nodes="nodes" :connections="edges">
-  <template #node="{ node, selected }">
-    <MyNodeCard :title="node.label" :payload="node.data" :active="selected" />
-  </template>
+<FlowCanvas v-model:graph="graph">
+  <NodeType type="card">
+    <template #body="{ node, selected }">
+      <MyNodeCard :title="node.data.label" :payload="node.data" :active="selected" />
+    </template>
+    <Port out="out" type="any" />
+  </NodeType>
 </FlowCanvas>
 ```
 
-The sockets (connection anchors) are always rendered by the engine layer regardless of the slot — drag from an output socket to an input socket to connect.
+The sockets (connection anchors) come from each type's `<Port>` schema and are rendered by the engine layer — drag from an output socket to an input socket to connect.
 
 ### Props
 
-`zoom` is **two-way** (bind with `r-model` / `v-model` / `bind:` / `[(…)]` / `onZoomChange`). The `nodes` / `connections` arrays reconcile into the live graph on change — no remount.
+`graph` and `zoom` are **two-way** (bind with `r-model` / `v-model` / `bind:` / `[(…)]` / `onGraphChange` / `onZoomChange`). The single bound `graph` object is the source of truth; dragging a node writes its new `x`/`y` back into a fresh `graph`, and drawing / removing a connection writes a fresh `connections` array — reconciled into the live engine on change, no remount.
 
 | Name | Type | Default | Two-way (model) | Description |
 | --- | --- | --- | :---: | --- |
-| `nodes` | `Array` | `[]` | | The graph nodes — `[{ id, label?, x, y, inputs?, outputs?, data? }]`. `inputs`/`outputs` are `[{ key, label?, multiple? }]`. Reconciled live (add / move / remove) on change; the consumer's `id` is used throughout so positions and connections align with your identifiers. |
-| `connections` | `Array` | `[]` | | The graph connections — `[{ id?, source, sourceOutput?, target, targetInput? }]`. `source`/`target` are node ids; `sourceOutput`/`targetInput` default to `'out'`/`'in'`. Reconciled live; a missing `id` is derived from the endpoints. |
+| `graph` | `Object` | `{…}` | ✓ | The single source of truth — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput? }] }`. `type` selects the node's `<NodeType>` template (render-by-type + its `<Port>` schema); `data` is the opaque payload handed to the type's `#body` scope. **Two-way**: the canvas writes back a fresh top-level object on every drag (x/y) and connect / disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `'out'`/`'in'`; a missing connection `id` is derived from the endpoints. |
+| `validateTypes` | `Boolean` | `true` | | Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port TYPE from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override (runs in addition). Set `false` for pure-`canConnect` (type as metadata only). |
 | `zoom` | `Number` | `1` | ✓ | The viewport zoom level. Two-way: scroll / pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. |
 | `pannable` | `Boolean` | `true` | | Whether the canvas can be panned (drag the background). Disabling detaches the area's drag handler. |
 | `zoomable` | `Boolean` | `true` | | Whether the canvas can be zoomed (scroll / pinch). Disabling detaches the area's zoom handler. |
-| `selectable` | `Boolean` | `true` | | Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `node` slot scope. |
+| `selectable` | `Boolean` | `true` | | Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope. |
 | `readonly` | `Boolean` | `false` | | Read-only viewer mode — no node drag, no connection editing, no selection. |
 | `minZoom` | `Number` | `0.1` | | Minimum zoom level (the lower bound of the area's zoom restrictor). `0` disables the bound. |
 | `maxZoom` | `Number` | `4` | | Maximum zoom level (the upper bound of the area's zoom restrictor). `0` disables the bound. |
@@ -160,7 +167,7 @@ The sockets (connection anchors) are always rendered by the engine layer regardl
 | `accumulateOnCtrl` | `Boolean` | `true` | | When selectable, hold Ctrl to add to the current selection instead of replacing it. |
 | `curvature` | `Number` | `0.3` | | The bezier curvature of connection paths (`classicConnectionPath`). |
 | `fitOnMount` | `Boolean` | `true` | | After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`). |
-| `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, config-array `connections` reconcile). Absent / `null` allows every connection (back-compat — zero behavioral change for existing demos). |
+| `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in **addition** to the automatic `:validate-types` check (the custom-rule override). Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent / `null` imposes no custom rule. |
 
 ### Events
 
@@ -168,7 +175,7 @@ The sockets (connection anchors) are always rendered by the engine layer regardl
 | --- | --- | --- |
 | `node-moved` | `{ id, x, y }` | A node finished a user drag to a new position. |
 | `node-picked` | `{ id }` | A node was picked (pointer-down). |
-| `node-action` | `{ id, name, detail }` | A `node` slot fill called its `emit(name, detail)` helper (e.g. an in-node button). |
+| `node-action` | `{ id, name, detail }` | A `<NodeType>` `#body` fill called its `emit(name, detail)` helper (e.g. an in-node button). |
 | `connection-created` | `{ id, source, sourceOutput, target, targetInput }` | A user drew a new connection (not fired for programmatic / props-driven adds). |
 | `connection-removed` | `{ id }` | A connection was removed (not fired for programmatic / props-driven removes). |
 | `connection-rejected` | `{ source, sourceOutput, target, targetInput }` | A connection was rejected by `canConnect` (no edge committed). Not fired for programmatic / props-driven adds. |
@@ -183,9 +190,9 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | --- | --- |
 | `getEditor()` | The underlying Rete `NodeEditor` (the graph-model escape hatch). |
 | `getArea()` | The underlying Rete `AreaPlugin` (viewport transform, node views). |
-| `addNode(spec)` | Imperatively add a node. NOT reaped by the `nodes` prop reconcile. |
+| `addNode(spec)` | Imperatively add a node. NOT reaped by the `graph` reconcile. |
 | `removeNode(id)` | Remove a node and its connections. |
-| `addConnection(spec)` | Imperatively add a connection. NOT reaped by the `connections` prop reconcile. |
+| `addConnection(spec)` | Imperatively add a connection. NOT reaped by the `graph` reconcile. |
 | `removeConnection(id)` | Remove a connection by id. |
 | `clear()` | Remove every node and connection. |
 | `zoomToFit()` | Pan/zoom to fit all nodes. |

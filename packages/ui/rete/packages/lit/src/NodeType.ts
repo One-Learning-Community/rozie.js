@@ -3,29 +3,27 @@ import { customElement, property, queryAssignedElements, state } from 'lit/decor
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context';
 
-const __rozieCtx_rete_node = createContext(Symbol.for("rozie:rete:node"));
+const __rozieCtx_rete_nodeType = createContext(Symbol.for("rozie:rete:nodeType"));
 
 const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
 
 interface RozieBodySlotCtx {
-  id: unknown;
-  label: unknown;
+  node: unknown;
+  selected: unknown;
+  emit: unknown;
 }
 
-@customElement('rozie-flow-node')
-export default class FlowNode extends SignalWatcher(LitElement) {
-  @property({ type: String, reflect: true }) id!: string;
-  @property({ type: Number, reflect: true }) x: number = 0;
-  @property({ type: Number, reflect: true }) y: number = 0;
-  @property({ type: Object }) label: unknown = undefined;
+@customElement('rozie-node-type')
+export default class NodeType extends SignalWatcher(LitElement) {
+  @property({ type: String, reflect: true }) type!: string;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
-private __rozieCtxProvider_rete_node = new ContextProvider(this, { context: __rozieCtx_rete_node, initialValue: ((__rozieCtxHost) => ({
-  get id() {
-    return __rozieCtxHost.id;
+private __rozieCtxProvider_rete_nodeType = new ContextProvider(this, { context: __rozieCtx_rete_nodeType, initialValue: ((__rozieCtxHost) => ({
+  get type() {
+    return __rozieCtxHost.type;
   },
-  addPort: (side: any, key: any, label: any, multiple: any) => {
-    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addPort(__rozieCtxHost.id, side, key, label, multiple);
+  addPort: (side: any, key: any, portType: any, label: any, multiple: any) => {
+    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addTypePort(__rozieCtxHost.type, side, key, portType, label, multiple);
   }
 }))(this) });
 private __rozieCtxConsumer_rete_canvas = new ContextConsumer(this, { context: __rozieCtx_rete_canvas, subscribe: true });
@@ -33,7 +31,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
 
   @state() private _hasSlotBody = false;
   @queryAssignedElements({ slot: 'body', flatten: true }) private _slotBodyElements!: Element[];
-  @property({ attribute: false }) body?: (scope: { id: unknown; label: unknown }) => unknown;
+  @property({ attribute: false }) body?: (scope: { node: unknown; selected: unknown; emit: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 
@@ -82,18 +80,18 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
       dispose(): void;
     }
     const portals = {
-      body: (container: HTMLElement, scope: { id: unknown; label: unknown }): ReactivePortalHandle => {
+      body: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
         const tpl = this.body;
         if (typeof tpl !== 'function') return { update() {}, dispose() {} };
         // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-body', '23c15996');
-        const renderScope = (s: { id: unknown; label: unknown }): void => {
+        container.setAttribute('data-rozie-portal-body', '372f9492');
+        const renderScope = (s: { node: unknown; selected: unknown; emit: unknown }): void => {
           render(tpl(s), container);
         };
         renderScope(scope);
         this._portalContainers.add(container);
         return {
-          update: (s: { id: unknown; label: unknown }): void => renderScope(s),
+          update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
           dispose: (): void => {
             render(nothing, container);
             this._portalContainers.delete(container);
@@ -105,8 +103,10 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     this.cv = this.canvas;
 
     // The live $portals.body handle ({ dispose }) returned by the parent-invoked
-    // renderBody callback. Module-scope `any` so the teardown — which the Solid emitter
-    // hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose it.
+    // bodyRenderer callback. Module-scope `any` so the teardown — which the Solid
+    // emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
+    // it. (A NodeType type-template projects ONE body root per graph node; the canvas
+    // disposes per-node on node unmount, this is the last-projection handle.)
 
     this._disconnectCleanups.push((() => {
       if (this.bodyHandle && this.bodyHandle.dispose) {
@@ -114,49 +114,47 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
           this.bodyHandle.dispose();
         } catch (e: any) {}
       }
-      if (this.cv) this.cv.unregister(this.id);
+      if (this.cv) this.cv.unregisterType(this.type);
     }));
 
     // The body-mount closure — captures the mount-scoped `portals` local. Disposes a
-    // prior handle first so a re-fired renderBody (e.g. ports changed → fresh node
-    // build) does not stack portal roots into the same engine host.
-    this.mountBody = (host: any) => {
-      if (!host) return;
+    // prior handle first so a re-fired bodyRenderer (e.g. ports changed → fresh node
+    // build) does not stack portal roots into the same engine host. Mounts the type's
+    // `#body` slot, scoped with the graph node ({ node, selected, emit }).
+    this.mountBody = (host: any, scope: any) => {
+      if (!host) return null;
       if (this.bodyHandle && this.bodyHandle.dispose) {
         try {
           this.bodyHandle.dispose();
         } catch (e: any) {}
       }
+      const s = scope || {};
       this.bodyHandle = portals.body(host, {
-        id: this.id,
-        label: this.label
+        node: s.node,
+        selected: s.selected,
+        emit: s.emit
       });
+      return this.bodyHandle;
     };
-    // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
-    // builds the engine node, then renderNode invokes renderBody(body) — at which point
-    // the FlowNode mounts its own body portal into the engine `body` host.
-    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
-    // the $onUpdate below performs the registration once the value arrives.
-    // register this node's spec INCLUDING the renderBody callback. reconcileNodes()
-    // builds the engine node, then renderNode invokes renderBody(body) — at which point
-    // the FlowNode mounts its own body portal into the engine `body` host.
-    // On Lit the injected canvas may still be undefined here (REQ-30 async context);
-    // the $onUpdate below performs the registration once the value arrives.
+    // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
+    // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
+    // type and projects the body into the engine host. On Lit the injected canvas may
+    // still be undefined here (REQ-30 async context); the $onUpdate below performs the
+    // registration once the value arrives.
+    // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
+    // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
+    // type and projects the body into the engine host. On Lit the injected canvas may
+    // still be undefined here (REQ-30 async context); the $onUpdate below performs the
+    // registration once the value arrives.
     if (this.cv && !this.registered) {
       this.registered = true;
-      this.cv.register(this.id, this.buildSpec());
+      this.cv.registerType(this.type, this.buildSpec());
     }
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('x'))) { const __watchVal = (() => this.x)(); (() => {
-      if (this.cv) this.cv.update(this.id, this.buildSpec());
-    })(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('y'))) { const __watchVal = (() => this.y)(); (() => {
-      if (this.cv) this.cv.update(this.id, this.buildSpec());
-    })(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('label'))) { const __watchVal = (() => this.label)(); (() => {
-      if (this.cv) this.cv.update(this.id, this.buildSpec());
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('type'))) { const __watchVal = (() => this.type)(); (() => {
+      if (this.cv) this.cv.registerType(this.type, this.buildSpec());
     })(); }
     this.__rozieFirstUpdateDone = true;
 
@@ -165,7 +163,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     if (live == null) return;
     this.cv = live;
     this.registered = true;
-    this.cv.register(this.id, this.buildSpec());
+    this.cv.registerType(this.type, this.buildSpec());
   }
 
   disconnectedCallback(): void {
@@ -185,7 +183,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
 
 <slot name="body"></slot>
 
-<div class="rozie-flow-node-children" style="display:none" data-rozie-s-23c15996><slot></slot></div>
+<div class="rozie-node-type-children" style="display:none" data-rozie-s-372f9492><slot></slot></div>
 `;
   }
 
@@ -198,29 +196,23 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
   registered = false;
 
   buildSpec = () => ({
-  id: this.id,
-  x: this.x,
-  y: this.y,
-  label: this.label,
-  inputs: [],
-  outputs: [],
-  // D-04 render-callback: the parent hands the engine body host; delegate to the
-  // mountBody closure (defined inside $onMount so it can see the emitter's mount-
-  // scoped `portals` local). Until $onMount has run, mountBody is null — but the
-  // parent only invokes renderBody AFTER reconcileNodes (post-register, post-mount),
-  // so mountBody is always set by then.
-  renderBody: (host: any) => {
-    // try/catch so a per-target portal-render hiccup (e.g. a Lit lit-html
-    // "cannot find node" when re-rendering into an engine-owned host that the area
-    // re-created) can NEVER abort the parent's reconcileNodes loop — a thrown
-    // renderBody would propagate out of area.update/addNode and stop the whole graph
-    // from building (cfg renders, the declarative nodes don't). The body simply
-    // re-mounts on the next reconcile tick if a single attempt fails.
+  type: this.type,
+  // RENDER-BY-TYPE callback: the canvas hands the engine body host + scope; delegate
+  // to the mountBody closure (defined inside $onMount so it can see the emitter's
+  // mount-scoped `portals` local). Until $onMount has run, mountBody is null — but
+  // the canvas only invokes bodyRenderer AFTER reconcileNodes (post-register,
+  // post-mount), so mountBody is always set by then. Returns the { dispose } handle.
+  bodyRenderer: (host: any, scope: any) => {
+    // try/catch so a per-target portal-render hiccup (e.g. a Lit lit-html "cannot
+    // find node" when re-rendering into an engine-owned host the area re-created)
+    // can NEVER abort the canvas's renderNode loop — a thrown bodyRenderer would
+    // propagate out of area.update/addNode and stop the whole graph from building.
     if (host && this.mountBody) {
       try {
-        this.mountBody(host);
+        return this.mountBody(host, scope);
       } catch (e: any) {}
     }
+    return null;
   }
 });
 }

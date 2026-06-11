@@ -28,19 +28,24 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'FlowCanvas',
+  // Phase 41 controlled-graph: the one-way `nodes`/`connections` props are GONE,
+  // replaced by the single two-way `graph` model + the `validateTypes` toggle.
   props: [
-    'nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable',
+    'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
     'curvature', 'fitOnMount', 'canConnect',
   ],
-  models: ['zoom'],
+  // `graph` + `zoom` are both two-way (the bound graph is the source of truth +
+  // write-back target; zoom is the viewport binding). Neither is a same-named emit
+  // (the MapLibre zoom/pitch model-prop == emit-name collision lesson).
+  models: ['graph', 'zoom'],
   emits: [
     'node-action', 'connection-created', 'connection-removed', 'node-picked',
     'node-moved', 'translated', 'context-menu', 'connection-rejected',
   ],
-  // 'node' = the reactive multi-instance portal slot (config-array #node path);
-  // '' = the default slot that hosts the Phase 37 declarative <FlowNode>/<Connection>
-  // children (added in 37-02). Both coexist.
+  // 'node' = the reactive multi-instance portal slot (the low-level render-by-type
+  // escape hatch); '' = the default slot that hosts the Phase 41 declarative
+  // <NodeType>/<Port> children. Both coexist.
   slots: ['', 'node'],
   expose: [
     'getEditor', 'getArea', 'addNode', 'removeNode', 'addConnection',
@@ -71,7 +76,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
 
-  it('model:true props match (zoom only)', () => {
+  it('model:true props match (graph + zoom)', () => {
     const modelNames = ir.props
       .filter((p: { isModel?: boolean }) => p.isModel)
       .map((p: { name: string }) => p.name);
@@ -111,6 +116,46 @@ describe('FlowCanvas.rozie surface gate', () => {
     const r = compile(source, { target, filename: FILENAME });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
+    expect(r.code.length).toBeGreaterThan(0);
+  });
+});
+
+// Phase 41 controlled-graph children: the node-TYPE template <NodeType> + the typed
+// directional port <Port> (repurposed from the Phase-37 <FlowNode>/<Handle>). Both
+// must compile to all 6 with ZERO error diagnostics (NO emitter change).
+describe('NodeType.rozie + Port.rozie surface gate', () => {
+  const NODE_TYPE_SRC = readFileSync(resolve(HERE, '..', 'src', 'NodeType.rozie'), 'utf8');
+  const PORT_SRC = readFileSync(resolve(HERE, '..', 'src', 'Port.rozie'), 'utf8');
+
+  it('NodeType has a single required `type` prop (no id/x/y) + provides rete:nodeType', () => {
+    const { ast } = parse(NODE_TYPE_SRC, { filename: 'NodeType.rozie' });
+    const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+    expect(ir.name).toBe('NodeType');
+    expect(ir.props.map((p: { name: string }) => p.name)).toEqual(['type']);
+    expect(NODE_TYPE_SRC).toContain("$provide('rete:nodeType'");
+    expect(NODE_TYPE_SRC).toContain('registerType');
+  });
+
+  it('Port derives side/key from out=/in= + addPort against rete:nodeType', () => {
+    const { ast } = parse(PORT_SRC, { filename: 'Port.rozie' });
+    const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+    expect(ir.name).toBe('Port');
+    expect(sorted(ir.props.map((p: { name: string }) => p.name))).toEqual(
+      sorted(['out', 'in', 'type', 'label', 'multiple']),
+    );
+    expect(PORT_SRC).toContain("$inject('rete:nodeType')");
+    expect(PORT_SRC).toContain('addPort');
+  });
+
+  const CHILD_TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
+  it.each(CHILD_TARGETS)('compile NodeType(%s) emits zero error diagnostics', (target) => {
+    const r = compile(NODE_TYPE_SRC, { target, filename: 'NodeType.rozie' });
+    expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(r.code.length).toBeGreaterThan(0);
+  });
+  it.each(CHILD_TARGETS)('compile Port(%s) emits zero error diagnostics', (target) => {
+    const r = compile(PORT_SRC, { target, filename: 'Port.rozie' });
+    expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);
   });
 });

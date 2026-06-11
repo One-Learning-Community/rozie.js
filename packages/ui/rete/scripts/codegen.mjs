@@ -25,15 +25,24 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/rete
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
 
-// Phase 37: the package now ships the parent <FlowCanvas> PLUS the declarative
-// <FlowNode>/<Handle>/<Connection> children (the dogfood of the Phase 36
-// $provide/$inject primitive). Codegen compiles each sibling .rozie source into
-// all 6 leaves (the chartjs / maplibre multi-component precedent). FlowCanvas MUST
-// be FIRST — it owns the handle-manifest + docs-table validation gates (the
-// renderless / render-callback children have no $expose / docs page); the children
-// are pure additions.
+// Phase 41 (controlled-graph redesign): the package ships the parent <FlowCanvas>
+// PLUS the node-TYPE-template children <NodeType> (the `#body` render-by-type
+// template + a nested <Port> port schema) and <Port> (the typed directional port).
+// The Phase-37 per-INSTANCE <FlowNode>/<Handle> and the <Connection> edge child are
+// REMOVED (D6 clean break — edges live only in the bound `graph.connections`).
+// Codegen compiles each sibling .rozie source into all 6 leaves (the chartjs /
+// maplibre multi-component precedent). FlowCanvas MUST be FIRST — it owns the
+// handle-manifest + docs-table validation gates (the render-callback / renderless
+// children have no $expose / docs page); the children are pure additions.
 const PARENT = 'FlowCanvas';
-const COMPONENTS = [PARENT, 'FlowNode', 'Handle', 'Connection'];
+const COMPONENTS = [PARENT, 'NodeType', 'Port'];
+
+// Removed components whose pre-existing leaf outputs must be DELETED — the codegen
+// drives generation but won't auto-delete a removed component's stale leaves, and
+// an orphaned leaf src (e.g. Connection.tsx) + its barrel re-export would break the
+// bundled-leaf tsdown build (the barrel only re-exports COMPONENTS). Cleaned per
+// target below (the leaf src + React sidecars).
+const REMOVED_COMPONENTS = ['FlowNode', 'Handle', 'Connection'];
 
 /** Per-target leaf dir + emitted file extension (build mode is informational). */
 const TARGETS = {
@@ -77,6 +86,19 @@ function main() {
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
+
+    // STALE-LEAF CLEANUP (Phase 41 D6 clean break): delete any pre-existing leaf
+    // output for a REMOVED component (FlowNode/Handle/Connection). The codegen never
+    // auto-deletes a dropped component's leaves, and an orphaned leaf src + its barrel
+    // re-export would break the bundled-leaf tsdown build (the barrel below only
+    // re-exports COMPONENTS). Removes the per-target leaf file + the React-only
+    // .css/.global.css/.d.ts sidecars.
+    for (const removed of REMOVED_COMPONENTS) {
+      for (const ext of [cfg.ext, 'css', 'global.css', 'd.ts']) {
+        const p = resolve(leafSrc, `${removed}.${ext}`);
+        if (existsSync(p)) rmSync(p);
+      }
+    }
 
     // Compile each sibling component into this leaf. The SCOPE FENCE throw is
     // applied to EACH compile — an error means a mis-wired codegen/authoring path,
