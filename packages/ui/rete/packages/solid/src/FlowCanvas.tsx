@@ -124,7 +124,9 @@ interface FlowCanvasProps {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  canConnect?: ((...args: unknown[]) => unknown) | null;
   onNodeAction?: (...args: unknown[]) => void;
+  onConnectionRejected?: (...args: unknown[]) => void;
   onConnectionCreated?: (...args: unknown[]) => void;
   onConnectionRemoved?: (...args: unknown[]) => void;
   onNodePicked?: (...args: unknown[]) => void;
@@ -154,8 +156,8 @@ export interface FlowCanvasHandle {
 }
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
-  const _merged = mergeProps({ nodes: (() => [])(), connections: (() => [])(), pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true }, _props);
-  const [local, attrs] = splitProps(_merged, ['nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'children', 'ref']);
+  const _merged = mergeProps({ nodes: (() => [])(), connections: (() => [])(), pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, canConnect: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'canConnect', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }); });
 
@@ -571,6 +573,41 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         }
       }
     };
+
+    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
+    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
+    // returns false. The falsy emit result makes editor.addConnection return false
+    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
+    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
+    // imperative addConnection, and config-array reconcile uniformly (all three route
+    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
+    // captured at mount) so a reactive prop change takes effect on the next attempt.
+    // Registered before the connectioncreated-forwarding pipe so it halts the chain
+    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
+    // addConnection before connectioncreated is ever emitted).
+    editor.addPipe((context: any) => {
+      if (!context || typeof context !== 'object' || !('type' in context)) return context;
+      if (context.type === 'connectioncreate') {
+        const c = context.data;
+        // ClassicPreset.Connection fields: { id, source, sourceOutput, target, targetInput }.
+        // Same shape as serializeConn minus the engine-assigned `id` (never created).
+        const conn = {
+          source: c.source,
+          sourceOutput: c.sourceOutput,
+          target: c.target,
+          targetInput: c.targetInput
+        };
+        if (typeof local.canConnect === 'function' && local.canConnect(conn) === false) {
+          // Echo-guard the EMIT only (mirrors connection-created/connection-removed) so a
+          // programmatic reconcile that the rule would reject doesn't surface as a
+          // user-facing rejection. The block (return undefined) stays UNCONDITIONAL so the
+          // rule is enforced on every path.
+          if (!programmatic) _props.onConnectionRejected?.(conn);
+          return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
+        }
+      }
+      return context;
+    });
 
     // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
     editor.addPipe((context: any) => {

@@ -160,6 +160,7 @@ The sockets (connection anchors) are always rendered by the engine layer regardl
 | `accumulateOnCtrl` | `Boolean` | `true` | | When selectable, hold Ctrl to add to the current selection instead of replacing it. |
 | `curvature` | `Number` | `0.3` | | The bezier curvature of connection paths (`classicConnectionPath`). |
 | `fitOnMount` | `Boolean` | `true` | | After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`). |
+| `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, config-array `connections` reconcile). Absent / `null` allows every connection (back-compat — zero behavioral change for existing demos). |
 
 ### Events
 
@@ -170,6 +171,7 @@ The sockets (connection anchors) are always rendered by the engine layer regardl
 | `node-action` | `{ id, name, detail }` | A `node` slot fill called its `emit(name, detail)` helper (e.g. an in-node button). |
 | `connection-created` | `{ id, source, sourceOutput, target, targetInput }` | A user drew a new connection (not fired for programmatic / props-driven adds). |
 | `connection-removed` | `{ id }` | A connection was removed (not fired for programmatic / props-driven removes). |
+| `connection-rejected` | `{ source, sourceOutput, target, targetInput }` | A connection was rejected by `canConnect` (no edge committed). Not fired for programmatic / props-driven adds. |
 | `translated` | `{ x, y }` | The viewport was panned. |
 | `context-menu` | `{ id }` | Right-click on the canvas (`id` is the node id, or `null` for the background). The native browser menu is suppressed. |
 

@@ -54,12 +54,14 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 | `accumulateOnCtrl` | `Boolean` | `true` |  |  |
 | `curvature` | `Number` | `0.3` |  |  |
 | `fitOnMount` | `Boolean` | `true` |  |  |
+| `canConnect` | `Function` | `null` |  |  |
 
 ## Events
 
 | Event | Description |
 | --- | --- |
 | `node-action` | |
+| `connection-rejected` | |
 | `connection-created` | |
 | `connection-removed` | |
 | `node-picked` | |

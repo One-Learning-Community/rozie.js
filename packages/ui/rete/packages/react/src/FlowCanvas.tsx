@@ -36,7 +36,9 @@ interface FlowCanvasProps {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  canConnect?: ((...args: any[]) => any) | null;
   onNodeAction?: (...args: any[]) => void;
+  onConnectionRejected?: (...args: any[]) => void;
   onConnectionCreated?: (...args: any[]) => void;
   onConnectionRemoved?: (...args: any[]) => void;
   onNodePicked?: (...args: any[]) => void;
@@ -68,7 +70,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultNodes = useState(() => (() => [])())[0];
   const __defaultConnections = useState(() => (() => [])())[0];
-  const props: Omit<FlowCanvasProps, 'nodes' | 'connections' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount'> & { nodes: any[]; connections: any[]; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean } = {
+  const props: Omit<FlowCanvasProps, 'nodes' | 'connections' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'canConnect'> & { nodes: any[]; connections: any[]; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; canConnect: ((...args: any[]) => any) | null } = {
     ..._props,
     nodes: _props.nodes ?? __defaultNodes,
     connections: _props.connections ?? __defaultConnections,
@@ -82,6 +84,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     accumulateOnCtrl: _props.accumulateOnCtrl ?? true,
     curvature: _props.curvature ?? 0.3,
     fitOnMount: _props.fitOnMount ?? true,
+    canConnect: _props.canConnect ?? null,
   };
   const _renderNodeRef = useRef(props.renderNode);
   _renderNodeRef.current = props.renderNode;
@@ -729,6 +732,41 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
       }
     };
+
+    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
+    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
+    // returns false. The falsy emit result makes editor.addConnection return false
+    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
+    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
+    // imperative addConnection, and config-array reconcile uniformly (all three route
+    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
+    // captured at mount) so a reactive prop change takes effect on the next attempt.
+    // Registered before the connectioncreated-forwarding pipe so it halts the chain
+    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
+    // addConnection before connectioncreated is ever emitted).
+    editor.current.addPipe((context: any) => {
+      if (!context || typeof context !== 'object' || !('type' in context)) return context;
+      if (context.type === 'connectioncreate') {
+        const c = context.data;
+        // ClassicPreset.Connection fields: { id, source, sourceOutput, target, targetInput }.
+        // Same shape as serializeConn minus the engine-assigned `id` (never created).
+        const conn = {
+          source: c.source,
+          sourceOutput: c.sourceOutput,
+          target: c.target,
+          targetInput: c.targetInput
+        };
+        if (typeof props.canConnect === 'function' && props.canConnect(conn) === false) {
+          // Echo-guard the EMIT only (mirrors connection-created/connection-removed) so a
+          // programmatic reconcile that the rule would reject doesn't surface as a
+          // user-facing rejection. The block (return undefined) stays UNCONDITIONAL so the
+          // rule is enforced on every path.
+          if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected(conn);
+          return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
+        }
+      }
+      return context;
+    });
 
     // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
     editor.current.addPipe((context: any) => {

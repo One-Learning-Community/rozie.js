@@ -57,12 +57,14 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 | `accumulateOnCtrl` | `Boolean` | `true` |  |  |
 | `curvature` | `Number` | `0.3` |  |  |
 | `fitOnMount` | `Boolean` | `true` |  |  |
+| `canConnect` | `Function` | `null` |  |  |
 
 ## Events
 
 | Event | Description |
 | --- | --- |
 | `node-action` | |
+| `connection-rejected` | |
 | `connection-created` | |
 | `connection-removed` | |
 | `node-picked` | |

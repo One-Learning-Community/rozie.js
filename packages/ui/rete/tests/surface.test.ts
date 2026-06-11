@@ -31,12 +31,12 @@ const EXPECT = {
   props: [
     'nodes', 'connections', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
-    'curvature', 'fitOnMount',
+    'curvature', 'fitOnMount', 'canConnect',
   ],
   models: ['zoom'],
   emits: [
     'node-action', 'connection-created', 'connection-removed', 'node-picked',
-    'node-moved', 'translated', 'context-menu',
+    'node-moved', 'translated', 'context-menu', 'connection-rejected',
   ],
   // 'node' = the reactive multi-instance portal slot (config-array #node path);
   // '' = the default slot that hosts the Phase 37 declarative <FlowNode>/<Connection>
@@ -66,7 +66,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (13 props)', () => {
+  it('props surface matches (14 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -78,7 +78,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (7 emits)', () => {
+  it('emits surface matches (8 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 

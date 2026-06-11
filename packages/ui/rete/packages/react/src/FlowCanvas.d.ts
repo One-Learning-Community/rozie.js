@@ -18,7 +18,9 @@ export interface FlowCanvasProps {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  canConnect?: ((...args: unknown[]) => unknown) | null;
   onNodeAction?: (...args: unknown[]) => void;
+  onConnectionRejected?: (...args: unknown[]) => void;
   onConnectionCreated?: (...args: unknown[]) => void;
   onConnectionRemoved?: (...args: unknown[]) => void;
   onNodePicked?: (...args: unknown[]) => void;

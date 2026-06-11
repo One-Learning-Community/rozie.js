@@ -133,6 +133,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) accumulateOnCtrl: boolean = true;
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
+  @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
   private _nodeReg = signal({});
   private _connReg = signal({});
   private _portReg = signal({});
@@ -824,6 +825,56 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         }
       }
     };
+
+    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
+    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
+    // returns false. The falsy emit result makes editor.addConnection return false
+    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
+    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
+    // imperative addConnection, and config-array reconcile uniformly (all three route
+    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
+    // captured at mount) so a reactive prop change takes effect on the next attempt.
+    // Registered before the connectioncreated-forwarding pipe so it halts the chain
+    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
+    // addConnection before connectioncreated is ever emitted).
+    // ─── connection-validation gate (D2/D3) ────────────────────────────────────
+    // Cancels Rete's cancellable `connectioncreate` pre-event when $props.canConnect
+    // returns false. The falsy emit result makes editor.addConnection return false
+    // WITHOUT pushing the connection or emitting `connectioncreated` — so no ghost
+    // edge is drawn and no `connection-created` fires. Gates drag-to-connect,
+    // imperative addConnection, and config-array reconcile uniformly (all three route
+    // through editor.addConnection). $props.canConnect is read LIVE at gate time (not
+    // captured at mount) so a reactive prop change takes effect on the next attempt.
+    // Registered before the connectioncreated-forwarding pipe so it halts the chain
+    // earlier (order is not load-bearing — cancelling connectioncreate short-circuits
+    // addConnection before connectioncreated is ever emitted).
+    this.editor.addPipe((context: any) => {
+      if (!context || typeof context !== 'object' || !('type' in context)) return context;
+      if (context.type === 'connectioncreate') {
+        const c = context.data;
+        // ClassicPreset.Connection fields: { id, source, sourceOutput, target, targetInput }.
+        // Same shape as serializeConn minus the engine-assigned `id` (never created).
+        const conn = {
+          source: c.source,
+          sourceOutput: c.sourceOutput,
+          target: c.target,
+          targetInput: c.targetInput
+        };
+        if (typeof this.canConnect === 'function' && this.canConnect(conn) === false) {
+          // Echo-guard the EMIT only (mirrors connection-created/connection-removed) so a
+          // programmatic reconcile that the rule would reject doesn't surface as a
+          // user-facing rejection. The block (return undefined) stays UNCONDITIONAL so the
+          // rule is enforced on every path.
+          if (!this.programmatic) this.dispatchEvent(new CustomEvent("connection-rejected", {
+            detail: conn,
+            bubbles: true,
+            composed: true
+          }));
+          return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
+        }
+      }
+      return context;
+    });
 
     // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
     // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
