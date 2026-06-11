@@ -328,6 +328,7 @@
 @lezer/yaml
 @lit-labs/preact-signals
 @lit-labs/ssr-dom-shim
+@lit/context
 @lit/reactive-element
 @lmdb/lmdb-darwin-arm64
 @lmdb/lmdb-darwin-x64
@@ -1348,6 +1349,10 @@ resolve-pkg-maps
 resolve-protobuf-schema
 resolve-url-loader
 restore-cursor
+rete
+rete-area-plugin
+rete-connection-plugin
+rete-render-utils
 retext
 retext-latin
 retext-smartypants
