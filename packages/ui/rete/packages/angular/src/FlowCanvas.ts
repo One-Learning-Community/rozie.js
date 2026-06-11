@@ -119,6 +119,19 @@ function rozieToken(key: string): InjectionToken<unknown> {
     ::ng-deep .rozie-flow-canvas .rozie-flow-socket:hover { background: #3b82f6; }
     ::ng-deep .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
     ::ng-deep .rozie-flow-canvas .rozie-flow-connection__svg {
+        /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by
+           default, so the 1px-tall connection SVG sits on the connection element's TEXT
+           BASELINE — which, with the engine container's default line-height, pushes the
+           whole path DOWN ~14px. That offset is in screen space (the connection element
+           is the area-transform origin), so EVERY connection endpoint lands ~14px below
+           its socket — visibly anchoring connectors at the BOTTOM of each node instead
+           of on the socket. The socket positions reported by getDOMSocketPosition are
+           already correct (offsetTop/offsetLeft within the node-view); the inline
+           baseline is the sole cause of the vertical drift. block (or equivalently
+           line-height:0 / vertical-align:top on the inline box) removes the baseline gap
+           so the path renders at its true coordinates. Verified: drops the endpoint→
+           socket vertical offset from ~13.9px to ~0.1px on all 6 targets. */
+        display: block;
         overflow: visible;
         width: 1px;
         height: 1px;
