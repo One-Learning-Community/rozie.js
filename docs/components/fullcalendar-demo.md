@@ -60,7 +60,7 @@ This is the **real `@rozie-ui/fullcalendar-vue` package** running on this page (
 </div>
 </ClientOnly>
 
-The active `view` is two-way bound with `v-model:view` — the readout updates whether you click the calendar's own toolbar or the **Month / Week** buttons above, which drive the imperative handle (`changeView`). The **Prev / Today / Next** buttons call the `prev`, `today`, and `next` handle verbs, and the current month/week label is read back off the raw `Calendar` instance via `getApi()`. See the [full API](/guide/fullcalendar) for the complete prop/event/handle surface.
+The active `view` is two-way bound with `v-model:view` — the readout updates whether you click the calendar's own toolbar or the **Month / Week** buttons above, which drive the imperative handle (`changeView`). The **Prev / Today / Next** buttons call the `prev`, `today`, and `next` handle verbs, and the current month/week label is read back off the raw `Calendar` instance via `getApi()`. See the [full API](/components/fullcalendar) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -85,7 +85,7 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [FullCalendar — showcase & API](/guide/fullcalendar) — install, quick starts for all six frameworks, the `:options` passthrough, the opt-in plugin model, and the full reference.
+- [FullCalendar — showcase & API](/components/fullcalendar) — install, quick starts for all six frameworks, the `:options` passthrough, the opt-in plugin model, and the full reference.
 - [The portal-slot primitive](/examples/portal-list) — how the ten `*Content` render hooks route a consumer fragment through each target's imperative-render API.
 
 <style scoped>

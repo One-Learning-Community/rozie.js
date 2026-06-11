@@ -56,11 +56,11 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 ## Try it
 
-The [`@rozie-ui/embla` showcase + API reference](/guide/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 9-verb imperative handle, and the prev/next/dots recipe.
+The [`@rozie-ui/embla` showcase + API reference](/components/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 9-verb imperative handle, and the prev/next/dots recipe.
 
 ## Cross-references
 
-- [Embla — showcase & API](/guide/embla) — the full `@rozie-ui/embla` surface, quick starts, and recipes.
-- [Embla — live demo](/guide/embla-demo) — the real Vue package running in the page.
+- [Embla — showcase & API](/components/embla) — the full `@rozie-ui/embla` surface, quick starts, and recipes.
+- [Embla — live demo](/components/embla-demo) — the real Vue package running in the page.
 - [`Carousel.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie)
-- [Cropper libraries comparison](/guide/cropper-comparison) — a sibling engine-wrapper port.
+- [Cropper libraries comparison](/components/cropper-comparison) — a sibling engine-wrapper port.

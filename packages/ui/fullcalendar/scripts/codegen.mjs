@@ -23,7 +23,7 @@
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write FullCalendar.css + FullCalendar.d.ts)
  *   4. render each leaf README from the IR + the hand-kept event/handle manifests
- *   5. ENFORCE validateDocsPropsTable against docs/guide/fullcalendar.md
+ *   5. ENFORCE validateDocsPropsTable against docs/components/fullcalendar.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable
  *      structural columns — prop name, type, default. Never rewrites the
  *      hand-authored prose. Plan 27-03 ships the guide; until then the
@@ -190,7 +190,7 @@ function main() {
   }
 
   // (5) ENFORCE docs props-table validation (REQ-27-6): the IR-derivable
-  // structural columns (prop name + type + default) in docs/guide/fullcalendar.md
+  // structural columns (prop name + type + default) in docs/components/fullcalendar.md
   // MUST match ir.props or this script THROWS. It does NOT overwrite the
   // hand-authored prose (Runtime-updatable? column + Descriptions stay) —
   // VALIDATE-NOT-OVERWRITE. The docs file is the single-source-of-truth surface
@@ -198,11 +198,11 @@ function main() {
   // drifts. (Same ENFORCING shape as @rozie-ui/sortable-list — NOT flatpickr's
   // optional existsSync→skip.)
   //
-  // Plan 27-03 authors docs/guide/fullcalendar.md. Until it lands, the
+  // Plan 27-03 authors docs/components/fullcalendar.md. Until it lands, the
   // ROZIE_FULLCALENDAR_SKIP_GUIDE env escape hatch relaxes the absent-guide
   // throw to a skip so Plan 27-02 can emit the leaves first. Plan 27-03 runs
   // codegen WITHOUT the flag, flipping validation back to ENFORCING-passing.
-  const guideRelPath = 'docs/guide/fullcalendar.md';
+  const guideRelPath = 'docs/components/fullcalendar.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_FULLCALENDAR_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -218,7 +218,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/fullcalendar.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/fullcalendar.md not yet authored ' +
         '(ROZIE_FULLCALENDAR_SKIP_GUIDE=1; Plan 27-03 authors the guide and re-runs WITHOUT the flag).',
     );
   } else {

@@ -75,10 +75,10 @@ This page concedes where the standalone wrappers are genuinely ahead — that's 
 
 ## Try it
 
-The [`@rozie-ui/maplibre` showcase + API reference](/guide/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, both the `<Source>` / `<Layer>` declarative children and the `:sources` / `:layers` config-array passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
+The [`@rozie-ui/maplibre` showcase + API reference](/components/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, both the `<Source>` / `<Layer>` declarative children and the `:sources` / `:layers` config-array passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
 
 ## Cross-references
 
-- [MapLibre — showcase & API](/guide/maplibre) — the full `@rozie-ui/maplibre` surface, quick starts, and recipes.
+- [MapLibre — showcase & API](/components/maplibre) — the full `@rozie-ui/maplibre` surface, quick starts, and recipes.
 - [`MapLibre.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/src/MapLibre.rozie)
 - [The portal-slot primitive](/examples/portal-list) — the mechanism the `marker` / `popup` reactive slots build on.

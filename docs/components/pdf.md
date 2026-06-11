@@ -1,6 +1,6 @@
 # PdfViewer — the cross-framework PDF viewer
 
-`PdfViewer` is Rozie's data-bound port of [PDF.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist` v6) — Mozilla's de-facto vanilla-JS PDF renderer. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **lopsided**: [react-pdf (wojtekmaj)](https://github.com/wojtekmaj/react-pdf) is deep and maintained for React; Vue ([vue-pdf-embed](https://github.com/hrynko/vue-pdf-embed)), Angular ([ng2-pdf-viewer](https://github.com/VadimDez/ng2-pdf-viewer)) and Svelte have thinner / older options — and **Solid and Lit have effectively nothing**. Rozie collapses all six into one source, so the five underserved frameworks get a real embeddable PDF viewer — with selectable text, page navigation, zoom and rotation — for free. See the [PDF libraries comparison](/guide/pdf-comparison) for the full per-framework matrix.
+`PdfViewer` is Rozie's data-bound port of [PDF.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist` v6) — Mozilla's de-facto vanilla-JS PDF renderer. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **lopsided**: [react-pdf (wojtekmaj)](https://github.com/wojtekmaj/react-pdf) is deep and maintained for React; Vue ([vue-pdf-embed](https://github.com/hrynko/vue-pdf-embed)), Angular ([ng2-pdf-viewer](https://github.com/VadimDez/ng2-pdf-viewer)) and Svelte have thinner / older options — and **Solid and Lit have effectively nothing**. Rozie collapses all six into one source, so the five underserved frameworks get a real embeddable PDF viewer — with selectable text, page navigation, zoom and rotation — for free. See the [PDF libraries comparison](/components/pdf-comparison) for the full per-framework matrix.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the five lifecycle events, the two-way `page` model, the 12-verb imperative handle, the worker / standard-font / text-layer story, and the recipes for continuous scroll, binary sources, and bundling the worker.
 
@@ -25,7 +25,7 @@ Each package carries the **`pdfjs-dist` engine peer** (`^6`) plus its framework 
 npm i @rozie-ui/pdf-react pdfjs-dist
 ```
 
-Unlike [MapLibre](/guide/maplibre) or [Cropper](/guide/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from a version-matched jsDelivr CDN, so the component works with **zero config** out of the box — override the `workerSrc` prop only for offline / CSP / bundled-worker setups (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `PdfViewer.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+Unlike [MapLibre](/components/maplibre) or [Cropper](/components/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from a version-matched jsDelivr CDN, so the component works with **zero config** out of the box — override the `workerSrc` prop only for offline / CSP / bundled-worker setups (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `PdfViewer.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
 
 ## Quick start
 
@@ -370,9 +370,9 @@ When `src` is a URL on another origin, the fetch is subject to **CORS** — the 
 
 ## Cross-references
 
-- [PDF libraries comparison](/guide/pdf-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
+- [PDF libraries comparison](/components/pdf-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
 - [`PdfViewer.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pdf/src/PdfViewer.rozie) — the canonical wrapper.
-- [PdfViewer live demo](/guide/pdf-demo) — the rendered viewer across all six targets.
-- [Cropper — showcase & API](/guide/cropper) — the sibling no-slots engine-wrapper port.
-- [MapLibre — showcase & API](/guide/maplibre) — the sibling engine-wrapper port (the two-way model + imperative-handle pattern).
+- [PdfViewer live demo](/components/pdf-demo) — the rendered viewer across all six targets.
+- [Cropper — showcase & API](/components/cropper) — the sibling no-slots engine-wrapper port.
+- [MapLibre — showcase & API](/components/maplibre) — the sibling engine-wrapper port (the two-way model + imperative-handle pattern).
 - [Features](/guide/features) — the full Rozie author-side API (`$expose`, `r-model`, the prop / event / slot surface).

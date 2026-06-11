@@ -6,7 +6,7 @@ community keeps reaching for. But every framework gets its *own* wrapper,
 versioned and maintained separately, and the cross-framework story is whoever
 happened to publish a binding for your framework this year.
 
-Rozie's [`@rozie-ui/flatpickr`](/guide/flatpickr) is the killer demo for
+Rozie's [`@rozie-ui/flatpickr`](/components/flatpickr) is the killer demo for
 [Rozie's competitive wedge](/guide/why): one `.rozie` file compiles to
 idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers — six
 framework targets from a single source, where the existing ecosystem ships
@@ -91,10 +91,10 @@ re-check the dates before relying on them.
 - **The range partial-commit guard.** Rozie defaults to `commitOn="complete"`,
   so a range only commits once both endpoints are chosen — a guard the
   standalone wrappers leave to the consumer. See [Range mode and commit
-  semantics](/guide/flatpickr#range-mode-and-commit-semantics).
+  semantics](/components/flatpickr#range-mode-and-commit-semantics).
 
 - **Uniform imperative handle + two-way string value across all six.** Rozie's
-  [`$expose` handle](/guide/flatpickr#imperative-handle) gives the *same*
+  [`$expose` handle](/components/flatpickr#imperative-handle) gives the *same*
   five-method API — `clear` / `openPicker` / `closePicker` / `selectDate` /
   `jumpToDate` — on every target. react-flatpickr exposes the raw instance via
   a `.flatpickr` ref and lit-flatpickr ships a rich method set, but
@@ -120,7 +120,7 @@ keeps the comparison credible.
   `ControlValueAccessor` from the single two-way `date` model (registered via
   `NG_VALUE_ACCESSOR` on the component, no wrapper directive), so `[(ngModel)]`,
   `[formControl]`, and `formControlName` bind directly. See the
-  [`formControlName` recipe + coexistence semantics](/guide/flatpickr#forms-drop-in).
+  [`formControlName` recipe + coexistence semantics](/components/flatpickr#forms-drop-in).
   The two wrappers reach the same Angular-forms cell; Rozie additionally ships
   the *same* source to five other frameworks. The behavior is proven at runtime
   by [`flatpickr-cva.spec.ts`](https://github.com/One-Learning-Community/rozie.js/blob/main/tests/visual-regression/specs/flatpickr-cva.spec.ts)
@@ -133,13 +133,13 @@ keeps the comparison credible.
   `register('field')` object onto the component — `register`'s `onChange`,
   `onBlur`, and `ref` collide with the component's own `onChange` emit-prop.
   Wire the value through `date` / `onDateChange` and forward only `name`. See
-  [Forms drop-in](/guide/flatpickr#forms-drop-in).
+  [Forms drop-in](/components/flatpickr#forms-drop-in).
 
 - **Shadow-DOM rangePlugin caveat.** `rangePlugin`'s second-input option must be
   passed the **element**, not a selector string, in any shadow-DOM /
   custom-element (Lit) context — `document.querySelector` cannot see into shadow
   DOM and fails silently. The warning callout lives in [Two-input range via
-  rangePlugin](/guide/flatpickr#two-input-range-via-rangeplugin).
+  rangePlugin](/components/flatpickr#two-input-range-via-rangeplugin).
 
 - **Single-framework ergonomics are not the contest.** The matrix scores
   out-of-the-box, cross-framework capability. react-flatpickr (195.6k
@@ -154,6 +154,6 @@ its per-target compiled output — the same `.rozie` source that powers every
 target cell in the matrix above.
 
 Ready to ship it? The [`@rozie-ui/flatpickr` showcase + API
-reference](/guide/flatpickr) documents the `@rozie-ui/flatpickr-*` packages —
+reference](/components/flatpickr) documents the `@rozie-ui/flatpickr-*` packages —
 one pre-compiled, per-framework install (`npm i @rozie-ui/flatpickr-react`,
 etc.) with no Rozie toolchain required.

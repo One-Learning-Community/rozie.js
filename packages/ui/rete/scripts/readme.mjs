@@ -400,7 +400,7 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
 // ---------------------------------------------------------------------------
 // Docs props-table validator (VALIDATE-NOT-OVERWRITE). Identical contract to the
 // maplibre/codemirror/chartjs validators. codegen.mjs invokes this against
-// docs/guide/rete.md (which ships a real "### Props" table) — ENFORCING.
+// docs/components/rete.md (which ships a real "### Props" table) — ENFORCING.
 // ---------------------------------------------------------------------------
 
 export function validateDocsPropsTable(ir, docsMarkdown) {

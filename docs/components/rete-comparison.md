@@ -87,10 +87,10 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 ## Try it
 
-The [`@rozie-ui/rete` showcase + API reference](/guide/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, so there is no engine CSS to import — all node / socket / connection chrome is styled by the component.
+The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, so there is no engine CSS to import — all node / socket / connection chrome is styled by the component.
 
 ## Cross-references
 
-- [FlowCanvas — showcase & API](/guide/rete) — the full `@rozie-ui/rete` surface, quick starts, and the `node` slot recipe.
+- [FlowCanvas — showcase & API](/components/rete) — the full `@rozie-ui/rete` surface, quick starts, and the `node` slot recipe.
 - [`FlowCanvas.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/FlowCanvas.rozie)
 - [The portal-slot primitive](/examples/portal-list) — the mechanism the `node` reactive slot builds on.

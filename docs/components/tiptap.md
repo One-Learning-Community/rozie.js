@@ -1,6 +1,6 @@
 # TipTap — the cross-framework rich-text editor
 
-`TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie collapses all six into one source — and notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/guide/tiptap-comparison) for the full matrix.
+`TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie collapses all six into one source — and notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/components/tiptap-comparison) for the full matrix.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 14-verb imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
 
@@ -397,7 +397,7 @@ el.nodeView = ({ node, selected }) =>
   html`<span data-selected=${selected}>${node.attrs.label}</span>`;
 ```
 
-The same `TipTap.rozie` source ships this into **Solid** (where `solid-tiptap` has no node-view renderer) and **Lit** (where no wrapper exists at all) — see the [comparison page](/guide/tiptap-comparison#node-view-portal-slots-g1-shipped) for the gap context.
+The same `TipTap.rozie` source ships this into **Solid** (where `solid-tiptap` has no node-view renderer) and **Lit** (where no wrapper exists at all) — see the [comparison page](/components/tiptap-comparison#node-view-portal-slots-g1-shipped) for the gap context.
 
 ## Recipes
 
@@ -468,16 +468,16 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 ### Placeholder rendering is bundled
 
-The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch on all six targets. The prop still also forwards `aria-placeholder` for assistive tech. See the [comparison page](/guide/tiptap-comparison#bundle-placeholder-g3-shipped) for details.
+The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch on all six targets. The prop still also forwards `aria-placeholder` for assistive tech. See the [comparison page](/components/tiptap-comparison#bundle-placeholder-g3-shipped) for details.
 
 ### Feature-complete versus the official wrappers
 
-TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), and selection-anchored **bubble / floating menus** ship via the [`bubbleMenu` / `floatingMenu` slots](#bubble-floating-menu-slots), both uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). Together with the bundled Placeholder and the auto-emitted Angular `ControlValueAccessor`, that closes every meaningful gap versus the official wrappers. The one intentionally-unmatched item is switching the *two-way model payload itself* to JSON (`ngx-tiptap`'s `outputFormat`) — read JSON off the `getJSON()` handle instead. See the [comparison page](/guide/tiptap-comparison#bubble-floating-menu-slots-g2-shipped) for the full matrix.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), and selection-anchored **bubble / floating menus** ship via the [`bubbleMenu` / `floatingMenu` slots](#bubble-floating-menu-slots), both uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). Together with the bundled Placeholder and the auto-emitted Angular `ControlValueAccessor`, that closes every meaningful gap versus the official wrappers. The one intentionally-unmatched item is switching the *two-way model payload itself* to JSON (`ngx-tiptap`'s `outputFormat`) — read JSON off the `getJSON()` handle instead. See the [comparison page](/components/tiptap-comparison#bubble-floating-menu-slots-g2-shipped) for the full matrix.
 
 ## Cross-references
 
 - [`TipTap.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie) — the canonical wrapper.
-- [TipTap libraries comparison](/guide/tiptap-comparison) — the per-framework wrapper matrix + the gap-closure status.
+- [TipTap libraries comparison](/components/tiptap-comparison) — the per-framework wrapper matrix + the gap-closure status.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API. The `nodeView` slot adds the `reactive` flag for engine-driven in-place re-render.
 - [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
 - [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)

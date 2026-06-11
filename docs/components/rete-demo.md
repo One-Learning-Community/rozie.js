@@ -77,7 +77,7 @@ This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePres
 </div>
 </ClientOnly>
 
-The graph is a pair of plain config arrays (`:nodes` / `:connections`); **Add node** pushes onto `nodes` and the wrapper reconciles it into the live editor with no remount. `zoom` is **two-way bound** with `v-model:zoom` — the readout tracks it as you scroll, and **Fit** drives the imperative handle (`zoomToFit()`), which echoes the new zoom back into the binding. Each node body is your own `<template #node>` fragment, rendered per node through the reactive `node` portal slot. See the [full API](/guide/rete) for the complete prop / event / handle surface.
+The graph is a pair of plain config arrays (`:nodes` / `:connections`); **Add node** pushes onto `nodes` and the wrapper reconciles it into the live editor with no remount. `zoom` is **two-way bound** with `v-model:zoom` — the readout tracks it as you scroll, and **Fit** drives the imperative handle (`zoomToFit()`), which echoes the new zoom back into the binding. Each node body is your own `<template #node>` fragment, rendered per node through the reactive `node` portal slot. See the [full API](/components/rete) for the complete prop / event / handle surface.
 
 ## One source, six outputs
 
@@ -102,8 +102,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [FlowCanvas — showcase & API](/guide/rete) — install, quick starts for all six frameworks, the events, the two-way zoom binding, the imperative handle, and the `node` slot.
-- [Node-flow editor libraries comparison](/guide/rete-comparison) — how `@rozie-ui/rete` stacks up against React Flow / Vue Flow / Svelte Flow / Foblex (and the Solid / Lit gap it closes).
+- [FlowCanvas — showcase & API](/components/rete) — install, quick starts for all six frameworks, the events, the two-way zoom binding, the imperative handle, and the `node` slot.
+- [Node-flow editor libraries comparison](/components/rete-comparison) — how `@rozie-ui/rete` stacks up against React Flow / Vue Flow / Svelte Flow / Foblex (and the Solid / Lit gap it closes).
 
 <style scoped>
 .flow-live {

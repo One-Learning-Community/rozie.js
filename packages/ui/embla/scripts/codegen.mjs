@@ -30,7 +30,7 @@
  *        (React only: also write Carousel.css + Carousel.d.ts; Embla ships NO
  *         nested-:root engine rules → r.globalCss is null → NO Carousel.global.css)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
- *   5. ENFORCE validateDocsPropsTable against docs/guide/embla.md
+ *   5. ENFORCE validateDocsPropsTable against docs/components/embla.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable structural
  *      columns — prop name, type, default. Never rewrites the hand-authored prose.
  *      ROZIE_EMBLA_SKIP_GUIDE=1 relaxes the absent-guide throw to a skip so the
@@ -151,8 +151,8 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 
-  // (5) ENFORCE docs props-table validation against docs/guide/embla.md.
-  const guideRelPath = 'docs/guide/embla.md';
+  // (5) ENFORCE docs props-table validation against docs/components/embla.md.
+  const guideRelPath = 'docs/components/embla.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_EMBLA_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -165,7 +165,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/embla.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/embla.md not yet authored ' +
         '(ROZIE_EMBLA_SKIP_GUIDE=1; author the guide and re-run WITHOUT the flag).',
     );
   } else {

@@ -64,7 +64,7 @@ This is the **real `@rozie-ui/tiptap-vue` package** running on this page (VitePr
 </div>
 </ClientOnly>
 
-The document is two-way bound with `v-model:html` — the readout above updates live as you type, and the buttons drive the imperative handle (`toggleBold`, `toggleItalic`, `toggleHeading`, `toggleBulletList`, `undo`, `redo`, `focusEditor`, `clearContent`). The component bundles its own toolbar (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting); the buttons here are a second, *external* toolbar driving the same `$expose` handle. See the [full API](/guide/tiptap) for the complete prop/event/handle surface — including the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots and the reactive `nodeView` slot.
+The document is two-way bound with `v-model:html` — the readout above updates live as you type, and the buttons drive the imperative handle (`toggleBold`, `toggleItalic`, `toggleHeading`, `toggleBulletList`, `undo`, `redo`, `focusEditor`, `clearContent`). The component bundles its own toolbar (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting); the buttons here are a second, *external* toolbar driving the same `$expose` handle. See the [full API](/components/tiptap) for the complete prop/event/handle surface — including the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots and the reactive `nodeView` slot.
 
 ## One source, six outputs
 
@@ -89,8 +89,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [TipTap — showcase & API](/guide/tiptap) — install, quick starts for all six frameworks, the events, the imperative handle, and the toolbar / bubble-menu / floating-menu / node-view slots.
-- [TipTap libraries comparison](/guide/tiptap-comparison) — how `@rozie-ui/tiptap` stacks up against the per-framework wrappers.
+- [TipTap — showcase & API](/components/tiptap) — install, quick starts for all six frameworks, the events, the imperative handle, and the toolbar / bubble-menu / floating-menu / node-view slots.
+- [TipTap libraries comparison](/components/tiptap-comparison) — how `@rozie-ui/tiptap` stacks up against the per-framework wrappers.
 
 <style scoped>
 .tiptap-live {

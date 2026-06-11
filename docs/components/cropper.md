@@ -307,6 +307,6 @@ Cropper.js v1 ships runtime setters only for the aspect ratio, drag mode, crop b
 
 ## Cross-references
 
-- [Cropper libraries comparison](/guide/cropper-comparison) — how `@rozie-ui/cropper` stacks up against the per-framework wrappers.
-- [MapLibre — showcase & API](/guide/maplibre) — the sibling engine-wrapper port (the two-way object model + imperative handle pattern).
+- [Cropper libraries comparison](/components/cropper-comparison) — how `@rozie-ui/cropper` stacks up against the per-framework wrappers.
+- [MapLibre — showcase & API](/components/maplibre) — the sibling engine-wrapper port (the two-way object model + imperative handle pattern).
 - [Features](/guide/features) — the full Rozie author-side API.

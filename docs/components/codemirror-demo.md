@@ -82,7 +82,7 @@ This is the **real `@rozie-ui/codemirror-vue` package** running on this page (Vi
 </div>
 </ClientOnly>
 
-The document is two-way bound with `v-model:value` — the readout above updates live as you type, the language/theme toggles reconfigure the live editor **without a remount** (cursor, history, and scroll position are preserved), and the buttons drive the imperative handle (`focus`, `insertText`, `getValue`). The JSON/Python toggles feed the curated `@rozie-ui/codemirror-vue/languages` presets through `:extensions`, since the bundled `language` prop ships JavaScript only. See the [full API](/guide/codemirror) for the complete prop/handle/slot surface.
+The document is two-way bound with `v-model:value` — the readout above updates live as you type, the language/theme toggles reconfigure the live editor **without a remount** (cursor, history, and scroll position are preserved), and the buttons drive the imperative handle (`focus`, `insertText`, `getValue`). The JSON/Python toggles feed the curated `@rozie-ui/codemirror-vue/languages` presets through `:extensions`, since the bundled `language` prop ships JavaScript only. See the [full API](/components/codemirror) for the complete prop/handle/slot surface.
 
 ## One source, six outputs
 
@@ -107,8 +107,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [CodeMirror — showcase & API](/guide/codemirror) — install, quick starts for all six frameworks, the `:extensions` passthrough, the language presets, and the full prop/handle/slot reference.
-- [CodeMirror libraries comparison](/guide/codemirror-comparison) — how `@rozie-ui/codemirror` stacks up against the per-framework wrappers (including the Angular binding still on CodeMirror 5).
+- [CodeMirror — showcase & API](/components/codemirror) — install, quick starts for all six frameworks, the `:extensions` passthrough, the language presets, and the full prop/handle/slot reference.
+- [CodeMirror libraries comparison](/components/codemirror-comparison) — how `@rozie-ui/codemirror` stacks up against the per-framework wrappers (including the Angular binding still on CodeMirror 5).
 
 <style scoped>
 .cm-live {

@@ -25,12 +25,12 @@
  *        (React only: also write TipTap.css + TipTap.d.ts; bundled leaves get a
  *         src/index.ts barrel)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
- *   5. ENFORCE validateDocsPropsTable against docs/guide/tiptap.md (THROWS if the
+ *   5. ENFORCE validateDocsPropsTable against docs/components/tiptap.md (THROWS if the
  *      guide is absent AND on drift of name/type/default).
  *
  *      ROZIE_TIPTAP_SKIP_GUIDE=1 was the Wave-02 bootstrap escape hatch — it
  *      relaxed the absent-guide throw to a skip so leaves could emit before Wave 03
- *      authored the guide. As of Phase 33 (Wave 04, plan 33-05) docs/guide/tiptap.md
+ *      authored the guide. As of Phase 33 (Wave 04, plan 33-05) docs/components/tiptap.md
  *      SHIPS, so the bootstrap window is CLOSED: normal runs are ENFORCING with no
  *      flag, and even with the flag set the props-table validator still runs (the
  *      flag only ever relaxed the *absent-guide* throw, never the drift check). The
@@ -147,10 +147,10 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 
-  // (5) ENFORCE docs props-table validation against docs/guide/tiptap.md.
+  // (5) ENFORCE docs props-table validation against docs/components/tiptap.md.
   // The guide SHIPS as of Phase 33 — the Wave-02 bootstrap window is CLOSED. The
   // skip flag is retained only as a guarded historical fallback (do not set it).
-  const guideRelPath = 'docs/guide/tiptap.md';
+  const guideRelPath = 'docs/components/tiptap.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_TIPTAP_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -163,7 +163,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/tiptap.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/tiptap.md not yet authored ' +
         '(ROZIE_TIPTAP_SKIP_GUIDE=1; Wave 03 authors the guide and re-runs WITHOUT the flag).',
     );
   } else {

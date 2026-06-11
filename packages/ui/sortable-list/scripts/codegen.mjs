@@ -20,7 +20,7 @@
  *        (React only: also write SortableList.css + SortableList.d.ts)
  *   4. copy src/internal/ → each leaf src/internal/ (excluding *.test.ts)
  *   5. render each leaf README from the IR + the hand-kept event manifest
- *   6. ENFORCE validateDocsPropsTable against docs/guide/sortable-list.md
+ *   6. ENFORCE validateDocsPropsTable against docs/components/sortable-list.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
  *      type, default — but NEVER rewrites the hand-authored prose; Plan 20-04)
  */
@@ -157,13 +157,13 @@ function main() {
   }
 
   // (6) ENFORCE docs props-table validation (Plan 20-04): the IR-derivable
-  // structural columns (prop name + type + default) in docs/guide/sortable-list.md
+  // structural columns (prop name + type + default) in docs/components/sortable-list.md
   // MUST match ir.props or this script THROWS. It does NOT overwrite the
   // hand-authored prose (the Runtime-updatable? column + Descriptions stay) —
   // VALIDATE-NOT-OVERWRITE (OQ2). The docs file is the single-source-of-truth
   // surface for the structural columns; reconcile the table (not the validator)
   // if it drifts.
-  const docsPath = resolve(REPO_ROOT, 'docs/guide/sortable-list.md');
+  const docsPath = resolve(REPO_ROOT, 'docs/components/sortable-list.md');
   if (!existsSync(docsPath)) {
     throw new Error(
       `codegen: docs props-table validation FAILED — ${docsPath} not found (the docs page is the single-source-of-truth surface and must exist)`,

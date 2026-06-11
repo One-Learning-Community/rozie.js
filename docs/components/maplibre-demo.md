@@ -71,7 +71,7 @@ This is the **real `@rozie-ui/maplibre-vue` package** running on this page (Vite
 </div>
 </ClientOnly>
 
-The camera is two-way bound with `v-model:center` and `v-model:zoom` — the readout above updates live as you pan and zoom, and the **Fly to** buttons drive the imperative handle (`flyTo`), while **Zoom in / out** and **Reset** mutate the bound state directly. Because the binding is two-way, a `flyTo()` echoes back into `center`/`zoom` and the readout tracks it — the round-trip is the whole point. `center` is `[lng, lat]` — **longitude first** (MapLibre's convention). See the [full API](/guide/maplibre) for the complete prop/event/handle surface.
+The camera is two-way bound with `v-model:center` and `v-model:zoom` — the readout above updates live as you pan and zoom, and the **Fly to** buttons drive the imperative handle (`flyTo`), while **Zoom in / out** and **Reset** mutate the bound state directly. Because the binding is two-way, a `flyTo()` echoes back into `center`/`zoom` and the readout tracks it — the round-trip is the whole point. `center` is `[lng, lat]` — **longitude first** (MapLibre's convention). See the [full API](/components/maplibre) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -96,8 +96,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [MapLibre — showcase & API](/guide/maplibre) — install, quick starts for all six frameworks, the 20 events, the four two-way camera bindings, the imperative handle, and the portal slots.
-- [MapLibre libraries comparison](/guide/maplibre-comparison) — how `@rozie-ui/maplibre` stacks up against the per-framework wrappers (and the Solid / Lit gap it closes).
+- [MapLibre — showcase & API](/components/maplibre) — install, quick starts for all six frameworks, the 20 events, the four two-way camera bindings, the imperative handle, and the portal slots.
+- [MapLibre libraries comparison](/components/maplibre-comparison) — how `@rozie-ui/maplibre` stacks up against the per-framework wrappers (and the Solid / Lit gap it closes).
 
 <style scoped>
 .map-live {

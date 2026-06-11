@@ -57,11 +57,11 @@ This page concedes where the standalone wrappers and PDF.js's own viewer are gen
 
 ## Try it
 
-The [`@rozie-ui/pdf` showcase + API reference](/guide/pdf) documents the `@rozie-ui/pdf-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/pdf-react pdfjs-dist`, etc.). The PDF.js Web Worker **auto-configures** from the version-matched CDN, so there's nothing extra to import to render a PDF (override `:worker-src` for offline / CSP / bundled-worker builds). The showcase walks the two-way `page` binding, single vs `render-all-pages` modes, the selectable text layer, zoom / rotation, password-protected PDFs, and the 12-verb imperative handle. The [live demo](/guide/pdf-demo) runs the component across all six targets.
+The [`@rozie-ui/pdf` showcase + API reference](/components/pdf) documents the `@rozie-ui/pdf-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/pdf-react pdfjs-dist`, etc.). The PDF.js Web Worker **auto-configures** from the version-matched CDN, so there's nothing extra to import to render a PDF (override `:worker-src` for offline / CSP / bundled-worker builds). The showcase walks the two-way `page` binding, single vs `render-all-pages` modes, the selectable text layer, zoom / rotation, password-protected PDFs, and the 12-verb imperative handle. The [live demo](/components/pdf-demo) runs the component across all six targets.
 
 ## Cross-references
 
-- [PDF — showcase & API](/guide/pdf) — the full `@rozie-ui/pdf` surface, quick starts, and recipes.
-- [PDF — live demo](/guide/pdf-demo) — the viewer running across all six targets.
+- [PDF — showcase & API](/components/pdf) — the full `@rozie-ui/pdf` surface, quick starts, and recipes.
+- [PDF — live demo](/components/pdf-demo) — the viewer running across all six targets.
 - [`PdfViewer.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pdf/src/PdfViewer.rozie)
-- [Cropper libraries comparison](/guide/cropper-comparison) — the sibling engine-wrapper port.
+- [Cropper libraries comparison](/components/cropper-comparison) — the sibling engine-wrapper port.

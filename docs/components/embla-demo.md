@@ -48,7 +48,7 @@ This is the **real `@rozie-ui/embla-vue` package** running on this page (VitePre
 </div>
 </ClientOnly>
 
-The snap index is two-way bound with `v-model:selectedIndex` — the readout updates live as you drag or scroll, and the buttons drive the imperative handle (`scrollPrev`, `scrollNext`, `scrollToIndex`). Dragging the carousel writes the new index back through the model; clicking a dot writes the index in and scrolls the carousel — round-trip, echo-guarded. See the [full API](/guide/embla) for the complete prop/event/handle surface.
+The snap index is two-way bound with `v-model:selectedIndex` — the readout updates live as you drag or scroll, and the buttons drive the imperative handle (`scrollPrev`, `scrollNext`, `scrollToIndex`). Dragging the carousel writes the new index back through the model; clicking a dot writes the index in and scrolls the carousel — round-trip, echo-guarded. See the [full API](/components/embla) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -73,8 +73,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [Embla — showcase & API](/guide/embla) — install, quick starts for all six frameworks, and the full reference.
-- [Embla libraries comparison](/guide/embla-comparison) — how `@rozie-ui/embla` stacks up against the per-framework wrappers.
+- [Embla — showcase & API](/components/embla) — install, quick starts for all six frameworks, and the full reference.
+- [Embla libraries comparison](/components/embla-comparison) — how `@rozie-ui/embla` stacks up against the per-framework wrappers.
 
 <style scoped>
 .embla-live {

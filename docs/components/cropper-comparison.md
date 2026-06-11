@@ -49,18 +49,18 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **React depth on React.** `react-cropper` is a mature, multi-year library with a large user base, battle-tested edge-case handling, and React-idiomatic ergonomics refined over many releases. On React specifically it exposes more accumulated polish than Rozie's curated prop set. Rozie's value is **not** "more than react-cropper on React" — it's the **same idiomatic component on all six frameworks from one source**, with the five underserved targets getting a Cropper.js component they otherwise lack. For anything outside the curated surface, `getCropper()` hands you the raw engine on every target.
 
-- **Runtime-reconciling every option.** Cropper.js v1 ships runtime setters only for the aspect ratio, drag mode, crop box, enable/disable, and source — so those five props reconcile live, and the rest are applied at construction (the *Runtime-updatable?* column in the [API table](/guide/cropper#props)). Wrappers that rebuild the whole instance on any option change (as `react-cropper` does for some props) can appear to "reconcile" more; Rozie deliberately keeps the construction-time set construction-time rather than churning a full destroy/rebuild. Anything not surfaced reconciles through the `options` passthrough at construction.
+- **Runtime-reconciling every option.** Cropper.js v1 ships runtime setters only for the aspect ratio, drag mode, crop box, enable/disable, and source — so those five props reconcile live, and the rest are applied at construction (the *Runtime-updatable?* column in the [API table](/components/cropper#props)). Wrappers that rebuild the whole instance on any option change (as `react-cropper` does for some props) can appear to "reconcile" more; Rozie deliberately keeps the construction-time set construction-time rather than churning a full destroy/rebuild. Anything not surfaced reconciles through the `options` passthrough at construction.
 
 - **`@rozie-ui/cropper` is `0.1.0`.** The surface (20 props / 6 events / 18-verb handle / two-way `data` model) is stable and gate-verified, but it is younger than `react-cropper`.
 
-- **Cropper.js v1, not v2.** These packages wrap the mature v1. Cropper.js v2 (the Web-Components rewrite) is a separate, newer API; teams that want v2's web-component model are better served by it directly (it is already cross-framework via custom elements). See [Why v1, not v2](/guide/cropper#why-v1-not-v2).
+- **Cropper.js v1, not v2.** These packages wrap the mature v1. Cropper.js v2 (the Web-Components rewrite) is a separate, newer API; teams that want v2's web-component model are better served by it directly (it is already cross-framework via custom elements). See [Why v1, not v2](/components/cropper#why-v1-not-v2).
 
 ## Try it
 
-The [`@rozie-ui/cropper` showcase + API reference](/guide/cropper) documents the `@rozie-ui/cropper-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/cropper-react cropperjs`, etc.), plus the `import 'cropperjs/dist/cropper.css'` the engine DOM needs. The showcase walks the two-way `data` binding, the 6-event surface, the 18-verb imperative handle, and the crop/rotate/flip/export recipes.
+The [`@rozie-ui/cropper` showcase + API reference](/components/cropper) documents the `@rozie-ui/cropper-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/cropper-react cropperjs`, etc.), plus the `import 'cropperjs/dist/cropper.css'` the engine DOM needs. The showcase walks the two-way `data` binding, the 6-event surface, the 18-verb imperative handle, and the crop/rotate/flip/export recipes.
 
 ## Cross-references
 
-- [Cropper — showcase & API](/guide/cropper) — the full `@rozie-ui/cropper` surface, quick starts, and recipes.
+- [Cropper — showcase & API](/components/cropper) — the full `@rozie-ui/cropper` surface, quick starts, and recipes.
 - [`Cropper.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/src/Cropper.rozie)
-- [MapLibre libraries comparison](/guide/maplibre-comparison) — the sibling engine-wrapper port.
+- [MapLibre libraries comparison](/components/maplibre-comparison) — the sibling engine-wrapper port.

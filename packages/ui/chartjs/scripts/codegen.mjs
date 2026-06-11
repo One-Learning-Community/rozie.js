@@ -311,7 +311,7 @@ function main() {
   }
 
   // ENFORCE docs props-table validation (VALIDATE-NOT-OVERWRITE).
-  const guideRelPath = 'docs/guide/chartjs.md';
+  const guideRelPath = 'docs/components/chartjs.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_CHARTJS_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {

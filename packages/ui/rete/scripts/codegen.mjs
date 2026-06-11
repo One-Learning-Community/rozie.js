@@ -149,12 +149,12 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓`);
   }
 
-  // ENFORCE docs props-table validation against docs/guide/rete.md (the
+  // ENFORCE docs props-table validation against docs/components/rete.md (the
   // single-source-of-truth surface for the structural columns). VALIDATE-NOT-
   // OVERWRITE: throws on drift of name/type/default, never rewrites prose. Until
   // the guide is authored, the ROZIE_RETE_SKIP_GUIDE escape hatch relaxes the
   // absent-guide throw to a skip.
-  const guideRelPath = 'docs/guide/rete.md';
+  const guideRelPath = 'docs/components/rete.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_RETE_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {

@@ -1,8 +1,8 @@
 # SortableList — the cross-framework drag-and-drop component
 
-`SortableList` is Rozie's data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/) — the headline demo for Rozie's competitive wedge. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers, with a feature set that every standalone library on the [Sortable libraries comparison](/guide/sortable-comparison) matrix either skips or implements partially.
+`SortableList` is Rozie's data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/) — the headline demo for Rozie's competitive wedge. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers, with a feature set that every standalone library on the [Sortable libraries comparison](/components/sortable-comparison) matrix either skips or implements partially.
 
-This page is the **show-and-tell**: API reference, live demos, and the recipes that cover the long tail of what you'd want a drag-and-drop list to do. The [comparison page](/guide/sortable-comparison) is the **sell**.
+This page is the **show-and-tell**: API reference, live demos, and the recipes that cover the long tail of what you'd want a drag-and-drop list to do. The [comparison page](/components/sortable-comparison) is the **sell**.
 
 The full source for `SortableList.rozie` lives in [the canonical example page](/examples/sortable-list).
 
@@ -19,7 +19,7 @@ The full source for `SortableList.rozie` lives in [the canonical example page](/
 | `@rozie-ui/sortable-list-solid` | `npm i @rozie-ui/sortable-list-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/solid/README.md) |
 | `@rozie-ui/sortable-list-lit` | `npm i @rozie-ui/sortable-list-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/lit/README.md) |
 
-Each package carries `sortablejs ^1.15` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The per-leaf READMEs above and the **Props** table below are generated from the same IR parse of `SortableList.rozie`, so they cannot drift from the compiled output (the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run). This page documents the API surface shared by all six packages; the [comparison page](/guide/sortable-comparison) frames the cross-framework wedge, and the [example page](/examples/sortable-list) shows the per-target compiled output side by side.
+Each package carries `sortablejs ^1.15` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The per-leaf READMEs above and the **Props** table below are generated from the same IR parse of `SortableList.rozie`, so they cannot drift from the compiled output (the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run). This page documents the API surface shared by all six packages; the [comparison page](/components/sortable-comparison) frames the cross-framework wedge, and the [example page](/examples/sortable-list) shows the per-target compiled output side by side.
 
 ## Quick start
 
@@ -350,6 +350,6 @@ On Lit this lowers to the confined cross-shadow rule `rozie-sortable-list[data-r
 - [`$classSelector()` — class-name-as-selector for vanilla-JS engines](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine)
 - [`$restoreFocus()` — keep focus on a row across keyed-reconciler re-renders](/guide/features#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders)
 - [`r-external` and `$reconcileAfterDomMutation()` — DOM the framework doesn't own](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own)
-- [Sortable libraries comparison](/guide/sortable-comparison) — feature matrix vs react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, Angular CDK
+- [Sortable libraries comparison](/components/sortable-comparison) — feature matrix vs react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, Angular CDK
 - [`SortableList.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/SortableList.rozie) — the canonical wrapper (now colocated in the `@rozie-ui/sortable-list` package)
 - [`useSortableJS()` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/internal/useSortableJS.ts) — the framework-agnostic SortableJS-vs-reconciler bridge (colocated + vendored into each leaf package's `src/internal/`)

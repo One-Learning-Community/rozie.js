@@ -12,7 +12,7 @@ What the wrapper demonstrates:
 - **The DOM-reconciler workaround** — on `onUpdate`, the wrapper *restores* the pre-drag DOM order before writing the model. The framework then sees a model change against an unchanged DOM and reconciles cleanly, moving keyed nodes with proper transitions. This is the bug every per-framework wrapper has to fix; here it is fixed once.
 - **A default scoped slot** (`:item` / `:index`) so consumers render whatever they like per row, **`$watch`** reconciling `disabled` / `group` / `handle` into the live instance via `instance.option()`, and **`$emit`** for `start` / `end` / `change`.
 
-This page shows the live demo plus the per-target compiled output. For the full API reference, recipes, and the published `@rozie-ui/sortable-list-*` packages (one pre-compiled, per-framework install — no Rozie toolchain required), see the [SortableList showcase + package docs](/guide/sortable-list).
+This page shows the live demo plus the per-target compiled output. For the full API reference, recipes, and the published `@rozie-ui/sortable-list-*` packages (one pre-compiled, per-framework install — no Rozie toolchain required), see the [SortableList showcase + package docs](/components/sortable-list).
 
 ## Live demo
 

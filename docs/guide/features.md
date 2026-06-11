@@ -406,7 +406,7 @@ Components with **zero or multiple** `model: true` props don't get an accessor �
 
 This is on by default. To opt out, pass `angular: { cva: false }` to `@rozie/unplugin` or `compile()`, or `--no-cva` on the CLI — the emitted class is then byte-identical to the pre-CVA output. The other five targets are untouched either way; CVA is an Angular-only forms contract.
 
-See the [Flatpickr forms recipe](/guide/flatpickr#forms-drop-in) for a worked example against a real engine-wrapper component.
+See the [Flatpickr forms recipe](/components/flatpickr#forms-drop-in) for a worked example against a real engine-wrapper component.
 
 ## `$expose({ ... })` → a consumer-callable imperative handle everywhere
 

@@ -1,6 +1,6 @@
 # MapLibre — the cross-framework interactive map
 
-`MapLibre` is Rozie's data-bound port of [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) — the open-source (BSD-3) WebGL map engine, the community fork of Mapbox GL JS v1. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **uneven**: [react-map-gl / @vis.gl/react-maplibre](https://visgl.github.io/react-map-gl/) is deep, [@indoorequal/vue-maplibre-gl](https://indoorequal.github.io/vue-maplibre-gl/), [svelte-maplibre-gl](https://svelte-maplibre-gl.mierune.dev/) and [@maplibre/ngx-maplibre-gl](https://maplibre.org/ngx-maplibre-gl/) are solid — but **Solid has only a stale/Mapbox-first option and Lit has no real wrapper at all**. Rozie collapses all six into one source, and Solid + Lit get a category-leading wrapper for free. See the [MapLibre libraries comparison](/guide/maplibre-comparison) for the full per-framework matrix.
+`MapLibre` is Rozie's data-bound port of [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) — the open-source (BSD-3) WebGL map engine, the community fork of Mapbox GL JS v1. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **uneven**: [react-map-gl / @vis.gl/react-maplibre](https://visgl.github.io/react-map-gl/) is deep, [@indoorequal/vue-maplibre-gl](https://indoorequal.github.io/vue-maplibre-gl/), [svelte-maplibre-gl](https://svelte-maplibre-gl.mierune.dev/) and [@maplibre/ngx-maplibre-gl](https://maplibre.org/ngx-maplibre-gl/) are solid — but **Solid has only a stale/Mapbox-first option and Lit has no real wrapper at all**. Rozie collapses all six into one source, and Solid + Lit get a category-leading wrapper for free. See the [MapLibre libraries comparison](/components/maplibre-comparison) for the full per-framework matrix.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the 20 map events, the four two-way camera bindings, the imperative handle, the consumer-extensible `:sources` / `:layers` / `:options` passthroughs, and the per-target recipe for the reactive `marker` / `popup` portal slots and the mount-once `control` slot.
 
@@ -469,7 +469,7 @@ Sources and layers can also be authored as **declarative child components** — 
 - **Flat `<Layer source="id" />`** directly under `<MapLibre>` also works, for background layers (no source) and cross-source references.
 - **Both shapes coexist with `:sources` / `:layers`.** A config array and declarative children feed the **same id-keyed registry** through the same style-load-gated `addSource` / `addLayer` reconcile; on an id collision the declarative child wins (last-writer-wins, matching the engine's own reconcile).
 
-`<Source>` takes `id` (required) plus `:spec` (the `SourceSpecification`); `<Layer>` takes `id` (required), `type`, `:paint` / `:layout`, an optional `source` (for the flat shape), and `beforeId` for draw order. This dogfoods Rozie's own [`$provide` / `$inject` cross-component context primitive](/guide/features) — the map provides the registry, each child injects it and registers on mount / updates on prop change / unregisters on unmount. The big incumbents still ship deeper component catalogs (see the [comparison page](/guide/maplibre-comparison#declarative-children)) — Rozie's declarative children are a curated subset that works identically on all six targets.
+`<Source>` takes `id` (required) plus `:spec` (the `SourceSpecification`); `<Layer>` takes `id` (required), `type`, `:paint` / `:layout`, an optional `source` (for the flat shape), and `beforeId` for draw order. This dogfoods Rozie's own [`$provide` / `$inject` cross-component context primitive](/guide/features) — the map provides the registry, each child injects it and registers on mount / updates on prop change / unregisters on unmount. The big incumbents still ship deeper component catalogs (see the [comparison page](/components/maplibre-comparison#declarative-children)) — Rozie's declarative children are a curated subset that works identically on all six targets.
 
 ### Hit-testing layer features
 
@@ -534,7 +534,7 @@ MapLibre needs an explicitly-sized container. The wrapper's `.rozie-maplibre` ho
 
 ## Cross-references
 
-- [MapLibre libraries comparison](/guide/maplibre-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
+- [MapLibre libraries comparison](/components/maplibre-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
 - [`MapLibre.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/src/MapLibre.rozie) — the canonical wrapper.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal reactive />` routes a consumer fragment through each target's imperative-render API.
 - [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)

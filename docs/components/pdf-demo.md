@@ -58,7 +58,7 @@ This is the **real `@rozie-ui/pdf-vue` package** running on this page (VitePress
 </div>
 </ClientOnly>
 
-The current page is two-way bound with `v-model:page` (the readout tracks it as you scroll in continuous mode), and the buttons drive the imperative handle (`prevPage` / `nextPage` / `zoomIn` / `zoomOut` / `fitWidth` / `rotateCW`). The worker is bundled locally here via `new URL(...)`; left unset it defaults to a CDN copy. See the [full API](/guide/pdf) for every prop, event, and handle verb.
+The current page is two-way bound with `v-model:page` (the readout tracks it as you scroll in continuous mode), and the buttons drive the imperative handle (`prevPage` / `nextPage` / `zoomIn` / `zoomOut` / `fitWidth` / `rotateCW`). The worker is bundled locally here via `new URL(...)`; left unset it defaults to a CDN copy. See the [full API](/components/pdf) for every prop, event, and handle verb.
 
 ## One source, six outputs
 
@@ -83,8 +83,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [PdfViewer — showcase & API](/guide/pdf) — install, quick starts for all six frameworks, the worker setup, and the full reference.
-- [PDF libraries comparison](/guide/pdf-comparison) — how `@rozie-ui/pdf` stacks up against react-pdf, vue-pdf-embed, ng2-pdf-viewer, and the underserved frameworks.
+- [PdfViewer — showcase & API](/components/pdf) — install, quick starts for all six frameworks, the worker setup, and the full reference.
+- [PDF libraries comparison](/components/pdf-comparison) — how `@rozie-ui/pdf` stacks up against react-pdf, vue-pdf-embed, ng2-pdf-viewer, and the underserved frameworks.
 
 <style scoped>
 .pdf-live {

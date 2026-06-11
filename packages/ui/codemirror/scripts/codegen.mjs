@@ -33,7 +33,7 @@
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write CodeMirror.css + CodeMirror.d.ts)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
- *   5. ENFORCE validateDocsPropsTable against docs/guide/codemirror.md
+ *   5. ENFORCE validateDocsPropsTable against docs/components/codemirror.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable
  *      structural columns — prop name, type, default. Never rewrites the
  *      hand-authored prose. Plan 29-03 ships the guide; until then the
@@ -513,18 +513,18 @@ function main() {
   }
 
   // (5) ENFORCE docs props-table validation: the IR-derivable structural columns
-  // (prop name + type + default) in docs/guide/codemirror.md MUST match ir.props
+  // (prop name + type + default) in docs/components/codemirror.md MUST match ir.props
   // or this script THROWS. It does NOT overwrite the hand-authored prose
   // (Runtime-updatable? column + Descriptions stay) — VALIDATE-NOT-OVERWRITE. The
   // docs file is the single-source-of-truth surface for the structural columns;
   // reconcile the table (not the validator) if it drifts. (Same ENFORCING shape
   // as @rozie-ui/fullcalendar.)
   //
-  // Plan 29-03 authors docs/guide/codemirror.md. Until it lands, the
+  // Plan 29-03 authors docs/components/codemirror.md. Until it lands, the
   // ROZIE_CODEMIRROR_SKIP_GUIDE env escape hatch relaxes the absent-guide throw
   // to a skip so Plan 29-02 can emit the leaves first. Plan 29-03 runs codegen
   // WITHOUT the flag, flipping validation back to ENFORCING-passing.
-  const guideRelPath = 'docs/guide/codemirror.md';
+  const guideRelPath = 'docs/components/codemirror.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_CODEMIRROR_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -540,7 +540,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/codemirror.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/codemirror.md not yet authored ' +
         '(ROZIE_CODEMIRROR_SKIP_GUIDE=1; Plan 29-03 authors the guide and re-runs WITHOUT the flag).',
     );
   } else {

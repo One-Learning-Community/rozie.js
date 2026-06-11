@@ -397,7 +397,7 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
 // Docs props-table validator (VALIDATE-NOT-OVERWRITE).
 //
 // Identical contract to the maplibre/codemirror/chartjs validators. codegen.mjs
-// invokes this against docs/guide/cropper.md (which ships a real "### Props"
+// invokes this against docs/components/cropper.md (which ships a real "### Props"
 // table) — ENFORCING: it throws on drift of the IR-derivable structural columns
 // (name/type/default).
 // ---------------------------------------------------------------------------

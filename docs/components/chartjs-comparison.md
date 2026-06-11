@@ -7,7 +7,7 @@ quality varies wildly: React and Vue are served by large, healthy wrappers;
 Angular and Svelte have solid maintained ones; **Solid's only option has been
 frozen since mid-2024; and Lit has no modern Chart.js wrapper at all.**
 
-Rozie's [`@rozie-ui/chartjs`](/guide/chartjs) compiles one `.rozie` file to
+Rozie's [`@rozie-ui/chartjs`](/components/chartjs) compiles one `.rozie` file to
 idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers — six framework
 targets from a single source, each a pre-compiled `@rozie-ui/chartjs-*` package
 with no Rozie toolchain required. The same generic `Chart` (the `type` prop
@@ -30,7 +30,7 @@ of absence.)
 
 | Wrapper | Frameworks | Latest published | Framework support | Structured events | Imperative handle | HTML-tooltip slot | Per-type components | Selective (tree-shakable) registration |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: |
-| **[Rozie @rozie-ui/chartjs](/guide/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (8 verbs) on all 6 | ✓ **portal slot** on all 6 | ✓ **8 typed components** + generic `Chart`, all 6 | ✓ consumer-registers + `/auto` entry (per-type tree-shakes on source leaves) |
+| **[Rozie @rozie-ui/chartjs](/components/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (8 verbs) on all 6 | ✓ **portal slot** on all 6 | ✓ **8 typed components** + generic `Chart`, all 6 | ✓ consumer-registers + `/auto` entry (per-type tree-shakes on source leaves) |
 | [react-chartjs-2](https://react-chartjs-2.js.org/) | React | **5.3.1** · 2025-10 | React 16.8 – **19** | ~ `options.onClick` + `getElement*AtEvent` helpers (no React events) | ✓ `ref` → Chart.js instance | ✗ external-handler only (no React slot) | ✓ 8 typed + generic `Chart` | ✓ typed components auto-register their controller |
 | [vue-chartjs](https://vue-chartjs.org/) | Vue 3 | **5.3.3** · 2025 | Vue 3 (3.x+) | ✗ emits no Vue events | ✓ `ref.chart` → instance | ✗ external-handler only (canvas-fallback slot only) | ✓ 8 typed + generic + `createTypedChart` | ✓ manual `ChartJS.register(...)` |
 | [ng2-charts](https://valor-software.com/ng2-charts) | Angular | **10.0.0** · 2026-03 *(v8 = Ng19)* | Angular 17 – **21** *(no signals — `@Input`/`OnChanges`)* | ✓ `chartClick` / `chartHover` (2, Angular only) | ✓ `ViewChild(BaseChartDirective).chart` | ✗ no `ng-template` tooltip | ~ one `canvas[baseChart]` directive (`type` input) | ✓ `provideCharts(...)` selective |
@@ -70,7 +70,7 @@ dates before relying on them.
   vue-chartjs emits **no** Vue events at all; ng2-charts is the only one with
   native framework events (`chartClick` / `chartHover`); Solid and Lit have none.
   Rozie surfaces **three** events — [`@click` / `@hover` /
-  `@datasetClick`](/guide/chartjs#events) — with structured payloads
+  `@datasetClick`](/components/chartjs#events) — with structured payloads
   (`{ event, elements, chart }`, the hit elements already resolved via
   `getElementsAtEventForMode`) **identically on all six targets**, and each is
   *composed* over any consumer-supplied `options.onClick`/`onHover` rather than
@@ -81,7 +81,7 @@ dates before relying on them.
   one of them a custom HTML tooltip means hand-writing
   `options.plugins.tooltip.external`, a DOM-building callback that lives outside
   the framework's rendering model. Rozie surfaces it as
-  [one `tooltip` portal slot](/guide/chartjs#slots) that emits the framework's
+  [one `tooltip` portal slot](/components/chartjs#slots) that emits the framework's
   idiomatic consumer surface — React/Solid render-prop, Vue scoped-slot, Svelte
   snippet, Angular `ng-template` content-child, Lit slot bridge — fed the live
   tooltip model (`{ title, body, dataPoints, opacity }`). The slot is guarded:
@@ -94,7 +94,7 @@ dates before relying on them.
   Chart.js instance its own way — a React `ref` to the instance, vue-chartjs's
   `ref.chart`, ng2-charts's `ViewChild(BaseChartDirective).chart`, svelte-chartjs's
   `bind:chart`, and nothing documented on Solid/Lit. Rozie's
-  [`$expose` handle](/guide/chartjs#imperative-handle) is the *same* eight verbs —
+  [`$expose` handle](/components/chartjs#imperative-handle) is the *same* eight verbs —
   `getChart` / `updateChart` / `resizeChart` / `resetChart` / `renderChart` /
   `stopChart` / `clearChart` / **`toBase64Image`** (PNG export) — on every target,
   grabbed with each framework's native ref mechanism. `getChart()` returns the raw
@@ -109,7 +109,7 @@ dates before relying on them.
 
 - **`:plugins` consumer-extensibility, applied uniformly.** Chart.js plugins
   (datalabels, annotation, zoom, a custom crosshair) are passed per-instance
-  through [`:plugins`](/guide/chartjs#extending-with-plugins) — the Chart.js
+  through [`:plugins`](/components/chartjs#extending-with-plugins) — the Chart.js
   analog of an options bag — identically on all six targets, with no per-plugin
   wrapper code and zero bundle cost for plugins you don't engage. (This matches
   the per-instance `plugins` prop the React/Vue/Svelte wrappers also offer; the
@@ -133,7 +133,7 @@ comparison credible, and it doubles as Rozie's own roadmap.
   controller. Both are resolved: the generic `Chart` no longer auto-registers
   (the consumer registers what they use, or imports the `/auto` kitchen-sink
   entry), and each package now also exports the eight
-  [per-type components](/guide/chartjs#per-type-components) — `Line`/`Bar`/…/`Bubble`
+  [per-type components](/components/chartjs#per-type-components) — `Line`/`Bar`/…/`Bubble`
   — each registering only its own controller set. The bundled React/Solid/Lit
   packages now expose a **per-variant subpath** for each typed component
   (`@rozie-ui/chartjs-react/line`, `…/bar`, …, `…/bubble`), and each subpath
@@ -146,7 +146,7 @@ comparison credible, and it doubles as Rozie's own roadmap.
 
 - **`datasetIdKey` and a11y `fallback` — now covered.** The `datasetIdKey` prop
   (default `'label'`) matches datasets by a stable key across updates (with index
-  fallback), and a non-portal [`fallback` slot](/guide/chartjs#slots) renders a11y
+  fallback), and a non-portal [`fallback` slot](/components/chartjs#slots) renders a11y
   content inside the `<canvas>` (alongside the `ariaLabel` prop) — closing the
   react/vue parity gap on both.
 
@@ -159,7 +159,7 @@ comparison credible, and it doubles as Rozie's own roadmap.
 
 ## Try it
 
-The [`@rozie-ui/chartjs` showcase + API reference](/guide/chartjs) documents the
+The [`@rozie-ui/chartjs` showcase + API reference](/components/chartjs) documents the
 `@rozie-ui/chartjs-*` packages — one pre-compiled, per-framework install
 (`npm i @rozie-ui/chartjs-react chart.js`, etc.). The
 [`ChartScreenshotDemo` source](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/ChartScreenshotDemo.rozie)

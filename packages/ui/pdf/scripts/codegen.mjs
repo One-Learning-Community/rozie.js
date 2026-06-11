@@ -29,7 +29,7 @@
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write PdfViewer.css [+ PdfViewer.global.css if present] + PdfViewer.d.ts)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
- *   5. ENFORCE validateDocsPropsTable against docs/guide/pdf.md
+ *   5. ENFORCE validateDocsPropsTable against docs/components/pdf.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable structural
  *      columns — prop name, type, default. Never rewrites the hand-authored prose.
  *      ROZIE_PDF_SKIP_GUIDE=1 relaxes the absent-guide throw to a skip so the
@@ -152,8 +152,8 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 
-  // (5) ENFORCE docs props-table validation against docs/guide/pdf.md.
-  const guideRelPath = 'docs/guide/pdf.md';
+  // (5) ENFORCE docs props-table validation against docs/components/pdf.md.
+  const guideRelPath = 'docs/components/pdf.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_PDF_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -166,7 +166,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/pdf.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/pdf.md not yet authored ' +
         '(ROZIE_PDF_SKIP_GUIDE=1; author the guide and re-run WITHOUT the flag).',
     );
   } else {

@@ -4,7 +4,7 @@
 
 One `Carousel.rozie` source compiles to six idiomatic packages — so all six frameworks get the *same* props, events, two-way `selectedIndex`, and imperative handle. Lit consumers get a category-leading Embla wrapper for free; Angular gets a first-party-quality signals wrapper from the same source as the other five.
 
-The full source for `Carousel.rozie` lives in the [`@rozie-ui/embla` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie). See it running in the [live demo](/guide/embla-demo), and how it stacks up against the per-framework wrappers in the [libraries comparison](/guide/embla-comparison).
+The full source for `Carousel.rozie` lives in the [`@rozie-ui/embla` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie). See it running in the [live demo](/components/embla-demo), and how it stacks up against the per-framework wrappers in the [libraries comparison](/components/embla-comparison).
 
 ## The `@rozie-ui/embla` packages
 
@@ -157,6 +157,6 @@ Set `autoplay` to mount the Autoplay plugin; `autoplayDelay` controls the interv
 
 ## See also
 
-- [Embla — live demo](/guide/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for all six targets.
-- [Embla libraries comparison](/guide/embla-comparison) — how `@rozie-ui/embla` stacks up against `embla-carousel-{react,vue,svelte,solid}`, the Angular community wrapper, and the (absent) Lit story.
+- [Embla — live demo](/components/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for all six targets.
+- [Embla libraries comparison](/components/embla-comparison) — how `@rozie-ui/embla` stacks up against `embla-carousel-{react,vue,svelte,solid}`, the Angular community wrapper, and the (absent) Lit story.
 - [`Carousel.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie)

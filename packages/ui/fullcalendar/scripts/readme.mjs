@@ -378,7 +378,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
 // Docs props-table validator (VALIDATE-NOT-OVERWRITE).
 //
 // Identical contract to the sortable-list/flatpickr validator. codegen.mjs
-// invokes this against docs/guide/fullcalendar.md (REQ-27-6 ships a real
+// invokes this against docs/components/fullcalendar.md (REQ-27-6 ships a real
 // "### Props" table) — ENFORCING: it throws on drift of the IR-derivable
 // structural columns (name/type/default).
 // ---------------------------------------------------------------------------

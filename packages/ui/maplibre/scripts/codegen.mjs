@@ -36,7 +36,7 @@
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write MapLibre.css + MapLibre.global.css + MapLibre.d.ts)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
- *   5. ENFORCE validateDocsPropsTable against docs/guide/maplibre.md
+ *   5. ENFORCE validateDocsPropsTable against docs/components/maplibre.md
  *      (THROWS if the guide is absent AND on drift of the IR-derivable
  *      structural columns — prop name, type, default. Never rewrites the
  *      hand-authored prose. Wave 3 ships the guide; until then the
@@ -178,18 +178,18 @@ function main() {
   }
 
   // (5) ENFORCE docs props-table validation: the IR-derivable structural columns
-  // (prop name + type + default) in docs/guide/maplibre.md MUST match ir.props
+  // (prop name + type + default) in docs/components/maplibre.md MUST match ir.props
   // or this script THROWS. It does NOT overwrite the hand-authored prose
   // (Runtime-updatable? column + Descriptions stay) — VALIDATE-NOT-OVERWRITE. The
   // docs file is the single-source-of-truth surface for the structural columns;
   // reconcile the table (not the validator) if it drifts. (Same ENFORCING shape
   // as @rozie-ui/codemirror.)
   //
-  // Wave 3 authors docs/guide/maplibre.md. Until it lands, the
+  // Wave 3 authors docs/components/maplibre.md. Until it lands, the
   // ROZIE_MAPLIBRE_SKIP_GUIDE env escape hatch relaxes the absent-guide throw to
   // a skip so this wave can emit the leaves first. Wave 3 runs codegen WITHOUT
   // the flag, flipping validation back to ENFORCING-passing.
-  const guideRelPath = 'docs/guide/maplibre.md';
+  const guideRelPath = 'docs/components/maplibre.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_MAPLIBRE_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
@@ -205,7 +205,7 @@ function main() {
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   if (!guideExists) {
     console.log(
-      'codegen: docs props-table validation SKIPPED — docs/guide/maplibre.md not yet authored ' +
+      'codegen: docs props-table validation SKIPPED — docs/components/maplibre.md not yet authored ' +
         '(ROZIE_MAPLIBRE_SKIP_GUIDE=1; Wave 3 authors the guide and re-runs WITHOUT the flag).',
     );
   } else {

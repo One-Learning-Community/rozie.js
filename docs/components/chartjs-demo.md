@@ -93,7 +93,7 @@ This is the **real `@rozie-ui/chartjs-vue` package** running on this page (ViteP
 </div>
 </ClientOnly>
 
-The `type` prop is bound reactively — flipping it re-creates the instance (Chart.js has no stable runtime type-swap), while **Randomize** mutates the bound `data` object so the wrapper reconciles it into the live chart in place. The **Export PNG** button drives the imperative handle (`toBase64Image`). See the [full API](/guide/chartjs) for the complete prop / event / handle surface.
+The `type` prop is bound reactively — flipping it re-creates the instance (Chart.js has no stable runtime type-swap), while **Randomize** mutates the bound `data` object so the wrapper reconciles it into the live chart in place. The **Export PNG** button drives the imperative handle (`toBase64Image`). See the [full API](/components/chartjs) for the complete prop / event / handle surface.
 
 ## One source, six outputs
 
@@ -118,7 +118,7 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [Chart.js — showcase & API](/guide/chartjs) — install, quick starts for all six frameworks, per-type components, and the full reference.
+- [Chart.js — showcase & API](/components/chartjs) — install, quick starts for all six frameworks, per-type components, and the full reference.
 - [The LineChart example](/examples/line-chart) — a focused single-type walkthrough of the same wrapper.
 
 <style scoped>

@@ -17,7 +17,7 @@
  * Render a prop's declared type from its `typeAnnotation`.
  * For SortableList every prop is a constructor identifier
  * (`Array`/`String`/`Number`/`Boolean`/`Object`/`Function`), matching the
- * Type column in docs/guide/sortable-list.md.
+ * Type column in docs/components/sortable-list.md.
  */
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'unknown';
@@ -463,14 +463,14 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
 // Docs props-table validator (OQ2 VALIDATE-NOT-OVERWRITE).
 //
 // Parses the IR-derivable structural columns (prop name + type + default) out
-// of the hand-authored props table in docs/guide/sortable-list.md and ASSERTS
+// of the hand-authored props table in docs/components/sortable-list.md and ASSERTS
 // they match `ir.props`. It NEVER rewrites the docs prose. Returns a result
 // object describing any drift; the caller decides whether to throw.
 // ---------------------------------------------------------------------------
 
 /**
  * @param {object} ir            once-parsed IR
- * @param {string} docsMarkdown  raw contents of docs/guide/sortable-list.md
+ * @param {string} docsMarkdown  raw contents of docs/components/sortable-list.md
  * @returns {{ ok: boolean, errors: string[], checkedRows: number }}
  */
 export function validateDocsPropsTable(ir, docsMarkdown) {

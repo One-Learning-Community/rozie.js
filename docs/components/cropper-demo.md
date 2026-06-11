@@ -63,7 +63,7 @@ This is the **real `@rozie-ui/cropper-vue` package** running on this page (ViteP
 </div>
 </ClientOnly>
 
-The crop box is two-way bound with `v-model:data` — the readout above updates live as you drag, and the buttons drive the imperative handle (`setAspectRatio`, `rotateBy`, `scaleX`/`scaleY`, `reset`, `getCroppedDataURL`). See the [full API](/guide/cropper) for the complete prop/event/handle surface.
+The crop box is two-way bound with `v-model:data` — the readout above updates live as you drag, and the buttons drive the imperative handle (`setAspectRatio`, `rotateBy`, `scaleX`/`scaleY`, `reset`, `getCroppedDataURL`). See the [full API](/components/cropper) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -88,8 +88,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [Cropper — showcase & API](/guide/cropper) — install, quick starts for all six frameworks, and the full reference.
-- [Cropper libraries comparison](/guide/cropper-comparison) — how `@rozie-ui/cropper` stacks up against the per-framework wrappers.
+- [Cropper — showcase & API](/components/cropper) — install, quick starts for all six frameworks, and the full reference.
+- [Cropper libraries comparison](/components/cropper-comparison) — how `@rozie-ui/cropper` stacks up against the per-framework wrappers.
 
 <style scoped>
 .cropper-live {

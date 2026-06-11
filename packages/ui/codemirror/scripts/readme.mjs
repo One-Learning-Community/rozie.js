@@ -422,7 +422,7 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
 // Docs props-table validator (VALIDATE-NOT-OVERWRITE).
 //
 // Identical contract to the fullcalendar validator. codegen.mjs invokes this
-// against docs/guide/codemirror.md (which ships a real "### Props" table) —
+// against docs/components/codemirror.md (which ships a real "### Props" table) —
 // ENFORCING: it throws on drift of the IR-derivable structural columns
 // (name/type/default).
 // ---------------------------------------------------------------------------

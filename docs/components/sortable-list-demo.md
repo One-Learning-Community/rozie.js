@@ -78,7 +78,7 @@ This is the **real `@rozie-ui/sortable-list-vue` package** running on this page 
 </div>
 </ClientOnly>
 
-The list is two-way bound with `v-model:items` — the readout above updates live as you drag or press the buttons, and "Toggle drag" drives the imperative handle (`option('disabled', …)`). The component renders each row through its **default scoped slot** (`{ item, index }`), and `item-key="id"` keeps the keyed reconciler stable across reorders. See the [full API](/guide/sortable-list) for the complete prop/event/handle surface.
+The list is two-way bound with `v-model:items` — the readout above updates live as you drag or press the buttons, and "Toggle drag" drives the imperative handle (`option('disabled', …)`). The component renders each row through its **default scoped slot** (`{ item, index }`), and `item-key="id"` keeps the keyed reconciler stable across reorders. See the [full API](/components/sortable-list) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -103,8 +103,8 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [SortableList — showcase & API](/guide/sortable-list) — install, quick starts for all six frameworks, and the full reference.
-- [Sortable libraries comparison](/guide/sortable-comparison) — how `@rozie-ui/sortable-list` stacks up against react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, and the Angular CDK.
+- [SortableList — showcase & API](/components/sortable-list) — install, quick starts for all six frameworks, and the full reference.
+- [Sortable libraries comparison](/components/sortable-comparison) — how `@rozie-ui/sortable-list` stacks up against react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, and the Angular CDK.
 
 <style scoped>
 .sortable-live {

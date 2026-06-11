@@ -52,7 +52,7 @@ Where they differ:
   Svelte, Angular, Solid, Lit) and spends that focus on deep cross-framework
   behavioral parity and on affordances component-library authors need: scoped and
   scoped-param slots, [portal slots](/guide/features), an
-  [`$expose` imperative handle](/guide/fullcalendar#imperative-handle) that lands
+  [`$expose` imperative handle](/components/fullcalendar#imperative-handle) that lands
   as a native handle on every target, consumer-side two-way binding, and
   [scoped CSS without CSS-in-JS](/guide/creature-comforts). It is a breadth-vs.-depth
   trade, made on purpose.
@@ -61,7 +61,7 @@ Where they differ:
   editor and Figma import. Rozie is purpose-built for **wrapping vanilla-JS
   engines** (date pickers, calendars, drag-and-drop, editors) once and shipping
   idiomatic consumers for every framework — see the
-  [`@rozie-ui`](/guide/fullcalendar) component families.
+  [`@rozie-ui`](/components/fullcalendar) component families.
 
 **Choose Mitosis** when you want the widest possible target matrix, prefer JSX
 authoring, or you're already in the Builder.io ecosystem. **Rozie fits** when you

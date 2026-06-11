@@ -65,7 +65,7 @@ This is the **real `@rozie-ui/flatpickr-vue` package** running on this page (Vit
 </div>
 </ClientOnly>
 
-The selected value is two-way bound with `v-model:date` — the readout above updates live as you pick, and the toolbar drives the imperative handle (`openPicker`, `closePicker`, `jumpToDate`, `clear`) plus reactive props (`mode`, `inline`). The reactive `mode` change reconciles into the live picker via flatpickr's `set()`; `inline` is construction-time, so the demo re-keys the component to rebuild the engine. See the [full API](/guide/flatpickr) for the complete prop/event/handle surface.
+The selected value is two-way bound with `v-model:date` — the readout above updates live as you pick, and the toolbar drives the imperative handle (`openPicker`, `closePicker`, `jumpToDate`, `clear`) plus reactive props (`mode`, `inline`). The reactive `mode` change reconciles into the live picker via flatpickr's `set()`; `inline` is construction-time, so the demo re-keys the component to rebuild the engine. See the [full API](/components/flatpickr) for the complete prop/event/handle surface.
 
 ## One source, six outputs
 
@@ -90,7 +90,7 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [Flatpickr — showcase & API](/guide/flatpickr) — install, quick starts for all six frameworks, and the full reference.
+- [Flatpickr — showcase & API](/components/flatpickr) — install, quick starts for all six frameworks, and the full reference.
 - [Flatpickr example & per-target output](/examples/flatpickr) — the live source plus compiled React/Vue/Svelte/Angular/Solid/Lit output side by side.
 
 <style scoped>

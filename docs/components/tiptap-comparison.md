@@ -78,7 +78,7 @@ The strongest differentiator now ships: render a **framework component as a cust
 
 **Cross-framework reach.** The same `TipTap.rozie` source ships node views into **Solid** (where `solid-tiptap` has none) and **Lit** (where no wrapper exists) — the two frameworks the official ecosystem leaves to hand-rolling. The reactive-chrome-around-editable-hole composition was verified once in a real TipTap document (REQ-24), with **Angular as the first-class live-browser proof target (REQ-25)**.
 
-See the [TipTap guide's Node-view slots section](/guide/tiptap#node-view-slots) for the per-target consumer shapes and the editable-hole recipe.
+See the [TipTap guide's Node-view slots section](/components/tiptap#node-view-slots) for the per-target consumer shapes and the editable-hole recipe.
 
 ## Bundle Placeholder (G3 — shipped) {#bundle-placeholder-g3-shipped}
 
@@ -118,6 +118,6 @@ JSON output is **available today** through `getJSON()` on the `$expose` handle �
 
 ## Cross-references
 
-- [TipTap — showcase & API](/guide/tiptap) — the full `@rozie-ui/tiptap` surface, quick starts, and recipes.
+- [TipTap — showcase & API](/components/tiptap) — the full `@rozie-ui/tiptap` surface, quick starts, and recipes.
 - [`TipTap.rozie` source](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie)
 - [The portal-slot primitive](/examples/portal-list) — the mechanism the `nodeView` reactive slot builds on.

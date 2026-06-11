@@ -142,9 +142,9 @@ function main() {
   // (5) OPTIONAL docs props-table validation. Flatpickr ships a live-compile
   // showcase page (docs/examples/flatpickr.md) with no "### Props" table, so
   // there is nothing to validate against — unlike sortable-list's
-  // docs/guide/sortable-list.md. If a guide page is added later, this enforces
+  // docs/components/sortable-list.md. If a guide page is added later, this enforces
   // structural-column parity (VALIDATE-NOT-OVERWRITE) and throws on drift.
-  const guidePath = resolve(REPO_ROOT, 'docs/guide/flatpickr.md');
+  const guidePath = resolve(REPO_ROOT, 'docs/components/flatpickr.md');
   if (existsSync(guidePath)) {
     const docs = readFileSync(guidePath, 'utf8');
     const result = validateDocsPropsTable(ir, docs);
@@ -159,7 +159,7 @@ function main() {
     );
   } else {
     console.log(
-      'codegen: docs props-table validation SKIPPED — no docs/guide/flatpickr.md props table (showcase page only)',
+      'codegen: docs props-table validation SKIPPED — no docs/components/flatpickr.md props table (showcase page only)',
     );
   }
 
