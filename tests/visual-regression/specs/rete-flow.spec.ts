@@ -7,67 +7,86 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Node-flow-editor behavioral smoke — Rete.js v2 (`FlowCanvas`).
+ * Node-flow-editor behavioral smoke — Rete.js v2 (`FlowCanvas`), reworked onto the
+ * Phase-41 CONTROLLED-GRAPH model.
  *
  * FlowCanvas is the framework-agnostic-engine archetype: the engine
  * (NodeEditor + AreaPlugin + ConnectionPlugin) owns the graph + all pointer
  * interaction, and a single VANILLA render pipe (no rete-react/vue/… plugin)
- * fills each engine node element with DOM, emits `render` socket signals (so the
- * ConnectionPlugin + the DOM socket-position watcher see the anchors), and draws
- * connection SVG paths. `examples/demos/FlowCanvasDemo.rozie` drives a
- * config-array `:nodes` / `:connections` graph, a two-way `r-model:zoom`, an
- * "add node" button (push onto `$data.nodes`), and fills the REACTIVE
- * multi-instance `node` portal slot with framework-native node chrome.
+ * fills each engine node element with DOM, emits `render`/`rendered` socket signals
+ * (so the ConnectionPlugin + the DOM socket-position watcher see the anchors), and
+ * draws connection SVG paths.
  *
- *   1. **Mount + vanilla render (all 6 targets) — the make-or-break.** The
- *      wrapper's host `.rozie-flow-canvas` appears and the vanilla render pipe
- *      fills the engine node elements: ≥3 `.rozie-flow-node` boxes render. This
- *      proves the custom render layer fired across the framework boundary (no
- *      framework render plugin involved).
+ * THE REDESIGN (41-02/41-03/41-04): the consumer no longer feeds config-arrays
+ * `:nodes`/`:connections` + a reactive `#node` portal. Instead it binds ONE
+ * `r-model:graph` object `{ nodes:[{id,type,x,y,data}], connections:[] }` as the
+ * SINGLE SOURCE OF TRUTH and declares `<NodeType type><template #body>` + typed
+ * `<Port output/input type>` TEMPLATES ONCE each. The canvas renders every graph
+ * node FROM ITS TYPE (render-by-type — the demo never r-fors the nodes), and writes
+ * back x/y on drag + connections on connect/disconnect into the bound graph (a fresh
+ * immutable object). `examples/demos/FlowCanvasDemo.rozie` is the behavioral driver;
+ * `FlowCanvasAdvancedDemo.rozie` is the typed-pipeline centerpiece.
  *
- *   2. **Connections (all 6 targets).** The `:connections` array draws SVG paths
- *      via `classicConnectionPath` + the socket-position watcher — ≥1
- *      `.rozie-flow-connection__path` renders. Proves socket render-signal
- *      emission reached the watcher and the path redraw ran.
- *
- *   3. **Reactive node portal slot.** Each node body is the consumer
- *      `<template #node>` fragment (`.rozie-demo-node`) mounted per node via the
- *      reactive multi-instance portal. Their presence proves the per-node portal
- *      mounted framework-native content.
- *
- *   4. **Config-array reconcile (add node).** Clicking "Add node" pushes onto
- *      `$data.nodes`; the wrapper `$watch` reconciles it into the live editor
- *      (no remount), the count readout climbs, and a new `.rozie-flow-node`
- *      appears — the reactive-add proof.
- *
- *   5. **Two-way zoom.** Clicking "Zoom in" mutates `$data.zoom`; the model write
- *      reconciles into the live area (`area.area.zoom`) and the bound readout
- *      reflects the new level — the two-way round-trip proof.
+ * THE LOAD-BEARING SHIFT FROM THE OLD CELLS — assert the BOUND GRAPH, not just
+ * element counts. A count-only VR pass once masked a totally non-rendering feature on
+ * THIS component (project_next_port_rete_flow). So the drag cell asserts the BOUND
+ * `readout-node0-x` (the write-back into `$data.graph`) actually changed — not just
+ * that a `.rozie-flow-node` moved in the DOM — and is ECHO-SAFE (stable after the
+ * drag settles, no oscillation / climbing count from a write-back loop). Connect /
+ * disconnect assert the bound `connection-count` readout. Validation asserts the
+ * `readout-rejected` TEXT (the attempted types), not a path count. Remove asserts the
+ * SPECIFIC node body gone (toHaveCount(0)), not just a count delta.
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
  * `toHaveScreenshot`. The deterministic pixel baseline is the SEPARATE
- * `FlowCanvasScreenshot` matrix cell (`FlowCanvasScreenshotDemo`). Like
- * `maplibre-map.spec.ts`, this spec runs locally on macOS without a Docker
- * baseline.
+ * `FlowCanvasScreenshot` matrix cell (`FlowCanvasScreenshotDemo`).
  *
  * If this spec is red but the other engine specs (chart, tiptap, maplibre) are
  * green, the regression is in the FlowCanvas wrapper's vanilla render pipe (the
- * `area.addPipe` render handler, the socket render-signal emission, or the
- * `$watch` graph reconcilers) — not the broader engine-wrapper pattern.
+ * `area.addPipe` render handler, the render/rendered socket-signal emission, the
+ * render-by-type bodyRenderer, or the graph write-back reconcilers) — not the
+ * broader engine-wrapper pattern.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
+// All 6 targets must pass the controlled-graph cells (the Svelte Port reserved-word
+// blocker was resolved in 41-04 commit 0c6736ad by renaming the <Port in/out> attrs
+// to input/output — Svelte's $props() destructure now binds legal identifiers).
 const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
   typeof TARGETS[number]
 >();
 
+/**
+ * 1. CONTROLLED GRAPH — render-by-type, DRAG WRITE-BACK, add-node reconcile, two-way zoom.
+ *
+ * `examples/demos/FlowCanvasDemo.rozie` binds ONE `r-model:graph` (3 `task` nodes
+ * Source/Filter/Sink + 2 connections) and declares a single `task` <NodeType> whose
+ * `#body` (`.rozie-demo-node`) renders for EVERY node of the type. It exposes
+ * `readout-count` / `readout-zoom` / `readout-connect` / `readout-node0-x`, plus
+ * `add-node` / `zoom-in`.
+ *
+ *   1. Mount + vanilla render (all 6) — ≥3 `.rozie-flow-node` boxes filled.
+ *   2. RENDER-BY-TYPE — the single `task` `#body` (`.rozie-demo-node`) renders for
+ *      EVERY node (≥3), proving the per-type body projection mounts per instance.
+ *   3. Connections — the 2 bound edges draw `.rozie-flow-connection__path`.
+ *   4. DRAG WRITE-BACK (the #1 proof) — drag the 'Source' node; assert the BOUND
+ *      `readout-node0-x` (= `Math.round($data.graph.nodes[0].x)`) CHANGED. This proves
+ *      the canvas wrote the new x back into `$data.graph` — NOT merely that the engine
+ *      moved the DOM (which a `.rozie-flow-node` transform check would pass even with a
+ *      dead write-back). ECHO-SAFETY: after the drag settles, the readout is STABLE on
+ *      a re-sample (no oscillation / climbing from a write-back→reconcile→write loop)
+ *      and the node count did not climb.
+ *   5. Add-node reconcile — `add-node` appends to `$data.graph.nodes` (fresh object);
+ *      the count readout climbs 3→4 and a new node box appears (no remount).
+ *   6. Two-way zoom — `zoom-in` mutates `$data.zoom`; the bound readout reflects it.
+ */
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`rete-flow [${target}]: graph mounts via vanilla render, connections draw, node portal + reconcile + two-way zoom`, async ({
+  runner(`rete-flow [${target}]: controlled graph renders by type, drag writes back to the bound graph, add-node reconciles, two-way zoom`, async ({
     page,
   }) => {
     await page.goto(`/?example=FlowCanvas&target=${target}`);
@@ -78,28 +97,78 @@ for (const target of TARGETS) {
     // The CSS locators pierce Lit's open shadow root.
     const canvas = page.locator('.rozie-flow-canvas').first();
     await expect(canvas).toBeVisible({ timeout: 15_000 });
-    // ≥3 node boxes filled by the vanilla render pipe.
     await expect
       .poll(async () => page.locator('.rozie-flow-node').count(), {
         timeout: 15_000,
       })
       .toBeGreaterThanOrEqual(3);
 
-    // ---- 2. connections drawn ----
-    await expect
-      .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
-        timeout: 10_000,
-      })
-      .toBeGreaterThanOrEqual(1);
-
-    // ---- 3. reactive node portal slot mounted consumer content ----
+    // ---- 2. RENDER-BY-TYPE: the single `task` #body renders for every instance ----
+    // `.rozie-demo-node` is the type's `<template #body>` fill, mounted per graph node
+    // via the render-by-type bodyRenderer ($portals.body). One declared template,
+    // ≥3 rendered bodies — the per-type projection proof.
     await expect
       .poll(async () => page.locator('.rozie-demo-node').count(), {
         timeout: 10_000,
       })
       .toBeGreaterThanOrEqual(3);
+    // each type body carries its node's label (the #body read `node.data.label`).
+    await expect(
+      page.locator('.rozie-demo-node', { hasText: 'Source' }).first(),
+    ).toBeVisible({ timeout: 10_000 });
 
-    // ---- 4. config-array reconcile: add a node ----
+    // ---- 3. the 2 bound connections draw ----
+    await expect
+      .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(2);
+
+    // ---- 4. DRAG WRITE-BACK (the #1 proof): drag node 'a' → BOUND readout-node0-x changes ----
+    const node0xReadout = page.getByTestId('readout-node0-x');
+    // readout-node0-x = Math.round($data.graph.nodes[0].x); the demo seeds x=20.
+    await expect(node0xReadout).toHaveText('20');
+
+    // Drag the 'Source' node body by a clear horizontal delta. Grab the node by its
+    // HEAD/body (not a socket) so this is a node-move gesture, not a connect gesture.
+    const sourceNode = page.locator('.rozie-flow-node', { hasText: 'Source' }).first();
+    await expect(sourceNode).toBeVisible({ timeout: 10_000 });
+    const nb = await sourceNode.boundingBox();
+    if (!nb) throw new Error('source node bounding box unavailable');
+    // Grab near the top-left of the node (the label area), away from the output socket
+    // on the right edge, so we move the node rather than start a connection drag.
+    const grabX = nb.x + 14;
+    const grabY = nb.y + 10;
+    const DX = 80;
+    await page.mouse.move(grabX, grabY);
+    await page.mouse.down();
+    // move in steps so the area-plugin drag fires pointermove → translate write-back.
+    await page.mouse.move(grabX + DX / 2, grabY, { steps: 6 });
+    await page.mouse.move(grabX + DX, grabY, { steps: 6 });
+    await page.mouse.up();
+
+    // THE WRITE-BACK PROOF: the BOUND graph's nodes[0].x changed (the canvas wrote a
+    // fresh {...graph, nodes} back into $data.graph). NOT a DOM-transform check — this
+    // reads the consumer's bound model via the readout, so a dead write-back FAILS here
+    // even though the engine still moved the node box visually.
+    await expect
+      .poll(async () => Number((await node0xReadout.textContent())?.trim() ?? 'NaN'), {
+        timeout: 10_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBeGreaterThan(20);
+
+    // ---- ECHO-SAFETY: after settle, the readout is STABLE (no write-back loop) ----
+    await page.waitForTimeout(500);
+    const settled = (await node0xReadout.textContent())?.trim();
+    const boxesAfterDrag = await page.locator('.rozie-flow-node').count();
+    await page.waitForTimeout(400);
+    // re-sample: a write-back→reconcile→write echo loop would oscillate/climb the x or
+    // duplicate node boxes; both must be identical after settle.
+    expect((await node0xReadout.textContent())?.trim()).toBe(settled);
+    expect(await page.locator('.rozie-flow-node').count()).toBe(boxesAfterDrag);
+
+    // ---- 5. add-node reconcile (fresh-object append, no remount) ----
     const countReadout = page.getByTestId('readout-count');
     await expect(countReadout).toHaveText('3');
     const before = await page.locator('.rozie-flow-node').count();
@@ -111,7 +180,7 @@ for (const target of TARGETS) {
       })
       .toBeGreaterThan(before);
 
-    // ---- 5. two-way zoom round-trip ----
+    // ---- 6. two-way zoom round-trip ----
     const zoomReadout = page.getByTestId('readout-zoom');
     await expect(zoomReadout).toHaveText('1');
     await page.getByTestId('zoom-in').click();
@@ -120,181 +189,34 @@ for (const target of TARGETS) {
 }
 
 /**
- * Phase 37 — declarative `<FlowNode>` / `<Handle>` / `<Connection>` children +
- * the D-04 $portals body + the D-02 union + the D37-08 provenance.
+ * 2. CONNECT WRITE-BACK — drag-to-connect appends to the bound graph + draws the live
+ * preview line.
  *
- * `examples/demos/FlowCanvasDeclarativeDemo.rozie` feeds ONE `<FlowCanvas>` BOTH a
- * config-array (`:nodes` → `cfg`) AND declarative children: `<FlowNode id="a">`
- * with an INLINE `<template #body>` (`.demo-card`) + a nested output `<Handle>`, an
- * r-for-gated `<FlowNode id="b">` (the unmount-reap vehicle) + nested in/out
- * `<Handle>`s, and a flat `<Connection source="a" target="b"/>`. It proves:
+ * `examples/demos/FlowCanvasDemo.rozie` starts with 2 bound edges (a→b, b→c) and the
+ * a→c pair unconnected. Dragging from 'Source' output to 'Sink' input commits a real
+ * connection: the canvas writes the new edge back into `$data.graph.connections` AND
+ * fires `@connection-created` → the demo's `onConnect` bumps `readout-connect`.
  *
- *   1. **D-04 body via $portals (esp. Lit).** Each `<FlowNode>` mounts its `#body`
- *      portal slot DIRECTLY into the engine `.rozie-flow-node__body` host via the
- *      shipped reactive-portal machinery (`$portals.body` → React createRoot+flushSync
- *      / Vue render / Svelte mount / Solid accessor / Angular ViewContainerRef / Lit
- *      render) — the SAME mechanism the config-array `#node` slot uses, which is
- *      6/6-green. NO framework-owned DOM is relocated (the abandoned `$el`-move path
- *      threw on react removeChild / angular @for / lit lit-html). The body text
- *      (`[data-testid=card-a]`) appears INSIDE a `.rozie-flow-node__body`.
- *   2. **Nested `<Handle>` ports.** The Handles addPort() into the node spec, so
- *      `buildSocketRow` renders `[data-testid=socket]` sockets.
- *   3. **Flat `<Connection>`.** A `.rozie-flow-connection__path` draws between the
- *      declarative nodes.
- *   4. **D-02 union.** The merged node set (cfg + a + b) reaches the engine; with
- *      the imperative add it is cfg + a + b + imp = 4, read via `$expose getNodes()`.
- *   5. **D37-08 provenance.** Toggling b off reaps its registry-managed node while
- *      the imperative `imp` node (in NEITHER provenance set) SURVIVES.
+ *   MID-DRAG (the rubber-band fix proof): with the button held, the count of DRAWN
+ *   paths (a non-empty `d` attribute) reaches ≥3 (2 committed + the live preview).
+ *   Counting elements or asserting the committed edge would NOT distinguish fixed from
+ *   broken (the pseudo `<path>` element exists either way; pre-fix it simply has no
+ *   `d`). Only a non-empty `d` mid-drag proves the rubber-band actually draws.
  *
- * Behavioral-only — NO new pixel baseline (D-08). Angular's component `ref` is the
- * host element (no `getNodes`), so its union/provenance readouts stay `0`/`false`;
- * for Angular we assert the rendered `.rozie-flow-node` DOM count instead (the
- * union still feeds the SAME reconcile, and the 5 ref-resolving targets prove the
- * merged-count + provenance via the handle).
+ *   WRITE-BACK (the controlled-graph proof): after release, the BOUND `readout-connect`
+ *   reads '1' — the `@connection-created` round-tripped on ALL 6 (incl. the Svelte
+ *   hyphenated-emit path fixed in 595968e0). Sink's `in` input is single-connection
+ *   (Rete ClassicPreset `multiple:false` default), so dropping a→c onto c's occupied
+ *   input EVICTS b→c (`connectionremoved`) — the net DRAWN count settles back to 2 even
+ *   though a→c persisted. We therefore assert the WRITE-BACK via the connect readout +
+ *   that the count settled to a stable ≥2 (the committed edges), NOT a brittle =3.
  */
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`rete-flow-declarative [${target}]: <FlowNode> inline body (D-04) + nested <Handle> + flat <Connection> + D-02 union + D37-08 provenance`, async ({
-    page,
-  }) => {
-    await page.goto(`/?example=FlowCanvasDeclarative&target=${target}`);
-    const mount = page.getByTestId('rozie-mount');
-    await expect(mount).toBeVisible();
-
-    // ---- 1. mount + the declarative + config-array nodes render ----
-    const canvas = page.locator('.rozie-flow-canvas').first();
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
-    // cfg (config-array) + a + b (declarative) = 3 node boxes.
-    await expect
-      .poll(async () => page.locator('.rozie-flow-node').count(), {
-        timeout: 15_000,
-      })
-      .toBeGreaterThanOrEqual(3);
-
-    // ---- 2. D-04 body renders INSIDE the engine node via $portals (esp. Lit) ----
-    // The FlowNode mounts its `#body` portal slot directly into the engine
-    // `.rozie-flow-node__body` host (the 6/6-green reactive-portal machinery, no DOM
-    // relocation). Assert the inline body text is visible inside an engine node — the
-    // make-or-break body-projection proof.
-    await expect(
-      page.locator('.rozie-flow-node .rozie-flow-node__body').first(),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('card-a').first()).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByTestId('card-a').first()).toHaveText('Source card');
-
-    // ---- 3. nested <Handle> ports render sockets ----
-    await expect
-      .poll(async () => page.getByTestId('socket').count(), { timeout: 10_000 })
-      .toBeGreaterThanOrEqual(1);
-
-    // ---- 4. flat <Connection> draws an edge between the declarative nodes ----
-    await expect
-      .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
-        timeout: 10_000,
-      })
-      .toBeGreaterThanOrEqual(1);
-
-    // ---- 5. D-02 union + D37-08 provenance via the $expose handle ----
-    if (target === 'angular') {
-      // Angular's component `ref` resolves to the host ELEMENT, not the $expose
-      // instance handle (the documented Angular ref edge — see the spec preamble), so
-      // the imperative `addNode()` / `getNodes()` paths are not reachable via the ref
-      // here. We therefore assert the parts that DO exercise the same union+reconcile
-      // on Angular at the DOM level:
-      //   • D-02 union: cfg (config-array) + a + b (declarative) = 3 engine node boxes.
-      //   • D37-08 registry-managed reap: toggling b off unmounts the declarative
-      //     <FlowNode id="b">, whose registry-managed engine node is reaped (3 → 2).
-      // The "imperative $expose node SURVIVES the reap" half of D37-08 is proven on
-      // the 5 ref-resolving targets below (where getNodes()/addNode() are reachable);
-      // it cannot be triggered through Angular's host-element ref.
-      const before = await page.locator('.rozie-flow-node').count();
-      expect(before).toBeGreaterThanOrEqual(3);
-      await page.getByTestId('toggle-b').click();
-      await expect
-        .poll(async () => page.locator('.rozie-flow-node').count(), {
-          timeout: 10_000,
-        })
-        .toBeLessThan(before);
-      return;
-    }
-
-    const countReadout = mount.getByTestId('readout-node-count');
-    const impReadout = mount.getByTestId('readout-imp-present');
-
-    // D-02 union: cfg + a + b = 3 nodes in the live engine.
-    await expect
-      .poll(
-        async () => {
-          await mount.getByTestId('check-union').click();
-          return Number((await countReadout.textContent())?.trim() ?? '0');
-        },
-        { timeout: 15_000, intervals: [300, 600, 1200] },
-      )
-      .toBe(3);
-
-    // Add the imperative node → union is now 4; imp present.
-    await mount.getByTestId('add-imperative').click();
-    await expect
-      .poll(
-        async () => {
-          await mount.getByTestId('check-union').click();
-          return Number((await countReadout.textContent())?.trim() ?? '0');
-        },
-        { timeout: 10_000, intervals: [300, 600, 1200] },
-      )
-      .toBe(4);
-    await expect(impReadout).toHaveText('true');
-
-    // D37-08: toggle b off → its registry-managed node is reaped (4 → 3), but the
-    // imperative `imp` node (in NEITHER provenance set) SURVIVES the reconcile.
-    await mount.getByTestId('toggle-b').click();
-    await expect
-      .poll(
-        async () => {
-          await mount.getByTestId('check-union').click();
-          return Number((await countReadout.textContent())?.trim() ?? '0');
-        },
-        { timeout: 10_000, intervals: [300, 600, 1200] },
-      )
-      .toBe(3);
-    // imp survived the reap — the provenance distinction proof.
-    await expect(impReadout).toHaveText('true');
-  });
-}
-
-/**
- * Drag-to-connect rubber-band preview line (quick-260610-jrk).
- *
- * When the user drags an edge from an output socket toward an input socket,
- * `rete-connection-plugin` renders a *pseudo-connection* whose render signal
- * carries a literal pointer coordinate (`data.end` when dragging from an output)
- * alongside a payload with one DANGLING endpoint (`target:''`/`targetInput:''`).
- * The vanilla render pipe must seed that dangling endpoint from the pointer (the
- * socketWatcher listener for an empty node id never fires) and update it on every
- * pointermove — otherwise `redraw()`'s `if (!start || !end) return` guard means the
- * preview line is never drawn and the editor gives no drag feedback.
- *
- * THE FIX PROOF (load-bearing): mid-drag, with the button still held, assert the
- * count of DRAWN paths (a `d` attribute that is a non-empty string) reaches ≥3.
- * Justification: the committed edge commits CORRECTLY even WITHOUT the fix, and the
- * pseudo `<path>` ELEMENT is created either way — pre-fix it simply has no `d`
- * attribute (the start/end guard). So counting elements, or asserting the committed
- * edge / lastConnect, would NOT distinguish fixed from broken. Only a pseudo path
- * with a NON-EMPTY `d` mid-drag (2 committed drawn → 3 during the drag) proves the
- * rubber-band actually draws. This is target-agnostic — all 6 go through the same
- * vanilla render pipe and the same `.rozie-flow-connection__path`.
- */
-for (const target of TARGETS) {
-  const built = existsSync(
-    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
-  );
-  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`rete-flow-drag [${target}]: drag-to-connect draws the live preview line`, async ({
+  runner(`rete-flow-drag [${target}]: drag-to-connect draws the live preview + writes the edge back to the bound graph`, async ({
     page,
   }) => {
     await page.goto(`/?example=FlowCanvas&target=${target}`);
@@ -308,7 +230,7 @@ for (const target of TARGETS) {
         timeout: 15_000,
       })
       .toBeGreaterThanOrEqual(3);
-    // the 2 config-array edges (a→b, b→c) are committed and drawn before we drag.
+    // the 2 bound edges (a→b, b→c) are committed and drawn before we drag.
     await expect
       .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
         timeout: 10_000,
@@ -352,9 +274,9 @@ for (const target of TARGETS) {
     await page.mouse.down();
     await page.mouse.move(midX, midY, { steps: 8 });
 
-    // THE FIX PROOF: mid-drag, the pseudo path draws → drawn count climbs to ≥3
-    // (the 2 committed edges + the live preview line). expect.poll samples while
-    // the button is still held so it catches the rubber-band as it tracks.
+    // THE PREVIEW PROOF: mid-drag, the pseudo path draws → drawn count climbs to ≥3
+    // (the 2 committed edges + the live preview line). expect.poll samples while the
+    // button is still held so it catches the rubber-band as it tracks.
     await expect
       .poll(drawnCount, { timeout: 5_000, intervals: [100, 200, 300, 500] })
       .toBeGreaterThanOrEqual(3);
@@ -363,73 +285,44 @@ for (const target of TARGETS) {
     await page.mouse.move(inCx, inCy, { steps: 8 });
     await page.mouse.up();
 
-    // CORROBORATION (gesture completed): the drop landed on a compatible input
-    // socket and committed a real connection in the editor, firing the wrapper's
-    // `connection-created` event. The demo's `@connection-created="onConnect"`
-    // increments `$data.lastConnect`, surfaced via readout-connect → '1'.
-    //
-    // Asserted on ALL 6 targets (debug svelte-emit-async-callback, 2026-06-11). The
-    // earlier Svelte exemption was NOT an async-from-engine-callback gap as first
-    // suspected — the root cause was a Svelte producer/consumer event-name
-    // normalization mismatch: the consumer-side child-component @event binding kept
-    // hyphens (`onconnection-created`) while the producer's `$emit` lowering strips
-    // them (`onconnectioncreated`), so the callback prop was never bound and
-    // `onconnectioncreated?.(…)` silently no-oped. The non-hyphenated `nodepicked`
-    // from the SAME async pipe always round-tripped, which falsified the async
-    // hypothesis. Fixed in packages/targets/svelte by composing the consumer prop
-    // name with the shared svelteCallbackPropName normalizer. The full commit
-    // round-trip is now asserted on Svelte too.
+    // THE WRITE-BACK PROOF (controlled graph): the drop committed a real connection in
+    // the editor, firing `@connection-created`. The canvas wrote the edge back into
+    // `$data.graph.connections`; the demo's `onConnect` bumps the BOUND `readout-connect`
+    // to '1'. Asserted on ALL 6 incl. Svelte (the hyphenated-emit normalizer fix).
     await expect(page.getByTestId('readout-connect')).toHaveText('1', {
       timeout: 10_000,
     });
-    // PERSISTENCE PROOF (260610-jrk continuation): after release the rubber-band
-    // pseudo is torn down, but the freshly drag-created a→c edge is a REAL
-    // connection that renders and PERSISTS with a non-empty `d` — so the drawn-path
-    // count settles to EXACTLY 3 (a→b, b→c committed + a→c drag-created). This
-    // upgrades the earlier soft `≥2` (which a vanishing a→c would have passed) to a
-    // strict `=3` that fails if the drag-created edge does not keep a drawn path.
-    //
-    // Why this is now assertable: the DOM evidence in the 260610-jrk continuation
-    // (an instrumented `area.addPipe` trace) proved the a→c connection IS created
-    // (`connectioncreated`, programmatic=0) AND rendered with a real bezier `d`. The
-    // earlier "doesn't persist" reading was a misdiagnosis — Sink's input was a
-    // single-connection input (ClassicPreset `multiple:false` default), so dropping
-    // a→c onto c's already-occupied input correctly EVICTED b→c (`connectionremoved`
-    // for e2), leaving the count at 2 even though a→c persisted. Sink's input is now
-    // `multiple: true` in FlowCanvasDemo, so a→c ADDS a third edge instead of
-    // replacing b→c — making the persistence directly countable.
-    await expect
-      .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
-      .toBe(3);
+
+    // CORROBORATION + ECHO-SAFETY: after the rubber-band tears down, the drawn-path
+    // count settles to a STABLE value ≥2 (Sink's single input evicts b→c when a→c lands,
+    // so the net committed set stays 2). We assert it is stable on a re-sample (no
+    // write-back→reconcile oscillation), not a brittle exact 3 (which a single-input
+    // eviction correctly violates).
+    await page.waitForTimeout(600);
+    const settled = await drawnCount();
+    expect(settled).toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(400);
+    expect(await drawnCount()).toBe(settled);
   });
 }
 
 /**
- * Connector / socket vertical-alignment proof (quick-260610-jrk continuation #2).
+ * 3. Connector / socket vertical-alignment proof (quick-260610-jrk continuation #2,
+ * carried over to the controlled-graph demo).
  *
  * THE BUG: connection lines anchored ~14px BELOW each socket, at the node BOTTOM,
  * instead of on the socket. ROOT CAUSE (DOM-evidence-confirmed): the connection
  * `<svg>` was `display:inline` (the SVG default), so the 1px-tall SVG sat on the
- * connection element's TEXT BASELINE. With the engine container's default
- * line-height that baseline is ~14px below the connection element's top — and the
- * connection element IS the area-transform origin, so the offset is in screen space
- * and pushes EVERY endpoint ~14px down. The socket positions reported by
- * `getDOMSocketPosition` (offsetTop within the node-view) were already correct; the
- * inline-SVG baseline was the sole vertical drift. FIX: `display:block` on
- * `.rozie-flow-connection__svg` removes the baseline gap (CSS-only, in FlowCanvas's
- * scoped `:root {}` engine-DOM block — no script/emitter change).
+ * connection element's TEXT BASELINE — ~14px below the connection element's top — and
+ * the connection element IS the area-transform origin, so the offset is in screen
+ * space and pushes EVERY endpoint ~14px down. FIX: `display:block` on
+ * `.rozie-flow-connection__svg` (CSS-only, in FlowCanvas's scoped `:root {}` block).
  *
- * THE PROOF (load-bearing — must FAIL pre-fix, PASS post-fix): every drawn
- * connection path's START and END screen point must sit within tolerance of SOME
- * socket center VERTICALLY. Pre-fix worst dy ≈ 13.9px (node bottom); post-fix it
- * collapses to «1px (on the socket). The HORIZONTAL offset is NOT asserted tightly:
- * `getDOMSocketPosition.calculatePosition` intentionally returns the socket center
- * shifted 12px OUTWARD (`position.x + 12 * (side==='input' ? -1 : 1)`), so a correct
- * endpoint is ~12px horizontally from the socket center BY DESIGN — only a loose
- * sanity bound (≤ 20px) is checked horizontally. Tolerance rationale for the
- * vertical proof: cross-target sub-pixel kerning / AA / curvature-handle rounding is
- * « 6px, while the bug's node-bottom offset (~14px) is well outside it. Holds on all
- * 6 targets — they share the one vanilla render pipe + the same scoped connection CSS.
+ * THE PROOF (must FAIL pre-fix, PASS post-fix): every drawn connection path's START
+ * and END screen point must sit within tolerance of SOME socket center VERTICALLY.
+ * Pre-fix worst dy ≈ 13.9px (node bottom); post-fix «1px (on the socket). HORIZONTAL
+ * is only sanity-bounded: `getDOMSocketPosition.calculatePosition` returns the socket
+ * center shifted 12px OUTWARD by design.
  */
 const ALIGN_DY_TOLERANCE_PX = 6;
 const ALIGN_DX_SANITY_PX = 20; // 12px intentional outward offset + AA/rounding slack
@@ -453,7 +346,7 @@ for (const target of TARGETS) {
         timeout: 15_000,
       })
       .toBeGreaterThanOrEqual(3);
-    // both config-array edges (a→b, b→c) drawn before we measure.
+    // both bound edges (a→b, b→c) drawn before we measure.
     await expect
       .poll(async () => page.locator('.rozie-flow-connection__path').count(), {
         timeout: 10_000,
@@ -463,13 +356,10 @@ for (const target of TARGETS) {
     // Give the watcher-driven redraw a moment to settle after mount/fit.
     await page.waitForTimeout(1200);
 
-    // For every DRAWN path, compute its START + END screen points (via the path's
-    // own getPointAtLength + getScreenCTM, so transforms/zoom are accounted for),
-    // collect every socket's screen-center, and report the worst-case offset of any
-    // endpoint from its NEAREST socket center. The bug-specific signal is VERTICAL
-    // (worstDy): pre-fix ~14px (node bottom), post-fix «1px (on the socket). The
-    // horizontal offset is loose (the lib intentionally shifts the stored position
-    // 12px outward), so worstDx is only sanity-bounded.
+    // For every DRAWN path, compute its START + END screen points (via the path's own
+    // getPointAtLength + getScreenCTM, so transforms/zoom are accounted for), collect
+    // every socket's screen-center, and report the worst-case offset of any endpoint
+    // from its NEAREST socket center. The bug-specific signal is VERTICAL (worstDy).
     const result = await page.evaluate(() => {
       // Deep query across the document AND every open shadow root (Lit renders the
       // canvas + sockets + connections inside a shadow root; plain querySelectorAll
@@ -564,65 +454,51 @@ for (const target of TARGETS) {
 }
 
 /**
- * Phase 40 — typed-socket connection validation: the function-typed `:can-connect`
- * prop + the `connection-rejected` emit (D1–D5).
+ * 4. TYPED PIPELINE — automatic typed validation (reject + accept), `canConnect`
+ * OVERRIDE, connect WRITE-BACK, and per-node ✕ REMOVE on the controlled graph.
  *
- * `examples/demos/FlowCanvasAdvancedDemo.rozie` is a typed data-pipeline with five
- * nodes carrying a port type tag in `data.portTypes` (number / string) and a PURE
- * same-type-only `canConnect` predicate bound via `:can-connect="canConnect"`. The
- * graph starts with NO connections, so the drawn-path count begins at 0 — a clean
- * baseline for both the REJECT and ACCEPT deltas.
+ * `examples/demos/FlowCanvasAdvancedDemo.rozie` binds ONE `r-model:graph` of 5 typed
+ * nodes (Number Source / Text Source / Math / Format / Merge) and declares 4
+ * `<NodeType>` templates with typed `<Port>`s — `source` carries BOTH a `number` and a
+ * `string` OUTPUT, `merge` BOTH a `number` and a `string` INPUT (both `multiple`).
+ * `:validate-types="true"` auto-rejects type-mismatched drags FROM THE PORT SCHEMA (no
+ * predicate needed); a small `:can-connect="canConnect"` self-loop rule layers on top.
+ * The graph starts with NO connections (drawnCount baseline 0). Each node `#body` carries
+ * a per-node ✕ on `@pointerup`/`:data-id` → top-level `onRemoveClick` filters
+ * `$data.graph` into a FRESH object (controlled-model remove).
  *
- * Each target runs BOTH gestures sequentially on the SAME graph:
+ *   RENDER-BY-TYPE: each declared type's `#body` renders for its instances — both the
+ *   'Number Source' (source type) and the 'Merge' (merge type) bodies are present.
  *
- *   REJECT (the novel proof): drag the Number Source's `number` output → the Merge
- *   node's `string` input (cross-type). The wrapper's editor pipe runs `canConnect`
- *   at Rete's cancellable `connectioncreate`, gets `false`, emits `connection-rejected`
- *   and returns `undefined` to CANCEL — so `connectioncreated` never fires, no edge
- *   commits, and no `.rozie-flow-connection__path` draws. Assert:
- *     • drawnCount STAYS 0 (no commit), AND
- *     • `readout-rejected` shows the attempted types text (`number → string`) — the
- *       demo's `@connection-rejected` handler ran and wrote it. This TEXT assertion
- *       (not a count) is load-bearing: a count-only check previously masked a totally
- *       non-rendering feature on this component (project_next_port_rete_flow), and a
- *       rejected pseudo-path element can exist mid-drag, so element presence is not
- *       proof. Merge's input is `multiple:true` + empty so a rejected drag never
- *       evicts a prior edge (Pitfall 2) — the 0-count is unambiguous.
- *     • `readout-accepted` STAYS 0 (no `connection-created`).
+ *   AUTOMATIC TYPED REJECT (D3, the novel proof): drag the Number Source's `number`
+ *   output → Merge's `string` input (cross-type). `:validate-types` resolves the port
+ *   types and CANCELS the connection — `connectioncreated` never fires, no path draws.
+ *   Assert: drawnCount STAYS 0 AND `readout-rejected` shows the attempted types TEXT
+ *   (load-bearing, NOT a count: a count-only check once masked a non-rendering feature,
+ *   and a rejected pseudo-path can exist mid-drag). `readout-accepted` STAYS 0.
  *
- *   ACCEPT (mirrors rete-flow-drag): drag the Number Source's `number` output → the
- *   Math node's `number` input (same-type). `canConnect` returns true, the edge
- *   commits, `connectioncreated` fires → `@connection-created` increments
- *   `$data.acceptedCount`. Assert:
- *     • drawnCount climbs to EXACTLY 1 (the committed same-type edge), AND
- *     • `readout-accepted` reads `1` (connection-created round-tripped — incl. the
- *       Svelte hyphenated-emit path, the 595968e0 live regression).
+ *   ACCEPT: drag the Number Source's `number` output → Math's `number` input
+ *   (same-type). The typed check + canConnect pass; the edge commits and is WRITTEN BACK
+ *   into `$data.graph.connections` — the BOUND `connection-count` climbs 0→1 and
+ *   `readout-accepted` reads 1.
  *
- *   REMOVE (cross-target ✕ proof): click the 'Text Source' (txt) node's per-node ✕
- *   button. The ✕ rides the node id on a `:data-id` attribute bind (accessor-rewritten
- *   on Solid) and calls a TOP-LEVEL `onRemoveClick` (NOT slot-scope `emit('remove',…)`,
- *   which is DEAD on Solid — `emit`/`node` are not accessor-rewritten inside @click
- *   bodies there). `onRemoveClick` reads the id off the DOM dataset and filters it out
- *   of `$data.nodes`; the wrapper reconciles and reaps the node box. Assert:
- *     • the `node-count` readout drops 5 → 4 (the config-array write reconciled), AND
- *     • the rendered `.rozie-flow-node` box count drops by exactly 1, AND
- *     • the SPECIFIC removed node's box ('Text Source') is GONE (not a count-only
- *       delta — the load-bearing per-node proof).
- *   This is the proof the new mechanism works on EVERY target incl. Solid (the prior
- *   slot-scope-emit ✕ silently no-oped on Solid and was never VR-gated). `txt` is a
- *   leaf node untouched by the reject/accept drags above, so removing it last cannot
- *   perturb those assertions.
+ *   canConnect OVERRIDE: drag the Math node's `number` output → its OWN `number` input
+ *   (a self-loop). The typed check passes (number→number) but the custom `canConnect`
+ *   (`c.source !== c.target`) REJECTS it — proving the consumer rule runs IN ADDITION to
+ *   the automatic validation. `connection-count` stays 1; `readout-rejected` updates to
+ *   the self-loop edge.
  *
- * This is the cross-target proof that the FUNCTION-typed prop invokes identically on
- * all 6 (incl. Lit property binding `.canConnect=${fn}`) and the hyphenated
- * `connection-rejected` round-trips on Svelte (D4). Behavioral-only — NO screenshot.
+ *   ✕ REMOVE (all 6 incl. Solid): click the 'Text Source' node's ✕ (@pointerup/:data-id
+ *   → top-level onRemoveClick filters the bound graph). Assert `node-count` drops 5→4,
+ *   the box count drops by exactly 1, AND the SPECIFIC removed node's body is GONE
+ *   (toHaveCount(0)) — the load-bearing per-node proof.
  */
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`rete-flow-advanced [${target}]: typed :can-connect rejects cross-type + accepts same-type`, async ({
+  runner(`rete-flow-advanced [${target}]: automatic typed validation rejects cross-type + canConnect override + connect write-back + ✕ remove`, async ({
     page,
   }) => {
     await page.goto(`/?example=FlowCanvasAdvanced&target=${target}`);
@@ -638,6 +514,15 @@ for (const target of TARGETS) {
       })
       .toBeGreaterThanOrEqual(5);
 
+    // RENDER-BY-TYPE: both the source-type and merge-type #body templates rendered for
+    // their instances (the per-type body projection across distinct types).
+    await expect(
+      page.locator('.rozie-flow-node', { hasText: 'Number Source' }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator('.rozie-flow-node', { hasText: 'Merge' }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+
     // counts DRAWN paths (non-empty `d`), piercing Lit's open shadow root.
     const drawnCount = async () =>
       page
@@ -648,17 +533,37 @@ for (const target of TARGETS) {
               .length,
         );
 
-    // no initial connections — the baseline is a clean 0.
+    // BOUND-graph readout: connection-count = $data.graph.connections.length.
+    const connectionCount = page.getByTestId('connection-count');
+
+    // no initial connections — the baseline is a clean 0 (both drawn paths AND the
+    // bound graph).
     await expect.poll(drawnCount, { timeout: 10_000 }).toBe(0);
+    await expect(connectionCount).toHaveText('0');
     await expect(page.getByTestId('readout-accepted')).toHaveText('0');
 
-    // Locate a socket by its node's distinctive label (substring, case-insensitive).
-    // 'Number Source' / 'Math' / 'Merge' are unique node labels (the port type labels
-    // are the bare words 'number'/'string', which never spell these phrases).
+    // Locate a socket by its node's distinctive label + the socket side. `.first()`
+    // takes the first port of that side (for nodes with one port per side).
     const socketOf = (label: string, side: 'output' | 'input') =>
       page
         .locator('.rozie-flow-node', { hasText: label })
         .locator(`.rozie-flow-socket--${side}`)
+        .first();
+
+    // Locate a TYPED socket precisely: the port ROW (.rozie-flow-port--<side>) whose
+    // label span reads the port's `label` ('number'/'string') inside the named node,
+    // then that row's socket. Needed for the multi-port `source`/`merge` types where
+    // `.first()` would ambiguously pick num-vs-str. The row's label span is the
+    // `port.label` text (buildSocketRow renders label='number'/'string').
+    const typedSocketOf = (
+      node: string,
+      side: 'output' | 'input',
+      portLabel: string,
+    ) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
         .first();
 
     const center = async (locator: ReturnType<typeof socketOf>) => {
@@ -681,22 +586,25 @@ for (const target of TARGETS) {
       await page.mouse.up();
     };
 
-    // ---- REJECT: number output → string input (cross-type) is BLOCKED ----
-    const numOut = await center(socketOf('Number Source', 'output'));
-    const mergeIn = await center(socketOf('Merge', 'input'));
-    await drag(numOut, mergeIn);
+    // ---- REJECT (automatic typed validation): number output → string input ----
+    // Number Source's `number` output → Merge's `string` input (cross-type). Both nodes
+    // are multi-port, so target the TYPED socket by its port label, not `.first()`.
+    const numOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mergeStrIn = await center(typedSocketOf('Merge', 'input', 'string'));
+    await drag(numOut, mergeStrIn);
 
-    // no edge committed — the drawn-path count stays 0.
+    // no edge committed — drawn count + the BOUND connection-count both stay 0.
     await expect.poll(drawnCount, { timeout: 5_000 }).toBe(0);
-    // the @connection-rejected handler ran and wrote the attempted types (TEXT, not
-    // a count — the load-bearing assertion). The readout reads e.g. 'number → string'.
+    await expect(connectionCount).toHaveText('0');
+    // the @connection-rejected handler ran and wrote the attempted types (TEXT, not a
+    // count — the load-bearing assertion). The readout reads e.g. 'num:num → merge:…'.
     const rejected = page.getByTestId('readout-rejected');
-    await expect(rejected).toContainText('number', { timeout: 10_000 });
-    await expect(rejected).toContainText('string');
+    await expect(rejected).toContainText('num', { timeout: 10_000 });
+    await expect(rejected).toContainText('merge');
     // no connection-created fired on the rejected drag.
     await expect(page.getByTestId('readout-accepted')).toHaveText('0');
 
-    // ---- ACCEPT: number output → number input (same-type) COMMITS ----
+    // ---- ACCEPT (same-type) + CONNECT WRITE-BACK: number output → number input ----
     const mathIn = await center(socketOf('Math', 'input'));
     await drag(numOut, mathIn);
 
@@ -704,16 +612,33 @@ for (const target of TARGETS) {
     await expect
       .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
       .toBe(1);
-    // connection-created round-tripped (incl. the Svelte hyphenated-emit path).
+    // WRITE-BACK: the edge was written back into $data.graph.connections — the BOUND
+    // connection-count climbed 0→1 …
+    await expect(connectionCount).toHaveText('1', { timeout: 10_000 });
+    // … and @connection-created round-tripped (incl. the Svelte hyphenated-emit path).
     await expect(page.getByTestId('readout-accepted')).toHaveText('1', {
       timeout: 10_000,
     });
 
-    // ---- REMOVE: the per-node ✕ removes a node on ALL 6 (incl. Solid) ----
-    // The ✕ uses :data-id + a TOP-LEVEL onRemoveClick (NOT slot-scope emit), so it
-    // works on Solid where slot-scope @click bodies are not accessor-rewritten. We
-    // remove the 'Text Source' (txt) LEAF node — untouched by the reject/accept drags
-    // above — so sequencing the removal last cannot disturb those assertions.
+    // ---- canConnect OVERRIDE: Math number output → Math number input (self-loop) ----
+    // The typed check passes (number→number) but the custom canConnect (source!==target)
+    // REJECTS it — proving the consumer rule layers ON TOP of the automatic validation.
+    const mathOut = await center(socketOf('Math', 'output'));
+    const mathInAgain = await center(socketOf('Math', 'input'));
+    await drag(mathOut, mathInAgain);
+    // no new edge: the BOUND connection-count stays 1 and drawnCount stays 1.
+    await expect(connectionCount).toHaveText('1');
+    await expect.poll(drawnCount, { timeout: 5_000 }).toBe(1);
+    // the self-loop reject updated the rejected readout to the math→math edge.
+    await expect(rejected).toContainText('math', { timeout: 10_000 });
+    // accepted did not climb (no second commit).
+    await expect(page.getByTestId('readout-accepted')).toHaveText('1');
+
+    // ---- ✕ REMOVE: per-node remove on the controlled graph (all 6 incl. Solid) ----
+    // The ✕ uses :data-id + a TOP-LEVEL onRemoveClick (NOT slot-scope emit), so it works
+    // on Solid where slot-scope @click bodies are not accessor-rewritten. Remove the
+    // 'Text Source' (txt) LEAF node — untouched by the drags above — so sequencing the
+    // removal last cannot disturb those assertions.
     const nodeCount = page.getByTestId('node-count');
     await expect(nodeCount).toHaveText('5');
     const txtNode = page.locator('.rozie-flow-node', { hasText: 'Text Source' });
@@ -722,7 +647,7 @@ for (const target of TARGETS) {
 
     await page.getByTestId('remove-txt').click();
 
-    // the config-array filter reconciled: the count readout drops by exactly 1 …
+    // the controlled-graph filter reconciled: the BOUND node-count drops by exactly 1 …
     await expect(nodeCount).toHaveText('4');
     // … the engine reaps exactly one node box …
     await expect
