@@ -3,16 +3,16 @@ import { createEffect, mergeProps, onMount, splitProps, useContext } from 'solid
 import { rozieContext } from '@rozie/runtime-solid';
 
 interface PortProps {
-  out?: string;
-  in?: string;
+  output?: string;
+  input?: string;
   type?: string;
   label?: unknown;
   multiple?: unknown;
 }
 
 export default function Port(_props: PortProps): JSX.Element {
-  const _merged = mergeProps({ out: undefined, in: undefined, type: undefined, label: undefined, multiple: undefined }, _props);
-  const [local, attrs] = splitProps(_merged, ['out', 'in', 'type', 'label', 'multiple']);
+  const _merged = mergeProps({ output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined }, _props);
+  const [local, attrs] = splitProps(_merged, ['output', 'input', 'type', 'label', 'multiple']);
 
   const injectedType = useContext(rozieContext("rete:nodeType"));
   onMount(() => {
@@ -42,14 +42,15 @@ export default function Port(_props: PortProps): JSX.Element {
   let nt: any = null;
   nt = injectedType;
 
-  // Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-  // `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-  // key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
+  // Derive side + key from which of output=/input= is set. output wins if both are
+  // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+  // read normally — no member-access-only workaround needed. null key (neither set) ⇒
+  // addPort no-ops on the canvas side (key == null guard).
   function portSide() {
-    return local.out != null ? 'output' : 'input';
+    return local.output != null ? 'output' : 'input';
   }
   function portKey() {
-    return local.out != null ? local.out : local.in;
+    return local.output != null ? local.output : local.input;
   }
 
   // idempotency flag so the $onMount addPort and the late-context $onUpdate path

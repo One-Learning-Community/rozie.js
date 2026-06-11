@@ -9,7 +9,7 @@
     <FlowCanvas r-model:graph="$data.graph">
       <NodeType type="source">
         <template #body="{ node }">{{ node.data.label }}</template>
-        <Port out="num" type="number" />
+        <Port output="num" type="number" />
       </NodeType>
     </FlowCanvas>
 

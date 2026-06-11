@@ -2,16 +2,16 @@
 import { getContext, onMount } from 'svelte';
 
 interface Props {
-  out?: string;
-  in?: string;
+  output?: string;
+  input?: string;
   type?: string;
   label?: unknown;
   multiple?: unknown;
 }
 
 let {
-  out = undefined,
-  in = undefined,
+  output = undefined,
+  input = undefined,
   type = undefined,
   label = undefined,
   multiple = undefined
@@ -27,14 +27,16 @@ const injectedType = getContext('rete:nodeType');
 let nt: any = null;
 nt = injectedType;
 
-// Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-// `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-// key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
-// Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-// `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-// key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
-const portSide = () => out != null ? 'output' : 'input';
-const portKey = () => out != null ? out : in;
+// Derive side + key from which of output=/input= is set. output wins if both are
+// (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+// read normally — no member-access-only workaround needed. null key (neither set) ⇒
+// addPort no-ops on the canvas side (key == null guard).
+// Derive side + key from which of output=/input= is set. output wins if both are
+// (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+// read normally — no member-access-only workaround needed. null key (neither set) ⇒
+// addPort no-ops on the canvas side (key == null guard).
+const portSide = () => output != null ? 'output' : 'input';
+const portKey = () => output != null ? output : input;
 
 // idempotency flag so the $onMount addPort and the late-context $onUpdate path
 // (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —

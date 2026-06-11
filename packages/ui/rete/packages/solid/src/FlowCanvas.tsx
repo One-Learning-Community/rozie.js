@@ -1399,7 +1399,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   // both (an array read-modify-write under one type key would clobber). buildNode reads
   // the type's portReg entries on every run regardless of mount order. The unique key
   // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
-  // `side` is derived by <Port> from which of out=/in= is set (out⇒'output', in⇒'input');
+  // `side` is derived by <Port> from which of output=/input= is set (output⇒'output', input⇒'input');
   // `portType` carries the port type that drives validate-types + the typed-port color.
   addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
     if (type == null || key == null) return;

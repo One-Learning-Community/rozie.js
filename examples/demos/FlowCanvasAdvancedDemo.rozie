@@ -19,9 +19,9 @@
       The demo does NOT r-for the nodes — that is the whole point (less plumbing).
 
     - MULTI-PORT TYPES (Dan's ask). `<NodeType type="source">` declares
-      `<Port out="num" type="number"/>` AND `<Port out="str" type="string"/>` — one
+      `<Port output="num" type="number"/>` AND `<Port output="str" type="string"/>` — one
       type, two typed outputs. `<NodeType type="merge">` declares
-      `<Port in="num" type="number" multiple/>` AND `<Port in="str" type="string"
+      `<Port input="num" type="number" multiple/>` AND `<Port input="str" type="string"
       multiple/>` — one type, two typed inputs (both `multiple` so a drag onto them
       never evicts a prior edge → drawn-path counts stay cleanly assertable).
 
@@ -260,8 +260,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port out="num" type="number" label="number" />
-        <Port out="str" type="string" label="string" />
+        <Port output="num" type="number" label="number" />
+        <Port output="str" type="string" label="string" />
       </NodeType>
 
       <!-- numTx: number → number. -->
@@ -285,8 +285,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port in="in" type="number" label="number" />
-        <Port out="out" type="number" label="number" />
+        <Port input="in" type="number" label="number" />
+        <Port output="out" type="number" label="number" />
       </NodeType>
 
       <!-- strTx: number → string. -->
@@ -310,8 +310,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port in="in" type="number" label="number" />
-        <Port out="out" type="string" label="string" />
+        <Port input="in" type="number" label="number" />
+        <Port output="out" type="string" label="string" />
       </NodeType>
 
       <!-- merge: ONE type, BOTH a number AND a string INPUT port, both multiple. -->
@@ -335,8 +335,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port in="num" type="number" label="number" multiple />
-        <Port in="str" type="string" label="string" multiple />
+        <Port input="num" type="number" label="number" multiple />
+        <Port input="str" type="string" label="string" multiple />
       </NodeType>
     </FlowCanvas>
   </div>

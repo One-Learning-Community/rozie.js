@@ -119,11 +119,11 @@ const onConnect = () => { $data.lastConnect = ($data.lastConnect || 0) + 1 }
             <strong>{{ node.data.label }}</strong>
           </div>
         </template>
-        <Port in="in" label="in" />
+        <Port input="in" label="in" />
         <!-- Sink's input is `multiple` so a drag-created edge ADDS rather than evicts
              (Rete single-input holds exactly one), letting the spec assert an exact
              3rd drawn path; declared on the shared `task` type input. -->
-        <Port out="out" label="out" />
+        <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>
   </div>

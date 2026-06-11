@@ -22,8 +22,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
   `,
 })
 export class Port {
-  out = input<string>(undefined);
-  in = input<string>(undefined);
+  output = input<string>(undefined);
+  input = input<string>(undefined);
   type = input<string>(undefined);
   label = input<unknown>(undefined);
   multiple = input<unknown>(undefined);
@@ -32,9 +32,10 @@ export class Port {
   constructor() {
     this.nt = this.injectedType;
 
-    // Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-    // `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-    // key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
+    // Derive side + key from which of output=/input= is set. output wins if both are
+    // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+    // read normally — no member-access-only workaround needed. null key (neither set) ⇒
+    // addPort no-ops on the canvas side (key == null guard).
     effect(() => () => {
       if (this.added) return;
       const live = this.injectedType;
@@ -57,8 +58,8 @@ export class Port {
   }
 
   nt: any = null;
-  portSide = () => this.out() != null ? 'output' : 'input';
-  portKey = () => this.out() != null ? this.out() : this.in();
+  portSide = () => this.output() != null ? 'output' : 'input';
+  portKey = () => this.output() != null ? this.output() : this.input();
   added = false;
 }
 

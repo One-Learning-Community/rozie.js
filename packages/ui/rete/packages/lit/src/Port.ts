@@ -7,8 +7,8 @@ const __rozieCtx_rete_nodeType = createContext(Symbol.for("rozie:rete:nodeType")
 
 @customElement('rozie-port')
 export default class Port extends SignalWatcher(LitElement) {
-  @property({ type: String, reflect: true }) out: string = undefined;
-  @property({ type: String, reflect: true }) in: string = undefined;
+  @property({ type: String, reflect: true }) output: string = undefined;
+  @property({ type: String, reflect: true }) input: string = undefined;
   @property({ type: String, reflect: true }) type: string = undefined;
   @property({ type: Object }) label: unknown = undefined;
   @property({ type: Object }) multiple: unknown = undefined;
@@ -23,9 +23,10 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
   firstUpdated(): void {
     this.nt = this.injectedType;
 
-    // Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-    // `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-    // key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
+    // Derive side + key from which of output=/input= is set. output wins if both are
+    // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+    // read normally — no member-access-only workaround needed. null key (neither set) ⇒
+    // addPort no-ops on the canvas side (key == null guard).
 
     // register this typed port against the enclosing node TYPE's schema; the canvas's
     // reconcileNodes builds buildNode with the updated input/output spec for every node
@@ -62,9 +63,9 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
 
   nt: any = null;
 
-  portSide = () => this.out != null ? 'output' : 'input';
+  portSide = () => this.output != null ? 'output' : 'input';
 
-  portKey = () => this.out != null ? this.out : this.in;
+  portKey = () => this.output != null ? this.output : this.input;
 
   added = false;
 }

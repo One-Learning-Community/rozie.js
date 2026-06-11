@@ -2,8 +2,8 @@ import { useCallback, useContext, useEffect, useRef } from 'react';
 import { rozieContext } from '@rozie/runtime-react';
 
 interface PortProps {
-  out?: string;
-  in?: string;
+  output?: string;
+  input?: string;
   type?: string;
   label?: unknown;
   multiple?: unknown;
@@ -11,10 +11,10 @@ interface PortProps {
 
 export default function Port(_props: PortProps): JSX.Element {
   const injectedType = useContext(rozieContext("rete:nodeType"));
-  const props: Omit<PortProps, 'out' | 'in' | 'type' | 'label' | 'multiple'> & { out: string; in: string; type: string; label: unknown; multiple: unknown } = {
+  const props: Omit<PortProps, 'output' | 'input' | 'type' | 'label' | 'multiple'> & { output: string; input: string; type: string; label: unknown; multiple: unknown } = {
     ..._props,
-    out: _props.out ?? undefined,
-    in: _props.in ?? undefined,
+    output: _props.output ?? undefined,
+    input: _props.input ?? undefined,
     type: _props.type ?? undefined,
     label: _props.label ?? undefined,
     multiple: _props.multiple ?? undefined,
@@ -24,11 +24,12 @@ export default function Port(_props: PortProps): JSX.Element {
 
   nt.current = injectedType;
 
-  // Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-  // `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-  // key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
-  const portSide = useCallback(() => props.out != null ? 'output' : 'input', [props.out]);
-  const portKey = useCallback(() => props.out != null ? props.out : props.in, [props.in, props.out]);
+  // Derive side + key from which of output=/input= is set. output wins if both are
+  // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+  // read normally — no member-access-only workaround needed. null key (neither set) ⇒
+  // addPort no-ops on the canvas side (key == null guard).
+  const portSide = useCallback(() => props.output != null ? 'output' : 'input', [props.output]);
+  const portKey = useCallback(() => props.output != null ? props.output : props.input, [props.input, props.output]);
 
   useEffect(() => {
     // register this typed port against the enclosing node TYPE's schema; the canvas's

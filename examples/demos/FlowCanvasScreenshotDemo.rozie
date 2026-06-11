@@ -76,8 +76,8 @@
         <template #body="{ node }">
           <div class="rozie-shot-node">{{ node.data.label }}</div>
         </template>
-        <Port in="in" label="in" />
-        <Port out="out" label="out" />
+        <Port input="in" label="in" />
+        <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>
   </div>

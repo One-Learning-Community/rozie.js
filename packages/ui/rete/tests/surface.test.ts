@@ -121,8 +121,10 @@ describe('FlowCanvas.rozie surface gate', () => {
 });
 
 // Phase 41 controlled-graph children: the node-TYPE template <NodeType> + the typed
-// directional port <Port> (repurposed from the Phase-37 <FlowNode>/<Handle>). Both
-// must compile to all 6 with ZERO error diagnostics (NO emitter change).
+// directional port <Port output=/input=> (repurposed from the Phase-37 <FlowNode>/
+// <Handle>). Both must compile to all 6 with ZERO error diagnostics (NO emitter
+// change). Direction attrs are `input`/`output` (NOT `in`/`out` — `in` is a JS
+// reserved word the Svelte $props() destructure rejects).
 describe('NodeType.rozie + Port.rozie surface gate', () => {
   const NODE_TYPE_SRC = readFileSync(resolve(HERE, '..', 'src', 'NodeType.rozie'), 'utf8');
   const PORT_SRC = readFileSync(resolve(HERE, '..', 'src', 'Port.rozie'), 'utf8');
@@ -136,12 +138,12 @@ describe('NodeType.rozie + Port.rozie surface gate', () => {
     expect(NODE_TYPE_SRC).toContain('registerType');
   });
 
-  it('Port derives side/key from out=/in= + addPort against rete:nodeType', () => {
+  it('Port derives side/key from output=/input= + addPort against rete:nodeType', () => {
     const { ast } = parse(PORT_SRC, { filename: 'Port.rozie' });
     const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
     expect(ir.name).toBe('Port');
     expect(sorted(ir.props.map((p: { name: string }) => p.name))).toEqual(
-      sorted(['out', 'in', 'type', 'label', 'multiple']),
+      sorted(['output', 'input', 'type', 'label', 'multiple']),
     );
     expect(PORT_SRC).toContain("$inject('rete:nodeType')");
     expect(PORT_SRC).toContain('addPort');

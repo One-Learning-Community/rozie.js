@@ -42,13 +42,13 @@ Rete ships **no stylesheet** — every node, socket, and connection is styled by
 <FlowCanvas r-model:graph="$data.graph" :validate-types="true" @connection-rejected="onReject">
   <NodeType type="source">
     <template #body="{ node }">{{ node.data.label }}</template>
-    <Port out="num" type="number" />
-    <Port out="str" type="string" />
+    <Port output="num" type="number" />
+    <Port output="str" type="string" />
   </NodeType>
   <NodeType type="merge">
     <template #body="{ node }">Merge</template>
-    <Port in="num" type="number" multiple />
-    <Port in="str" type="string" multiple />
+    <Port input="num" type="number" multiple />
+    <Port input="str" type="string" multiple />
   </NodeType>
 </FlowCanvas>
 ```
@@ -58,7 +58,7 @@ with `$data.graph = { nodes: [{ id, type, x, y, data }], connections: [{ id?, so
 ### Node TYPE templates
 
 - **`<NodeType type="…">`** — declares a node TYPE **once**: its visible body (a named `#body` slot, scoped `{ node, selected, emit }`) plus its port schema (nested `<Port>` children). **Every** graph node whose `type` matches renders this template (render-by-type) and uses its ports. A `<NodeType>` carries **no** `id`/`x`/`y` — instance identity and position live in the bound `graph`, not on the tag.
-- **`<Port out="KEY" type="T" [multiple]>` / `<Port in="KEY" type="T" [multiple]>`** — declares one typed directional port on its enclosing `<NodeType>`. The **direction is derived from which attribute is set** (`out` ⇒ output, `in` ⇒ input), the key is its value, and `type` drives `:validate-types` (a type-mismatched connection is auto-rejected). Optional `label` / `multiple`. Nests inside its `<NodeType>` and auto-binds via injected context (no type to wire by hand).
+- **`<Port output="KEY" type="T" [multiple]>` / `<Port input="KEY" type="T" [multiple]>`** — declares one typed directional port on its enclosing `<NodeType>`. The **direction is derived from which attribute is set** (`output` ⇒ output port, `input` ⇒ input port), the key is its value, and `type` drives `:validate-types` (a type-mismatched connection is auto-rejected). Optional `label` / `multiple`. Nests inside its `<NodeType>` and auto-binds via injected context (no type to wire by hand). _(The attrs are `input`/`output`, not `in`/`out` — `in` is a JS reserved word that Svelte's `$props()` destructure rejects.)_
 
 **Why the node body is a named `#body` slot, not bare children.** A node body has to *teleport* into the node element the Rete engine creates — it does not render in the normal component tree. Rozie mounts it through a portal, which gives it a fresh render-root inside the engine-owned host. A portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming `<Port>` children (which stay in the normal child position) is therefore the correct cross-framework shape — so the body must be the `#body` slot, not a bare default-slot child.
 
@@ -87,11 +87,11 @@ export function Demo() {
       <FlowCanvas graph={graph} onGraphChange={setGraph} validateTypes>
         <NodeType type="source">
           {({ node }) => <div>{node.data.label}</div>}
-          <Port out="num" type="number" />
+          <Port output="num" type="number" />
         </NodeType>
         <NodeType type="merge">
           {({ node }) => <div>{node.data.label}</div>}
-          <Port in="num" type="number" multiple />
+          <Port input="num" type="number" multiple />
         </NodeType>
       </FlowCanvas>
     </div>
@@ -120,11 +120,11 @@ const graph = ref({
     <FlowCanvas v-model:graph="graph" :validate-types="true" @connection-rejected="onReject">
       <NodeType type="source">
         <template #body="{ node }">{{ node.data.label }}</template>
-        <Port out="num" type="number" />
+        <Port output="num" type="number" />
       </NodeType>
       <NodeType type="merge">
         <template #body="{ node }">{{ node.data.label }}</template>
-        <Port in="num" type="number" multiple />
+        <Port input="num" type="number" multiple />
       </NodeType>
     </FlowCanvas>
   </div>
@@ -141,7 +141,7 @@ Each `<NodeType>`'s `#body` is a **reactive portal template**: one portal handle
     <template #body="{ node, selected }">
       <MyNodeCard :title="node.data.label" :payload="node.data" :active="selected" />
     </template>
-    <Port out="out" type="any" />
+    <Port output="out" type="any" />
   </NodeType>
 </FlowCanvas>
 ```

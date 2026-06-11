@@ -2,13 +2,13 @@
   Port.rozie — declarative <Port> typed directional port/socket child for
   @rozie-ui/rete (Phase 41 controlled-graph redesign; repurposed from the Phase-37
   <Handle>). A <Port> declares ONE typed port on its enclosing <NodeType>; the
-  direction is derived from which of out=/in= is set, NOT a `side` string:
+  direction is derived from which of output=/input= is set, NOT a `side` string:
 
     <NodeType type="source">
-      <Port out="num" type="number" />     ⇒ side 'output', key 'num', portType 'number'
+      <Port output="num" type="number" />     ⇒ side 'output', key 'num', portType 'number'
     </NodeType>
     <NodeType type="merge">
-      <Port in="num" type="number" multiple />  ⇒ side 'input', key 'num', multiple
+      <Port input="num" type="number" multiple />  ⇒ side 'input', key 'num', multiple
     </NodeType>
 
   A <Port> injects the nearest <NodeType>'s `rete:nodeType` sub-context and calls its
@@ -22,6 +22,12 @@
   validation (a type-mismatched connection is auto-rejected) — it is NOT socket
   identity (a single shared Socket gates identity; the portType is the typed layer).
 
+  DIRECTION ATTRS ARE `input`/`output` (NOT `in`/`out`): `in` is a JS reserved word
+  that cannot be a bare destructuring binding, which the Svelte emitter's MANDATORY
+  `$props()` destructure (`let { in } = $props()`) rejects — only Svelte fails (the
+  other 5 built). `input`/`output` are ordinary identifiers, so they destructure
+  cleanly on all 6 targets and are read normally (no member-access-only workaround).
+
   LIT ASYNC EDGE (REQ-30): the injected nodeType ctx may be `undefined` on Lit's
   first paint until the async context-request resolves — the read is guarded (the
   null-let `any` alias + the $onUpdate late-context addPort). Renderless: the
@@ -29,22 +35,18 @@
 -->
 <!--
   inherit-attrs/inherit-listeners are OFF: <Port> is renderless (empty template), so
-  there is no root element for auto-fallthrough to land on. Leaving fallthrough ON
-  ALSO makes the emitter destructure every prop name out of the consumer props to
-  compute $attrs — and `in` is a JS reserved word that cannot be a destructuring
-  binding (`const { in } = props` is a syntax error on React/Solid). Disabling
-  fallthrough suppresses that destructure entirely (the renderless-component shape).
+  there is no root element for auto-fallthrough to land on. This is the
+  renderless-component shape (the same fence NodeType uses) — NOT a reserved-word
+  workaround (the direction attrs `input`/`output` are ordinary identifiers).
 -->
 <rozie name="Port" inherit-attrs="false" inherit-listeners="false">
 
 <props>
 {
-  // OUTPUT key — set this (not `in`) to declare an output port. side ⇒ 'output'.
-  out:      { type: String, default: undefined },
-  // INPUT key — set this (not `out`) to declare an input port. side ⇒ 'input'.
-  // (`in` is a JS reserved word as a bare identifier — it is read ONLY as
-  // `$props.in`, NEVER destructured bare.)
-  in:       { type: String, default: undefined },
+  // OUTPUT key — set this (not `input`) to declare an output port. side ⇒ 'output'.
+  output:   { type: String, default: undefined },
+  // INPUT key — set this (not `output`) to declare an input port. side ⇒ 'input'.
+  input:    { type: String, default: undefined },
   // The PORT TYPE — drives the canvas's typed-socket :validate-types (a type-
   // mismatched connection is auto-rejected). Optional (an untyped port imposes no
   // type constraint → connects to anything).
@@ -74,11 +76,12 @@ const injectedType = $inject('rete:nodeType')
 let nt = null
 nt = injectedType
 
-// Derive side + key from which of out=/in= is set. out wins if both are (mis)set;
-// `in` is read ONLY via $props.in (reserved word — never destructured bare). null
-// key (neither set) ⇒ addPort no-ops on the canvas side (key == null guard).
-const portSide = () => ($props.out != null ? 'output' : 'input')
-const portKey = () => ($props.out != null ? $props.out : $props.in)
+// Derive side + key from which of output=/input= is set. output wins if both are
+// (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
+// read normally — no member-access-only workaround needed. null key (neither set) ⇒
+// addPort no-ops on the canvas side (key == null guard).
+const portSide = () => ($props.output != null ? 'output' : 'input')
+const portKey = () => ($props.output != null ? $props.output : $props.input)
 
 // idempotency flag so the $onMount addPort and the late-context $onUpdate path
 // (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —

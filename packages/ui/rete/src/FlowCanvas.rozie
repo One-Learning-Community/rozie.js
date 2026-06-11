@@ -49,13 +49,13 @@
                 @connection-rejected="onReject">
       <NodeType type="source">
         <template #body="{ node }">{{ node.data.label }}</template>
-        <Port out="num" type="number" />
-        <Port out="str" type="string" />
+        <Port output="num" type="number" />
+        <Port output="str" type="string" />
       </NodeType>
       <NodeType type="merge">
         <template #body="{ node }">Merge</template>
-        <Port in="num" type="number" multiple />
-        <Port in="str" type="string" multiple />
+        <Port input="num" type="number" multiple />
+        <Port input="str" type="string" multiple />
       </NodeType>
     </FlowCanvas>
 
@@ -393,7 +393,7 @@ $provide('rete:canvas', {
   // both (an array read-modify-write under one type key would clobber). buildNode reads
   // the type's portReg entries on every run regardless of mount order. The unique key
   // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
-  // `side` is derived by <Port> from which of out=/in= is set (out⇒'output', in⇒'input');
+  // `side` is derived by <Port> from which of output=/input= is set (output⇒'output', input⇒'input');
   // `portType` carries the port type that drives validate-types + the typed-port color.
   addTypePort: (type, side, key, portType, label, multiple) => {
     if (type == null || key == null) return

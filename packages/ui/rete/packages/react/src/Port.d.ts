@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 export interface PortProps {
-  out?: string;
-  in?: string;
+  output?: string;
+  input?: string;
   type?: string;
   label?: unknown;
   multiple?: unknown;
