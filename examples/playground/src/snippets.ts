@@ -223,6 +223,19 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../demos/MapLibreDemo.rozie',
     dependencyGlobPaths: ['../../../packages/ui/maplibre/src/MapLibre.rozie'],
   },
+  {
+    // Phase 40 — the typed-data-pipeline advanced demo for @rozie-ui/rete.
+    // Exercises the new `canConnect` connection-validation prop + the
+    // `connection-rejected` emit (number=blue / string=green typed ports,
+    // same-type-only rule, live rejected-types readout) alongside the breadth
+    // of the FlowCanvas API (reactive #node portal slot, per-node ✕ remove,
+    // two-way zoom, zoomToFit). The FlowCanvas wrapper lives in
+    // @rozie-ui/rete (packages/ui/rete/src/FlowCanvas.rozie).
+    key: 'bundle/FlowCanvasAdvancedDemo',
+    label: 'bundle/FlowCanvasAdvancedDemo',
+    entryGlobPath: '../../demos/FlowCanvasAdvancedDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/rete/src/FlowCanvas.rozie'],
+  },
 ];
 
 // Bundle entry/dep paths can resolve against either glob root: top-level
