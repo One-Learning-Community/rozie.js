@@ -1,24 +1,30 @@
 <!--
-  FlowCanvasDemo.rozie — BEHAVIORAL consumer for the FlowCanvas (Rete.js) wrapper.
+  FlowCanvasDemo.rozie — BEHAVIORAL consumer for the FlowCanvas (Rete.js) wrapper,
+  reworked to the Phase-41 CONTROLLED-GRAPH model.
 
   The companion of FlowCanvasScreenshotDemo (the content-stable pixel cell). THIS
-  demo drives the config-array graph + the two-way zoom + the reactive node
-  portal slot and asserts the DOM reflects them, across all 6 targets
-  (rete-flow.spec.ts):
+  demo drives the single `r-model:graph` controlled graph + the two-way zoom + the
+  render-by-type `<NodeType>` template, and asserts the DOM reflects them across all
+  6 targets (rete-flow.spec.ts):
 
-    - :nodes / :connections config arrays build the graph; the spec asserts the
-      engine rendered the node boxes (.rozie-flow-node) and a connection path
+    - r-model:graph binds ONE `{ nodes, connections }` object as the single source of
+      truth; the canvas renders each graph node from its TYPE template (here a single
+      `task` <NodeType> with an input + output <Port>). The spec asserts the engine
+      rendered the node boxes (.rozie-flow-node) and a connection path
       (.rozie-flow-connection__path).
-    - "Add node" pushes a new entry onto $data.nodes → the wrapper's $watch
-      reconciles it into the live editor (no remount); the node-count readout +
+    - "Add node" appends to `$data.graph.nodes` (a FRESH graph object) → the wrapper's
+      $watch reconciles it into the live editor (no remount); the node-count readout +
       a new .rozie-flow-node prove the reactive add.
-    - r-model:zoom two-way binds to $data.zoom; "Zoom in" mutates $data.zoom →
-      wrapper $watch → area.zoom → the readout reflects it.
-    - <template #node> fills the REACTIVE MULTI-INSTANCE `node` portal slot with
-      framework-native node chrome (.rozie-demo-node), proving the per-node portal
-      mounts and re-renders in place.
+    - DRAG WRITE-BACK: dragging a node makes the canvas rewrite `$data.graph.nodes[i]
+      .x/y` back into the bound model; the node0-x readout reflects it.
+    - r-model:zoom two-way binds to $data.zoom; "Zoom in" mutates $data.zoom → wrapper
+      $watch → area.zoom → the readout reflects it.
+    - A `task` <NodeType> with a `<template #body>` (.rozie-demo-node) renders for
+      EVERY node of the type (render-by-type) — proving the per-type body projection
+      mounts + re-renders in place.
 
-  Container needs explicit height (the wrapper's canvas fills it).
+  Container needs explicit height/width (the wrapper's canvas fills it; the VR host
+  mounts at max-content, so an auto width clips offscreen sockets).
 
   This is the BEHAVIORAL cell — do NOT add screenshot stabilization here. The
   content-stable SCREENSHOT cell is the SEPARATE FlowCanvasScreenshotDemo.rozie.
@@ -29,6 +35,8 @@
 <components>
 {
   FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
 }
 </components>
 
@@ -37,79 +45,86 @@
   zoom: 1,
   nextId: 3,
   lastConnect: 0,
-  lastMoved: 0,
-  nodes: [
-    { id: 'a', label: 'Source', x: 20,  y: 40,  data: { kind: 'in' },  outputs: [{ key: 'out', label: 'out' }] },
-    { id: 'b', label: 'Filter', x: 260, y: 40,  data: { kind: 'op' },  inputs: [{ key: 'in', label: 'in' }], outputs: [{ key: 'out', label: 'out' }] },
-    // Sink's input is `multiple: true` so a drag-created a→c edge ADDS a third
-    // connection (a→b, b→c, a→c) instead of REPLACING the existing b→c. Rete's
-    // ClassicPreset single-input (multiple:false, the default) holds exactly one
-    // connection, so dropping a→c onto an already-occupied single input correctly
-    // evicts b→c — leaving the edge count at 2 and masking the fact that the new
-    // a→c edge DID persist. A multiple input lets the drag spec assert the
-    // drag-created edge persists as an exact 3rd drawn path (the persistence
-    // proof) rather than a soft ≥2.
-    { id: 'c', label: 'Sink',   x: 500, y: 120, data: { kind: 'out' }, inputs: [{ key: 'in', label: 'in', multiple: true }] },
-  ],
-  connections: [
-    { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
-    { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
-  ],
+  // THE SINGLE SOURCE OF TRUTH — one controlled graph object. Every node is a single
+  // `task` type; the canvas renders them all from the one <NodeType> template below
+  // and writes back x/y on drag + connections on connect/disconnect.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 20,  y: 40,  data: { label: 'Source' } },
+      { id: 'b', type: 'task', x: 260, y: 40,  data: { label: 'Filter' } },
+      { id: 'c', type: 'task', x: 500, y: 120, data: { label: 'Sink' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+    ],
+  },
 }
 </data>
 
 <script>
-// Push a new node onto the config array — the wrapper reconciles it live.
+// Append a node to the controlled graph — a FRESH graph object (in-place deep
+// mutation is silently dropped on React/Solid/Lit/Angular). The wrapper reconciles
+// it live (no remount).
 const addNode = () => {
   const id = 'n' + $data.nextId
   $data.nextId = $data.nextId + 1
-  $data.nodes = [
-    ...$data.nodes,
-    { id, label: 'Node ' + id, x: 120 + $data.nodes.length * 30, y: 220, data: { kind: 'op' }, inputs: [{ key: 'in' }], outputs: [{ key: 'out' }] },
+  const nodes = [
+    ...$data.graph.nodes,
+    { id, type: 'task', x: 120 + $data.graph.nodes.length * 30, y: 220, data: { label: 'Node ' + id } },
   ]
+  $data.graph = { ...$data.graph, nodes }
 }
 
 // Drive $data.zoom up — the two-way bind reconciles into the live area.
 const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
 
-// Track graph events for assertion.
+// Track connection events for assertion (the canvas has already written the edge back
+// into $data.graph.connections — the connection-count readout reflects that).
 const onConnect = () => { $data.lastConnect = ($data.lastConnect || 0) + 1 }
-const onMoved = () => { $data.lastMoved = ($data.lastMoved || 0) + 1 }
 </script>
 
 <template>
 <div class="flow-demo">
-  <h3>FlowCanvas — behavioral</h3>
+  <h3>FlowCanvas — controlled graph (behavioral)</h3>
 
   <div class="controls">
     <button type="button" data-testid="add-node" @click="addNode">Add node</button>
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
-    <span class="readout" data-testid="readout-count">{{ $data.nodes.length }}</span>
+    <span class="readout" data-testid="readout-count">{{ $data.graph.nodes.length }}</span>
     <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
     <span class="readout" data-testid="readout-connect">{{ $data.lastConnect }}</span>
+    <!-- Drag write-back proof: the canvas rewrites $data.graph.nodes[0].x live. -->
+    <span class="readout" data-testid="readout-node0-x">{{ Math.round($data.graph.nodes[0].x) }}</span>
   </div>
 
   <!--
     Explicit width: the VR host mounts at `width: max-content`, so a width-auto
-    flow-wrap collapses to ~236px and the canvas (overflow:hidden) clips every node
-    past the first — making the Filter/Sink sockets geometrically present but
-    un-hittable (elementsFromPoint returns nothing), which would break the
-    drag-to-connect drop. A fixed width keeps all node sockets on-canvas + hittable.
+    flow-wrap collapses and the canvas (overflow:hidden) clips every node past the
+    first — making the Filter/Sink sockets geometrically present but un-hittable,
+    which would break the drag-to-connect drop. A fixed width keeps all sockets
+    on-canvas + hittable.
   -->
   <div class="flow-wrap" style="height: 340px; width: 720px">
     <FlowCanvas
-      :nodes="$data.nodes"
-      :connections="$data.connections"
+      r-model:graph="$data.graph"
       r-model:zoom="$data.zoom"
       :fit-on-mount="false"
       @connection-created="onConnect"
-      @node-moved="onMoved"
     >
-      <template #node="{ node, selected }">
-        <div class="rozie-demo-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
-          <strong>{{ node.label }}</strong>
-        </div>
-      </template>
+      <!-- ONE `task` type template renders every node of the type (render-by-type). -->
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port in="in" label="in" />
+        <!-- Sink's input is `multiple` so a drag-created edge ADDS rather than evicts
+             (Rete single-input holds exactly one), letting the spec assert an exact
+             3rd drawn path; declared on the shared `task` type input. -->
+        <Port out="out" label="out" />
+      </NodeType>
     </FlowCanvas>
   </div>
 </div>
@@ -128,6 +143,7 @@ const onMoved = () => { $data.lastMoved = ($data.lastMoved || 0) + 1 }
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 .controls button {
   padding: 0.25rem 0.625rem;
@@ -143,14 +159,19 @@ const onMoved = () => { $data.lastMoved = ($data.lastMoved || 0) + 1 }
   font-size: 0.875rem;
   min-width: 2ch;
 }
-.rozie-demo-node {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  color: #111827;
+
+:root {
+  /* Engine-DOM escape hatch — the #body chrome teleports into the engine node
+     element inside <rozie-flow-canvas>'s shadow root (render-by-type bodyRenderer →
+     $portals.body), so on Lit a plain scoped rule cannot reach it. :root emits
+     document-level CSS adopted into the shadow root. NOT :global() (ROZ128). */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
 }
-.rozie-demo-node[data-kind="in"]  strong { color: #047857; }
-.rozie-demo-node[data-kind="out"] strong { color: #b91c1c; }
-.rozie-demo-node.is-selected { background: rgba(59, 130, 246, 0.08); }
 </style>
 
 </rozie>

@@ -1,63 +1,87 @@
 <!--
-  FlowCanvasAdvancedDemo.rozie — BEHAVIORAL consumer for the Phase-40
-  `canConnect` connection-validation prop + the `connection-rejected` emit on the
-  FlowCanvas (Rete.js) wrapper.
+  FlowCanvasAdvancedDemo.rozie — the controlled-graph TYPED-PIPELINE advanced demo
+  for the @rozie-ui/rete FlowCanvas (Rete.js) wrapper (Phase 41 redesign).
 
-  This is the typed-data-pipeline advanced demo (D5). It exercises the BREADTH of
-  the FlowCanvas API alongside the new validation gate, and is the cross-target
-  proof (rete-flow.spec.ts `rete-flow-advanced`) that the FUNCTION-typed
-  `:can-connect` prop invokes identically on all 6 (incl. Lit property binding)
-  and that the hyphenated `connection-rejected` emit round-trips on Svelte (D4).
+  THE CONSUMER SURFACE THE WAVE-2 VR SPEC (41-05) ASSERTS AGAINST. It proves the
+  locked authoring API end-to-end: the consumer writes ONE `r-model:graph` object
+  + a handful of `<NodeType>` / `<Port>` TYPE TEMPLATES and NOTHING else — the
+  canvas owns the flow middleware (render-by-type, drag/connect/disconnect
+  write-back, typed validation). This is Dan's multi-port ask "coming together
+  cleanly": a `source` type with BOTH a number AND a string OUTPUT port, and a
+  `merge` type with BOTH a number AND a string INPUT port, fall out naturally from
+  the per-TYPE port schema.
 
-  What it proves:
-    - TYPED SOCKETS via a PURE `canConnect` predicate. Each node carries a port
-      type tag in `data.portTypes` (number / string). `canConnect(c)` resolves the
-      source-output type and the target-input type from `$data.nodes` and returns
-      `srcT === tgtT` (same-type-only). It is a PURE predicate — it does NOT mutate
-      `$data` or call any engine method (the predicate runs synchronously inside
-      Rete's `connectioncreate` signal chain; a write there risks engine
-      re-entrancy — RESEARCH § Anti-Patterns).
-    - REJECT readout via the EMIT, not the predicate. `onReject` (the
-      `@connection-rejected` handler) is the SOLE writer of `$data.lastRejected`;
-      it resolves the attempted types from the rejected-connection payload via the
-      same `typeOf()` helper. Routing the readout through the echo-guarded
-      `connection-rejected` emit (rather than mutating inside `canConnect`) keeps
-      the predicate pure AND means programmatic-reconcile rejections (echo-guarded
-      in plan 40-01) never spuriously update the user-facing readout.
-    - ACCEPT round-trip. A same-type drag commits the edge; `@connection-created`
-      increments `$data.acceptedCount`.
-    - PER-NODE ✕ action (works on ALL 6 incl. Solid). Each node body (the reactive
-      `#node` portal slot) carries a ✕ button. The node id rides on a `:data-id`
-      attribute bind (accessor-rewritten on Solid) and @click calls the TOP-LEVEL
-      `onRemoveClick`, which reads the id back off the DOM dataset and removes the node
-      from `$data.nodes` (reconcile reaps it). It deliberately does NOT route through a
-      slot-scope `emit('remove', node.id)`: slot-scope `emit`/`node` are NOT
-      accessor-rewritten inside an @click body on Solid (the foreign-slot accessor
-      limitation — same root cause as r-if when-conditions), so that path is DEAD on
-      Solid. The `node-action` emit remains a real FlowCanvas capability; this demo
-      just no longer uses it to drive remove. The `rete-flow-advanced` VR cell now
-      asserts ✕ removal across all 6 (node count −1 + the specific node box gone).
-    - TWO-WAY zoom (`r-model:zoom`), a `fit` button ($expose `zoomToFit`), and live
-      node / connection / accepted / rejected readouts.
+  What it proves (rete-flow.spec.ts `rete-flow-advanced`):
+    - CONTROLLED GRAPH. `<FlowCanvas r-model:graph="$data.graph">` binds ONE graph
+      object `{ nodes:[{id,type,x,y,data}], connections:[] }` as the single source
+      of truth. The demo declares <NodeType> templates ONCE each (source / numTx /
+      strTx / merge); the canvas renders every graph node from its type's template.
+      The demo does NOT r-for the nodes — that is the whole point (less plumbing).
+
+    - MULTI-PORT TYPES (Dan's ask). `<NodeType type="source">` declares
+      `<Port out="num" type="number"/>` AND `<Port out="str" type="string"/>` — one
+      type, two typed outputs. `<NodeType type="merge">` declares
+      `<Port in="num" type="number" multiple/>` AND `<Port in="str" type="string"
+      multiple/>` — one type, two typed inputs (both `multiple` so a drag onto them
+      never evicts a prior edge → drawn-path counts stay cleanly assertable).
+
+    - AUTOMATIC TYPED VALIDATION. `:validate-types="true"` (the default) auto-rejects
+      a type-mismatched drag by resolving src/tgt port types from the <Port type>
+      schema — NO consumer predicate needed for the common case. A number→string
+      drag is REFUSED and surfaces `@connection-rejected` → `onReject` writes the
+      attempted types to `data-testid="readout-rejected"`.
+
+    - canConnect OVERRIDE (the custom-rule path, kept demonstrable). On TOP of the
+      automatic typed check the demo layers a tiny `canConnect` rule that forbids a
+      self-loop (source === target) — proving a consumer custom rule runs IN ADDITION
+      to the automatic validation, and ALSO surfaces `@connection-rejected`. It is a
+      PURE predicate (no $data write / no engine call — it runs synchronously inside
+      Rete's connectioncreate signal chain; a write there risks engine re-entrancy,
+      RESEARCH § Anti-Patterns). The reject readout routes through the echo-guarded
+      emit, never the predicate.
+
+    - DRAG WRITE-BACK (the load-bearing new mechanism). Dragging a node makes the
+      canvas write a FRESH `{...graph, nodes}` object back into `$data.graph` via the
+      `graph` model — so `$data.graph.nodes[0].x` updates LIVE with no consumer
+      reconcile. The `data-testid="readout-node0-x"` readout reflects it so the VR
+      cell can assert the write-back. Connect/disconnect likewise rewrite
+      `$data.graph.connections` (the connection-count readout reflects it).
+
+    - PER-NODE ✕ REMOVE (works on ALL 6 incl. Solid). Each type's `#body` template
+      carries a ✕ button. The node id rides on a `:data-id` attribute bind
+      (accessor-rewritten on Solid) and `@pointerup` calls the TOP-LEVEL
+      `onRemoveClick`, which reads the id off the DOM dataset and filters
+      `$data.graph.nodes` into a FRESH graph object assigned to `$data.graph`
+      (controlled-model remove — the reconcile reaps the engine node). It does NOT
+      route through a slot-scope `emit('remove', node.id)`: slot-scope `emit`/`node`
+      are NOT accessor-rewritten inside an @click body on Solid (the foreign-slot
+      accessor limitation), so that path is DEAD on Solid. `@pointerup` (not @click,
+      not @pointerdown) is the proven cross-target one — @click is swallowed by
+      Rete's node-drag gesture, @pointerdown is stopPropagation-blocked at the node
+      element so it never reaches Solid's DELEGATED pointerdown on `document`, while
+      Rete does not stop pointerup for a non-socket target so it reaches all 6.
+
+    - TWO-WAY zoom (`r-model:zoom`), a `fit` button ($expose zoomToFit), and live
+      node / connection / accepted / rejected / node0-x / zoom readouts.
 
   Pitfall notes (the rete-port landmines):
-    - #node slot params are named EXACTLY `node` / `selected` (the wrapper also offers
-      `emit`, dropped from this demo's destructure since the ✕ no longer uses it). Do
+    - The `#body` slot params are EXACTLY `node` / `selected` / `emit` (the canvas's
+      bodyRenderer hands this scope; `node` is the GRAPH node {id,type,x,y,data}). Do
       NOT author a local binding that shadows them (Pitfall 4 — the Svelte
-      slot-name/loop-var shadow trap that has bitten this component before).
-    - The `merge` input is `multiple: true` so a rejected/accepted drag onto it
-      never evicts a prior edge (Pitfall 2 — single-input eviction-before-add), so
-      the drawn-path count is cleanly assertable.
-    - Port colors (number = blue / string = green) for the node chrome are styled
-      via the nested `:root {}` engine-DOM escape hatch — plain scoped CSS silently
-      drops on Lit for portal/engine-mounted content (Pitfall 5); `:global()` is a
-      ROZ128 hard error.
-    - The flow-wrap has an explicit width (720px like FlowCanvasDemo): the VR host
-      mounts at `max-content`, so an auto width clips offscreen sockets and the drag
-      gesture cannot hit them.
+      slot-name/loop-var shadow trap).
+    - Node chrome (the kind glyph + typed-port chips) is rendered via {{ }} interp
+      helpers + :attr binds — NOT r-if / @click slot-scope refs, which are not
+      accessor-rewritten on Solid (a `<Show when={node.…}>` blanks the WHOLE #body
+      fill there — the documented Solid foreign-slot accessor limitation).
+    - Port colors (number = blue / string = green) are styled via the nested
+      `:root {}` engine-DOM escape hatch — plain scoped CSS silently drops on Lit for
+      portal/engine-mounted content (Pitfall 5); `:global()` is a ROZ128 hard error.
+    - The flow-wrap has an explicit 720px width: the VR host mounts at
+      `max-content`, so an auto width clips offscreen sockets and the drag gesture
+      cannot hit them.
 
   BEHAVIORAL cell — NO screenshot stabilization, NO new pixel baseline (Phase 37
-  D-08). The existing FlowCanvasScreenshot stays the pixel gate.
+  D-08). FlowCanvasScreenshot stays the pixel gate.
 -->
 
 <rozie name="FlowCanvasAdvancedDemo">
@@ -65,6 +89,8 @@
 <components>
 {
   FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
 }
 </components>
 
@@ -72,128 +98,127 @@
 {
   zoom: 1,
   // Last rejected attempt, written ONLY by onReject (the @connection-rejected
-  // handler). Empty until the first cross-type drag is blocked.
+  // handler). Empty until the first rejected drag (cross-type OR self-loop).
   lastRejected: '',
-  // Count of accepted (same-type) connections, incremented in @connection-created.
+  // Count of accepted connections, incremented in @connection-created.
   acceptedCount: 0,
-  // A typed data pipeline. Each node carries a port type tag in data.portTypes
-  // keyed by port key ('out' / 'in') so canConnect can resolve type by node+key.
-  // number = blue, string = green. Start with NO connections so accept/reject
-  // counts begin from a known baseline (drawnCount === 0).
-  nodes: [
-    { id: 'num',   label: 'Number Source', x: 20,  y: 30,  data: { kind: 'source',    portTypes: { out: 'number' } },
-      outputs: [{ key: 'out', label: 'number' }] },
-    { id: 'txt',   label: 'Text Source',   x: 20,  y: 200, data: { kind: 'source',    portTypes: { out: 'string' } },
-      outputs: [{ key: 'out', label: 'string' }] },
-    { id: 'math',  label: 'Math',          x: 280, y: 30,  data: { kind: 'transform', portTypes: { in: 'number', out: 'number' } },
-      inputs: [{ key: 'in', label: 'number' }], outputs: [{ key: 'out', label: 'number' }] },
-    { id: 'fmt',   label: 'Format',        x: 280, y: 200, data: { kind: 'transform', portTypes: { in: 'number', out: 'string' } },
-      inputs: [{ key: 'in', label: 'number' }], outputs: [{ key: 'out', label: 'string' }] },
-    // merge.in is multiple:true — a rejected/accepted drag onto it never evicts a
-    // prior edge (Pitfall 2), so drawn-path counts stay cleanly assertable.
-    { id: 'merge', label: 'Merge',         x: 540, y: 110, data: { kind: 'merge',     portTypes: { in: 'string' } },
-      inputs: [{ key: 'in', label: 'string', multiple: true }] },
-  ],
-  connections: [],
+  // THE SINGLE SOURCE OF TRUTH — the controlled graph (r-model:graph). Each node is
+  // { id, type, x, y, data }; `type` selects the <NodeType> template, `data.label`
+  // renders in its #body. Start with NO connections so accept/reject counts begin
+  // from a known baseline (drawnCount === 0). The canvas WRITES BACK x/y on drag and
+  // connections on connect/disconnect into this object (fresh-object immutable echo).
+  //
+  //   source : number Source / text Source — a type with BOTH a number AND a string
+  //            OUTPUT port (Dan's multi-port ask).
+  //   numTx  : a number→number transform (number in, number out).
+  //   strTx  : a number→string transform (number in, string out).
+  //   merge  : a type with BOTH a number AND a string INPUT port, both multiple.
+  graph: {
+    nodes: [
+      { id: 'num',   type: 'source', x: 20,  y: 30,  data: { label: 'Number Source' } },
+      { id: 'txt',   type: 'source', x: 20,  y: 200, data: { label: 'Text Source' } },
+      { id: 'math',  type: 'numTx',  x: 280, y: 30,  data: { label: 'Math' } },
+      { id: 'fmt',   type: 'strTx',  x: 280, y: 200, data: { label: 'Format' } },
+      { id: 'merge', type: 'merge',  x: 540, y: 110, data: { label: 'Merge' } },
+    ],
+    connections: [],
+  },
 }
 </data>
 
 <script>
-// Resolve a port's declared type from the demo's own node model. Pure read.
-const typeOf = (nodeId, key) => {
-  const n = $data.nodes.find((x) => x.id === nodeId)
-  return n && n.data && n.data.portTypes ? n.data.portTypes[key] : undefined
-}
-
-// PURE connection-validation predicate (same-type-only). Bound via :can-connect.
-// MUST NOT mutate $data or call any engine method — it runs synchronously inside
-// Rete's connectioncreate signal chain. Returns true to allow, false to reject.
-// The rejected-type readout is set in onReject (NOT here) so the predicate stays
-// pure and reusable for programmatic reconciles.
-const canConnect = (c) => {
-  const srcT = typeOf(c.source, c.sourceOutput)
-  const tgtT = typeOf(c.target, c.targetInput)
-  return srcT != null && srcT === tgtT
-}
-
-// @connection-rejected handler — the SOLE writer of $data.lastRejected. Resolves
-// the attempted types from the rejected payload via the same typeOf() helper.
+// @connection-rejected handler — the SOLE writer of $data.lastRejected. The payload
+// is the canvas conn { id, source, sourceOutput, target, targetInput }. We surface
+// the attempted port keys (the typed validation already knows the types; the demo
+// shows the routed edge so a self-loop reject and a cross-type reject are both
+// legible). Routed through the echo-guarded emit so a programmatic reconcile never
+// spuriously updates the readout.
 const onReject = (c) => {
-  const srcT = typeOf(c.source, c.sourceOutput)
-  const tgtT = typeOf(c.target, c.targetInput)
-  $data.lastRejected = (srcT == null ? '?' : srcT) + ' → ' + (tgtT == null ? '?' : tgtT)
+  const from = (c.source == null ? '?' : c.source) + ':' + (c.sourceOutput == null ? '?' : c.sourceOutput)
+  const to = (c.target == null ? '?' : c.target) + ':' + (c.targetInput == null ? '?' : c.targetInput)
+  $data.lastRejected = from + ' → ' + to
 }
 
-// @connection-created handler — a same-type drag committed; bump the count.
+// @connection-created handler — a valid (typed + canConnect-allowed) drag committed;
+// bump the count. The canvas has ALREADY written the edge back into
+// $data.graph.connections (the connection-count readout reflects that).
 const onConnect = () => { $data.acceptedCount = ($data.acceptedCount || 0) + 1 }
 
-// Per-node ✕ removal — a TOP-LEVEL handler (NOT slot-scope). The node id rides on
-// the button's `:data-id` attribute bind (attribute binds ARE accessor-rewritten on
-// Solid; only event-handler / r-if BODIES are not — the foreign-slot accessor
-// limitation), so we read it back off the DOM rather than routing through a slot-scope
-// `emit('remove', node.id)` (which is DEAD on Solid: `emit`/`node` are undefined inside
-// an event-handler body there).
+// canConnect OVERRIDE — the OPTIONAL custom rule that runs IN ADDITION to the
+// automatic typed validation (:validate-types). Forbids a self-loop (a node wired to
+// itself). PURE predicate: it MUST NOT mutate $data or call any engine method (it
+// runs synchronously inside Rete's connectioncreate signal chain — a write there
+// risks engine re-entrancy). Returns false to REJECT (→ @connection-rejected). The
+// automatic typed check already rejects cross-type drags; this demonstrates a
+// consumer rule layered on top of it.
+const canConnect = (c) => c.source !== c.target
+
+// Per-node ✕ removal — a TOP-LEVEL handler (NOT slot-scope), filtering the CONTROLLED
+// graph. The node id rides on the button's `:data-id` attribute bind (accessor-
+// rewritten on Solid; only event-handler / r-if BODIES are not — the foreign-slot
+// accessor limitation), so we read it back off the DOM rather than routing through a
+// slot-scope `emit('remove', node.id)` (which is DEAD on Solid: `emit`/`node` are
+// undefined inside an event-handler body there).
 //
 // Bound on `@pointerup` (NOT @click and NOT @pointerdown) — the trickiest part of
 // making ✕ work on all 6, driven by how Rete + Solid interact:
-//   • @click is swallowed on EVERY target: pressing the ✕ starts a (zero-distance)
-//     Rete node-drag on pointerdown, and the browser does not synthesize a `click`
-//     out of the drag gesture.
+//   • @click is swallowed on EVERY target: pressing ✕ starts a (zero-distance) Rete
+//     node-drag on pointerdown, and the browser does not synthesize a `click` from it.
 //   • @pointerdown works on 5 targets but is DEAD on Solid: Rete's node-drag handler
-//     (rete-area-plugin `Drag.down`) calls `e.stopPropagation()` during the bubble
-//     phase at the node element. The other 5 attach the listener directly to the
-//     button (fires before the node), but Solid DELEGATES pointerdown to `document`,
-//     so Rete's stopPropagation blocks it from ever reaching Solid's delegated handler.
+//     (rete-area-plugin `Drag.down`) calls `e.stopPropagation()` at the node element.
+//     The other 5 attach the listener directly to the button (fires before the node),
+//     but Solid DELEGATES pointerdown to `document`, so Rete's stopPropagation blocks
+//     it from ever reaching Solid's delegated handler.
 //   • @pointerup is the sweet spot: neither `Drag.up` nor the connection plugin stop
 //     pointerup for a non-socket target, so the native event reaches `document` and
 //     Solid's delegated handler fires — AND the direct listener fires on the other 5.
-// We do NOT stopPropagation here: Rete ends its no-op drag on the window-level
-// pointerup, and blocking it would strand the drag state. The node id rides on the
-// `:data-id` attribute bind (accessor-rewritten on Solid; event-handler/r-if BODIES are
-// not — hence we read it off the DOM, not slot-scope `node`). We resolve it via
+// We do NOT stopPropagation here (Rete ends its no-op drag on the window-level
+// pointerup; blocking it would strand the drag state). We resolve the id via
 // `e.target.closest('[data-id]')` rather than `e.currentTarget`, since on Solid's
-// delegated pointerup `currentTarget` is the delegation root, not the button. Reconcile
-// reaps the removed node from the live editor.
+// delegated pointerup `currentTarget` is the delegation root, not the button.
+//
+// CONTROLLED-MODEL REMOVE: build a FRESH nodes array → assign a FRESH graph object to
+// $data.graph (in-place deep mutation is silently dropped on React/Solid/Lit/Angular).
+// The canvas's reconcile reaps the removed node from the live editor.
 const onRemoveClick = (e) => {
   const el = e.target && e.target.closest ? e.target.closest('[data-id]') : null
   const id = el && el.dataset ? el.dataset.id : undefined
-  if (id != null) $data.nodes = $data.nodes.filter((n) => String(n.id) !== String(id))
+  if (id == null) return
+  const nodes = $data.graph.nodes.filter((n) => String(n.id) !== String(id))
+  const connections = $data.graph.connections.filter(
+    (c) => String(c.source) !== String(id) && String(c.target) !== String(id),
+  )
+  $data.graph = { ...$data.graph, nodes, connections }
 }
 
-// $expose zoomToFit() via the framework ref (best-effort: Angular's ref is the
-// host element, so it no-ops there — the VR cells do not gate fit).
+// $expose zoomToFit() via the framework ref (best-effort: Angular's ref is the host
+// element, so it no-ops there — the VR cells do not gate fit).
 const fit = () => { $refs.flow?.zoomToFit?.() }
 
 // Drive $data.zoom up — the two-way bind reconciles into the live area.
 const zoomIn = () => { $data.zoom = Math.min(Math.round(($data.zoom + 0.25) * 100) / 100, 4) }
 
-// #node slot chrome helpers, used via {{ }} interpolation (NOT r-if). The Solid
-// emitter rewrites slot-scope params (node/selected/emit) to the foreign-slot
-// accessor ONLY inside attribute binds + {{ }} interps — NOT inside r-if `when`
-// conditions or @click handler bodies (the documented Solid foreign-slot accessor
-// limitation). An `r-if="node.…"` therefore compiles to `<Show when={node.…}>`
-// with a bare, undefined `node` that throws at render and blanks the WHOLE #node
-// portal fill on Solid. Routing the kind glyph + the typed-port chips through
-// interpolation helpers keeps the switch-on-kind + typed-port chrome portal-safe
-// on all 6 targets.
-const kindGlyph = (kind) => (kind === 'source' ? '▶' : kind === 'transform' ? '⇄' : '⊕')
-const portChip = (portTypes, key) => {
-  const t = portTypes ? portTypes[key] : undefined
-  return t == null ? '' : key + ':' + t
-}
+// #body slot chrome helpers, used via {{ }} interpolation (NOT r-if — the Solid
+// foreign-slot accessor limitation). The badge glyph keys off the graph node's type;
+// the port chips read the type's declared ports so number=blue / string=green chrome
+// renders without any r-if `when` (which would blank the whole #body fill on Solid).
+const kindGlyph = (type) =>
+  type === 'source' ? '▶' : type === 'merge' ? '⊕' : '⇄'
 </script>
 
 <template>
 <div class="flow-adv-demo">
-  <h3>FlowCanvas — typed connection validation</h3>
+  <h3>FlowCanvas — controlled graph + typed pipeline</h3>
 
   <div class="controls">
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
     <button type="button" data-testid="fit" @click="fit">Fit</button>
-    <span class="readout" data-testid="node-count">{{ $data.nodes.length }}</span>
-    <span class="readout" data-testid="connection-count">{{ $data.connections.length }}</span>
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="connection-count">{{ $data.graph.connections.length }}</span>
     <span class="readout" data-testid="readout-accepted">{{ $data.acceptedCount }}</span>
     <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+    <!-- Drag write-back proof: the canvas rewrites $data.graph.nodes[0].x live. -->
+    <span class="readout" data-testid="readout-node0-x">{{ Math.round($data.graph.nodes[0].x) }}</span>
     <span class="readout readout--rejected" data-testid="readout-rejected">{{ $data.lastRejected }}</span>
   </div>
 
@@ -206,51 +231,113 @@ const portChip = (portTypes, key) => {
   <div class="flow-wrap" style="height: 360px; width: 720px">
     <FlowCanvas
       ref="flow"
-      :nodes="$data.nodes"
-      :connections="$data.connections"
+      r-model:graph="$data.graph"
+      :validate-types="true"
       :can-connect="canConnect"
       r-model:zoom="$data.zoom"
       :fit-on-mount="false"
       @connection-created="onConnect"
       @connection-rejected="onReject"
     >
-      <!-- slot params MUST stay named node/selected (Pitfall 4 shadow). `emit` is
-           dropped from the destructure — the ✕ no longer routes through slot-scope
-           emit (it uses a top-level handler + :data-id, see onRemoveClick). -->
-      <template #node="{ node, selected }">
-        <div class="adv-node" :class="{ 'is-selected': selected }" :data-kind="node.data?.kind">
-          <div class="adv-node__head">
-            <!-- kind glyph + typed-port chips via {{ }} interp helpers (NOT r-if):
-                 r-if / @click slot-scope refs are not accessor-rewritten on Solid
-                 (foreign-slot limitation) and a `<Show when={node.…}>` blanks the
-                 whole portal fill there. Interps + :attr binds ARE rewritten, so
-                 these render on all 6. See the kindGlyph/portChip note in <script>. -->
-            <span class="adv-node__badge">{{ kindGlyph(node.data?.kind) }}</span>
-            <strong class="adv-node__label">{{ node.label }}</strong>
-            <!-- ✕ removal works on ALL 6 (incl. Solid): the node id rides on the
-                 `:data-id` attribute bind (accessor-rewritten on Solid) and the handler
-                 is the TOP-LEVEL onRemoveClick — NOT slot-scope `emit`/`node`, which are
-                 not accessor-rewritten inside event-handler bodies on Solid. Fired on
-                 `@pointerup`: @click is swallowed by Rete's node-drag gesture, and
-                 @pointerdown is stopPropagation-blocked at the node element so it never
-                 reaches Solid's DELEGATED pointerdown handler on `document`. Rete does
-                 not stop pointerup for a non-socket target, so it reaches all 6. NO
-                 modifier (no `this.`-less Angular guarded-handler). See the onRemoveClick
-                 note in <script> for the full Rete/Solid-delegation rationale. -->
-            <button
-              type="button"
-              class="adv-node__x"
-              :data-id="node.id"
-              :data-testid="'remove-' + node.id"
-              @pointerup="onRemoveClick($event)"
-            >&#10005;</button>
+      <!-- source: ONE type, BOTH a number AND a string OUTPUT port (Dan's ask). -->
+      <NodeType type="source">
+        <template #body="{ node }">
+          <div class="adv-node" :data-type="node.type">
+            <div class="adv-node__head">
+              <span class="adv-node__badge">{{ kindGlyph(node.type) }}</span>
+              <strong class="adv-node__label">{{ node.data.label }}</strong>
+              <button
+                type="button"
+                class="adv-node__x"
+                :data-id="node.id"
+                :data-testid="'remove-' + node.id"
+                @pointerup="onRemoveClick($event)"
+              >&#10005;</button>
+            </div>
+            <div class="adv-node__ports">
+              <span class="adv-port" data-type="number">num</span>
+              <span class="adv-port" data-type="string">str</span>
+            </div>
           </div>
-          <div class="adv-node__ports">
-            <span class="adv-port" :data-type="node.data?.portTypes?.in">{{ portChip(node.data?.portTypes, 'in') }}</span>
-            <span class="adv-port" :data-type="node.data?.portTypes?.out">{{ portChip(node.data?.portTypes, 'out') }}</span>
+        </template>
+        <Port out="num" type="number" label="number" />
+        <Port out="str" type="string" label="string" />
+      </NodeType>
+
+      <!-- numTx: number → number. -->
+      <NodeType type="numTx">
+        <template #body="{ node }">
+          <div class="adv-node" :data-type="node.type">
+            <div class="adv-node__head">
+              <span class="adv-node__badge">{{ kindGlyph(node.type) }}</span>
+              <strong class="adv-node__label">{{ node.data.label }}</strong>
+              <button
+                type="button"
+                class="adv-node__x"
+                :data-id="node.id"
+                :data-testid="'remove-' + node.id"
+                @pointerup="onRemoveClick($event)"
+              >&#10005;</button>
+            </div>
+            <div class="adv-node__ports">
+              <span class="adv-port" data-type="number">in</span>
+              <span class="adv-port" data-type="number">out</span>
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
+        <Port in="in" type="number" label="number" />
+        <Port out="out" type="number" label="number" />
+      </NodeType>
+
+      <!-- strTx: number → string. -->
+      <NodeType type="strTx">
+        <template #body="{ node }">
+          <div class="adv-node" :data-type="node.type">
+            <div class="adv-node__head">
+              <span class="adv-node__badge">{{ kindGlyph(node.type) }}</span>
+              <strong class="adv-node__label">{{ node.data.label }}</strong>
+              <button
+                type="button"
+                class="adv-node__x"
+                :data-id="node.id"
+                :data-testid="'remove-' + node.id"
+                @pointerup="onRemoveClick($event)"
+              >&#10005;</button>
+            </div>
+            <div class="adv-node__ports">
+              <span class="adv-port" data-type="number">in</span>
+              <span class="adv-port" data-type="string">out</span>
+            </div>
+          </div>
+        </template>
+        <Port in="in" type="number" label="number" />
+        <Port out="out" type="string" label="string" />
+      </NodeType>
+
+      <!-- merge: ONE type, BOTH a number AND a string INPUT port, both multiple. -->
+      <NodeType type="merge">
+        <template #body="{ node }">
+          <div class="adv-node" :data-type="node.type">
+            <div class="adv-node__head">
+              <span class="adv-node__badge">{{ kindGlyph(node.type) }}</span>
+              <strong class="adv-node__label">{{ node.data.label }}</strong>
+              <button
+                type="button"
+                class="adv-node__x"
+                :data-id="node.id"
+                :data-testid="'remove-' + node.id"
+                @pointerup="onRemoveClick($event)"
+              >&#10005;</button>
+            </div>
+            <div class="adv-node__ports">
+              <span class="adv-port" data-type="number">num</span>
+              <span class="adv-port" data-type="string">str</span>
+            </div>
+          </div>
+        </template>
+        <Port in="num" type="number" label="number" multiple />
+        <Port in="str" type="string" label="string" multiple />
+      </NodeType>
     </FlowCanvas>
   </div>
 </div>
@@ -288,12 +375,12 @@ const portChip = (portTypes, key) => {
 .controls .readout--rejected { color: #b91c1c; min-width: 8ch; }
 
 :root {
-  /* Phase-34 engine-DOM escape hatch: the #node chrome teleports (via the
-     reactive $portals.node render-callback) into the engine node element INSIDE
-     <rozie-flow-canvas>'s shadow root, so on Lit it cannot be reached by a plain
-     scoped rule (no [data-rozie-s-*] attr crosses the shadow boundary). :root emits
-     document-level CSS that FlowCanvas's `adopt-document-styles` adopts into its
-     shadow root. NOT :global() (ROZ128 hard error). Mirrors FlowCanvasDeclarativeDemo. */
+  /* Phase-34 engine-DOM escape hatch: the #body chrome teleports (via the
+     render-by-type bodyRenderer → $portals.body render-callback) into the engine
+     node element INSIDE <rozie-flow-canvas>'s shadow root, so on Lit it cannot be
+     reached by a plain scoped rule (no [data-rozie-s-*] attr crosses the shadow
+     boundary). :root emits document-level CSS that FlowCanvas's `adopt-document-
+     styles` adopts into its shadow root. NOT :global() (ROZ128 hard error). */
   .rozie-flow-canvas .adv-node {
     padding: 0.375rem 0.5rem;
     font-size: 0.8125rem;
@@ -327,7 +414,6 @@ const portChip = (portTypes, key) => {
   /* typed-port colors — number = blue, string = green */
   .rozie-flow-canvas .adv-port[data-type="number"] { color: #3b82f6; font-weight: 600; }
   .rozie-flow-canvas .adv-port[data-type="string"] { color: #10b981; font-weight: 600; }
-  .rozie-flow-canvas .adv-node.is-selected { background: rgba(59, 130, 246, 0.08); }
 }
 </style>
 

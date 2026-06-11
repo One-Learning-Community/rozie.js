@@ -1,30 +1,34 @@
 <!--
   FlowCanvasScreenshotDemo.rozie — CONTENT-STABLE pixel cell for the FlowCanvas
-  (Rete.js) wrapper. The companion of the behavioral FlowCanvasDemo.
+  (Rete.js) wrapper, reworked to the Phase-41 CONTROLLED-GRAPH model. The companion
+  of the behavioral FlowCanvasDemo.
 
   Deterministic, animation-free render for cross-target screenshot parity:
-    - a fixed 3-node / 2-connection graph at fixed positions.
+    - a fixed 3-node / 2-connection controlled graph (`r-model:graph`) at fixed
+      positions, all three nodes a single `task` type.
     - pannable / zoomable / selectable all OFF — no drag affordances, no
       interaction-state variation.
     - fitOnMount OFF + zoom pinned to 1 — the viewport transform is identity, so
       node positions map 1:1 to pixels on every target (no zoomAt animation, no
       per-target fit rounding).
-    - default node chrome (no `node` slot) so the rendered node bodies are the
-      engine-layer title chrome, identical across targets.
+    - a single `task` <NodeType> with a minimal `#body` (the label) so the rendered
+      node chrome is content-identical across targets (render-by-type, one template
+      for every node).
 
-  NOTE (tracked deferral, the canvas/WebGL precedent): the connection SVG paths
-  are drawn from DOM socket positions measured after layout. If a target shows
-  sub-pixel path drift at the human-verify gate, the SCREENSHOT cell for that
-  target is a tracked deferral (like the Chart.js canvas + Lit-MapLibre WebGL
-  cells); the BEHAVIORAL cell (FlowCanvasDemo) remains the correctness gate.
+  NOTE (tracked deferral, the canvas/WebGL precedent): the connection SVG paths are
+  drawn from DOM socket positions measured after layout. If a target shows sub-pixel
+  path drift at the human-verify gate, the SCREENSHOT cell for that target is a
+  tracked deferral (like the Chart.js canvas + Lit-MapLibre WebGL cells); the
+  BEHAVIORAL cell (FlowCanvasDemo) remains the correctness gate.
 
-  EXPLICIT WIDTH (260610-jrk continuation): the VR host mounts at
-  `width: max-content`, so a width-auto flow-wrap collapsed the
-  `overflow:hidden` canvas to ~236px — nodes b (x=240) and c (x=460) rendered
-  off-canvas and the intended fixed 3-node / 2-connection graph never actually
-  showed (the old baseline was a single clipped node with no edges). A fixed
-  width keeps all 3 nodes + both drawn bezier connections on-canvas so the pixel
-  cell DEMONSTRATES the feature it guards.
+  EXPLICIT WIDTH: the VR host mounts at `width: max-content`, so a width-auto
+  flow-wrap collapses the `overflow:hidden` canvas and nodes b/c render off-canvas. A
+  fixed width keeps all 3 nodes + both drawn bezier connections on-canvas so the
+  pixel cell DEMONSTRATES the feature it guards.
+
+  NOTE (41-04): the model changed (config-array → controlled graph + render-by-type
+  body), so the pixel BASELINE is regenerated in 41-05's Linux-Docker VR run; this
+  demo stays content-STABLE (fixed graph, no interaction, minimal body).
 -->
 
 <rozie name="FlowCanvasScreenshotDemo">
@@ -32,20 +36,25 @@
 <components>
 {
   FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
 }
 </components>
 
 <data>
 {
-  nodes: [
-    { id: 'a', label: 'Input',   x: 20,  y: 30,  outputs: [{ key: 'out', label: 'value' }] },
-    { id: 'b', label: 'Process', x: 240, y: 30,  inputs: [{ key: 'in', label: 'in' }], outputs: [{ key: 'out', label: 'out' }] },
-    { id: 'c', label: 'Output',  x: 460, y: 110, inputs: [{ key: 'in', label: 'result' }] },
-  ],
-  connections: [
-    { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
-    { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
-  ],
+  // The single source of truth — a fixed controlled graph, all `task` type.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 20,  y: 30,  data: { label: 'Input' } },
+      { id: 'b', type: 'task', x: 240, y: 30,  data: { label: 'Process' } },
+      { id: 'c', type: 'task', x: 460, y: 110, data: { label: 'Output' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+    ],
+  },
 }
 </data>
 
@@ -54,14 +63,23 @@
   <h3>FlowCanvas — screenshot</h3>
   <div class="flow-wrap" style="width: 720px; height: 280px">
     <FlowCanvas
-      :nodes="$data.nodes"
-      :connections="$data.connections"
+      r-model:graph="$data.graph"
       :zoom="1"
       :pannable="false"
       :zoomable="false"
       :selectable="false"
       :fit-on-mount="false"
-    />
+    >
+      <!-- ONE `task` type; minimal #body (just the label) for content-stable,
+           cross-target-identical node chrome. -->
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-shot-node">{{ node.data.label }}</div>
+        </template>
+        <Port in="in" label="in" />
+        <Port out="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
   </div>
 </div>
 </template>
@@ -74,6 +92,19 @@
   max-width: 760px;
 }
 .flow-shot h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+
+:root {
+  /* Engine-DOM escape hatch — the #body teleports into the engine node element
+     inside <rozie-flow-canvas>'s shadow root (render-by-type bodyRenderer →
+     $portals.body), so on Lit a plain scoped rule cannot reach it. :root emits
+     document-level CSS adopted into the shadow root. NOT :global() (ROZ128). */
+  .rozie-flow-canvas .rozie-shot-node {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
 </style>
 
 </rozie>
