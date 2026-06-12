@@ -44,14 +44,26 @@ const COMPONENTS = [PARENT, 'NodeType', 'Port'];
 // target below (the leaf src + React sidecars).
 const REMOVED_COMPONENTS = ['FlowNode', 'Handle', 'Connection'];
 
-/** Per-target leaf dir + emitted file extension (build mode is informational). */
+/**
+ * Per-target leaf dir + emitted file extension (`build` mode is informational).
+ *
+ * `barrelExt` — the module-path suffix the barrel `index.ts` uses when it
+ *   re-exports each component (`'.vue'` / `'.svelte'`, or `''` for extensionless
+ *   TS/TSX module specifiers). Distinct from `ext` (the emitted leaf file's
+ *   extension) because `import { default as X } from './X.vue'` needs the `.vue`
+ *   suffix while `from './X'` is correct for `.tsx`/`.ts`.
+ * `exportStyle` — `'default'` (the component module's DEFAULT export is the
+ *   component: React/Solid/Lit `.tsx`/`.ts`, and the Vue/Svelte SFCs) vs
+ *   `'named'` (Angular emits a named `export class <Name>` — re-export it by
+ *   name). Mirrors the @rozie-ui/chartjs barrel convention.
+ */
 const TARGETS = {
-  react: { dir: 'react', ext: 'tsx', build: 'tsdown' },
-  vue: { dir: 'vue', ext: 'vue', build: 'source' },
-  svelte: { dir: 'svelte', ext: 'svelte', build: 'source' },
-  angular: { dir: 'angular', ext: 'ts', build: 'source' },
-  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown' },
-  lit: { dir: 'lit', ext: 'ts', build: 'tsdown' },
+  react: { dir: 'react', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
+  vue: { dir: 'vue', ext: 'vue', barrelExt: '.vue', exportStyle: 'default', build: 'source' },
+  svelte: { dir: 'svelte', ext: 'svelte', barrelExt: '.svelte', exportStyle: 'default', build: 'source' },
+  angular: { dir: 'angular', ext: 'ts', barrelExt: '', exportStyle: 'named', build: 'source' },
+  solid: { dir: 'solid', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
+  lit: { dir: 'lit', ext: 'ts', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
 };
 
 function leafPkgName(dir) {
@@ -136,28 +148,51 @@ function main() {
       }
     }
 
-    // Bundled leaves (tsdown) entry on src/index.ts. Each component is a DEFAULT
-    // export, so the multi-export barrel re-exports every component's default under
-    // its named export (an `export *` would NOT forward a default). The PARENT also
-    // re-exports the package default + the `FlowCanvasHandle` type (React/Solid emit
-    // it in the .tsx).
-    if (cfg.build === 'tsdown') {
-      const childExports = COMPONENTS.filter((n) => n !== PARENT)
-        .map((n) => `export { default as ${n} } from './${n}';\n`)
-        .join('');
-      const barrel =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
-          ? `export { default as FlowCanvas } from './FlowCanvas';\n` +
-            `export { default } from './FlowCanvas';\n` +
-            childExports +
-            `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
-              .map((m) => m.name)
-              .join(', ')} }. */\n` +
-            `export type { FlowCanvasHandle } from './FlowCanvas';\n`
-          : `export { default as FlowCanvas } from './FlowCanvas';\nexport { default } from './FlowCanvas';\n` +
-            childExports;
-      writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
-    }
+    // Named-export BARREL — emitted for EVERY target (not just the bundled
+    // tsdown leaves). This is the fix for the Phase-41 packaging gap: without a
+    // barrel the source-shipped leaves (vue/svelte/angular) could only point
+    // `exports["."]` at FlowCanvas.<ext>, so the documented
+    // `import FlowCanvas, { NodeType, Port } from '@rozie-ui/rete-<target>'`
+    // resolved ONLY on react (which had a hand-mirrored barrel). The barrel
+    // re-exports every component by name + a back-compat default (= FlowCanvas).
+    //
+    // Per-target re-export FORM (mirrors @rozie-ui/chartjs barrelLine):
+    //  - exportStyle 'default' (react/solid/lit .tsx/.ts + vue/svelte SFCs): the
+    //    component is the module DEFAULT → `export { default as X } from './X<ext>'`
+    //    (an `export *` would NOT forward a default). A `export { default } from
+    //    './FlowCanvas<ext>'` gives the package its back-compat default.
+    //  - exportStyle 'named' (angular): the emitter writes `export class <Name>`
+    //    → re-export by NAME (`export { X } from './X'`). The angular leaves ALSO
+    //    emit `export default <Name>`, so the FlowCanvas default re-export below
+    //    still resolves for back-compat.
+    //
+    // For Lit the per-component module also carries the `@customElement(...)`
+    // self-registration side effect; `export { default as X } from './X'` imports
+    // (and therefore evaluates) every component module, so importing the barrel
+    // runs all three custom-element registrations — no bare side-effect import
+    // needed.
+    const bx = cfg.barrelExt; // module-path suffix in the barrel ('' | '.vue' | '.svelte')
+    const reexport = (name) =>
+      cfg.exportStyle === 'named'
+        ? `export { ${name} } from './${name}${bx}';\n`
+        : `export { default as ${name} } from './${name}${bx}';\n`;
+
+    const childExports = COMPONENTS.filter((n) => n !== PARENT).map(reexport).join('');
+    const handleType =
+      (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ? `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+            .map((m) => m.name)
+            .join(', ')} }. */\n` + `export type { FlowCanvasHandle } from './FlowCanvas';\n`
+        : '';
+    const barrel =
+      reexport(PARENT) +
+      // Back-compat package default = FlowCanvas (every target's FlowCanvas leaf
+      // has a default export: SFC default, .tsx/.ts default, and the angular
+      // `export default FlowCanvas`).
+      `export { default } from './FlowCanvas${bx}';\n` +
+      childExports +
+      handleType;
+    writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
 
     // README from the single PARENT IR parse.
     const pkgName = leafPkgName(cfg.dir);

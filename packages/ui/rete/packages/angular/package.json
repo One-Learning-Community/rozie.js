@@ -30,9 +30,9 @@
   },
   "exports": {
     ".": {
-      "types": "./src/FlowCanvas.ts",
-      "import": "./src/FlowCanvas.ts",
-      "default": "./src/FlowCanvas.ts"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "files": [
