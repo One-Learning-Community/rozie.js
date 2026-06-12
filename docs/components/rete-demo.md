@@ -72,6 +72,7 @@ This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePres
       ref="flow"
       v-model:graph="graph"
       v-model:zoom="zoom"
+      :minimap="true"
       style="width: 100%; height: 380px;"
     >
       <NodeType type="in">
@@ -102,7 +103,7 @@ This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePres
 </div>
 </ClientOnly>
 
-The graph is **one controlled object** (`v-model:graph`) — the single source of truth, shaped `{ nodes: [{ id, type, x, y, data }], connections: [...] }`. Each node's `type` selects a `<NodeType>` template; the canvas renders every node from its type (render-by-type) and **writes back** into the bound object: dragging a node rewrites its `x`/`y`, and drawing or removing an edge rewrites `connections` — you never hand-reconcile. **Add node** writes a fresh `graph` object and the wrapper reconciles it into the live editor with no remount. `zoom` is **two-way bound** with `v-model:zoom` — the readout tracks it as you scroll, and **Fit** drives the imperative handle (`zoomToFit()`), which echoes the new zoom back into the binding. Each node body is your own `<NodeType>`'s `#body` template, rendered per node through the reactive body portal. See the [full API](/components/rete) for the complete prop / event / handle surface.
+The graph is **one controlled object** (`v-model:graph`) — the single source of truth, shaped `{ nodes: [{ id, type, x, y, data }], connections: [...] }`. Each node's `type` selects a `<NodeType>` template; the canvas renders every node from its type (render-by-type) and **writes back** into the bound object: dragging a node rewrites its `x`/`y`, and drawing or removing an edge rewrites `connections` — you never hand-reconcile. **Add node** writes a fresh `graph` object and the wrapper reconciles it into the live editor with no remount. `zoom` is **two-way bound** with `v-model:zoom` — the readout tracks it as you scroll, and **Fit** drives the imperative handle (`zoomToFit()`), which echoes the new zoom back into the binding. Each node body is your own `<NodeType>`'s `#body` template, rendered per node through the reactive body portal. The two **built-in overlays** are both visible above: the **Controls** cluster (bottom-left, zoom / fit — `:controls`, on by default) and the opt-in **MiniMap** (bottom-right, `:minimap="true"`) — a scaled map of every node (at its measured size) plus the current viewport window, **pannable** to recenter. See the [full API](/components/rete) for the complete prop / event / handle surface.
 
 ## One source, six outputs
 
