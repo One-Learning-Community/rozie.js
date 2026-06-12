@@ -41,6 +41,8 @@ interface FlowCanvasProps {
   controls?: boolean;
   minimap?: boolean;
   canConnect?: ((...args: any[]) => any) | null;
+  onEdgeClick?: (...args: any[]) => void;
+  onEdgeSelected?: (...args: any[]) => void;
   onSelectionChange?: (...args: any[]) => void;
   onNodeAction?: (...args: any[]) => void;
   onConnectionRejected?: (...args: any[]) => void;
@@ -105,9 +107,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const renderScope = useRef<any>(null);
   const selector = useRef<any>(null);
   const onCanvasKeydown = useRef<any>(null);
+  const selectedConnId = useRef<any>(null);
   const keydownContainer = useRef<any>(null);
   const scheduleMinimapRedraw = useRef<any>(null);
   const programmatic = useRef(0);
+  const edgeClickGuard = useRef(false);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
   const reconcileNodesRunning = useRef(false);
@@ -169,21 +173,19 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // selection does not emit on mount). COMPONENT-scope so it survives across area events.
   let lastSelectionIds: any = null;
 
-  // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
-  // On every drag/connect/disconnect the canvas emits a FRESH top-level
-  // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
-  // applyNodeChanges style (Wave-0-proven 6/6; in-place deep mutation is SILENT on
-  // React/Solid/Lit/Angular). Echo-guarded by the `programmatic` counter + the
-  // no-op-diff property: the write-back value already matches engine truth (the node
-  // is already at x/y; the edge already exists) so the consumer's re-bind →
-  // $watch(graph) → reconcile is a no-op diff.
-  //
-  // DRAG COALESCING (Pitfall 2): `nodetranslated` fires on every pointermove during a
-  // drag; emitting a fresh graph + full reconcile per frame is a rebuild storm. We
-  // accumulate the latest position per node (pendingDragPositions) and flush ONE fresh
-  // graph write per animation frame (dragFlushRaf), plus a final flush so the last
-  // position always lands. requestAnimationFrame coalesces multiple moves in a frame
-  // into a single $model.graph emit.
+  // T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
+  // PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
+  // written into $model.graph, so the controlled-graph write-back assertions are
+  // unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
+  // survives across area events + so the Solid-hoisted teardown can clear it. The
+  // `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
+  // source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
+  // element so a background-click clear (and re-select) can drop `.is-selected` without
+  // re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
+  // branch checks so an edge click (which fires its own pointerup on the path AND lets the
+  // area's background pointerup run) does not immediately clear the selection it just made
+  // — reset on the next microtask, after the gesture settles.
+  let selectedPathEl: any = null;
   const pendingDragPositions = useMemo(() => new Map(), []);
   const currentGraph = useCallback(() => graph || {
     nodes: [],
@@ -243,6 +245,37 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
   }, [currentGraph, setGraph]);
+  const clearEdgeSelection = useCallback(() => {
+    if (selectedPathEl && selectedPathEl.classList) {
+      try {
+        selectedPathEl.classList.remove('is-selected');
+      } catch (e: any) {}
+    }
+    selectedConnId.current = null;
+    selectedPathEl = null;
+  }, []);
+  const { onEdgeClick: _rozieProp_onEdgeClick, onEdgeSelected: _rozieProp_onEdgeSelected } = props;
+    const selectEdge = useCallback((id: any, pathEl: any) => {
+    if (id == null) return;
+    clearEdgeSelection();
+    selectedConnId.current = id;
+    selectedPathEl = pathEl;
+    if (pathEl && pathEl.classList) {
+      try {
+        pathEl.classList.add('is-selected');
+      } catch (e: any) {}
+    }
+    edgeClickGuard.current = true;
+    Promise.resolve().then(() => {
+      edgeClickGuard.current = false;
+    });
+    _rozieProp_onEdgeClick && _rozieProp_onEdgeClick({
+      id
+    });
+    _rozieProp_onEdgeSelected && _rozieProp_onEdgeSelected({
+      id
+    });
+  }, [_rozieProp_onEdgeClick, _rozieProp_onEdgeSelected, clearEdgeSelection]);
   const deleteNode = useCallback((id: any) => {
     if (id == null) return false;
     const g = currentGraph();
@@ -268,7 +301,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   function maybeEmitSelectionChange() {
     if (programmatic.current) return;
     const ids = selectedNodeIds();
-    const key = [...ids].map((x: any) => String(x)).sort().join(' ');
+    const key = [...ids].map((x: any) => String(x)).sort().join(' ');
     if (key === lastSelectionIds) return;
     lastSelectionIds = key;
     props.onSelectionChange && props.onSelectionChange({
@@ -753,9 +786,24 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         const ids = selectedNodeIds();
-        if (ids.length === 0) return;
-        e.preventDefault();
-        for (const id of ids as any) deleteNode(id);
+        if (ids.length > 0) {
+          e.preventDefault();
+          for (const id of ids as any) deleteNode(id);
+          return;
+        }
+        // T1.1 — EDGE DELETE (D-08). No node is picked but an edge is selected → remove
+        // exactly that edge via the controlled-graph write-back (the disconnect path: a
+        // fresh `{ ...g, connections: filtered }` object), then clear the selection. The
+        // wrapper's own $watch(graph) reconcile reaps the live engine connection (the
+        // single removal path — we do NOT also call editor.removeConnection, which would
+        // race the reconcile into "cannot find connection", mirroring deleteNode). Node
+        // delete takes precedence (handled above); this only runs when nothing's picked.
+        if (selectedConnId.current != null) {
+          e.preventDefault();
+          const id = selectedConnId.current;
+          clearEdgeSelection();
+          writeBackConnectionRemoved(id);
+        }
       };
       keydownContainer.current = container;
       container.addEventListener('keydown', onCanvasKeydown.current);
@@ -1088,6 +1136,24 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       path.setAttribute('marker-end', 'url(#' + markerId + ')');
       svg.appendChild(path);
 
+      // ── T1.1 edge-select listener (D-08) ─────────────────────────────────────────
+      // Attach an IMPERATIVE pointerup listener on the engine-DOM <path> (NOT a template
+      // `@` — the path is engine-created; NOT click — Rete swallows it; NOT pointerdown —
+      // Rete stopPropagations it: the Phase-41 connector landmine, playbook §6a item 7).
+      // Gated on `selectable && !readonly` (mirrors node delete) and ONLY for COMMITTED
+      // edges — a drag-to-connect pseudo (either side dangling) carries no stable id and
+      // must not be selectable. `selectEdge` reads the id back off the closure (the
+      // committed connection.id == the graph connection id — conn.id = spec.id at build),
+      // so it always matches what `writeBackConnectionRemoved` filters. `.stop` keeps the
+      // pointerup from reaching the area's pan/background handling beneath the path.
+      if (props.selectable && !props.readonly && !srcDangling && !tgtDangling) {
+        path.style.cursor = 'pointer';
+        path.addEventListener('pointerup', (e: any) => {
+          if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+          selectEdge(connection.id, path);
+        });
+      }
+
       // ── per-edge label + styling (F3) ────────────────────────────────────────────
       // The consumer's connection spec ({ id, source, …, label?, stroke?, dashed? }) is kept
       // in connMeta keyed by id (the connection-side analog of nodeMeta). A committed edge
@@ -1313,6 +1379,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
         // pointerup that ended a node pick — already surfaced by the nodepicked branch).
         scheduleSelectionEmit();
+        // T1.1: a background pointerup (anywhere not on a connection path) clears the edge
+        // selection — UNLESS this same gesture just selected an edge (the path's own
+        // pointerup ran in the same tick and raised `edgeClickGuard`; the guard self-resets
+        // on the next microtask). Mirrors the node selectable's click-to-deselect.
+        if (!edgeClickGuard.current && selectedConnId.current != null) clearEdgeSelection();
       } else if (context.type === 'nodetranslated') {
         if (!programmatic.current) {
           const id = context.data.id;
@@ -1800,6 +1871,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       }
       dragFlushRaf.current = 0;
       pendingDragPositions.clear();
+      // T1.1: drop the edge-selection state + its cached <path> reference on teardown.
+      clearEdgeSelection();
       // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
       if (minimapHost.current) {
         if (onMinimapPointerDown.current) {

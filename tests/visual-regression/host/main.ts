@@ -368,6 +368,13 @@ export const EXAMPLES = [
   // `graph.connections[].label/stroke/dashed`. The spec asserts the labels render, the
   // styling applies, and a relabel writes through the controlled graph. Behavioral-only.
   'FlowCanvasEdges',
+  // Phase 44 T1.1 (D-08, edge select + delete) — FlowCanvasEdgeDelete is the BEHAVIORAL
+  // cell (loader → examples/demos/FlowCanvasEdgeDeleteDemo.rozie): a Start node fanning
+  // out to Approve + Reject via two committed edges. The spec (rete-flow-edge-delete)
+  // clicks a specific `.rozie-flow-connection__path`, presses Delete, and asserts the
+  // path count dropped by exactly 1, the targeted edge's path is gone, and the
+  // `connection-count` readout decremented. Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasEdgeDelete',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -533,6 +540,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasVertical: 'rozie-flow-canvas-vertical',
   // Phase 43 edges cell — '-demo' appended → 'rozie-flow-canvas-edges-demo'.
   FlowCanvasEdges: 'rozie-flow-canvas-edges',
+  // Phase 44 edge-delete cell — '-demo' appended → 'rozie-flow-canvas-edge-delete-demo'.
+  FlowCanvasEdgeDelete: 'rozie-flow-canvas-edge-delete',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -724,6 +733,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasVertical: {},
   // Phase 43 — FlowCanvasEdgesDemo is self-contained (seeds its own labeled/styled graph).
   FlowCanvasEdges: {},
+  // Phase 44 — FlowCanvasEdgeDeleteDemo is self-contained (seeds its own graph + edges).
+  FlowCanvasEdgeDelete: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

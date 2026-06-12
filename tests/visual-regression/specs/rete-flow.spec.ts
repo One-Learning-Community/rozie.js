@@ -1297,3 +1297,97 @@ for (const target of TARGETS) {
     await expect.poll(async () => labels.count(), { timeout: 5_000 }).toBe(2);
   });
 }
+
+/**
+ * 8. EDGE SELECT + DELETE — Phase 44 T1.1 (D-08).
+ *
+ * `examples/demos/FlowCanvasEdgeDeleteDemo.rozie` (3 `step` nodes Start→Approve/Reject,
+ * 2 committed edges e1: start→yes, e2: start→no). This proves the NEW edge-select +
+ * edge-delete seam on all 6:
+ *
+ *   CLICK a specific connection `.rozie-flow-connection__path` (its midpoint) — the
+ *   imperative pointerup listener (NOT click — Rete swallows it) fires
+ *   selectEdge(connection.id): `.is-selected` toggles on that path, @edge-click /
+ *   @edge-selected emit, and the consumer's `edge-clicked-id` readout updates. Focus the
+ *   canvas, press Delete → the keydown handler's edge branch calls
+ *   writeBackConnectionRemoved(selectedConnId), filtering exactly that edge out of a fresh
+ *   `{ ...graph, connections }` object → the $watch(graph) reconcile reaps the engine edge.
+ *
+ *   The load-bearing assertions (per the count-only-masks-bugs lesson on THIS component):
+ *   (a) the BOUND `connection-count` readout decremented exactly 2→1; (b) the total drawn
+ *   `.rozie-flow-connection__path` count dropped by exactly 1; (c) the SPECIFIC clicked
+ *   edge's path is GONE — no remaining path carries its captured `d` (toHaveCount(0)), not
+ *   merely a delta. No `toHaveScreenshot` — behavioral cell only (FlowCanvasScreenshot is
+ *   the separate, byte-identical pixel cell).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-edge-delete [${target}]: click an edge + Delete removes exactly that edge from the bound graph`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasEdgeDelete&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    // helper: the DRAWN paths (non-empty `d`), piercing Lit's open shadow root.
+    const pathLoc = page.locator('.rozie-flow-connection__path');
+    const drawnDs = async (): Promise<string[]> =>
+      pathLoc.evaluateAll((els) =>
+        els
+          .map((e) => (e.getAttribute('d') || '').trim())
+          .filter((d) => d.length > 0),
+      );
+
+    // both committed edges (e1, e2) draw before we delete.
+    await expect.poll(async () => (await drawnDs()).length, { timeout: 10_000 }).toBe(2);
+
+    const countReadout = page.getByTestId('connection-count');
+    await expect(countReadout).toHaveText('2');
+    const clickedReadout = page.getByTestId('edge-clicked-id');
+    await expect(clickedReadout).toHaveText('');
+
+    // ---- SELECT a specific edge: click the FIRST path's midpoint ----
+    // Capture its `d` so we can later assert THAT path (not just any) is gone.
+    const targetPath = pathLoc.first();
+    const targetD = (await targetPath.getAttribute('d'))?.trim() || '';
+    expect(targetD.length, 'expected the target edge to have a drawn path').toBeGreaterThan(0);
+    const pb = await targetPath.boundingBox();
+    if (!pb) throw new Error('target connection path bounding box unavailable');
+    // pointerup at the path midpoint → the per-edge select listener fires.
+    await page.mouse.click(pb.x + pb.width / 2, pb.y + pb.height / 2);
+
+    // selection settled: `.is-selected` lands on exactly one path AND the consumer's
+    // edge-clicked-id readout is now a non-empty id (the @edge-click signal reached it).
+    await expect(
+      page.locator('.rozie-flow-connection__path.is-selected'),
+    ).toHaveCount(1, { timeout: 5_000 });
+    await expect.poll(async () => (await clickedReadout.textContent())?.trim() || '', {
+      timeout: 5_000,
+    }).not.toBe('');
+
+    // ---- focus the canvas (keydown listener lives on .rozie-flow-canvas, tabindex=0) +
+    //      press Delete → writeBackConnectionRemoved(selectedConnId) ----
+    await canvas.focus();
+    await page.keyboard.press('Delete');
+
+    // (a) BOUND connection-count decremented exactly 2→1.
+    await expect(countReadout).toHaveText('1', { timeout: 10_000 });
+    // (b) the total drawn-path count dropped by exactly 1 (2→1).
+    await expect.poll(async () => (await drawnDs()).length, { timeout: 10_000 }).toBe(1);
+    // (c) the SPECIFIC clicked edge's path is GONE — no remaining path carries its `d`.
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => d === targetD).length, {
+        timeout: 10_000,
+      })
+      .toBe(0);
+  });
+}

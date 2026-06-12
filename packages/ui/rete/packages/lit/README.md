@@ -55,6 +55,8 @@ el.addEventListener('connection-created', (e) => console.log('connected', e.deta
 
 | Event | Description |
 | --- | --- |
+| `edge-click` | |
+| `edge-selected` | |
 | `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |

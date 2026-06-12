@@ -62,6 +62,8 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 
 | Event | Description |
 | --- | --- |
+| `edge-click` | |
+| `edge-selected` | |
 | `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |

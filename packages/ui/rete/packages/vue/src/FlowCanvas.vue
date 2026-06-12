@@ -29,6 +29,8 @@ const graph = defineModel<Record<string, any>>('graph', { default: () => ({
 const zoom = defineModel<number>('zoom', { default: 1 });
 
 const emit = defineEmits<{
+  'edge-click': [...args: any[]];
+  'edge-selected': [...args: any[]];
   'selection-change': [...args: any[]];
   'node-action': [...args: any[]];
   'connection-rejected': [...args: any[]];
@@ -201,6 +203,34 @@ let programmatic = 0;
 // selection does not emit on mount). COMPONENT-scope so it survives across area events.
 let lastSelectionIds: any = null;
 
+// T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
+// PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
+// written into $model.graph, so the controlled-graph write-back assertions are
+// unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
+// survives across area events + so the Solid-hoisted teardown can clear it. The
+// `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
+// source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
+// element so a background-click clear (and re-select) can drop `.is-selected` without
+// re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
+// branch checks so an edge click (which fires its own pointerup on the path AND lets the
+// area's background pointerup run) does not immediately clear the selection it just made
+// — reset on the next microtask, after the gesture settles.
+// T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
+// PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
+// written into $model.graph, so the controlled-graph write-back assertions are
+// unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
+// survives across area events + so the Solid-hoisted teardown can clear it. The
+// `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
+// source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
+// element so a background-click clear (and re-select) can drop `.is-selected` without
+// re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
+// branch checks so an edge click (which fires its own pointerup on the path AND lets the
+// area's background pointerup run) does not immediately clear the selection it just made
+// — reset on the next microtask, after the gesture settles.
+let selectedConnId: any = null;
+let selectedPathEl: any = null;
+let edgeClickGuard = false;
+
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
 // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
@@ -312,6 +342,61 @@ const writeBackConnectionRemoved = (id: any) => {
   };
 };
 
+// T1.1 — EDGE SELECTION helpers (D-08). Selection state is kept PURELY in script
+// (selectedConnId / selectedPathEl) and surfaced to the consumer via @edge-click /
+// @edge-selected — never written into $model.graph (echo-safe like selectedNodeIds).
+//
+// `clearEdgeSelection` drops `.is-selected` from the live <path> (if still attached) and
+// nulls the selection. `selectEdge` is invoked from the per-edge pointerup listener: it
+// clears any prior selection, marks THIS path `.is-selected`, records the id + element,
+// raises the one-shot `edgeClickGuard` (so the area's own background-pointerup branch
+// does not immediately clear what this click just selected — the same pointerup gesture
+// fires on the path AND lets the area pipe run), and emits BOTH @edge-click and
+// @edge-selected ({ id }). The guard self-resets on the next microtask once the gesture
+// has settled.
+// T1.1 — EDGE SELECTION helpers (D-08). Selection state is kept PURELY in script
+// (selectedConnId / selectedPathEl) and surfaced to the consumer via @edge-click /
+// @edge-selected — never written into $model.graph (echo-safe like selectedNodeIds).
+//
+// `clearEdgeSelection` drops `.is-selected` from the live <path> (if still attached) and
+// nulls the selection. `selectEdge` is invoked from the per-edge pointerup listener: it
+// clears any prior selection, marks THIS path `.is-selected`, records the id + element,
+// raises the one-shot `edgeClickGuard` (so the area's own background-pointerup branch
+// does not immediately clear what this click just selected — the same pointerup gesture
+// fires on the path AND lets the area pipe run), and emits BOTH @edge-click and
+// @edge-selected ({ id }). The guard self-resets on the next microtask once the gesture
+// has settled.
+const clearEdgeSelection = () => {
+  if (selectedPathEl && selectedPathEl.classList) {
+    try {
+      selectedPathEl.classList.remove('is-selected');
+    } catch (e: any) {}
+  }
+  selectedConnId = null;
+  selectedPathEl = null;
+};
+const selectEdge = (id: any, pathEl: any) => {
+  if (id == null) return;
+  clearEdgeSelection();
+  selectedConnId = id;
+  selectedPathEl = pathEl;
+  if (pathEl && pathEl.classList) {
+    try {
+      pathEl.classList.add('is-selected');
+    } catch (e: any) {}
+  }
+  edgeClickGuard = true;
+  Promise.resolve().then(() => {
+    edgeClickGuard = false;
+  });
+  emit('edge-click', {
+    id
+  });
+  emit('edge-selected', {
+    id
+  });
+};
+
 // CASCADING DELETE (the PUBLIC controlled-graph node delete — Win 1). Distinct from
 // the engine-only `removeNode` $expose verb: `removeNode` operates directly on the
 // editor and is NOT written back to the model (the provenance-tracked imperative
@@ -389,7 +474,7 @@ const selectedNodeIds = () => {
 const maybeEmitSelectionChange = () => {
   if (programmatic) return;
   const ids = selectedNodeIds();
-  const key = [...ids].map((x: any) => String(x)).sort().join(' ');
+  const key = [...ids].map((x: any) => String(x)).sort().join(' ');
   if (key === lastSelectionIds) return;
   lastSelectionIds = key;
   emit('selection-change', {
@@ -1041,9 +1126,24 @@ onMounted(() => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const ids = selectedNodeIds();
-      if (ids.length === 0) return;
-      e.preventDefault();
-      for (const id of ids as any) deleteNode(id);
+      if (ids.length > 0) {
+        e.preventDefault();
+        for (const id of ids as any) deleteNode(id);
+        return;
+      }
+      // T1.1 — EDGE DELETE (D-08). No node is picked but an edge is selected → remove
+      // exactly that edge via the controlled-graph write-back (the disconnect path: a
+      // fresh `{ ...g, connections: filtered }` object), then clear the selection. The
+      // wrapper's own $watch(graph) reconcile reaps the live engine connection (the
+      // single removal path — we do NOT also call editor.removeConnection, which would
+      // race the reconcile into "cannot find connection", mirroring deleteNode). Node
+      // delete takes precedence (handled above); this only runs when nothing's picked.
+      if (selectedConnId != null) {
+        e.preventDefault();
+        const id = selectedConnId;
+        clearEdgeSelection();
+        writeBackConnectionRemoved(id);
+      }
     };
     keydownContainer = container;
     container.addEventListener('keydown', onCanvasKeydown);
@@ -1376,6 +1476,24 @@ onMounted(() => {
     path.setAttribute('marker-end', 'url(#' + markerId + ')');
     svg.appendChild(path);
 
+    // ── T1.1 edge-select listener (D-08) ─────────────────────────────────────────
+    // Attach an IMPERATIVE pointerup listener on the engine-DOM <path> (NOT a template
+    // `@` — the path is engine-created; NOT click — Rete swallows it; NOT pointerdown —
+    // Rete stopPropagations it: the Phase-41 connector landmine, playbook §6a item 7).
+    // Gated on `selectable && !readonly` (mirrors node delete) and ONLY for COMMITTED
+    // edges — a drag-to-connect pseudo (either side dangling) carries no stable id and
+    // must not be selectable. `selectEdge` reads the id back off the closure (the
+    // committed connection.id == the graph connection id — conn.id = spec.id at build),
+    // so it always matches what `writeBackConnectionRemoved` filters. `.stop` keeps the
+    // pointerup from reaching the area's pan/background handling beneath the path.
+    if (props.selectable && !props.readonly && !srcDangling && !tgtDangling) {
+      path.style.cursor = 'pointer';
+      path.addEventListener('pointerup', (e: any) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        selectEdge(connection.id, path);
+      });
+    }
+
     // ── per-edge label + styling (F3) ────────────────────────────────────────────
     // The consumer's connection spec ({ id, source, …, label?, stroke?, dashed? }) is kept
     // in connMeta keyed by id (the connection-side analog of nodeMeta). A committed edge
@@ -1601,6 +1719,11 @@ onMounted(() => {
       // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
       // pointerup that ended a node pick — already surfaced by the nodepicked branch).
       scheduleSelectionEmit();
+      // T1.1: a background pointerup (anywhere not on a connection path) clears the edge
+      // selection — UNLESS this same gesture just selected an edge (the path's own
+      // pointerup ran in the same tick and raised `edgeClickGuard`; the guard self-resets
+      // on the next microtask). Mirrors the node selectable's click-to-deselect.
+      if (!edgeClickGuard && selectedConnId != null) clearEdgeSelection();
     } else if (context.type === 'nodetranslated') {
       if (!programmatic) {
         const id = context.data.id;
@@ -2086,6 +2209,8 @@ onMounted(() => {
     }
     dragFlushRaf = 0;
     pendingDragPositions.clear();
+    // T1.1: drop the edge-selection state + its cached <path> reference on teardown.
+    clearEdgeSelection();
     // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
     if (minimapHost) {
       if (onMinimapPointerDown) {
@@ -2326,6 +2451,10 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnectio
     stroke: #64748b;
     stroke-width: 3px;
     pointer-events: auto;
+  }
+.rozie-flow-canvas .rozie-flow-connection__path.is-selected {
+    stroke: #3b82f6;
+    stroke-width: 4px;
   }
 .rozie-flow-canvas .rozie-flow-connection__label {
     font: 600 11px system-ui, sans-serif;

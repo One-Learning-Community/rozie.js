@@ -65,6 +65,8 @@ export function Demo() {
 
 | Event | Description |
 | --- | --- |
+| `edge-click` | |
+| `edge-selected` | |
 | `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |

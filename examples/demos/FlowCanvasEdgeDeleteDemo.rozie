@@ -1,0 +1,102 @@
+<!--
+  FlowCanvasEdgeDeleteDemo.rozie — BEHAVIORAL consumer for Phase 44 T1.1 (D-08): edge
+  selection + delete. Clicking a connection path selects it (.is-selected toggles on the
+  engine-DOM __path) and fires @edge-click / @edge-selected; pressing Delete/Backspace
+  with an edge selected removes EXACTLY that edge through the controlled graph
+  (writeBackConnectionRemoved → a fresh `{ ...g, connections: filtered }` object).
+
+  Selection state lives in the COMPONENT script (selectedConnId) — never echoed into the
+  bound graph — so the only model write here is the delete itself. The spec
+  (`rete-flow-edge-delete`) clicks a specific `.rozie-flow-connection__path`, presses
+  Delete, and asserts the path count dropped by exactly 1, the targeted edge's path is
+  gone, and the `connection-count` readout decremented (the controlled-graph signal).
+-->
+
+<rozie name="FlowCanvasEdgeDeleteDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // last id surfaced by @edge-click (empty until the first click) — proves the select
+  // emit reaches the consumer.
+  clickedId: '',
+  graph: {
+    nodes: [
+      { id: 'start', type: 'step', x: 20,  y: 120, data: { label: 'Start' } },
+      { id: 'yes',   type: 'step', x: 340, y: 40,  data: { label: 'Approve' } },
+      { id: 'no',    type: 'step', x: 340, y: 220, data: { label: 'Reject' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'start', sourceOutput: 'out', target: 'yes', targetInput: 'in' },
+      { id: 'e2', source: 'start', sourceOutput: 'out', target: 'no',  targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// @edge-click → surface the selected edge id into a testid readout (the select signal).
+const onEdgeClick = (e) => {
+  $data.clickedId = e && e.id != null ? String(e.id) : ''
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — edge select + delete (behavioral)</h3>
+
+  <div class="controls">
+    <span class="readout">edges: <b data-testid="connection-count">{{ $data.graph.connections.length }}</b></span>
+    <span class="readout">clicked: <b data-testid="edge-clicked-id">{{ $data.clickedId }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+      @edge-click="onEdgeClick"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

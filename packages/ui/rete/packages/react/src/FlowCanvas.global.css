@@ -102,6 +102,10 @@
     stroke-width: 3px;
     pointer-events: auto;
   }
+.rozie-flow-canvas .rozie-flow-connection__path.is-selected {
+    stroke: #3b82f6;
+    stroke-width: 4px;
+  }
 .rozie-flow-canvas .rozie-flow-connection__label {
     font: 600 11px system-ui, sans-serif;
     fill: #334155;

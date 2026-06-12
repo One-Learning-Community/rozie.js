@@ -71,6 +71,8 @@ export class DemoComponent {
 
 | Event | Description |
 | --- | --- |
+| `edge-click` | |
+| `edge-selected` | |
 | `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |
