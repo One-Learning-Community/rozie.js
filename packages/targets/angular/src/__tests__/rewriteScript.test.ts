@@ -233,6 +233,41 @@ describe('rewriteRozieIdentifiers — $refs refLowersToNonNull', () => {
   });
 });
 
+describe('rewriteRozieIdentifiers — $refs on a CHILD COMPONENT (refs-lowering-cross-target Finding 2)', () => {
+  // A ref whose element is a registered <components> child resolves to the
+  // COMPONENT INSTANCE (`this.X()`), not the host `ElementRef`.
+  const componentIR = (refTag: string) =>
+    buildIR({
+      components: [
+        {
+          type: 'ComponentDecl',
+          localName: 'Child',
+          importPath: './Child.rozie',
+          sourceLoc: sloc,
+        },
+      ],
+      refs: [{ type: 'RefDecl', name: 'flow', elementTag: refTag, sourceLoc: sloc } as RefDecl],
+    } as Partial<IRComponent>);
+
+  it('bare component-ref read → this.X() (component instance, no .nativeElement)', () => {
+    const code = rewrite('const a = $refs.flow;', componentIR('Child')).code;
+    expect(code).toContain('this.flow()');
+    expect(code).not.toContain('nativeElement');
+  });
+
+  it('component-ref non-optional member → this.X()! (no .nativeElement)', () => {
+    const code = rewrite('$refs.flow.scrollNext();', componentIR('Child')).code;
+    expect(code).toMatch(/this\.flow\(\)!\.scrollNext\(\)/);
+    expect(code).not.toContain('nativeElement');
+  });
+
+  it('a same-named ref on a plain HTML element is UNCHANGED (.nativeElement)', () => {
+    // elementTag 'div' is not a registered component → host ElementRef path.
+    const code = rewrite('const a = $refs.flow;', componentIR('div')).code;
+    expect(code).toContain('this.flow()?.nativeElement');
+  });
+});
+
 describe('rewriteRozieIdentifiers — $slots / $portals handlers', () => {
   it('$slots.X (static name) → merged form with this. prefix', () => {
     const ir = buildIR({ slots: [mkSlot('footer')] });

@@ -49,6 +49,7 @@ import {
 import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
+import { collectComponentRefTypes } from './componentRefs.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -615,6 +616,9 @@ export function rewriteRozieIdentifiers(
     cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
+  // refs-lowering-cross-target Finding 2: refs on a CHILD COMPONENT lower to the
+  // component INSTANCE (`this.X()`), not the host `ElementRef` (`this.X()?.nativeElement`).
+  const componentRefNames = new Set(collectComponentRefTypes(ir).keys());
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
   const portalSlotNames = new Set(
     ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
@@ -931,27 +935,37 @@ export function rewriteRozieIdentifiers(
           t.memberExpression(t.thisExpression(), synthId),
           [],
         );
-        // Lower to `this.foo()!.nativeElement` (non-null) vs
-        // `this.foo()?.nativeElement` (optional) per refLowersToNonNull —
+        // refs-lowering-cross-target Finding 2: a ref on a CHILD COMPONENT
+        // resolves to the COMPONENT INSTANCE (`this.foo()` — Angular's view-query
+        // default read for a template-ref var on a component element), which
+        // carries the $expose methods. An HTML-element ref keeps the
+        // `.nativeElement` access (the DOM element).
+        const isComponentRef = componentRefNames.has(prop.name);
+        // Lower to `this.foo()!`(.nativeElement) (non-null) vs
+        // `this.foo()`(?.nativeElement) (optional) per refLowersToNonNull —
         // authored non-optional access (TS2532 narrowing) OR passed into an
         // engine constructor/function call (TS2379 under
         // exactOptionalPropertyTypes). See refLowersToNonNull's doc comment.
         if (refLowersToNonNull(path)) {
           path.replaceWith(
-            t.memberExpression(
-              t.tsNonNullExpression(refCall),
-              t.identifier('nativeElement'),
-            ),
+            isComponentRef
+              ? t.tsNonNullExpression(refCall)
+              : t.memberExpression(
+                  t.tsNonNullExpression(refCall),
+                  t.identifier('nativeElement'),
+                ),
           );
           return;
         }
         path.replaceWith(
-          t.optionalMemberExpression(
-            refCall,
-            t.identifier('nativeElement'),
-            false,
-            true,
-          ),
+          isComponentRef
+            ? refCall
+            : t.optionalMemberExpression(
+                refCall,
+                t.identifier('nativeElement'),
+                false,
+                true,
+              ),
         );
         return;
       }
@@ -1003,16 +1017,21 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
+        // refs-lowering-cross-target Finding 2 — component ref → instance
+        // (`this.X()`); HTML-element ref → `this.X()?.nativeElement`.
+        const refCall = t.callExpression(
+          t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
+          [],
+        );
         path.replaceWith(
-          t.optionalMemberExpression(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
-            t.identifier('nativeElement'),
-            false,
-            true,
-          ),
+          componentRefNames.has(prop.name)
+            ? refCall
+            : t.optionalMemberExpression(
+                refCall,
+                t.identifier('nativeElement'),
+                false,
+                true,
+              ),
         );
         return;
       }

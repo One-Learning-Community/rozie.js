@@ -1026,26 +1026,17 @@ const PALETTE_PROJECTION_TOL_PX = 32;
 
 // The `screenToFlowPosition` VERB compiles identically on all 6 (the surface gate proves
 // it) and the projection is target-agnostic (pure transform inverse). This cell exercises
-// it through a CONSUMER ref (`$refs.flow.screenToFlowPosition(...)`), which resolves the
-// child's $expose handle on five targets but NOT on Angular: Rozie's `$refs` to a child
-// COMPONENT lowers to the host element on Angular (a documented parity edge), so the demo's
-// `$refs.flow` lacks the handle (silent no-op — confirmed: no error, count stays 1). A real
-// Angular consumer reaches the verb natively via `@ViewChild(FlowCanvas).screenToFlowPosition()`
-// — see the docs recipe. So Angular is fixme HERE (the consumer-ref access path), not a
-// feature gap. (react/svelte previously failed too — a `const flow = $refs.flow` self-shadow
-// TDZ — fixed by renaming the local; see the backlog todo for the latent emitter gap.)
-const PALETTE_REF_HOST_DIVERGENT: ReadonlySet<typeof TARGETS[number]> = new Set<
-  typeof TARGETS[number]
->(['angular']);
-
+// it through a CONSUMER ref (`$refs.flow.screenToFlowPosition(...)`), which now resolves the
+// child's $expose handle/instance on ALL SIX targets (refs-lowering-cross-target):
+//   - Finding 2 fix: Angular's `$refs.<childComponent>` lowers to the component INSTANCE
+//     (`viewChild('flow')`), not the host element — the verb is reachable via `$refs`.
+//   - Finding 1 fix: react/svelte no longer self-shadow `const flow = $refs.flow`
+//     (the deconflict pre-pass renames the local), so the round-trip runs there too.
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const runner =
-    !built || KNOWN_FAILING.has(target) || PALETTE_REF_HOST_DIVERGENT.has(target)
-      ? test.fixme
-      : test;
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
   runner(`rete-flow-palette [${target}]: screenToFlowPosition projects a drop point to graph coords + appends the node there`, async ({
     page,
   }) => {

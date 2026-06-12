@@ -18,10 +18,10 @@
   item is wired too (the documented pattern, exercised live).
 
   NOTE on the handle: `$refs.flow.screenToFlowPosition(...)` is the consumer-ref call. On
-  five targets the `ref` resolves to the $expose handle; Angular's `$refs` to a child Rozie
-  component resolves to the host element (a documented Rozie parity edge — a real Angular
-  app uses native `@ViewChild(FlowCanvas).screenToFlowPosition()`). The optional-chain keeps
-  it a safe no-op where the ref diverges.
+  all six targets the `ref` to a child Rozie component now resolves to the component's
+  $expose handle/instance — Angular's `$refs.<childComponent>` resolves the component
+  instance (via `viewChild('flow')`), no longer the host element (fixed in
+  refs-lowering-cross-target Finding 2).
 -->
 
 <rozie name="FlowCanvasPaletteDemo">
@@ -55,13 +55,14 @@
 // append a FRESH node there (controlled-graph immutable write — in-place mutation is
 // silently dropped on React/Solid/Lit/Angular).
 const dropNodeAt = (clientX, clientY) => {
-  // NOTE: name the local `handle`, NOT `flow` — a `const flow = $refs.flow` collides with
-  // the `ref="flow"` variable and lowers to `const flow = flow.current` (a self-reference
-  // TDZ: "Cannot access 'flow' before initialization") on React/Svelte/Angular. The
-  // $refs-self-shadow analog of the deconflictPropShadows prop/param case; logged as a
-  // latent emitter finding. Distinct local name sidesteps it (works on all 6).
-  const handle = $refs.flow
-  const pos = handle && handle.screenToFlowPosition ? handle.screenToFlowPosition(clientX, clientY) : null
+  // The local is named `flow`, the SAME as `ref="flow"` — this is the
+  // refs-self-shadow regression. The deconflict pre-pass (React/Svelte) renames
+  // the colliding local to `flow$local` so `$refs.flow` resolves to the real ref
+  // instead of self-referencing (the old `const flow = flow.current` TDZ). On
+  // Angular `$refs.flow` now resolves the FlowCanvas COMPONENT INSTANCE (the
+  // $expose handle), not the host element. Works on all 6.
+  const flow = $refs.flow
+  const pos = flow && flow.screenToFlowPosition ? flow.screenToFlowPosition(clientX, clientY) : null
   if (!pos) return
   $data.dropX = Math.round(pos.x)
   $data.dropY = Math.round(pos.y)

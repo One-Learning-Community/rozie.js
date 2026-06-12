@@ -60,6 +60,7 @@ import {
   normalizeModelAccessor,
 } from '../rewrite/rewriteScript.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
+import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
 import {
   AngularImportCollector,
   collectAngularImports,
@@ -924,7 +925,20 @@ export function emitScript(
   }
 
   // 6c. RefDecls — viewChild signals.
+  // refs-lowering-cross-target Finding 2: a ref on a CHILD COMPONENT queries the
+  // COMPONENT INSTANCE (`viewChild<FooComponent>('foo')`) — Angular's view-query
+  // default read for a template-ref var on a component element returns the
+  // component instance, which carries the `$expose` methods (public class
+  // members). An HTML-element ref stays `viewChild<ElementRef<DomType>>('foo')`.
+  // The component type name == the tag == the imported binding (shell imports
+  // each child as `import { <localName> }` with no alias; self = the local class).
+  const componentRefTypes = collectComponentRefTypes(ir);
   for (const r of ir.refs) {
+    const componentType = componentRefTypes.get(r.name);
+    if (componentType !== undefined) {
+      fieldLines.push(`${r.name} = viewChild<${componentType}>('${r.name}');`);
+      continue;
+    }
     let domType = 'HTMLElement';
     switch (r.elementTag.toLowerCase()) {
       case 'input':
