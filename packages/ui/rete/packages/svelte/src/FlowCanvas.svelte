@@ -1432,6 +1432,29 @@ onMount(() => {
     });
   };
 
+  // ── hand-written edge-type path generators (T1.2, D-01) ───────────────────────
+  // `rete-render-utils` ships ONLY `classicConnectionPath` (bezier) + `loopConnectionPath`;
+  // step/smoothstep/straight do NOT exist in any installed rete package, so they are
+  // hand-written here matching React-Flow's `step|smoothstep|straight` semantics. Each is a
+  // PURE `(start, end) → d-string` function over `{x,y}` graph-screen points; the `d` is
+  // composed from numeric coords + literal SVG commands and written via setAttribute (never
+  // innerHTML — no injection, T-44-02-2 accept). The default branch stays
+  // `classicConnectionPath` → byte-identical bezier (pixel-baseline safe).
+  // straight: a single line, no curvature.
+  const straightPath = (s: any, e: any) => `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
+  // step: orthogonal HV-VH with a mid-X break.
+  const stepPath = (s: any, e: any) => {
+    const mx = (s.x + e.x) / 2;
+    return `M ${s.x} ${s.y} L ${mx} ${s.y} L ${mx} ${e.y} L ${e.x} ${e.y}`;
+  };
+  // smoothstep: step with rounded corners (radius r, clamped to half the shorter leg).
+  const smoothstepPath = (s: any, e: any, r = 8) => {
+    const mx = (s.x + e.x) / 2;
+    const dir = e.y >= s.y ? 1 : -1;
+    const rr = Math.min(r, Math.abs(mx - s.x), Math.abs(e.y - s.y) / 2);
+    return [`M ${s.x} ${s.y}`, `L ${mx - rr} ${s.y}`, `Q ${mx} ${s.y} ${mx} ${s.y + dir * rr}`, `L ${mx} ${e.y - dir * rr}`, `Q ${mx} ${e.y} ${mx + rr} ${e.y}`, `L ${e.x} ${e.y}`].join(' ');
+  };
+
   // ── connection renderer ──
   // Mounts an <svg><path> and redraws it whenever either endpoint socket moves
   // (real connection) OR the dragged pointer moves (user drag-to-connect pseudo).
@@ -1535,6 +1558,14 @@ onMount(() => {
       }
       if (emeta.dashed === true) path.setAttribute('stroke-dasharray', '7 5');
     }
+    // ── resolved edge type (T1.2) ────────────────────────────────────────────────
+    // The consumer-supplied `connection.type` selects a path generator. ALLOWLIST it
+    // (`bezier|step|smoothstep|straight`); any other/absent value falls through to the
+    // bezier default — no dynamic path-fn lookup keyed on the raw string, no eval
+    // (T-44-02-1 mitigate). A dangling drag-preview pseudo has no committed connMeta
+    // entry, so it stays bezier too.
+    const rawType = emeta && emeta.type != null ? String(emeta.type) : 'bezier';
+    const edgeType = rawType === 'step' || rawType === 'smoothstep' || rawType === 'straight' ? rawType : 'bezier';
     let labelEl: any = null;
     const edgeLabel = emeta && emeta.label != null ? String(emeta.label) : null;
     if (edgeLabel) {
@@ -1551,7 +1582,10 @@ onMount(() => {
     const curvature$local = typeof curvature === 'number' ? curvature : 0.3;
     const redraw = () => {
       if (!start || !end) return;
-      path.setAttribute('d', classicConnectionPath([start, end], curvature$local));
+      // branch on the resolved edge type; default (bezier/unknown) stays
+      // classicConnectionPath UNCHANGED → byte-identical bezier output.
+      const d = edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature$local);
+      path.setAttribute('d', d);
       if (labelEl) {
         labelEl.setAttribute('x', String((start.x + end.x) / 2));
         labelEl.setAttribute('y', String((start.y + end.y) / 2));
@@ -1943,11 +1977,12 @@ onMount(() => {
         targetInput: tgtIn,
         label: spec.label,
         stroke: spec.stroke,
-        dashed: spec.dashed
+        dashed: spec.dashed,
+        type: spec.type
       };
     };
-    // cheap style signature so a label/style change on an EXISTING edge re-renders it.
-    const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) : '';
+    // cheap style signature so a label/style/type change on an EXISTING edge re-renders it.
+    const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) + '|' + String(s.type) : '';
     const merged = graphConns.map(norm).filter(Boolean);
     const want = [];
     programmatic++;
