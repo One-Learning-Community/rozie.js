@@ -10,7 +10,7 @@ export default class Port extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) output: string = undefined;
   @property({ type: String, reflect: true }) input: string = undefined;
   @property({ type: String, reflect: true }) type: string = undefined;
-  @property({ type: Object }) label: unknown = undefined;
+  @property({ type: String, reflect: true }) label: string = undefined;
   @property({ type: Object }) multiple: unknown = undefined;
 private __rozieCtxConsumer_rete_nodeType = new ContextConsumer(this, { context: __rozieCtx_rete_nodeType, subscribe: true });
 private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value; }

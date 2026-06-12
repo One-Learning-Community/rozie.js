@@ -5,7 +5,7 @@ interface Props {
   output?: string;
   input?: string;
   type?: string;
-  label?: unknown;
+  label?: string;
   multiple?: unknown;
 }
 

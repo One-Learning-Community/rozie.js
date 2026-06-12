@@ -36,12 +36,31 @@ cv = canvas;
 // emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
 // it. (A NodeType type-template projects ONE body root per graph node; the canvas
 // disposes per-node on node unmount, this is the last-projection handle.)
+//
+// PER-NODE FIX: a Set of INDEPENDENT handles — ONE PER GRAPH NODE of this type.
+// render-by-type calls bodyRenderer once per node a->b->c; the old single-handle
+// form disposed the PRIOR node's body on each call, leaving only the LAST node of
+// the type rendered (3 nodes, 1 body — the count-only-VR-masking bug). Each call now
+// mounts an INDEPENDENT handle and disposes NONE of its siblings; the canvas already
+// owns per-node disposal (entry.bodyHandle in nodeEntries, torn down on node unmount).
+// Module-scope `any` so the Solid-hoisted teardown can sweep any leftovers. This is
+// the controlled-graph analog of FlowCanvas's per-node $portals.node handle map.
 // The live $portals.body handle ({ dispose }) returned by the parent-invoked
 // bodyRenderer callback. Module-scope `any` so the teardown — which the Solid
 // emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
 // it. (A NodeType type-template projects ONE body root per graph node; the canvas
 // disposes per-node on node unmount, this is the last-projection handle.)
-let bodyHandle: any = null;
+//
+// PER-NODE FIX: a Set of INDEPENDENT handles — ONE PER GRAPH NODE of this type.
+// render-by-type calls bodyRenderer once per node a->b->c; the old single-handle
+// form disposed the PRIOR node's body on each call, leaving only the LAST node of
+// the type rendered (3 nodes, 1 body — the count-only-VR-masking bug). Each call now
+// mounts an INDEPENDENT handle and disposes NONE of its siblings; the canvas already
+// owns per-node disposal (entry.bodyHandle in nodeEntries, torn down on node unmount).
+// Module-scope `any` so the Solid-hoisted teardown can sweep any leftovers. This is
+// the controlled-graph analog of FlowCanvas's per-node $portals.node handle map.
+let bodyHandles: any = null;
+bodyHandles = new Set();
 
 // The body-mount closure, DEFINED INSIDE $onMount (below) so it captures the
 // emitter-synthesized `portals` local — which on React/Angular/Lit is scoped to the
@@ -145,24 +164,40 @@ onBeforeUnmount(() => {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  // The body-mount closure — captures the mount-scoped `portals` local. Disposes a
-  // prior handle first so a re-fired bodyRenderer (e.g. ports changed → fresh node
-  // build) does not stack portal roots into the same engine host. Mounts the type's
-  // `#body` slot, scoped with the graph node ({ node, selected, emit }).
+  // The body-mount closure — captures the mount-scoped `portals` local. Mounts an
+  // INDEPENDENT body root PER graph node (the canvas calls this once per node of the
+  // type), so every instance keeps its OWN #body — it must NOT dispose any sibling's
+  // handle (the bug: a single shared handle torn down on each call left only the LAST
+  // node rendered). The returned { dispose } is wrapped to deregister ITSELF from the
+  // live set when the canvas disposes that node's projection (entry.bodyHandle on node
+  // unmount / port-resync); a leftover handle is swept by the component teardown below.
   mountBody = (host: any, scope: any) => {
     if (!host) return null;
-    if (bodyHandle && bodyHandle.dispose) {
-      try {
-        bodyHandle.dispose();
-      } catch (e: any) {}
-    }
     const s = scope || {};
-    bodyHandle = portals.body(host, {
+    const h = portals.body(host, {
       node: s.node,
       selected: s.selected,
       emit: s.emit
     });
-    return bodyHandle;
+    if (!h) return null;
+    bodyHandles.add(h);
+    return {
+      update: (next: any) => {
+        if (h && h.update) {
+          try {
+            return h.update(next);
+          } catch (e: any) {}
+        }
+      },
+      dispose: () => {
+        bodyHandles.delete(h);
+        if (h && h.dispose) {
+          try {
+            h.dispose();
+          } catch (e: any) {}
+        }
+      }
+    };
   };
   // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
   // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
@@ -174,10 +209,17 @@ onMounted(() => {
     cv.registerType(props.type, buildSpec());
   }
   _cleanup_0 = () => {
-    if (bodyHandle && bodyHandle.dispose) {
-      try {
-        bodyHandle.dispose();
-      } catch (e: any) {}
+    // sweep any body projections still live at teardown (the canvas normally disposes
+    // each per node unmount, but a component-level unmount must clean any stragglers).
+    if (bodyHandles) {
+      for (const h of bodyHandles as any) {
+        if (h && h.dispose) {
+          try {
+            h.dispose();
+          } catch (e: any) {}
+        }
+      }
+      bodyHandles.clear();
     }
     if (cv) cv.unregisterType(props.type);
   };

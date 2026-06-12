@@ -6,7 +6,7 @@
 import { inject, onMounted, onUpdated } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ output?: string; input?: string; type?: string; label?: unknown; multiple?: unknown }>(),
+  defineProps<{ output?: string; input?: string; type?: string; label?: string; multiple?: unknown }>(),
   { output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined }
 );
 

@@ -357,15 +357,19 @@ const buildNode = (spec, portReg) => {
   return node
 }
 
-// Resolve a single port's TYPE for the validation pipe: look up the live node's
-// `type` (via nodeMeta) then the portReg entry keyed `type::side::key`. Returns the
-// portType string or null (null on either side ⇒ no type constraint ⇒ allow).
-const portTypeOf = (nodeId, side, key) => {
-  const meta = nodeMeta.get(nodeId)
-  if (!meta || meta.type == null || key == null) return null
-  const entry = $data.portReg[meta.type + '::' + side + '::' + key]
-  return entry ? entry.portType : null
-}
+// NOTE: portTypeOf (the validation-pipe port-type resolver) is DEFINED INSIDE
+// $onMount (next to the editor.addPipe that uses it), NOT here at top level. It reads
+// $data.portReg, and a top-level definition lowers on React to a `useCallback` whose
+// captured `portReg` is FROZEN at the snapshot when the validation pipe (set up once in
+// the mount effect) was created — i.e. the INITIAL empty {} before any <Port> registered.
+// A stale-empty portReg makes portTypeOf return null for every port, so the typed-socket
+// validation `srcType != null && tgtType != null && srcType !== tgtType` check is SKIPPED
+// and a cross-type connection is WRONGLY ALLOWED (the React-only "reject didn't fire" bug
+// the advanced VR cell surfaced). Defined inside $onMount, the emitter lowers its
+// $data.portReg read to the live `_portRegRef.current` (the same ref the reconcilers use),
+// so validation always sees the current schema. The 5 non-React targets read live signals
+// so they were correct either way; this is the React stale-closure fix (the MapLibre/PDF
+// $watch-reroute lesson, here as a mount-scoped definition). ZERO emitter change.
 
 // ─── per-TYPE registry (Phase 41 controlled-graph — the per-TYPE shift of the
 // Phase 37 per-instance $provide/$inject dogfood) ────────────────────────────────
@@ -727,6 +731,19 @@ $onMount(() => {
         return
       }
     }
+  }
+
+  // Resolve a single port's TYPE for the validation pipe: look up the live node's
+  // `type` (via nodeMeta) then the portReg entry keyed `type::side::key`. Returns the
+  // portType string or null (null on either side ⇒ no type constraint ⇒ allow). DEFINED
+  // HERE (inside $onMount) — NOT at top level — so its $data.portReg read lowers on React
+  // to the live `_portRegRef.current` rather than a stale-empty closure snapshot captured
+  // when this once-only mount effect first ran (the cross-type-reject-didn't-fire bug).
+  const portTypeOf = (nodeId, side, key) => {
+    const meta = nodeMeta.get(nodeId)
+    if (!meta || meta.type == null || key == null) return null
+    const entry = $data.portReg[meta.type + '::' + side + '::' + key]
+    return entry ? entry.portType : null
   }
 
   // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──

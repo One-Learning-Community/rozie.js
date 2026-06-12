@@ -5,13 +5,13 @@ interface PortProps {
   output?: string;
   input?: string;
   type?: string;
-  label?: unknown;
+  label?: string;
   multiple?: unknown;
 }
 
 export default function Port(_props: PortProps): JSX.Element {
   const injectedType = useContext(rozieContext("rete:nodeType"));
-  const props: Omit<PortProps, 'output' | 'input' | 'type' | 'label' | 'multiple'> & { output: string; input: string; type: string; label: unknown; multiple: unknown } = {
+  const props: Omit<PortProps, 'output' | 'input' | 'type' | 'label' | 'multiple'> & { output: string; input: string; type: string; label: string; multiple: unknown } = {
     ..._props,
     output: _props.output ?? undefined,
     input: _props.input ?? undefined,

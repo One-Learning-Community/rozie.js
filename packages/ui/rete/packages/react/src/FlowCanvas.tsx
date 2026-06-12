@@ -247,12 +247,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     return node;
   }, [portReg, portSchemaForType]);
-  const portTypeOf = useCallback((nodeId: any, side: any, key: any) => {
-    const meta = nodeMeta.get(nodeId);
-    if (!meta || meta.type == null || key == null) return null;
-    const entry = portReg[meta.type + '::' + side + '::' + key];
-    return entry ? entry.portType : null;
-  }, [portReg]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision discipline (ROZ121/ROZ524/Lit-lifecycle):
   //   - NO `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom`
@@ -813,6 +807,19 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           return;
         }
       }
+    };
+
+    // Resolve a single port's TYPE for the validation pipe: look up the live node's
+    // `type` (via nodeMeta) then the portReg entry keyed `type::side::key`. Returns the
+    // portType string or null (null on either side ⇒ no type constraint ⇒ allow). DEFINED
+    // HERE (inside $onMount) — NOT at top level — so its $data.portReg read lowers on React
+    // to the live `_portRegRef.current` rather than a stale-empty closure snapshot captured
+    // when this once-only mount effect first ran (the cross-type-reject-didn't-fire bug).
+    const portTypeOf = (nodeId: any, side: any, key: any) => {
+      const meta = nodeMeta.get(nodeId);
+      if (!meta || meta.type == null || key == null) return null;
+      const entry = _portRegRef.current[meta.type + '::' + side + '::' + key];
+      return entry ? entry.portType : null;
     };
 
     // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──

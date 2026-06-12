@@ -285,7 +285,16 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port input="in" type="number" label="number" />
+        <!--
+          input is `multiple`: the self-loop VR step drags Math's output onto Math's
+          own input (which already holds the accepted num→math edge). With a SINGLE
+          input, Rete EVICTS the existing edge to make room for the replacement BEFORE
+          canConnect can reject the self-loop — so the original edge is destroyed even
+          though the self-loop is refused (connection-count drops 1→0). A `multiple`
+          input never evicts, so the rejected self-loop leaves num→math intact (the
+          intended "reject does not mutate the graph" semantics).
+        -->
+        <Port input="in" type="number" label="number" :multiple="true" />
         <Port output="out" type="number" label="number" />
       </NodeType>
 
@@ -335,8 +344,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port input="num" type="number" label="number" multiple />
-        <Port input="str" type="string" label="string" multiple />
+        <Port input="num" type="number" label="number" :multiple="true" />
+        <Port input="str" type="string" label="string" :multiple="true" />
       </NodeType>
     </FlowCanvas>
   </div>

@@ -51,9 +51,25 @@
   // mismatched connection is auto-rejected). Optional (an untyped port imposes no
   // type constraint → connects to anything).
   type:     { type: String, default: undefined },
-  // optional socket label (defaults to the key in buildSocketRow).
-  label:    { default: undefined },
-  // allow multiple connections into/out of this socket.
+  // optional socket label (defaults to the key in buildSocketRow). TYPED String:
+  // on Lit a prop with no explicit `type:` lowers to `@property({ type: Object })`,
+  // which JSON.parses the HTML attribute — so `label="number"` becomes `JSON.parse
+  // ("number")` → THROWS → label stays undefined, and buildSocketRow falls back to the
+  // KEY ('num') instead of the label ('number') on Lit (the 5 other targets pass the
+  // attribute through verbatim, so they were correct). Declaring `type: String` lowers
+  // to `@property({ type: String })` (no JSON parse) so the attribute string lands as-is.
+  label:    { type: String, default: undefined },
+  // allow multiple connections into/out of this socket. Left UNTYPED (default undefined)
+  // to PRESERVE the canvas's side asymmetry keyed off undefined: outputs default multi
+  // (`multiple !== false`), inputs default single (`multiple === true`). Forcing
+  // `type: Boolean` would make Lit coerce an ABSENT attribute to `false` (not undefined),
+  // flipping default-output multiplicity on Lit ONLY (a cross-target divergence that would
+  // regress the passing rete-flow-drag Lit cell). A consumer that needs an EXPLICIT multi
+  // port must BIND it (`:multiple="true"`) rather than use the bare boolean attribute
+  // (`multiple`): on Lit an untyped prop is `@property({ type: Object })`, so the BARE
+  // attribute is the empty string → `JSON.parse('')` THROWS → multiple stays undefined;
+  // a BOUND `:multiple="true"` passes a real boolean through the framework prop binding
+  // (no HTML-attribute JSON parse), landing true on all 6 targets.
   multiple: { default: undefined },
 }
 </props>

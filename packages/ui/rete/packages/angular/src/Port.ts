@@ -25,7 +25,7 @@ export class Port {
   output = input<string>(undefined);
   input = input<string>(undefined);
   type = input<string>(undefined);
-  label = input<unknown>(undefined);
+  label = input<string>(undefined);
   multiple = input<unknown>(undefined);
   injectedType = inject(rozieToken('rete:nodeType'));
 
