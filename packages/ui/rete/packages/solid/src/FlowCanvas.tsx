@@ -528,8 +528,39 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       element.classList.add('rozie-flow-connection');
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('class', 'rozie-flow-connection__svg');
+
+      // ── direction arrowhead (Win 3) ─────────────────────────────────────────────
+      // A <defs><marker> in THIS connection's own <svg>, referenced by `marker-end` so
+      // the triangle sits at the path END (the input socket — the path runs output→input,
+      // so marker-end points INTO the target). The marker id is UNIQUE per connection
+      // (`rozie-arrow-<id>`) so two edges' markers never collide on a shared document id
+      // (url(#id) resolves to the first match otherwise). The def lives in the SAME
+      // per-edge <svg> inside the SAME shadow root as the path, so url(#id) resolves
+      // within that root — no cross-root reference (Lit-safe). markerUnits="userSpaceOnUse"
+      // keeps a constant pixel size under the area zoom transform. Inline fill (#64748b,
+      // matching the connection stroke) is the cross-target-safe choice — no scoped-CSS /
+      // :root rule needed for the marker DOM. The marker is purely decorative — it does
+      // NOT touch the path `d` / socket alignment (the rete-flow-align cell stays green).
+      const markerId = 'rozie-arrow-' + String(id);
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+      marker.setAttribute('id', markerId);
+      marker.setAttribute('markerWidth', '7');
+      marker.setAttribute('markerHeight', '7');
+      marker.setAttribute('refX', '6');
+      marker.setAttribute('refY', '3');
+      marker.setAttribute('orient', 'auto');
+      marker.setAttribute('markerUnits', 'userSpaceOnUse');
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arrow.setAttribute('class', 'rozie-flow-connection__arrow');
+      arrow.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+      arrow.setAttribute('fill', '#64748b');
+      marker.appendChild(arrow);
+      defs.appendChild(marker);
+      svg.appendChild(defs);
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('class', 'rozie-flow-connection__path');
+      path.setAttribute('marker-end', 'url(#' + markerId + ')');
       svg.appendChild(path);
       element.appendChild(svg);
       let start: any = null;

@@ -124,6 +124,26 @@ for (const target of TARGETS) {
       })
       .toBeGreaterThanOrEqual(2);
 
+    // ---- 3b. DIRECTION ARROWHEADS (Win 3): every drawn path carries a marker-end ----
+    // Structural proof (pierces Lit's open shadow root via evaluateAll): at least one
+    // drawn connection path references an arrowhead marker (`marker-end: url(#…)`). The
+    // marker <defs> lives in the same per-edge <svg>, so the reference resolves within
+    // the shadow root on Lit too. Pixel correctness is gated by the FlowCanvasScreenshot
+    // baseline; here we assert the attribute is present (NOT a count).
+    await expect
+      .poll(
+        async () =>
+          page.locator('.rozie-flow-connection__path').evaluateAll((els) =>
+            els.filter(
+              (e) =>
+                (e.getAttribute('d') || '').trim().length > 0 &&
+                (e.getAttribute('marker-end') || '').includes('url('),
+            ).length,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThanOrEqual(2);
+
     // ---- 4. DRAG WRITE-BACK (the #1 proof): drag node 'a' → BOUND readout-node0-x changes ----
     const node0xReadout = page.getByTestId('readout-node0-x');
     // readout-node0-x = Math.round($data.graph.nodes[0].x); the demo seeds x=20.
