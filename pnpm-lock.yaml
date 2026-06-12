@@ -2686,12 +2686,18 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       rete:
         specifier: ^2.0.5
         version: 2.0.6
       rete-area-plugin:
         specifier: ^2.1.2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2.0.4
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
@@ -2704,6 +2710,9 @@ importers:
       vitest:
         specifier: ^4.1.0
         version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/rete/packages/angular:
     dependencies:
@@ -2713,18 +2722,27 @@ importers:
       '@angular/core':
         specifier: ^19 || ^20 || ^21
         version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       rete:
         specifier: ^2
         version: 2.0.6
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
       rete-render-utils:
         specifier: ^2
         version: 2.0.3(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/rete/packages/lit:
     dependencies:
@@ -2740,6 +2758,9 @@ importers:
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../../runtime/lit
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       lit:
         specifier: ^3
         version: 3.3.2
@@ -2749,18 +2770,27 @@ importers:
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
       rete-render-utils:
         specifier: ^2
         version: 2.0.3(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/rete/packages/react:
     dependencies:
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../../../runtime/react
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       react:
         specifier: ^18.2 || ^19
         version: 19.2.6
@@ -2773,12 +2803,18 @@ importers:
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
       rete-render-utils:
         specifier: ^2
         version: 2.0.3(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
     devDependencies:
       '@types/react':
         specifier: ^18
@@ -2792,12 +2828,18 @@ importers:
       '@rozie/runtime-solid':
         specifier: workspace:*
         version: link:../../../../runtime/solid
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       rete:
         specifier: ^2
         version: 2.0.6
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
@@ -2807,18 +2849,27 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/rete/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
         specifier: workspace:*
         version: link:../../../../runtime/svelte
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       rete:
         specifier: ^2
         version: 2.0.6
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
@@ -2828,15 +2879,24 @@ importers:
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/rete/packages/vue:
     dependencies:
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       rete:
         specifier: ^2
         version: 2.0.6
       rete-area-plugin:
         specifier: ^2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
@@ -2846,6 +2906,9 @@ importers:
       vue:
         specifier: ^3.4
         version: 3.5.33(typescript@5.9.3)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
 
   packages/ui/sortable-list:
     devDependencies:
@@ -3978,6 +4041,9 @@ importers:
       cropperjs:
         specifier: ^1.6.2
         version: 1.6.2
+      elkjs:
+        specifier: ^0.8.2
+        version: 0.8.2
       embla-carousel:
         specifier: ^8.6
         version: 8.6.0
@@ -4011,6 +4077,9 @@ importers:
       rete-area-plugin:
         specifier: ^2.1.2
         version: 2.1.5(rete@2.0.6)
+      rete-auto-arrange-plugin:
+        specifier: ^2.0.2
+        version: 2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0)
       rete-connection-plugin:
         specifier: ^2.0.4
         version: 2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
@@ -4035,6 +4104,9 @@ importers:
       vue:
         specifier: ^3.4.0
         version: 3.5.33(typescript@5.6.3)
+      web-worker:
+        specifier: ^1.2.0
+        version: 1.5.0
       zone.js:
         specifier: ^0.14
         version: 0.14.10
@@ -9587,6 +9659,9 @@ packages:
   electron-to-chromium@1.5.349:
     resolution: {integrity: sha512-QsWVGyRuY07Aqb234QytTfwd5d9AJlfNIQ5wIOl1L+PZDzI9d9+Fn0FRale/QYlFxt/bUnB0/nLd1jFPGxGK1A==}
 
+  elkjs@0.8.2:
+    resolution: {integrity: sha512-L6uRgvZTH+4OF5NE/MBbzQx/WYpru1xCBE9respNj6qznEewGUIfhzmm7horWWxbNO2M0WckQypGctR8lH79xQ==}
+
   embla-carousel-autoplay@8.6.0:
     resolution: {integrity: sha512-OBu5G3nwaSXkZCo1A6LTaFMZ8EpkYbwIaH+bPqdBnDGQ2fh4+NbzjXjs2SktoPNKCtflfVMc75njaDHOYXcrsA==}
     peerDependencies:
@@ -11918,6 +11993,14 @@ packages:
     peerDependencies:
       rete: ^2.0.0
 
+  rete-auto-arrange-plugin@2.0.2:
+    resolution: {integrity: sha512-VLTnVb9tqHfQKkFMZzpYgYxDWcIa+nXHRC+Po0k+gUh2zJqegkx8bFSA1n6VkMv+wPYa9EnWsTMfUDD3k1QEzg==}
+    peerDependencies:
+      elkjs: ^0.8.2
+      rete: ^2.0.1
+      rete-area-plugin: ^2.0.0
+      web-worker: ^1.2.0
+
   rete-connection-plugin@2.0.5:
     resolution: {integrity: sha512-KFtlOyEJRc0y9STVgo2T+t+j9u5fxiTxbyzPbMCm0uqncb3b8d2ABDIzvWoNo5zQAh2Oz/OvlUovupbzrGzpSg==}
     peerDependencies:
@@ -13166,6 +13249,9 @@ packages:
 
   web-namespaces@2.0.1:
     resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
+
+  web-worker@1.5.0:
+    resolution: {integrity: sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw==}
 
   webidl-conversions@7.0.0:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
@@ -18918,7 +19004,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:
@@ -20222,6 +20308,8 @@ snapshots:
   ee-first@1.1.1: {}
 
   electron-to-chromium@1.5.349: {}
+
+  elkjs@0.8.2: {}
 
   embla-carousel-autoplay@8.6.0(embla-carousel@8.6.0):
     dependencies:
@@ -22988,6 +23076,14 @@ snapshots:
       '@babel/runtime': 7.29.2
       rete: 2.0.6
 
+  rete-auto-arrange-plugin@2.0.2(elkjs@0.8.2)(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)(web-worker@1.5.0):
+    dependencies:
+      '@babel/runtime': 7.29.2
+      elkjs: 0.8.2
+      rete: 2.0.6
+      rete-area-plugin: 2.1.5(rete@2.0.6)
+      web-worker: 1.5.0
+
   rete-connection-plugin@2.0.5(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6):
     dependencies:
       '@babel/runtime': 7.29.2
@@ -24528,6 +24624,8 @@ snapshots:
     optional: true
 
   web-namespaces@2.0.1: {}
+
+  web-worker@1.5.0: {}
 
   webidl-conversions@7.0.0: {}
 

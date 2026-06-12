@@ -43,7 +43,10 @@
     "rete": "^2",
     "rete-area-plugin": "^2",
     "rete-connection-plugin": "^2",
-    "rete-render-utils": "^2"
+    "rete-render-utils": "^2",
+    "rete-auto-arrange-plugin": "^2.0.2",
+    "elkjs": "^0.8.2",
+    "web-worker": "^1.2.0"
   },
   "peerDependenciesMeta": {
     "vue": {
@@ -60,6 +63,15 @@
     },
     "rete-render-utils": {
       "optional": false
+    },
+    "rete-auto-arrange-plugin": {
+      "optional": true
+    },
+    "elkjs": {
+      "optional": true
+    },
+    "web-worker": {
+      "optional": true
     }
   },
   "scripts": {
