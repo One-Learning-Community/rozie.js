@@ -35,7 +35,7 @@ const EXPECT = {
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
-    'curvature', 'fitOnMount', 'controls', 'canConnect',
+    'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect',
   ],
   // `graph` + `zoom` are both two-way (the bound graph is the source of truth +
   // write-back target; zoom is the viewport binding). Neither is a same-named emit
@@ -59,8 +59,8 @@ const EXPECT = {
   // hatch). Also wired to the Delete/Backspace key.
   expose: [
     'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'addConnection',
-    'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'getNodes',
-    'getConnections', 'getTransform',
+    'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'setCenter', 'setViewport',
+    'getNodes', 'getConnections', 'getTransform',
   ],
 } as const;
 
@@ -81,7 +81,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (15 props)', () => {
+  it('props surface matches (16 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -110,7 +110,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (13 verbs)', () => {
+  it('expose surface matches (15 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

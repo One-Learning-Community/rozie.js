@@ -168,6 +168,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `curvature` | `Number` | `0.3` | | The bezier curvature of connection paths (`classicConnectionPath`). |
 | `fitOnMount` | `Boolean` | `true` | | After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`). |
 | `controls` | `Boolean` | `true` | | Render the built-in **Controls overlay** — a zoom in / zoom out / fit-view button cluster over the canvas (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo` / `zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly` (zoom/fit are view-only). Opt out with `:controls="false"`. |
+| `minimap` | `Boolean` | `false` | | Render the built-in **MiniMap overlay** — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the **measured** engine node-view dims) plus the current viewport window (the area outside dimmed). **Pannable**: drag the minimap to recenter the main viewport (via `setCenter`). Opt-in (default OFF) — the React Flow `<MiniMap/>` parity. Evaluated at construction (like `pannable` / `zoomable` / `controls`); set it at mount time. |
 | `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in **addition** to the automatic `:validate-types` check (the custom-rule override). Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent / `null` imposes no custom rule. |
 
 ### Events
@@ -200,6 +201,8 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `clear()` | Remove every node and connection. |
 | `zoomToFit()` | Pan/zoom to fit all nodes. |
 | `zoomTo(k)` | Set the zoom level (echoes into the `zoom` model). |
+| `setCenter(x, y, opts?)` | Center the viewport on graph coordinates `(x, y)`; `opts.zoom` optionally sets the zoom. Echoes the level into the `zoom` model and fires `translated`. Powers the pannable MiniMap. |
+| `setViewport({ x, y, k })` | Set the raw viewport transform (any field omitted keeps its current value). Echoes `k` into the `zoom` model and fires `translated`. |
 | `getNodes()` | Serialized snapshot `[{ id, label, x, y }]` with live positions. |
 | `getConnections()` | Serialized snapshot `[{ id, source, sourceOutput, target, targetInput }]`. |
 | `getTransform()` | The viewport transform `{ x, y, k }`. |

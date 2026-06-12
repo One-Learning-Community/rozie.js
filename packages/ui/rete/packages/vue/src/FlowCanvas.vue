@@ -6,7 +6,7 @@
     <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" @click="controlZoomIn">+</button>
     <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" @click="controlZoomOut">&#8722;</button>
     <button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" @click="controlFit">&#9744;</button>
-  </div></div>
+  </div><div v-if="props.minimap" class="rozie-flow-minimap" ref="minimapElRef" data-testid="flow-minimap"></div></div>
 
 
 
@@ -18,8 +18,8 @@
 import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; canConnect?: ((...args: any[]) => any) | null }>(),
-  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, canConnect: null }
+  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; minimap?: boolean; canConnect?: ((...args: any[]) => any) | null }>(),
+  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null }
 );
 
 const graph = defineModel<Record<string, any>>('graph', { default: () => ({
@@ -51,6 +51,7 @@ const typeReg = ref({});
 const portReg = ref({});
 
 const canvasElRef = ref<HTMLElement>();
+const minimapElRef = ref<HTMLElement>();
 
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
@@ -87,6 +88,46 @@ let selector: any = null;
 // removeEventListener (the same component-scope discipline as nodeInstances below).
 let keydownContainer: any = null;
 let onCanvasKeydown: any = null;
+
+// Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
+// SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
+// $onMount-returned teardown — which the Solid emitter hoists into a sibling
+// onCleanup() OUTSIDE the mount IIFE — can still removeEventListener them (the same
+// keydown / nodeInstances discipline). `minimapMap` is the live minimap-px ↔ graph-
+// coord mapping the pointer-pan handlers read; `scheduleMinimapRedraw` is the bridge
+// the top-level $watch + the engine pipes call (assigned inside $onMount, like the
+// reconcilers). minimapRedrawRaf coalesces the viewport-rect redraw to one per frame
+// (the drag-write-back discipline — the viewport rect redraws on every pan/zoom).
+// Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
+// SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
+// $onMount-returned teardown — which the Solid emitter hoists into a sibling
+// onCleanup() OUTSIDE the mount IIFE — can still removeEventListener them (the same
+// keydown / nodeInstances discipline). `minimapMap` is the live minimap-px ↔ graph-
+// coord mapping the pointer-pan handlers read; `scheduleMinimapRedraw` is the bridge
+// the top-level $watch + the engine pipes call (assigned inside $onMount, like the
+// reconcilers). minimapRedrawRaf coalesces the viewport-rect redraw to one per frame
+// (the drag-write-back discipline — the viewport rect redraws on every pan/zoom).
+let minimapHost: any = null;
+let minimapSvg: any = null;
+let minimapRedrawRaf = 0;
+let minimapMap: any = null;
+let minimapPanning = false;
+let onMinimapPointerDown: any = null;
+let onMinimapPointerMove: any = null;
+let onMinimapPointerUp: any = null;
+let scheduleMinimapRedraw: any = null;
+
+// MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
+// MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
+const MINIMAP_W = 200;
+const MINIMAP_H = 150;
+// Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
+// first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
+// Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
+// first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
+const MINIMAP_DEFAULT_NODE_W = 140;
+const MINIMAP_DEFAULT_NODE_H = 52;
+const SVGNS = 'http://www.w3.org/2000/svg';
 
 // One Socket shared by every port (Rete sockets gate compatibility by identity;
 // a single socket = "anything connects to anything", the common editor default).
@@ -349,6 +390,8 @@ const maybeEmitSelectionChange = () => {
   emit('selection-change', {
     ids
   });
+  // the selected set changed → repaint the minimap (selected nodes are highlighted).
+  if (scheduleMinimapRedraw) scheduleMinimapRedraw();
 };
 
 // Schedule the selection recompute AFTER the engine's own async selection update has
@@ -626,6 +669,76 @@ async function zoomTo(k: any) {
   if (k !== zoom.value) zoom.value = k;
 }
 
+// ─── viewport API (Phase 42 — the T11 gap + what the pannable minimap needs) ─────
+// Both write the AreaPlugin transform via the CONFIRMED Rete v2 area API: with the
+// origin omitted `area.area.zoom(k)` leaves x/y unchanged (transform.x += 0·d), and
+// `area.area.translate(x, y)` sets the pan ABSOLUTELY (verified against rete-area-
+// plugin@2.1.5). Echo-guarded with `programmatic` so the transform write doesn't loop
+// back through the zoomed/nodetranslated write-back (the `translated` emit stays
+// UNCONDITIONAL, so @translated still surfaces a programmatic recenter — a real
+// viewport change the consumer asked for). After, echo `$model.zoom` (mirrors zoomTo).
+// Collision discipline: setCenter/setViewport are NOT Lit lifecycle names, NOT emit
+// names, NOT prop names, NOT React model-setters (`graph`/`zoom` → setGraph/setZoom),
+// and NOT inherited DOM methods (the Embla scrollTo lesson) — clean on all 6.
+//
+// setViewport({ x, y, k }) — set the raw transform (any field omitted keeps its
+// current value).
+// ─── viewport API (Phase 42 — the T11 gap + what the pannable minimap needs) ─────
+// Both write the AreaPlugin transform via the CONFIRMED Rete v2 area API: with the
+// origin omitted `area.area.zoom(k)` leaves x/y unchanged (transform.x += 0·d), and
+// `area.area.translate(x, y)` sets the pan ABSOLUTELY (verified against rete-area-
+// plugin@2.1.5). Echo-guarded with `programmatic` so the transform write doesn't loop
+// back through the zoomed/nodetranslated write-back (the `translated` emit stays
+// UNCONDITIONAL, so @translated still surfaces a programmatic recenter — a real
+// viewport change the consumer asked for). After, echo `$model.zoom` (mirrors zoomTo).
+// Collision discipline: setCenter/setViewport are NOT Lit lifecycle names, NOT emit
+// names, NOT prop names, NOT React model-setters (`graph`/`zoom` → setGraph/setZoom),
+// and NOT inherited DOM methods (the Embla scrollTo lesson) — clean on all 6.
+//
+// setViewport({ x, y, k }) — set the raw transform (any field omitted keeps its
+// current value).
+async function setViewport(vp: any) {
+  if (!area || !vp || typeof vp !== 'object') return;
+  const tf = area.area.transform;
+  const k = typeof vp.k === 'number' ? vp.k : tf.k;
+  const x = typeof vp.x === 'number' ? vp.x : tf.x;
+  const y = typeof vp.y === 'number' ? vp.y : tf.y;
+  programmatic++;
+  try {
+    if (k !== area.area.transform.k) await area.area.zoom(k);
+    await area.area.translate(x, y);
+  } finally {
+    programmatic--;
+  }
+  if (k !== zoom.value) zoom.value = k;
+}
+
+// setCenter(x, y, opts?) — center the viewport on graph-coords (x, y), optionally
+// setting zoom (`opts.zoom`). The transform that puts graph point (x,y) at the canvas
+// center is tx = W/2 − x·k, ty = H/2 − y·k (screen = graph·k + transform). W/H are the
+// engine container's pixel dims (area.container — public on AreaPlugin, no $refs read).
+// setCenter(x, y, opts?) — center the viewport on graph-coords (x, y), optionally
+// setting zoom (`opts.zoom`). The transform that puts graph point (x,y) at the canvas
+// center is tx = W/2 − x·k, ty = H/2 − y·k (screen = graph·k + transform). W/H are the
+// engine container's pixel dims (area.container — public on AreaPlugin, no $refs read).
+async function setCenter(x: any, y: any, opts: any) {
+  if (!area || typeof x !== 'number' || typeof y !== 'number') return;
+  const k = opts && typeof opts.zoom === 'number' ? opts.zoom : area.area.transform.k;
+  const el = area.container;
+  const cw = el && el.clientWidth ? el.clientWidth : 0;
+  const ch = el && el.clientHeight ? el.clientHeight : 0;
+  const tx = cw / 2 - x * k;
+  const ty = ch / 2 - y * k;
+  programmatic++;
+  try {
+    if (k !== area.area.transform.k) await area.area.zoom(k);
+    await area.area.translate(tx, ty);
+  } finally {
+    programmatic--;
+  }
+  if (k !== zoom.value) zoom.value = k;
+}
+
 // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
 // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
 // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
@@ -881,6 +994,10 @@ onMounted(() => {
   // unfilled (dropping the default-chrome title). The cross-target slot-name ==
   // local-binding shadow trap.
   const renderNode = (element: any, reteNode: any) => {
+    // a (re)render means node DOM exists / changed → refresh the minimap (its node
+    // rects measure these elements; coalesced, so calling it on every render is cheap,
+    // and it covers Lit's measure-after-first-paint).
+    if (scheduleMinimapRedraw) scheduleMinimapRedraw();
     const id = reteNode.id;
     const meta = nodeMeta.get(id) || {
       id,
@@ -1344,16 +1461,22 @@ onMounted(() => {
           y: pos.y
         });
       }
+      // a node moved → its minimap rect moves (works during a programmatic translate too).
+      if (scheduleMinimapRedraw) scheduleMinimapRedraw();
     } else if (context.type === 'translated') {
       emit('translated', {
         x: context.data.position.x,
         y: context.data.position.y
       });
+      // the viewport window moved → redraw the minimap viewport rect + mask.
+      if (scheduleMinimapRedraw) scheduleMinimapRedraw();
     } else if (context.type === 'zoomed') {
       if (!programmatic) {
         const k = area.area.transform.k;
         if (k !== zoom.value) zoom.value = k;
       }
+      // the viewport window resized (zoom) → redraw the minimap viewport rect + mask.
+      if (scheduleMinimapRedraw) scheduleMinimapRedraw();
     } else if (context.type === 'contextmenu') {
       // suppress the native browser menu over the canvas; surface a hook instead.
       context.data.event.preventDefault();
@@ -1544,12 +1667,197 @@ onMounted(() => {
     } finally {
       programmatic--;
     }
+  };
+
+  // ─── built-in MiniMap (opt-in :minimap, Phase 42) ────────────────────────────
+  // An absolute light-DOM SVG overlay (bottom-right) showing a scaled map of every
+  // node + the current viewport window (outside dimmed), PANNABLE (drag recenters via
+  // setCenter). The host div is COMPONENT-template DOM (carries the [data-rozie-s-*]
+  // scope attr → plain scoped CSS positions it); its SVG children are built
+  // IMPERATIVELY with createElementNS (the connection-renderer discipline) so SVG
+  // namespacing is identical on all 6 (no SVG-in-template cross-target risk) and styled
+  // with INLINE attributes (the arrowhead-marker lesson — no scoped-CSS / :root rule
+  // needed for engine-style DOM). Node dims come from the MEASURED engine node-view
+  // elements (area.nodeViews.get(id).element offsetW/H — target-agnostic, like the
+  // render pipe) with a default-rect fallback for Lit's unmeasured first paint.
+  const measureNodeSize = (id: any) => {
+    const view = area && area.nodeViews ? area.nodeViews.get(id) : null;
+    const el = view && view.element ? view.element : null;
+    const w = el && el.offsetWidth ? el.offsetWidth : MINIMAP_DEFAULT_NODE_W;
+    const h = el && el.offsetHeight ? el.offsetHeight : MINIMAP_DEFAULT_NODE_H;
+    return {
+      w,
+      h
+    };
+  };
+  const mkMinimapRect = (x: any, y: any, w: any, h: any, cls: any, fill: any, stroke: any, strokeW: any) => {
+    const r = document.createElementNS(SVGNS, 'rect');
+    r.setAttribute('class', cls);
+    r.setAttribute('x', String(x));
+    r.setAttribute('y', String(y));
+    r.setAttribute('width', String(Math.max(w, 0)));
+    r.setAttribute('height', String(Math.max(h, 0)));
+    if (fill) r.setAttribute('fill', fill);
+    if (stroke) {
+      r.setAttribute('stroke', stroke);
+      r.setAttribute('stroke-width', String(strokeW || 1));
+    }
+    return r;
+  };
+
+  // Rebuild the minimap SVG: node rects (selected highlighted) + a dim mask outside the
+  // viewport (evenodd punch-out) + the viewport window outline. The bounds union the
+  // node rects AND the viewport window so the viewport indicator stays in-frame even
+  // when panned past the nodes. Stores `minimapMap` (the px↔graph mapping the pointer-
+  // pan handlers read). Cheap (a handful of rects) → a full rebuild per frame is fine.
+  const redrawMinimap = () => {
+    minimapRedrawRaf = 0;
+    if (!props.minimap || !minimapSvg || !area || !container) return;
+    const t = area.area.transform;
+    const k = t.k || 1;
+    const cw = container.clientWidth || MINIMAP_W;
+    const ch = container.clientHeight || MINIMAP_H;
+    // viewport window in GRAPH coords (screen [0,cw]×[0,ch] → graph).
+    const vx = -t.x / k,
+      vy = -t.y / k,
+      vw = cw / k,
+      vh = ch / k;
+    const graphNodes = currentGraph().nodes || [];
+    const selIds = new Set(selectedNodeIds().map((s: any) => String(s)));
+    const rects = [];
+    for (const n of graphNodes as any) {
+      if (!n || n.id == null) continue;
+      const view = area.nodeViews.get(n.id);
+      const gx = view ? view.position.x : n.x || 0;
+      const gy = view ? view.position.y : n.y || 0;
+      const sz = measureNodeSize(n.id);
+      rects.push({
+        gx,
+        gy,
+        gw: sz.w,
+        gh: sz.h,
+        selected: selIds.has(String(n.id))
+      });
+    }
+    let minX = vx,
+      minY = vy,
+      maxX = vx + vw,
+      maxY = vy + vh;
+    for (const r of rects as any) {
+      if (r.gx < minX) minX = r.gx;
+      if (r.gy < minY) minY = r.gy;
+      if (r.gx + r.gw > maxX) maxX = r.gx + r.gw;
+      if (r.gy + r.gh > maxY) maxY = r.gy + r.gh;
+    }
+    const padX = (maxX - minX) * 0.1 || 20;
+    const padY = (maxY - minY) * 0.1 || 20;
+    minX -= padX;
+    minY -= padY;
+    maxX += padX;
+    maxY += padY;
+    const bw = maxX - minX || 1;
+    const bh = maxY - minY || 1;
+    const scale = Math.min(MINIMAP_W / bw, MINIMAP_H / bh);
+    const offX = (MINIMAP_W - bw * scale) / 2;
+    const offY = (MINIMAP_H - bh * scale) / 2;
+    minimapMap = {
+      minX,
+      minY,
+      scale,
+      offX,
+      offY
+    };
+    const toMMx = (gx: any) => (gx - minX) * scale + offX;
+    const toMMy = (gy: any) => (gy - minY) * scale + offY;
+    minimapSvg.innerHTML = '';
+    for (const r of rects as any) {
+      const fill = r.selected ? '#3b82f6' : '#94a3b8';
+      minimapSvg.appendChild(mkMinimapRect(toMMx(r.gx), toMMy(r.gy), r.gw * scale, r.gh * scale, 'rozie-flow-minimap__node', fill, null, 0));
+    }
+    // dim mask OUTSIDE the viewport: full minimap rect with the viewport rect punched
+    // out (both subpaths same winding → fill-rule:evenodd leaves the viewport a hole).
+    const mvx = toMMx(vx),
+      mvy = toMMy(vy),
+      mvw = vw * scale,
+      mvh = vh * scale;
+    const mask = document.createElementNS(SVGNS, 'path');
+    mask.setAttribute('class', 'rozie-flow-minimap__mask');
+    mask.setAttribute('fill-rule', 'evenodd');
+    mask.setAttribute('fill', 'rgba(15, 23, 42, 0.18)');
+    mask.setAttribute('d', 'M0 0 H' + MINIMAP_W + ' V' + MINIMAP_H + ' H0 Z ' + 'M' + mvx + ' ' + mvy + ' h' + mvw + ' v' + mvh + ' h' + -mvw + ' Z');
+    minimapSvg.appendChild(mask);
+    minimapSvg.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', '#3b82f6', 1.5));
+  };
+
+  // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
+  // when :minimap is off (the bridge stays callable everywhere, cheap).
+  scheduleMinimapRedraw = () => {
+    if (!props.minimap || minimapRedrawRaf) return;
+    if (typeof requestAnimationFrame === 'function') {
+      minimapRedrawRaf = requestAnimationFrame(redrawMinimap);
+    } else {
+      minimapRedrawRaf = 1;
+      Promise.resolve().then(redrawMinimap);
+    }
+  };
+
+  // Map a minimap pointer event → graph coords (via the stored minimapMap) → setCenter.
+  // Pan is a view op → allowed even when readonly, but gated by `pannable` (mirror the
+  // main-canvas pannable gate). Pointer capture keeps the drag tracking off the box.
+  const minimapPointerToGraph = (e: any) => {
+    if (!minimapMap || !minimapHost) return null;
+    const box = minimapHost.getBoundingClientRect();
+    const rw = box.width || MINIMAP_W;
+    const rh = box.height || MINIMAP_H;
+    const mx = (e.clientX - box.left) * (MINIMAP_W / rw);
+    const my = (e.clientY - box.top) * (MINIMAP_H / rh);
+    return {
+      gx: minimapMap.minX + (mx - minimapMap.offX) / minimapMap.scale,
+      gy: minimapMap.minY + (my - minimapMap.offY) / minimapMap.scale
+    };
+  };
+  if (props.minimap && minimapElRef.value) {
+    minimapHost = minimapElRef.value;
+    minimapSvg = document.createElementNS(SVGNS, 'svg');
+    minimapSvg.setAttribute('class', 'rozie-flow-minimap__svg');
+    minimapSvg.setAttribute('viewBox', '0 0 ' + MINIMAP_W + ' ' + MINIMAP_H);
+    minimapSvg.setAttribute('preserveAspectRatio', 'none');
+    minimapHost.appendChild(minimapSvg);
+    onMinimapPointerDown = (e: any) => {
+      if (!props.pannable) return;
+      const g = minimapPointerToGraph(e);
+      if (!g) return;
+      minimapPanning = true;
+      try {
+        if (e.target && e.target.setPointerCapture && e.pointerId != null) e.target.setPointerCapture(e.pointerId);
+      } catch (err: any) {}
+      e.preventDefault();
+      e.stopPropagation();
+      setCenter(g.gx, g.gy, null);
+    };
+    onMinimapPointerMove = (e: any) => {
+      if (!minimapPanning || !props.pannable) return;
+      const g = minimapPointerToGraph(e);
+      if (!g) return;
+      e.preventDefault();
+      setCenter(g.gx, g.gy, null);
+    };
+    onMinimapPointerUp = (e: any) => {
+      if (!minimapPanning) return;
+      minimapPanning = false;
+      try {
+        if (e.target && e.target.releasePointerCapture && e.pointerId != null) e.target.releasePointerCapture(e.pointerId);
+      } catch (err: any) {}
+    };
+    minimapHost.addEventListener('pointerdown', onMinimapPointerDown);
+    minimapHost.addEventListener('pointermove', onMinimapPointerMove);
+    minimapHost.addEventListener('pointerup', onMinimapPointerUp);
   }
 
   // ─── initial graph: nodes first, then connections (connections reference live
   // node instances), then optional fit. Sequenced via an async IIFE so the
   // $onMount-returned teardown stays synchronous. ──────────────────────────────
-;
+  ;
   (async () => {
     await reconcileNodes();
     await reconcileConnections();
@@ -1573,6 +1881,9 @@ onMounted(() => {
         if (k !== zoom.value) zoom.value = k;
       }
     }
+    // draw the minimap once the graph + fit have settled (also redrawn on every
+    // render / pan / zoom / drag / selection / graph change below).
+    if (scheduleMinimapRedraw) scheduleMinimapRedraw();
   })();
   _cleanup_0 = () => {
     if (onCanvasKeydown && keydownContainer && typeof keydownContainer.removeEventListener === 'function') {
@@ -1587,6 +1898,30 @@ onMounted(() => {
     }
     dragFlushRaf = 0;
     pendingDragPositions.clear();
+    // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
+    if (minimapHost) {
+      if (onMinimapPointerDown) {
+        try {
+          minimapHost.removeEventListener('pointerdown', onMinimapPointerDown);
+        } catch (e: any) {}
+      }
+      if (onMinimapPointerMove) {
+        try {
+          minimapHost.removeEventListener('pointermove', onMinimapPointerMove);
+        } catch (e: any) {}
+      }
+      if (onMinimapPointerUp) {
+        try {
+          minimapHost.removeEventListener('pointerup', onMinimapPointerUp);
+        } catch (e: any) {}
+      }
+    }
+    if (minimapRedrawRaf && typeof cancelAnimationFrame === 'function') {
+      try {
+        cancelAnimationFrame(minimapRedrawRaf);
+      } catch (e: any) {}
+    }
+    minimapRedrawRaf = 0;
     for (const [, entry] of nodeEntries as any) {
       if (entry.handle) entry.handle.dispose();
       if (entry.bodyHandle && entry.bodyHandle.dispose) {
@@ -1614,6 +1949,8 @@ watch(() => graph.value, () => {
       if (reconcileConnections) reconcileConnections();
     });
   }
+  // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
+  if (scheduleMinimapRedraw) scheduleMinimapRedraw();
 });
 watch(() => portReg.value, () => {
   if (reconcileNodes) {
@@ -1634,7 +1971,7 @@ watch(() => zoom.value, (v: any) => {
   });
 });
 
-defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform });
+defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, getNodes, getConnections, getTransform });
 </script>
 
 <style scoped>
@@ -1679,6 +2016,22 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnectio
 }
 .rozie-flow-controls__btn:hover { background: #f1f5f9; }
 .rozie-flow-controls__btn:active { background: #e2e8f0; }
+.rozie-flow-minimap {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 10;
+  width: 200px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+}
+.rozie-flow-minimap__svg { display: block; width: 100%; height: 100%; }
 </style>
 
 <style>

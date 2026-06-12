@@ -21,6 +21,7 @@ export interface FlowCanvasProps {
   curvature?: number;
   fitOnMount?: boolean;
   controls?: boolean;
+  minimap?: boolean;
   canConnect?: ((...args: unknown[]) => unknown) | null;
   onSelectionChange?: (...args: unknown[]) => void;
   onNodeAction?: (...args: unknown[]) => void;
@@ -47,6 +48,8 @@ export interface FlowCanvasHandle {
   clear: (...args: any[]) => any;
   zoomToFit: (...args: any[]) => any;
   zoomTo: (...args: any[]) => any;
+  setCenter: (...args: any[]) => any;
+  setViewport: (...args: any[]) => any;
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;

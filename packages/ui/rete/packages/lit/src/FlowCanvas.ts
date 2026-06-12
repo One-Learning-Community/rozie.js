@@ -68,6 +68,22 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
 }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
+.rozie-flow-minimap[data-rozie-s-cd396d6a] {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 10;
+  width: 200px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+}
+.rozie-flow-minimap__svg[data-rozie-s-cd396d6a] { display: block; width: 100%; height: 100%; }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -170,10 +186,12 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
   @property({ type: Boolean, reflect: true }) controls: boolean = true;
+  @property({ type: Boolean, reflect: true }) minimap: boolean = false;
   @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
   private _typeReg = signal({});
   private _portReg = signal({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
+  @query('[data-rozie-ref="minimapEl"]') private _refMinimapEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_2 = true;
@@ -318,6 +336,30 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
       this.dragFlushRaf = 0;
       this.pendingDragPositions.clear();
+      // MiniMap teardown — remove the pointer-pan listeners + cancel a pending redraw.
+      if (this.minimapHost) {
+        if (this.onMinimapPointerDown) {
+          try {
+            this.minimapHost.removeEventListener('pointerdown', this.onMinimapPointerDown);
+          } catch (e: any) {}
+        }
+        if (this.onMinimapPointerMove) {
+          try {
+            this.minimapHost.removeEventListener('pointermove', this.onMinimapPointerMove);
+          } catch (e: any) {}
+        }
+        if (this.onMinimapPointerUp) {
+          try {
+            this.minimapHost.removeEventListener('pointerup', this.onMinimapPointerUp);
+          } catch (e: any) {}
+        }
+      }
+      if (this.minimapRedrawRaf && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(this.minimapRedrawRaf);
+        } catch (e: any) {}
+      }
+      this.minimapRedrawRaf = 0;
       for (const [, entry] of this.nodeEntries as any) {
         if (entry.handle) entry.handle.dispose();
         if (entry.bodyHandle && entry.bodyHandle.dispose) {
@@ -343,6 +385,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           if (this.reconcileConnections) this.reconcileConnections();
         });
       }
+      // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
+      if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
     })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._portReg.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       if (this.reconcileNodes) {
@@ -567,6 +611,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // unfilled (dropping the default-chrome title). The cross-target slot-name ==
     // local-binding shadow trap.
     const renderNode = (element: any, reteNode: any) => {
+      // a (re)render means node DOM exists / changed → refresh the minimap (its node
+      // rects measure these elements; coalesced, so calling it on every render is cheap,
+      // and it covers Lit's measure-after-first-paint).
+      if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
       const id = reteNode.id;
       const meta = this.nodeMeta.get(id) || {
         id,
@@ -1098,6 +1146,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             composed: true
           }));
         }
+        // a node moved → its minimap rect moves (works during a programmatic translate too).
+        if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
       } else if (context.type === 'translated') {
         this.dispatchEvent(new CustomEvent("translated", {
           detail: {
@@ -1107,11 +1157,15 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           bubbles: true,
           composed: true
         }));
+        // the viewport window moved → redraw the minimap viewport rect + mask.
+        if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
       } else if (context.type === 'zoomed') {
         if (!this.programmatic) {
           const k = this.area.area.transform.k;
           if (k !== this.zoom) this._zoomControllable.write(k);
         }
+        // the viewport window resized (zoom) → redraw the minimap viewport rect + mask.
+        if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
       } else if (context.type === 'contextmenu') {
         // suppress the native browser menu over the canvas; surface a hook instead.
         context.data.event.preventDefault();
@@ -1318,8 +1372,217 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       } finally {
         this.programmatic--;
       }
+    };
+
+    // ─── built-in MiniMap (opt-in :minimap, Phase 42) ────────────────────────────
+    // An absolute light-DOM SVG overlay (bottom-right) showing a scaled map of every
+    // node + the current viewport window (outside dimmed), PANNABLE (drag recenters via
+    // setCenter). The host div is COMPONENT-template DOM (carries the [data-rozie-s-*]
+    // scope attr → plain scoped CSS positions it); its SVG children are built
+    // IMPERATIVELY with createElementNS (the connection-renderer discipline) so SVG
+    // namespacing is identical on all 6 (no SVG-in-template cross-target risk) and styled
+    // with INLINE attributes (the arrowhead-marker lesson — no scoped-CSS / :root rule
+    // needed for engine-style DOM). Node dims come from the MEASURED engine node-view
+    // elements (area.nodeViews.get(id).element offsetW/H — target-agnostic, like the
+    // render pipe) with a default-rect fallback for Lit's unmeasured first paint.
+    // ─── built-in MiniMap (opt-in :minimap, Phase 42) ────────────────────────────
+    // An absolute light-DOM SVG overlay (bottom-right) showing a scaled map of every
+    // node + the current viewport window (outside dimmed), PANNABLE (drag recenters via
+    // setCenter). The host div is COMPONENT-template DOM (carries the [data-rozie-s-*]
+    // scope attr → plain scoped CSS positions it); its SVG children are built
+    // IMPERATIVELY with createElementNS (the connection-renderer discipline) so SVG
+    // namespacing is identical on all 6 (no SVG-in-template cross-target risk) and styled
+    // with INLINE attributes (the arrowhead-marker lesson — no scoped-CSS / :root rule
+    // needed for engine-style DOM). Node dims come from the MEASURED engine node-view
+    // elements (area.nodeViews.get(id).element offsetW/H — target-agnostic, like the
+    // render pipe) with a default-rect fallback for Lit's unmeasured first paint.
+    const measureNodeSize = (id: any) => {
+      const view = this.area && this.area.nodeViews ? this.area.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      const w = el && el.offsetWidth ? el.offsetWidth : this.MINIMAP_DEFAULT_NODE_W;
+      const h = el && el.offsetHeight ? el.offsetHeight : this.MINIMAP_DEFAULT_NODE_H;
+      return {
+        w,
+        h
+      };
+    };
+    const mkMinimapRect = (x: any, y: any, w: any, h: any, cls: any, fill: any, stroke: any, strokeW: any) => {
+      const r = document.createElementNS(this.SVGNS, 'rect');
+      r.setAttribute('class', cls);
+      r.setAttribute('x', String(x));
+      r.setAttribute('y', String(y));
+      r.setAttribute('width', String(Math.max(w, 0)));
+      r.setAttribute('height', String(Math.max(h, 0)));
+      if (fill) r.setAttribute('fill', fill);
+      if (stroke) {
+        r.setAttribute('stroke', stroke);
+        r.setAttribute('stroke-width', String(strokeW || 1));
+      }
+      return r;
+    };
+
+    // Rebuild the minimap SVG: node rects (selected highlighted) + a dim mask outside the
+    // viewport (evenodd punch-out) + the viewport window outline. The bounds union the
+    // node rects AND the viewport window so the viewport indicator stays in-frame even
+    // when panned past the nodes. Stores `minimapMap` (the px↔graph mapping the pointer-
+    // pan handlers read). Cheap (a handful of rects) → a full rebuild per frame is fine.
+    // Rebuild the minimap SVG: node rects (selected highlighted) + a dim mask outside the
+    // viewport (evenodd punch-out) + the viewport window outline. The bounds union the
+    // node rects AND the viewport window so the viewport indicator stays in-frame even
+    // when panned past the nodes. Stores `minimapMap` (the px↔graph mapping the pointer-
+    // pan handlers read). Cheap (a handful of rects) → a full rebuild per frame is fine.
+    const redrawMinimap = () => {
+      this.minimapRedrawRaf = 0;
+      if (!this.minimap || !this.minimapSvg || !this.area || !container) return;
+      const t = this.area.area.transform;
+      const k = t.k || 1;
+      const cw = container.clientWidth || this.MINIMAP_W;
+      const ch = container.clientHeight || this.MINIMAP_H;
+      // viewport window in GRAPH coords (screen [0,cw]×[0,ch] → graph).
+      const vx = -t.x / k,
+        vy = -t.y / k,
+        vw = cw / k,
+        vh = ch / k;
+      const graphNodes = this.currentGraph().nodes || [];
+      const selIds = new Set(this.selectedNodeIds().map((s: any) => String(s)));
+      const rects = [];
+      for (const n of graphNodes as any) {
+        if (!n || n.id == null) continue;
+        const view = this.area.nodeViews.get(n.id);
+        const gx = view ? view.position.x : n.x || 0;
+        const gy = view ? view.position.y : n.y || 0;
+        const sz = measureNodeSize(n.id);
+        rects.push({
+          gx,
+          gy,
+          gw: sz.w,
+          gh: sz.h,
+          selected: selIds.has(String(n.id))
+        });
+      }
+      let minX = vx,
+        minY = vy,
+        maxX = vx + vw,
+        maxY = vy + vh;
+      for (const r of rects as any) {
+        if (r.gx < minX) minX = r.gx;
+        if (r.gy < minY) minY = r.gy;
+        if (r.gx + r.gw > maxX) maxX = r.gx + r.gw;
+        if (r.gy + r.gh > maxY) maxY = r.gy + r.gh;
+      }
+      const padX = (maxX - minX) * 0.1 || 20;
+      const padY = (maxY - minY) * 0.1 || 20;
+      minX -= padX;
+      minY -= padY;
+      maxX += padX;
+      maxY += padY;
+      const bw = maxX - minX || 1;
+      const bh = maxY - minY || 1;
+      const scale = Math.min(this.MINIMAP_W / bw, this.MINIMAP_H / bh);
+      const offX = (this.MINIMAP_W - bw * scale) / 2;
+      const offY = (this.MINIMAP_H - bh * scale) / 2;
+      this.minimapMap = {
+        minX,
+        minY,
+        scale,
+        offX,
+        offY
+      };
+      const toMMx = (gx: any) => (gx - minX) * scale + offX;
+      const toMMy = (gy: any) => (gy - minY) * scale + offY;
+      this.minimapSvg.innerHTML = '';
+      for (const r of rects as any) {
+        const fill = r.selected ? '#3b82f6' : '#94a3b8';
+        this.minimapSvg.appendChild(mkMinimapRect(toMMx(r.gx), toMMy(r.gy), r.gw * scale, r.gh * scale, 'rozie-flow-minimap__node', fill, null, 0));
+      }
+      // dim mask OUTSIDE the viewport: full minimap rect with the viewport rect punched
+      // out (both subpaths same winding → fill-rule:evenodd leaves the viewport a hole).
+      const mvx = toMMx(vx),
+        mvy = toMMy(vy),
+        mvw = vw * scale,
+        mvh = vh * scale;
+      const mask = document.createElementNS(this.SVGNS, 'path');
+      mask.setAttribute('class', 'rozie-flow-minimap__mask');
+      mask.setAttribute('fill-rule', 'evenodd');
+      mask.setAttribute('fill', 'rgba(15, 23, 42, 0.18)');
+      mask.setAttribute('d', 'M0 0 H' + this.MINIMAP_W + ' V' + this.MINIMAP_H + ' H0 Z ' + 'M' + mvx + ' ' + mvy + ' h' + mvw + ' v' + mvh + ' h' + -mvw + ' Z');
+      this.minimapSvg.appendChild(mask);
+      this.minimapSvg.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', '#3b82f6', 1.5));
+    };
+
+    // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
+    // when :minimap is off (the bridge stays callable everywhere, cheap).
+    // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
+    // when :minimap is off (the bridge stays callable everywhere, cheap).
+    this.scheduleMinimapRedraw = () => {
+      if (!this.minimap || this.minimapRedrawRaf) return;
+      if (typeof requestAnimationFrame === 'function') {
+        this.minimapRedrawRaf = requestAnimationFrame(redrawMinimap);
+      } else {
+        this.minimapRedrawRaf = 1;
+        Promise.resolve().then(redrawMinimap);
+      }
+    };
+
+    // Map a minimap pointer event → graph coords (via the stored minimapMap) → setCenter.
+    // Pan is a view op → allowed even when readonly, but gated by `pannable` (mirror the
+    // main-canvas pannable gate). Pointer capture keeps the drag tracking off the box.
+    // Map a minimap pointer event → graph coords (via the stored minimapMap) → setCenter.
+    // Pan is a view op → allowed even when readonly, but gated by `pannable` (mirror the
+    // main-canvas pannable gate). Pointer capture keeps the drag tracking off the box.
+    const minimapPointerToGraph = (e: any) => {
+      if (!this.minimapMap || !this.minimapHost) return null;
+      const box = this.minimapHost.getBoundingClientRect();
+      const rw = box.width || this.MINIMAP_W;
+      const rh = box.height || this.MINIMAP_H;
+      const mx = (e.clientX - box.left) * (this.MINIMAP_W / rw);
+      const my = (e.clientY - box.top) * (this.MINIMAP_H / rh);
+      return {
+        gx: this.minimapMap.minX + (mx - this.minimapMap.offX) / this.minimapMap.scale,
+        gy: this.minimapMap.minY + (my - this.minimapMap.offY) / this.minimapMap.scale
+      };
+    };
+    if (this.minimap && this._refMinimapEl) {
+      this.minimapHost = this._refMinimapEl;
+      this.minimapSvg = document.createElementNS(this.SVGNS, 'svg');
+      this.minimapSvg.setAttribute('class', 'rozie-flow-minimap__svg');
+      this.minimapSvg.setAttribute('viewBox', '0 0 ' + this.MINIMAP_W + ' ' + this.MINIMAP_H);
+      this.minimapSvg.setAttribute('preserveAspectRatio', 'none');
+      this.minimapHost.appendChild(this.minimapSvg);
+      this.onMinimapPointerDown = (e: any) => {
+        if (!this.pannable) return;
+        const g = minimapPointerToGraph(e);
+        if (!g) return;
+        this.minimapPanning = true;
+        try {
+          if (e.target && e.target.setPointerCapture && e.pointerId != null) e.target.setPointerCapture(e.pointerId);
+        } catch (err: any) {}
+        e.preventDefault();
+        e.stopPropagation();
+        this.setCenter(g.gx, g.gy, null);
+      };
+      this.onMinimapPointerMove = (e: any) => {
+        if (!this.minimapPanning || !this.pannable) return;
+        const g = minimapPointerToGraph(e);
+        if (!g) return;
+        e.preventDefault();
+        this.setCenter(g.gx, g.gy, null);
+      };
+      this.onMinimapPointerUp = (e: any) => {
+        if (!this.minimapPanning) return;
+        this.minimapPanning = false;
+        try {
+          if (e.target && e.target.releasePointerCapture && e.pointerId != null) e.target.releasePointerCapture(e.pointerId);
+        } catch (err: any) {}
+      };
+      this.minimapHost.addEventListener('pointerdown', this.onMinimapPointerDown);
+      this.minimapHost.addEventListener('pointermove', this.onMinimapPointerMove);
+      this.minimapHost.addEventListener('pointerup', this.onMinimapPointerUp);
     }
 
+    // ─── initial graph: nodes first, then connections (connections reference live
+    // node instances), then optional fit. Sequenced via an async IIFE so the
+    // $onMount-returned teardown stays synchronous. ──────────────────────────────
     // ─── initial graph: nodes first, then connections (connections reference live
     // node instances), then optional fit. Sequenced via an async IIFE so the
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
@@ -1347,6 +1610,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           if (k !== this.zoom) this._zoomControllable.write(k);
         }
       }
+      // draw the minimap once the graph + fit have settled (also redrawn on every
+      // render / pan / zoom / drag / selection / graph change below).
+      if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
     })();
   }
 
@@ -1376,7 +1642,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-in" aria-label="Zoom in" @click=${this.controlZoomIn} data-rozie-s-cd396d6a>+</button>
     <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-out" aria-label="Zoom out" @click=${this.controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button>
     <button class="rozie-flow-controls__btn" type="button" data-testid="flow-fit" aria-label="Fit view" @click=${this.controlFit} data-rozie-s-cd396d6a>&#9744;</button>
-  </div>` : nothing}</div>
+  </div>` : nothing}${this.minimap ? html`<div class="rozie-flow-minimap" data-testid="flow-minimap" data-rozie-ref="minimapEl" data-rozie-s-cd396d6a></div>` : nothing}</div>
 
 <slot name="node"></slot>
 
@@ -1399,6 +1665,34 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   keydownContainer: any = null;
 
   onCanvasKeydown: any = null;
+
+  minimapHost: any = null;
+
+  minimapSvg: any = null;
+
+  minimapRedrawRaf = 0;
+
+  minimapMap: any = null;
+
+  minimapPanning = false;
+
+  onMinimapPointerDown: any = null;
+
+  onMinimapPointerMove: any = null;
+
+  onMinimapPointerUp: any = null;
+
+  scheduleMinimapRedraw: any = null;
+
+  MINIMAP_W = 200;
+
+  MINIMAP_H = 150;
+
+  MINIMAP_DEFAULT_NODE_W = 140;
+
+  MINIMAP_DEFAULT_NODE_H = 52;
+
+  SVGNS = 'http://www.w3.org/2000/svg';
 
   SOCKET = new ClassicPreset.Socket('flow');
 
@@ -1524,6 +1818,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     bubbles: true,
     composed: true
   }));
+  // the selected set changed → repaint the minimap (selected nodes are highlighted).
+  if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
 };
 
   scheduleSelectionEmit = () => {
@@ -1701,6 +1997,40 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.programmatic++;
     try {
       await this.area.area.zoom(k);
+    } finally {
+      this.programmatic--;
+    }
+    if (k !== this.zoom) this._zoomControllable.write(k);
+  }
+
+  async setViewport(vp: any) {
+    if (!this.area || !vp || typeof vp !== 'object') return;
+    const tf = this.area.area.transform;
+    const k = typeof vp.k === 'number' ? vp.k : tf.k;
+    const x = typeof vp.x === 'number' ? vp.x : tf.x;
+    const y = typeof vp.y === 'number' ? vp.y : tf.y;
+    this.programmatic++;
+    try {
+      if (k !== this.area.area.transform.k) await this.area.area.zoom(k);
+      await this.area.area.translate(x, y);
+    } finally {
+      this.programmatic--;
+    }
+    if (k !== this.zoom) this._zoomControllable.write(k);
+  }
+
+  async setCenter(x: any, y: any, opts: any) {
+    if (!this.area || typeof x !== 'number' || typeof y !== 'number') return;
+    const k = opts && typeof opts.zoom === 'number' ? opts.zoom : this.area.area.transform.k;
+    const el = this.area.container;
+    const cw = el && el.clientWidth ? el.clientWidth : 0;
+    const ch = el && el.clientHeight ? el.clientHeight : 0;
+    const tx = cw / 2 - x * k;
+    const ty = ch / 2 - y * k;
+    this.programmatic++;
+    try {
+      if (k !== this.area.area.transform.k) await this.area.area.zoom(k);
+      await this.area.area.translate(tx, ty);
     } finally {
       this.programmatic--;
     }

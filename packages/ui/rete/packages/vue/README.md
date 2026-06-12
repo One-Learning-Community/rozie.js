@@ -58,6 +58,7 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 | `curvature` | `Number` | `0.3` |  |  |
 | `fitOnMount` | `Boolean` | `true` |  |  |
 | `controls` | `Boolean` | `true` |  |  |
+| `minimap` | `Boolean` | `false` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 
 ## Events
@@ -102,6 +103,8 @@ const flow = ref();         // template ref
 | `clear` | Remove every node and connection from the graph. |
 | `zoomToFit` | Pan and zoom the viewport to fit all nodes (Rete `AreaExtensions.zoomAt`). |
 | `zoomTo` | Set the zoom level — `zoomTo(k)`. Echoes the new level back into the two-way `zoom` model. |
+| `setCenter` | Center the viewport on graph coordinates — `setCenter(x, y, { zoom? })`. Optionally sets the zoom. Echoes the level into the `zoom` model and fires `translated`. Powers the pannable built-in MiniMap. |
+| `setViewport` | Set the raw viewport transform — `setViewport({ x, y, k })` (any field omitted keeps its current value). Echoes `k` into the `zoom` model and fires `translated`. |
 | `getNodes` | Return a serialized snapshot of all nodes as `[{ id, label, x, y }]` (live positions from the area). |
 | `getConnections` | Return a serialized snapshot of all connections as `[{ id, source, sourceOutput, target, targetInput }]`. |
 | `getTransform` | Return the current viewport transform `{ x, y, k }` (pan offset + zoom), or null before mount. |
