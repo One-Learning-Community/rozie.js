@@ -39,6 +39,7 @@ export interface FlowCanvasHandle {
   getArea: (...args: any[]) => any;
   addNode: (...args: any[]) => any;
   removeNode: (...args: any[]) => any;
+  deleteNode: (...args: any[]) => any;
   addConnection: (...args: any[]) => any;
   removeConnection: (...args: any[]) => any;
   clear: (...args: any[]) => any;

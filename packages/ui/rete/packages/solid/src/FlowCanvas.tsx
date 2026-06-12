@@ -147,6 +147,7 @@ export interface FlowCanvasHandle {
   getArea: (...args: any[]) => any;
   addNode: (...args: any[]) => any;
   removeNode: (...args: any[]) => any;
+  deleteNode: (...args: any[]) => any;
   addConnection: (...args: any[]) => any;
   removeConnection: (...args: any[]) => any;
   clear: (...args: any[]) => any;
@@ -161,7 +162,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, canConnect: null }, _props);
   const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'canConnect', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }); });
+  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }); });
 
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const [graph, setGraph] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'graph', (() => ({
@@ -261,6 +262,29 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     // ── interaction toggles ──
     if (!local.pannable) area.area.setDragHandler(null);
     if (!local.zoomable) area.area.setZoomHandler(null);
+
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    if (local.selectable && !local.readonly && container && typeof container.addEventListener === 'function') {
+      onCanvasKeydown = (e: any) => {
+        if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        const ids = selectedNodeIds();
+        if (ids.length === 0) return;
+        e.preventDefault();
+        for (const id of ids as any) deleteNode(id);
+      };
+      keydownContainer = container;
+      container.addEventListener('keydown', onCanvasKeydown);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // THE VANILLA RENDER PIPE. Intercepts the AreaPlugin's render/unmount signals.
@@ -945,6 +969,11 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
+    if (onCanvasKeydown && keydownContainer && typeof keydownContainer.removeEventListener === 'function') {
+      try {
+        keydownContainer.removeEventListener('keydown', onCanvasKeydown);
+      } catch (e: any) {}
+    }
     if (dragFlushRaf && typeof cancelAnimationFrame === 'function') {
       try {
         cancelAnimationFrame(dragFlushRaf);
@@ -1011,6 +1040,12 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   let socketWatcher: any = null;
   let renderScope: any = null;
   let selector: any = null;
+  // Win 1: the Delete/Backspace keydown listener + its host container. COMPONENT-scope
+  // (NOT $onMount-local) so the $onMount-returned teardown — which the Solid emitter
+  // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — can still see them to
+  // removeEventListener (the same component-scope discipline as nodeInstances below).
+  let keydownContainer: any = null;
+  let onCanvasKeydown: any = null;
 
   // One Socket shared by every port (Rete sockets gate compatibility by identity;
   // a single socket = "anything connects to anything", the common editor default).
@@ -1135,6 +1170,47 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       ...g,
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
+  }
+
+  // CASCADING DELETE (the PUBLIC controlled-graph node delete — Win 1). Distinct from
+  // the engine-only `removeNode` $expose verb: `removeNode` operates directly on the
+  // editor and is NOT written back to the model (the provenance-tracked imperative
+  // escape hatch); `deleteNode` is the BLESSED controlled-graph delete — it filters the
+  // node AND every incident connection out of FRESH arrays and writes ONE fresh
+  // top-level `{ ...g, nodes, connections }` object via `$model.graph` (the Phase-41
+  // write-back contract — in-place mutation is silently dropped on React/Solid/Lit/
+  // Angular). The wrapper's own `$watch(graph)` reconcile then reaps the live engine
+  // node + edges — we do NOT call editor.removeNode here (a double-remove would race the
+  // reconcile into Rete's "cannot find node"; the controlled-model filter is the single
+  // removal path). NOT echo-guarded with `programmatic` — this is a CONSUMER-driven write
+  // that SHOULD update the bound model (mirrors the demo's per-node ✕ filter). Returns
+  // true if a node was removed. The id-coerce-to-String mirrors the demo's onRemoveClick.
+  function deleteNode(id: any) {
+    if (id == null) return false;
+    const g = currentGraph();
+    const sid = String(id);
+    const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
+    if (nodes.length === (g.nodes || []).length) return false;
+    const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+    setGraph({
+      ...g,
+      nodes,
+      connections
+    });
+    return true;
+  }
+
+  // Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
+  // AreaExtensions.selector() `entities` Map holds the picked entities ({ label, id });
+  // for selectable nodes each entity's `id` is the node id. Empty when nothing is picked
+  // or selection is disabled. Read-only — no $data / engine write.
+  function selectedNodeIds() {
+    if (!selector || !selector.entities) return [];
+    const ids = [];
+    for (const e of selector.entities.values() as any) {
+      if (e && e.id != null) ids.push(e.id);
+    }
+    return ids;
   }
 
   // The $portals/$emit-capturing reconcilers are built INSIDE $onMount ($portals
@@ -1444,7 +1520,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   }
 }}>
     <>
-    <div class={"rozie-flow-canvas"} ref={(el) => { canvasElRef = el as HTMLElement; }} data-rozie-s-cd396d6a="" />
+    <div class={"rozie-flow-canvas"} ref={(el) => { canvasElRef = el as HTMLElement; }} tabIndex={0} data-rozie-s-cd396d6a="" />
 
 
 

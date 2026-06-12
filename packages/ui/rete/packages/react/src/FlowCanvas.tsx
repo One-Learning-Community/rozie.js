@@ -57,6 +57,7 @@ export interface FlowCanvasHandle {
   getArea: (...args: any[]) => any;
   addNode: (...args: any[]) => any;
   removeNode: (...args: any[]) => any;
+  deleteNode: (...args: any[]) => any;
   addConnection: (...args: any[]) => any;
   removeConnection: (...args: any[]) => any;
   clear: (...args: any[]) => any;
@@ -95,6 +96,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const socketWatcher = useRef<any>(null);
   const renderScope = useRef<any>(null);
   const selector = useRef<any>(null);
+  const onCanvasKeydown = useRef<any>(null);
+  const keydownContainer = useRef<any>(null);
   const programmatic = useRef(0);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
@@ -197,6 +200,28 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
   }, [currentGraph, setGraph]);
+  const deleteNode = useCallback((id: any) => {
+    if (id == null) return false;
+    const g = currentGraph();
+    const sid = String(id);
+    const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
+    if (nodes.length === (g.nodes || []).length) return false;
+    const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+    setGraph({
+      ...g,
+      nodes,
+      connections
+    });
+    return true;
+  }, [currentGraph, setGraph]);
+  const selectedNodeIds = useCallback(() => {
+    if (!selector.current || !selector.current.entities) return [];
+    const ids = [];
+    for (const e of selector.current.entities.values() as any) {
+      if (e && e.id != null) ids.push(e.id);
+    }
+    return ids;
+  }, []);
   const serializeConn = useCallback((c: any) => ({
     id: c.id,
     source: c.source,
@@ -471,6 +496,29 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // ── interaction toggles ──
     if (!props.pannable) area.current.area.setDragHandler(null);
     if (!props.zoomable) area.current.area.setZoomHandler(null);
+
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
+      onCanvasKeydown.current = (e: any) => {
+        if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        const ids = selectedNodeIds();
+        if (ids.length === 0) return;
+        e.preventDefault();
+        for (const id of ids as any) deleteNode(id);
+      };
+      keydownContainer.current = container;
+      container.addEventListener('keydown', onCanvasKeydown.current);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // THE VANILLA RENDER PIPE. Intercepts the AreaPlugin's render/unmount signals.
@@ -1155,6 +1203,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
+      if (onCanvasKeydown.current && keydownContainer.current && typeof keydownContainer.current.removeEventListener === 'function') {
+        try {
+          keydownContainer.current.removeEventListener('keydown', onCanvasKeydown.current);
+        } catch (e: any) {}
+      }
       if (dragFlushRaf.current && typeof cancelAnimationFrame === 'function') {
         try {
           cancelAnimationFrame(dragFlushRaf.current);
@@ -1212,7 +1265,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
   }, [zoom]);
 
-  useImperativeHandle(ref, () => ({ getEditor, getArea, addNode, removeNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <__ctx_rete_canvas.Provider value={{
@@ -1268,7 +1321,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }
 }}>
     <>
-    <div className={"rozie-flow-canvas"} ref={canvasEl} data-rozie-s-cd396d6a="" />
+    <div className={"rozie-flow-canvas"} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="" />
 
 
 

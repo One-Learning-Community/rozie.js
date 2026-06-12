@@ -47,8 +47,11 @@ const EXPECT = {
   // escape hatch); '' = the default slot that hosts the Phase 41 declarative
   // <NodeType>/<Port> children. Both coexist.
   slots: ['', 'node'],
+  // `deleteNode` (Win 1, quick-260611-sqa) = the PUBLIC controlled-graph cascading
+  // delete (fresh-graph write-back), distinct from `removeNode` (engine-only escape
+  // hatch). Also wired to the Delete/Backspace key.
   expose: [
-    'getEditor', 'getArea', 'addNode', 'removeNode', 'addConnection',
+    'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'addConnection',
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'getNodes',
     'getConnections', 'getTransform',
   ],
@@ -100,7 +103,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (12 verbs)', () => {
+  it('expose surface matches (13 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

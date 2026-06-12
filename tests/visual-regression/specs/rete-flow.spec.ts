@@ -660,3 +660,96 @@ for (const target of TARGETS) {
     await expect(txtNode).toHaveCount(0);
   });
 }
+
+/**
+ * 5. NODE DELETE — Delete/Backspace key on the selected node, cascading the incident
+ * edges (Win 1, quick-260611-sqa).
+ *
+ * `examples/demos/FlowCanvasDemo.rozie` (3 `task` nodes Source→Filter→Sink, 2 bound
+ * edges a→b, b→c). This proves the NEW cascading delete on the controlled graph via the
+ * Delete key on all 6:
+ *
+ *   SELECT the MIDDLE node ('Filter', id 'b') — it carries BOTH bound edges (a→b and
+ *   b→c) — by clicking its body (Rete `nodepicked` → `.is-selected`), focus the canvas,
+ *   press Delete. The canvas's keydown handler collects the selected node id from the
+ *   live selector and calls the cascading `deleteNode('b')`, which filters the node AND
+ *   both incident connections out of FRESH arrays and writes ONE fresh `{...graph,
+ *   nodes, connections}` back through the model → the `$watch(graph)` reconcile reaps the
+ *   engine node + both edges.
+ *
+ *   This exercises BOTH delete paths in one: the Delete KEY wiring AND the cascading
+ *   `deleteNode` verb body (the keydown handler calls the same exposed function). Assert
+ *   the BOUND `readout-count` drops 3→2, the SPECIFIC 'Filter' node body is GONE
+ *   (`toHaveCount(0)` — NOT a count-only delta; a count check once masked a
+ *   non-rendering feature on THIS component), AND the two incident edges cascaded away
+ *   (the drawn-path count drops to 0 — the cascade proof).
+ *
+ * (The imperative `$refs.flow.deleteNode(id)` call from a consumer is the SAME function
+ * body the key handler invokes; its handle exposure is gated by the surface test +
+ * per-target handle synthesis, and the demo-ref handle is a documented cross-target
+ * divergence — Angular's child ref is the host element — so the VR proves the function
+ * behavior via the key path, which works uniformly on all 6.)
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-delete [${target}]: Delete key cascades the selected node + its incident edges out of the bound graph`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+
+    // counts DRAWN paths (non-empty `d`), piercing Lit's open shadow root.
+    const drawnCount = async () =>
+      page
+        .locator('.rozie-flow-connection__path')
+        .evaluateAll(
+          (els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0)
+              .length,
+        );
+
+    // both bound edges (a→b, b→c) drawn before we delete.
+    await expect.poll(drawnCount, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+
+    const countReadout = page.getByTestId('readout-count');
+    await expect(countReadout).toHaveText('3');
+
+    // ---- SELECT the MIDDLE 'Filter' node (carries BOTH edges) + press Delete ----
+    const filterNode = page.locator('.rozie-flow-node', { hasText: 'Filter' });
+    await expect(filterNode).toHaveCount(1);
+    const fb = await filterNode.first().boundingBox();
+    if (!fb) throw new Error('Filter node bounding box unavailable');
+    // click its body near the label (away from the right-edge output socket) to PICK it.
+    await page.mouse.click(fb.x + 14, fb.y + 10);
+    // selection settles — the `.is-selected` class lands on the .rozie-flow-node box
+    // (Lit may settle async, so the locator carries its own timeout).
+    await expect(
+      page.locator('.rozie-flow-node.is-selected', { hasText: 'Filter' }),
+    ).toHaveCount(1, { timeout: 5_000 });
+
+    // focus the canvas (the keydown listener lives on .rozie-flow-canvas, tabindex=0)
+    // and press Delete → cascading deleteNode('b').
+    await canvas.focus();
+    await page.keyboard.press('Delete');
+
+    // BOUND node-count drops 3→2 and the SPECIFIC 'Filter' node body is gone.
+    await expect(countReadout).toHaveText('2', { timeout: 10_000 });
+    await expect(filterNode).toHaveCount(0, { timeout: 10_000 });
+
+    // CASCADE PROOF: both edges incident to 'b' (a→b and b→c) were filtered out of the
+    // fresh graph → the reconcile removed them → the drawn-path count falls to 0.
+    await expect.poll(drawnCount, { timeout: 10_000 }).toBe(0);
+  });
+}

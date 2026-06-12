@@ -191,7 +191,8 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `getEditor()` | The underlying Rete `NodeEditor` (the graph-model escape hatch). |
 | `getArea()` | The underlying Rete `AreaPlugin` (viewport transform, node views). |
 | `addNode(spec)` | Imperatively add a node. NOT reaped by the `graph` reconcile. |
-| `removeNode(id)` | Remove a node and its connections. |
+| `removeNode(id)` | Remove a node and its connections directly on the engine — the imperative **escape hatch**, NOT written back to the bound `graph`. (Use `deleteNode` for the controlled-graph delete.) |
+| `deleteNode(id)` | Cascading controlled-graph delete: removes the node **and its incident connections**, writing a fresh `graph` object back through the two-way model (the `$watch(graph)` reconcile reaps the live engine node/edges). The blessed delete — matches the Delete / Backspace key. Returns whether a node was removed. |
 | `addConnection(spec)` | Imperatively add a connection. NOT reaped by the `graph` reconcile. |
 | `removeConnection(id)` | Remove a connection by id. |
 | `clear()` | Remove every node and connection. |

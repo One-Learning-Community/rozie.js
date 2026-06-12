@@ -43,7 +43,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
   imports: [NgTemplateOutlet],
   template: `
 
-    <div class="rozie-flow-canvas" #canvasEl></div>
+    <div class="rozie-flow-canvas" #canvasEl tabindex="0"></div>
 
 
 
@@ -298,6 +298,8 @@ export class FlowCanvas {
         };
       },
     };
+    const __selectable = this.selectable();
+    const __readonly = this.readonly();
     const __minZoom = this.minZoom();
     const __maxZoom = this.maxZoom();
     const __snapGrid = this.snapGrid();
@@ -337,7 +339,7 @@ export class FlowCanvas {
 
     // ── selection (selectableNodes) ──
     // ── selection (selectableNodes) ──
-    if (this.selectable() && !this.readonly()) {
+    if (__selectable && !__readonly) {
       this.selector = AreaExtensions.selector();
       AreaExtensions.selectableNodes(this.area, this.selector, {
         accumulating: this.accumulateOnCtrl() ? AreaExtensions.accumulateOnCtrl() : {
@@ -375,6 +377,38 @@ export class FlowCanvas {
     // ── interaction toggles ──
     if (!this.pannable()) this.area.area.setDragHandler(null);
     if (!this.zoomable()) this.area.area.setZoomHandler(null);
+
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    if (__selectable && !__readonly && container && typeof container.addEventListener === 'function') {
+      this.onCanvasKeydown = (e: any) => {
+        if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        const ids = this.selectedNodeIds();
+        if (ids.length === 0) return;
+        e.preventDefault();
+        for (const id of ids as any) this.deleteNode(id);
+      };
+      this.keydownContainer = container;
+      container.addEventListener('keydown', this.onCanvasKeydown);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // THE VANILLA RENDER PIPE. Intercepts the AreaPlugin's render/unmount signals.
@@ -1129,6 +1163,11 @@ export class FlowCanvas {
       }
     })();
     this.__rozieDestroyRef.onDestroy(() => {
+      if (this.onCanvasKeydown && this.keydownContainer && typeof this.keydownContainer.removeEventListener === 'function') {
+        try {
+          this.keydownContainer.removeEventListener('keydown', this.onCanvasKeydown);
+        } catch (e: any) {}
+      }
       if (this.dragFlushRaf && typeof cancelAnimationFrame === 'function') {
         try {
           cancelAnimationFrame(this.dragFlushRaf);
@@ -1166,6 +1205,8 @@ export class FlowCanvas {
   socketWatcher: any = null;
   renderScope: any = null;
   selector: any = null;
+  keydownContainer: any = null;
+  onCanvasKeydown: any = null;
   SOCKET = new ClassicPreset.Socket('flow');
   nodeInstances = new Map();
   nodeMeta = new Map();
@@ -1234,6 +1275,28 @@ export class FlowCanvas {
       ...g,
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
+  };
+  deleteNode = (id: any) => {
+    if (id == null) return false;
+    const g = this.currentGraph();
+    const sid = String(id);
+    const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
+    if (nodes.length === (g.nodes || []).length) return false;
+    const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+    this.graph.set({
+      ...g,
+      nodes,
+      connections
+    });
+    return true;
+  };
+  selectedNodeIds = () => {
+    if (!this.selector || !this.selector.entities) return [];
+    const ids = [];
+    for (const e of this.selector.entities.values() as any) {
+      if (e && e.id != null) ids.push(e.id);
+    }
+    return ids;
   };
   reconcileNodes: any = null;
   reconcileConnections: any = null;

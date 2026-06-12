@@ -276,6 +276,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     };
 
     this._disconnectCleanups.push((() => {
+      if (this.onCanvasKeydown && this.keydownContainer && typeof this.keydownContainer.removeEventListener === 'function') {
+        try {
+          this.keydownContainer.removeEventListener('keydown', this.onCanvasKeydown);
+        } catch (e: any) {}
+      }
       if (this.dragFlushRaf && typeof cancelAnimationFrame === 'function') {
         try {
           cancelAnimationFrame(this.dragFlushRaf);
@@ -455,6 +460,38 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // ── interaction toggles ──
     if (!this.pannable) this.area.area.setDragHandler(null);
     if (!this.zoomable) this.area.area.setZoomHandler(null);
+
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
+    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
+    // the template so it can receive key focus) rather than `document`: the listener
+    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
+    // reaches it on Lit too (a `:target="document"` listener does not reliably see
+    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
+    // cross-target path). Gated on selectable && !readonly. We guard against deleting
+    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
+    // typing in a node never nukes it. The listener is removed in the teardown.
+    if (this.selectable && !this.readonly && container && typeof container.addEventListener === 'function') {
+      this.onCanvasKeydown = (e: any) => {
+        if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        const ids = this.selectedNodeIds();
+        if (ids.length === 0) return;
+        e.preventDefault();
+        for (const id of ids as any) this.deleteNode(id);
+      };
+      this.keydownContainer = container;
+      container.addEventListener('keydown', this.onCanvasKeydown);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // THE VANILLA RENDER PIPE. Intercepts the AreaPlugin's render/unmount signals.
@@ -1261,7 +1298,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   render() {
     return html`
-<div class="rozie-flow-canvas" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a></div>
+<div class="rozie-flow-canvas" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a></div>
 
 <slot name="node"></slot>
 
@@ -1280,6 +1317,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   renderScope: any = null;
 
   selector: any = null;
+
+  keydownContainer: any = null;
+
+  onCanvasKeydown: any = null;
 
   SOCKET = new ClassicPreset.Socket('flow');
 
@@ -1364,6 +1405,30 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     ...g,
     connections: (g.connections || []).filter((e: any) => e && e.id !== id)
   });
+};
+
+  deleteNode = (id: any) => {
+  if (id == null) return false;
+  const g = this.currentGraph();
+  const sid = String(id);
+  const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
+  if (nodes.length === (g.nodes || []).length) return false;
+  const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+  this._graphControllable.write({
+    ...g,
+    nodes,
+    connections
+  });
+  return true;
+};
+
+  selectedNodeIds = () => {
+  if (!this.selector || !this.selector.entities) return [];
+  const ids = [];
+  for (const e of this.selector.entities.values() as any) {
+    if (e && e.id != null) ids.push(e.id);
+  }
+  return ids;
 };
 
   reconcileNodes: any = null;
