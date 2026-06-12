@@ -183,6 +183,11 @@ const nodeMeta = new Map();
 const connInstances = new Map();
 const nodeEntries = new Map();
 const connEntries = new Map();
+// connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
+// connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
+// connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
+// connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
+const connMeta = new Map();
 
 // ids last applied FROM THE BOUND GRAPH, so reconcile removes only graph-managed
 // entities — an imperative $expose addNode/addConnection is NOT auto-reaped on the
@@ -669,6 +674,7 @@ export async function clear() {
   nodeInstances.clear();
   nodeMeta.clear();
   connInstances.clear();
+  connMeta.clear();
   lastPropNodeIds = [];
   lastPropConnIds = [];
 }
@@ -1392,6 +1398,33 @@ onMount(() => {
     path.setAttribute('class', 'rozie-flow-connection__path');
     path.setAttribute('marker-end', 'url(#' + markerId + ')');
     svg.appendChild(path);
+
+    // ── per-edge label + styling (F3) ────────────────────────────────────────────
+    // The consumer's connection spec ({ id, source, …, label?, stroke?, dashed? }) is kept
+    // in connMeta keyed by id (the connection-side analog of nodeMeta). A committed edge
+    // resolves its label/style here; a drag-preview pseudo (no committed id) has none.
+    // Styling is applied as INLINE attributes (the arrowhead-marker discipline — engine DOM
+    // carries no scope attr); a `label` renders an SVG <text> at the path midpoint (white
+    // halo via paint-order for legibility over the line), repositioned in redraw().
+    const emeta = connMeta.get(connection.id) || null;
+    if (emeta) {
+      if (emeta.stroke != null) {
+        const s = String(emeta.stroke);
+        path.setAttribute('stroke', s);
+        arrow.setAttribute('fill', s);
+      }
+      if (emeta.dashed === true) path.setAttribute('stroke-dasharray', '7 5');
+    }
+    let labelEl: any = null;
+    const edgeLabel = emeta && emeta.label != null ? String(emeta.label) : null;
+    if (edgeLabel) {
+      labelEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      labelEl.setAttribute('class', 'rozie-flow-connection__label');
+      labelEl.setAttribute('text-anchor', 'middle');
+      labelEl.setAttribute('dominant-baseline', 'middle');
+      labelEl.textContent = edgeLabel;
+      svg.appendChild(labelEl);
+    }
     element.appendChild(svg);
     let start: any = null;
     let end: any = null;
@@ -1399,6 +1432,10 @@ onMount(() => {
     const redraw = () => {
       if (!start || !end) return;
       path.setAttribute('d', classicConnectionPath([start, end], curvature$local));
+      if (labelEl) {
+        labelEl.setAttribute('x', String((start.x + end.x) / 2));
+        labelEl.setAttribute('y', String((start.y + end.y) / 2));
+      }
     };
 
     // Seed the DANGLING side's coordinate from the pointer FIRST — socketWatcher
@@ -1559,6 +1596,7 @@ onMount(() => {
       }
     } else if (context.type === 'connectionremoved') {
       connInstances.delete(context.data.id);
+      connMeta.delete(context.data.id);
       if (!programmatic) {
         // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
         writeBackConnectionRemoved(context.data.id);
@@ -1771,14 +1809,20 @@ onMount(() => {
       const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
       const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
       const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+      // carry the optional per-edge label/style (F3) through to connMeta → renderConnection.
       return {
         id,
         source: spec.source,
         sourceOutput: srcOut,
         target: spec.target,
-        targetInput: tgtIn
+        targetInput: tgtIn,
+        label: spec.label,
+        stroke: spec.stroke,
+        dashed: spec.dashed
       };
     };
+    // cheap style signature so a label/style change on an EXISTING edge re-renders it.
+    const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) : '';
     const merged = graphConns.map(norm).filter(Boolean);
     const want = [];
     programmatic++;
@@ -1786,7 +1830,22 @@ onMount(() => {
       for (const spec of merged as any) {
         if (!spec || spec.id == null) continue;
         want.push(spec.id);
-        if (connInstances.has(spec.id)) continue;
+        if (connInstances.has(spec.id)) {
+          // existing edge — relabel/restyle in place if its label/style changed (the
+          // controlled-graph expectation: edit the bound graph → see the change). Drop the
+          // render entry so area.update takes the fresh-build path (re-applies label/style).
+          const changed = edgeStyleSig(connMeta.get(spec.id)) !== edgeStyleSig(spec);
+          connMeta.set(spec.id, spec);
+          if (changed) {
+            const entry = connEntries.get(spec.id);
+            if (entry) {
+              entry.dispose();
+              connEntries.delete(spec.id);
+            }
+            await area.update('connection', spec.id);
+          }
+          continue;
+        }
         const sourceNode = nodeInstances.get(spec.source);
         const targetNode = nodeInstances.get(spec.target);
         if (!sourceNode || !targetNode) continue;
@@ -1801,6 +1860,9 @@ onMount(() => {
         const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
         conn.id = spec.id;
         connInstances.set(spec.id, conn);
+        // seed connMeta BEFORE addConnection so renderConnection sees the label/style on
+        // its first render (the render fires synchronously inside addConnection's pipe).
+        connMeta.set(spec.id, spec);
         await editor.addConnection(conn);
       }
       // remove dropped GRAPH-managed edges — imperatively added edges survive.
@@ -1809,6 +1871,7 @@ onMount(() => {
         if (!want.includes(id) && connInstances.has(id)) {
           await editor.removeConnection(id);
           connInstances.delete(id);
+          connMeta.delete(id);
         }
       }
       lastPropConnIds = want;
@@ -2290,6 +2353,16 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
       stroke: #64748b;
       stroke-width: 3px;
       pointer-events: auto;
+    }
+  .rozie-flow-canvas .rozie-flow-connection__label {
+      font: 600 11px system-ui, sans-serif;
+      fill: #334155;
+      paint-order: stroke;
+      stroke: #ffffff;
+      stroke-width: 3px;
+      stroke-linejoin: round;
+      pointer-events: none;
+      user-select: none;
     }
 }
 </style>

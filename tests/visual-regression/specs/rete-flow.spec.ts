@@ -1225,3 +1225,84 @@ for (const target of TARGETS) {
     ).toBeLessThanOrEqual(VERTICAL_ALIGN_DY_SANITY_PX);
   });
 }
+
+/**
+ * 11. EDGE LABELS + STYLING — per-edge `label` / `stroke` / `dashed` (Phase 43 F3).
+ *
+ * `examples/demos/FlowCanvasEdgesDemo.rozie` fans a Start node out to Approve (green edge
+ * labeled 'approve') + Reject (red dashed edge labeled 'reject') — the labels/styles live
+ * directly on `graph.connections[]`. Proves:
+ *   1. both edges draw with their LABELS rendered (`.rozie-flow-connection__label` ×2, text
+ *      'approve' / 'reject').
+ *   2. STYLING applies — one path stroke is green (#16a34a), one is red (#dc2626) and dashed
+ *      (a non-empty `stroke-dasharray`).
+ *   3. LIVE RE-RENDER — clicking "Relabel" writes a fresh `graph.connections` (e1 label →
+ *      'approved!'); the rendered edge label updates (the controlled-graph edit path).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-edges [${target}]: per-edge label + stroke/dashed styling render and relabel live`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasEdges&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+    // both styled edges draw.
+    await expect
+      .poll(
+        async () =>
+          page.locator('.rozie-flow-connection__path').evaluateAll((els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0).length,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThanOrEqual(2);
+
+    // ---- 1. both edge LABELS render with their text ----
+    const labels = page.locator('.rozie-flow-connection__label');
+    await expect.poll(async () => labels.count(), { timeout: 10_000 }).toBe(2);
+    await expect(
+      page.locator('.rozie-flow-connection__label', { hasText: 'approve' }),
+    ).toHaveCount(1, { timeout: 10_000 });
+    await expect(
+      page.locator('.rozie-flow-connection__label', { hasText: 'reject' }),
+    ).toHaveCount(1);
+
+    // ---- 2. STYLING: one green stroke, one red + dashed ----
+    const styles = await page
+      .locator('.rozie-flow-connection__path')
+      .evaluateAll((els) =>
+        els
+          .filter((e) => (e.getAttribute('d') || '').trim().length > 0)
+          .map((e) => ({
+            stroke: (e.getAttribute('stroke') || '').toLowerCase(),
+            dash: (e.getAttribute('stroke-dasharray') || '').trim(),
+          })),
+      );
+    const green = styles.find((s) => s.stroke === '#16a34a');
+    const red = styles.find((s) => s.stroke === '#dc2626');
+    expect(green, `expected a green (#16a34a) edge; got ${JSON.stringify(styles)}`).toBeTruthy();
+    expect(red, `expected a red (#dc2626) edge; got ${JSON.stringify(styles)}`).toBeTruthy();
+    expect(red?.dash.length, `expected the red edge to be dashed; got ${JSON.stringify(red)}`).toBeGreaterThan(0);
+
+    // ---- 3. LIVE RE-RENDER: relabel e1 through the controlled graph ----
+    await page.getByTestId('relabel').click();
+    await expect(
+      page.locator('.rozie-flow-connection__label', { hasText: 'approved!' }),
+    ).toHaveCount(1, { timeout: 10_000 });
+    // the other label is untouched, and the count is still 2 (no duplicate edge).
+    await expect(
+      page.locator('.rozie-flow-connection__label', { hasText: 'reject' }),
+    ).toHaveCount(1);
+    await expect.poll(async () => labels.count(), { timeout: 5_000 }).toBe(2);
+  });
+}

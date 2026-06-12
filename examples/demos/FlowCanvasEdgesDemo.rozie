@@ -1,0 +1,106 @@
+<!--
+  FlowCanvasEdgesDemo.rozie — BEHAVIORAL consumer for Phase 43 F3: edge labels + per-edge
+  styling. Conditional/labeled edges are core to workflow graphs (a "Start" node fanning
+  out to "Approve" (green, labeled "approve") and "Reject" (red, dashed, labeled "reject")).
+
+  Edge label/style live DIRECTLY on the bound `graph.connections` entry (optional `label`,
+  `stroke`, `dashed`) — per-edge, the React-Flow `edge.label`/`edge.style` model. The spec
+  (`rete-flow-edges`) asserts the labels render, the styling is applied (stroke color +
+  dash), and a relabel writes through the controlled graph (live re-render).
+-->
+
+<rozie name="FlowCanvasEdgesDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  graph: {
+    nodes: [
+      { id: 'start', type: 'step', x: 20,  y: 120, data: { label: 'Start' } },
+      { id: 'yes',   type: 'step', x: 340, y: 40,  data: { label: 'Approve' } },
+      { id: 'no',    type: 'step', x: 340, y: 220, data: { label: 'Reject' } },
+    ],
+    // optional per-edge `label` / `stroke` / `dashed` — the F3 surface.
+    connections: [
+      { id: 'e1', source: 'start', sourceOutput: 'out', target: 'yes', targetInput: 'in', label: 'approve', stroke: '#16a34a' },
+      { id: 'e2', source: 'start', sourceOutput: 'out', target: 'no',  targetInput: 'in', label: 'reject',  stroke: '#dc2626', dashed: true },
+    ],
+  },
+}
+</data>
+
+<script>
+// Relabel e1 through the controlled graph (a FRESH connections array) — proving an edge
+// label edit on an EXISTING edge re-renders (the controlled-graph expectation).
+const relabel = () => {
+  const connections = $data.graph.connections.map((c) => (c && c.id === 'e1' ? { ...c, label: 'approved!' } : c))
+  $data.graph = { ...$data.graph, connections }
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — labeled / styled edges (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="relabel" @click="relabel">Relabel</button>
+    <span class="readout" data-testid="readout-count">{{ $data.graph.connections.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout { font-variant-numeric: tabular-nums; font-size: 0.875rem; min-width: 2ch; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

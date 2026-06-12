@@ -188,6 +188,16 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
     stroke-width: 3px;
     pointer-events: auto;
   }
+.rozie-flow-canvas .rozie-flow-connection__label {
+    font: 600 11px system-ui, sans-serif;
+    fill: #334155;
+    paint-order: stroke;
+    stroke: #ffffff;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    pointer-events: none;
+    user-select: none;
+  }
 `;
 
   @property({ type: Object, attribute: 'graph' }) _graph_attr: any = {
@@ -1016,6 +1026,33 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       path.setAttribute('class', 'rozie-flow-connection__path');
       path.setAttribute('marker-end', 'url(#' + markerId + ')');
       svg.appendChild(path);
+
+      // ── per-edge label + styling (F3) ────────────────────────────────────────────
+      // The consumer's connection spec ({ id, source, …, label?, stroke?, dashed? }) is kept
+      // in connMeta keyed by id (the connection-side analog of nodeMeta). A committed edge
+      // resolves its label/style here; a drag-preview pseudo (no committed id) has none.
+      // Styling is applied as INLINE attributes (the arrowhead-marker discipline — engine DOM
+      // carries no scope attr); a `label` renders an SVG <text> at the path midpoint (white
+      // halo via paint-order for legibility over the line), repositioned in redraw().
+      const emeta = this.connMeta.get(connection.id) || null;
+      if (emeta) {
+        if (emeta.stroke != null) {
+          const s = String(emeta.stroke);
+          path.setAttribute('stroke', s);
+          arrow.setAttribute('fill', s);
+        }
+        if (emeta.dashed === true) path.setAttribute('stroke-dasharray', '7 5');
+      }
+      let labelEl: any = null;
+      const edgeLabel = emeta && emeta.label != null ? String(emeta.label) : null;
+      if (edgeLabel) {
+        labelEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        labelEl.setAttribute('class', 'rozie-flow-connection__label');
+        labelEl.setAttribute('text-anchor', 'middle');
+        labelEl.setAttribute('dominant-baseline', 'middle');
+        labelEl.textContent = edgeLabel;
+        svg.appendChild(labelEl);
+      }
       element.appendChild(svg);
       let start: any = null;
       let end: any = null;
@@ -1023,6 +1060,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       const redraw = () => {
         if (!start || !end) return;
         path.setAttribute('d', classicConnectionPath([start, end], curvature));
+        if (labelEl) {
+          labelEl.setAttribute('x', String((start.x + end.x) / 2));
+          labelEl.setAttribute('y', String((start.y + end.y) / 2));
+        }
       };
 
       // Seed the DANGLING side's coordinate from the pointer FIRST — socketWatcher
@@ -1219,6 +1260,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         }
       } else if (context.type === 'connectionremoved') {
         this.connInstances.delete(context.data.id);
+        this.connMeta.delete(context.data.id);
         if (!this.programmatic) {
           // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
           this.writeBackConnectionRemoved(context.data.id);
@@ -1463,14 +1505,20 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         const srcOut = spec.sourceOutput != null ? spec.sourceOutput : 'out';
         const tgtIn = spec.targetInput != null ? spec.targetInput : 'in';
         const id = spec.id != null ? spec.id : `${spec.source}:${srcOut}->${spec.target}:${tgtIn}`;
+        // carry the optional per-edge label/style (F3) through to connMeta → renderConnection.
         return {
           id,
           source: spec.source,
           sourceOutput: srcOut,
           target: spec.target,
-          targetInput: tgtIn
+          targetInput: tgtIn,
+          label: spec.label,
+          stroke: spec.stroke,
+          dashed: spec.dashed
         };
       };
+      // cheap style signature so a label/style change on an EXISTING edge re-renders it.
+      const edgeStyleSig = (s: any) => s ? String(s.label) + '|' + String(s.stroke) + '|' + String(s.dashed) : '';
       const merged = graphConns.map(norm).filter(Boolean);
       const want = [];
       this.programmatic++;
@@ -1478,7 +1526,22 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         for (const spec of merged as any) {
           if (!spec || spec.id == null) continue;
           want.push(spec.id);
-          if (this.connInstances.has(spec.id)) continue;
+          if (this.connInstances.has(spec.id)) {
+            // existing edge — relabel/restyle in place if its label/style changed (the
+            // controlled-graph expectation: edit the bound graph → see the change). Drop the
+            // render entry so area.update takes the fresh-build path (re-applies label/style).
+            const changed = edgeStyleSig(this.connMeta.get(spec.id)) !== edgeStyleSig(spec);
+            this.connMeta.set(spec.id, spec);
+            if (changed) {
+              const entry = this.connEntries.get(spec.id);
+              if (entry) {
+                entry.dispose();
+                this.connEntries.delete(spec.id);
+              }
+              await this.area.update('connection', spec.id);
+            }
+            continue;
+          }
           const sourceNode = this.nodeInstances.get(spec.source);
           const targetNode = this.nodeInstances.get(spec.target);
           if (!sourceNode || !targetNode) continue;
@@ -1493,6 +1556,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           const conn = new ClassicPreset.Connection(sourceNode, spec.sourceOutput, targetNode, spec.targetInput);
           conn.id = spec.id;
           this.connInstances.set(spec.id, conn);
+          // seed connMeta BEFORE addConnection so renderConnection sees the label/style on
+          // its first render (the render fires synchronously inside addConnection's pipe).
+          this.connMeta.set(spec.id, spec);
           await this.editor.addConnection(conn);
         }
         // remove dropped GRAPH-managed edges — imperatively added edges survive.
@@ -1501,6 +1567,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           if (!want.includes(id) && this.connInstances.has(id)) {
             await this.editor.removeConnection(id);
             this.connInstances.delete(id);
+            this.connMeta.delete(id);
           }
         }
         this.lastPropConnIds = want;
@@ -1841,6 +1908,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   connEntries = new Map();
 
+  connMeta = new Map();
+
   lastPropNodeIds: any = null;
 
   lastPropConnIds: any = null;
@@ -2111,6 +2180,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.nodeInstances.clear();
     this.nodeMeta.clear();
     this.connInstances.clear();
+    this.connMeta.clear();
     this.lastPropNodeIds = [];
     this.lastPropConnIds = [];
   }
@@ -2346,5 +2416,15 @@ injectGlobalStyles('rozie-flow-canvas-global', `
     stroke: #64748b;
     stroke-width: 3px;
     pointer-events: auto;
+  }
+.rozie-flow-canvas .rozie-flow-connection__label {
+    font: 600 11px system-ui, sans-serif;
+    fill: #334155;
+    paint-order: stroke;
+    stroke: #ffffff;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    pointer-events: none;
+    user-select: none;
   }
 `);

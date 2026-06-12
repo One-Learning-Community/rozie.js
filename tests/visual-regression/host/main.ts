@@ -362,6 +362,12 @@ export const EXAMPLES = [
   // axis (the custom getDOMSocketPosition offset) — endpoints stay horizontally aligned
   // with the sockets. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasVertical',
+  // Phase 43 F3 (edge labels + styling) — FlowCanvasEdges is the BEHAVIORAL cell (loader →
+  // examples/demos/FlowCanvasEdgesDemo.rozie): a Start node fanning out to Approve (green,
+  // labeled 'approve') + Reject (red, dashed, labeled 'reject') via per-edge
+  // `graph.connections[].label/stroke/dashed`. The spec asserts the labels render, the
+  // styling applies, and a relabel writes through the controlled graph. Behavioral-only.
+  'FlowCanvasEdges',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -525,6 +531,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasPalette: 'rozie-flow-canvas-palette',
   // Phase 43 vertical cell — '-demo' appended → 'rozie-flow-canvas-vertical-demo'.
   FlowCanvasVertical: 'rozie-flow-canvas-vertical',
+  // Phase 43 edges cell — '-demo' appended → 'rozie-flow-canvas-edges-demo'.
+  FlowCanvasEdges: 'rozie-flow-canvas-edges',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -714,6 +722,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasPalette: {},
   // Phase 43 — FlowCanvasVerticalDemo is self-contained (seeds its own vertical graph).
   FlowCanvasVertical: {},
+  // Phase 43 — FlowCanvasEdgesDemo is self-contained (seeds its own labeled/styled graph).
+  FlowCanvasEdges: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
