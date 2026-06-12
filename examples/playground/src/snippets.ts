@@ -224,17 +224,26 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/maplibre/src/MapLibre.rozie'],
   },
   {
-    // Phase 40 — the typed-data-pipeline advanced demo for @rozie-ui/rete.
-    // Exercises the new `canConnect` connection-validation prop + the
-    // `connection-rejected` emit (number=blue / string=green typed ports,
-    // same-type-only rule, live rejected-types readout) alongside the breadth
-    // of the FlowCanvas API (reactive #node portal slot, per-node ✕ remove,
-    // two-way zoom, zoomToFit). The FlowCanvas wrapper lives in
-    // @rozie-ui/rete (packages/ui/rete/src/FlowCanvas.rozie).
+    // Phase 41 — the CONTROLLED-GRAPH typed-pipeline advanced demo for
+    // @rozie-ui/rete. The consumer binds ONE `r-model:graph` object (the single
+    // source of truth) and declares a couple of `<NodeType type>` TYPE TEMPLATES
+    // with nested typed `<Port output=|input= type=>` ports — nothing else. The
+    // canvas owns the flow middleware: render-by-type, drag/connect/disconnect
+    // write-back into the bound graph, and automatic typed-socket validation
+    // (`:validate-types`, default ON) with `canConnect` as the optional override.
+    // Dan's multi-port ask falls out of the per-type schema: a `source` type with
+    // BOTH a number AND a string OUTPUT port, a `merge` type with BOTH a number AND
+    // a string INPUT port (number=blue / string=green typed-port colors). The
+    // FlowCanvas/NodeType/Port wrappers live in @rozie-ui/rete
+    // (packages/ui/rete/src/*.rozie).
     key: 'bundle/FlowCanvasAdvancedDemo',
     label: 'bundle/FlowCanvasAdvancedDemo',
     entryGlobPath: '../../demos/FlowCanvasAdvancedDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/rete/src/FlowCanvas.rozie'],
+    dependencyGlobPaths: [
+      '../../../packages/ui/rete/src/FlowCanvas.rozie',
+      '../../../packages/ui/rete/src/NodeType.rozie',
+      '../../../packages/ui/rete/src/Port.rozie',
+    ],
   },
 ];
 

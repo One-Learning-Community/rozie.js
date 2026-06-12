@@ -33,12 +33,13 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Pan / zoom viewport | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ (engine-owned) |
 | Node drag | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ (engine-owned) |
 | **Drag-to-connect** (sockets) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ (socket render-signal bridge) |
-| **Custom node bodies** (framework component) | ✅ node types | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ `node` reactive portal slot (all 6) |
+| **Custom node bodies** (framework component) | ✅ node types | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ render-by-type `#body` portal (all 6) |
+| **Node TYPE templates** (declare once, render-by-type) | ✅ `nodeTypes` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `<NodeType type>` + nested `<Port>` |
+| **Controlled graph** (bound state, canvas writes back) | ✅ `nodes`/`edges` + `onNodesChange` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ one `r-model:graph` (write-back on drag/connect) |
+| **Typed-socket validation** (auto-reject mismatch) | ⚠️ consumer-glue | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `:validate-types` from `<Port type>` + `canConnect` override |
 | Two-way zoom binding | ⚠️ controlled | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `r-model:zoom` (echo-guarded) |
-| Graph events (moved / connected / picked) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 7 structured events |
+| Graph events (moved / connected / picked) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 8 structured events |
 | Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform 12-verb `$expose` |
-| Declarative graph children (`<FlowNode>` / `<Handle>` / `<Connection>`) | ✅ JSX children | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ children **and** `:nodes` / `:connections` config props |
-| Config-array graph (`:nodes` / `:connections`) | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ reconciled live, no remount |
 | MiniMap / Background / Controls | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ deferred (see below) |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -46,36 +47,47 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 ## Where Rozie wins today
 
 - **One definition, six idiomatic packages** — including the two frameworks the ecosystem leaves out entirely: **Solid** (only a single-author experiment) and **Lit** (nothing). Those consumers get a real node editor they otherwise cannot have, from the same source that produces the four big-framework packages.
-- **Framework-native node bodies on all six** — the `node` **reactive multi-instance portal slot** renders a real framework fragment (any component, any reactivity) as a graph node, re-rendered in place as the node's data / selection changes, reconciled off the `nodes` data array.
+- **A controlled-graph authoring model on all six** — the consumer binds **one `r-model:graph` object** and declares a couple of **`<NodeType type>` templates** (each with a `#body` and a typed `<Port>` schema); the canvas renders every node by its type and **writes layout + connections back** into the bound object, so there is no hand-reconciling. It is the xyflow `nodeTypes` + controlled-state mental model, Vue-natural — and it is the *same* model on Solid and Lit, which have no such library at all.
+- **Framework-native node bodies on all six** — each `<NodeType>`'s `#body` is a **reactive multi-instance portal**: one handle mounts per graph node of that type, rendering a real framework fragment (any component, any reactivity), re-rendered in place as the node's data / selection changes.
+- **Automatic typed-socket validation on all six** — port `type` lives on the `<Port>` schema, so the canvas auto-rejects type-mismatched connections (`:validate-types`, default on) with `canConnect` as the optional custom-rule override — a feature the standalone editors leave to consumer glue.
 - **The engine owns interaction, so behavior is identical by construction** — pan/zoom transform, node drag, edge drawing, and connection-handle hit-testing all live in Rete's `AreaPlugin` + `ConnectionPlugin`. Rozie never re-implements pointer math per target, so there is no cross-framework drift in *how the editor feels*.
 - **A uniform 12-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `addConnection` / `removeConnection` / `clear` / `zoomToFit` / `zoomTo` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
 - **`getEditor()` / `getArea()` are always one hop from the raw engine**, so the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) is reachable on any target when the curated surface doesn't cover something.
 
-## Declarative `<FlowNode>` / `<Handle>` / `<Connection>` children — now supported {#declarative-children}
+## The controlled-graph + `<NodeType>` / `<Port>` model {#controlled-graph}
 
-Declarative graph children are **now supported on all six targets, alongside the `:nodes` / `:connections` config-array props**. The vocabulary follows Rete's own model, not React Flow's: `<FlowNode>` is a node, `<Handle>` is a **port / socket** (nested inside its node), and `<Connection>` is an **edge** (a flat child of the canvas, since an edge spans two nodes and can't nest inside one).
+`FlowCanvas` follows the **controlled-graph** mental model (xyflow's `nodeTypes` +
+controlled `nodes`/`edges`, made Vue-natural with `r-model`): the consumer binds **one
+`graph` object** and declares node **TYPE templates** — nothing more. The canvas is the
+middleware: it renders each node by its `type` (render-by-type), owns drag / zoom / connect
+/ validation, and **writes layout (`x`/`y` on drag) and connections (on connect /
+disconnect) back** into the bound object, so the developer never hand-reconciles.
 
 ```html
-<FlowCanvas>
-  <FlowNode id="a" :x="40" :y="60">
-    <template #body><MyCard /></template>
-    <Handle side="output" port="out" />
-  </FlowNode>
-  <FlowNode id="b" :x="320" :y="60">
-    <template #body><MyCard /></template>
-    <Handle side="input" port="in" />
-  </FlowNode>
-  <Connection source="a" target="b" sourceOutput="out" targetInput="in" />
+<FlowCanvas r-model:graph="$data.graph" :validate-types="true" @connection-rejected="onReject">
+  <NodeType type="source">
+    <template #body="{ node }">{{ node.data.label }}</template>
+    <Port output="num" type="number" />
+    <Port output="str" type="string" />
+  </NodeType>
+  <NodeType type="merge">
+    <template #body="{ node }">Merge</template>
+    <Port input="num" type="number" multiple />
+    <Port input="str" type="string" multiple />
+  </NodeType>
 </FlowCanvas>
 ```
 
-- **`<Handle>` nests inside `<FlowNode>`** and auto-binds to its node via injected context (no `nodeId` to wire by hand).
-- **`<Connection>` is a flat child** of `<FlowCanvas>` referencing source / target node ids + handle keys.
-- **Both shapes coexist with `:nodes` / `:connections`.** A config array and declarative children feed the **same id-keyed registry**; on an id collision the declarative child wins (last-writer-wins). It is the **same `addNode` / `addConnection` runtime** — children just register into the engine's existing reconcile.
+with `$data.graph = { nodes: [{ id, type, x, y, data }], connections: [...] }` — the
+**single source of truth**.
 
-**Why the node body is a named `#body` slot, not bare children.** A FlowNode's visual body has to *teleport* into the node element the Rete engine creates — it doesn't render in the normal component tree. Rozie mounts that body through a portal (`$portals.body`), which gives it a fresh framework render-root inside the engine-owned host. But a portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming config children (`<Handle>` / `<Connection>`, which stay in the normal child position) is therefore the robust cross-framework shape: the body teleports, the config children keep their tree scope and inject correctly. Verified behaviorally across all six targets (including the Angular real-build).
+- **`<NodeType type>` declares a node TYPE once** (a `#body` template scoped `{ node, selected, emit }` + a nested `<Port>` schema). Every graph node whose `type` matches renders this template; a `<NodeType>` has **no** `id`/`x`/`y` — instance identity + position live in the bound `graph`, not on the tag. This cleanly separates "what a `source` looks like" from "this source exists at x,y" — the disjoint the old instance-children model (`<FlowNode id>`) conflated.
+- **`<Port output=|input= type= [multiple]>` declares one typed directional port** on its `<NodeType>`. Direction is the attribute name (`output` / `input`); `type` drives automatic validation. _(The attrs are `input`/`output`, not `in`/`out` — `in` is a JS reserved word that the Svelte `$props()` destructure rejects.)_
+- **Edges live ONLY in `graph.connections`.** There is no flat `<Connection>` child — drawing or removing an edge writes a fresh `connections` array back through the `graph` model.
 
-This was built by dogfooding Rozie's own cross-component context primitive (`$provide` / `$inject`): the canvas provides an id-keyed registry, and each child injects it. (A general `$portals.default` capability also exists for default-slot portals — but `<FlowNode>` deliberately uses the named `#body` slot for the tree-scope reason above; it does **not** rely on the bare default slot.)
+**Why the node body is a named `#body` slot, not bare children.** A node body has to *teleport* into the node element the Rete engine creates — it doesn't render in the normal component tree. Rozie mounts that body through a portal (`$portals.body`), which gives it a fresh framework render-root inside the engine-owned host. But a portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming `<Port>` children (which stay in the normal child position) is therefore the robust cross-framework shape: the body teleports, the ports keep their tree scope and inject correctly. Verified behaviorally across all six targets (including the Angular real-build).
+
+This was built by dogfooding Rozie's own cross-component context primitive (`$provide` / `$inject`): `<FlowCanvas>` provides a per-TYPE registry, `<NodeType>` provides a nested per-type sub-context, and `<Port>` injects it.
 
 ## What Rozie defers {#what-rozie-defers}
 
@@ -83,7 +95,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 - **MiniMap / Background variants / NodeToolbar / NodeResizer.** React Flow ships these as first-class components. `FlowCanvas` v1 covers the canvas + nodes + sockets + connections + a dotted background; the second-tier chrome is on the roadmap (config-prop first, the MapLibre stance).
 - **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
-- **`@rozie-ui/rete` is `0.1.0`.** The surface (13 props / 7 events / 12-verb handle / `node` reactive slot) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
+- **`@rozie-ui/rete` is `0.1.0`.** The surface (13 props / 8 events / 12-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
 
 ## Try it
 
@@ -91,6 +103,6 @@ The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the 
 
 ## Cross-references
 
-- [FlowCanvas — showcase & API](/components/rete) — the full `@rozie-ui/rete` surface, quick starts, and the `node` slot recipe.
+- [FlowCanvas — showcase & API](/components/rete) — the full `@rozie-ui/rete` surface, quick starts, and the `<NodeType>` / `<Port>` type-template recipe.
 - [`FlowCanvas.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/FlowCanvas.rozie)
-- [The portal-slot primitive](/examples/portal-list) — the mechanism the `node` reactive slot builds on.
+- [The portal-slot primitive](/examples/portal-list) — the mechanism the `<NodeType>` `#body` render-by-type portal builds on.
