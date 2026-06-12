@@ -162,15 +162,24 @@ function patternIntroducesBinding(pattern: t.Node, name: string): boolean {
 
 /**
  * Returns true if the subtree rooted at `node` contains a NON-computed
- * `$props.<propName>` read (MemberExpression or OptionalMemberExpression) — the
- * exact shape the downstream rewrite lowers to a bare `<propName>`. This is the
- * trigger condition for the prop-shadow bug: a colliding local/param only
+ * `<accessor>.<name>` read (MemberExpression or OptionalMemberExpression) — the
+ * exact shape the downstream rewrite lowers to a bare `<name>`. This is the
+ * trigger condition for the accessor-shadow bug: a colliding local/param only
  * mis-captures the rewrite when such a read actually exists within its scope.
  *
- * `$props['x']` (computed) is excluded — the downstream rewrite skips computed
- * access, so it never lowers to a bare identifier and cannot be captured.
+ * `accessor` is `$props` for the prop-shadow case and `$refs` for the
+ * ref-shadow case (refs-self-shadow-tdz) — Svelte lowers BOTH to bare locals
+ * (`let { value } = $props()` / `let dialogEl = $state(...)`), so both are
+ * exposed to the same self-reference TDZ.
+ *
+ * `<accessor>['x']` (computed) is excluded — the downstream rewrite skips
+ * computed access, so it never lowers to a bare identifier and cannot be captured.
  */
-function subtreeReadsProp(node: t.Node | null | undefined, propName: string): boolean {
+function subtreeReadsAccessor(
+  node: t.Node | null | undefined,
+  accessor: '$props' | '$refs',
+  name: string,
+): boolean {
   if (!node) return false;
   let found = false;
   // Hand-rolled recursive walk — no Babel `traverse`, which requires a
@@ -185,9 +194,9 @@ function subtreeReadsProp(node: t.Node | null | undefined, propName: string): bo
       if (
         !n.computed &&
         t.isIdentifier(obj) &&
-        obj.name === '$props' &&
+        obj.name === accessor &&
         t.isIdentifier(prop) &&
-        prop.name === propName
+        prop.name === name
       ) {
         found = true;
         return;
@@ -256,9 +265,12 @@ function subtreeReadsProp(node: t.Node | null | undefined, propName: string): bo
  * the entire existing corpus (zero dist-parity / leaf-codegen drift) and fires
  * exactly where the bug lives.
  *
- * data/ref/computed names are NOT considered here — they are top-level
- * bare-lowered by construction, and a same-named local there is already a
- * ROZ621 collision error handled elsewhere.
+ * For the `$props` accessor, data/ref/computed names are NOT considered — they
+ * are top-level bare-lowered by construction, and a same-named local there is
+ * already a ROZ621 collision error handled elsewhere. For the `$refs` accessor
+ * (refs-self-shadow-tdz), the colliding name is a `ref=` name; ref names are
+ * disjoint from prop/data/computed names (ROZ621 already errors on overlap), so
+ * the two passes never double-rename the same local.
  *
  * Why `scope.rename` is safe here (vs React's `hoistModuleLet`, which must do a
  * manual ancestor walk): this pre-pass runs on the freshly-cloned,
@@ -269,48 +281,58 @@ function subtreeReadsProp(node: t.Node | null | undefined, propName: string): bo
  * collision on `patternIntroducesBinding` — the destructuring-aware shape ported
  * from React — so a destructured param/declarator (`function f({ src })`,
  * `const { src } = obj`) is recognised.
+ *
+ * Parameterized over the accessor object name (`$props` | `$refs`) so the
+ * identical scope-aware logic covers BOTH the prop self-shadow
+ * (`const X = $props.X`) and the ref self-shadow (`const X = $refs.X`). The
+ * caller invokes it once per accessor.
  */
-function deconflictPropShadows(program: t.File, propNames: ReadonlySet<string>): void {
-  if (propNames.size === 0) return;
+function deconflictAccessorShadows(
+  program: t.File,
+  names: ReadonlySet<string>,
+  accessor: '$props' | '$refs',
+): void {
+  if (names.size === 0) return;
   const alias = (name: string): string => `${name}$local`;
 
   traverse(program, {
-    // Function PARAMETERS shadowing a prop (facet b — silent wrong-value).
-    // Only fires when the function body actually reads `$props.<prop>`.
+    // Function PARAMETERS shadowing a name (facet b — silent wrong-value).
+    // Only fires when the function body actually reads `<accessor>.<name>`.
     Function(path) {
       const body = path.node.body;
       for (const param of path.node.params) {
-        for (const propName of propNames) {
+        for (const name of names) {
           if (
-            patternIntroducesBinding(param, propName) &&
-            subtreeReadsProp(body, propName)
+            patternIntroducesBinding(param, name) &&
+            subtreeReadsAccessor(body, accessor, name)
           ) {
             // `path.scope` for a Function path is the scope INTRODUCED by that
             // function — i.e. the scope that binds its params. rename() updates
             // the param node + every reference inside the body.
-            path.scope.rename(propName, alias(propName));
+            path.scope.rename(name, alias(name));
           }
         }
       }
     },
-    // `const`/`let`/`var` DECLARATORS shadowing a prop (facet a — the
-    // `const X = $props.X` → `const X = X` self-reference). Only fires when the
-    // binding's owning scope actually reads `$props.<prop>` (for the canonical
-    // self-reference that read is the declarator's own initializer). The
-    // initializer is still `$props.X` at this point (not yet rewritten), so
-    // renaming the declared local to `X$local` leaves `$props.X` untouched —
-    // the later rewrite then emits `const X$local = X` reading the real prop.
+    // `const`/`let`/`var` DECLARATORS shadowing a name (facet a — the
+    // `const X = <accessor>.X` → `const X = X` self-reference). Only fires when
+    // the binding's owning scope actually reads `<accessor>.<name>` (for the
+    // canonical self-reference that read is the declarator's own initializer).
+    // The initializer is still `<accessor>.X` at this point (not yet rewritten),
+    // so renaming the declared local to `X$local` leaves `<accessor>.X`
+    // untouched — the later rewrite then emits `const X$local = X` reading the
+    // real prop/ref.
     VariableDeclarator(path) {
       const id = path.node.id;
-      for (const propName of propNames) {
-        if (!patternIntroducesBinding(id, propName)) continue;
-        const binding = path.scope.getBinding(propName);
+      for (const name of names) {
+        if (!patternIntroducesBinding(id, name)) continue;
+        const binding = path.scope.getBinding(name);
         // The binding's owning scope is the block/program the declarator lives
         // in. Fall back to the declarator's own scope defensively (a binding is
         // always resolvable here since we just matched its declarator).
         const ownerScope = binding ? binding.scope : path.scope;
-        if (subtreeReadsProp(ownerScope.block, propName)) {
-          ownerScope.rename(propName, alias(propName));
+        if (subtreeReadsAccessor(ownerScope.block, accessor, name)) {
+          ownerScope.rename(name, alias(name));
         }
       }
     },
@@ -390,15 +412,18 @@ export function rewriteRozieIdentifiers(
     },
   });
 
-  // SCOPE-AWARE PRE-PASS (debug `svelte-prop-shadow-self-ref`): rename any local
-  // binding (function param or `const`/`let`/`var` declarator) that shadows a
-  // PROP name to `<name>$local` BEFORE the scope-blind `$props.X` →
-  // bare-identifier rewrite below. Prevents the `const X = $props.X` →
-  // `const X = X` TDZ self-reference and the silent param-capture wrong-value
-  // variant. Runs AFTER `$model`→`$props` normalization so model props are
-  // covered too. See deconflictPropShadows for the full rationale.
+  // SCOPE-AWARE PRE-PASS (debug `svelte-prop-shadow-self-ref` + `refs-self-shadow-tdz`):
+  // rename any local binding (function param or `const`/`let`/`var` declarator) that
+  // shadows a PROP name OR a REF name to `<name>$local` BEFORE the scope-blind
+  // `$props.X` / `$refs.X` → bare-identifier rewrite below. Prevents the
+  // `const X = $props.X` → `const X = X` and `const X = $refs.X` → `const X = X`
+  // TDZ self-references and the silent param-capture wrong-value variant. The prop
+  // pass runs AFTER `$model`→`$props` normalization so model props are covered too.
+  // Ref names are disjoint from prop names (ROZ621), so the two passes never
+  // double-rename. See deconflictAccessorShadows for the full rationale.
   const propNames = new Set<string>([...modelProps, ...nonModelProps]);
-  deconflictPropShadows(program, propNames);
+  deconflictAccessorShadows(program, propNames, '$props');
+  deconflictAccessorShadows(program, refNames, '$refs');
 
   traverse(program, {
     Identifier(path) {
