@@ -891,3 +891,114 @@ for (const target of TARGETS) {
     await page.getByTestId('flow-fit').click();
   });
 }
+
+/**
+ * 8. MINIMAP — the built-in MiniMap overlay (opt-in :minimap) + the pannable viewport
+ * API (Phase 42, setCenter/setViewport).
+ *
+ * `examples/demos/FlowCanvasMinimapDemo.rozie` binds a WIDE 4-node controlled graph
+ * (x up to 920) with `:minimap="true"` + `:fit-on-mount="false"` so the graph overflows
+ * the 720px canvas — making the minimap's viewport window a real SUB-rectangle of the
+ * content bounds (the dim mask + outline are meaningful). The minimap SVG is built
+ * imperatively (createElementNS) into the light-DOM host, styled with inline attributes,
+ * so it renders identically on all 6 incl. Lit (the locators pierce its open shadow root).
+ *
+ *   1. The minimap host (`[data-testid=flow-minimap]`) renders.
+ *   2. NODE RECTS (NOT count-only-trivial): `.rozie-flow-minimap__node` count == the
+ *      graph node count (4), AND every rect has a positive measured width (proving the
+ *      node-view dims were read + placed, not zero-size).
+ *   3. VIEWPORT RECT: exactly one `.rozie-flow-minimap__viewport` renders, with a width
+ *      `> 0` and `< 200` (the minimap box width) — i.e. a real sub-window, since the
+ *      graph is wider than the viewport.
+ *   4. PANNABLE (the nav feature): a pointer-drag on the minimap recenters the main
+ *      viewport (setCenter → area.translate → @translated). The BOUND `readout-tx`
+ *      (= Math.round of the viewport pan x) changes from its initial '0', and is STABLE
+ *      on a re-sample (no write-back oscillation), and the node count never changed
+ *      (panning never touches the graph model).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-minimap [${target}]: the built-in MiniMap renders node + viewport rects and pannable-recenters the bound viewport`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasMinimap&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // the 4 wide nodes render.
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(4);
+
+    // ---- 1. the minimap host rendered (opt-in :minimap ON) ----
+    const minimap = page.getByTestId('flow-minimap');
+    await expect(minimap).toBeVisible({ timeout: 10_000 });
+
+    // ---- 2. NODE RECTS: count == graph node count (4) + positive widths ----
+    // `.rozie-flow-minimap__node` are the imperative SVG rects; locators pierce Lit's
+    // open shadow root. Poll for the measured-redraw to settle to exactly 4.
+    await expect
+      .poll(async () => page.locator('.rozie-flow-minimap__node').count(), {
+        timeout: 10_000,
+      })
+      .toBe(4);
+    // every node rect has a positive width (the node-view dims were measured + scaled,
+    // not a degenerate zero-rect) — the load-bearing "not count-only" assertion.
+    const minNodeWidth = await page
+      .locator('.rozie-flow-minimap__node')
+      .evaluateAll((els) =>
+        Math.min(
+          ...els.map((e) =>
+            parseFloat((e as SVGRectElement).getAttribute('width') || '0'),
+          ),
+        ),
+      );
+    expect(minNodeWidth).toBeGreaterThan(0);
+
+    // ---- 3. VIEWPORT RECT renders as a real sub-window (0 < width < 200) ----
+    const viewportRect = page.locator('.rozie-flow-minimap__viewport');
+    await expect(viewportRect).toHaveCount(1, { timeout: 10_000 });
+    const vpWidth = await viewportRect.evaluate((e) =>
+      parseFloat((e as SVGRectElement).getAttribute('width') || '0'),
+    );
+    expect(vpWidth).toBeGreaterThan(0);
+    // the graph (x up to 920) is wider than the 720px viewport, so the viewport window
+    // is strictly narrower than the 200px minimap box — a genuine sub-rectangle.
+    expect(vpWidth).toBeLessThan(200);
+
+    // ---- 4. PANNABLE: drag the minimap → the BOUND viewport pan (readout-tx) changes ----
+    const txReadout = page.getByTestId('readout-tx');
+    await expect(txReadout).toHaveText('0');
+
+    const mmBox = await minimap.boundingBox();
+    if (!mmBox) throw new Error('minimap bounding box unavailable');
+    // press at the minimap center, drag toward its top-left corner (a clearly off-center
+    // graph coord → a clearly non-zero recenter). pointerdown already calls setCenter.
+    const cx = mmBox.x + mmBox.width / 2;
+    const cy = mmBox.y + mmBox.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(mmBox.x + 12, mmBox.y + 12, { steps: 6 });
+    await page.mouse.up();
+
+    // THE PAN PROOF: the bound viewport-pan readout moved off its initial 0 (setCenter
+    // wrote the AreaPlugin transform → @translated surfaced the new pan x).
+    await expect(txReadout).not.toHaveText('0', { timeout: 5_000 });
+
+    // ECHO-SAFETY: after settle the readout is STABLE (no write-back loop) and the graph
+    // node count never changed (panning is a view op — it never touches the model).
+    await page.waitForTimeout(500);
+    const settled = (await txReadout.textContent())?.trim();
+    const nodeBoxes = await page.locator('.rozie-flow-node').count();
+    await page.waitForTimeout(400);
+    expect((await txReadout.textContent())?.trim()).toBe(settled);
+    expect(await page.locator('.rozie-flow-node').count()).toBe(nodeBoxes);
+  });
+}

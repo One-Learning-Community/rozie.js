@@ -1,0 +1,129 @@
+<!--
+  FlowCanvasMinimapDemo.rozie — BEHAVIORAL consumer for the Phase-42 built-in MiniMap
+  (+ the setCenter/setViewport viewport API it needs) on the controlled-graph FlowCanvas.
+
+  A DEDICATED minimap cell (NOT folded into FlowCanvasDemo) so the existing rete-flow
+  cells + the FlowCanvasScreenshot pixel baseline stay byte-untouched. It binds the same
+  r-model:graph controlled graph + a single `task` <NodeType>, turns `:minimap="true"`
+  ON, and leaves `:fit-on-mount="false"` so the wide 4-node graph overflows the canvas —
+  making the minimap's viewport window a real SUB-rectangle of the content bounds (the
+  dim mask + viewport outline are meaningful, not a degenerate full-frame).
+
+  The minimap (rete-flow.spec.ts `rete-flow-minimap`) asserts on all 6 incl. Lit:
+    - the minimap host (`[data-testid=flow-minimap]`) renders + the SVG node rects
+      (`.rozie-flow-minimap__node`) count == the graph node count (4),
+    - the viewport window rect (`.rozie-flow-minimap__viewport`) renders,
+    - PANNABLE: a pointer-drag on the minimap recenters the main viewport (setCenter →
+      area.translate → @translated) → the BOUND `readout-tx` changes.
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasMinimapDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // last viewport translate x (from @translated) — the pannable write-back proof.
+  tx: 0,
+  // THE SINGLE SOURCE OF TRUTH — 4 `task` nodes spread WIDE (x up to 920) so the graph
+  // overflows the 720px canvas: the minimap viewport window is a real sub-rect.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 20,  y: 40,  data: { label: 'Ingest' } },
+      { id: 'b', type: 'task', x: 320, y: 40,  data: { label: 'Transform' } },
+      { id: 'c', type: 'task', x: 620, y: 200, data: { label: 'Validate' } },
+      { id: 'd', type: 'task', x: 920, y: 80,  data: { label: 'Export' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+      { id: 'e3', source: 'c', sourceOutput: 'out', target: 'd', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// @translated surfaces the new viewport pan (x, y) — including the programmatic
+// recenter the minimap pan drives. Record x so the spec can prove a minimap drag
+// moved the bound viewport.
+const onTranslated = (e) => { $data.tx = e && typeof e.x === 'number' ? Math.round(e.x) : $data.tx }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — built-in MiniMap (behavioral)</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
+    <!-- pannable proof: the minimap drag recenters the viewport → @translated → tx. -->
+    <span class="readout" data-testid="readout-tx">{{ $data.tx }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 360px; width: 720px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :minimap="true"
+      :fit-on-mount="false"
+      @translated="onTranslated"
+    >
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root (render-by-type bodyRenderer → $portals.body), so on Lit a plain scoped rule
+     cannot reach it — :root emits document-level CSS adopted into the shadow root. */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

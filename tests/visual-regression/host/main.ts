@@ -338,6 +338,17 @@ export const EXAMPLES = [
   // cell (behavioral-only, NO new pixel baseline; FlowCanvasScreenshot stays the
   // pixel gate).
   'FlowCanvasAdvanced',
+  // Phase 42 (built-in MiniMap + viewport API) — FlowCanvasMinimap is the BEHAVIORAL
+  // minimap cell (loader → examples/demos/FlowCanvasMinimapDemo.rozie, which imports
+  // ../../packages/ui/rete/src/{FlowCanvas,NodeType,Port}.rozie). It binds a wide
+  // 4-node controlled graph with `:minimap="true"` (+ :fit-on-mount="false" so the
+  // graph overflows → the minimap viewport window is a real sub-rect) and proves: the
+  // minimap host + node rects (count == graph nodes) + the viewport rect render, and a
+  // pointer-drag on the minimap recenters the bound viewport (setCenter → @translated →
+  // readout-tx) — see rete-flow.spec.ts (rete-flow-minimap). Built for all 6 targets
+  // but NOT a screenshot cell (behavioral-only; FlowCanvasScreenshot stays the one
+  // rete pixel baseline, with :minimap OFF).
+  'FlowCanvasMinimap',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -494,6 +505,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 41 — the lit entry appends '-demo' → tag
   // 'rozie-flow-canvas-advanced-demo' = kebab of FlowCanvasAdvancedDemo.
   FlowCanvasAdvanced: 'rozie-flow-canvas-advanced',
+  // Phase 42 minimap cell — '-demo' appended by the entry → 'rozie-flow-canvas-minimap-demo'
+  // = kebab of FlowCanvasMinimapDemo.
+  FlowCanvasMinimap: 'rozie-flow-canvas-minimap',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -676,6 +690,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // r-model:graph + r-model:zoom internally (not parent-supplied), so NO MODEL_PROPS
   // entry (the FlowCanvas/MapLibre precedent). No parent props needed.
   FlowCanvasAdvanced: {},
+  // Phase 42 — FlowCanvasMinimapDemo is self-contained (seeds its own controlled graph
+  // + :minimap internally), so no parent props (the FlowCanvas/MapLibre precedent).
+  FlowCanvasMinimap: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
