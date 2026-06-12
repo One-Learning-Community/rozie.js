@@ -12,6 +12,7 @@ export default class Port extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) type: string = undefined;
   @property({ type: String, reflect: true }) label: string = undefined;
   @property({ type: Object }) multiple: unknown = undefined;
+  @property({ type: String, reflect: true }) position: string = undefined;
 private __rozieCtxConsumer_rete_nodeType = new ContextConsumer(this, { context: __rozieCtx_rete_nodeType, subscribe: true });
 private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value; }
 
@@ -34,7 +35,7 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (this.nt && !this.added) {
       this.added = true;
-      this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple);
+      this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple, this.position);
     }
   }
 
@@ -44,7 +45,7 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
     if (live == null) return;
     this.nt = live;
     this.added = true;
-    this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple);
+    this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple, this.position);
   }
 
   disconnectedCallback(): void {

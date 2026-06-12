@@ -136,6 +136,32 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
 .rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
 .rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: #3b82f6; }
+.rozie-flow-canvas .rozie-flow-node--rows {
+    display: flex;
+    flex-direction: column;
+  }
+.rozie-flow-canvas .rozie-flow-node__mid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: stretch;
+  }
+.rozie-flow-canvas .rozie-flow-node__row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+  }
+.rozie-flow-canvas .rozie-flow-port--vertical {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: 0.7rem;
+  }
+.rozie-flow-canvas .rozie-flow-socket--top,
+  .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by
@@ -224,7 +250,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
   // `side` is derived by <Port> from which of output=/input= is set (output⇒'output', input⇒'input');
   // `portType` carries the port type that drives validate-types + the typed-port color.
-  addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
+  // `position` (F2) is the socket's VISUAL placement (left|right|top|bottom; default by
+  // side) — drives the render-pipe socket layout + the connection-anchor axis.
+  addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
     if (type == null || key == null) return;
     const portKey = type + '::' + side + '::' + key;
     __rozieCtxHost._portReg.value = {
@@ -235,7 +263,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         key,
         portType,
         label,
-        multiple
+        multiple,
+        position
       }
     };
   },
@@ -434,7 +463,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       // also makes a re-fired addTypePort (late Lit context) idempotent — same key, same value.
       // `side` is derived by <Port> from which of output=/input= is set (output⇒'output', input⇒'input');
       // `portType` carries the port type that drives validate-types + the typed-port color.
-      addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any) => {
+      // `position` (F2) is the socket's VISUAL placement (left|right|top|bottom; default by
+      // side) — drives the render-pipe socket layout + the connection-anchor axis.
+      addTypePort: (type: any, side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
         if (type == null || key == null) return;
         const portKey = type + '::' + side + '::' + key;
         __rozieCtxHost._portReg.value = {
@@ -445,7 +476,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             key,
             portType,
             label,
-            multiple
+            multiple,
+            position
           }
         };
       },
@@ -467,11 +499,64 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.area = new AreaPlugin(container);
     this.connectionPlugin = new ConnectionPlugin();
     this.connectionPlugin.addPreset(ConnectionPresets.classic.setup());
+
+    // Resolve a port's VISUAL position (F2) from the per-TYPE port schema (portReg, keyed
+    // `type::side::key`), defaulting by DIRECTION (input → left, output → right) for exact
+    // back-compat. DEFINED HERE inside $onMount (NOT top level) so its $data.portReg read
+    // lowers on React to the live `_portRegRef.current`, not a stale-empty mount-time
+    // closure (the portTypeOf discipline). Used by both the socket-anchor offset below and
+    // renderNode's socket layout.
+    // Resolve a port's VISUAL position (F2) from the per-TYPE port schema (portReg, keyed
+    // `type::side::key`), defaulting by DIRECTION (input → left, output → right) for exact
+    // back-compat. DEFINED HERE inside $onMount (NOT top level) so its $data.portReg read
+    // lowers on React to the live `_portRegRef.current`, not a stale-empty mount-time
+    // closure (the portTypeOf discipline). Used by both the socket-anchor offset below and
+    // renderNode's socket layout.
+    const resolvePortPosition = (type: any, side: any, key: any) => {
+      const entry = type != null && key != null ? this._portReg.value[type + '::' + side + '::' + key] : null;
+      const p = entry && entry.position != null ? entry.position : null;
+      if (p === 'left' || p === 'right' || p === 'top' || p === 'bottom') return p;
+      return side === 'input' ? 'left' : 'right';
+    };
+
     // DOM-based socket position watcher — feeds connection-path redraw + the
-    // ConnectionPlugin's drag-to-connect hit-testing.
+    // ConnectionPlugin's drag-to-connect hit-testing. A CUSTOM `offset` (F2): the rete
+    // default shifts the anchor 12px OUTWARD on the X axis only (`x + 12·(input?−1:1)`) —
+    // correct for left/right, wrong for top/bottom. We resolve each socket's visual
+    // position and shift on the matching axis (±x for left/right — IDENTICAL to the default,
+    // so the rete-flow-align cell stays green; ±y for top/bottom). The position is looked up
+    // live via nodeMeta→type→portReg, so it tracks late-registered ports.
     // DOM-based socket position watcher — feeds connection-path redraw + the
-    // ConnectionPlugin's drag-to-connect hit-testing.
-    this.socketWatcher = getDOMSocketPosition();
+    // ConnectionPlugin's drag-to-connect hit-testing. A CUSTOM `offset` (F2): the rete
+    // default shifts the anchor 12px OUTWARD on the X axis only (`x + 12·(input?−1:1)`) —
+    // correct for left/right, wrong for top/bottom. We resolve each socket's visual
+    // position and shift on the matching axis (±x for left/right — IDENTICAL to the default,
+    // so the rete-flow-align cell stays green; ±y for top/bottom). The position is looked up
+    // live via nodeMeta→type→portReg, so it tracks late-registered ports.
+    const SOCKET_SHIFT = 12;
+    const socketOffset = (position: any, nodeId: any, side: any, key: any) => {
+      const meta = this.nodeMeta.get(nodeId);
+      const p = meta ? resolvePortPosition(meta.type, side, key) : side === 'input' ? 'left' : 'right';
+      if (p === 'top') return {
+        x: position.x,
+        y: position.y - SOCKET_SHIFT
+      };
+      if (p === 'bottom') return {
+        x: position.x,
+        y: position.y + SOCKET_SHIFT
+      };
+      if (p === 'left') return {
+        x: position.x - SOCKET_SHIFT,
+        y: position.y
+      };
+      return {
+        x: position.x + SOCKET_SHIFT,
+        y: position.y
+      };
+    };
+    this.socketWatcher = getDOMSocketPosition({
+      offset: socketOffset
+    });
     this.editor.use(this.area);
     this.area.use(this.connectionPlugin);
     // The socket-position watcher (and, conceptually, our vanilla "render plugin")
@@ -644,19 +729,66 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       element.innerHTML = '';
       const box = document.createElement('div');
       box.className = 'rozie-flow-node' + (selected ? ' is-selected' : '');
-      const inputsCol = document.createElement('div');
-      inputsCol.className = 'rozie-flow-node__col rozie-flow-node__col--in';
       const body = document.createElement('div');
       body.className = 'rozie-flow-node__body';
-      const outputsCol = document.createElement('div');
-      outputsCol.className = 'rozie-flow-node__col rozie-flow-node__col--out';
-      box.appendChild(inputsCol);
-      box.appendChild(body);
-      box.appendChild(outputsCol);
-      element.appendChild(box);
+
+      // ── socket layout (F2: position-aware) ───────────────────────────────────────
+      // Bucket the node's ports by VISUAL position (default input→left, output→right).
+      // When NO port is top/bottom (every pre-F2 graph), render the EXACT classic
+      // [inputsCol | body | outputsCol] 3-column structure — byte-identical DOM, so the
+      // FlowCanvasScreenshot pixel baseline is untouched. A node that declares ANY top/
+      // bottom port gets the 3-ROW structure (topRow / midRow[left|body|right] / bottomRow).
       const socketDisposers = [];
-      buildSocketRow(inputsCol, reteNode, 'input', socketDisposers);
-      buildSocketRow(outputsCol, reteNode, 'output', socketDisposers);
+      const portEntries = [];
+      for (const key of Object.keys(reteNode.inputs) as any) portEntries.push({
+        side: 'input',
+        key,
+        position: resolvePortPosition(meta.type, 'input', key)
+      });
+      for (const key of Object.keys(reteNode.outputs) as any) portEntries.push({
+        side: 'output',
+        key,
+        position: resolvePortPosition(meta.type, 'output', key)
+      });
+      const hasVertical = portEntries.some((p: any) => p.position === 'top' || p.position === 'bottom');
+      if (!hasVertical) {
+        // CLASSIC left/right layout — byte-for-byte identical to pre-F2 (pixel-baseline safe).
+        const inputsCol = document.createElement('div');
+        inputsCol.className = 'rozie-flow-node__col rozie-flow-node__col--in';
+        const outputsCol = document.createElement('div');
+        outputsCol.className = 'rozie-flow-node__col rozie-flow-node__col--out';
+        box.appendChild(inputsCol);
+        box.appendChild(body);
+        box.appendChild(outputsCol);
+        element.appendChild(box);
+        for (const p of portEntries as any) {
+          renderSocketInto(p.position === 'right' ? outputsCol : inputsCol, reteNode, p.side, p.key, p.position, socketDisposers);
+        }
+      } else {
+        // VERTICAL-capable 3-row layout (only when a top/bottom port exists).
+        box.classList.add('rozie-flow-node--rows');
+        const topRow = document.createElement('div');
+        topRow.className = 'rozie-flow-node__row rozie-flow-node__row--top';
+        const midRow = document.createElement('div');
+        midRow.className = 'rozie-flow-node__mid';
+        const leftCol = document.createElement('div');
+        leftCol.className = 'rozie-flow-node__col rozie-flow-node__col--in';
+        const rightCol = document.createElement('div');
+        rightCol.className = 'rozie-flow-node__col rozie-flow-node__col--out';
+        const bottomRow = document.createElement('div');
+        bottomRow.className = 'rozie-flow-node__row rozie-flow-node__row--bottom';
+        midRow.appendChild(leftCol);
+        midRow.appendChild(body);
+        midRow.appendChild(rightCol);
+        box.appendChild(topRow);
+        box.appendChild(midRow);
+        box.appendChild(bottomRow);
+        element.appendChild(box);
+        for (const p of portEntries as any) {
+          const zone = p.position === 'top' ? topRow : p.position === 'bottom' ? bottomRow : p.position === 'right' ? rightCol : leftCol;
+          renderSocketInto(zone, reteNode, p.side, p.key, p.position, socketDisposers);
+        }
+      }
 
       // emit per-node event helper handed to the slot scope so a consumer node body
       // can raise a custom event carrying its id (e.g. a delete button).
@@ -724,79 +856,82 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       this.nodeEntries.set(id, entry);
     };
 
-    // Render one column of sockets and, crucially, EMIT a socket render signal per
-    // socket so the ConnectionPlugin + position watcher register it.
-    // Render one column of sockets and, crucially, EMIT a socket render signal per
-    // socket so the ConnectionPlugin + position watcher register it.
-    const buildSocketRow = (col: any, reteNode: any, side: any, socketDisposers: any) => {
-      const ports = side === 'input' ? reteNode.inputs : reteNode.outputs;
-      for (const key of Object.keys(ports) as any) {
-        const port = ports[key];
-        if (!port) continue;
-        const row = document.createElement('div');
-        row.className = 'rozie-flow-port rozie-flow-port--' + side;
-        const socketEl = document.createElement('div');
-        socketEl.className = 'rozie-flow-socket rozie-flow-socket--' + side;
-        socketEl.setAttribute('data-testid', 'socket');
-        const label = document.createElement('span');
-        label.className = 'rozie-flow-port__label';
-        label.textContent = port.label != null ? String(port.label) : key;
-        if (side === 'input') {
-          row.appendChild(socketEl);
-          row.appendChild(label);
-        } else {
-          row.appendChild(label);
-          row.appendChild(socketEl);
-        }
-        col.appendChild(row);
+    // Render ONE socket into a zone and, crucially, EMIT its render signal so the
+    // ConnectionPlugin + position watcher register it. `position` is the socket's visual
+    // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
+    // (the classic horizontal port row); top/bottom get a vertical port (socket above its
+    // label) + a `--<position>` socket class so the socket straddles the matching edge.
+    // Render ONE socket into a zone and, crucially, EMIT its render signal so the
+    // ConnectionPlugin + position watcher register it. `position` is the socket's visual
+    // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
+    // (the classic horizontal port row); top/bottom get a vertical port (socket above its
+    // label) + a `--<position>` socket class so the socket straddles the matching edge.
+    const renderSocketInto = (zone: any, reteNode: any, side: any, key: any, position: any, socketDisposers: any) => {
+      const port = (side === 'input' ? reteNode.inputs : reteNode.outputs)[key];
+      if (!port) return;
+      const vertical = position === 'top' || position === 'bottom';
+      const row = document.createElement('div');
+      row.className = 'rozie-flow-port rozie-flow-port--' + side + (vertical ? ' rozie-flow-port--vertical' : '');
+      const socketEl = document.createElement('div');
+      socketEl.className = 'rozie-flow-socket rozie-flow-socket--' + side + (vertical ? ' rozie-flow-socket--' + position : '');
+      socketEl.setAttribute('data-testid', 'socket');
+      const label = document.createElement('span');
+      label.className = 'rozie-flow-port__label';
+      label.textContent = port.label != null ? String(port.label) : key;
 
-        // LOAD-BEARING: announce the socket to the rest of the area's child plugins.
-        // 'render' lets the ConnectionPlugin register the socket as a drag anchor.
-        this.area.emit({
-          type: 'render',
-          data: {
-            type: 'socket',
-            side,
-            key,
-            nodeId: reteNode.id,
-            element: socketEl,
-            payload: {
-              socket: port.socket
-            }
-          }
-        });
-        // ALSO LOAD-BEARING (the socket-position contract): getDOMSocketPosition
-        // measures + stores a socket's DOM position ONLY on a 'rendered' socket signal
-        // — that is the render-plugin lifecycle's post-mount phase (an official render
-        // plugin emits 'rendered' after the framework commits the socket element). Our
-        // vanilla pipe creates the socket DOM synchronously and has already appended it
-        // under the engine node-view element by this point, so we fire 'rendered' right
-        // after 'render'. WITHOUT IT the position store stays permanently empty, every
-        // socketWatcher.listen() callback reads back null, and NO connection path —
-        // committed OR the drag-to-connect preview — is ever drawn (redraw()'s
-        // `if (!start || !end) return` guard never passes).
-        this.area.emit({
-          type: 'rendered',
-          data: {
-            type: 'socket',
-            side,
-            key,
-            nodeId: reteNode.id,
-            element: socketEl,
-            payload: {
-              socket: port.socket
-            }
-          }
-        });
-        socketDisposers.push(() => {
-          this.area.emit({
-            type: 'unmount',
-            data: {
-              element: socketEl
-            }
-          });
-        });
+      // CLASSIC: inputs socket-first, outputs label-first (byte-identical to pre-F2).
+      // VERTICAL: socket-first (the socket sits on the edge, label tucked inward).
+      if (side === 'input' || vertical) {
+        row.appendChild(socketEl);
+        row.appendChild(label);
+      } else {
+        row.appendChild(label);
+        row.appendChild(socketEl);
       }
+      zone.appendChild(row);
+
+      // LOAD-BEARING: announce the socket to the rest of the area's child plugins.
+      // 'render' lets the ConnectionPlugin register the socket as a drag anchor.
+      this.area.emit({
+        type: 'render',
+        data: {
+          type: 'socket',
+          side,
+          key,
+          nodeId: reteNode.id,
+          element: socketEl,
+          payload: {
+            socket: port.socket
+          }
+        }
+      });
+      // ALSO LOAD-BEARING (the socket-position contract): getDOMSocketPosition measures +
+      // stores a socket's DOM position ONLY on a 'rendered' socket signal — the render-plugin
+      // lifecycle's post-mount phase. Our vanilla pipe creates + appends the socket DOM
+      // synchronously, so we fire 'rendered' right after 'render'. WITHOUT IT the position
+      // store stays empty, every socketWatcher.listen() callback reads null, and NO
+      // connection path (committed OR drag preview) is ever drawn.
+      this.area.emit({
+        type: 'rendered',
+        data: {
+          type: 'socket',
+          side,
+          key,
+          nodeId: reteNode.id,
+          element: socketEl,
+          payload: {
+            socket: port.socket
+          }
+        }
+      });
+      socketDisposers.push(() => {
+        this.area.emit({
+          type: 'unmount',
+          data: {
+            element: socketEl
+          }
+        });
+      });
     };
 
     // ── connection renderer ──
@@ -2160,6 +2295,32 @@ injectGlobalStyles('rozie-flow-canvas-global', `
 .rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
 .rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: #3b82f6; }
+.rozie-flow-canvas .rozie-flow-node--rows {
+    display: flex;
+    flex-direction: column;
+  }
+.rozie-flow-canvas .rozie-flow-node__mid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: stretch;
+  }
+.rozie-flow-canvas .rozie-flow-node__row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+  }
+.rozie-flow-canvas .rozie-flow-port--vertical {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: 0.7rem;
+  }
+.rozie-flow-canvas .rozie-flow-socket--top,
+  .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by

@@ -71,6 +71,14 @@
   // a BOUND `:multiple="true"` passes a real boolean through the framework prop binding
   // (no HTML-attribute JSON parse), landing true on all 6 targets.
   multiple: { default: undefined },
+  // VISUAL placement of the socket on the node: 'left' | 'right' | 'top' | 'bottom'.
+  // Default by DIRECTION (input → left, output → right — exact back-compat; existing
+  // graphs unchanged). 'top'/'bottom' enable VERTICAL flows (decision trees, top-down
+  // pipelines) — the canvas lays the socket out on that edge and the connection anchor
+  // shifts on the matching axis (a custom getDOMSocketPosition offset). type:String
+  // (the Lit JSON-parse discipline — a bare position="top" attribute must land as the
+  // string, not be JSON-parsed to undefined).
+  position: { type: String, default: undefined },
 }
 </props>
 
@@ -111,7 +119,7 @@ $onMount(() => {
   // context, REQ-30) — the $onUpdate below adds the port once it resolves.
   if (nt && !added) {
     added = true
-    nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple)
+    nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple, $props.position)
   }
 })
 
@@ -128,7 +136,7 @@ $onUpdate(() => {
   if (live == null) return
   nt = live
   added = true
-  nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple)
+  nt.addPort(portSide(), portKey(), $props.type, $props.label, $props.multiple, $props.position)
 })
 </script>
 

@@ -43,8 +43,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
   get type() {
     return __rozieCtxHost.type();
   },
-  addPort: (side: any, key: any, portType: any, label: any, multiple: any) => {
-    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addTypePort(__rozieCtxHost.type(), side, key, portType, label, multiple);
+  addPort: (side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
+    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addTypePort(__rozieCtxHost.type(), side, key, portType, label, multiple, position);
   }
 }); },
     },

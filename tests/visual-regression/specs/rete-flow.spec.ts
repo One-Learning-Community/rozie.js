@@ -1093,3 +1093,135 @@ for (const target of TARGETS) {
     ).toBeLessThanOrEqual(PALETTE_PROJECTION_TOL_PX);
   });
 }
+
+/**
+ * 10. TOP/BOTTOM HANDLES — `<Port position="top|bottom">` vertical flow (Phase 43 F2).
+ *
+ * `examples/demos/FlowCanvasVerticalDemo.rozie` declares a `step` <NodeType> with its INPUT
+ * on the TOP edge and OUTPUT on the BOTTOM edge, and stacks 3 nodes so the 2 edges run
+ * top→bottom. This proves the position-aware render layout + the custom getDOMSocketPosition
+ * offset (which must shift the connection anchor on the Y axis for top/bottom ports — the
+ * rete default shifts X only):
+ *
+ *   1. the 3 nodes render and the top/bottom sockets exist (`.rozie-flow-socket--top` x3,
+ *      `.rozie-flow-socket--bottom` x3).
+ *   2. the 2 vertical connections draw (`.rozie-flow-connection__path`, non-empty `d`).
+ *   3. ALIGNMENT (the load-bearing offset proof): every drawn path endpoint sits within a
+ *      tight HORIZONTAL tolerance of some socket center (dx ≈ 0). With the rete DEFAULT
+ *      offset the top/bottom anchor would be pushed ±12px on X (dx ≈ 12, fails); the custom
+ *      offset shifts Y instead, so the endpoint stays horizontally aligned with the socket.
+ */
+const VERTICAL_ALIGN_DX_TOL_PX = 7;   // proves the anchor did NOT shift on X (default = ~12)
+const VERTICAL_ALIGN_DY_SANITY_PX = 22; // the intentional ±12 outward Y shift + AA/rounding
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-vertical [${target}]: <Port position=top/bottom> renders edge sockets + the connection anchor shifts on the Y axis`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasVertical&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    // ---- 1. top + bottom sockets render (3 each — one per step node) ----
+    await expect
+      .poll(async () => page.locator('.rozie-flow-socket--top').count(), { timeout: 10_000 })
+      .toBe(3);
+    await expect
+      .poll(async () => page.locator('.rozie-flow-socket--bottom').count(), { timeout: 10_000 })
+      .toBe(3);
+
+    // ---- 2. the 2 vertical connections draw ----
+    await expect
+      .poll(
+        async () =>
+          page.locator('.rozie-flow-connection__path').evaluateAll((els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0).length,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThanOrEqual(2);
+
+    // give the watcher-driven redraw a moment to settle after mount.
+    await page.waitForTimeout(1000);
+
+    // ---- 3. ALIGNMENT: endpoints are HORIZONTALLY aligned with sockets (Y-axis offset) ----
+    const result = await page.evaluate(() => {
+      const deepQueryAll = (selector: string): Element[] => {
+        const out: Element[] = [];
+        const walk = (root: Document | ShadowRoot) => {
+          out.push(...Array.from(root.querySelectorAll(selector)));
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as HTMLElement).shadowRoot;
+            if (sr) walk(sr);
+          }
+        };
+        walk(document);
+        return out;
+      };
+      const sockets = deepQueryAll('.rozie-flow-socket').map((s) => {
+        const r = (s as HTMLElement).getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      const paths = deepQueryAll('.rozie-flow-connection__path').filter(
+        (p) => ((p as SVGPathElement).getAttribute('d') || '').trim().length > 0,
+      ) as SVGPathElement[];
+      const screenPoint = (p: SVGPathElement, len: number) => {
+        const pt = p.getPointAtLength(len);
+        const m = p.getScreenCTM();
+        if (!m) return null;
+        return { x: pt.x * m.a + pt.y * m.c + m.e, y: pt.x * m.b + pt.y * m.d + m.f };
+      };
+      let worstDx = 0;
+      let worstDy = 0;
+      let endpointCount = 0;
+      for (const p of paths) {
+        const total = p.getTotalLength();
+        for (const e of [screenPoint(p, 0), screenPoint(p, total)]) {
+          if (!e) continue;
+          let best = Infinity;
+          let bestDx = Infinity;
+          let bestDy = Infinity;
+          for (const s of sockets) {
+            const dx = Math.abs(e.x - s.x);
+            const dy = Math.abs(e.y - s.y);
+            const d = Math.hypot(dx, dy);
+            if (d < best) {
+              best = d;
+              bestDx = dx;
+              bestDy = dy;
+            }
+          }
+          endpointCount++;
+          if (bestDx > worstDx) worstDx = bestDx;
+          if (bestDy > worstDy) worstDy = bestDy;
+        }
+      }
+      return { socketCount: sockets.length, pathCount: paths.length, endpointCount, worstDx, worstDy };
+    });
+
+    expect(result.socketCount).toBeGreaterThanOrEqual(6);
+    expect(result.pathCount).toBeGreaterThanOrEqual(2);
+    expect(result.endpointCount).toBeGreaterThanOrEqual(4);
+    // THE PROOF (horizontal): top/bottom anchors did NOT shift on X — endpoints stay
+    // aligned with the socket column. Default (X-shift) offset would give worstDx ~12.
+    expect(
+      result.worstDx,
+      `worst horizontal endpoint→socket offset ${result.worstDx.toFixed(2)}px (tol ${VERTICAL_ALIGN_DX_TOL_PX}px) — the rete default X-shift would be ~12px`,
+    ).toBeLessThanOrEqual(VERTICAL_ALIGN_DX_TOL_PX);
+    // SANITY (vertical): the anchor IS shifted ±12px outward on Y by design.
+    expect(
+      result.worstDy,
+      `worst vertical endpoint→socket offset ${result.worstDy.toFixed(2)}px (sanity ${VERTICAL_ALIGN_DY_SANITY_PX}px; ~12px is the intentional outward Y shift)`,
+    ).toBeLessThanOrEqual(VERTICAL_ALIGN_DY_SANITY_PX);
+  });
+}

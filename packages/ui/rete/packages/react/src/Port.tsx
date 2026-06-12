@@ -7,17 +7,19 @@ interface PortProps {
   type?: string;
   label?: string;
   multiple?: unknown;
+  position?: string;
 }
 
 export default function Port(_props: PortProps): JSX.Element {
   const injectedType = useContext(rozieContext("rete:nodeType"));
-  const props: Omit<PortProps, 'output' | 'input' | 'type' | 'label' | 'multiple'> & { output: string; input: string; type: string; label: string; multiple: unknown } = {
+  const props: Omit<PortProps, 'output' | 'input' | 'type' | 'label' | 'multiple' | 'position'> & { output: string; input: string; type: string; label: string; multiple: unknown; position: string } = {
     ..._props,
     output: _props.output ?? undefined,
     input: _props.input ?? undefined,
     type: _props.type ?? undefined,
     label: _props.label ?? undefined,
     multiple: _props.multiple ?? undefined,
+    position: _props.position ?? undefined,
   };
   const nt = useRef<any>(null);
   const added = useRef(false);
@@ -38,7 +40,7 @@ export default function Port(_props: PortProps): JSX.Element {
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (nt.current && !added.current) {
       added.current = true;
-      nt.current.addPort(portSide(), portKey(), props.type, props.label, props.multiple);
+      nt.current.addPort(portSide(), portKey(), props.type, props.label, props.multiple, props.position);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -47,8 +49,8 @@ export default function Port(_props: PortProps): JSX.Element {
     if (live == null) return;
     nt.current = live;
     added.current = true;
-    nt.current.addPort(portSide(), portKey(), props.type, props.label, props.multiple);
-  }, [added, injectedType, nt, portKey, portSide, props.label, props.multiple, props.type]);
+    nt.current.addPort(portSide(), portKey(), props.type, props.label, props.multiple, props.position);
+  }, [added, injectedType, nt, portKey, portSide, props.label, props.multiple, props.position, props.type]);
 
   return (
     null

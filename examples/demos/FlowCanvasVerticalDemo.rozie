@@ -1,0 +1,97 @@
+<!--
+  FlowCanvasVerticalDemo.rozie — BEHAVIORAL consumer for Phase 43 F2: top/bottom handle
+  positioning (`<Port position>`). A VERTICAL flow (top-down pipeline / decision tree)
+  where each `step` node has its INPUT on the TOP edge and its OUTPUT on the BOTTOM edge,
+  so connections run top→bottom instead of left→right.
+
+  The spec (`rete-flow-vertical`) proves the custom `getDOMSocketPosition` offset shifts the
+  connection anchor on the matching AXIS for top/bottom ports:
+    - top/bottom sockets render (`.rozie-flow-socket--top` / `--bottom`, 3 each),
+    - the 2 vertical connections draw,
+    - ALIGNMENT (the load-bearing proof): every drawn path endpoint is HORIZONTALLY aligned
+      with a socket center (dx ≈ 0). The rete DEFAULT offset shifts the anchor on X (±12),
+      which would leave dx ≈ 12 for a top/bottom socket; our custom offset shifts Y instead,
+      so dx stays ≈ 0 — the discriminator between the fix and the default.
+
+  Self-contained controlled graph; container needs explicit height/width (VR host mounts at
+  max-content).
+-->
+
+<rozie name="FlowCanvasVerticalDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // a vertical pipeline: each `step` has a TOP input + a BOTTOM output (declared once on
+  // the type), and the nodes are stacked so edges run top→bottom.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'step', x: 200, y: 20,  data: { label: 'Ingest' } },
+      { id: 'b', type: 'step', x: 200, y: 180, data: { label: 'Process' } },
+      { id: 'c', type: 'step', x: 200, y: 340, data: { label: 'Output' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — top/bottom handles (vertical flow)</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-count">{{ $data.graph.nodes.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 480px; width: 520px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <!-- ONE `step` type: INPUT on top, OUTPUT on bottom → a vertical flow. -->
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" position="top" :multiple="true" />
+        <Port output="out" label="out" position="bottom" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 560px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.controls .readout { font-variant-numeric: tabular-nums; font-size: 0.875rem; min-width: 2ch; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

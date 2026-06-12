@@ -27,6 +27,7 @@ export class Port {
   type = input<string>(undefined);
   label = input<string>(undefined);
   multiple = input<unknown>(undefined);
+  position = input<string>(undefined);
   injectedType = inject(rozieToken('rete:nodeType'));
 
   constructor() {
@@ -42,7 +43,7 @@ export class Port {
       if (live == null) return;
       this.nt = live;
       this.added = true;
-      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple());
+      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple(), this.position());
     });
   }
 
@@ -53,7 +54,7 @@ export class Port {
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (this.nt && !this.added) {
       this.added = true;
-      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple());
+      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple(), this.position());
     }
   }
 

@@ -195,8 +195,8 @@ $provide('rete:nodeType', {
   get type() {
     return $props.type
   },
-  addPort: (side, key, portType, label, multiple) => {
-    if (cv) cv.addTypePort($props.type, side, key, portType, label, multiple)
+  addPort: (side, key, portType, label, multiple, position) => {
+    if (cv) cv.addTypePort($props.type, side, key, portType, label, multiple, position)
   },
 })
 </script>

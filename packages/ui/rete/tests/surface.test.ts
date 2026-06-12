@@ -153,7 +153,7 @@ describe('NodeType.rozie + Port.rozie surface gate', () => {
     const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
     expect(ir.name).toBe('Port');
     expect(sorted(ir.props.map((p: { name: string }) => p.name))).toEqual(
-      sorted(['output', 'input', 'type', 'label', 'multiple']),
+      sorted(['output', 'input', 'type', 'label', 'multiple', 'position']),
     );
     expect(PORT_SRC).toContain("$inject('rete:nodeType')");
     expect(PORT_SRC).toContain('addPort');

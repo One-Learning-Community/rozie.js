@@ -7,6 +7,7 @@ interface Props {
   type?: string;
   label?: string;
   multiple?: unknown;
+  position?: string;
 }
 
 let {
@@ -14,7 +15,8 @@ let {
   input = undefined,
   type = undefined,
   label = undefined,
-  multiple = undefined
+  multiple = undefined,
+  position = undefined
 }: Props = $props();
 
 const injectedType = getContext('rete:nodeType');
@@ -53,7 +55,7 @@ onMount(() => {
   // context, REQ-30) — the $onUpdate below adds the port once it resolves.
   if (nt && !added) {
     added = true;
-    nt.addPort(portSide(), portKey(), type, label, multiple);
+    nt.addPort(portSide(), portKey(), type, label, multiple, position);
   }
 });
 $effect(() => (() => {
@@ -62,7 +64,7 @@ $effect(() => (() => {
   if (live == null) return;
   nt = live;
   added = true;
-  nt.addPort(portSide(), portKey(), type, label, multiple);
+  nt.addPort(portSide(), portKey(), type, label, multiple, position);
 })());
 </script>
 

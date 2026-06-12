@@ -6,8 +6,8 @@
 import { inject, onMounted, onUpdated } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ output?: string; input?: string; type?: string; label?: string; multiple?: unknown }>(),
-  { output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined }
+  defineProps<{ output?: string; input?: string; type?: string; label?: string; multiple?: unknown; position?: string }>(),
+  { output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined, position: undefined }
 );
 
 const injectedType = inject('rete:nodeType');
@@ -46,7 +46,7 @@ onMounted(() => {
   // context, REQ-30) — the $onUpdate below adds the port once it resolves.
   if (nt && !added) {
     added = true;
-    nt.addPort(portSide(), portKey(), props.type, props.label, props.multiple);
+    nt.addPort(portSide(), portKey(), props.type, props.label, props.multiple, props.position);
   }
 });
 onUpdated(() => {
@@ -55,6 +55,6 @@ onUpdated(() => {
   if (live == null) return;
   nt = live;
   added = true;
-  nt.addPort(portSide(), portKey(), props.type, props.label, props.multiple);
+  nt.addPort(portSide(), portKey(), props.type, props.label, props.multiple, props.position);
 });
 </script>

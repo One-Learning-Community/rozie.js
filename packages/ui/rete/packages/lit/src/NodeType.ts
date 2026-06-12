@@ -22,8 +22,8 @@ private __rozieCtxProvider_rete_nodeType = new ContextProvider(this, { context: 
   get type() {
     return __rozieCtxHost.type;
   },
-  addPort: (side: any, key: any, portType: any, label: any, multiple: any) => {
-    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addTypePort(__rozieCtxHost.type, side, key, portType, label, multiple);
+  addPort: (side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
+    if (__rozieCtxHost.cv) __rozieCtxHost.cv.addTypePort(__rozieCtxHost.type, side, key, portType, label, multiple, position);
   }
 }))(this) });
 private __rozieCtxConsumer_rete_canvas = new ContextConsumer(this, { context: __rozieCtx_rete_canvas, subscribe: true });

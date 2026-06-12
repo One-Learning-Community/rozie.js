@@ -6,6 +6,7 @@ export interface PortProps {
   type?: string;
   label?: string;
   multiple?: unknown;
+  position?: string;
 }
 
 declare function Port(props: PortProps): JSX.Element;

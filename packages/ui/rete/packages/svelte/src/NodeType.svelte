@@ -127,8 +127,8 @@ setContext('rete:nodeType', {
   get type() {
     return type;
   },
-  addPort: (side: any, key: any, portType: any, label: any, multiple: any) => {
-    if (cv) cv.addTypePort(type, side, key, portType, label, multiple);
+  addPort: (side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
+    if (cv) cv.addTypePort(type, side, key, portType, label, multiple, position);
   }
 });
 

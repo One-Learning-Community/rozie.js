@@ -50,6 +50,32 @@
 .rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
 .rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
 .rozie-flow-canvas .rozie-flow-socket:hover { background: #3b82f6; }
+.rozie-flow-canvas .rozie-flow-node--rows {
+    display: flex;
+    flex-direction: column;
+  }
+.rozie-flow-canvas .rozie-flow-node__mid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: stretch;
+  }
+.rozie-flow-canvas .rozie-flow-node__row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+  }
+.rozie-flow-canvas .rozie-flow-port--vertical {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: 0.7rem;
+  }
+.rozie-flow-canvas .rozie-flow-socket--top,
+  .rozie-flow-canvas .rozie-flow-socket--bottom { margin-left: 0; margin-right: 0; }
+.rozie-flow-canvas .rozie-flow-socket--top { margin-top: -6px; }
+.rozie-flow-canvas .rozie-flow-socket--bottom { margin-bottom: -6px; }
 .rozie-flow-canvas .rozie-flow-connection { position: absolute; }
 .rozie-flow-canvas .rozie-flow-connection__svg {
     /* display:block is LOAD-BEARING, not cosmetic. An <svg> is display:inline by

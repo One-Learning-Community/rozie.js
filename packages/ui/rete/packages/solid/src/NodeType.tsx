@@ -200,8 +200,8 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
   get type() {
     return local.type;
   },
-  addPort: (side: any, key: any, portType: any, label: any, multiple: any) => {
-    if (cv) cv.addTypePort(local.type, side, key, portType, label, multiple);
+  addPort: (side: any, key: any, portType: any, label: any, multiple: any, position: any) => {
+    if (cv) cv.addTypePort(local.type, side, key, portType, label, multiple, position);
   }
 }}>
     <>

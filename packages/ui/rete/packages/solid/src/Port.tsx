@@ -8,11 +8,12 @@ interface PortProps {
   type?: string;
   label?: string;
   multiple?: unknown;
+  position?: string;
 }
 
 export default function Port(_props: PortProps): JSX.Element {
-  const _merged = mergeProps({ output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined }, _props);
-  const [local, attrs] = splitProps(_merged, ['output', 'input', 'type', 'label', 'multiple']);
+  const _merged = mergeProps({ output: undefined, input: undefined, type: undefined, label: undefined, multiple: undefined, position: undefined }, _props);
+  const [local, attrs] = splitProps(_merged, ['output', 'input', 'type', 'label', 'multiple', 'position']);
 
   const injectedType = useContext(rozieContext("rete:nodeType"));
   onMount(() => {
@@ -22,7 +23,7 @@ export default function Port(_props: PortProps): JSX.Element {
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (nt && !added) {
       added = true;
-      nt.addPort(portSide(), portKey(), local.type, local.label, local.multiple);
+      nt.addPort(portSide(), portKey(), local.type, local.label, local.multiple, local.position);
     }
   });
   createEffect(() => {
@@ -31,7 +32,7 @@ export default function Port(_props: PortProps): JSX.Element {
     if (live == null) return;
     nt = live;
     added = true;
-    nt.addPort(portSide(), portKey(), local.type, local.label, local.multiple);
+    nt.addPort(portSide(), portKey(), local.type, local.label, local.multiple, local.position);
   });
 
   // $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
