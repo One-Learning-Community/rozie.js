@@ -2088,6 +2088,19 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     } : null;
   }
 
+  screenToFlowPosition(clientX: any, clientY: any) {
+    if (!this.area || typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+    const el = this.area.container;
+    const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+    if (!rect) return null;
+    const t = this.area.area.transform;
+    const k = t.k || 1;
+    return {
+      x: (clientX - rect.left - t.x) / k,
+      y: (clientY - rect.top - t.y) / k
+    };
+  }
+
   get graph(): any { return this._graphControllable.read(); }
   set graph(v: any) { this._graphControllable.notifyPropertyWrite(v); }
   get zoom(): number { return this._zoomControllable.read(); }

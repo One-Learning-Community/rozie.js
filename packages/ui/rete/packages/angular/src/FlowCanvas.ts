@@ -1915,6 +1915,18 @@ export class FlowCanvas {
       k: this.area.area.transform.k
     } : null;
   };
+  screenToFlowPosition = (clientX: any, clientY: any) => {
+    if (!this.area || typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+    const el = this.area.container;
+    const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+    if (!rect) return null;
+    const t = this.area.area.transform;
+    const k = t.k || 1;
+    return {
+      x: (clientX - rect.left - t.x) / k,
+      y: (clientY - rect.top - t.y) / k
+    };
+  };
 
   static ngTemplateContextGuard(
     _dir: FlowCanvas,

@@ -1,0 +1,172 @@
+<!--
+  FlowCanvasPaletteDemo.rozie — BEHAVIORAL consumer for Phase 43 F1: palette drag-drop
+  via the `screenToFlowPosition(clientX, clientY)` $expose verb (the React-Flow
+  `screenToFlowPosition` parity — the #1 no-code-builder interaction).
+
+  THE PATTERN (consumer owns the DnD, the canvas owns the projection — exactly like
+  React Flow): a palette item is `draggable`; the canvas wrapper handles `@dragover.prevent`
+  + `@drop`; on drop the consumer calls `flow.screenToFlowPosition(e.clientX, e.clientY)`
+  to get the graph coords under the pointer and appends a FRESH node there into the bound
+  controlled `graph` (immutable write-back — in-place mutation is silently dropped on
+  React/Solid/Lit/Angular).
+
+  The spec (`rete-flow-palette`) drives a DETERMINISTIC proxy — a "Drop at center" button
+  that runs the SAME `dropNodeAt` path at the canvas center (screen→flow projection +
+  fresh-node append) — rather than flaky native HTML5 DnD, and asserts the new node lands
+  at the projected position (dropped at the canvas center → renders at the canvas center),
+  proving the round-trip projection is correct cross-target. The real draggable palette
+  item is wired too (the documented pattern, exercised live).
+
+  NOTE on the handle: `$refs.flow.screenToFlowPosition(...)` is the consumer-ref call. On
+  five targets the `ref` resolves to the $expose handle; Angular's `$refs` to a child Rozie
+  component resolves to the host element (a documented Rozie parity edge — a real Angular
+  app uses native `@ViewChild(FlowCanvas).screenToFlowPosition()`). The optional-chain keeps
+  it a safe no-op where the ref diverges.
+-->
+
+<rozie name="FlowCanvasPaletteDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  nextId: 1,
+  dropX: 0,
+  dropY: 0,
+  // one seed node so the canvas + the `task` NodeType mount.
+  graph: {
+    nodes: [
+      { id: 'seed', type: 'task', x: 40, y: 40, data: { label: 'Seed' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// Shared placement: project a SCREEN point → graph coords via the canvas handle, then
+// append a FRESH node there (controlled-graph immutable write — in-place mutation is
+// silently dropped on React/Solid/Lit/Angular).
+const dropNodeAt = (clientX, clientY) => {
+  // NOTE: name the local `handle`, NOT `flow` — a `const flow = $refs.flow` collides with
+  // the `ref="flow"` variable and lowers to `const flow = flow.current` (a self-reference
+  // TDZ: "Cannot access 'flow' before initialization") on React/Svelte/Angular. The
+  // $refs-self-shadow analog of the deconflictPropShadows prop/param case; logged as a
+  // latent emitter finding. Distinct local name sidesteps it (works on all 6).
+  const handle = $refs.flow
+  const pos = handle && handle.screenToFlowPosition ? handle.screenToFlowPosition(clientX, clientY) : null
+  if (!pos) return
+  $data.dropX = Math.round(pos.x)
+  $data.dropY = Math.round(pos.y)
+  const id = 'p' + $data.nextId
+  $data.nextId = $data.nextId + 1
+  const nodes = [...$data.graph.nodes, { id, type: 'task', x: pos.x, y: pos.y, data: { label: 'Dropped ' + id } }]
+  $data.graph = { ...$data.graph, nodes }
+}
+
+// The real HTML5 drop (the documented recipe — the consumer owns dragover/drop).
+const onDrop = (e) => { dropNodeAt(e.clientX, e.clientY) }
+
+// Deterministic VR proxy: drop a node at the canvas CENTER via the SAME path, so the spec
+// can assert the projection round-trip without flaky native DnD.
+const dropAtCenter = () => {
+  const el = $refs.canvasWrap
+  if (!el || !el.getBoundingClientRect) return
+  const r = el.getBoundingClientRect()
+  dropNodeAt(r.left + r.width / 2, r.top + r.height / 2)
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — palette drag-drop (behavioral)</h3>
+
+  <div class="palette">
+    <div class="palette__item" draggable="true" data-testid="palette-item">＋ Drag me onto the canvas</div>
+    <button type="button" data-testid="drop-center" @click="dropAtCenter">Drop at center</button>
+    <span class="readout" data-testid="readout-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="readout-dropx">{{ $data.dropX }}</span>
+  </div>
+
+  <div
+    class="flow-wrap"
+    ref="canvasWrap"
+    @dragover.prevent
+    @drop.prevent="onDrop"
+    style="height: 340px; width: 720px"
+  >
+    <FlowCanvas
+      ref="flow"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.palette {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.palette__item {
+  padding: 0.375rem 0.75rem;
+  border: 1px dashed rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  background: #eef2ff;
+  cursor: grab;
+  font-size: 0.8125rem;
+  user-select: none;
+}
+.palette button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.palette .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

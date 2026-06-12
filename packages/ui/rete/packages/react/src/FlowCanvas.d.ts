@@ -50,6 +50,7 @@ export interface FlowCanvasHandle {
   zoomTo: (...args: any[]) => any;
   setCenter: (...args: any[]) => any;
   setViewport: (...args: any[]) => any;
+  screenToFlowPosition: (...args: any[]) => any;
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;

@@ -795,6 +795,39 @@ function getTransform() {
   } : null;
 }
 
+// screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
+// palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
+// parity). The INVERSE of the area transform: a graph point projects to the screen as
+// `screen = containerOrigin + transform.{x,y} + graph·k`, so
+// `graph = (client − containerOrigin − transform) / k`. `area.container` is public on
+// the AreaPlugin (no $refs read). Returns null before the area mounts. The component
+// owns ONLY this projection — the consumer owns the drag/drop (a palette item's
+// `draggable` + the canvas `@dragover.prevent`/`@drop`) and writes the new node into the
+// bound `graph` at the returned coords, exactly like React Flow (which does not own the
+// palette either).
+// screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
+// palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
+// parity). The INVERSE of the area transform: a graph point projects to the screen as
+// `screen = containerOrigin + transform.{x,y} + graph·k`, so
+// `graph = (client − containerOrigin − transform) / k`. `area.container` is public on
+// the AreaPlugin (no $refs read). Returns null before the area mounts. The component
+// owns ONLY this projection — the consumer owns the drag/drop (a palette item's
+// `draggable` + the canvas `@dragover.prevent`/`@drop`) and writes the new node into the
+// bound `graph` at the returned coords, exactly like React Flow (which does not own the
+// palette either).
+function screenToFlowPosition(clientX: any, clientY: any) {
+  if (!area || typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+  const el = area.container;
+  const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+  if (!rect) return null;
+  const t = area.area.transform;
+  const k = t.k || 1;
+  return {
+    x: (clientX - rect.left - t.x) / k,
+    y: (clientY - rect.top - t.y) / k
+  };
+}
+
 provide('rete:canvas', {
   // Register/replace a node TYPE template. `spec` carries an optional
   // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
@@ -1971,7 +2004,7 @@ watch(() => zoom.value, (v: any) => {
   });
 });
 
-defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, getNodes, getConnections, getTransform });
+defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform });
 </script>
 
 <style scoped>

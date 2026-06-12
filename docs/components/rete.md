@@ -203,8 +203,41 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `zoomTo(k)` | Set the zoom level (echoes into the `zoom` model). |
 | `setCenter(x, y, opts?)` | Center the viewport on graph coordinates `(x, y)`; `opts.zoom` optionally sets the zoom. Echoes the level into the `zoom` model and fires `translated`. Powers the pannable MiniMap. |
 | `setViewport({ x, y, k })` | Set the raw viewport transform (any field omitted keeps its current value). Echoes `k` into the `zoom` model and fires `translated`. |
+| `screenToFlowPosition(clientX, clientY)` | Project a screen/client coordinate to graph coordinates `{ x, y }` (or `null` before mount). The **palette drag-drop** primitive — on a canvas `@drop`, call it with the event's client coords and push a fresh node into the bound `graph` at the result. The consumer owns the drag/drop; the canvas owns the projection. |
 | `getNodes()` | Serialized snapshot `[{ id, label, x, y }]` with live positions. |
 | `getConnections()` | Serialized snapshot `[{ id, source, sourceOutput, target, targetInput }]`. |
 | `getTransform()` | The viewport transform `{ x, y, k }`. |
 
 > The method is `zoomTo`, not `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom` state setter that a `setZoom` verb would collide with (the same collision discipline as the rest of `@rozie-ui`).
+
+### Palette drag-drop (`screenToFlowPosition`)
+
+Dropping a node from a sidebar palette onto the canvas — the bread-and-butter no-code-builder interaction — works like React Flow: **you own the drag/drop, the canvas owns the projection.** Grab the canvas handle, mark a palette item `draggable`, and on the canvas `@drop` translate the pointer to graph coordinates and append a node into the bound `graph`:
+
+```html
+<!-- palette item -->
+<div draggable="true">＋ New node</div>
+
+<!-- canvas wrapper owns dragover/drop -->
+<div @dragover.prevent @drop.prevent="onDrop">
+  <FlowCanvas ref="flow" r-model:graph="$data.graph">
+    <NodeType type="task"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
+  </FlowCanvas>
+</div>
+```
+
+```js
+const onDrop = (e) => {
+  // name the local anything BUT `flow` — `const flow = $refs.flow` self-shadows the ref.
+  const canvas = $refs.flow
+  const pos = canvas?.screenToFlowPosition(e.clientX, e.clientY)
+  if (!pos) return
+  // controlled-graph write-back: a FRESH graph object (in-place mutation is dropped on 4/6).
+  $data.graph = { ...$data.graph, nodes: [...$data.graph.nodes,
+    { id: crypto.randomUUID(), type: 'task', x: pos.x, y: pos.y, data: { label: 'New' } }] }
+}
+```
+
+`screenToFlowPosition(clientX, clientY)` inverts the viewport transform (pan + zoom), so a node placed at the result renders exactly under the drop point regardless of how the canvas is panned or zoomed.
+
+> **Angular consumers:** reach the handle with a native `@ViewChild(FlowCanvas)` query (`this.flow.screenToFlowPosition(...)`). Rozie's `$refs` to a child *component* resolves to the host element on Angular (a documented parity edge), so the in-template `$refs.flow` path above is for the other five targets.

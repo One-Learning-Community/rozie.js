@@ -203,6 +203,7 @@ export interface FlowCanvasHandle {
   zoomTo: (...args: any[]) => any;
   setCenter: (...args: any[]) => any;
   setViewport: (...args: any[]) => any;
+  screenToFlowPosition: (...args: any[]) => any;
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;
@@ -212,7 +213,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null }, _props);
   const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, getNodes, getConnections, getTransform }); });
+  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform }); });
 
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const [graph, setGraph] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'graph', (() => ({
@@ -1929,6 +1930,29 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       y: area.area.transform.y,
       k: area.area.transform.k
     } : null;
+  }
+
+  // screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
+  // palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
+  // parity). The INVERSE of the area transform: a graph point projects to the screen as
+  // `screen = containerOrigin + transform.{x,y} + graph·k`, so
+  // `graph = (client − containerOrigin − transform) / k`. `area.container` is public on
+  // the AreaPlugin (no $refs read). Returns null before the area mounts. The component
+  // owns ONLY this projection — the consumer owns the drag/drop (a palette item's
+  // `draggable` + the canvas `@dragover.prevent`/`@drop`) and writes the new node into the
+  // bound `graph` at the returned coords, exactly like React Flow (which does not own the
+  // palette either).
+  function screenToFlowPosition(clientX: any, clientY: any) {
+    if (!area || typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+    const el = area.container;
+    const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+    if (!rect) return null;
+    const t = area.area.transform;
+    const k = t.k || 1;
+    return {
+      x: (clientX - rect.left - t.x) / k,
+      y: (clientY - rect.top - t.y) / k
+    };
   }
 
   return (

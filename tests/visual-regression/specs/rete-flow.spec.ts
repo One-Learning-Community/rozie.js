@@ -1002,3 +1002,94 @@ for (const target of TARGETS) {
     expect(await page.locator('.rozie-flow-node').count()).toBe(nodeBoxes);
   });
 }
+
+/**
+ * 9. PALETTE DRAG-DROP — `screenToFlowPosition(clientX, clientY)` (Phase 43 F1).
+ *
+ * `examples/demos/FlowCanvasPaletteDemo.rozie` seeds ONE node and wires the palette-drop
+ * pattern (consumer owns the DnD; the canvas owns the projection — RF parity). The spec
+ * drives the DETERMINISTIC proxy: a "Drop at center" button runs the SAME `dropNodeAt`
+ * path at the canvas center — `flow.screenToFlowPosition(centerX, centerY)` → append a
+ * fresh node there — so we assert the projection ROUND-TRIP without flaky native HTML5 DnD:
+ *
+ *   1. seed renders (1 `.rozie-flow-node`, `readout-count` == 1).
+ *   2. click "Drop at center" → a node is appended to the bound graph (`readout-count`
+ *      climbs 1→2) — proving `screenToFlowPosition` returned a coord and the controlled
+ *      write-back landed.
+ *   3. PROJECTION CORRECTNESS (the load-bearing assertion, NOT count-only): the new
+ *      'Dropped' node's rendered box top-left sits at the canvas center within tolerance —
+ *      dropped at the center screen point ⇒ rendered back at the center (screen→flow→screen
+ *      round-trips). A wrong projection would place it far off-center even though the count
+ *      still climbed.
+ */
+const PALETTE_PROJECTION_TOL_PX = 32;
+
+// The `screenToFlowPosition` VERB compiles identically on all 6 (the surface gate proves
+// it) and the projection is target-agnostic (pure transform inverse). This cell exercises
+// it through a CONSUMER ref (`$refs.flow.screenToFlowPosition(...)`), which resolves the
+// child's $expose handle on five targets but NOT on Angular: Rozie's `$refs` to a child
+// COMPONENT lowers to the host element on Angular (a documented parity edge), so the demo's
+// `$refs.flow` lacks the handle (silent no-op — confirmed: no error, count stays 1). A real
+// Angular consumer reaches the verb natively via `@ViewChild(FlowCanvas).screenToFlowPosition()`
+// — see the docs recipe. So Angular is fixme HERE (the consumer-ref access path), not a
+// feature gap. (react/svelte previously failed too — a `const flow = $refs.flow` self-shadow
+// TDZ — fixed by renaming the local; see the backlog todo for the latent emitter gap.)
+const PALETTE_REF_HOST_DIVERGENT: ReadonlySet<typeof TARGETS[number]> = new Set<
+  typeof TARGETS[number]
+>(['angular']);
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner =
+    !built || KNOWN_FAILING.has(target) || PALETTE_REF_HOST_DIVERGENT.has(target)
+      ? test.fixme
+      : test;
+  runner(`rete-flow-palette [${target}]: screenToFlowPosition projects a drop point to graph coords + appends the node there`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasPalette&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // the seed node renders.
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+    const countReadout = page.getByTestId('readout-count');
+    await expect(countReadout).toHaveText('1');
+
+    // the canvas center (the deterministic drop point).
+    const cbox = await canvas.boundingBox();
+    if (!cbox) throw new Error('canvas bounding box unavailable');
+    const centerX = cbox.x + cbox.width / 2;
+    const centerY = cbox.y + cbox.height / 2;
+
+    // ---- drop a node at the canvas center via screenToFlowPosition ----
+    await page.getByTestId('drop-center').click();
+
+    // the controlled write-back landed — a fresh node appended (1→2).
+    await expect(countReadout).toHaveText('2', { timeout: 10_000 });
+    const dropped = page.locator('.rozie-flow-node', { hasText: 'Dropped' });
+    await expect(dropped).toHaveCount(1, { timeout: 10_000 });
+
+    // ---- PROJECTION CORRECTNESS: the dropped node renders AT the center ----
+    // screenToFlowPosition(center) → graph coord whose node origin renders back at the
+    // center screen point. The node element's box top-left ≈ the drop point.
+    const dbox = await dropped.first().boundingBox();
+    if (!dbox) throw new Error('dropped node bounding box unavailable');
+    expect(
+      Math.abs(dbox.x - centerX),
+      `dropped node x ${dbox.x.toFixed(1)} vs canvas center ${centerX.toFixed(1)} (tol ${PALETTE_PROJECTION_TOL_PX}px)`,
+    ).toBeLessThanOrEqual(PALETTE_PROJECTION_TOL_PX);
+    expect(
+      Math.abs(dbox.y - centerY),
+      `dropped node y ${dbox.y.toFixed(1)} vs canvas center ${centerY.toFixed(1)} (tol ${PALETTE_PROJECTION_TOL_PX}px)`,
+    ).toBeLessThanOrEqual(PALETTE_PROJECTION_TOL_PX);
+  });
+}

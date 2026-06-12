@@ -349,6 +349,12 @@ export const EXAMPLES = [
   // but NOT a screenshot cell (behavioral-only; FlowCanvasScreenshot stays the one
   // rete pixel baseline, with :minimap OFF).
   'FlowCanvasMinimap',
+  // Phase 43 F1 (palette drag-drop) — FlowCanvasPalette is the BEHAVIORAL cell (loader →
+  // examples/demos/FlowCanvasPaletteDemo.rozie). It proves the `screenToFlowPosition`
+  // $expose verb: a "Drop at center" button projects the canvas-center screen point to
+  // graph coords + appends a fresh node there; the spec asserts the new node lands at the
+  // canvas center (round-trip projection). Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasPalette',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -508,6 +514,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 42 minimap cell — '-demo' appended by the entry → 'rozie-flow-canvas-minimap-demo'
   // = kebab of FlowCanvasMinimapDemo.
   FlowCanvasMinimap: 'rozie-flow-canvas-minimap',
+  // Phase 43 palette cell — '-demo' appended → 'rozie-flow-canvas-palette-demo'.
+  FlowCanvasPalette: 'rozie-flow-canvas-palette',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -693,6 +701,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 42 — FlowCanvasMinimapDemo is self-contained (seeds its own controlled graph
   // + :minimap internally), so no parent props (the FlowCanvas/MapLibre precedent).
   FlowCanvasMinimap: {},
+  // Phase 43 — FlowCanvasPaletteDemo is self-contained (seeds its own graph). No parent props.
+  FlowCanvasPalette: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
