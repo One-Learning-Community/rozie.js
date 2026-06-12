@@ -69,6 +69,7 @@ export class DemoComponent {
 
 | Event | Description |
 | --- | --- |
+| `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |
 | `connection-created` | |

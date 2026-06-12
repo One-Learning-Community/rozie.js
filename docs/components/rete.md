@@ -159,7 +159,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `zoom` | `Number` | `1` | ✓ | The viewport zoom level. Two-way: scroll / pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. |
 | `pannable` | `Boolean` | `true` | | Whether the canvas can be panned (drag the background). Disabling detaches the area's drag handler. |
 | `zoomable` | `Boolean` | `true` | | Whether the canvas can be zoomed (scroll / pinch). Disabling detaches the area's zoom handler. |
-| `selectable` | `Boolean` | `true` | | Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope. |
+| `selectable` | `Boolean` | `true` | | Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope, and surfaced to the consumer via the `@selection-change` event. |
 | `readonly` | `Boolean` | `false` | | Read-only viewer mode — no node drag, no connection editing, no selection. |
 | `minZoom` | `Number` | `0.1` | | Minimum zoom level (the lower bound of the area's zoom restrictor). `0` disables the bound. |
 | `maxZoom` | `Number` | `4` | | Maximum zoom level (the upper bound of the area's zoom restrictor). `0` disables the bound. |
@@ -175,6 +175,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | --- | --- | --- |
 | `node-moved` | `{ id, x, y }` | A node finished a user drag to a new position. |
 | `node-picked` | `{ id }` | A node was picked (pointer-down). |
+| `selection-change` | `{ ids }` | The set of selected node ids changed — fired on pick / re-pick / deselect (background click clears it). Deduped (only on an actual change) and echo-guarded against the wrapper's own programmatic unselects. The #1 hook for an inspector panel. Selection is surfaced purely via this event — it is **not** written into the bound `graph`. |
 | `node-action` | `{ id, name, detail }` | A `<NodeType>` `#body` fill called its `emit(name, detail)` helper (e.g. an in-node button). |
 | `connection-created` | `{ id, source, sourceOutput, target, targetInput }` | A user drew a new connection (not fired for programmatic / props-driven adds). |
 | `connection-removed` | `{ id }` | A connection was removed (not fired for programmatic / props-driven removes). |

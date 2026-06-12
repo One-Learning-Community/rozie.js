@@ -22,6 +22,7 @@ interface Props {
   node?: Snippet<[{ node: any; selected: any; emit: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
+  onselectionchange?: (...args: unknown[]) => void;
   onnodeaction?: (...args: unknown[]) => void;
   onconnectionrejected?: (...args: unknown[]) => void;
   onconnectioncreated?: (...args: unknown[]) => void;
@@ -53,6 +54,7 @@ let {
   node: __nodeProp,
   children: __childrenProp,
   snippets,
+  onselectionchange,
   onnodeaction,
   onconnectionrejected,
   onconnectioncreated,
@@ -163,6 +165,16 @@ let lastPropConnIds: any = null;
 // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
 // eventData guard, in counter form so batched/nested ops never race).
 let programmatic = 0;
+
+// Win 2: the last emitted selection id-set, joined to a stable string, so
+// @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
+// set does not spam the consumer). `null` until the first emit (so the initial empty
+// selection does not emit on mount). COMPONENT-scope so it survives across area events.
+// Win 2: the last emitted selection id-set, joined to a stable string, so
+// @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
+// set does not spam the consumer). `null` until the first emit (so the initial empty
+// selection does not emit on mount). COMPONENT-scope so it survives across area events.
+let lastSelectionIds: any = null;
 
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
@@ -331,6 +343,54 @@ const selectedNodeIds = () => {
     if (e && e.id != null) ids.push(e.id);
   }
   return ids;
+};
+
+// Win 2: surface selection changes to the consumer via @selection-change ({ ids }).
+// Computes the current selected-id set, dedupes against the last-emitted set (joined
+// string), and emits only on an ACTUAL change. Echo-guarded by `programmatic` so a
+// PROGRAMMATIC unselect (clear/deleteNode may unpick) does not surface as a user
+// selection. Selection is kept PURELY in the emit — never written into the graph model
+// — so the controlled-graph echo-safety (the drag write-back assertions) is unaffected.
+// Sorted before joining so the dedup key is order-independent (the selector Map order
+// is not guaranteed stable across pick/unpick).
+// Win 2: surface selection changes to the consumer via @selection-change ({ ids }).
+// Computes the current selected-id set, dedupes against the last-emitted set (joined
+// string), and emits only on an ACTUAL change. Echo-guarded by `programmatic` so a
+// PROGRAMMATIC unselect (clear/deleteNode may unpick) does not surface as a user
+// selection. Selection is kept PURELY in the emit — never written into the graph model
+// — so the controlled-graph echo-safety (the drag write-back assertions) is unaffected.
+// Sorted before joining so the dedup key is order-independent (the selector Map order
+// is not guaranteed stable across pick/unpick).
+const maybeEmitSelectionChange = () => {
+  if (programmatic) return;
+  const ids = selectedNodeIds();
+  const key = [...ids].map((x: any) => String(x)).sort().join(' ');
+  if (key === lastSelectionIds) return;
+  lastSelectionIds = key;
+  onselectionchange?.({
+    ids
+  });
+};
+
+// Schedule the selection recompute AFTER the engine's own async selection update has
+// settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
+// area.update() calls, so a bare microtask can run before `selector.entities` reflects
+// the new state. A microtask AND an rAF together guarantee we recompute once the engine
+// chain has flushed (the dedup collapses the pair to at most one emit). Falls back to a
+// double microtask where rAF is unavailable (non-DOM test env).
+// Schedule the selection recompute AFTER the engine's own async selection update has
+// settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
+// area.update() calls, so a bare microtask can run before `selector.entities` reflects
+// the new state. A microtask AND an rAF together guarantee we recompute once the engine
+// chain has flushed (the dedup collapses the pair to at most one emit). Falls back to a
+// double microtask where rAF is unavailable (non-DOM test env).
+const scheduleSelectionEmit = () => {
+  Promise.resolve().then(maybeEmitSelectionChange);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(maybeEmitSelectionChange);
+  } else {
+    Promise.resolve().then(() => Promise.resolve().then(maybeEmitSelectionChange));
+  }
 };
 
 // The $portals/$emit-capturing reconcilers are built INSIDE $onMount ($portals
@@ -1206,6 +1266,17 @@ onMount(() => {
       onnodepicked?.({
         id: context.data.id
       });
+      // Win 2: a pick changed the selection — surface @selection-change after the
+      // engine's awaited select() for THIS pick has flushed the selector entities.
+      scheduleSelectionEmit();
+    } else if (context.type === 'pointerup') {
+      // Win 2: AreaExtensions.selectableNodes UNSELECTS all on a click-like background
+      // pointerUP (its `twitch < 4` deselect — NOT on pointerdown, verified against
+      // rete-area-plugin's selectable pipe). Its unselectAll() is async and its pipe
+      // runs before ours, so recompute AFTER its awaited unselectAll() flushes (the
+      // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
+      // pointerup that ended a node pick — already surfaced by the nodepicked branch).
+      scheduleSelectionEmit();
     } else if (context.type === 'nodetranslated') {
       if (!programmatic) {
         const id = context.data.id;

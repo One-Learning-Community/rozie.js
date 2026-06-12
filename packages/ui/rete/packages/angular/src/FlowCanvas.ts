@@ -222,6 +222,7 @@ export class FlowCanvas {
   typeReg = signal({});
   portReg = signal({});
   canvasEl = viewChild<ElementRef<HTMLDivElement>>('canvasEl');
+  selectionChange = output<unknown>({ alias: 'selection-change' });
   nodeAction = output<unknown>({ alias: 'node-action' });
   connectionRejected = output<unknown>({ alias: 'connection-rejected' });
   connectionCreated = output<unknown>({ alias: 'connection-created' });
@@ -894,6 +895,17 @@ export class FlowCanvas {
         this.nodePicked.emit({
           id: context.data.id
         });
+        // Win 2: a pick changed the selection — surface @selection-change after the
+        // engine's awaited select() for THIS pick has flushed the selector entities.
+        this.scheduleSelectionEmit();
+      } else if (context.type === 'pointerup') {
+        // Win 2: AreaExtensions.selectableNodes UNSELECTS all on a click-like background
+        // pointerUP (its `twitch < 4` deselect — NOT on pointerdown, verified against
+        // rete-area-plugin's selectable pipe). Its unselectAll() is async and its pipe
+        // runs before ours, so recompute AFTER its awaited unselectAll() flushes (the
+        // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
+        // pointerup that ended a node pick — already surfaced by the nodepicked branch).
+        this.scheduleSelectionEmit();
       } else if (context.type === 'nodetranslated') {
         if (!this.programmatic) {
           const id = context.data.id;
@@ -1216,6 +1228,7 @@ export class FlowCanvas {
   lastPropNodeIds: any = null;
   lastPropConnIds: any = null;
   programmatic = 0;
+  lastSelectionIds: any = null;
   pendingDragPositions = new Map();
   dragFlushRaf = 0;
   currentGraph = () => this.graph() || {
@@ -1297,6 +1310,24 @@ export class FlowCanvas {
       if (e && e.id != null) ids.push(e.id);
     }
     return ids;
+  };
+  maybeEmitSelectionChange = () => {
+    if (this.programmatic) return;
+    const ids = this.selectedNodeIds();
+    const key = [...ids].map((x: any) => String(x)).sort().join(' ');
+    if (key === this.lastSelectionIds) return;
+    this.lastSelectionIds = key;
+    this.selectionChange.emit({
+      ids
+    });
+  };
+  scheduleSelectionEmit = () => {
+    Promise.resolve().then(this.maybeEmitSelectionChange);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(this.maybeEmitSelectionChange);
+    } else {
+      Promise.resolve().then(() => Promise.resolve().then(this.maybeEmitSelectionChange));
+    }
   };
   reconcileNodes: any = null;
   reconcileConnections: any = null;

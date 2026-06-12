@@ -53,6 +53,7 @@ el.addEventListener('connection-created', (e) => console.log('connected', e.deta
 
 | Event | Description |
 | --- | --- |
+| `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |
 | `connection-created` | |

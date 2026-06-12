@@ -39,6 +39,7 @@ interface FlowCanvasProps {
   curvature?: number;
   fitOnMount?: boolean;
   canConnect?: ((...args: any[]) => any) | null;
+  onSelectionChange?: (...args: any[]) => void;
   onNodeAction?: (...args: any[]) => void;
   onConnectionRejected?: (...args: any[]) => void;
   onConnectionCreated?: (...args: any[]) => void;
@@ -139,6 +140,27 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const connInstances = useMemo(() => new Map(), []);
   const nodeEntries = useMemo(() => new Map(), []);
   const connEntries = useMemo(() => new Map(), []);
+  // Win 2: the last emitted selection id-set, joined to a stable string, so
+  // @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
+  // set does not spam the consumer). `null` until the first emit (so the initial empty
+  // selection does not emit on mount). COMPONENT-scope so it survives across area events.
+  let lastSelectionIds: any = null;
+
+  // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
+  // On every drag/connect/disconnect the canvas emits a FRESH top-level
+  // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
+  // applyNodeChanges style (Wave-0-proven 6/6; in-place deep mutation is SILENT on
+  // React/Solid/Lit/Angular). Echo-guarded by the `programmatic` counter + the
+  // no-op-diff property: the write-back value already matches engine truth (the node
+  // is already at x/y; the edge already exists) so the consumer's re-bind →
+  // $watch(graph) → reconcile is a no-op diff.
+  //
+  // DRAG COALESCING (Pitfall 2): `nodetranslated` fires on every pointermove during a
+  // drag; emitting a fresh graph + full reconcile per frame is a rebuild storm. We
+  // accumulate the latest position per node (pendingDragPositions) and flush ONE fresh
+  // graph write per animation frame (dragFlushRaf), plus a final flush so the last
+  // position always lands. requestAnimationFrame coalesces multiple moves in a frame
+  // into a single $model.graph emit.
   const pendingDragPositions = useMemo(() => new Map(), []);
   function currentGraph() {
     return graph || {
@@ -222,6 +244,24 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     return ids;
   }, []);
+  function maybeEmitSelectionChange() {
+    if (programmatic.current) return;
+    const ids = selectedNodeIds();
+    const key = [...ids].map((x: any) => String(x)).sort().join(' ');
+    if (key === lastSelectionIds) return;
+    lastSelectionIds = key;
+    props.onSelectionChange && props.onSelectionChange({
+      ids
+    });
+  }
+  const scheduleSelectionEmit = useCallback(() => {
+    Promise.resolve().then(maybeEmitSelectionChange);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(maybeEmitSelectionChange);
+    } else {
+      Promise.resolve().then(() => Promise.resolve().then(maybeEmitSelectionChange));
+    }
+  }, [maybeEmitSelectionChange]);
   const serializeConn = useCallback((c: any) => ({
     id: c.id,
     source: c.source,
@@ -947,6 +987,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         props.onNodePicked && props.onNodePicked({
           id: context.data.id
         });
+        // Win 2: a pick changed the selection — surface @selection-change after the
+        // engine's awaited select() for THIS pick has flushed the selector entities.
+        scheduleSelectionEmit();
+      } else if (context.type === 'pointerup') {
+        // Win 2: AreaExtensions.selectableNodes UNSELECTS all on a click-like background
+        // pointerUP (its `twitch < 4` deselect — NOT on pointerdown, verified against
+        // rete-area-plugin's selectable pipe). Its unselectAll() is async and its pipe
+        // runs before ours, so recompute AFTER its awaited unselectAll() flushes (the
+        // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
+        // pointerup that ended a node pick — already surfaced by the nodepicked branch).
+        scheduleSelectionEmit();
       } else if (context.type === 'nodetranslated') {
         if (!programmatic.current) {
           const id = context.data.id;

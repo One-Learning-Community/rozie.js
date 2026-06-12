@@ -63,6 +63,7 @@ export function Demo() {
 
 | Event | Description |
 | --- | --- |
+| `selection-change` | |
 | `node-action` | |
 | `connection-rejected` | |
 | `connection-created` | |

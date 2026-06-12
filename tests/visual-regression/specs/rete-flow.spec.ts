@@ -753,3 +753,69 @@ for (const target of TARGETS) {
     await expect.poll(drawnCount, { timeout: 10_000 }).toBe(0);
   });
 }
+
+/**
+ * 6. SELECTION SURFACED — @selection-change fires { ids } on pick / unpick / deselect
+ * (Win 2, quick-260611-sqa).
+ *
+ * `examples/demos/FlowCanvasAdvancedDemo.rozie` wires `@selection-change` →
+ * `onSelectionChange` → writes the joined selected ids to `data-testid="readout-selection"`
+ * (the #1 real-app need: click a node → drive an inspector). The canvas computes the
+ * selected-id set from the live selector after a pick/unpick, dedupes, and emits.
+ *
+ *   PICK: click the 'Number Source' (num) node body → the readout updates to contain
+ *   'num'.
+ *   RE-PICK: click 'Math' (math) → the readout changes to 'math' (single-select replaces).
+ *   DESELECT: click the empty canvas background → the readout clears (the selector
+ *   unselects all → empty { ids } emit).
+ *
+ * The readout TEXT is asserted (the load-bearing surface — not a count). expect.poll /
+ * toContainText absorbs Lit's async settle. Selection is NOT written into the graph
+ * model, so this never perturbs the controlled-graph echo-safety assertions.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-selection [${target}]: @selection-change surfaces the selected node ids on pick / re-pick / deselect`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasAdvanced&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(5);
+
+    const selection = page.getByTestId('readout-selection');
+    // empty before any pick (the initial empty selection does not emit on mount).
+    await expect(selection).toHaveText('');
+
+    // ---- PICK 'Number Source' (id 'num') ----
+    const numNode = page.locator('.rozie-flow-node', { hasText: 'Number Source' }).first();
+    const numBox = await numNode.boundingBox();
+    if (!numBox) throw new Error('Number Source node bounding box unavailable');
+    await page.mouse.click(numBox.x + 14, numBox.y + 10);
+    await expect(selection).toContainText('num', { timeout: 10_000 });
+
+    // ---- RE-PICK 'Math' (id 'math') → single-select replaces ----
+    const mathNode = page.locator('.rozie-flow-node', { hasText: 'Math' }).first();
+    const mathBox = await mathNode.boundingBox();
+    if (!mathBox) throw new Error('Math node bounding box unavailable');
+    await page.mouse.click(mathBox.x + 14, mathBox.y + 10);
+    await expect(selection).toContainText('math', { timeout: 10_000 });
+
+    // ---- DESELECT: click the empty canvas background → selection clears ----
+    const cb = await canvas.boundingBox();
+    if (!cb) throw new Error('canvas bounding box unavailable');
+    // bottom-right corner of the canvas — away from any node (nodes sit upper-left).
+    await page.mouse.click(cb.x + cb.width - 12, cb.y + cb.height - 12);
+    await expect(selection).toHaveText('', { timeout: 10_000 });
+  });
+}

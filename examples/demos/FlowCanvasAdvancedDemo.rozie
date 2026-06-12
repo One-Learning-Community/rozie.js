@@ -100,6 +100,10 @@
   // Last rejected attempt, written ONLY by onReject (the @connection-rejected
   // handler). Empty until the first rejected drag (cross-type OR self-loop).
   lastRejected: '',
+  // Win 2: the currently-selected node ids, written ONLY by onSelectionChange (the
+  // @selection-change handler). Empty until the first pick; reflects the live selection
+  // for an inspector-style consumer.
+  selectedIds: '',
   // Count of accepted connections, incremented in @connection-created.
   acceptedCount: 0,
   // THE SINGLE SOURCE OF TRUTH — the controlled graph (r-model:graph). Each node is
@@ -143,6 +147,12 @@ const onReject = (c) => {
 // bump the count. The canvas has ALREADY written the edge back into
 // $data.graph.connections (the connection-count readout reflects that).
 const onConnect = () => { $data.acceptedCount = ($data.acceptedCount || 0) + 1 }
+
+// @selection-change handler (Win 2) — the SOLE writer of $data.selectedIds. The payload
+// is { ids: string[] } of the currently-selected node ids; we join them for the readout
+// (the #1 real-app need: click a node → drive an inspector). Empty string when the
+// selection clears (background click).
+const onSelectionChange = (e) => { $data.selectedIds = (e && e.ids ? e.ids : []).join(',') }
 
 // canConnect OVERRIDE — the OPTIONAL custom rule that runs IN ADDITION to the
 // automatic typed validation (:validate-types). Forbids a self-loop (a node wired to
@@ -220,6 +230,8 @@ const kindGlyph = (type) =>
     <!-- Drag write-back proof: the canvas rewrites $data.graph.nodes[0].x live. -->
     <span class="readout" data-testid="readout-node0-x">{{ Math.round($data.graph.nodes[0].x) }}</span>
     <span class="readout readout--rejected" data-testid="readout-rejected">{{ $data.lastRejected }}</span>
+    <!-- Win 2: the live selection (ids joined) — the inspector-driving readout. -->
+    <span class="readout" data-testid="readout-selection">{{ $data.selectedIds }}</span>
   </div>
 
   <!--
@@ -238,6 +250,7 @@ const kindGlyph = (type) =>
       :fit-on-mount="false"
       @connection-created="onConnect"
       @connection-rejected="onReject"
+      @selection-change="onSelectionChange"
     >
       <!-- source: ONE type, BOTH a number AND a string OUTPUT port (Dan's ask). -->
       <NodeType type="source">

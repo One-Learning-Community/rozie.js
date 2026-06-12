@@ -39,9 +39,14 @@ const EXPECT = {
   // write-back target; zoom is the viewport binding). Neither is a same-named emit
   // (the MapLibre zoom/pitch model-prop == emit-name collision lesson).
   models: ['graph', 'zoom'],
+  // `selection-change` (Win 2, quick-260611-sqa) surfaces the selected node ids to the
+  // consumer ({ ids }) on pick/unpick/deselect. ROZ127-clean (no prop/model/expose
+  // collision): `selectable` is the prop, there is no `selection` model, so no
+  // model-prop==emit clash (the MapLibre zoom/pitch lesson).
   emits: [
     'node-action', 'connection-created', 'connection-removed', 'node-picked',
     'node-moved', 'translated', 'context-menu', 'connection-rejected',
+    'selection-change',
   ],
   // 'node' = the reactive multi-instance portal slot (the low-level render-by-type
   // escape hatch); '' = the default slot that hosts the Phase 41 declarative
@@ -86,7 +91,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (8 emits)', () => {
+  it('emits surface matches (9 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
