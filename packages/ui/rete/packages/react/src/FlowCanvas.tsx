@@ -38,6 +38,7 @@ interface FlowCanvasProps {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  controls?: boolean;
   canConnect?: ((...args: any[]) => any) | null;
   onSelectionChange?: (...args: any[]) => void;
   onNodeAction?: (...args: any[]) => void;
@@ -72,7 +73,7 @@ export interface FlowCanvasHandle {
 const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(_props: FlowCanvasProps, ref): JSX.Element {
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'canConnect'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; canConnect: ((...args: any[]) => any) | null } = {
+  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'canConnect'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; controls: boolean; canConnect: ((...args: any[]) => any) | null } = {
     ..._props,
     validateTypes: _props.validateTypes ?? true,
     pannable: _props.pannable ?? true,
@@ -85,6 +86,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     accumulateOnCtrl: _props.accumulateOnCtrl ?? true,
     curvature: _props.curvature ?? 0.3,
     fitOnMount: _props.fitOnMount ?? true,
+    controls: _props.controls ?? true,
     canConnect: _props.canConnect ?? null,
   };
   const _renderNodeRef = useRef(props.renderNode);
@@ -424,6 +426,38 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     if (k !== zoom) setZoom(k);
   }
+
+  // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+  // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+  // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+  // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+  // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+  // edit the graph). A no-op before the area mounts.
+  // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+  // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+  // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+  // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+  // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+  // edit the graph). A no-op before the area mounts.
+  const ZOOM_STEP = 1.2;
+  function clampZoom(k: any) {
+    let lo = typeof props.minZoom === 'number' && props.minZoom > 0 ? props.minZoom : 0.01;
+    let hi = typeof props.maxZoom === 'number' && props.maxZoom > 0 ? props.maxZoom : 100;
+    if (k < lo) return lo;
+    if (k > hi) return hi;
+    return k;
+  }
+  const controlZoomIn = useCallback(() => {
+    if (!area.current) return;
+    zoomTo(clampZoom(area.current.area.transform.k * ZOOM_STEP));
+  }, [clampZoom, zoomTo]);
+  const controlZoomOut = useCallback(() => {
+    if (!area.current) return;
+    zoomTo(clampZoom(area.current.area.transform.k / ZOOM_STEP));
+  }, [clampZoom, zoomTo]);
+  const controlFit = useCallback(() => {
+    zoomToFit();
+  }, [zoomToFit]);
   function getNodes() {
     if (!area.current) return [];
     const out = [];
@@ -1403,7 +1437,13 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }
 }}>
     <>
-    <div className={"rozie-flow-canvas"} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="" />
+    <div className={"rozie-flow-canvas"} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="">
+      
+      {(props.controls) && <div className={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
+        <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-in" aria-label="Zoom in" onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>
+        <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-out" aria-label="Zoom out" onClick={controlZoomOut} data-rozie-s-cd396d6a="">&#8722;</button>
+        <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-fit" aria-label="Fit view" onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
+      </div>}</div>
 
 
 

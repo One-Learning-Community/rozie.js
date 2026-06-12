@@ -69,6 +69,7 @@
       :zoomable="false"
       :selectable="false"
       :fit-on-mount="false"
+      :controls="false"
     >
       <!-- ONE `task` type; minimal #body (just the label) for content-stable,
            cross-target-identical node chrome. -->

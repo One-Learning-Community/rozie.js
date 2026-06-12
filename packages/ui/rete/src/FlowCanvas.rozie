@@ -129,6 +129,11 @@
   curvature:    { type: Number,  default: 0.3 },
   // auto-fit the viewport to all nodes after the initial graph mounts.
   fitOnMount:   { type: Boolean, default: true },
+  // built-in Controls overlay (zoom in / zoom out / fit) — default ON; opt out with
+  // :controls="false". type:Boolean lowers cleanly cross-target (no Lit object-prop
+  // JSON.parse landmine). The buttons reuse the same zoom/fit path as the zoomTo/
+  // zoomToFit $expose verbs (one implementation).
+  controls:     { type: Boolean, default: true },
   // Connection-validation predicate. Receives the normalized candidate connection
   // { source, sourceOutput, target, targetInput }; return false to REJECT (the
   // wrapper cancels Rete's connectioncreate pre-event — no edge committed, no ghost
@@ -1298,6 +1303,30 @@ async function zoomTo(k) {
   try { await area.area.zoom(k) } finally { programmatic-- }
   if (k !== $props.zoom) $model.zoom = k
 }
+
+// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+// edit the graph). A no-op before the area mounts.
+const ZOOM_STEP = 1.2
+const clampZoom = (k) => {
+  let lo = typeof $props.minZoom === 'number' && $props.minZoom > 0 ? $props.minZoom : 0.01
+  let hi = typeof $props.maxZoom === 'number' && $props.maxZoom > 0 ? $props.maxZoom : 100
+  if (k < lo) return lo
+  if (k > hi) return hi
+  return k
+}
+const controlZoomIn = () => {
+  if (!area) return
+  zoomTo(clampZoom(area.area.transform.k * ZOOM_STEP))
+}
+const controlZoomOut = () => {
+  if (!area) return
+  zoomTo(clampZoom(area.area.transform.k / ZOOM_STEP))
+}
+const controlFit = () => { zoomToFit() }
 function getNodes() {
   if (!area) return []
   const out = []
@@ -1321,7 +1350,41 @@ $expose({
 </script>
 
 <template>
-<div class="rozie-flow-canvas" ref="canvasEl" tabindex="0"></div>
+<div class="rozie-flow-canvas" ref="canvasEl" tabindex="0">
+  <!--
+    built-in Controls overlay (Win 4) — zoom in / out / fit, gated on :controls
+    (default ON; :controls="false" opts out). Rendered INSIDE the engine container
+    (position:relative) but the AreaPlugin only APPENDS its own transform layer, it
+    never clears the container, so the overlay coexists. The overlay box is
+    pointer-events:none (it must not steal pan/zoom from the canvas); only the buttons
+    re-enable pointer events. These are COMPONENT-template DOM (NOT engine-mounted), so
+    they carry the [data-rozie-s-*] scope attr and a PLAIN scoped rule styles them (no
+    :root escape hatch needed). The buttons reuse the zoomTo/zoomToFit verbs.
+  -->
+  <div class="rozie-flow-controls" r-if="$props.controls">
+    <button
+      type="button"
+      class="rozie-flow-controls__btn"
+      data-testid="flow-zoom-in"
+      aria-label="Zoom in"
+      @click="controlZoomIn"
+    >+</button>
+    <button
+      type="button"
+      class="rozie-flow-controls__btn"
+      data-testid="flow-zoom-out"
+      aria-label="Zoom out"
+      @click="controlZoomOut"
+    >&#8722;</button>
+    <button
+      type="button"
+      class="rozie-flow-controls__btn"
+      data-testid="flow-fit"
+      aria-label="Fit view"
+      @click="controlFit"
+    >&#9744;</button>
+  </div>
+</div>
 <!--
   node — REACTIVE MULTI-INSTANCE portal slot — the LOW-LEVEL render-by-type escape
   hatch (the consumer switches on node.type inside one #node slot). Declared but NOT
@@ -1356,6 +1419,40 @@ $expose({
     #f7f8fa;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
+
+/* built-in Controls overlay (Win 4) — COMPONENT-template DOM, so plain scoped CSS
+   styles it (it carries the [data-rozie-s-*] scope attr; no :root escape hatch). The
+   cluster is pointer-events:none so it never steals pan/zoom from the canvas; the
+   buttons re-enable pointer events. Positioned bottom-left over the canvas. */
+.rozie-flow-controls {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.rozie-flow-controls__btn {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: 600 16px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-controls__btn:hover { background: #f1f5f9; }
+.rozie-flow-controls__btn:active { background: #e2e8f0; }
 
 :root {
   /* Engine-rendered node / socket / connection DOM never carries the

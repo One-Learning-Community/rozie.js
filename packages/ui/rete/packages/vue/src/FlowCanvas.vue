@@ -1,6 +1,12 @@
 <template>
 
-<div class="rozie-flow-canvas" ref="canvasElRef" tabindex="0"></div>
+<div class="rozie-flow-canvas" ref="canvasElRef" tabindex="0">
+  
+  <div v-if="props.controls" class="rozie-flow-controls">
+    <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" @click="controlZoomIn">+</button>
+    <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" @click="controlZoomOut">&#8722;</button>
+    <button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" @click="controlFit">&#9744;</button>
+  </div></div>
 
 
 
@@ -12,8 +18,8 @@
 import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; canConnect?: ((...args: any[]) => any) | null }>(),
-  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, canConnect: null }
+  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; canConnect?: ((...args: any[]) => any) | null }>(),
+  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, canConnect: null }
 );
 
 const graph = defineModel<Record<string, any>>('graph', { default: () => ({
@@ -619,6 +625,38 @@ async function zoomTo(k: any) {
   }
   if (k !== zoom.value) zoom.value = k;
 }
+
+// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+// edit the graph). A no-op before the area mounts.
+// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+// edit the graph). A no-op before the area mounts.
+const ZOOM_STEP = 1.2;
+const clampZoom = (k: any) => {
+  let lo = typeof props.minZoom === 'number' && props.minZoom > 0 ? props.minZoom : 0.01;
+  let hi = typeof props.maxZoom === 'number' && props.maxZoom > 0 ? props.maxZoom : 100;
+  if (k < lo) return lo;
+  if (k > hi) return hi;
+  return k;
+};
+const controlZoomIn = () => {
+  if (!area) return;
+  zoomTo(clampZoom(area.area.transform.k * ZOOM_STEP));
+};
+const controlZoomOut = () => {
+  if (!area) return;
+  zoomTo(clampZoom(area.area.transform.k / ZOOM_STEP));
+};
+const controlFit = () => {
+  zoomToFit();
+};
 function getNodes() {
   if (!area) return [];
   const out = [];
@@ -1612,6 +1650,35 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnectio
     #f7f8fa;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
+.rozie-flow-controls {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.rozie-flow-controls__btn {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: 600 16px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-controls__btn:hover { background: #f1f5f9; }
+.rozie-flow-controls__btn:active { background: #e2e8f0; }
 </style>
 
 <style>

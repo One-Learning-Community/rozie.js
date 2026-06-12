@@ -839,3 +839,55 @@ for (const target of TARGETS) {
     await expect(selection).toHaveText('', { timeout: 10_000 });
   });
 }
+
+/**
+ * 7. CONTROLS WIDGET — the built-in zoom in / out / fit overlay (Win 4,
+ * quick-260611-sqa).
+ *
+ * `examples/demos/FlowCanvasDemo.rozie` leaves `controls` at its default (ON), so the
+ * built-in overlay renders. Assert the `flow-zoom-in` button is present over the canvas
+ * and clicking it drives the BOUND `readout-zoom` (= $data.zoom, two-way) — the buttons
+ * reuse the zoomTo verb which echoes $model.zoom. Then `flow-fit` is present + clickable
+ * (it calls zoomToFit; view-only, no graph mutation asserted here).
+ *
+ *   The overlay is COMPONENT-template DOM (not engine-mounted), so the locators resolve
+ *   on all 6 incl. piercing Lit's open shadow root. The button click changes the bound
+ *   zoom readout — proving the built-in control drives the live area + echoes the model.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-controls [${target}]: the built-in Controls overlay drives the bound zoom`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(3);
+
+    // the built-in Controls overlay rendered (default :controls ON).
+    const zoomInBtn = page.getByTestId('flow-zoom-in');
+    await expect(zoomInBtn).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('flow-zoom-out')).toBeVisible();
+    await expect(page.getByTestId('flow-fit')).toBeVisible();
+
+    // clicking the built-in zoom-in drives the BOUND zoom (the button reuses zoomTo →
+    // echoes $model.zoom → the demo's readout-zoom reflects it).
+    const zoomReadout = page.getByTestId('readout-zoom');
+    await expect(zoomReadout).toHaveText('1');
+    await zoomInBtn.click();
+    await expect(zoomReadout).not.toHaveText('1', { timeout: 5_000 });
+
+    // fit is present + clickable (view-only; no graph mutation).
+    await page.getByTestId('flow-fit').click();
+  });
+}

@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
 import { __rozieInjectStyle, createControllableSignal, rozieContext } from '@rozie/runtime-solid';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
@@ -27,6 +27,35 @@ __rozieInjectStyle('FlowCanvas-cd396d6a', `.rozie-flow-canvas[data-rozie-s-cd396
     #f7f8fa;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
+.rozie-flow-controls[data-rozie-s-cd396d6a] {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a] {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: 600 16px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -126,6 +155,7 @@ interface FlowCanvasProps {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  controls?: boolean;
   canConnect?: ((...args: unknown[]) => unknown) | null;
   onSelectionChange?: (...args: unknown[]) => void;
   onNodeAction?: (...args: unknown[]) => void;
@@ -160,8 +190,8 @@ export interface FlowCanvasHandle {
 }
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
-  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, canConnect: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'canConnect', 'children', 'ref']);
+  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, canConnect: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'canConnect', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, getNodes, getConnections, getTransform }); });
 
@@ -1524,6 +1554,32 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     }
     if (k !== zoom()) setZoom(k);
   }
+
+  // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+  // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+  // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+  // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+  // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+  // edit the graph). A no-op before the area mounts.
+  const ZOOM_STEP = 1.2;
+  function clampZoom(k: any) {
+    let lo = typeof local.minZoom === 'number' && local.minZoom > 0 ? local.minZoom : 0.01;
+    let hi = typeof local.maxZoom === 'number' && local.maxZoom > 0 ? local.maxZoom : 100;
+    if (k < lo) return lo;
+    if (k > hi) return hi;
+    return k;
+  }
+  function controlZoomIn() {
+    if (!area) return;
+    zoomTo(clampZoom(area.area.transform.k * ZOOM_STEP));
+  }
+  function controlZoomOut() {
+    if (!area) return;
+    zoomTo(clampZoom(area.area.transform.k / ZOOM_STEP));
+  }
+  function controlFit() {
+    zoomToFit();
+  }
   function getNodes() {
     if (!area) return [];
     const out = [];
@@ -1603,7 +1659,13 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   }
 }}>
     <>
-    <div class={"rozie-flow-canvas"} ref={(el) => { canvasElRef = el as HTMLElement; }} tabIndex={0} data-rozie-s-cd396d6a="" />
+    <div class={"rozie-flow-canvas"} ref={(el) => { canvasElRef = el as HTMLElement; }} tabIndex={0} data-rozie-s-cd396d6a="">
+      
+      {<Show when={local.controls}><div class={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
+        <button type="button" data-testid="flow-zoom-in" aria-label="Zoom in" class={"rozie-flow-controls__btn"} onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>
+        <button type="button" data-testid="flow-zoom-out" aria-label="Zoom out" class={"rozie-flow-controls__btn"} onClick={controlZoomOut} data-rozie-s-cd396d6a="">&#8722;</button>
+        <button type="button" data-testid="flow-fit" aria-label="Fit view" class={"rozie-flow-controls__btn"} onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
+      </div></Show>}</div>
 
 
 

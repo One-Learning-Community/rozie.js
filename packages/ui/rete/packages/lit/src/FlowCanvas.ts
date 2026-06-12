@@ -39,6 +39,35 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
     #f7f8fa;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
+.rozie-flow-controls[data-rozie-s-cd396d6a] {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a] {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: 600 16px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
+.rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -140,6 +169,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) accumulateOnCtrl: boolean = true;
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
+  @property({ type: Boolean, reflect: true }) controls: boolean = true;
   @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
   private _typeReg = signal({});
   private _portReg = signal({});
@@ -1340,7 +1370,13 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   render() {
     return html`
-<div class="rozie-flow-canvas" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a></div>
+<div class="rozie-flow-canvas" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a>
+  
+  ${this.controls ? html`<div class="rozie-flow-controls" data-rozie-s-cd396d6a>
+    <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-in" aria-label="Zoom in" @click=${this.controlZoomIn} data-rozie-s-cd396d6a>+</button>
+    <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-out" aria-label="Zoom out" @click=${this.controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button>
+    <button class="rozie-flow-controls__btn" type="button" data-testid="flow-fit" aria-label="Fit view" @click=${this.controlFit} data-rozie-s-cd396d6a>&#9744;</button>
+  </div>` : nothing}</div>
 
 <slot name="node"></slot>
 
@@ -1670,6 +1706,30 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     }
     if (k !== this.zoom) this._zoomControllable.write(k);
   }
+
+  ZOOM_STEP = 1.2;
+
+  clampZoom = (k: any) => {
+  let lo = typeof this.minZoom === 'number' && this.minZoom > 0 ? this.minZoom : 0.01;
+  let hi = typeof this.maxZoom === 'number' && this.maxZoom > 0 ? this.maxZoom : 100;
+  if (k < lo) return lo;
+  if (k > hi) return hi;
+  return k;
+};
+
+  controlZoomIn = () => {
+  if (!this.area) return;
+  this.zoomTo(this.clampZoom(this.area.area.transform.k * this.ZOOM_STEP));
+};
+
+  controlZoomOut = () => {
+  if (!this.area) return;
+  this.zoomTo(this.clampZoom(this.area.area.transform.k / this.ZOOM_STEP));
+};
+
+  controlFit = () => {
+  this.zoomToFit();
+};
 
   getNodes() {
     if (!this.area) return [];

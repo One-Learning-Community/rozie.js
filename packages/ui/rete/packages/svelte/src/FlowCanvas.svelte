@@ -18,6 +18,7 @@ interface Props {
   accumulateOnCtrl?: boolean;
   curvature?: number;
   fitOnMount?: boolean;
+  controls?: boolean;
   canConnect?: ((...args: any[]) => any) | null;
   node?: Snippet<[{ node: any; selected: any; emit: any }]>;
   children?: Snippet;
@@ -50,6 +51,7 @@ let {
   accumulateOnCtrl = true,
   curvature = 0.3,
   fitOnMount = true,
+  controls = true,
   canConnect = null,
   node: __nodeProp,
   children: __childrenProp,
@@ -646,6 +648,38 @@ export async function zoomTo(k: any) {
   }
   if (k !== zoom) zoom = k;
 }
+
+// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+// edit the graph). A no-op before the area mounts.
+// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
+// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
+// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
+// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
+// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
+// edit the graph). A no-op before the area mounts.
+const ZOOM_STEP = 1.2;
+const clampZoom = (k: any) => {
+  let lo = typeof minZoom === 'number' && minZoom > 0 ? minZoom : 0.01;
+  let hi = typeof maxZoom === 'number' && maxZoom > 0 ? maxZoom : 100;
+  if (k < lo) return lo;
+  if (k > hi) return hi;
+  return k;
+};
+const controlZoomIn = () => {
+  if (!area) return;
+  zoomTo(clampZoom(area.area.transform.k * ZOOM_STEP));
+};
+const controlZoomOut = () => {
+  if (!area) return;
+  zoomTo(clampZoom(area.area.transform.k / ZOOM_STEP));
+};
+const controlFit = () => {
+  zoomToFit();
+};
 export function getNodes() {
   if (!area) return [];
   const out = [];
@@ -1625,7 +1659,7 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-<div class="rozie-flow-canvas" bind:this={canvasEl} tabindex="0" data-rozie-s-cd396d6a></div>{@render children?.()}
+<div class="rozie-flow-canvas" bind:this={canvasEl} tabindex="0" data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button></div>{/if}</div>{@render children?.()}
 
 <style>
 :global {
@@ -1641,6 +1675,35 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
       #f7f8fa;
     border: 1px solid rgba(0, 0, 0, 0.1);
   }
+  .rozie-flow-controls[data-rozie-s-cd396d6a] {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    pointer-events: none;
+  }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a] {
+    pointer-events: auto;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font: 600 16px/1 system-ui, sans-serif;
+    color: #334155;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.16);
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+    cursor: pointer;
+    user-select: none;
+  }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
 }
 
 :global {

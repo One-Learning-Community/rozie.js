@@ -63,6 +63,7 @@ export class DemoComponent {
 | `accumulateOnCtrl` | `Boolean` | `true` |  |  |
 | `curvature` | `Number` | `0.3` |  |  |
 | `fitOnMount` | `Boolean` | `true` |  |  |
+| `controls` | `Boolean` | `true` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 
 ## Events

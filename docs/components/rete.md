@@ -167,6 +167,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `accumulateOnCtrl` | `Boolean` | `true` | | When selectable, hold Ctrl to add to the current selection instead of replacing it. |
 | `curvature` | `Number` | `0.3` | | The bezier curvature of connection paths (`classicConnectionPath`). |
 | `fitOnMount` | `Boolean` | `true` | | After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`). |
+| `controls` | `Boolean` | `true` | | Render the built-in **Controls overlay** — a zoom in / zoom out / fit-view button cluster over the canvas (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo` / `zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly` (zoom/fit are view-only). Opt out with `:controls="false"`. |
 | `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in **addition** to the automatic `:validate-types` check (the custom-rule override). Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent / `null` imposes no custom rule. |
 
 ### Events

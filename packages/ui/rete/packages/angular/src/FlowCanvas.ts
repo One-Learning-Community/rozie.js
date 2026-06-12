@@ -43,7 +43,15 @@ function rozieToken(key: string): InjectionToken<unknown> {
   imports: [NgTemplateOutlet],
   template: `
 
-    <div class="rozie-flow-canvas" #canvasEl tabindex="0"></div>
+    <div class="rozie-flow-canvas" #canvasEl tabindex="0">
+      
+      @if (controls()) {
+    <div class="rozie-flow-controls">
+        <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" (click)="controlZoomIn()">+</button>
+        <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" (click)="controlZoomOut()">&#8722;</button>
+        <button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" (click)="controlFit()">&#9744;</button>
+      </div>
+    }</div>
 
 
 
@@ -63,6 +71,35 @@ function rozieToken(key: string): InjectionToken<unknown> {
         #f7f8fa;
       border: 1px solid rgba(0, 0, 0, 0.1);
     }
+    .rozie-flow-controls {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      pointer-events: none;
+    }
+    .rozie-flow-controls__btn {
+      pointer-events: auto;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font: 600 16px/1 system-ui, sans-serif;
+      color: #334155;
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.16);
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+      cursor: pointer;
+      user-select: none;
+    }
+    .rozie-flow-controls__btn:hover { background: #f1f5f9; }
+    .rozie-flow-controls__btn:active { background: #e2e8f0; }
 
     ::ng-deep .rozie-flow-canvas .rozie-flow-node {
         display: grid;
@@ -218,6 +255,7 @@ export class FlowCanvas {
   accumulateOnCtrl = input<boolean>(true);
   curvature = input<number>(0.3);
   fitOnMount = input<boolean>(true);
+  controls = input<boolean>(true);
   canConnect = input<((...args: unknown[]) => unknown) | null>(null);
   typeReg = signal({});
   portReg = signal({});
@@ -1515,6 +1553,27 @@ export class FlowCanvas {
       this.programmatic--;
     }
     if (k !== this.zoom()) this.zoom.set(k);
+  };
+  ZOOM_STEP = 1.2;
+  clampZoom = (k: any) => {
+    const __minZoom = this.minZoom();
+    const __maxZoom = this.maxZoom();
+    let lo = typeof __minZoom === 'number' && __minZoom > 0 ? __minZoom : 0.01;
+    let hi = typeof __maxZoom === 'number' && __maxZoom > 0 ? __maxZoom : 100;
+    if (k < lo) return lo;
+    if (k > hi) return hi;
+    return k;
+  };
+  controlZoomIn = () => {
+    if (!this.area) return;
+    this.zoomTo(this.clampZoom(this.area.area.transform.k * this.ZOOM_STEP));
+  };
+  controlZoomOut = () => {
+    if (!this.area) return;
+    this.zoomTo(this.clampZoom(this.area.area.transform.k / this.ZOOM_STEP));
+  };
+  controlFit = () => {
+    this.zoomToFit();
   };
   getNodes = () => {
     if (!this.area) return [];

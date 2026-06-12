@@ -30,10 +30,12 @@ const EXPECT = {
   name: 'FlowCanvas',
   // Phase 41 controlled-graph: the one-way `nodes`/`connections` props are GONE,
   // replaced by the single two-way `graph` model + the `validateTypes` toggle.
+  // `controls` (Win 4, quick-260611-sqa) = the built-in zoom/fit overlay toggle
+  // (Boolean, default ON; :controls="false" opts out).
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
-    'curvature', 'fitOnMount', 'canConnect',
+    'curvature', 'fitOnMount', 'controls', 'canConnect',
   ],
   // `graph` + `zoom` are both two-way (the bound graph is the source of truth +
   // write-back target; zoom is the viewport binding). Neither is a same-named emit
@@ -79,7 +81,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (14 props)', () => {
+  it('props surface matches (15 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
