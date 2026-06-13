@@ -381,6 +381,39 @@ describe('rewriteRozieIdentifiers — $snapshot and computed', () => {
   });
 });
 
+// Phase 45 — $clone(x) → structuredClone(x). Solid accessor reads (_props.X()
+// / state getters) yield plain values, so there is no reactive proxy to
+// unwrap; a direct structuredClone gives the independent deep copy (D-01).
+describe('rewriteRozieIdentifiers — $clone', () => {
+  it('$clone($data.config) → structuredClone(config()) (NOT toRaw / $state.snapshot)', () => {
+    const ir = buildIR({ state: [state('config')] });
+    const out = rewrite('const c = $clone($data.config);', ir).code;
+    expect(out).toContain('structuredClone(');
+    expect(out).not.toContain('$clone');
+    expect(out).not.toContain('toRaw');
+    expect(out).not.toContain('$state.snapshot');
+  });
+
+  it("$clone's argument reactive reads still lower (no path.skip)", () => {
+    // $data.config getter read → config() inside the clone, proving the arg
+    // is still traversed.
+    const ir = buildIR({ state: [state('config')] });
+    const out = rewrite('const c = $clone($data.config);', ir).code;
+    expect(out).toContain('structuredClone(config())');
+    expect(out).not.toContain('$data.');
+  });
+
+  it('$clone(a, b) is left untouched (arity !== 1)', () => {
+    const ir = buildIR();
+    expect(rewrite('$clone(a, b);', ir).code).toContain('$clone(a, b);');
+  });
+
+  it('$clone(...x) (spread arg) is left untouched', () => {
+    const ir = buildIR();
+    expect(rewrite('$clone(...x);', ir).code).toContain('$clone(...x);');
+  });
+});
+
 describe('rewriteRozieIdentifiers — Identifier-visitor skips', () => {
   it('computed name already a call callee stays a single call', () => {
     const ir = buildIR({ computed: [computed('total')] });
