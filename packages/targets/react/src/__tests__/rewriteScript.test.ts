@@ -365,3 +365,75 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     ).not.toThrow();
   });
 });
+
+// Phase 45 — $clone(x) → structuredClone(x). React props/state are plain JS
+// values (no reactive proxy), so a direct structuredClone gives the
+// independent deep copy safe for undo/history stacks (D-01 plain leg).
+describe('rewriteRozieIdentifiers (React) — $clone', () => {
+  function cloneIR(
+    overrides: Partial<
+      Pick<
+        IRComponent,
+        'props' | 'state' | 'refs' | 'computed' | 'emits' | 'lifecycle' | 'listeners' | 'slots'
+      >
+    > = {},
+  ): IRComponent {
+    return {
+      type: 'IRComponent',
+      name: 'Synthetic',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      listeners: [],
+      ...overrides,
+    } as unknown as IRComponent;
+  }
+
+  it('$clone($props.x) → structuredClone(...) (NOT toRaw / $state.snapshot)', () => {
+    const program = babelParse(`const c = $clone($props.x);\n`, { sourceType: 'module' });
+    rewriteRozieIdentifiers(program, cloneIR());
+    const out = generate(program).code;
+    expect(out).toContain('structuredClone(');
+    expect(out).not.toContain('$clone');
+    expect(out).not.toContain('toRaw');
+    expect(out).not.toContain('$state.snapshot');
+  });
+
+  it("$clone's argument reactive reads still lower (no path.skip)", () => {
+    // $data.graph is a registered state read → lowers to `graph` inside the
+    // clone, proving the argument is still traversed (no path.skip).
+    const program = babelParse(`const c = $clone($data.graph);\n`, { sourceType: 'module' });
+    rewriteRozieIdentifiers(
+      program,
+      cloneIR({
+        state: [
+          {
+            type: 'StateDecl',
+            name: 'graph',
+            initializer: t.objectExpression([]),
+            sourceLoc: { start: 0, end: 0 },
+          },
+        ] as IRComponent['state'],
+      }),
+    );
+    const out = generate(program).code;
+    expect(out).toContain('structuredClone(graph)');
+    expect(out).not.toContain('$data.');
+  });
+
+  it('$clone(a, b) is left untouched (arity !== 1)', () => {
+    const program = babelParse(`$clone(a, b);\n`, { sourceType: 'module' });
+    rewriteRozieIdentifiers(program, cloneIR());
+    expect(generate(program).code).toContain('$clone(a, b);');
+  });
+
+  it('$clone(...x) (spread arg) is left untouched', () => {
+    const program = babelParse(`$clone(...x);\n`, { sourceType: 'module' });
+    rewriteRozieIdentifiers(program, cloneIR());
+    expect(generate(program).code).toContain('$clone(...x);');
+  });
+});

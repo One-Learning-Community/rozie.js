@@ -878,6 +878,23 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 45 — $clone(x) → structuredClone(x) (D-01 plain leg). React
+      // props/state are plain JS values, so there is no reactive proxy to
+      // unwrap (no toRaw / $state.snapshot — those are Vue/Svelte-only); a
+      // direct structuredClone gives an independent deep copy safe for
+      // undo/history stacks. Do NOT path.skip(): the single argument may carry
+      // $props/$data reactive reads that still need per-target lowering.
+      if (callee.name === '$clone') {
+        const args = path.node.arguments;
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) {
+            path.replaceWith(t.callExpression(t.identifier('structuredClone'), [arg]));
+          }
+        }
+        return;
+      }
+
       // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
       // the sigil exists for the Lit target only — React's keyed reconciler
       // diffs against live DOM at patch time, so the in-source DOM-restore
