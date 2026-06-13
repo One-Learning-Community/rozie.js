@@ -622,6 +622,56 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     });
     this.editor.use(this.area);
     this.area.use(this.connectionPlugin);
+
+    // ── T2.5 RECONNECT coalescing pipe (D-08 reconnectable edges, D-03 one-gesture-one-entry) ──
+    // `connectionpick` / `connectiondrop` are emitted on the ConnectionPlugin's OWN scope (they
+    // are NOT editor signals like connectioncreated/removed, nor area signals like nodepicked),
+    // so they must be observed via a pipe attached DIRECTLY to `connectionPlugin` — they do not
+    // propagate into editor.addPipe / area.addPipe. Grabbing an already-connected input socket
+    // fires connectionpick, then the classic preset removes the old edge + (on drop over a new
+    // socket) adds a new one — a remove+add pair that would push TWO history entries (Pitfall 2).
+    // We open a reconnect-in-flight window on connectionpick (capturing the PRE-gesture snapshot
+    // ONCE) and close it on connectiondrop (pushing that single snapshot iff the gesture actually
+    // changed the graph) — so the whole reconnect is ONE undoable step.
+    // ── T2.5 RECONNECT coalescing pipe (D-08 reconnectable edges, D-03 one-gesture-one-entry) ──
+    // `connectionpick` / `connectiondrop` are emitted on the ConnectionPlugin's OWN scope (they
+    // are NOT editor signals like connectioncreated/removed, nor area signals like nodepicked),
+    // so they must be observed via a pipe attached DIRECTLY to `connectionPlugin` — they do not
+    // propagate into editor.addPipe / area.addPipe. Grabbing an already-connected input socket
+    // fires connectionpick, then the classic preset removes the old edge + (on drop over a new
+    // socket) adds a new one — a remove+add pair that would push TWO history entries (Pitfall 2).
+    // We open a reconnect-in-flight window on connectionpick (capturing the PRE-gesture snapshot
+    // ONCE) and close it on connectiondrop (pushing that single snapshot iff the gesture actually
+    // changed the graph) — so the whole reconnect is ONE undoable step.
+    this.connectionPlugin.addPipe((context: any) => {
+      if (!context || typeof context !== 'object' || !('type' in context)) return context;
+      if (context.type === 'connectionpick') {
+        // Open the coalesce window + capture the pre-gesture snapshot once. Gated on
+        // !programmatic + history (a restore-driven engine op must not record history). A
+        // re-pick while a close is pending cancels the pending close (the gesture continues).
+        if (!this.programmatic && this.history !== false) {
+          this.reconnectInFlight++;
+          this.reconnectPreSnapshot = this.snapshotCurrent();
+          this.reconnectDidWriteBack = false;
+          this.reconnectCloseScheduled = false;
+        }
+      } else if (context.type === 'connectiondrop') {
+        // The gesture ended. CRITICAL ORDERING: the classic preset emits `connectiondrop`
+        // BEFORE the editor's `connectionremoved` / `connectioncreated` signals fire (the
+        // pseudo-connection is dropped, THEN the real add/remove run — verified in the event
+        // trace: drop → connectioncreate → connectioncreated → connectionremove →
+        // connectionremoved). So we must NOT close the window synchronously here, or the
+        // trailing writeBacks would run with inFlight=0 and each push its own (wrong) history
+        // entry. Instead DEFER the close to a macrotask (setTimeout 0), which runs after all
+        // the synchronous + microtask writeBack signals have settled. The window stays open
+        // across the remove+add (both suppress their per-event push, setting
+        // reconnectDidWriteBack), then closeReconnectGesture pushes the SINGLE pre-gesture
+        // snapshot iff the graph actually changed. Re-entrant picks can't desync because the
+        // close is gated on a one-shot scheduled flag.
+        this.scheduleReconnectClose();
+      }
+      return context;
+    });
     // The socket-position watcher (and, conceptually, our vanilla "render plugin")
     // must attach to a CHILD scope of the area — `attach` calls
     // `scope.parentScope(BaseAreaPlugin)`, which walks UP one level, so the scope's
@@ -1540,37 +1590,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           bubbles: true,
           composed: true
         }));
-      } else if (context.type === 'connectionpick') {
-        // T2.5 — the user grabbed a socket to start a connect/reconnect gesture. Mark a
-        // reconnect-in-flight window so the per-event history pushes (writeBackConnection*)
-        // are suppressed; capture the PRE-gesture snapshot ONCE here so the whole gesture
-        // coalesces to a SINGLE undo entry pushed on connectiondrop (D-03). Gated on
-        // !programmatic + history (a restore-driven engine op must not record history).
-        if (!this.programmatic && this.history !== false) {
-          this.reconnectInFlight++;
-          this.reconnectPreSnapshot = this.snapshotCurrent();
-          this.reconnectDidWriteBack = false;
-        }
-      } else if (context.type === 'connectiondrop') {
-        // T2.5 — the gesture ended. created:true → the endpoint landed on a new socket (a
-        // real reconnect: one connectionremoved + one connectioncreated already wrote back
-        // the graph) OR a fresh connection was drawn; created:false → dropped on the empty
-        // pane (the edge was removed with no re-add). EITHER way, IF the gesture actually
-        // changed the graph (reconnectDidWriteBack — a remove and/or add ran), the net change
-        // is one user gesture → push the SINGLE pre-gesture snapshot captured on connectionpick,
-        // restoring the pre-reconnect state in one undo step. A pick→drop that changed nothing
-        // (clicked a socket, released with no edge created/removed) pushes NOTHING (no empty
-        // history entry). Then clear the flag + per-gesture state.
-        if (this.reconnectInFlight > 0) {
-          this.reconnectInFlight--;
-          if (this.reconnectInFlight === 0) {
-            if (!this.programmatic && this.history !== false && this.reconnectDidWriteBack && this.reconnectPreSnapshot) {
-              this.pushHistorySnapshot(this.reconnectPreSnapshot);
-            }
-            this.reconnectPreSnapshot = null;
-            this.reconnectDidWriteBack = false;
-          }
-        }
       }
       return context;
     });
@@ -2335,6 +2354,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   reconnectDidWriteBack = false;
 
+  reconnectCloseScheduled = false;
+
   pendingDragPositions = new Map();
 
   dragFlushRaf = 0;
@@ -2387,6 +2408,23 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   if (this.programmatic) return;
   if (this.history === false) return;
   this.pushHistorySnapshot(this.snapshotCurrent());
+};
+
+  closeReconnectGesture = () => {
+  if (!this.reconnectCloseScheduled) return;
+  this.reconnectCloseScheduled = false;
+  if (this.reconnectInFlight > 0) this.reconnectInFlight = 0;
+  if (!this.programmatic && this.history !== false && this.reconnectDidWriteBack && this.reconnectPreSnapshot) {
+    this.pushHistorySnapshot(this.reconnectPreSnapshot);
+  }
+  this.reconnectPreSnapshot = null;
+  this.reconnectDidWriteBack = false;
+};
+
+  scheduleReconnectClose = () => {
+  if (this.reconnectCloseScheduled) return;
+  this.reconnectCloseScheduled = true;
+  if (typeof setTimeout === 'function') setTimeout(this.closeReconnectGesture, 0);else Promise.resolve().then(this.closeReconnectGesture);
 };
 
   restoreGraph = (snap: any) => {

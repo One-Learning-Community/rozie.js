@@ -1,0 +1,138 @@
+<!--
+  FlowCanvasReconnectDemo.rozie — BEHAVIORAL consumer for Phase 44 T2.5 (D-08, D-03):
+  reconnectable edges + undo coalescing. The shipped classic connection preset ALREADY
+  supports reconnect: grabbing an existing edge's input endpoint and dropping it on a
+  different socket fires connectionremoved + connectioncreated, which the canvas writes
+  back as ONE net change to the bound `graph.connections`. The T2.5 work is undo
+  granularity — that whole reconnect counts as ONE undoable gesture.
+
+  The graph: a `source` node (one output `out`) and a `sink` node with TWO input sockets
+  (`in1`, `in2`). One seeded connection source.out → sink.in1. Dragging the edge's input
+  endpoint from `in1` to `in2` rewrites `connections[0].targetInput` to 'in2' in ONE graph
+  write-back (edge COUNT unchanged: one removed + one added). Clicking `undo` ONCE restores
+  `targetInput` to 'in1' — proving the paired remove+add coalesced into a SINGLE history
+  entry (a double-entry would need two undos to fully revert).
+
+  Readouts (asserted SETTLED only — drag is velocity-flaky, never a mid-drag endpoint):
+    - `conn0-target-input` = graph.connections[0].targetInput (the reconnect target)
+    - `connection-count`    = graph.connections.length (must stay 1 across a reconnect)
+    - `undo-btn`            = calls the canvas's undo() $expose verb
+  Behavioral-only; NOT a screenshot cell.
+-->
+
+<rozie name="FlowCanvasReconnectDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  graph: {
+    nodes: [
+      { id: 'source', type: 'src',  x: 40,  y: 80,  data: { label: 'Source' } },
+      { id: 'sink',   type: 'sink', x: 340, y: 80,  data: { label: 'Sink' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'source', sourceOutput: 'out', target: 'sink', targetInput: 'in1' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive undo() — read in the
+// button handler (post-mount), never eagerly (ROZ123-safe).
+const doUndo = () => { const c = $refs.canvas; if (c && c.undo) c.undo() }
+
+// Defensive readouts: a reconnect writes the graph back in TWO steps (connectionremoved →
+// connections:[], then connectioncreated → connections:[new]), so a render between the two
+// commits sees an EMPTY connections array. Reading `connections[0].targetInput` directly
+// would throw mid-reconnect; these derive the readouts safely (the targetInput readout shows
+// '—' for the transient empty frame, then settles to the new target).
+const conn0Target = $computed(() => {
+  const cs = $data.graph && $data.graph.connections
+  return cs && cs.length > 0 && cs[0] ? cs[0].targetInput : '—'
+})
+const connCount = $computed(() => {
+  const cs = $data.graph && $data.graph.connections
+  return Array.isArray(cs) ? cs.length : 0
+})
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — reconnectable edges (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="undo-btn" @click="doUndo">undo</button>
+    <span class="readout">
+      edge[0] target: <b data-testid="conn0-target-input">{{ conn0Target }}</b>
+    </span>
+    <span class="readout">
+      edges: <b data-testid="connection-count">{{ connCount }}</b>
+    </span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="src">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port output="out" label="out" />
+      </NodeType>
+      <NodeType type="sink">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in1" label="in1" />
+        <Port input="in2" label="in2" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.controls button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

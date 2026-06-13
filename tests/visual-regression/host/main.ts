@@ -398,6 +398,15 @@ export const EXAMPLES = [
   // then sets mode='pan' and does the same drag → asserts viewport-x changed (panned) with no
   // new selection. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasMarquee',
+  // Phase 44 T2.5 (D-08, D-03, reconnectable edges) — FlowCanvasReconnect is the BEHAVIORAL
+  // cell (loader → examples/demos/FlowCanvasReconnectDemo.rozie): a source→sink graph where
+  // sink has TWO input sockets (in1/in2) and one seeded edge into in1. The spec
+  // (rete-flow-reconnect) drags the edge's input endpoint from in1 to in2 → asserts
+  // conn0-target-input changed to 'in2' (SETTLED) AND connection-count stayed 1 (one removed
+  // + one added), then clicks undo ONCE → asserts conn0-target-input returns to 'in1'
+  // (proving the reconnect coalesced into ONE history entry). Behavioral-only; NOT a
+  // screenshot cell.
+  'FlowCanvasReconnect',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -571,6 +580,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasUndo: 'rozie-flow-canvas-undo',
   // Phase 44 marquee cell — '-demo' appended → 'rozie-flow-canvas-marquee-demo'.
   FlowCanvasMarquee: 'rozie-flow-canvas-marquee',
+  // Phase 44 reconnect cell — '-demo' appended → 'rozie-flow-canvas-reconnect-demo'.
+  FlowCanvasReconnect: 'rozie-flow-canvas-reconnect',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -772,6 +783,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // internally via r-model:mode + a mode-btn toggle, :marquee ON). No parent props; no
   // MODEL_PROPS entry (mode is bound internally — the FlowCanvas/MapLibre precedent).
   FlowCanvasMarquee: {},
+  // Phase 44 — FlowCanvasReconnectDemo is self-contained (seeds its own source→sink graph
+  // with a two-input sink + one edge into in1). No parent props; no MODEL_PROPS entry
+  // (graph/zoom are bound internally — the FlowCanvas precedent).
+  FlowCanvasReconnect: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

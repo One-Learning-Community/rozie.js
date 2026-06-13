@@ -373,6 +373,13 @@ let reconnectPreSnapshot: any = null;
 // connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
 // pane with no edge created/removed) does NOT push an empty history entry.
 let reconnectDidWriteBack = false;
+// One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
+// writeBacks, so the window must close on a macrotask AFTER they settle — see the
+// connectiondrop branch). A re-pick before the deferred close runs cancels it.
+// One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
+// writeBacks, so the window must close on a macrotask AFTER they settle — see the
+// connectiondrop branch). A re-pick before the deferred close runs cancels it.
+let reconnectCloseScheduled = false;
 
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
@@ -519,6 +526,40 @@ const pushHistory = () => {
   if (programmatic) return;
   if (props.history === false) return;
   pushHistorySnapshot(snapshotCurrent());
+};
+
+// T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
+// connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
+// the classic preset fires AFTER the drop) have all run with the window still open
+// (suppressing their per-event pushHistory, flagging reconnectDidWriteBack). Pushes the
+// SINGLE pre-gesture snapshot iff the gesture actually changed the graph, then resets the
+// per-gesture state. Idempotent + gated on the one-shot scheduled flag so a re-pick can
+// cancel a pending close.
+// T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
+// connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
+// the classic preset fires AFTER the drop) have all run with the window still open
+// (suppressing their per-event pushHistory, flagging reconnectDidWriteBack). Pushes the
+// SINGLE pre-gesture snapshot iff the gesture actually changed the graph, then resets the
+// per-gesture state. Idempotent + gated on the one-shot scheduled flag so a re-pick can
+// cancel a pending close.
+const closeReconnectGesture = () => {
+  if (!reconnectCloseScheduled) return;
+  reconnectCloseScheduled = false;
+  if (reconnectInFlight > 0) reconnectInFlight = 0;
+  if (!programmatic && props.history !== false && reconnectDidWriteBack && reconnectPreSnapshot) {
+    pushHistorySnapshot(reconnectPreSnapshot);
+  }
+  reconnectPreSnapshot = null;
+  reconnectDidWriteBack = false;
+};
+// Schedule the deferred close on a macrotask (setTimeout 0) — runs after the synchronous +
+// microtask writeBack signals settle. Falls back to a microtask where setTimeout is absent.
+// Schedule the deferred close on a macrotask (setTimeout 0) — runs after the synchronous +
+// microtask writeBack signals settle. Falls back to a microtask where setTimeout is absent.
+const scheduleReconnectClose = () => {
+  if (reconnectCloseScheduled) return;
+  reconnectCloseScheduled = true;
+  if (typeof setTimeout === 'function') setTimeout(closeReconnectGesture, 0);else Promise.resolve().then(closeReconnectGesture);
 };
 
 // T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
@@ -1398,6 +1439,46 @@ onMounted(() => {
   });
   editor.use(area);
   area.use(connectionPlugin);
+
+  // ── T2.5 RECONNECT coalescing pipe (D-08 reconnectable edges, D-03 one-gesture-one-entry) ──
+  // `connectionpick` / `connectiondrop` are emitted on the ConnectionPlugin's OWN scope (they
+  // are NOT editor signals like connectioncreated/removed, nor area signals like nodepicked),
+  // so they must be observed via a pipe attached DIRECTLY to `connectionPlugin` — they do not
+  // propagate into editor.addPipe / area.addPipe. Grabbing an already-connected input socket
+  // fires connectionpick, then the classic preset removes the old edge + (on drop over a new
+  // socket) adds a new one — a remove+add pair that would push TWO history entries (Pitfall 2).
+  // We open a reconnect-in-flight window on connectionpick (capturing the PRE-gesture snapshot
+  // ONCE) and close it on connectiondrop (pushing that single snapshot iff the gesture actually
+  // changed the graph) — so the whole reconnect is ONE undoable step.
+  connectionPlugin.addPipe((context: any) => {
+    if (!context || typeof context !== 'object' || !('type' in context)) return context;
+    if (context.type === 'connectionpick') {
+      // Open the coalesce window + capture the pre-gesture snapshot once. Gated on
+      // !programmatic + history (a restore-driven engine op must not record history). A
+      // re-pick while a close is pending cancels the pending close (the gesture continues).
+      if (!programmatic && props.history !== false) {
+        reconnectInFlight++;
+        reconnectPreSnapshot = snapshotCurrent();
+        reconnectDidWriteBack = false;
+        reconnectCloseScheduled = false;
+      }
+    } else if (context.type === 'connectiondrop') {
+      // The gesture ended. CRITICAL ORDERING: the classic preset emits `connectiondrop`
+      // BEFORE the editor's `connectionremoved` / `connectioncreated` signals fire (the
+      // pseudo-connection is dropped, THEN the real add/remove run — verified in the event
+      // trace: drop → connectioncreate → connectioncreated → connectionremove →
+      // connectionremoved). So we must NOT close the window synchronously here, or the
+      // trailing writeBacks would run with inFlight=0 and each push its own (wrong) history
+      // entry. Instead DEFER the close to a macrotask (setTimeout 0), which runs after all
+      // the synchronous + microtask writeBack signals have settled. The window stays open
+      // across the remove+add (both suppress their per-event push, setting
+      // reconnectDidWriteBack), then closeReconnectGesture pushes the SINGLE pre-gesture
+      // snapshot iff the graph actually changed. Re-entrant picks can't desync because the
+      // close is gated on a one-shot scheduled flag.
+      scheduleReconnectClose();
+    }
+    return context;
+  });
   // The socket-position watcher (and, conceptually, our vanilla "render plugin")
   // must attach to a CHILD scope of the area — `attach` calls
   // `scope.parentScope(BaseAreaPlugin)`, which walks UP one level, so the scope's
@@ -2185,37 +2266,6 @@ onMounted(() => {
       emit('context-menu', {
         id: ctx && ctx.id ? ctx.id : null
       });
-    } else if (context.type === 'connectionpick') {
-      // T2.5 — the user grabbed a socket to start a connect/reconnect gesture. Mark a
-      // reconnect-in-flight window so the per-event history pushes (writeBackConnection*)
-      // are suppressed; capture the PRE-gesture snapshot ONCE here so the whole gesture
-      // coalesces to a SINGLE undo entry pushed on connectiondrop (D-03). Gated on
-      // !programmatic + history (a restore-driven engine op must not record history).
-      if (!programmatic && props.history !== false) {
-        reconnectInFlight++;
-        reconnectPreSnapshot = snapshotCurrent();
-        reconnectDidWriteBack = false;
-      }
-    } else if (context.type === 'connectiondrop') {
-      // T2.5 — the gesture ended. created:true → the endpoint landed on a new socket (a
-      // real reconnect: one connectionremoved + one connectioncreated already wrote back
-      // the graph) OR a fresh connection was drawn; created:false → dropped on the empty
-      // pane (the edge was removed with no re-add). EITHER way, IF the gesture actually
-      // changed the graph (reconnectDidWriteBack — a remove and/or add ran), the net change
-      // is one user gesture → push the SINGLE pre-gesture snapshot captured on connectionpick,
-      // restoring the pre-reconnect state in one undo step. A pick→drop that changed nothing
-      // (clicked a socket, released with no edge created/removed) pushes NOTHING (no empty
-      // history entry). Then clear the flag + per-gesture state.
-      if (reconnectInFlight > 0) {
-        reconnectInFlight--;
-        if (reconnectInFlight === 0) {
-          if (!programmatic && props.history !== false && reconnectDidWriteBack && reconnectPreSnapshot) {
-            pushHistorySnapshot(reconnectPreSnapshot);
-          }
-          reconnectPreSnapshot = null;
-          reconnectDidWriteBack = false;
-        }
-      }
     }
     return context;
   });

@@ -1681,3 +1681,118 @@ for (const target of TARGETS) {
     ).toBeLessThanOrEqual(selectedSettled);
   });
 }
+
+/**
+ * 12. RECONNECTABLE EDGES — reconnect coalesces to ONE undo entry (Phase 44 T2.5, D-08/D-03).
+ *
+ * `examples/demos/FlowCanvasReconnectDemo.rozie` binds a source→sink controlled graph where
+ * the `sink` node has TWO input sockets (in1/in2) and one seeded edge source.out → sink.in1.
+ * Dragging the edge's INPUT endpoint from in1 to in2 is the shipped classic-preset reconnect
+ * (one connectionremoved + one connectioncreated, net ONE graph change). Proves on all 6:
+ *
+ *   1. RECONNECT WRITE-BACK — after dragging the in1 endpoint to in2, `conn0-target-input`
+ *      (= graph.connections[0].targetInput) SETTLES to 'in2', and `connection-count` stays
+ *      '1' (one removed + one added — the edge count is unchanged across a reconnect).
+ *   2. ONE GESTURE = ONE UNDO ENTRY — clicking `undo-btn` ONCE restores `conn0-target-input`
+ *      to 'in1'. A double-history-entry (the Pitfall-2 bug) would need TWO undos to fully
+ *      revert; a single undo restoring the original target proves the paired remove+add
+ *      coalesced into ONE history entry.
+ *
+ * Asserts the SETTLED readouts only (the bound model after the gesture flushes), never a
+ * mid-drag endpoint (drag velocity is flaky). No `toHaveScreenshot` — behavioral cell.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-reconnect [${target}]: drag an edge endpoint to a new socket = ONE undoable reconnect`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasReconnect&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // the source + sink nodes render (sink carries the two input sockets).
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+    // the seeded edge is committed + drawn before we reconnect it.
+    await expect
+      .poll(
+        async () =>
+          page
+            .locator('.rozie-flow-connection__path')
+            .evaluateAll(
+              (els) =>
+                els.filter((e) => (e.getAttribute('d') || '').trim().length > 0)
+                  .length,
+            ),
+        { timeout: 10_000, intervals: [100, 300, 600, 1000] },
+      )
+      .toBeGreaterThanOrEqual(1);
+
+    const conn0Target = page.getByTestId('conn0-target-input');
+    const connCount = page.getByTestId('connection-count');
+
+    // ---- capture the PRE-reconnect bound state (edge into in1, one edge) ----
+    await expect(conn0Target).toHaveText('in1', { timeout: 10_000 });
+    await expect(connCount).toHaveText('1');
+
+    // Locate the sink's two input sockets by their port-row label (in1 / in2). Each port
+    // row is `.rozie-flow-port--input` carrying its `.rozie-flow-port__label`; pick the row
+    // whose label matches, then its socket.
+    const inputSocket = (label: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: 'Sink' })
+        .locator('.rozie-flow-port--input', { hasText: label })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (loc: ReturnType<typeof inputSocket>) => {
+      await expect(loc).toBeVisible({ timeout: 10_000 });
+      const box = await loc.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    const in1 = await center(inputSocket('in1'));
+    const in2 = await center(inputSocket('in2'));
+    const midX = (in1.x + in2.x) / 2;
+    const midY = (in1.y + in2.y) / 2;
+
+    // ---- 1. RECONNECT: grab the edge's in1 endpoint, drag it onto in2, drop ----
+    // Grabbing an already-connected input socket starts the classic-preset reconnect:
+    // the existing edge is removed and a pseudo-connection follows the pointer; dropping on
+    // in2 commits source.out → sink.in2.
+    await page.mouse.move(in1.x, in1.y);
+    await page.mouse.down();
+    await page.mouse.move(midX, midY, { steps: 8 });
+    await page.mouse.move(in2.x, in2.y, { steps: 8 });
+    await page.mouse.up();
+
+    // the reconnect committed: the bound edge[0] now targets in2 (SETTLED), and the edge
+    // COUNT is unchanged (one removed + one added → still exactly one edge).
+    await expect(conn0Target).toHaveText('in2', {
+      timeout: 10_000,
+    });
+    await expect(connCount).toHaveText('1');
+    // settle + re-sample: the target holds (no write-back→reconcile oscillation).
+    await page.waitForTimeout(500);
+    await expect(conn0Target).toHaveText('in2');
+    await expect(connCount).toHaveText('1');
+
+    // ---- 2. ONE UNDO restores the original target (proves the gesture coalesced) ----
+    await page.getByTestId('undo-btn').click();
+    await expect(conn0Target).toHaveText('in1', {
+      timeout: 10_000,
+    });
+    // a SINGLE undo fully reverts the reconnect and holds (a double-entry bug would leave
+    // the edge still on in2, needing a second undo). Edge count stays 1 throughout.
+    await page.waitForTimeout(400);
+    await expect(conn0Target).toHaveText('in1');
+    await expect(connCount).toHaveText('1');
+  });
+}
