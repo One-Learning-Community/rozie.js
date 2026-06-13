@@ -1320,6 +1320,7 @@ export class FlowCanvas {
       return context;
     });
     this.area.addPipe((context: any) => {
+      const __history = this.history();
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'nodepicked') {
         this.nodePicked.emit({
@@ -1328,7 +1329,7 @@ export class FlowCanvas {
         // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
         // is committed to history on the first `nodetranslated` (only if a drag follows;
         // gated on !programmatic + history). A re-pick mid-drag won't overwrite a live one.
-        if (!this.programmatic && this.history() !== false && !this.dragGestureActive) {
+        if (!this.programmatic && __history !== false && !this.dragGestureActive) {
           this.pendingDragSnapshot = this.snapshotCurrent();
         }
         // Win 2: a pick changed the selection — surface @selection-change after the
@@ -1409,6 +1410,37 @@ export class FlowCanvas {
         this.contextMenu.emit({
           id: ctx && ctx.id ? ctx.id : null
         });
+      } else if (context.type === 'connectionpick') {
+        // T2.5 — the user grabbed a socket to start a connect/reconnect gesture. Mark a
+        // reconnect-in-flight window so the per-event history pushes (writeBackConnection*)
+        // are suppressed; capture the PRE-gesture snapshot ONCE here so the whole gesture
+        // coalesces to a SINGLE undo entry pushed on connectiondrop (D-03). Gated on
+        // !programmatic + history (a restore-driven engine op must not record history).
+        if (!this.programmatic && __history !== false) {
+          this.reconnectInFlight++;
+          this.reconnectPreSnapshot = this.snapshotCurrent();
+          this.reconnectDidWriteBack = false;
+        }
+      } else if (context.type === 'connectiondrop') {
+        // T2.5 — the gesture ended. created:true → the endpoint landed on a new socket (a
+        // real reconnect: one connectionremoved + one connectioncreated already wrote back
+        // the graph) OR a fresh connection was drawn; created:false → dropped on the empty
+        // pane (the edge was removed with no re-add). EITHER way, IF the gesture actually
+        // changed the graph (reconnectDidWriteBack — a remove and/or add ran), the net change
+        // is one user gesture → push the SINGLE pre-gesture snapshot captured on connectionpick,
+        // restoring the pre-reconnect state in one undo step. A pick→drop that changed nothing
+        // (clicked a socket, released with no edge created/removed) pushes NOTHING (no empty
+        // history entry). Then clear the flag + per-gesture state.
+        if (this.reconnectInFlight > 0) {
+          this.reconnectInFlight--;
+          if (this.reconnectInFlight === 0) {
+            if (!this.programmatic && __history !== false && this.reconnectDidWriteBack && this.reconnectPreSnapshot) {
+              this.pushHistorySnapshot(this.reconnectPreSnapshot);
+            }
+            this.reconnectPreSnapshot = null;
+            this.reconnectDidWriteBack = false;
+          }
+        }
       }
       return context;
     });
@@ -2166,6 +2198,9 @@ export class FlowCanvas {
   redoStack = [];
   dragGestureActive = false;
   pendingDragSnapshot: any = null;
+  reconnectInFlight = 0;
+  reconnectPreSnapshot: any = null;
+  reconnectDidWriteBack = false;
   pendingDragPositions = new Map();
   dragFlushRaf = 0;
   currentGraph = () => this.graph() || {
@@ -2288,7 +2323,10 @@ export class FlowCanvas {
     if (this.programmatic) return;
     // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
     // pre-connect state — snapshotCurrent reads lastWrittenGraph, still the pre-connect value).
-    this.pushHistory();
+    // T2.5 — SUPPRESS while a reconnect is in flight: the paired remove+add of a reconnect
+    // (and a plain new-connection drag, which also rides connectionpick/drop) push ONE
+    // coalesced snapshot on connectiondrop instead (D-03 one-gesture-one-entry).
+    if (this.reconnectInFlight) this.reconnectDidWriteBack = true;else this.pushHistory();
     const g = this.baseGraph();
     const conn = {
       id: c.id,
@@ -2305,7 +2343,9 @@ export class FlowCanvas {
   writeBackConnectionRemoved = (id: any) => {
     if (this.programmatic) return;
     // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
-    this.pushHistory();
+    // T2.5 — SUPPRESS while a reconnect is in flight: the remove half of a reconnect is
+    // coalesced with its paired add into ONE snapshot pushed on connectiondrop (D-03).
+    if (this.reconnectInFlight) this.reconnectDidWriteBack = true;else this.pushHistory();
     const g = this.baseGraph();
     this.commitGraph({
       ...g,

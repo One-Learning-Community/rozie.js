@@ -126,6 +126,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const dragGestureActive = useRef(false);
   const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
+  const reconnectInFlight = useRef(0);
+  const reconnectPreSnapshot = useRef<any>(null);
+  const reconnectDidWriteBack = useRef(false);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
   const reconcileNodesRunning = useRef(false);
@@ -384,7 +387,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     if (programmatic.current) return;
     // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
     // pre-connect state — snapshotCurrent reads lastWrittenGraph, still the pre-connect value).
-    pushHistory();
+    // T2.5 — SUPPRESS while a reconnect is in flight: the paired remove+add of a reconnect
+    // (and a plain new-connection drag, which also rides connectionpick/drop) push ONE
+    // coalesced snapshot on connectiondrop instead (D-03 one-gesture-one-entry).
+    if (reconnectInFlight.current) reconnectDidWriteBack.current = true;else pushHistory();
     const g = baseGraph();
     const conn = {
       id: c.id,
@@ -401,7 +407,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const writeBackConnectionRemoved = useCallback((id: any) => {
     if (programmatic.current) return;
     // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
-    pushHistory();
+    // T2.5 — SUPPRESS while a reconnect is in flight: the remove half of a reconnect is
+    // coalesced with its paired add into ONE snapshot pushed on connectiondrop (D-03).
+    if (reconnectInFlight.current) reconnectDidWriteBack.current = true;else pushHistory();
     const g = baseGraph();
     commitGraph({
       ...g,
@@ -1678,6 +1686,37 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         props.onContextMenu && props.onContextMenu({
           id: ctx && ctx.id ? ctx.id : null
         });
+      } else if (context.type === 'connectionpick') {
+        // T2.5 — the user grabbed a socket to start a connect/reconnect gesture. Mark a
+        // reconnect-in-flight window so the per-event history pushes (writeBackConnection*)
+        // are suppressed; capture the PRE-gesture snapshot ONCE here so the whole gesture
+        // coalesces to a SINGLE undo entry pushed on connectiondrop (D-03). Gated on
+        // !programmatic + history (a restore-driven engine op must not record history).
+        if (!programmatic.current && props.history !== false) {
+          reconnectInFlight.current++;
+          reconnectPreSnapshot.current = snapshotCurrent();
+          reconnectDidWriteBack.current = false;
+        }
+      } else if (context.type === 'connectiondrop') {
+        // T2.5 — the gesture ended. created:true → the endpoint landed on a new socket (a
+        // real reconnect: one connectionremoved + one connectioncreated already wrote back
+        // the graph) OR a fresh connection was drawn; created:false → dropped on the empty
+        // pane (the edge was removed with no re-add). EITHER way, IF the gesture actually
+        // changed the graph (reconnectDidWriteBack — a remove and/or add ran), the net change
+        // is one user gesture → push the SINGLE pre-gesture snapshot captured on connectionpick,
+        // restoring the pre-reconnect state in one undo step. A pick→drop that changed nothing
+        // (clicked a socket, released with no edge created/removed) pushes NOTHING (no empty
+        // history entry). Then clear the flag + per-gesture state.
+        if (reconnectInFlight.current > 0) {
+          reconnectInFlight.current--;
+          if (reconnectInFlight.current === 0) {
+            if (!programmatic.current && props.history !== false && reconnectDidWriteBack.current && reconnectPreSnapshot.current) {
+              pushHistorySnapshot(reconnectPreSnapshot.current);
+            }
+            reconnectPreSnapshot.current = null;
+            reconnectDidWriteBack.current = false;
+          }
+        }
       }
       return context;
     });

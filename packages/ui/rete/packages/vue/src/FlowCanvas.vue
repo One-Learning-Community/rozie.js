@@ -328,6 +328,52 @@ let redoStack = [];
 let dragGestureActive = false;
 let pendingDragSnapshot: any = null;
 
+// T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
+// Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
+// shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
+// `editor.addConnection(new)` — so the write-back pipe sees a `connectionremoved` followed
+// by a `connectioncreated`, which would push TWO history entries (Pitfall 2: two Ctrl+Z to
+// undo one drag). The fix is to COALESCE: the ConnectionPlugin emits `connectionpick` when
+// the user grabs a socket and `connectiondrop` when they release. While a reconnect is in
+// flight (`reconnectInFlight > 0`) we SUPPRESS the per-event history pushes that
+// writeBackConnectionRemoved / writeBackConnectionCreated normally do (the graph write-back
+// itself STILL runs — the controlled graph stays correct), capturing the PRE-gesture
+// snapshot ONCE on connectionpick (`reconnectPreSnapshot`). On `connectiondrop` we push that
+// single snapshot (whether the drop landed on a new socket → `created:true` = a real
+// reconnect, OR on an empty pane → `created:false` = the edge was removed with no re-add)
+// and clear the flag. A plain drag-to-connect from an UNCONNECTED output socket also fires
+// connectionpick/drop, but there is no remove in that gesture — the single `connectioncreated`
+// write-back's own pushHistory is suppressed and the one coalesced snapshot is pushed on drop
+// instead, so the per-gesture count stays exactly one either way. Counter form (not a bool)
+// so a re-pick mid-gesture can't desync. COMPONENT-scope (survives across area events).
+// T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
+// Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
+// shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
+// `editor.addConnection(new)` — so the write-back pipe sees a `connectionremoved` followed
+// by a `connectioncreated`, which would push TWO history entries (Pitfall 2: two Ctrl+Z to
+// undo one drag). The fix is to COALESCE: the ConnectionPlugin emits `connectionpick` when
+// the user grabs a socket and `connectiondrop` when they release. While a reconnect is in
+// flight (`reconnectInFlight > 0`) we SUPPRESS the per-event history pushes that
+// writeBackConnectionRemoved / writeBackConnectionCreated normally do (the graph write-back
+// itself STILL runs — the controlled graph stays correct), capturing the PRE-gesture
+// snapshot ONCE on connectionpick (`reconnectPreSnapshot`). On `connectiondrop` we push that
+// single snapshot (whether the drop landed on a new socket → `created:true` = a real
+// reconnect, OR on an empty pane → `created:false` = the edge was removed with no re-add)
+// and clear the flag. A plain drag-to-connect from an UNCONNECTED output socket also fires
+// connectionpick/drop, but there is no remove in that gesture — the single `connectioncreated`
+// write-back's own pushHistory is suppressed and the one coalesced snapshot is pushed on drop
+// instead, so the per-gesture count stays exactly one either way. Counter form (not a bool)
+// so a re-pick mid-gesture can't desync. COMPONENT-scope (survives across area events).
+let reconnectInFlight = 0;
+let reconnectPreSnapshot: any = null;
+// Set true if a write-back (remove or add) actually ran during the in-flight window, so a
+// connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
+// pane with no edge created/removed) does NOT push an empty history entry.
+// Set true if a write-back (remove or add) actually ran during the in-flight window, so a
+// connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
+// pane with no edge created/removed) does NOT push an empty history entry.
+let reconnectDidWriteBack = false;
+
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
 // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
@@ -589,7 +635,10 @@ const writeBackConnectionCreated = (c: any) => {
   if (programmatic) return;
   // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
   // pre-connect state — snapshotCurrent reads lastWrittenGraph, still the pre-connect value).
-  pushHistory();
+  // T2.5 — SUPPRESS while a reconnect is in flight: the paired remove+add of a reconnect
+  // (and a plain new-connection drag, which also rides connectionpick/drop) push ONE
+  // coalesced snapshot on connectiondrop instead (D-03 one-gesture-one-entry).
+  if (reconnectInFlight) reconnectDidWriteBack = true;else pushHistory();
   const g = baseGraph();
   const conn = {
     id: c.id,
@@ -609,7 +658,9 @@ const writeBackConnectionCreated = (c: any) => {
 const writeBackConnectionRemoved = (id: any) => {
   if (programmatic) return;
   // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
-  pushHistory();
+  // T2.5 — SUPPRESS while a reconnect is in flight: the remove half of a reconnect is
+  // coalesced with its paired add into ONE snapshot pushed on connectiondrop (D-03).
+  if (reconnectInFlight) reconnectDidWriteBack = true;else pushHistory();
   const g = baseGraph();
   commitGraph({
     ...g,
@@ -2134,6 +2185,37 @@ onMounted(() => {
       emit('context-menu', {
         id: ctx && ctx.id ? ctx.id : null
       });
+    } else if (context.type === 'connectionpick') {
+      // T2.5 — the user grabbed a socket to start a connect/reconnect gesture. Mark a
+      // reconnect-in-flight window so the per-event history pushes (writeBackConnection*)
+      // are suppressed; capture the PRE-gesture snapshot ONCE here so the whole gesture
+      // coalesces to a SINGLE undo entry pushed on connectiondrop (D-03). Gated on
+      // !programmatic + history (a restore-driven engine op must not record history).
+      if (!programmatic && props.history !== false) {
+        reconnectInFlight++;
+        reconnectPreSnapshot = snapshotCurrent();
+        reconnectDidWriteBack = false;
+      }
+    } else if (context.type === 'connectiondrop') {
+      // T2.5 — the gesture ended. created:true → the endpoint landed on a new socket (a
+      // real reconnect: one connectionremoved + one connectioncreated already wrote back
+      // the graph) OR a fresh connection was drawn; created:false → dropped on the empty
+      // pane (the edge was removed with no re-add). EITHER way, IF the gesture actually
+      // changed the graph (reconnectDidWriteBack — a remove and/or add ran), the net change
+      // is one user gesture → push the SINGLE pre-gesture snapshot captured on connectionpick,
+      // restoring the pre-reconnect state in one undo step. A pick→drop that changed nothing
+      // (clicked a socket, released with no edge created/removed) pushes NOTHING (no empty
+      // history entry). Then clear the flag + per-gesture state.
+      if (reconnectInFlight > 0) {
+        reconnectInFlight--;
+        if (reconnectInFlight === 0) {
+          if (!programmatic && props.history !== false && reconnectDidWriteBack && reconnectPreSnapshot) {
+            pushHistorySnapshot(reconnectPreSnapshot);
+          }
+          reconnectPreSnapshot = null;
+          reconnectDidWriteBack = false;
+        }
+      }
     }
     return context;
   });
