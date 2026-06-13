@@ -23,6 +23,7 @@ export interface FlowCanvasProps {
   controls?: boolean;
   minimap?: boolean;
   canConnect?: ((...args: unknown[]) => unknown) | null;
+  history?: boolean;
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -56,6 +57,10 @@ export interface FlowCanvasHandle {
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;
+  undo: (...args: any[]) => any;
+  redo: (...args: any[]) => any;
+  canUndo: (...args: any[]) => any;
+  canRedo: (...args: any[]) => any;
 }
 
 declare const FlowCanvas: React.ForwardRefExoticComponent<FlowCanvasProps & React.RefAttributes<FlowCanvasHandle>>;

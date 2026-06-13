@@ -228,6 +228,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) controls: boolean = true;
   @property({ type: Boolean, reflect: true }) minimap: boolean = false;
   @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Boolean, reflect: true }) history: boolean = true;
   private _typeReg = signal({});
   private _portReg = signal({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
@@ -656,9 +657,29 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // typing in a node never nukes it. The listener is removed in the teardown.
     if (this.selectable && !this.readonly && container && typeof container.addEventListener === 'function') {
       this.onCanvasKeydown = (e: any) => {
-        if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+        if (!e) return;
         const t = e.target;
+        // Focus-guard (verbatim with the Delete branch): never act while focus is in a
+        // node-body text field (INPUT/TEXTAREA/contenteditable) — Ctrl+Z must reach the
+        // browser's native text undo there, and Delete must not nuke the node.
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        // ── T1.3 — Undo / Redo keybinds (D-02). Ctrl/Cmd+Z → undo; Ctrl/Cmd+Shift+Z and
+        // Ctrl/Cmd+Y → redo. Gated on the SAME focus-guard as Delete. preventDefault so the
+        // browser's page-level undo doesn't also fire. `metaKey` covers macOS Cmd. ──
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+          const k = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+          if (k === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            this.undo();
+            return;
+          }
+          if (k === 'z' && e.shiftKey || k === 'y') {
+            e.preventDefault();
+            this.redo();
+            return;
+          }
+        }
+        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
         const ids = this.selectedNodeIds();
         if (ids.length > 0) {
           e.preventDefault();
@@ -2014,6 +2035,12 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   edgeClickGuard = false;
 
+  HISTORY_CAP = 100;
+
+  historyStack = [];
+
+  redoStack = [];
+
   pendingDragPositions = new Map();
 
   dragFlushRaf = 0;
@@ -2022,6 +2049,70 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   nodes: [],
   connections: []
 };
+
+  pushHistory = () => {
+  if (this.programmatic) return;
+  if (this.history === false) return;
+  let snap;
+  try {
+    snap = structuredClone(this.currentGraph());
+  } catch (e: any) {
+    return;
+  }
+  this.historyStack.push(snap);
+  if (this.historyStack.length > this.HISTORY_CAP) {
+    this.historyStack = this.historyStack.slice(this.historyStack.length - this.HISTORY_CAP);
+  }
+  this.redoStack = [];
+};
+
+  restoreGraph = (snap: any) => {
+  if (!snap) return;
+  this.programmatic++;
+  try {
+    const fresh = {
+      nodes: (snap.nodes || []).map((n: any) => ({
+        ...n
+      })),
+      connections: (snap.connections || []).map((c: any) => ({
+        ...c
+      }))
+    };
+    this._graphControllable.write(fresh);
+  } finally {
+    this.programmatic--;
+  }
+};
+
+  undo = () => {
+  if (this.historyStack.length === 0) return;
+  let cur;
+  try {
+    cur = structuredClone(this.currentGraph());
+  } catch (e: any) {
+    cur = null;
+  }
+  const snap = this.historyStack.pop();
+  if (cur) this.redoStack.push(cur);
+  this.restoreGraph(snap);
+};
+
+  redo = () => {
+  if (this.redoStack.length === 0) return;
+  let cur;
+  try {
+    cur = structuredClone(this.currentGraph());
+  } catch (e: any) {
+    cur = null;
+  }
+  const snap = this.redoStack.pop();
+  if (cur) this.historyStack.push(cur);
+  this.restoreGraph(snap);
+};
+
+  canUndo = () => this.historyStack.length > 0;
+
+  canRedo = () => this.redoStack.length > 0;
 
   flushDragWriteBack = () => {
   this.dragFlushRaf = 0;
@@ -2040,6 +2131,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     } : n;
   });
   this.pendingDragPositions.clear();
+  // T1.3 — one history entry per DRAG gesture (the coalesced flush, NOT per frame).
+  this.pushHistory();
   this._graphControllable.write({
     ...g,
     nodes
@@ -2066,6 +2159,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     target: c.target,
     targetInput: c.targetInput
   };
+  // T1.3 — one history entry per CONNECT gesture.
+  this.pushHistory();
   this._graphControllable.write({
     ...g,
     connections: [...(g.connections || []), conn]
@@ -2075,6 +2170,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   writeBackConnectionRemoved = (id: any) => {
   if (this.programmatic) return;
   const g = this.currentGraph();
+  // T1.3 — one history entry per DISCONNECT / edge-delete gesture.
+  this.pushHistory();
   this._graphControllable.write({
     ...g,
     connections: (g.connections || []).filter((e: any) => e && e.id !== id)
@@ -2128,6 +2225,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
   if (nodes.length === (g.nodes || []).length) return false;
   const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+  // T1.3 — one history entry per DELETE gesture (node + its incident edges = ONE undo).
+  this.pushHistory();
   this._graphControllable.write({
     ...g,
     nodes,

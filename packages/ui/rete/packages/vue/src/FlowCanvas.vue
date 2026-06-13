@@ -18,8 +18,8 @@
 import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; minimap?: boolean; canConnect?: ((...args: any[]) => any) | null }>(),
-  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null }
+  defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; minimap?: boolean; canConnect?: ((...args: any[]) => any) | null; history?: boolean }>(),
+  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true }
 );
 
 const graph = defineModel<Record<string, any>>('graph', { default: () => ({
@@ -231,6 +231,58 @@ let selectedConnId: any = null;
 let selectedPathEl: any = null;
 let edgeClickGuard = false;
 
+// T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
+// echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
+// (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
+// D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (at the
+// flushDragWriteBack commit, after the rAF coalesce — never per pointermove frame), a
+// connect / disconnect / delete = one each. A push is gated on `!programmatic` so a
+// restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
+// history (D-04). Pushing truncates any forward (redo) tail at the cursor and drops the
+// oldest entry beyond the cap (Threat T-44-03-1: bounded memory). The cursor points at
+// the index of the CURRENT graph in the stack; undo moves it back, redo moves it
+// forward. Snapshots are `structuredClone` of the consumer's own serializable graph
+// JSON (Pattern 7; the global is available on all 6 runtimes / Node 20+) — no external
+// input, so the restore (T-44-03-2 accept) cannot loop (it rides the programmatic guard
+// + the existing $watch(graph) reconcile). Undo is ALWAYS on for v1; `:history=false`
+// (the `history` prop) is the cheap escape hatch that skips every push (the stack stays
+// empty → undo/redo are no-ops). COMPONENT-scope so the stack survives across area
+// events + the Solid-hoisted teardown.
+// T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
+// echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
+// (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
+// D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (at the
+// flushDragWriteBack commit, after the rAF coalesce — never per pointermove frame), a
+// connect / disconnect / delete = one each. A push is gated on `!programmatic` so a
+// restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
+// history (D-04). Pushing truncates any forward (redo) tail at the cursor and drops the
+// oldest entry beyond the cap (Threat T-44-03-1: bounded memory). The cursor points at
+// the index of the CURRENT graph in the stack; undo moves it back, redo moves it
+// forward. Snapshots are `structuredClone` of the consumer's own serializable graph
+// JSON (Pattern 7; the global is available on all 6 runtimes / Node 20+) — no external
+// input, so the restore (T-44-03-2 accept) cannot loop (it rides the programmatic guard
+// + the existing $watch(graph) reconcile). Undo is ALWAYS on for v1; `:history=false`
+// (the `history` prop) is the cheap escape hatch that skips every push (the stack stays
+// empty → undo/redo are no-ops). COMPONENT-scope so the stack survives across area
+// events + the Solid-hoisted teardown.
+const HISTORY_CAP = 100;
+// Two-stack model (simpler + correct than a single cursor): `historyStack` holds
+// PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
+// snapshots an undo popped off (the states to REDO forward to, newest last). A new
+// gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
+// redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
+// the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
+// pops redoStack → pushes the current graph back onto historyStack → restores it.
+// Two-stack model (simpler + correct than a single cursor): `historyStack` holds
+// PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
+// snapshots an undo popped off (the states to REDO forward to, newest last). A new
+// gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
+// redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
+// the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
+// pops redoStack → pushes the current graph back onto historyStack → restores it.
+let historyStack = [];
+let redoStack = [];
+
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
 // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
@@ -272,6 +324,110 @@ const currentGraph = () => graph.value || {
   connections: []
 };
 
+// T1.3 — snapshot the PRE-gesture graph onto the undo stack, just BEFORE a gesture's
+// write-back mutates `$model.graph` (D-03: one entry per gesture). MUST be called BEFORE
+// the `$model.graph = …` write at each commit point so the captured snapshot is the
+// state to UNDO back to. Gated on `!programmatic` (a restore-driven write runs INSIDE
+// the guard → never pushes — D-04) and on the `history` prop (`:history=false` opts the
+// whole feature out cheaply — the stacks stay empty, undo/redo no-op). A fresh gesture
+// CLEARS the redo stack (a new edit discards the redo branch — standard editor
+// semantics) and DROPS the oldest undo entry beyond HISTORY_CAP (Threat T-44-03-1:
+// bounded memory). `structuredClone` is a global on all 6 target runtimes + Node 20+;
+// the snapshot is decoupled from the live object so a later restore is stable.
+// T1.3 — snapshot the PRE-gesture graph onto the undo stack, just BEFORE a gesture's
+// write-back mutates `$model.graph` (D-03: one entry per gesture). MUST be called BEFORE
+// the `$model.graph = …` write at each commit point so the captured snapshot is the
+// state to UNDO back to. Gated on `!programmatic` (a restore-driven write runs INSIDE
+// the guard → never pushes — D-04) and on the `history` prop (`:history=false` opts the
+// whole feature out cheaply — the stacks stay empty, undo/redo no-op). A fresh gesture
+// CLEARS the redo stack (a new edit discards the redo branch — standard editor
+// semantics) and DROPS the oldest undo entry beyond HISTORY_CAP (Threat T-44-03-1:
+// bounded memory). `structuredClone` is a global on all 6 target runtimes + Node 20+;
+// the snapshot is decoupled from the live object so a later restore is stable.
+const pushHistory = () => {
+  if (programmatic) return;
+  if (props.history === false) return;
+  let snap;
+  try {
+    snap = structuredClone(currentGraph());
+  } catch (e: any) {
+    return;
+  }
+  historyStack.push(snap);
+  if (historyStack.length > HISTORY_CAP) {
+    historyStack = historyStack.slice(historyStack.length - HISTORY_CAP);
+  }
+  redoStack = [];
+};
+
+// T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
+// `$model.graph`, wrapped in the `programmatic` guard so the consumer's re-bind →
+// $watch(graph) → reconcile applies it WITHOUT re-entering history (D-04 — pushHistory /
+// the write-back helpers all bail while `programmatic` is raised). The snapshot is
+// re-cloned on the way out so the live bound object never aliases a stack entry (a later
+// consumer mutation of the graph can't corrupt the history). Graph-ONLY (D-03): the
+// viewport transform is untouched.
+// T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
+// `$model.graph`, wrapped in the `programmatic` guard so the consumer's re-bind →
+// $watch(graph) → reconcile applies it WITHOUT re-entering history (D-04 — pushHistory /
+// the write-back helpers all bail while `programmatic` is raised). The snapshot is
+// re-cloned on the way out so the live bound object never aliases a stack entry (a later
+// consumer mutation of the graph can't corrupt the history). Graph-ONLY (D-03): the
+// viewport transform is untouched.
+const restoreGraph = (snap: any) => {
+  if (!snap) return;
+  programmatic++;
+  try {
+    const fresh = {
+      nodes: (snap.nodes || []).map((n: any) => ({
+        ...n
+      })),
+      connections: (snap.connections || []).map((c: any) => ({
+        ...c
+      }))
+    };
+    graph.value = fresh;
+  } finally {
+    programmatic--;
+  }
+};
+
+// undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
+// stack, and restore the snapshot. No-op when nothing to undo.
+// undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
+// stack, and restore the snapshot. No-op when nothing to undo.
+const undo = () => {
+  if (historyStack.length === 0) return;
+  let cur;
+  try {
+    cur = structuredClone(currentGraph());
+  } catch (e: any) {
+    cur = null;
+  }
+  const snap = historyStack.pop();
+  if (cur) redoStack.push(cur);
+  restoreGraph(snap);
+};
+
+// redo() — pop the newest redo snapshot, push the CURRENT graph back onto the undo
+// stack, and restore it. No-op when nothing to redo.
+// redo() — pop the newest redo snapshot, push the CURRENT graph back onto the undo
+// stack, and restore it. No-op when nothing to redo.
+const redo = () => {
+  if (redoStack.length === 0) return;
+  let cur;
+  try {
+    cur = structuredClone(currentGraph());
+  } catch (e: any) {
+    cur = null;
+  }
+  const snap = redoStack.pop();
+  if (cur) historyStack.push(cur);
+  restoreGraph(snap);
+};
+const canUndo = () => historyStack.length > 0;
+const canRedo = () => redoStack.length > 0;
+
 // Flush the coalesced drag positions: one fresh graph object with every pending
 // node's x/y applied. Echo-guarded. Clears the pending map.
 // Flush the coalesced drag positions: one fresh graph object with every pending
@@ -293,6 +449,8 @@ const flushDragWriteBack = () => {
     } : n;
   });
   pendingDragPositions.clear();
+  // T1.3 — one history entry per DRAG gesture (the coalesced flush, NOT per frame).
+  pushHistory();
   graph.value = {
     ...g,
     nodes
@@ -325,6 +483,8 @@ const writeBackConnectionCreated = (c: any) => {
     target: c.target,
     targetInput: c.targetInput
   };
+  // T1.3 — one history entry per CONNECT gesture.
+  pushHistory();
   graph.value = {
     ...g,
     connections: [...(g.connections || []), conn]
@@ -336,6 +496,8 @@ const writeBackConnectionCreated = (c: any) => {
 const writeBackConnectionRemoved = (id: any) => {
   if (programmatic) return;
   const g = currentGraph();
+  // T1.3 — one history entry per DISCONNECT / edge-delete gesture.
+  pushHistory();
   graph.value = {
     ...g,
     connections: (g.connections || []).filter((e: any) => e && e.id !== id)
@@ -430,6 +592,8 @@ const deleteNode = (id: any) => {
   const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
   if (nodes.length === (g.nodes || []).length) return false;
   const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
+  // T1.3 — one history entry per DELETE gesture (node + its incident edges = ONE undo).
+  pushHistory();
   graph.value = {
     ...g,
     nodes,
@@ -1122,9 +1286,29 @@ onMounted(() => {
   // typing in a node never nukes it. The listener is removed in the teardown.
   if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
     onCanvasKeydown = (e: any) => {
-      if (!e || e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (!e) return;
       const t = e.target;
+      // Focus-guard (verbatim with the Delete branch): never act while focus is in a
+      // node-body text field (INPUT/TEXTAREA/contenteditable) — Ctrl+Z must reach the
+      // browser's native text undo there, and Delete must not nuke the node.
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      // ── T1.3 — Undo / Redo keybinds (D-02). Ctrl/Cmd+Z → undo; Ctrl/Cmd+Shift+Z and
+      // Ctrl/Cmd+Y → redo. Gated on the SAME focus-guard as Delete. preventDefault so the
+      // browser's page-level undo doesn't also fire. `metaKey` covers macOS Cmd. ──
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const k = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+        if (k === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+          return;
+        }
+        if (k === 'z' && e.shiftKey || k === 'y') {
+          e.preventDefault();
+          redo();
+          return;
+        }
+      }
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const ids = selectedNodeIds();
       if (ids.length > 0) {
         e.preventDefault();
@@ -2319,7 +2503,7 @@ watch(() => zoom.value, (v: any) => {
   });
 });
 
-defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform });
+defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, undo, redo, canUndo, canRedo });
 </script>
 
 <style scoped>

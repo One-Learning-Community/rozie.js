@@ -170,6 +170,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `controls` | `Boolean` | `true` | | Render the built-in **Controls overlay** — a zoom in / zoom out / fit-view button cluster over the canvas (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo` / `zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly` (zoom/fit are view-only). Opt out with `:controls="false"`. |
 | `minimap` | `Boolean` | `false` | | Render the built-in **MiniMap overlay** — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the **measured** engine node-view dims) plus the current viewport window (the area outside dimmed). **Pannable**: drag the minimap to recenter the main viewport (via `setCenter`). Opt-in (default OFF) — the React Flow `<MiniMap/>` parity. Evaluated at construction (like `pannable` / `zoomable` / `controls`); set it at mount time. |
 | `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in **addition** to the automatic `:validate-types` check (the custom-rule override). Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent / `null` imposes no custom rule. |
+| `history` | `Boolean` | `true` | | **Undo / redo**, on by default. Every gesture — drag, connect, disconnect, delete — pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; **not** the viewport), and `undo()` / `redo()` + **Ctrl/Cmd+Z** · **Ctrl/Cmd+Shift+Z** · **Ctrl/Cmd+Y** restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty; the verbs no-op). |
 
 ### Events
 
@@ -207,6 +208,10 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `getNodes()` | Serialized snapshot `[{ id, label, x, y }]` with live positions. |
 | `getConnections()` | Serialized snapshot `[{ id, source, sourceOutput, target, targetInput }]`. |
 | `getTransform()` | The viewport transform `{ x, y, k }`. |
+| `undo()` | Undo the most recent graph edit (drag / connect / disconnect / delete), restoring the previous snapshot through the `graph` model (echo-guarded; graph-only, not the viewport). One gesture = one step. No-op when there's nothing to undo. Also **Ctrl/Cmd+Z**. Opt out with `:history="false"`. |
+| `redo()` | Re-apply the edit most recently undone. A fresh edit after an undo discards the redo branch. No-op when there's nothing to redo. Also **Ctrl/Cmd+Shift+Z** and **Ctrl/Cmd+Y**. |
+| `canUndo()` | Whether there is an edit to undo → `boolean`. |
+| `canRedo()` | Whether there is an edit to redo → `boolean`. |
 
 > The method is `zoomTo`, not `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom` state setter that a `setZoom` verb would collide with (the same collision discipline as the rest of `@rozie-ui`).
 

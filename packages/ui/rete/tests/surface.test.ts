@@ -32,10 +32,12 @@ const EXPECT = {
   // replaced by the single two-way `graph` model + the `validateTypes` toggle.
   // `controls` (Win 4, quick-260611-sqa) = the built-in zoom/fit overlay toggle
   // (Boolean, default ON; :controls="false" opts out).
+  // `history` (Phase 44 T1.3, D-02) = the undo/redo toggle (Boolean, default ON;
+  // :history=false opts out — the snapshot stack stays empty, undo/redo no-op).
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
-    'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect',
+    'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history',
   ],
   // `graph` + `zoom` are both two-way (the bound graph is the source of truth +
   // write-back target; zoom is the viewport binding). Neither is a same-named emit
@@ -61,10 +63,14 @@ const EXPECT = {
   // `deleteNode` (Win 1, quick-260611-sqa) = the PUBLIC controlled-graph cascading
   // delete (fresh-graph write-back), distinct from `removeNode` (engine-only escape
   // hatch). Also wired to the Delete/Backspace key.
+  // `undo`/`redo` + `canUndo`/`canRedo` (Phase 44 T1.3, D-02) = the snapshot-stack
+  // imperative handle (collision-clean: not a Lit lifecycle / emit / prop / React
+  // model-setter / inherited-DOM-method name).
   expose: [
     'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'addConnection',
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'setCenter', 'setViewport',
     'screenToFlowPosition', 'getNodes', 'getConnections', 'getTransform',
+    'undo', 'redo', 'canUndo', 'canRedo',
   ],
 } as const;
 
@@ -85,7 +91,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (16 props)', () => {
+  it('props surface matches (17 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -114,7 +120,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (16 verbs)', () => {
+  it('expose surface matches (20 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });
