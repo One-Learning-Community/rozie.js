@@ -72,6 +72,7 @@ export function Demo() {
 | `edge-click` | |
 | `edge-selected` | |
 | `selection-change` | |
+| `connect-end` | |
 | `node-action` | |
 | `connection-rejected` | |
 | `connection-created` | |

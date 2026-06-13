@@ -32,6 +32,7 @@ export interface FlowCanvasProps {
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
+  onConnectEnd?: (...args: unknown[]) => void;
   onNodeAction?: (...args: unknown[]) => void;
   onConnectionRejected?: (...args: unknown[]) => void;
   onConnectionCreated?: (...args: unknown[]) => void;

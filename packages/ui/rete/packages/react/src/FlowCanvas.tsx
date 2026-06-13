@@ -63,6 +63,7 @@ interface FlowCanvasProps {
   onEdgeClick?: (...args: any[]) => void;
   onEdgeSelected?: (...args: any[]) => void;
   onSelectionChange?: (...args: any[]) => void;
+  onConnectEnd?: (...args: any[]) => void;
   onNodeAction?: (...args: any[]) => void;
   onConnectionRejected?: (...args: any[]) => void;
   onConnectionCreated?: (...args: any[]) => void;
@@ -1137,6 +1138,51 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // snapshot iff the graph actually changed. Re-entrant picks can't desync because the
         // close is gated on a one-shot scheduled flag.
         scheduleReconnectClose();
+
+        // ── T2.7 CONNECT-END-ON-PANE (D-07, pure emit) ──
+        // A drag that STARTED on an output socket and ENDED on empty canvas (no target
+        // socket, no connection created) surfaces `@connect-end { source, sourceOutput,
+        // position }` so the consumer can run its OWN node-picker / create-node flow at the
+        // drop point (the n8n "drag off a port → drop on the pane → pick a node" UX). The
+        // component owns ONLY this hook — it creates NO node and shows NO picker (D-07,
+        // consumer-owns-creation, exactly like screenToFlowPosition + the palette drop).
+        // Detection: `socket == null` (released over the pane, not a socket) && `created ==
+        // false` (no edge was made) && `initial.side === 'output'` (we only surface OUTPUT-
+        // started drags — an input-started drag off the pane has no "source output" to seed
+        // a downstream node from, and the reconnect path already owns input-endpoint drags).
+        // Position = `area.area.pointer` (the AreaPlugin's live pointer, ALREADY in graph
+        // coords — the same origin screenToFlowPosition projects into), so no client→graph
+        // projection is needed; we still fall back to screenToFlowPosition over a raw
+        // clientX/clientY if a future plugin build stops tracking area.area.pointer. Gated on
+        // !programmatic so a restore/imperative-driven drop never emits. NO node is created.
+        const cd = context.data;
+        if (cd && !cd.socket && cd.created === false && cd.initial && cd.initial.side === 'output' && !programmatic.current) {
+          let pos: any = null;
+          const inner = area.current && area.current.area ? area.current.area : null;
+          if (inner && inner.pointer && typeof inner.pointer.x === 'number' && typeof inner.pointer.y === 'number') {
+            pos = {
+              x: inner.pointer.x,
+              y: inner.pointer.y
+            };
+          }
+          if ((!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') && cd.initial && cd.initial.element && typeof cd.initial.element.getBoundingClientRect === 'function') {
+            // Fallback: project the last-known pointer client coords through the shipped
+            // screenToFlowPosition (graph-coord inverse of the area transform). The drop event
+            // carries no pointer; use the source socket element's center as a degraded anchor.
+            const r = cd.initial.element.getBoundingClientRect();
+            pos = screenToFlowPosition(r.left + r.width / 2, r.top + r.height / 2);
+          }
+          if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+            props.onConnectEnd && props.onConnectEnd({
+              source: cd.initial.nodeId,
+              sourceOutput: cd.initial.key,
+              position: {
+                x: pos.x,
+                y: pos.y
+              }
+            });
+          }
+        }
       }
       return context;
     });

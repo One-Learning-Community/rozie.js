@@ -58,10 +58,14 @@ const EXPECT = {
   // CONNECTION id ({ id }) when a consumer clicks an edge path. Both fresh names — not a
   // prop/model/expose/lifecycle collision (the selection state is the script-only
   // `selectedConnId`, never a model; `selectable` is the gating prop).
+  // `connect-end` (Phase 44 T2.7, D-07) surfaces { source, sourceOutput, position } when a
+  // drag started on an OUTPUT socket ends on empty canvas (socket==null && created==false).
+  // Pure emit — the consumer owns node creation (no built-in picker). Fresh name: not a
+  // prop/model/expose/lifecycle/React-setter collision (the MapLibre zoom/pitch lesson).
   emits: [
     'node-action', 'connection-created', 'connection-removed', 'node-picked',
     'node-moved', 'translated', 'context-menu', 'connection-rejected',
-    'selection-change', 'edge-click', 'edge-selected',
+    'selection-change', 'edge-click', 'edge-selected', 'connect-end',
   ],
   // 'node' = the reactive multi-instance portal slot (the low-level render-by-type
   // escape hatch); '' = the default slot that hosts the Phase 41 declarative
@@ -115,7 +119,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (11 emits)', () => {
+  it('emits surface matches (12 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 

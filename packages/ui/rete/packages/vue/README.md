@@ -72,6 +72,7 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 | `edge-click` | |
 | `edge-selected` | |
 | `selection-change` | |
+| `connect-end` | |
 | `node-action` | |
 | `connection-rejected` | |
 | `connection-created` | |
