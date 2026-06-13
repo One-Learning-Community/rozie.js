@@ -611,6 +611,26 @@ export function rewriteScript(
         return;
       }
 
+      // $clone(x) → structuredClone(x) — Phase 45 (D-01). Lit `@property`
+      // accessors return plain values, so there is no reactive proxy to
+      // unwrap; a direct structuredClone gives an independent deep copy safe
+      // for undo/history stacks. No `toRaw` (Vue-only) / `$state.snapshot`
+      // (Svelte-only) here. Uses the in-scope `const args` hoisted above the
+      // if-chain (do NOT re-declare). Do NOT path.skip() — the single argument
+      // may carry $props.X / $data.X reactive reads (e.g. $clone($data.graph))
+      // that still need rewriting to the `this._X.value` form.
+      if (callee.name === '$clone') {
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) {
+            path.replaceWith(
+              t.callExpression(t.identifier('structuredClone'), [arg]),
+            );
+          }
+        }
+        return;
+      }
+
       // $classSelector('grip') → ".grip" — Lit keeps authored class names
       // literal in the emitted DOM (style isolation via [data-rozie-s-<hash>]),
       // so the compile-time literal is correct. Shared with

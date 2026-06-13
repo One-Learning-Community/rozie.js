@@ -338,6 +338,31 @@ describe('rewriteScript — sigil rewrites', () => {
     expect(rewrite('$snapshot(a, b);', ir)).toContain('$snapshot(a, b);');
   });
 
+  it('$clone(x) → structuredClone(x) (deep-copy lowering)', () => {
+    const ir = buildIR();
+    const out = rewrite('const c = $clone(payload);', ir);
+    expect(out).toContain('structuredClone(payload)');
+    expect(out).not.toContain('$clone');
+    expect(out).not.toContain('toRaw');
+    expect(out).not.toContain('$state.snapshot');
+  });
+
+  it('$clone with non-single args is left untouched', () => {
+    const ir = buildIR();
+    expect(rewrite('$clone(a, b);', ir)).toContain('$clone(a, b);');
+  });
+
+  it('$clone with a spread (non-expression) argument is left untouched', () => {
+    const ir = buildIR();
+    expect(rewrite('const c = $clone(...x);', ir)).toContain('$clone(...x)');
+  });
+
+  it("$clone's argument reactive reads still lower (no path.skip)", () => {
+    const ir = buildIR({ state: [state('config')] });
+    const out = rewrite('const c = $clone($data.config);', ir);
+    expect(out).toContain('structuredClone(this._config.value)');
+  });
+
   it('$el free read → this._ref__rozieRoot', () => {
     const ir = buildIR({ refs: [ref('__rozieRoot')] });
     const out = rewrite('const root = $el;', ir);
