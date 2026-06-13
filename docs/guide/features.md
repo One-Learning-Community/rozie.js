@@ -768,6 +768,85 @@ Reach for `$snapshot()` **only** when you're handing a reactive value to library
 If you skip it where you do need it, you'll see the Svelte runtime error [`state_descriptors_fixed`](https://svelte.dev/e/state_descriptors_fixed) the first time the library tries to mutate the value.
 :::
 
+::: tip Need an independent copy, not an unwrap?
+`$snapshot()` is an **unwrap**, not a copy — on the five non-Svelte targets it hands back the same value you passed in. To freeze the current state so a later mutation can't reach back into it (undo/redo history, scratch snapshots), reach for [`$clone()`](#clone-x-—-an-independent-deep-copy-of-reactive-state) below instead.
+:::
+
+## `$clone(x)` — an independent deep copy of reactive state
+
+`$clone(x)` produces an **independent, deeply-copied** snapshot of a reactive value — safe to take on a `reactive()` / `$state` / signal-backed object on **every** target. It is the right primitive whenever you need to *freeze the current state* so that a later mutation of the live state doesn't reach back into the copy you stashed: undo/redo history stacks, cross-render scratch snapshots, "remember what this looked like before the drag."
+
+```rozie
+<data>{ graph: { nodes: [], connections: [] }, history: [] }</data>
+
+<script>
+const currentGraph = $computed(() => $data.graph)
+
+// Before mutating the live graph (e.g. on drag-start), push a frozen,
+// independent copy onto the undo stack. A later edit to $data.graph
+// can't reach back and corrupt this history entry.
+const pushUndo = () => {
+  $data.history = [...$data.history, $clone(currentGraph())]
+}
+
+const undo = () => {
+  const prev = $data.history.at(-1)
+  if (prev) $data.graph = prev   // the frozen copy, untouched by edits since
+}
+</script>
+```
+
+### The footgun it closes
+
+The naive way to take that snapshot is `structuredClone(x)` — and it works on React, Solid, Angular, and Lit, where reads return plain JS values. But a bare `structuredClone(<reactive value>)` **throws** (`DataCloneError: … could not be cloned`) on a Vue `reactive()` Proxy and a Svelte 5 `$state` Proxy. The result is a brutally **target-asymmetric** trap: your history stack fills correctly on four targets and is silently empty (or the component crashes) on Vue and Svelte only — the two targets a Vue-flavored author is least expecting to break.
+
+`$clone` exists to erase that asymmetry. One author-side call lowers to the right deep-copy primitive on each target, so it produces an independent copy everywhere:
+
+| Target | Expansion |
+| --- | --- |
+| Vue | `rozieDeepClone(x)` — from `@rozie/runtime-vue`; a recursive proxy-safe `structuredClone(deepToRaw(x))` that de-proxies **nested** `reactive()`/`ref` values, not just a top-level `reactive()` tree |
+| Svelte 5 | `$state.snapshot(x)` — Svelte's native recursive de-proxy + deep clone |
+| React | `structuredClone(x)` |
+| Solid | `structuredClone(x)` |
+| Angular | `structuredClone(x)` |
+| Lit | `structuredClone(x)` |
+
+Because the copy goes through the structured-clone algorithm (not lossy `JSON.parse(JSON.stringify(x))`), it preserves `Date`, `Map`, and `Set` rather than mangling them to ISO strings and `{}`. `$clone(null)` returns `null` on all six.
+
+::: warning Why a single `toRaw` isn't enough on Vue
+The Vue lowering deliberately uses a **recursive** de-proxy (`rozieDeepClone`), not `structuredClone(toRaw(x))`. A single top-level `toRaw` unwraps only the outermost `reactive()` tree — a *nested* independent reactive proxy or `ref` (e.g. an array of reactive items, or `$clone({ d: src.data })` where `src.data` is itself a live proxy) stays live, and `structuredClone` rejects it one level down. `rozieDeepClone` walks the whole structure (WeakMap-guarded against cycles) so Vue reaches true parity with Svelte's recursive `$state.snapshot`.
+
+A Vue leaf that uses `$clone` therefore needs `@rozie/runtime-vue` in its package `dependencies` — it's the one extra peer the sigil pulls in on the Vue target.
+:::
+
+### `$clone` vs `$snapshot` — pick the right one
+
+These two sigils look similar and are easy to confuse, but they answer different questions:
+
+| | [`$snapshot(x)`](#snapshot-—-crossing-into-untyped-js) | `$clone(x)` |
+| --- | --- | --- |
+| **What it does** | **Unwraps** a reactive value to a plain one | Produces an **independent deep copy** |
+| **On the 5 non-Svelte targets** | Identity passthrough — **same object back** | A real, separate copy every time |
+| **Reach for it when** | Handing a value to library code that mutates property descriptors (Chart.js `Object.defineProperty`) | Freezing state for history/undo/scratch — you must keep a copy that later edits can't touch |
+| **Independent copy guaranteed?** | No (only on Svelte) | Yes, on all six |
+
+If you take a "snapshot" for an undo stack with `$snapshot()` and your target happens to be React/Vue/Solid/Angular/Lit, you've stashed a **live reference** — the next edit mutates your "history" in place. Use `$clone()` for anything you intend to keep frozen.
+
+### Caveats — serializable state only
+
+`$clone` rides the structured-clone algorithm, so it carries that algorithm's one hard limit: **a value containing a function or a DOM node throws** (`DataCloneError`). Clone serializable state — graph data, plain config, history snapshots — not live handles, callbacks, or element references. This throw is an author error surfaced loudly, not a silent corruption.
+
+The ROZ135 steer (below) is intentionally **narrow**: it flags a *direct* `structuredClone($props/$data/$model.member)` and a single **one-hop** const alias (`const g = $data.graph; structuredClone(g)`). Two-hop chains, values passed through a parameter, and values returned from a call are **not** caught — so the absence of a warning is not a guarantee that a given `structuredClone` is safe. When in doubt on a reactive value, prefer `$clone`.
+
+### Diagnostics
+
+| Code | Severity | When |
+| --- | --- | --- |
+| `ROZ135` `STRUCTURED_CLONE_REACTIVE` | warning | A bare `structuredClone(<reactive member or one-hop alias>)` — steers you to `$clone(x)`, which is safe on Vue/Svelte where the raw call throws |
+| `ROZ136` `CLONE_BAD_ARITY` | error | `$clone` called with anything but exactly one non-spread argument (`$clone()`, `$clone(a, b)`, `$clone(...x)`) — the per-target lowering hard-codes a single argument |
+
+Naming a `<data>` field or `r-for` loop variable `$clone` collides with the reserved sigil (`ROZ202`). See the [Diagnostics reference](/reference/diagnostics) for the full code table.
+
 ## Safe non-primitive interpolation — objects render as portable JSON, never crash
 
 Interpolate a non-primitive value — an array, a plain object, a reactive `$data` graph — and the six targets used to disagree wildly. Vue pretty-printed JSON (its native `toDisplayString`), Svelte and Angular showed comma-joined `[object Object]`, Solid and Lit showed space-joined `[object Object]`, and **React threw `Objects are not valid as a React child` and crashed the component.** Same source, six renderings, one hard crash.

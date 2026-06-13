@@ -60,6 +60,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `$emit(name, …)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$refs.name` from `ref="name"` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$snapshot(x)` — crossing into untyped JS | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `$clone(x)` — independent deep copy of reactive state | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$onMount` / `$onUnmount` | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-solid-—-lifecycle-hooks-colocated-with-an-always-rendered-component) | [⚠︎](/parity#lit-solid-—-lifecycle-hooks-colocated-with-an-always-rendered-component) |
 | `$expose({ … })` — consumer-callable imperative handle | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
