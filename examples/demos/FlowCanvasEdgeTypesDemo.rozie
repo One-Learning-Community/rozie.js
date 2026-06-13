@@ -1,0 +1,115 @@
+<!--
+  FlowCanvasEdgeTypesDemo.rozie — BEHAVIORAL consumer for Phase 44 T1.2 (D-01): per-edge
+  `connection.type` selecting a path generator. A single Start node fans out to four
+  targets via four edges, one per type:
+    - e-step       (type: 'step')       → orthogonal HV-VH (L-segments)
+    - e-smoothstep (type: 'smoothstep') → step with rounded corners (Q arcs)
+    - e-straight   (type: 'straight')   → a single straight line
+    - e-bezier     (no type)            → the bezier DEFAULT (classicConnectionPath, C curve)
+
+  Edge type lives DIRECTLY on the bound `graph.connections` entry (optional `type`) — per-edge,
+  the React-Flow `edge.type` model (D-01). The spec (`rete-flow-edge-types`) asserts the step
+  edge's `d` contains orthogonal `L` segments and the default (bezier) edge's `d` still uses a
+  `C` bezier command (proving the bezier default is byte-identical / unchanged). Behavioral-only;
+  NOT a screenshot cell.
+-->
+
+<rozie name="FlowCanvasEdgeTypesDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  graph: {
+    nodes: [
+      { id: 'start', type: 'step', x: 20,  y: 180, data: { label: 'Start' } },
+      { id: 'a',     type: 'step', x: 360, y: 20,  data: { label: 'Step' } },
+      { id: 'b',     type: 'step', x: 360, y: 130, data: { label: 'Smooth' } },
+      { id: 'c',     type: 'step', x: 360, y: 240, data: { label: 'Straight' } },
+      { id: 'd',     type: 'step', x: 360, y: 350, data: { label: 'Bezier' } },
+    ],
+    // optional per-edge `type` — the T1.2 surface. e-bezier omits `type` → default bezier.
+    connections: [
+      { id: 'e-step',       source: 'start', sourceOutput: 'out', target: 'a', targetInput: 'in', type: 'step' },
+      { id: 'e-smoothstep', source: 'start', sourceOutput: 'out', target: 'b', targetInput: 'in', type: 'smoothstep' },
+      { id: 'e-straight',   source: 'start', sourceOutput: 'out', target: 'c', targetInput: 'in', type: 'straight' },
+      { id: 'e-bezier',     source: 'start', sourceOutput: 'out', target: 'd', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Re-type the step edge through the controlled graph (a FRESH connections array) — proving an
+// edge-type edit on an EXISTING edge re-renders (the controlled-graph + edgeStyleSig expectation).
+const toStraight = () => {
+  const connections = $data.graph.connections.map((c) => (c && c.id === 'e-step' ? { ...c, type: 'straight' } : c))
+  $data.graph = { ...$data.graph, connections }
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — edge types step/smoothstep/straight/bezier (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="to-straight" @click="toStraight">Step→Straight</button>
+    <span class="readout" data-testid="readout-count">{{ $data.graph.connections.length }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 420px; width: 640px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 680px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout { font-variant-numeric: tabular-nums; font-size: 0.875rem; min-width: 2ch; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

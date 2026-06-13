@@ -1391,3 +1391,94 @@ for (const target of TARGETS) {
       .toBe(0);
   });
 }
+
+/**
+ * 12. EDGE TYPES — per-edge `connection.type` step/smoothstep/straight/bezier (Phase 44 T1.2, D-01).
+ *
+ * `examples/demos/FlowCanvasEdgeTypesDemo.rozie` fans a Start node out to four targets, one
+ * edge per type: e-step ('step'), e-smoothstep ('smoothstep'), e-straight ('straight'), and
+ * e-bezier (NO type → the bezier DEFAULT). `connection.type` selects a path generator in
+ * renderConnection.redraw; the default branch stays `classicConnectionPath` (byte-identical).
+ * Proves:
+ *   1. the STEP edge's `d` is orthogonal — three `L` line-segments (`/L .* L .* L/`).
+ *   2. the BEZIER (default) edge's `d` STILL uses a `C` cubic-bezier command — proving the
+ *      bezier default path is UNCHANGED (no edit to the default branch).
+ *   3. the SMOOTHSTEP edge's `d` carries `Q` quadratic arcs (rounded corners) — distinct from
+ *      both the sharp step and the straight line.
+ *   4. LIVE RE-RENDER — re-typing the step edge to 'straight' through the controlled graph
+ *      (edgeStyleSig includes `type`) re-renders it: the step `L`-segment shape disappears and
+ *      a plain `M…L…` straight `d` appears (proving a type change on an existing edge re-draws).
+ * No `toHaveScreenshot` — behavioral cell only (FlowCanvasScreenshot is the byte-identical
+ * pixel cell, unaffected: edge types are opt-in via `connection.type`).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-edge-types [${target}]: per-edge connection.type selects step/smoothstep/straight/bezier path`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasEdgeTypes&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(5);
+
+    // helper: the DRAWN connection `d` strings (non-empty), piercing Lit's open shadow.
+    const pathLoc = page.locator('.rozie-flow-connection__path');
+    const drawnDs = async (): Promise<string[]> =>
+      pathLoc.evaluateAll((els) =>
+        els
+          .map((e) => (e.getAttribute('d') || '').trim())
+          .filter((d) => d.length > 0),
+      );
+
+    // all four typed edges draw.
+    await expect.poll(async () => (await drawnDs()).length, { timeout: 10_000 }).toBe(4);
+
+    // ---- 1. the STEP edge's `d` is orthogonal — three `L` line-segments ----
+    // `M sx sy L mx sy L mx ey L ex ey` → matches /L .* L .* L/ (and NOT a bezier `C`).
+    const stepRe = /L .* L .* L/;
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => stepRe.test(d) && !/[CcQq]/.test(d)).length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    // ---- 2. the BEZIER (default) edge's `d` STILL uses a `C` cubic command (unchanged) ----
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => /\bC\b|[ ]C[ ]/.test(d) || /C/.test(d)).length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    // ---- 3. the SMOOTHSTEP edge's `d` carries `Q` quadratic arcs (rounded corners) ----
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => /Q/.test(d)).length, { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    // capture the current set of step-shaped `d`s (sharp orthogonal, no curves) for re-type proof.
+    const stepDsBefore = (await drawnDs()).filter((d) => stepRe.test(d) && !/[CcQq]/.test(d));
+    expect(stepDsBefore.length, 'expected at least one sharp step edge before re-type').toBeGreaterThanOrEqual(1);
+
+    // ---- 4. LIVE RE-RENDER: re-type e-step 'step' → 'straight' through the controlled graph ----
+    await page.getByTestId('to-straight').click();
+    // the previously-step `d` (sharp three-segment) is GONE — re-typed to a straight line.
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => stepDsBefore.includes(d)).length, {
+        timeout: 10_000,
+      })
+      .toBe(0);
+    // count unchanged (4 edges, no add/drop — only a restyle).
+    await expect.poll(async () => (await drawnDs()).length, { timeout: 5_000 }).toBe(4);
+    // the bezier default edge STILL carries a `C` command (untouched by the re-type).
+    await expect
+      .poll(async () => (await drawnDs()).filter((d) => /C/.test(d)).length, { timeout: 5_000 })
+      .toBeGreaterThanOrEqual(1);
+  });
+}

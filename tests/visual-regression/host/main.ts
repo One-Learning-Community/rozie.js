@@ -375,6 +375,14 @@ export const EXAMPLES = [
   // path count dropped by exactly 1, the targeted edge's path is gone, and the
   // `connection-count` readout decremented. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasEdgeDelete',
+  // Phase 44 T1.2 (D-01, edge types) — FlowCanvasEdgeTypes is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasEdgeTypesDemo.rozie): a single Start node fanning
+  // out to four targets, one edge per type via `graph.connections[].type`
+  // (step/smoothstep/straight + a default no-type → bezier). The spec
+  // (rete-flow-edge-types) asserts the step edge's `d` contains orthogonal `L` segments
+  // and the default (bezier) edge's `d` still uses a `C` bezier command (bezier default
+  // unchanged). Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasEdgeTypes',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -542,6 +550,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasEdges: 'rozie-flow-canvas-edges',
   // Phase 44 edge-delete cell — '-demo' appended → 'rozie-flow-canvas-edge-delete-demo'.
   FlowCanvasEdgeDelete: 'rozie-flow-canvas-edge-delete',
+  // Phase 44 edge-types cell — '-demo' appended → 'rozie-flow-canvas-edge-types-demo'.
+  FlowCanvasEdgeTypes: 'rozie-flow-canvas-edge-types',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -735,6 +745,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasEdges: {},
   // Phase 44 — FlowCanvasEdgeDeleteDemo is self-contained (seeds its own graph + edges).
   FlowCanvasEdgeDelete: {},
+  // Phase 44 — FlowCanvasEdgeTypesDemo is self-contained (seeds its own typed-edge graph).
+  FlowCanvasEdgeTypes: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
