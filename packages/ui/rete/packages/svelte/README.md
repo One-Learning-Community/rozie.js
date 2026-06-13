@@ -58,6 +58,8 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 | `minimap` | `Boolean` | `false` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 | `history` | `Boolean` | `true` |  |  |
+| `mode` | `String` | `"pan"` | ✓ |  |
+| `marquee` | `Boolean` | `false` |  |  |
 
 ## Events
 

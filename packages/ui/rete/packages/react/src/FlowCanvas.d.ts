@@ -24,6 +24,10 @@ export interface FlowCanvasProps {
   minimap?: boolean;
   canConnect?: ((...args: unknown[]) => unknown) | null;
   history?: boolean;
+  mode?: string;
+  defaultMode?: string;
+  onModeChange?: (next: string) => void;
+  marquee?: boolean;
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;

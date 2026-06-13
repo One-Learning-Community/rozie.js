@@ -61,6 +61,8 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 | `minimap` | `Boolean` | `false` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 | `history` | `Boolean` | `true` |  |  |
+| `mode` | `String` | `"pan"` | ✓ |  |
+| `marquee` | `Boolean` | `false` |  |  |
 
 ## Events
 

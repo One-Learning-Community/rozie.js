@@ -39,6 +39,16 @@
 }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
+.rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] { background: #dbeafe; color: #1d4ed8; border-color: #3b82f6; }
+.rozie-flow-marquee[data-rozie-s-cd396d6a] {
+  position: absolute;
+  display: none;
+  z-index: 9;
+  pointer-events: none;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid #3b82f6;
+  border-radius: 2px;
+}
 .rozie-flow-minimap[data-rozie-s-cd396d6a] {
   position: absolute;
   right: 10px;

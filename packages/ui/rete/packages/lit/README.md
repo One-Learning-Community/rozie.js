@@ -51,6 +51,8 @@ el.addEventListener('connection-created', (e) => console.log('connected', e.deta
 | `minimap` | `Boolean` | `false` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 | `history` | `Boolean` | `true` |  |  |
+| `mode` | `String` | `"pan"` | ✓ |  |
+| `marquee` | `Boolean` | `false` |  |  |
 
 ## Events
 

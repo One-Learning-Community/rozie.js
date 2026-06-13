@@ -34,15 +34,19 @@ const EXPECT = {
   // (Boolean, default ON; :controls="false" opts out).
   // `history` (Phase 44 T1.3, D-02) = the undo/redo toggle (Boolean, default ON;
   // :history=false opts out — the snapshot stack stays empty, undo/redo no-op).
+  // `mode` (Phase 44 T2.4, D-05) = the two-way pan↔select interaction mode (String,
+  // default 'pan'); `marquee` gates the 4th Controls mode button (Boolean, default OFF
+  // → FlowCanvasScreenshot byte-identical).
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
     'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history',
+    'mode', 'marquee',
   ],
-  // `graph` + `zoom` are both two-way (the bound graph is the source of truth +
-  // write-back target; zoom is the viewport binding). Neither is a same-named emit
-  // (the MapLibre zoom/pitch model-prop == emit-name collision lesson).
-  models: ['graph', 'zoom'],
+  // `graph` + `zoom` + `mode` are two-way (the bound graph is the source of truth +
+  // write-back target; zoom is the viewport binding; mode is the pan↔select toggle).
+  // None is a same-named emit (the MapLibre zoom/pitch model-prop == emit-name lesson).
+  models: ['graph', 'zoom', 'mode'],
   // `selection-change` (Win 2, quick-260611-sqa) surfaces the selected node ids to the
   // consumer ({ ids }) on pick/unpick/deselect. ROZ127-clean (no prop/model/expose
   // collision): `selectable` is the prop, there is no `selection` model, so no
@@ -91,12 +95,12 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (17 props)', () => {
+  it('props surface matches (19 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
 
-  it('model:true props match (graph + zoom)', () => {
+  it('model:true props match (graph + zoom + mode)', () => {
     const modelNames = ir.props
       .filter((p: { isModel?: boolean }) => p.isModel)
       .map((p: { name: string }) => p.name);

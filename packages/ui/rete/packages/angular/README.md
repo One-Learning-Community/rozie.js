@@ -67,6 +67,8 @@ export class DemoComponent {
 | `minimap` | `Boolean` | `false` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 | `history` | `Boolean` | `true` |  |  |
+| `mode` | `String` | `"pan"` | ✓ |  |
+| `marquee` | `Boolean` | `false` |  |  |
 
 ## Events
 

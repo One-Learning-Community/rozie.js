@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
-import { __rozieInjectStyle, createControllableSignal, rozieContext } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -56,6 +56,16 @@ __rozieInjectStyle('FlowCanvas-cd396d6a', `.rozie-flow-canvas[data-rozie-s-cd396
 }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
 .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
+.rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] { background: #dbeafe; color: #1d4ed8; border-color: #3b82f6; }
+.rozie-flow-marquee[data-rozie-s-cd396d6a] {
+  position: absolute;
+  display: none;
+  z-index: 9;
+  pointer-events: none;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid #3b82f6;
+  border-radius: 2px;
+}
 .rozie-flow-minimap[data-rozie-s-cd396d6a] {
   position: absolute;
   right: 10px;
@@ -215,6 +225,10 @@ interface FlowCanvasProps {
   minimap?: boolean;
   canConnect?: ((...args: unknown[]) => unknown) | null;
   history?: boolean;
+  mode?: string;
+  defaultMode?: string;
+  onModeChange?: (mode: string) => void;
+  marquee?: boolean;
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -257,8 +271,8 @@ export interface FlowCanvasHandle {
 }
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
-  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true }, _props);
-  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history', 'children', 'ref']);
+  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true, marquee: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history', 'mode', 'marquee', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, undo, redo, canUndo, canRedo }); });
 
@@ -268,6 +282,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     connections: []
   }))());
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
+  const [mode, setMode] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'mode', 'pan');
   const [typeReg, setTypeReg] = createSignal({});
   const [portReg, setPortReg] = createSignal({});
   interface ReactivePortalHandle {
@@ -368,9 +383,13 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     socketWatcher.attach(renderScope);
 
     // ── selection (selectableNodes) ──
+    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
+    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
+    // accumulate). The handle is null when selection is off (readonly / !selectable), in
+    // which case the marquee branch no-ops.
     if (local.selectable && !local.readonly) {
       selector = AreaExtensions.selector();
-      AreaExtensions.selectableNodes(area, selector, {
+      nodeSelectApi = AreaExtensions.selectableNodes(area, selector, {
         accumulating: local.accumulateOnCtrl ? AreaExtensions.accumulateOnCtrl() : {
           active: () => false
         }
@@ -1534,6 +1553,139 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       minimapHost.addEventListener('pointerup', onMinimapPointerUp);
     }
 
+    // ─── T2.4 MARQUEE select (mode:'select') ─────────────────────────────────────
+    // A Figma-style rubber-band box. RESTORE-PATH resolution (RESEARCH Q2/A8): rete's
+    // internal `Drag` class is NOT exported, so setDragHandler(null) can't be cleanly
+    // reversed (re-instantiating Drag is impossible). Instead we leave the default pan Drag
+    // installed and intercept the EMPTY-canvas pointerdown in the CAPTURE phase on the
+    // container — the default Drag attaches its own bubble-phase pointerdown listener on the
+    // SAME container (verified rete-area-plugin@2.1.5: setDragHandler → Drag.initialize(
+    // this.container)), so a capture listener fires FIRST and stopPropagation() blocks pan
+    // before it starts. The interception is gated PURELY on the live `$props.mode` flag, so
+    // switching back to 'pan' restores pan with ZERO engine mutation (the persistent
+    // mode-guard the research preferred). A node drag is UNTOUCHED in both modes: we only act
+    // when the pointerdown target is NOT inside a node element (empty canvas).
+    //
+    // The box is a COMPONENT-TEMPLATE overlay div (ref="marqueeEl") — it carries the
+    // [data-rozie-s-*] scope attr so a PLAIN scoped rule styles it (NOT the :root engine-DOM
+    // escape hatch). On release we hit-test every graph node's rect (graph coords via
+    // area.nodeViews.get(id).position + measureNodeSize) against the box (converted to graph
+    // coords through the live transform) and nodeSelectApi.select(id, true) each intersector,
+    // then scheduleSelectionEmit() (the existing @selection-change path — NO new emit).
+    // Marquee changes only SELECTION (script-state), never the graph model → no history push.
+    const nodeAt = (target: any) => {
+      if (!target || typeof target.closest !== 'function') return null;
+      return target.closest('.rozie-flow-node');
+    };
+    // container-relative px → GRAPH coords (the inverse area transform, like
+    // screenToFlowPosition but already container-relative). px = transform + graph·k.
+    const containerPxToGraph = (px: any, py: any) => {
+      const t = area.area.transform;
+      const k = t.k || 1;
+      return {
+        x: (px - t.x) / k,
+        y: (py - t.y) / k
+      };
+    };
+    const updateMarqueeBox = () => {
+      if (!marqueeBox || !marqueeStart || !marqueeCur) return;
+      const x = Math.min(marqueeStart.x, marqueeCur.x);
+      const y = Math.min(marqueeStart.y, marqueeCur.y);
+      const w = Math.abs(marqueeCur.x - marqueeStart.x);
+      const h = Math.abs(marqueeCur.y - marqueeStart.y);
+      marqueeBox.style.left = x + 'px';
+      marqueeBox.style.top = y + 'px';
+      marqueeBox.style.width = w + 'px';
+      marqueeBox.style.height = h + 'px';
+      marqueeBox.style.display = 'block';
+    };
+    const finishMarquee = () => {
+      if (!marqueeActive) return;
+      marqueeActive = false;
+      if (marqueeBox) marqueeBox.style.display = 'none';
+      if (!marqueeStart || !marqueeCur || !nodeSelectApi) {
+        marqueeStart = null;
+        marqueeCur = null;
+        return;
+      }
+      // box in graph coords (two opposite corners → min/max).
+      const a = containerPxToGraph(marqueeStart.x, marqueeStart.y);
+      const b = containerPxToGraph(marqueeCur.x, marqueeCur.y);
+      const bx0 = Math.min(a.x, b.x),
+        by0 = Math.min(a.y, b.y);
+      const bx1 = Math.max(a.x, b.x),
+        by1 = Math.max(a.y, b.y);
+      marqueeStart = null;
+      marqueeCur = null;
+      const graphNodes = currentGraph().nodes || [];
+      let first = true;
+      for (const n of graphNodes as any) {
+        if (!n || n.id == null) continue;
+        const view = area.nodeViews.get(n.id);
+        const gx = view ? view.position.x : n.x || 0;
+        const gy = view ? view.position.y : n.y || 0;
+        const sz = measureNodeSize(n.id);
+        // a node intersects the box if their rects overlap (AABB), in graph coords.
+        const overlaps = gx < bx1 && gx + sz.w > bx0 && gy < by1 && gy + sz.h > by0;
+        if (overlaps) {
+          // accumulate=true keeps every intersector selected (first one replaces the prior
+          // selection so an old pick doesn't linger; rest accumulate). select(id, accumulate).
+          nodeSelectApi.select(n.id, !first);
+          first = false;
+        }
+      }
+      // surface @selection-change once the engine's awaited select() chain has flushed.
+      scheduleSelectionEmit();
+    };
+    if (local.selectable && !local.readonly && container && typeof container.addEventListener === 'function') {
+      marqueeBox = marqueeElRef || null;
+      onCanvasPointerDownCapture = (e: any) => {
+        // only in select mode, only the EMPTY canvas (not on a node — those still drag), only
+        // the primary button. A live `$props.mode` read = the persistent mode-guard (restoring
+        // pan is just this check returning early; no engine mutation).
+        if (mode() !== 'select') return;
+        if (e && e.button != null && e.button !== 0) return;
+        if (nodeAt(e.target)) return;
+        // BLOCK rete's pan Drag (its bubble-phase pointerdown on the same container) — capture
+        // phase runs first, so stopPropagation() here pre-empts pan; the marquee owns this drag.
+        e.stopPropagation();
+        e.preventDefault();
+        const box = container.getBoundingClientRect();
+        marqueeActive = true;
+        marqueeStart = {
+          x: e.clientX - box.left,
+          y: e.clientY - box.top
+        };
+        marqueeCur = {
+          x: marqueeStart.x,
+          y: marqueeStart.y
+        };
+        try {
+          if (container.setPointerCapture && e.pointerId != null) container.setPointerCapture(e.pointerId);
+        } catch (err: any) {}
+        updateMarqueeBox();
+      };
+      onMarqueePointerMove = (e: any) => {
+        if (!marqueeActive) return;
+        const box = container.getBoundingClientRect();
+        marqueeCur = {
+          x: e.clientX - box.left,
+          y: e.clientY - box.top
+        };
+        updateMarqueeBox();
+      };
+      onMarqueePointerUp = (e: any) => {
+        if (!marqueeActive) return;
+        try {
+          if (container.releasePointerCapture && e && e.pointerId != null) container.releasePointerCapture(e.pointerId);
+        } catch (err: any) {}
+        finishMarquee();
+      };
+      container.addEventListener('pointerdown', onCanvasPointerDownCapture, true);
+      container.addEventListener('pointermove', onMarqueePointerMove);
+      container.addEventListener('pointerup', onMarqueePointerUp);
+    }
+
     // ─── initial graph: nodes first, then connections (connections reference live
     // node instances), then optional fit. Sequenced via an async IIFE so the
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
@@ -1609,6 +1761,27 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       } catch (e: any) {}
     }
     minimapRedrawRaf = 0;
+    // T2.4 Marquee teardown — remove the capture-phase pointerdown guard + window listeners.
+    if (keydownContainer) {
+      if (onCanvasPointerDownCapture) {
+        try {
+          keydownContainer.removeEventListener('pointerdown', onCanvasPointerDownCapture, true);
+        } catch (e: any) {}
+      }
+      if (onMarqueePointerMove) {
+        try {
+          keydownContainer.removeEventListener('pointermove', onMarqueePointerMove);
+        } catch (e: any) {}
+      }
+      if (onMarqueePointerUp) {
+        try {
+          keydownContainer.removeEventListener('pointerup', onMarqueePointerUp);
+        } catch (e: any) {}
+      }
+    }
+    marqueeActive = false;
+    marqueeStart = null;
+    marqueeCur = null;
     for (const [, entry] of nodeEntries as any) {
       if (entry.handle) entry.handle.dispose();
       if (entry.bodyHandle && entry.bodyHandle.dispose) {
@@ -1668,6 +1841,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   })(v)), { defer: true }));
   let canvasElRef: HTMLElement | null = null;
   let minimapElRef: HTMLElement | null = null;
+  let marqueeElRef: HTMLElement | null = null;
 
   // ── engine instances — null-lets so typeNeutralize types them `any` (the
   // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
@@ -1707,6 +1881,22 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   let onMinimapPointerMove: any = null;
   let onMinimapPointerUp: any = null;
   let scheduleMinimapRedraw: any = null;
+
+  // T2.4 MARQUEE select (mode:'select') — the programmatic-select handle captured from
+  // AreaExtensions.selectableNodes ({ select(id, accumulate), unselect(id) }), the rubber-
+  // band overlay box (component-template DOM, scoped CSS), and the capture-phase pointerdown
+  // guard + window pointer listeners that draw the box in select mode. COMPONENT-scope (NOT
+  // $onMount-local) so the Solid-hoisted teardown can removeEventListener them (the keydown /
+  // minimap discipline). `marqueeBox` is the absolute overlay <div>; `marqueeActive` gates the
+  // in-progress drag; `marqueeStart`/`marqueeCur` are container-relative px corners.
+  let nodeSelectApi: any = null;
+  let marqueeBox: any = null;
+  let marqueeActive = false;
+  let marqueeStart: any = null;
+  let marqueeCur: any = null;
+  let onCanvasPointerDownCapture: any = null;
+  let onMarqueePointerMove: any = null;
+  let onMarqueePointerUp: any = null;
 
   // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
   const MINIMAP_W = 200;
@@ -2477,6 +2667,11 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   function controlFit() {
     zoomToFit();
   }
+  // T2.4 — the gated 4th Controls button toggles the two-way mode (pan ↔ select). Writes
+  // $model.mode (model:true); the consumer's r-model:mode (or the internal demo state) updates.
+  function toggleMode() {
+    setMode(mode() === 'select' ? 'pan' : 'select');
+  }
   function getNodes() {
     if (!area) return [];
     const out = [];
@@ -2588,7 +2783,9 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         <button type="button" data-testid="flow-zoom-in" aria-label="Zoom in" class={"rozie-flow-controls__btn"} onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>
         <button type="button" data-testid="flow-zoom-out" aria-label="Zoom out" class={"rozie-flow-controls__btn"} onClick={controlZoomOut} data-rozie-s-cd396d6a="">&#8722;</button>
         <button type="button" data-testid="flow-fit" aria-label="Fit view" class={"rozie-flow-controls__btn"} onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
-      </div></Show>}{<Show when={local.minimap}><div class={"rozie-flow-minimap"} ref={(el) => { minimapElRef = el as HTMLElement; }} data-testid="flow-minimap" data-rozie-s-cd396d6a="" /></Show>}</div>
+        
+        {<Show when={local.marquee}><button type="button" data-testid="flow-mode" aria-label={rozieAttr(mode() === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} class={"rozie-flow-controls__btn"} classList={{ 'is-active': mode() === 'select' }} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode() === 'select' ? '▢' : '✥')}</button></Show>}</div></Show>}{<Show when={local.minimap}><div class={"rozie-flow-minimap"} ref={(el) => { minimapElRef = el as HTMLElement; }} data-testid="flow-minimap" data-rozie-s-cd396d6a="" /></Show>}<div class={"rozie-flow-marquee"} ref={(el) => { marqueeElRef = el as HTMLElement; }} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
+    </div>
 
 
 
