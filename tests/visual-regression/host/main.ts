@@ -383,6 +383,13 @@ export const EXAMPLES = [
   // and the default (bezier) edge's `d` still uses a `C` bezier command (bezier default
   // unchanged). Behavioral-only; NOT a screenshot cell.
   'FlowCanvasEdgeTypes',
+  // Phase 44 T1.3 (D-02/03/04, undo/redo) — FlowCanvasUndo is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasUndoDemo.rozie): a 2-node graph + undo/redo
+  // buttons calling the canvas's undo()/redo() $expose verbs. The spec (rete-flow-undo)
+  // captures node A's bound x, drags it, asserts x changed, clicks undo (x EQUALS the
+  // pre-drag value exactly), then redo (x returns to post-drag). One gesture = one undo
+  // step. Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasUndo',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -552,6 +559,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasEdgeDelete: 'rozie-flow-canvas-edge-delete',
   // Phase 44 edge-types cell — '-demo' appended → 'rozie-flow-canvas-edge-types-demo'.
   FlowCanvasEdgeTypes: 'rozie-flow-canvas-edge-types',
+  // Phase 44 undo/redo cell — '-demo' appended → 'rozie-flow-canvas-undo-demo'.
+  FlowCanvasUndo: 'rozie-flow-canvas-undo',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -747,6 +756,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasEdgeDelete: {},
   // Phase 44 — FlowCanvasEdgeTypesDemo is self-contained (seeds its own typed-edge graph).
   FlowCanvasEdgeTypes: {},
+  // Phase 44 — FlowCanvasUndoDemo is self-contained (seeds its own 2-node graph).
+  FlowCanvasUndo: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

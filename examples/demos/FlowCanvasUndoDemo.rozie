@@ -1,0 +1,108 @@
+<!--
+  FlowCanvasUndoDemo.rozie — BEHAVIORAL consumer for Phase 44 T1.3 (D-02/03/04): undo/redo.
+  Drags a node → the canvas writes a fresh `{...graph, nodes}` back into `$data.graph`
+  (the controlled-graph write-back) AND pushes ONE history snapshot. Clicking the `undo`
+  button calls the canvas's `undo()` $expose verb, which restores the pre-drag snapshot
+  through the two-way `graph` model (echo-guarded by `programmatic`); `redo()` re-applies
+  the post-drag state. One gesture = one undo step (D-03).
+
+  `data-testid="node0-x"` reads `Math.round($data.graph.nodes[0].x)` — the BOUND model's
+  position, so the spec (`rete-flow-undo`) reads the SETTLED readout (drag is velocity-
+  flaky; never a mid-drag transform): captures pre-drag x, drags, asserts x changed, clicks
+  undo → asserts x EQUALS the captured pre-drag value EXACTLY, clicks redo → asserts it
+  returns to the post-drag value. Behavioral-only; NOT a screenshot cell.
+-->
+
+<rozie name="FlowCanvasUndoDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  graph: {
+    nodes: [
+      { id: 'a', type: 'step', x: 40,  y: 60,  data: { label: 'A' } },
+      { id: 'b', type: 'step', x: 320, y: 180, data: { label: 'B' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive undo()/redo() — read in
+// the button handlers (post-mount), never eagerly (ROZ123-safe).
+const doUndo = () => { const c = $refs.canvas; if (c && c.undo) c.undo() }
+const doRedo = () => { const c = $refs.canvas; if (c && c.redo) c.redo() }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — undo / redo (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="undo-btn" @click="doUndo">undo</button>
+    <button type="button" data-testid="redo-btn" @click="doRedo">redo</button>
+    <span class="readout">node A x: <b data-testid="node0-x">{{ Math.round($data.graph.nodes[0].x) }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.controls button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.controls .readout { font-size: 0.875rem; margin-left: auto; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

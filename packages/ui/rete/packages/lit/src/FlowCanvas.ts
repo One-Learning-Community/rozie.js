@@ -426,6 +426,17 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     }));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.graph)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
+      // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
+      // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
+      // this only refreshes it for a genuine outside edit).
+      if (this.selfWriteInFlight) {
+        // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
+        this.selfWriteInFlight = false;
+      } else if (!this.programmatic) {
+        const c = this.cloneGraph(this.currentGraph());
+        if (c != null) this.lastWrittenGraph = c;
+      }
       if (this.reconcileNodes) {
         Promise.resolve(this.reconcileNodes()).then(() => {
           if (this.reconcileConnections) this.reconcileConnections();
@@ -1390,6 +1401,12 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           bubbles: true,
           composed: true
         }));
+        // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
+        // is committed to history on the first `nodetranslated` (only if a drag follows;
+        // gated on !programmatic + history). A re-pick mid-drag won't overwrite a live one.
+        if (!this.programmatic && this.history !== false && !this.dragGestureActive) {
+          this.pendingDragSnapshot = this.snapshotCurrent();
+        }
         // Win 2: a pick changed the selection — surface @selection-change after the
         // engine's awaited select() for THIS pick has flushed the selector entities.
         this.scheduleSelectionEmit();
@@ -1401,6 +1418,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
         // pointerup that ended a node pick — already surfaced by the nodepicked branch).
         this.scheduleSelectionEmit();
+        // T1.3 — a pointerup ends any in-progress drag gesture, so the NEXT drag pushes a
+        // fresh history snapshot (one gesture = one undo step, D-03). Drop any stashed
+        // pre-drag snapshot that was never committed (a pick with no drag).
+        this.dragGestureActive = false;
+        this.pendingDragSnapshot = null;
         // T1.1: a background pointerup (anywhere not on a connection path) clears the edge
         // selection — UNLESS this same gesture just selected an edge (the path's own
         // pointerup ran in the same tick and raised `edgeClickGuard`; the guard self-resets
@@ -1414,6 +1436,17 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           if (meta) {
             meta.x = pos.x;
             meta.y = pos.y;
+          }
+          // T1.3 — commit ONE history snapshot per drag gesture, at its FIRST translate:
+          // the pre-move snapshot stashed on nodepicked (a drag truly happened now, not just
+          // a pick). dragGestureActive holds until the drag-ending pointerup resets it, so a
+          // continuous drag = ONE undo step (D-03).
+          if (!this.dragGestureActive) {
+            this.dragGestureActive = true;
+            if (this.pendingDragSnapshot) {
+              this.pushHistorySnapshot(this.pendingDragSnapshot);
+              this.pendingDragSnapshot = null;
+            }
           }
           // WRITE-BACK (coalesced): accumulate the latest position for this node and
           // flush ONE fresh graph object per animation frame (Pitfall 2 — the drag
@@ -1901,6 +1934,9 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
     ;
     (async () => {
+      // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
+      // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
+      this.lastWrittenGraph = this.cloneGraph(this.currentGraph());
       await this.reconcileNodes();
       await this.reconcileConnections();
       if (typeof this.zoom === 'number' && this.zoom !== 1) {
@@ -2041,6 +2077,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   redoStack = [];
 
+  dragGestureActive = false;
+
+  pendingDragSnapshot: any = null;
+
   pendingDragPositions = new Map();
 
   dragFlushRaf = 0;
@@ -2050,15 +2090,38 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   connections: []
 };
 
-  pushHistory = () => {
-  if (this.programmatic) return;
-  if (this.history === false) return;
-  let snap;
+  cloneGraph = (g: any) => {
+  if (g == null) return null;
   try {
-    snap = structuredClone(this.currentGraph());
-  } catch (e: any) {
-    return;
-  }
+    return JSON.parse(JSON.stringify(g));
+  } catch (e: any) {}
+  try {
+    return structuredClone(g);
+  } catch (e: any) {}
+  return null;
+};
+
+  lastWrittenGraph: any = null;
+
+  selfWriteInFlight = false;
+
+  commitGraph = (g: any) => {
+  const c = this.cloneGraph(g);
+  this.lastWrittenGraph = c != null ? c : g;
+  this.selfWriteInFlight = true;
+  this._graphControllable.write(g);
+};
+
+  snapshotCurrent = () => {
+  const src = this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
+  return this.cloneGraph(src);
+};
+
+  baseGraph = () => this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
+
+  pushHistorySnapshot = (snap: any) => {
+  if (this.history === false) return;
+  if (!snap) return;
   this.historyStack.push(snap);
   if (this.historyStack.length > this.HISTORY_CAP) {
     this.historyStack = this.historyStack.slice(this.historyStack.length - this.HISTORY_CAP);
@@ -2066,8 +2129,25 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   this.redoStack = [];
 };
 
+  pushHistory = () => {
+  if (this.programmatic) return;
+  if (this.history === false) return;
+  this.pushHistorySnapshot(this.snapshotCurrent());
+};
+
   restoreGraph = (snap: any) => {
   if (!snap) return;
+  // Cancel any in-flight drag write-back so a queued frame can't clobber the restore with
+  // a stale position after the programmatic guard releases.
+  this.pendingDragPositions.clear();
+  if (this.dragFlushRaf) {
+    if (typeof cancelAnimationFrame === 'function') {
+      try {
+        cancelAnimationFrame(this.dragFlushRaf);
+      } catch (e: any) {}
+    }
+    this.dragFlushRaf = 0;
+  }
   this.programmatic++;
   try {
     const fresh = {
@@ -2078,7 +2158,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         ...c
       }))
     };
-    this._graphControllable.write(fresh);
+    this.commitGraph(fresh);
   } finally {
     this.programmatic--;
   }
@@ -2086,12 +2166,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   undo = () => {
   if (this.historyStack.length === 0) return;
-  let cur;
-  try {
-    cur = structuredClone(this.currentGraph());
-  } catch (e: any) {
-    cur = null;
-  }
+  const cur = this.snapshotCurrent();
   const snap = this.historyStack.pop();
   if (cur) this.redoStack.push(cur);
   this.restoreGraph(snap);
@@ -2099,12 +2174,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   redo = () => {
   if (this.redoStack.length === 0) return;
-  let cur;
-  try {
-    cur = structuredClone(this.currentGraph());
-  } catch (e: any) {
-    cur = null;
-  }
+  const cur = this.snapshotCurrent();
   const snap = this.redoStack.pop();
   if (cur) this.historyStack.push(cur);
   this.restoreGraph(snap);
@@ -2121,7 +2191,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     return;
   }
   if (this.pendingDragPositions.size === 0) return;
-  const g = this.currentGraph();
+  const g = this.baseGraph();
   const nodes = (g.nodes || []).map((n: any) => {
     const p = n && n.id != null ? this.pendingDragPositions.get(n.id) : null;
     return p ? {
@@ -2131,9 +2201,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     } : n;
   });
   this.pendingDragPositions.clear();
-  // T1.3 — one history entry per DRAG gesture (the coalesced flush, NOT per frame).
-  this.pushHistory();
-  this._graphControllable.write({
+  this.commitGraph({
     ...g,
     nodes
   });
@@ -2151,7 +2219,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   writeBackConnectionCreated = (c: any) => {
   if (this.programmatic) return;
-  const g = this.currentGraph();
+  // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
+  // pre-connect state — snapshotCurrent reads lastWrittenGraph, still the pre-connect value).
+  this.pushHistory();
+  const g = this.baseGraph();
   const conn = {
     id: c.id,
     source: c.source,
@@ -2159,9 +2230,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     target: c.target,
     targetInput: c.targetInput
   };
-  // T1.3 — one history entry per CONNECT gesture.
-  this.pushHistory();
-  this._graphControllable.write({
+  this.commitGraph({
     ...g,
     connections: [...(g.connections || []), conn]
   });
@@ -2169,10 +2238,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   writeBackConnectionRemoved = (id: any) => {
   if (this.programmatic) return;
-  const g = this.currentGraph();
-  // T1.3 — one history entry per DISCONNECT / edge-delete gesture.
+  // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
   this.pushHistory();
-  this._graphControllable.write({
+  const g = this.baseGraph();
+  this.commitGraph({
     ...g,
     connections: (g.connections || []).filter((e: any) => e && e.id !== id)
   });
@@ -2220,14 +2289,14 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   deleteNode = (id: any) => {
   if (id == null) return false;
-  const g = this.currentGraph();
+  const g = this.baseGraph();
   const sid = String(id);
   const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
   if (nodes.length === (g.nodes || []).length) return false;
   const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
   // T1.3 — one history entry per DELETE gesture (node + its incident edges = ONE undo).
   this.pushHistory();
-  this._graphControllable.write({
+  this.commitGraph({
     ...g,
     nodes,
     connections

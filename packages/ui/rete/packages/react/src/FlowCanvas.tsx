@@ -117,6 +117,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const keydownContainer = useRef<any>(null);
   const scheduleMinimapRedraw = useRef<any>(null);
   const programmatic = useRef(0);
+  const dragGestureActive = useRef(false);
+  const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
@@ -130,7 +132,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const minimapPanning = useRef(false);
   const onMinimapPointerMove = useRef<any>(null);
   const onMinimapPointerUp = useRef<any>(null);
+  const lastWrittenGraph = useRef<any>(null);
   const dragFlushRaf = useRef(0);
+  const selfWriteInFlight = useRef(false);
   const [graph, setGraph] = useControllableState({
     value: props.graph,
     defaultValue: props.defaultGraph ?? (() => ({
@@ -195,20 +199,19 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
   // echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
   // (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
-  // D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (at the
-  // flushDragWriteBack commit, after the rAF coalesce — never per pointermove frame), a
+  // D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (snapshot taken
+  // on pointer-down, committed on the first translate — never per pointermove frame), a
   // connect / disconnect / delete = one each. A push is gated on `!programmatic` so a
   // restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
-  // history (D-04). Pushing truncates any forward (redo) tail at the cursor and drops the
-  // oldest entry beyond the cap (Threat T-44-03-1: bounded memory). The cursor points at
-  // the index of the CURRENT graph in the stack; undo moves it back, redo moves it
-  // forward. Snapshots are `structuredClone` of the consumer's own serializable graph
-  // JSON (Pattern 7; the global is available on all 6 runtimes / Node 20+) — no external
-  // input, so the restore (T-44-03-2 accept) cannot loop (it rides the programmatic guard
-  // + the existing $watch(graph) reconcile). Undo is ALWAYS on for v1; `:history=false`
-  // (the `history` prop) is the cheap escape hatch that skips every push (the stack stays
-  // empty → undo/redo are no-ops). COMPONENT-scope so the stack survives across area
-  // events + the Solid-hoisted teardown.
+  // history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
+  // cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
+  // serializable graph JSON (Pattern 7; `cloneGraph` — JSON round-trip with a
+  // `structuredClone` fallback — strips the Vue/Svelte reactivity Proxy that a bare
+  // `structuredClone` THROWS on) — no external input, so the restore (T-44-03-2 accept)
+  // cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
+  // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
+  // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
+  // COMPONENT-scope so the stack survives across area events + the Solid-hoisted teardown.
   const HISTORY_CAP = 100;
   // Two-stack model (simpler + correct than a single cursor): `historyStack` holds
   // PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
@@ -226,44 +229,70 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // pops redoStack → pushes the current graph back onto historyStack → restores it.
   let historyStack = [];
   let redoStack = [];
-
-  // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
-  // On every drag/connect/disconnect the canvas emits a FRESH top-level
-  // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
-  // applyNodeChanges style (Wave-0-proven 6/6; in-place deep mutation is SILENT on
-  // React/Solid/Lit/Angular). Echo-guarded by the `programmatic` counter + the
-  // no-op-diff property: the write-back value already matches engine truth (the node
-  // is already at x/y; the edge already exists) so the consumer's re-bind →
-  // $watch(graph) → reconcile is a no-op diff.
-  //
-  // DRAG COALESCING (Pitfall 2): `nodetranslated` fires on every pointermove during a
-  // drag; emitting a fresh graph + full reconcile per frame is a rebuild storm. We
-  // accumulate the latest position per node (pendingDragPositions) and flush ONE fresh
-  // graph write per animation frame (dragFlushRaf), plus a final flush so the last
-  // position always lands. requestAnimationFrame coalesces multiple moves in a frame
-  // into a single $model.graph emit.
+  // One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
+  // pointermove frame, so a push-per-flush would record many entries for ONE gesture. We
+  // snapshot the PRE-drag graph on `nodepicked` (pointer-DOWN, definitively before any
+  // movement — capturing it on the first `nodetranslated` is too late: the engine has
+  // already applied the initial delta + may have flushed a write-back, so $props.graph no
+  // longer holds the start position), stash it in `pendingDragSnapshot`, and COMMIT it to
+  // the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
+  // must not create a history entry). `dragGestureActive` then holds until the drag-ending
+  // `pointerup` resets it. D-03: a drag = ONE undo step.
   const pendingDragPositions = useMemo(() => new Map(), []);
   const currentGraph = useCallback(() => graph || {
     nodes: [],
     connections: []
   }, [graph]);
-  function pushHistory() {
-    if (programmatic.current) return;
-    if (props.history === false) return;
-    let snap;
+  const cloneGraph = useCallback((g: any) => {
+    if (g == null) return null;
     try {
-      snap = structuredClone(currentGraph());
-    } catch (e: any) {
-      return;
-    }
+      return JSON.parse(JSON.stringify(g));
+    } catch (e: any) {}
+    try {
+      return structuredClone(g);
+    } catch (e: any) {}
+    return null;
+  }, []);
+  function commitGraph(g: any) {
+    const c = cloneGraph(g);
+    lastWrittenGraph.current = c != null ? c : g;
+    selfWriteInFlight.current = true;
+    setGraph(g);
+  }
+  const snapshotCurrent = useCallback(() => {
+    const src = lastWrittenGraph.current != null ? lastWrittenGraph.current : currentGraph();
+    return cloneGraph(src);
+  }, [cloneGraph, currentGraph]);
+  function baseGraph() {
+    return lastWrittenGraph.current != null ? lastWrittenGraph.current : currentGraph();
+  }
+  const pushHistorySnapshot = useCallback((snap: any) => {
+    if (props.history === false) return;
+    if (!snap) return;
     historyStack.push(snap);
     if (historyStack.length > HISTORY_CAP) {
       historyStack = historyStack.slice(historyStack.length - HISTORY_CAP);
     }
     redoStack = [];
+  }, [props.history]);
+  function pushHistory() {
+    if (programmatic.current) return;
+    if (props.history === false) return;
+    pushHistorySnapshot(snapshotCurrent());
   }
   function restoreGraph(snap: any) {
     if (!snap) return;
+    // Cancel any in-flight drag write-back so a queued frame can't clobber the restore with
+    // a stale position after the programmatic guard releases.
+    pendingDragPositions.clear();
+    if (dragFlushRaf.current) {
+      if (typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(dragFlushRaf.current);
+        } catch (e: any) {}
+      }
+      dragFlushRaf.current = 0;
+    }
     programmatic.current++;
     try {
       const fresh = {
@@ -274,35 +303,25 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           ...c
         }))
       };
-      setGraph(fresh);
+      commitGraph(fresh);
     } finally {
       programmatic.current--;
     }
   }
   const undo = useCallback(() => {
     if (historyStack.length === 0) return;
-    let cur;
-    try {
-      cur = structuredClone(currentGraph());
-    } catch (e: any) {
-      cur = null;
-    }
+    const cur = snapshotCurrent();
     const snap = historyStack.pop();
     if (cur) redoStack.push(cur);
     restoreGraph(snap);
-  }, [currentGraph, restoreGraph]);
+  }, [restoreGraph, snapshotCurrent]);
   const redo = useCallback(() => {
     if (redoStack.length === 0) return;
-    let cur;
-    try {
-      cur = structuredClone(currentGraph());
-    } catch (e: any) {
-      cur = null;
-    }
+    const cur = snapshotCurrent();
     const snap = redoStack.pop();
     if (cur) historyStack.push(cur);
     restoreGraph(snap);
-  }, [currentGraph, restoreGraph]);
+  }, [restoreGraph, snapshotCurrent]);
   function canUndo() {
     return historyStack.length > 0;
   }
@@ -316,7 +335,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       return;
     }
     if (pendingDragPositions.size === 0) return;
-    const g = currentGraph();
+    const g = baseGraph();
     const nodes = (g.nodes || []).map((n: any) => {
       const p = n && n.id != null ? pendingDragPositions.get(n.id) : null;
       return p ? {
@@ -326,9 +345,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       } : n;
     });
     pendingDragPositions.clear();
-    // T1.3 — one history entry per DRAG gesture (the coalesced flush, NOT per frame).
-    pushHistory();
-    setGraph({
+    commitGraph({
       ...g,
       nodes
     });
@@ -344,7 +361,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }, [flushDragWriteBack]);
   const writeBackConnectionCreated = useCallback((c: any) => {
     if (programmatic.current) return;
-    const g = currentGraph();
+    // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
+    // pre-connect state — snapshotCurrent reads lastWrittenGraph, still the pre-connect value).
+    pushHistory();
+    const g = baseGraph();
     const conn = {
       id: c.id,
       source: c.source,
@@ -352,23 +372,21 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       target: c.target,
       targetInput: c.targetInput
     };
-    // T1.3 — one history entry per CONNECT gesture.
-    pushHistory();
-    setGraph({
+    commitGraph({
       ...g,
       connections: [...(g.connections || []), conn]
     });
-  }, [currentGraph, pushHistory, setGraph]);
+  }, [baseGraph, commitGraph, pushHistory]);
   const writeBackConnectionRemoved = useCallback((id: any) => {
     if (programmatic.current) return;
-    const g = currentGraph();
-    // T1.3 — one history entry per DISCONNECT / edge-delete gesture.
+    // T1.3 — one history entry per DISCONNECT / edge-delete gesture (BEFORE the write).
     pushHistory();
-    setGraph({
+    const g = baseGraph();
+    commitGraph({
       ...g,
       connections: (g.connections || []).filter((e: any) => e && e.id !== id)
     });
-  }, [currentGraph, pushHistory, setGraph]);
+  }, [baseGraph, commitGraph, pushHistory]);
   const clearEdgeSelection = useCallback(() => {
     if (selectedPathEl && selectedPathEl.classList) {
       try {
@@ -402,20 +420,20 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }, [_rozieProp_onEdgeClick, _rozieProp_onEdgeSelected, clearEdgeSelection]);
   const deleteNode = useCallback((id: any) => {
     if (id == null) return false;
-    const g = currentGraph();
+    const g = baseGraph();
     const sid = String(id);
     const nodes = (g.nodes || []).filter((n: any) => n && String(n.id) !== sid);
     if (nodes.length === (g.nodes || []).length) return false;
     const connections = (g.connections || []).filter((c: any) => c && String(c.source) !== sid && String(c.target) !== sid);
     // T1.3 — one history entry per DELETE gesture (node + its incident edges = ONE undo).
     pushHistory();
-    setGraph({
+    commitGraph({
       ...g,
       nodes,
       connections
     });
     return true;
-  }, [currentGraph, pushHistory, setGraph]);
+  }, [baseGraph, commitGraph, pushHistory]);
   const selectedNodeIds = useCallback(() => {
     if (!selector.current || !selector.current.entities) return [];
     const ids = [];
@@ -1548,6 +1566,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         props.onNodePicked && props.onNodePicked({
           id: context.data.id
         });
+        // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
+        // is committed to history on the first `nodetranslated` (only if a drag follows;
+        // gated on !programmatic + history). A re-pick mid-drag won't overwrite a live one.
+        if (!programmatic.current && props.history !== false && !dragGestureActive.current) {
+          pendingDragSnapshot.current = snapshotCurrent();
+        }
         // Win 2: a pick changed the selection — surface @selection-change after the
         // engine's awaited select() for THIS pick has flushed the selector entities.
         scheduleSelectionEmit();
@@ -1559,6 +1583,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
         // pointerup that ended a node pick — already surfaced by the nodepicked branch).
         scheduleSelectionEmit();
+        // T1.3 — a pointerup ends any in-progress drag gesture, so the NEXT drag pushes a
+        // fresh history snapshot (one gesture = one undo step, D-03). Drop any stashed
+        // pre-drag snapshot that was never committed (a pick with no drag).
+        dragGestureActive.current = false;
+        pendingDragSnapshot.current = null;
         // T1.1: a background pointerup (anywhere not on a connection path) clears the edge
         // selection — UNLESS this same gesture just selected an edge (the path's own
         // pointerup ran in the same tick and raised `edgeClickGuard`; the guard self-resets
@@ -1572,6 +1601,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (meta) {
             meta.x = pos.x;
             meta.y = pos.y;
+          }
+          // T1.3 — commit ONE history snapshot per drag gesture, at its FIRST translate:
+          // the pre-move snapshot stashed on nodepicked (a drag truly happened now, not just
+          // a pick). dragGestureActive holds until the drag-ending pointerup resets it, so a
+          // continuous drag = ONE undo step (D-03).
+          if (!dragGestureActive.current) {
+            dragGestureActive.current = true;
+            if (pendingDragSnapshot.current) {
+              pushHistorySnapshot(pendingDragSnapshot.current);
+              pendingDragSnapshot.current = null;
+            }
           }
           // WRITE-BACK (coalesced): accumulate the latest position for this node and
           // flush ONE fresh graph object per animation frame (Pitfall 2 — the drag
@@ -2011,6 +2051,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // $onMount-returned teardown stays synchronous. ──────────────────────────────
     ;
     (async () => {
+      // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
+      // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
+      lastWrittenGraph.current = cloneGraph(currentGraph());
       await reconcileNodes.current();
       await reconcileConnections.current();
       if (typeof _zoomRef.current === 'number' && _zoomRef.current !== 1) {
@@ -2099,6 +2142,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
+    // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
+    // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
+    // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
+    // this only refreshes it for a genuine outside edit).
+    if (selfWriteInFlight.current) {
+      // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
+      selfWriteInFlight.current = false;
+    } else if (!programmatic.current) {
+      const c = cloneGraph(currentGraph());
+      if (c != null) lastWrittenGraph.current = c;
+    }
     if (reconcileNodes.current) {
       Promise.resolve(reconcileNodes.current()).then(() => {
         if (reconcileConnections.current) reconcileConnections.current();
@@ -2106,7 +2160,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
     if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
-  }, [graph]);
+  }, [graph]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
     if (reconcileNodes.current) {

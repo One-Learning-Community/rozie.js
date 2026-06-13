@@ -1482,3 +1482,97 @@ for (const target of TARGETS) {
       .toBeGreaterThanOrEqual(1);
   });
 }
+
+/**
+ * 13. UNDO / REDO — per-gesture graph-only undo (Phase 44 T1.3, D-02/03/04).
+ *
+ * `examples/demos/FlowCanvasUndoDemo.rozie` (2 `step` nodes A,B + one edge; undo/redo
+ * buttons calling the canvas's `undo()`/`redo()` $expose verbs). A drag pushes ONE
+ * history snapshot (the pre-drag graph) and writes the post-drag graph back into the
+ * bound `$data.graph`; undo() restores the snapshot through the model (echo-guarded),
+ * redo() re-applies the post-drag state. Proves on all 6:
+ *
+ *   1. DRAG WRITE-BACK — node A's BOUND x (`node0-x` = Math.round(graph.nodes[0].x))
+ *      changes after a horizontal node-move gesture (the controlled-graph write-back).
+ *   2. UNDO — clicking `undo-btn` restores `node0-x` to EQUAL the captured pre-drag value
+ *      EXACTLY (not merely "smaller" — the snapshot is the literal pre-gesture graph).
+ *   3. ONE gesture = ONE step — a single undo reverts the whole drag (no second undo
+ *      needed to get back to the start).
+ *   4. REDO — clicking `redo-btn` returns `node0-x` to the post-drag value EXACTLY.
+ *
+ * Asserts the SETTLED readout only (the bound model after the gesture flushes), never a
+ * mid-drag transform (drag velocity is flaky). No `toHaveScreenshot` — behavioral cell.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-undo [${target}]: drag → undo restores the pre-gesture graph; redo re-applies it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasUndo&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+
+    const node0x = page.getByTestId('node0-x');
+    const readX = async (): Promise<number> =>
+      Number((await node0x.textContent())?.trim() ?? 'NaN');
+
+    // ---- capture the PRE-drag bound x (the demo seeds A at x=40) ----
+    await expect(node0x).toHaveText('40');
+    const preDragX = await readX();
+    expect(preDragX).toBe(40);
+
+    // ---- 1. DRAG WRITE-BACK: move node A horizontally → bound x changes ----
+    const nodeA = page.locator('.rozie-flow-node', { hasText: 'A' }).first();
+    await expect(nodeA).toBeVisible({ timeout: 10_000 });
+    const nb = await nodeA.boundingBox();
+    if (!nb) throw new Error('node A bounding box unavailable');
+    // grab near the top-left (label area), away from the right-edge output socket, so
+    // this is a node-move gesture (not a connect drag).
+    const grabX = nb.x + 14;
+    const grabY = nb.y + 10;
+    const DX = 90;
+    await page.mouse.move(grabX, grabY);
+    await page.mouse.down();
+    await page.mouse.move(grabX + DX / 2, grabY, { steps: 6 });
+    await page.mouse.move(grabX + DX, grabY, { steps: 6 });
+    await page.mouse.up();
+
+    // the bound x climbed (the canvas wrote a fresh {...graph, nodes} into $data.graph).
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBeGreaterThan(preDragX);
+
+    // settle, then capture the POST-drag value (stable — no write-back loop).
+    await page.waitForTimeout(500);
+    const postDragX = await readX();
+    expect(postDragX).toBeGreaterThan(preDragX);
+    await page.waitForTimeout(300);
+    expect(await readX(), 'post-drag readout must be settled (no echo loop)').toBe(postDragX);
+
+    // ---- 2 + 3. UNDO: one click restores the PRE-drag x EXACTLY (one gesture = one step) ----
+    await page.getByTestId('undo-btn').click();
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(preDragX);
+    // settle + re-sample: a single undo fully reverts the drag and holds (no oscillation).
+    await page.waitForTimeout(400);
+    expect(await readX(), 'a single undo reverts the whole drag and holds').toBe(preDragX);
+
+    // ---- 4. REDO: returns the bound x to the POST-drag value EXACTLY ----
+    await page.getByTestId('redo-btn').click();
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(postDragX);
+    await page.waitForTimeout(400);
+    expect(await readX(), 'redo returns to the post-drag value and holds').toBe(postDragX);
+  });
+}
