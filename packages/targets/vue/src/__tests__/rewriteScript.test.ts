@@ -33,6 +33,7 @@ import type { IRComponent, RefDecl, StateDecl } from '../../../../core/src/ir/ty
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { emitScript } from '../emit/emitScript.js';
+import { emitVue } from '../emitVue.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -293,7 +294,7 @@ function rewrite(
   src: string,
   ir: IRComponent,
   plugins: ('typescript' | 'jsx')[] = [],
-): { code: string; diagnostics: Diagnostic[]; slotsUsed: boolean; usesToRaw: boolean } {
+): { code: string; diagnostics: Diagnostic[]; slotsUsed: boolean; usesDeepClone: boolean } {
   const program = babelParse(src, { sourceType: 'module', plugins });
   const diagnostics: Diagnostic[] = [];
   const result = rewriteRozieIdentifiers(program, ir, diagnostics);
@@ -301,7 +302,7 @@ function rewrite(
     code: generate(program).code,
     diagnostics,
     slotsUsed: result.slotsUsed,
-    usesToRaw: result.usesToRaw,
+    usesDeepClone: result.usesDeepClone,
   };
 }
 
@@ -457,35 +458,39 @@ describe('rewriteRozieIdentifiers — $slots / $portals / $snapshot handlers', (
     expect(rewrite('obj.method();', ir).code).toContain('obj.method()');
   });
 
-  // Phase 45 — $clone(x) → structuredClone(toRaw(x)) on Vue + toRaw auto-import signal.
-  it('$clone(x) → structuredClone(toRaw(x)) and sets usesToRaw', () => {
+  // Phase 45-07 (WR-02/WR-06) — $clone(x) → rozieDeepClone(x) on Vue + the
+  // runtime-vue import signal (usesDeepClone). The recursive de-proxy walk now
+  // lives in the @rozie/runtime-vue helper (no top-level toRaw), bringing Vue to
+  // parity with Svelte's `$state.snapshot` on nested INDEPENDENT reactive proxies.
+  it('$clone(x) → rozieDeepClone(x) and sets usesDeepClone', () => {
     const ir = buildIR();
-    const { code, usesToRaw } = rewrite('const c = $clone(payload);', ir);
-    expect(code).toContain('structuredClone(toRaw(');
+    const { code, usesDeepClone } = rewrite('const c = $clone(payload);', ir);
+    expect(code).toContain('rozieDeepClone(payload)');
     expect(code).not.toContain('$clone');
-    expect(usesToRaw).toBe(true);
+    expect(code).not.toContain('toRaw');
+    expect(usesDeepClone).toBe(true);
   });
 
   it('$clone($data.x) still lowers the argument reactive read (no path.skip)', () => {
     const ir = buildIR({ state: [mkState('graph')] });
     const { code } = rewrite('const c = $clone($data.graph);', ir);
-    // toRaw wraps the rewritten Vue value form (graph.value), not the raw $data read.
-    expect(code).toContain('structuredClone(toRaw(graph.value))');
+    // rozieDeepClone wraps the rewritten Vue value form (graph.value), not the raw $data read.
+    expect(code).toContain('rozieDeepClone(graph.value)');
     expect(code).not.toContain('$data.graph');
   });
 
-  it('$clone with non-single args is left untouched and leaves usesToRaw false', () => {
+  it('$clone with non-single args is left untouched and leaves usesDeepClone false', () => {
     const ir = buildIR();
-    const { code, usesToRaw } = rewrite('$clone(a, b);', ir);
+    const { code, usesDeepClone } = rewrite('$clone(a, b);', ir);
     expect(code).toContain('$clone(a, b)');
-    expect(usesToRaw).toBe(false);
+    expect(usesDeepClone).toBe(false);
   });
 
   it('$clone with a spread (non-expression) argument is left untouched', () => {
     const ir = buildIR();
-    const { code, usesToRaw } = rewrite('const c = $clone(...x);', ir);
+    const { code, usesDeepClone } = rewrite('const c = $clone(...x);', ir);
     expect(code).toContain('$clone(...x)');
-    expect(usesToRaw).toBe(false);
+    expect(usesDeepClone).toBe(false);
   });
 });
 
@@ -691,9 +696,11 @@ describe('rewriteRozieIdentifiers — TS type-position skip', () => {
   });
 });
 
-// Phase 45 — emit-level proof that a `.rozie` using $clone auto-imports `toRaw`
-// from 'vue' through the usesToRaw result flag → emitScript imports.use('toRaw').
-describe('emitScript — $clone toRaw auto-import wiring', () => {
+// Phase 45-07 (WR-02/WR-06) — emit-level proof that a `.rozie` using $clone
+// lowers to `rozieDeepClone(x)` (emitScript flag usesDeepClone) and that emitVue
+// threads `import { rozieDeepClone } from '@rozie/runtime-vue'` through the
+// runtime-vue ScriptInjection dedupe path. No `toRaw` is emitted anymore.
+describe('emitScript / emitVue — $clone rozieDeepClone wiring', () => {
   function lowerSource(src: string): IRComponent {
     const parsed = parse(src, { filename: 'CloneEmit.rozie' });
     if (!parsed.ast) throw new Error('parse returned null');
@@ -718,24 +725,33 @@ $onMount(() => {
 </template>
 </rozie>`;
 
-  it('a .rozie using $clone emits `toRaw` in the `from \'vue\'` import line', () => {
-    const { script } = emitScript(lowerSource(SRC));
-    expect(script).toContain('structuredClone(toRaw(');
-    // toRaw is auto-collected into the single sorted `import { ... } from 'vue'` line.
-    const vueImport = script
-      .split('\n')
-      .find((l) => l.includes("from 'vue'"));
-    expect(vueImport).toBeDefined();
-    expect(vueImport).toContain('toRaw');
+  it('emitScript lowers $clone to rozieDeepClone and sets usesDeepClone (no toRaw)', () => {
+    const { script, usesDeepClone } = emitScript(lowerSource(SRC));
+    expect(script).toContain('rozieDeepClone(graph.value)');
+    expect(script).not.toContain('structuredClone');
+    expect(script).not.toContain('toRaw');
+    expect(usesDeepClone).toBe(true);
   });
 
-  it('a .rozie NOT using $clone does not import toRaw', () => {
-    const noClone = SRC.replace('$clone($data.graph)', '$data.graph');
-    const { script } = emitScript(lowerSource(noClone));
-    const vueImport = script
+  it('emitVue threads `rozieDeepClone` in the `@rozie/runtime-vue` import line', () => {
+    const { code } = emitVue(lowerSource(SRC), { filename: 'CloneEmit.rozie' });
+    expect(code).toContain('rozieDeepClone(graph.value)');
+    const runtimeImport = code
       .split('\n')
-      .find((l) => l.includes("from 'vue'"));
-    // toRaw must not leak in when $clone is absent.
+      .find((l) => l.includes("from '@rozie/runtime-vue'"));
+    expect(runtimeImport).toBeDefined();
+    expect(runtimeImport).toContain('rozieDeepClone');
+    // No `toRaw` leaks into any `from 'vue'` line.
+    const vueImport = code.split('\n').find((l) => l.includes("from 'vue'"));
     if (vueImport) expect(vueImport).not.toContain('toRaw');
+  });
+
+  it('a .rozie NOT using $clone emits no rozieDeepClone import and leaves usesDeepClone false', () => {
+    const noClone = SRC.replace('$clone($data.graph)', '$data.graph');
+    const { script, usesDeepClone } = emitScript(lowerSource(noClone));
+    expect(usesDeepClone).toBe(false);
+    expect(script).not.toContain('rozieDeepClone');
+    const { code } = emitVue(lowerSource(noClone), { filename: 'CloneEmit.rozie' });
+    expect(code).not.toContain('rozieDeepClone');
   });
 });

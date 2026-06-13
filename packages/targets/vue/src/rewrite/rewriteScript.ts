@@ -131,12 +131,17 @@ export interface RewriteRozieIdentifiersResult {
   slotsUsed: boolean;
   /**
    * Phase 45 — true if the script body called `$clone(x)`, which on Vue lowers
-   * to `structuredClone(toRaw(x))`. emitScript.ts consumes this to emit
-   * `import { toRaw } from 'vue'` via VueImportCollector.use('toRaw'). The
-   * `toRaw` unwrap is Vue-only; the other targets emit bare `structuredClone(x)`
-   * / `$state.snapshot(x)` and never reference `toRaw` (D-01, Phase 45).
+   * to `rozieDeepClone(x)` (Phase 45-07 WR-02/WR-06 fix). emitScript.ts consumes
+   * this to thread `import { rozieDeepClone } from '@rozie/runtime-vue'` through
+   * the runtime-vue ScriptInjection path. The helper is Vue-only; the other
+   * targets emit bare `structuredClone(x)` / `$state.snapshot(x)` (D-01).
+   *
+   * Named `usesDeepClone` (was `usesToRaw` pre-45-07): the lowering no longer
+   * emits `toRaw` — the recursive de-proxy walk lives inside the runtime helper,
+   * which brings Vue to parity with Svelte's recursive `$state.snapshot` for
+   * nested INDEPENDENT reactive proxies / refs (the WR-02 hole).
    */
-  usesToRaw: boolean;
+  usesDeepClone: boolean;
 }
 
 /**
@@ -163,7 +168,7 @@ export function rewriteRozieIdentifiers(
   diagnostics: Diagnostic[],
 ): RewriteRozieIdentifiersResult {
   let slotsUsed = false;
-  let usesToRaw = false; // Phase 45 — set by the $clone branch; signals toRaw auto-import.
+  let usesDeepClone = false; // Phase 45-07 — set by the $clone branch; signals rozieDeepClone runtime-vue import.
   // All slot names — both portal and non-portal slots route their
   // script-side presence checks (`$slots.X`) through `slots.X`, where
   // `slots` is a single `useSlots()` const at script-setup scope.
@@ -373,24 +378,34 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
-      // Phase 45 (D-01) — $clone(x) → structuredClone(toRaw(x)). Vue's
-      // reactive() wraps the target WITHOUT writing proxies back to nested
-      // objects (Vue source: baseHandlers.ts `get` trap returns `reactive(res)`
-      // without write-back; the proxy is cached in a separate `reactiveMap`
-      // WeakMap). toRaw() unwinds the top-level proxy to the raw target, whose
-      // nested objects stay raw — so structuredClone recurses over plain
-      // objects and never meets a nested Proxy ⇒ never throws "could not be
-      // cloned". A single top-level toRaw is sufficient (no deep-toRaw needed).
+      // Phase 45 (D-01) + 45-07 (WR-02/WR-06) — $clone(x) → rozieDeepClone(x).
+      //
+      // The original lowering emitted `structuredClone(toRaw(x))`. A SINGLE
+      // top-level `toRaw` is NOT sufficient: while Vue's reactive() does not
+      // write proxies back onto a raw target, a nested member can itself be an
+      // INDEPENDENT reactive proxy or a ref() (e.g.
+      // `reactive({ box: { inner: reactive(...) } })`, an array of reactive
+      // items, or the shipped FlowCanvas `$clone({ d: src.data }).d` where
+      // `src.data` is a live nested proxy). `toRaw` leaves those nested proxies
+      // intact, and `structuredClone` then throws "could not be cloned". The
+      // Task-1 runtime probe (tests/visual-regression/scripts/clone-nested-probe.mjs)
+      // proved this on real Vue proxies; Svelte's `$state.snapshot` does NOT
+      // share the hole because it recursively de-proxies.
+      //
+      // The fix routes the recursive de-proxy walk into the `@rozie/runtime-vue`
+      // `rozieDeepClone` helper (`structuredClone(deepToRaw(x))`), bringing Vue
+      // to parity. emitScript threads the runtime-vue import via the
+      // ScriptInjection path when usesDeepClone is set. (Function-bearing values
+      // still throw under structuredClone — same as before; $clone is for
+      // serializable graph/history state.)
       if (callee.name === '$clone') {
         const args = path.node.arguments;
         if (args.length === 1) {
           const arg = args[0]!;
           if (t.isExpression(arg)) {
-            usesToRaw = true;
+            usesDeepClone = true;
             path.replaceWith(
-              t.callExpression(t.identifier('structuredClone'), [
-                t.callExpression(t.identifier('toRaw'), [arg]),
-              ]),
+              t.callExpression(t.identifier('rozieDeepClone'), [arg]),
             );
             // Do NOT path.skip() — the arg may contain $props.X / $data.X reads
             // (e.g. $clone($data.graph)) that still need rewriting to .value form.
@@ -564,5 +579,5 @@ export function rewriteRozieIdentifiers(
     },
   });
 
-  return { slotsUsed, usesToRaw };
+  return { slotsUsed, usesDeepClone };
 }

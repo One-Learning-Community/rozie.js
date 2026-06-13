@@ -291,7 +291,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   if (opts.genericParams !== undefined) scriptOpts.genericParams = opts.genericParams;
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   scriptOpts.portalScopeHash = portalScopeHash;
-  const { script, scriptMap, preambleSectionLines, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
+  const { script, scriptMap, preambleSectionLines, usesDeepClone, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
   const {
     template,
     scriptInjections,
@@ -315,7 +315,23 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
       decl: '', // No decl — emitListeners renders its own block.
     }));
 
-  const allInjections = [...scriptInjections, ...listenerImportInjections];
+  // Phase 45-07 (WR-02/WR-06) — when the script lowered `$clone(x)` to
+  // `rozieDeepClone(x)`, thread the runtime-vue import through the SAME dedupe
+  // path (decl: '' — the call sites are already emitted inline by the rewrite).
+  // mergeScriptInjections coalesces it with any debounce/throttle/outside import
+  // line from `@rozie/runtime-vue`, sorted, so a component using both helpers
+  // emits a single `import { debounce, rozieDeepClone } from '@rozie/runtime-vue'`.
+  const deepCloneInjections: ScriptInjection[] = usesDeepClone
+    ? [
+        {
+          wrapName: 'rozieDeepClone',
+          import: { from: '@rozie/runtime-vue', name: 'rozieDeepClone' },
+          decl: '',
+        },
+      ]
+    : [];
+
+  const allInjections = [...scriptInjections, ...listenerImportInjections, ...deepCloneInjections];
 
   let enrichedScript = mergeScriptInjections(script, allInjections);
   const extraVueNames = listenerVueImports.has('watchEffect')

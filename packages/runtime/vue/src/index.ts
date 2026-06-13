@@ -25,3 +25,7 @@ export {
 // FORBIDDEN_KEYS-skipping identity over a null-prototype object (A1 / Pitfall 8
 // lock — Vue native-element v-on keys stay lowercase, no per-target key remap).
 export { normalizeListeners } from './normalizeListeners.js';
+// Phase 45-07 (WR-02 / WR-06) — recursive proxy-safe deep clone for the `$clone`
+// sigil. Replaces the old `structuredClone(toRaw(x))` lowering, which threw on
+// nested INDEPENDENT reactive proxies / refs. See rozieDeepClone.ts.
+export { rozieDeepClone } from './rozieDeepClone.js';

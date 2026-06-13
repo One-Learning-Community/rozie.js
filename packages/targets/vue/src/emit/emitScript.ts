@@ -896,6 +896,14 @@ export interface EmitScriptResult {
    * number of output lines before the user-authored statements begin.
    */
   preambleSectionLines: number;
+  /**
+   * Phase 45-07 (WR-02/WR-06) — true if the script body called `$clone(x)`,
+   * which on Vue lowers to `rozieDeepClone(x)`. emitVue consumes this to thread
+   * `import { rozieDeepClone } from '@rozie/runtime-vue'` through the runtime-vue
+   * ScriptInjection dedupe path (the same path debounce/throttle/useOutsideClick
+   * use), so it merges cleanly with any existing runtime-vue import line.
+   */
+  usesDeepClone: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -909,7 +917,7 @@ export function emitScript(
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
 
   // 2. Rewrite identifiers on the clone.
-  const { slotsUsed, usesToRaw } = rewriteRozieIdentifiers(cloned, ir, diagnostics);
+  const { slotsUsed, usesDeepClone } = rewriteRozieIdentifiers(cloned, ir, diagnostics);
 
   const imports = new VueImportCollector();
 
@@ -932,13 +940,11 @@ export function emitScript(
     imports.use('useSlots');
     useSlotsLine.push('const slots = useSlots();');
   }
-  // Phase 45 (D-01) — $clone(x) lowers to structuredClone(toRaw(x)) on Vue;
-  // auto-import `toRaw`. VueImportCollector.use merges it into the single sorted
-  // `import { ... } from 'vue'` line (no string-splicing → preserves the
-  // dist-parity byte contract).
-  if (usesToRaw) {
-    imports.use('toRaw');
-  }
+  // Phase 45-07 (WR-02/WR-06) — $clone(x) lowers to `rozieDeepClone(x)` on Vue
+  // (the recursive proxy-safe deep clone in @rozie/runtime-vue). The import is
+  // NOT a `'vue'` symbol, so it is NOT collected here; instead emitVue threads
+  // `import { rozieDeepClone } from '@rozie/runtime-vue'` via the runtime-vue
+  // ScriptInjection dedupe path using the usesDeepClone flag returned below.
   const dataLines = emitDataRefs(ir, imports);
   const refLines = emitTemplateRefs(ir, imports);
 
@@ -1055,5 +1061,5 @@ export function emitScript(
     }
   }
 
-  return { script, scriptMap, preambleSectionLines, diagnostics };
+  return { script, scriptMap, preambleSectionLines, usesDeepClone, diagnostics };
 }
