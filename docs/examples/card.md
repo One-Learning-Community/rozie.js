@@ -39,35 +39,29 @@ Note the auto kebab/camel conversion: the source writes `:on-close="$props.onClo
 ```rozie-src Card
 ```
 
-### Card — Vue output
+### Card — compiled output
+
+::: code-group
 
 ```rozie-out Card vue
 ```
 
-### Card — React output
-
 ```rozie-out Card react
 ```
-
-### Card — Svelte output
 
 ```rozie-out Card svelte
 ```
 
-### Card — Angular output
-
 ```rozie-out Card angular
 ```
-
-### Card — Solid output
 
 ```rozie-out Card solid
 ```
 
-### Card — Lit output
-
 ```rozie-out Card lit
 ```
+
+:::
 
 ---
 
@@ -78,32 +72,26 @@ A tiny leaf component (~30 lines) — no `<components>` block, no slots, no life
 ```rozie-src CardHeader
 ```
 
-### CardHeader — Vue output
+### CardHeader — compiled output
+
+::: code-group
 
 ```rozie-out CardHeader vue
 ```
 
-### CardHeader — React output
-
 ```rozie-out CardHeader react
 ```
-
-### CardHeader — Svelte output
 
 ```rozie-out CardHeader svelte
 ```
 
-### CardHeader — Angular output
-
 ```rozie-out CardHeader angular
 ```
-
-### CardHeader — Solid output
 
 ```rozie-out CardHeader solid
 ```
 
-### CardHeader — Lit output
-
 ```rozie-out CardHeader lit
 ```
+
+:::

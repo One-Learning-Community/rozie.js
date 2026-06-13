@@ -32,32 +32,26 @@ Two-way bound to the page's `items` ref. Add, toggle, remove — every mutation 
 ```rozie-src TodoList
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out TodoList vue
 ```
 
-## React output
-
 ```rozie-out TodoList react
 ```
-
-## Svelte output
 
 ```rozie-out TodoList svelte
 ```
 
-## Angular output
-
 ```rozie-out TodoList angular
 ```
-
-## Solid output
 
 ```rozie-out TodoList solid
 ```
 
-## Lit output
-
 ```rozie-out TodoList lit
 ```
+
+:::

@@ -45,32 +45,26 @@ Three levels deep — Vue's `defineOptions({ name: 'TreeNode' })` lets the compo
 ```rozie-src TreeNode
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out TreeNode vue
 ```
 
-## React output
-
 ```rozie-out TreeNode react
 ```
-
-## Svelte output
 
 ```rozie-out TreeNode svelte
 ```
 
-## Angular output
-
 ```rozie-out TreeNode angular
 ```
-
-## Solid output
 
 ```rozie-out TreeNode solid
 ```
 
-## Lit output
-
 ```rozie-out TreeNode lit
 ```
+
+:::

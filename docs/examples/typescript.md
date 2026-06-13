@@ -37,32 +37,26 @@ The card below is the actual `examples/typed/TypedCard.rozie` file, compiled by 
 ```rozie-src TypedCard
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out TypedCard vue
 ```
 
-## React output
-
 ```rozie-out TypedCard react
 ```
-
-## Svelte output
 
 ```rozie-out TypedCard svelte
 ```
 
-## Angular output
-
 ```rozie-out TypedCard angular
 ```
-
-## Solid output
 
 ```rozie-out TypedCard solid
 ```
 
-## Lit output
-
 ```rozie-out TypedCard lit
 ```
+
+:::

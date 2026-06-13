@@ -32,32 +32,26 @@ Click the button to open the *actual* `examples/Modal.rozie`. Press Escape, clic
 ```rozie-src Modal
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Modal vue
 ```
 
-## React output
-
 ```rozie-out Modal react
 ```
-
-## Svelte output
 
 ```rozie-out Modal svelte
 ```
 
-## Angular output
-
 ```rozie-out Modal angular
 ```
-
-## Solid output
 
 ```rozie-out Modal solid
 ```
 
-## Lit output
-
 ```rozie-out Modal lit
 ```
+
+:::

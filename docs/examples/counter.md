@@ -26,32 +26,26 @@ The Counter below is the *actual* `examples/Counter.rozie` file from the monorep
 ```rozie-src Counter
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Counter vue
 ```
 
-## React output
-
 ```rozie-out Counter react
 ```
-
-## Svelte output
 
 ```rozie-out Counter svelte
 ```
 
-## Angular output
-
 ```rozie-out Counter angular
 ```
-
-## Solid output
 
 ```rozie-out Counter solid
 ```
 
-## Lit output
-
 ```rozie-out Counter lit
 ```
+
+:::

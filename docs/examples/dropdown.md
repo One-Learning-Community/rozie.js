@@ -40,32 +40,26 @@ Click the trigger to open. Then try: clicking outside the panel (closes via the 
 ```rozie-src Dropdown
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Dropdown vue
 ```
 
-## React output
-
 ```rozie-out Dropdown react
 ```
-
-## Svelte output
 
 ```rozie-out Dropdown svelte
 ```
 
-## Angular output
-
 ```rozie-out Dropdown angular
 ```
-
-## Solid output
 
 ```rozie-out Dropdown solid
 ```
 
-## Lit output
-
 ```rozie-out Dropdown lit
 ```
+
+:::

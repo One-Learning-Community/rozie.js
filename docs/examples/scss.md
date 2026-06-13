@@ -34,32 +34,26 @@ The grid below is the actual `examples/BadgeGridStyledScss.rozie` file, compiled
 ```rozie-src BadgeGridStyledScss
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out BadgeGridStyledScss vue
 ```
 
-## React output
-
 ```rozie-out BadgeGridStyledScss react
 ```
-
-## Svelte output
 
 ```rozie-out BadgeGridStyledScss svelte
 ```
 
-## Angular output
-
 ```rozie-out BadgeGridStyledScss angular
 ```
-
-## Solid output
 
 ```rozie-out BadgeGridStyledScss solid
 ```
 
-## Lit output
-
 ```rozie-out BadgeGridStyledScss lit
 ```
+
+:::

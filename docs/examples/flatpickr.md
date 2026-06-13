@@ -28,35 +28,29 @@ The wrapper is a compact tour of the engine-binding pattern:
 ```rozie-src Flatpickr
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Flatpickr vue
 ```
 
-## React output
-
 ```rozie-out Flatpickr react
 ```
-
-## Svelte output
 
 ```rozie-out Flatpickr svelte
 ```
 
-## Angular output
-
 ```rozie-out Flatpickr angular
 ```
-
-## Solid output
 
 ```rozie-out Flatpickr solid
 ```
 
-## Lit output
-
 ```rozie-out Flatpickr lit
 ```
+
+:::
 
 ## Demo source — FlatpickrDemo.rozie
 

@@ -27,35 +27,29 @@ It is the deepest-reactivity example in the set:
 ```rozie-src Chart
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Chart vue
 ```
 
-## React output
-
 ```rozie-out Chart react
 ```
-
-## Svelte output
 
 ```rozie-out Chart svelte
 ```
 
-## Angular output
-
 ```rozie-out Chart angular
 ```
-
-## Solid output
 
 ```rozie-out Chart solid
 ```
 
-## Lit output
-
 ```rozie-out Chart lit
 ```
+
+:::
 
 ## Demo source — LineChartDemo.rozie
 

@@ -29,35 +29,29 @@ This page shows the live demo plus the per-target compiled output. For the full 
 ```rozie-src SortableList
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out SortableList vue
 ```
 
-## React output
-
 ```rozie-out SortableList react
 ```
-
-## Svelte output
 
 ```rozie-out SortableList svelte
 ```
 
-## Angular output
-
 ```rozie-out SortableList angular
 ```
-
-## Solid output
 
 ```rozie-out SortableList solid
 ```
 
-## Lit output
-
 ```rozie-out SortableList lit
 ```
+
+:::
 
 ## Demo source — SortableListDemo.rozie
 

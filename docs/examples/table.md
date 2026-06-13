@@ -25,35 +25,29 @@ Click the **Toggle footer** button to swap the `<tfoot>` content between the sum
 ```rozie-src Table
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out Table vue
 ```
 
-## React output
-
 ```rozie-out Table react
 ```
-
-## Svelte output
 
 ```rozie-out Table svelte
 ```
 
-## Angular output
-
 ```rozie-out Table angular
 ```
-
-## Solid output
 
 ```rozie-out Table solid
 ```
 
-## Lit output
-
 ```rozie-out Table lit
 ```
+
+:::
 
 ## Demo source — TableDemo.rozie
 

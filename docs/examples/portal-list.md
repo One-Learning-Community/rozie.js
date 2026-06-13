@@ -98,32 +98,26 @@ All six targets dispose every active portal mount BEFORE destroying the engine i
 ```rozie-src PortalListDemo
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out PortalList vue
 ```
 
-## React output
-
 ```rozie-out PortalList react
 ```
-
-## Svelte output
 
 ```rozie-out PortalList svelte
 ```
 
-## Angular output
-
 ```rozie-out PortalList angular
 ```
-
-## Solid output
 
 ```rozie-out PortalList solid
 ```
 
-## Lit output
-
 ```rozie-out PortalList lit
 ```
+
+:::

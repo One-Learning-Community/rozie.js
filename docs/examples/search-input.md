@@ -35,32 +35,26 @@ Type at least 2 characters. The `.debounce(300)` modifier means `search` fires o
 ```rozie-src SearchInput
 ```
 
-## Vue output
+## Compiled output
+
+::: code-group
 
 ```rozie-out SearchInput vue
 ```
 
-## React output
-
 ```rozie-out SearchInput react
 ```
-
-## Svelte output
 
 ```rozie-out SearchInput svelte
 ```
 
-## Angular output
-
 ```rozie-out SearchInput angular
 ```
-
-## Solid output
 
 ```rozie-out SearchInput solid
 ```
 
-## Lit output
-
 ```rozie-out SearchInput lit
 ```
+
+:::

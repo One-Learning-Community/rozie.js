@@ -36,6 +36,21 @@ const TARGET_LANG: Record<CompileTarget, string> = {
   lit: 'ts',
 };
 
+/**
+ * Human-readable tab label per target. Injected as the fence's `[label]` so a
+ * `rozie-out` block carries its framework name into a VitePress `::: code-group`
+ * (the label becomes the tab; outside a code-group it renders as the code-block
+ * title). An explicit trailing `[Custom]` in the fence info overrides this.
+ */
+const TARGET_LABEL: Record<CompileTarget, string> = {
+  vue: 'Vue',
+  react: 'React',
+  svelte: 'Svelte',
+  angular: 'Angular',
+  solid: 'Solid',
+  lit: 'Lit',
+};
+
 const VALID_TARGETS = new Set<string>(Object.keys(TARGET_LANG));
 
 export interface RozieCodegenOptions {
@@ -107,7 +122,12 @@ export function rozieCodegen(
       }
 
       if (info.startsWith('rozie-out')) {
-        const [name, target] = info.slice('rozie-out'.length).trim().split(/\s+/);
+        const rest = info.slice('rozie-out'.length).trim();
+        // An optional trailing `[Custom Label]` overrides the derived tab label.
+        const labelMatch = rest.match(/\[([^\]]*)\]\s*$/);
+        const explicitLabel = labelMatch ? labelMatch[1].trim() : '';
+        const spec = labelMatch ? rest.slice(0, labelMatch.index).trim() : rest;
+        const [name, target] = spec.split(/\s+/);
         if (!name || !target) {
           throw new Error(
             '[rozie-codegen] `rozie-out` needs a component name and a target',
@@ -131,7 +151,10 @@ export function rozieCodegen(
           );
         }
         token.content = result.code;
-        token.info = TARGET_LANG[target as CompileTarget];
+        const label = explicitLabel || TARGET_LABEL[target as CompileTarget];
+        // Language first, then `[label]` — VitePress reads the label to title the
+        // block / name the code-group tab.
+        token.info = `${TARGET_LANG[target as CompileTarget]} [${label}]`;
         continue;
       }
     }
