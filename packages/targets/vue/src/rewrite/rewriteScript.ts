@@ -129,6 +129,14 @@ export interface RewriteRozieIdentifiersResult {
    * (surfaced by FullCalendar.rozie's `if ($slots.event)` guard).
    */
   slotsUsed: boolean;
+  /**
+   * Phase 45 — true if the script body called `$clone(x)`, which on Vue lowers
+   * to `structuredClone(toRaw(x))`. emitScript.ts consumes this to emit
+   * `import { toRaw } from 'vue'` via VueImportCollector.use('toRaw'). The
+   * `toRaw` unwrap is Vue-only; the other targets emit bare `structuredClone(x)`
+   * / `$state.snapshot(x)` and never reference `toRaw` (D-01, Phase 45).
+   */
+  usesToRaw: boolean;
 }
 
 /**
@@ -155,6 +163,7 @@ export function rewriteRozieIdentifiers(
   diagnostics: Diagnostic[],
 ): RewriteRozieIdentifiersResult {
   let slotsUsed = false;
+  let usesToRaw = false; // Phase 45 — set by the $clone branch; signals toRaw auto-import.
   // All slot names — both portal and non-portal slots route their
   // script-side presence checks (`$slots.X`) through `slots.X`, where
   // `slots` is a single `useSlots()` const at script-setup scope.
@@ -364,6 +373,32 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 45 (D-01) — $clone(x) → structuredClone(toRaw(x)). Vue's
+      // reactive() wraps the target WITHOUT writing proxies back to nested
+      // objects (Vue source: baseHandlers.ts `get` trap returns `reactive(res)`
+      // without write-back; the proxy is cached in a separate `reactiveMap`
+      // WeakMap). toRaw() unwinds the top-level proxy to the raw target, whose
+      // nested objects stay raw — so structuredClone recurses over plain
+      // objects and never meets a nested Proxy ⇒ never throws "could not be
+      // cloned". A single top-level toRaw is sufficient (no deep-toRaw needed).
+      if (callee.name === '$clone') {
+        const args = path.node.arguments;
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) {
+            usesToRaw = true;
+            path.replaceWith(
+              t.callExpression(t.identifier('structuredClone'), [
+                t.callExpression(t.identifier('toRaw'), [arg]),
+              ]),
+            );
+            // Do NOT path.skip() — the arg may contain $props.X / $data.X reads
+            // (e.g. $clone($data.graph)) that still need rewriting to .value form.
+          }
+        }
+        return;
+      }
+
       // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
       // the sigil exists for the Lit target only, where lit-html's
       // sentinel-comment-keyed `repeat` cache desynchronises when a third-
@@ -529,5 +564,5 @@ export function rewriteRozieIdentifiers(
     },
   });
 
-  return { slotsUsed };
+  return { slotsUsed, usesToRaw };
 }

@@ -909,7 +909,7 @@ export function emitScript(
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
 
   // 2. Rewrite identifiers on the clone.
-  const { slotsUsed } = rewriteRozieIdentifiers(cloned, ir, diagnostics);
+  const { slotsUsed, usesToRaw } = rewriteRozieIdentifiers(cloned, ir, diagnostics);
 
   const imports = new VueImportCollector();
 
@@ -931,6 +931,13 @@ export function emitScript(
   if (slotsUsed || hasPortalSlots) {
     imports.use('useSlots');
     useSlotsLine.push('const slots = useSlots();');
+  }
+  // Phase 45 (D-01) — $clone(x) lowers to structuredClone(toRaw(x)) on Vue;
+  // auto-import `toRaw`. VueImportCollector.use merges it into the single sorted
+  // `import { ... } from 'vue'` line (no string-splicing → preserves the
+  // dist-parity byte contract).
+  if (usesToRaw) {
+    imports.use('toRaw');
   }
   const dataLines = emitDataRefs(ir, imports);
   const refLines = emitTemplateRefs(ir, imports);
