@@ -222,6 +222,38 @@ describe('rewriteRozieIdentifiers — sigil rewrites', () => {
     expect(code).toContain('$snapshot(a, b);');
   });
 
+  // Phase 45 (D-01) — $clone(x) → bare $state.snapshot(x) on Svelte (no outer
+  // structuredClone wrapper; $state.snapshot is already a deep de-proxied copy).
+  it('$clone(x) → bare $state.snapshot(x) (no structuredClone wrapper)', () => {
+    const ir = buildIR({ state: [state('config')] });
+    const { code } = rewrite('const c = $clone($data.config);', ir);
+    expect(code).toContain('$state.snapshot(config)');
+    expect(code).not.toContain('structuredClone');
+    expect(code).not.toContain('$clone');
+  });
+
+  it('$clone($data.x) still lowers the argument reactive read (no path.skip)', () => {
+    const ir = buildIR({ state: [state('config')] });
+    const { code } = rewrite('const c = $clone($data.config);', ir);
+    // The $data.config read lowers to the bare Svelte rune binding `config`.
+    expect(code).toContain('$state.snapshot(config)');
+    expect(code).not.toContain('$data.config');
+  });
+
+  it('$clone with non-single args is left untouched', () => {
+    const ir = buildIR();
+    const { code } = rewrite('$clone(a, b);', ir);
+    expect(code).toContain('$clone(a, b);');
+    expect(code).not.toContain('$state.snapshot');
+  });
+
+  it('$clone with a spread (non-expression) argument is left untouched', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const c = $clone(...x);', ir);
+    expect(code).toContain('$clone(...x)');
+    expect(code).not.toContain('$state.snapshot');
+  });
+
   it('$data.X?.y OptionalMemberExpression → X?.y', () => {
     const ir = buildIR({ state: [state('config')] });
     const { code } = rewrite('const c = $data.config?.y;', ir);

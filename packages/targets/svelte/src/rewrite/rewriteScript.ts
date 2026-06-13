@@ -649,6 +649,28 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 45 (D-01) — $clone(x) → bare $state.snapshot(x). Svelte's
+      // $state.snapshot is ALREADY a deep, recursively de-proxied, independent
+      // static copy (Svelte 5 docs + Q2 research) — emitting it bare is
+      // sufficient; an outer structuredClone would be redundant work AND would
+      // THROW on a `$state` proxy (the cross-target footgun this phase closes).
+      // The lowering shape is byte-identical to the Svelte $snapshot leg;
+      // $clone adds the semantic guarantee of an independent deep copy (not
+      // just a one-shot proxy unwrap) per D-01.
+      if (callee.name === '$clone') {
+        const args = path.node.arguments;
+        if (args.length !== 1) return;
+        const arg = args[0]!;
+        if (!t.isExpression(arg)) return;
+        path.node.callee = t.memberExpression(
+          t.identifier('$state'),
+          t.identifier('snapshot'),
+        );
+        // Do NOT path.skip() — the argument may contain $props.X / $data.X
+        // reads that still need rewriting.
+        return;
+      }
+
       // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
       // the sigil exists for the Lit target only — Svelte's keyed reconciler
       // diffs against live DOM at patch time, so the in-source DOM-restore
