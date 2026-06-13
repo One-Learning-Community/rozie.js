@@ -99,6 +99,17 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // byte-identically across all four entrypoints and all six targets, and
 // that the Plan 15-03/04/05 emitter changes propagate cleanly through
 // every pre-existing fixture as well (master rebless wave).
+// Phase 45 ($clone sigil) — EXAMPLES extended +1 with CloneProbe, the single-
+// file $clone proving probe ($clone(x) → structuredClone(toRaw(x)) on Vue /
+// $state.snapshot(x) on Svelte / structuredClone(x) on the other four, over
+// nested reactive state containing a Date). Registering it makes the bootstrap
+// compile() it across all six targets — the dist-parity proof that the six
+// per-target lowering branches emit byte-identically across all four
+// entrypoints. Rebless drift is confined to the new CloneProbe.* fixtures (+
+// the FlowCanvas dogfood). Single-file; stays OUT of RESOLVER_ROOT. See the
+// per-entry inline comment at the CloneProbe array slot below for the
+// authoritative description (this cumulative ledger is being phased out in
+// favor of those inline comments per IN-04).
 const EXAMPLES = [
   'Counter',
   'SearchInput',

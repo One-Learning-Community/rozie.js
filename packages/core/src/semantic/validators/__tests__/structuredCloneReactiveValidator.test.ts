@@ -48,6 +48,8 @@ $onMount(() => {
     expect(hits[0]!.severity).toBe('warning');
     expect(hits[0]!.code).toBe('ROZ135');
     expect(hits[0]!.message).toContain('$clone');
+    // IN-03 — the message names the resolved member path, not a bare ellipsis.
+    expect(hits[0]!.message).toContain('structuredClone($data.graph)');
     // loc points at the call (non-zero, plausible offset).
     expect(hits[0]!.loc.start).toBeGreaterThan(0);
   });
@@ -65,6 +67,25 @@ $onMount(() => {
     const hits = roz135(analyzeSource(src));
     expect(hits.length, JSON.stringify(hits)).toBe(1);
     expect(hits[0]!.message).toContain('$props');
+    // IN-03 — the full nested member path is rendered, not `$props.…`.
+    expect(hits[0]!.message).toContain('structuredClone($props.x.y)');
+  });
+
+  it('falls back to the `<root>.…` form when the member is a computed access (IN-03 defensive)', () => {
+    const src = `<rozie name="X">
+<data>{ x: {}, k: 'graph' }</data>
+<script>
+$onMount(() => {
+  const c = structuredClone($data[$data.k])
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+    const hits = roz135(analyzeSource(src));
+    expect(hits.length, JSON.stringify(hits)).toBe(1);
+    // A computed access can't render a precise dotted path → fall back to the
+    // bare ellipsis form (never throws, D-08).
+    expect(hits[0]!.message).toContain('structuredClone($data.…)');
   });
 
   it('fires on structuredClone($model.z)', () => {
@@ -80,6 +101,8 @@ $onMount(() => {
     const hits = roz135(analyzeSource(src));
     expect(hits.length, JSON.stringify(hits)).toBe(1);
     expect(hits[0]!.message).toContain('$model');
+    // IN-03 — names the member, not `$model.…`.
+    expect(hits[0]!.message).toContain('structuredClone($model.z)');
   });
 
   it('does NOT fire on structuredClone(plainLocal) — zero false positives', () => {

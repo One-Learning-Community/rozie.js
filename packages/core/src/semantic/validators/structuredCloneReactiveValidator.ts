@@ -100,16 +100,49 @@ function memberRoot(node: t.Node): string | null {
   return t.isIdentifier(cur) ? cur.name : null;
 }
 
-/** Emit ROZ135 (warning) for a `structuredClone(<reactive>)` call at `loc`. */
+/**
+ * Render the resolved member path of a `(Optional)MemberExpression` rooted at a
+ * reactive accessor — `$data.graph` → `'$data.graph'`, `$props.x.y` →
+ * `'$props.x.y'`. Returns null (caller falls back to the `<root>.…` form) when
+ * the chain contains a computed access (`$data[k]`), a call, or any non-plain-
+ * identifier property — i.e. whenever a precise dotted path can't be rendered
+ * (IN-03 — defensive; the validator NEVER throws, D-08).
+ */
+function memberPath(node: t.Node, rootName: string): string | null {
+  const segments: string[] = [];
+  let cur: t.Node = node;
+  while (t.isMemberExpression(cur) || t.isOptionalMemberExpression(cur)) {
+    const m = cur as t.MemberExpression | t.OptionalMemberExpression;
+    // Computed (`$data[k]`) or non-identifier property — can't render a precise
+    // dotted path; bail to the fallback form.
+    if (m.computed || !t.isIdentifier(m.property)) return null;
+    segments.unshift(m.property.name);
+    cur = m.object;
+  }
+  // The chain must bottom out at the reactive root identifier itself.
+  if (!t.isIdentifier(cur) || cur.name !== rootName) return null;
+  return [rootName, ...segments].join('.');
+}
+
+/**
+ * Emit ROZ135 (warning) for a `structuredClone(<reactive>)` call at `loc`.
+ *
+ * IN-03 — when the full dotted member path resolves (`$data.graph`), name it in
+ * the message; otherwise fall back to the bare `<root>.…` form. Defensive: a
+ * missing/odd-shaped path yields the fallback, never a throw (D-08).
+ */
 function pushStructuredCloneReactive(
   ctx: ValidatorContext,
   rootName: string,
+  argNode: t.Node,
   loc: SourceLoc,
 ): void {
+  const path = memberPath(argNode, rootName);
+  const rendered = path ?? `${rootName}.…`;
   ctx.diagnostics.push({
     code: RozieErrorCode.STRUCTURED_CLONE_REACTIVE,
     severity: 'warning',
-    message: `structuredClone(${rootName}.…) throws on Vue reactive()/Svelte $state proxies — use $clone(…) instead.`,
+    message: `structuredClone(${rendered}) throws on Vue reactive()/Svelte $state proxies — use $clone(…) instead.`,
     loc,
     hint: '$clone(x) deep-clones and strips the reactive proxy on all six targets: structuredClone(toRaw(x)) on Vue, $state.snapshot(x) on Svelte, structuredClone(x) elsewhere.',
   });
@@ -139,6 +172,7 @@ function flagStructuredCloneInTree(
       pushStructuredCloneReactive(
         ctx,
         rootName,
+        arg,
         locFromNodeOffset(path.node, baseOffset),
       );
     },
