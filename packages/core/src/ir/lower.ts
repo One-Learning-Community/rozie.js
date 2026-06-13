@@ -49,6 +49,7 @@ import { validateSlotPropCollision } from './validateSlotPropCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
+import { validateClone } from './validateClone.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import * as t from '@babel/types';
@@ -300,6 +301,16 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ975/ROZ976 diagnostics; never
   // mutates `ir`.
   validateRestoreFocus(ir, diagnostics);
+
+  // Phase 45 (D-01, gap-closure WR-01) — validate every `$clone(value)` call's
+  // arity (ROZ136). Same lowerToIR chokepoint covers compile() AND
+  // @rozie/unplugin, on every target, BEFORE per-target lowering — so a
+  // malformed `$clone()` / `$clone(a, b)` / `$clone(...x)` is a hard error
+  // instead of a dangling `$clone` identifier (runtime ReferenceError). Adds
+  // ONLY diagnostics; valid unary `$clone(x)` lowering is untouched (no emitter
+  // change, no dist-parity rebless). Collected-not-thrown (D-08); never mutates
+  // `ir`.
+  validateClone(ir, diagnostics);
 
   // Phase 14 — validate cross-framework attribute fallthrough (R8/R9). Wired
   // directly after validateClassSelector — the same lowerToIR chokepoint both

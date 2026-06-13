@@ -338,6 +338,21 @@ export const RozieErrorCode = {
   // both compile() and @rozie/unplugin (both route through lowerToIR).
   // ROZ135 is the next free code after ROZ134 in the 100 semantic-binding cluster.
   STRUCTURED_CLONE_REACTIVE: 'ROZ135', // warn — structuredClone($props/$data/$model.x) throws on Vue reactive()/Svelte $state proxies; use $clone(x).
+  // Phase 45 (D-01) — a `$clone(...)` call with anything other than exactly one
+  // plain (non-spread) argument: `$clone()`, `$clone(a, b)`, `$clone(...x)`. The
+  // sigil's per-target lowering hard-codes the single-argument
+  // `structuredClone(toRaw(x))` (Vue) / `$state.snapshot(x)` (Svelte) /
+  // `structuredClone(x)` (React/Solid/Angular/Lit) shape and cannot mechanically
+  // interpret any other arity — a malformed call would otherwise fall through the
+  // unary lowering guard and emit a DANGLING `$clone` identifier (runtime
+  // ReferenceError on all six targets, zero compile signal — the ROZ977
+  // anti-pattern). Error (not warn) so the footgun-fix is not itself
+  // footgun-bearing — a wrong-arity `$clone` is an unrecoverable footgun. Emitted
+  // from validateClone, wired into lowerToIR directly after validateRestoreFocus
+  // so it fires once for both compile() and @rozie/unplugin (both route through
+  // lowerToIR). ROZ136 is the next free code after ROZ135 in the 100
+  // semantic-binding cluster.
+  CLONE_BAD_ARITY: 'ROZ136', // error — $clone(value) requires exactly one non-spread argument; the per-target lowering cannot interpret any other arity.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
