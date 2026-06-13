@@ -327,7 +327,7 @@ export const RozieErrorCode = {
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
-  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose / $provide / $inject. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
+  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose / $provide / $inject / $clone. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
   // 260530: expression-context `++`/`--` on reactive state ($data.<key> or a
   // model:true $props.<key>) where the UpdateExpression's value is CONSUMED
   // (parent is not an ExpressionStatement). Such reads can't be satisfied by a

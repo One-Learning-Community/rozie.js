@@ -64,10 +64,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$expose', // Phase 21 — producer-side imperative-handle sigil
   '$provide', // Phase 36 — cross-component context provide sigil
   '$inject', // Phase 36 — cross-component context inject sigil
+  '$clone', // Phase 45 — target-rewritten deep-clone call-form sigil
 ]);
 
 const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose, $provide, $inject';
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose, $provide, $inject, $clone';
 
 function emitCollision(
   name: string,

@@ -127,6 +127,15 @@ const STABLE_IDENTIFIERS = new Set([
   // entry React's dep collector treats it as a free identifier and emits
   // `[$restoreFocus]` into a useEffect dep array → runtime ReferenceError.
   '$restoreFocus',
+  // Phase 45 — `$clone` is a target-rewritten call-form sigil. `$clone(x)`
+  // lowers to `structuredClone(toRaw(x))` on Vue, `$state.snapshot(x)` on
+  // Svelte, and `structuredClone(x)` on the other four targets. Like
+  // `$snapshot`, it is not itself a reactive binding; without this entry the
+  // React/Solid dep collector treats `$clone` inside a `$computed` /
+  // `<listeners>` body as a free closure identifier and emits `[$clone]` into a
+  // `useEffect` / `useMemo` dep array → runtime `ReferenceError`. Dep tracking
+  // happens on the argument (e.g., `$data.graph`), not the sigil.
+  '$clone',
   'undefined',
   'null',
   'NaN',
