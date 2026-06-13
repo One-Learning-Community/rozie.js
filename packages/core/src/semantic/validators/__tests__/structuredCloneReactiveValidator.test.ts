@@ -154,4 +154,206 @@ $onMount(() => {
       runStructuredCloneReactiveValidator(ast, diagnostics),
     ).not.toThrow();
   });
+
+  // ── WR-03: one-hop `const` reactive-alias detection ───────────────────────
+
+  describe('WR-03 — one-hop const reactive-alias detection', () => {
+    it('fires on `const g = $data.graph; structuredClone(g)` (NEW positive)', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+$onMount(() => {
+  const g = $data.graph
+  const c = structuredClone(g)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.severity).toBe('warning');
+      expect(hits[0]!.code).toBe('ROZ135');
+      expect(hits[0]!.message).toContain('$clone');
+      // Names the alias AND the reactive member it points at.
+      expect(hits[0]!.message).toContain('structuredClone(g)');
+      expect(hits[0]!.message).toContain('g = $data.graph');
+      expect(hits[0]!.loc.start).toBeGreaterThan(0);
+    });
+
+    it('fires on `const p = $props.x; structuredClone(p)`', () => {
+      const src = `<rozie name="X">
+<props>{ x: { type: Object } }</props>
+<script>
+$onMount(() => {
+  const p = $props.x
+  const c = structuredClone(p)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.message).toContain('structuredClone(p)');
+      expect(hits[0]!.message).toContain('p = $props.x');
+    });
+
+    it('fires on `const m = $model.z; structuredClone(m)`', () => {
+      const src = `<rozie name="X">
+<props>{ z: { type: Object, model: true } }</props>
+<script>
+$onMount(() => {
+  const m = $model.z
+  const c = structuredClone(m)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.message).toContain('structuredClone(m)');
+      expect(hits[0]!.message).toContain('m = $model.z');
+    });
+
+    it('renders the precise nested member path for an aliased member (IN-03 reuse)', () => {
+      const src = `<rozie name="X">
+<props>{ x: { type: Object } }</props>
+<script>
+$onMount(() => {
+  const y = $props.x.y
+  const c = structuredClone(y)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.message).toContain('y = $props.x.y');
+    });
+
+    it('does NOT fire on a non-reactive initializer — `const local = computeSomething(); structuredClone(local)` (zero false positive)', () => {
+      const src = `<rozie name="X">
+<script>
+function computeSomething() { return { a: 1 } }
+$onMount(() => {
+  const local = computeSomething()
+  const c = structuredClone(local)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(0);
+    });
+
+    it('does NOT fire on a `let` reassigned to a non-reactive value (conservative)', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+$onMount(() => {
+  let g = $data.graph
+  g = { other: true }
+  const c = structuredClone(g)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(0);
+    });
+
+    it('does NOT fire on a plain `let` alias (let initializer may go stale — conservative)', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+$onMount(() => {
+  let g = $data.graph
+  const c = structuredClone(g)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(0);
+    });
+
+    it('does NOT fire on a two-hop chain — `const a = $data.x; const b = a; structuredClone(b)` (out of scope)', () => {
+      const src = `<rozie name="X">
+<data>{ x: {} }</data>
+<script>
+$onMount(() => {
+  const a = $data.x
+  const b = a
+  const c = structuredClone(b)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(0);
+    });
+
+    it('direct `structuredClone($data.graph)` still fires alongside the alias logic (no regression)', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+$onMount(() => {
+  const c = structuredClone($data.graph)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      // Direct-member message form (alias form NOT used for a direct member).
+      expect(hits[0]!.message).toContain('structuredClone($data.graph)');
+      expect(hits[0]!.message).not.toContain('where');
+    });
+
+    it('emits at most ONE diagnostic per aliased call', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+$onMount(() => {
+  const g = $data.graph
+  const c = structuredClone(g)
+})
+</script>
+<template><div></div></template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+    });
+
+    it('fires on an aliased call inside a <template> interpolation (cross-block resolution)', () => {
+      const src = `<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+const g = $data.graph
+</script>
+<template>
+<div>{{ structuredClone(g) }}</div>
+</template>
+</rozie>`;
+      const hits = roz135(analyzeSource(src));
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.message).toContain('g = $data.graph');
+    });
+
+    it('never throws when an alias declaration is malformed/ambiguous', () => {
+      const ast: RozieAST = parseOrThrow(`<rozie name="X">
+<data>{ graph: {} }</data>
+<script>
+const { g } = $data
+const g = $data.graph
+let g = somethingElse
+$onMount(() => { const c = structuredClone(g) })
+</script>
+<template><div></div></template>
+</rozie>`);
+      const diagnostics: Diagnostic[] = [];
+      expect(() =>
+        runStructuredCloneReactiveValidator(ast, diagnostics),
+      ).not.toThrow();
+    });
+  });
 });

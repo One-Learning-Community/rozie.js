@@ -18,8 +18,16 @@
  *       identifier ∈ { $props, $data, $model }.
  *   Examples: structuredClone($data.graph), structuredClone($props.x.y),
  *             structuredClone($model.z).
+ *   OR a `CallExpression structuredClone(<id>)` where `<id>` is a ONE-HOP
+ *     `const` alias — a same-scope `const <id> = <member rooted at a reactive
+ *     accessor>` declaration (WR-03). Example: `const g = $data.graph;
+ *     structuredClone(g)`. Aliases collected per <script>; const-only,
+ *     single-declaration, initializer-is-directly-a-reactive-member.
  *   Walked in <script> and <template> expression positions (binding,
- *   interpolation, r-if/r-show/r-text/r-html, r-for iterable).
+ *   interpolation, r-if/r-show/r-text/r-html, r-for iterable). Note: the alias
+ *   map is built from <script> declarations only — a `structuredClone(g)` in a
+ *   template references a <script>-scoped const, so template calls consult the
+ *   same map.
  *
  * ── DO-NOT-FLAG ──────────────────────────────────────────────────────────────
  *   - structuredClone(someKnownPlainLocal) — argument is not a member rooted at
@@ -27,8 +35,14 @@
  *     positives; a legitimate clone of a plain local still compiles clean).
  *   - <listeners> handler bodies — intentionally NOT walked (mirrors
  *     refsPreMountValidator; A2 conservative default).
- *   - Aliased reactive bindings (`let g = $data.graph; structuredClone(g)`) —
- *     out of scope for v1 (D-02 / Open-Q: literal match only).
+ *   - Aliased reactive bindings BEYOND one hop. We DO flag a one-hop `const`
+ *     alias whose initializer is DIRECTLY a reactive member
+ *     (`const g = $data.graph; structuredClone(g)` → flag), but NOT:
+ *       · transitive chains  `const a = $data.x; const b = a; clone(b)`
+ *       · `let`/reassigned/multiply-declared aliases (initializer may go stale)
+ *       · function parameters `commitGraph(g)` or call returns `currentGraph()`
+ *     Those need flow / interprocedural analysis and risk false positives —
+ *     out of scope (WR-03: one-hop const alias only; D-02 zero-false-positive).
  *
  * Severity is `warning` (NOT error) — a legitimate `structuredClone(plainLocal)`
  * must still compile. Mirrors the ROZ123/127/128 target-asymmetry guard pattern.
@@ -72,8 +86,27 @@ const traverse: TraverseFn =
  *  throws on Vue/Svelte proxies. Syntactic match only (D-02). */
 const REACTIVE_ROOTS = new Set(['$props', '$data', '$model']);
 
+/**
+ * A collected one-hop reactive alias: a same-scope `const <name> = <member
+ * rooted at $props/$data/$model>` declaration (WR-03). `rootName` is the
+ * reactive accessor root; `memberNode` is the initializer member expression
+ * (reused to render the precise dotted path via `memberPath`, IN-03).
+ */
+interface ReactiveAlias {
+  rootName: string;
+  memberNode: t.MemberExpression | t.OptionalMemberExpression;
+}
+
 interface ValidatorContext {
   diagnostics: Diagnostic[];
+  /**
+   * One-hop reactive `const` aliases collected from the `<script>` pre-pass,
+   * keyed by alias identifier name. A name maps to `null` (a disqualifier
+   * tombstone) when it is multiply-declared, declared with `let`/`var`, or
+   * otherwise assigned — so a later `structuredClone(<name>)` is NOT flagged
+   * (conservative: ambiguous → do not flag, zero false positives).
+   */
+  reactiveAliases: Map<string, ReactiveAlias | null>;
 }
 
 /**
@@ -149,34 +182,171 @@ function pushStructuredCloneReactive(
 }
 
 /**
+ * If `node` is a (Optional)MemberExpression rooted at a reactive accessor
+ * ($props/$data/$model), return `{ rootName, memberNode }`; else null. Shared
+ * root-detection predicate so the direct-member case and the one-hop alias case
+ * agree on what "rooted at a reactive accessor" means (single source of truth).
+ */
+function asReactiveMember(node: t.Node): ReactiveAlias | null {
+  if (!t.isMemberExpression(node) && !t.isOptionalMemberExpression(node)) {
+    return null;
+  }
+  const rootName = memberRoot(node);
+  if (rootName === null || !REACTIVE_ROOTS.has(rootName)) return null;
+  return { rootName, memberNode: node };
+}
+
+/**
+ * Pre-pass over a `<script>` program: collect ONE-HOP reactive `const` aliases
+ * into `ctx.reactiveAliases` (WR-03). A `const <id> = <reactive member>`
+ * declaration registers `<id> → { rootName, memberNode }`. Conservative
+ * disqualifiers tombstone the name (`→ null`) so a later `structuredClone(<id>)`
+ * is NOT flagged:
+ *   - `let`/`var` bindings (the alias may be reassigned to a non-reactive value)
+ *   - any name declared more than once (ambiguous which init is live)
+ *   - any name that is ASSIGNED elsewhere (`g = other`) — alias goes stale
+ * Once tombstoned, a name stays tombstoned (ambiguous beats a false positive).
+ *
+ * Out of scope (NOT collected — documented; would need flow analysis): two-hop
+ * chains (`const b = a`), function params, call-return aliases. These leave the
+ * name absent from the map → not flagged.
+ *
+ * NEVER throws (D-08): @babel/traverse runs a scope-binding pass that itself can
+ * throw on malformed input (e.g. a duplicate `const`/`let` declaration the
+ * parser-layer diagnostics already own), so the whole walk is wrapped in a
+ * try/catch — a partially-built alias map is fine (we only ever ADD live
+ * aliases; an aborted walk just yields fewer, never false, flags).
+ */
+function collectReactiveAliases(
+  program: t.Node,
+  ctx: ValidatorContext,
+): void {
+  const aliases = ctx.reactiveAliases;
+  // Mark a name as disqualified: once null, it can never become an alias.
+  const tombstone = (name: string): void => {
+    aliases.set(name, null);
+  };
+
+  try {
+    traverse(program, {
+      VariableDeclarator(path) {
+        const id = path.node.id;
+        if (!t.isIdentifier(id)) return; // destructuring etc. — not a one-hop alias.
+        const name = id.name;
+        // Already disqualified — leave the tombstone.
+        if (aliases.has(name) && aliases.get(name) === null) return;
+        // A second declaration of the same name → ambiguous → disqualify.
+        if (aliases.has(name)) {
+          tombstone(name);
+          return;
+        }
+        const decl = path.parentPath;
+        const isConst =
+          decl.isVariableDeclaration() && decl.node.kind === 'const';
+        const init = path.node.init;
+        const reactive = init ? asReactiveMember(init) : null;
+        // `const <id> = <reactive member>` → collect. Anything else
+        // (`let`/`var`, non-reactive init, no init) → tombstone the name so a
+        // later same-name re-declare can't promote it, and a `structuredClone`
+        // of it is never flagged.
+        if (isConst && reactive) {
+          aliases.set(name, reactive);
+        } else {
+          tombstone(name);
+        }
+      },
+      AssignmentExpression(path) {
+        // A bare `g = …` reassignment makes any same-named alias stale →
+        // disqualify (covers the `let g = $data.graph; g = other` case).
+        const left = path.node.left;
+        if (t.isIdentifier(left)) tombstone(left.name);
+      },
+    });
+  } catch {
+    // @babel/traverse scope-binding can throw on malformed input (duplicate
+    // declarations etc.); the parser layer already diagnosed it. Keep whatever
+    // aliases were collected before the throw — never propagate (D-08).
+  }
+}
+
+/**
+ * Emit ROZ135 (warning) for a one-hop aliased `structuredClone(<alias>)` call
+ * (WR-03), naming BOTH the alias identifier and the reactive member it points
+ * at (`structuredClone(g) where g = $data.graph …`). Reuses `memberPath`
+ * (IN-03) for the precise dotted member; defensive fallback, never throws (D-08).
+ */
+function pushStructuredCloneReactiveAlias(
+  ctx: ValidatorContext,
+  aliasName: string,
+  alias: ReactiveAlias,
+  loc: SourceLoc,
+): void {
+  const path = memberPath(alias.memberNode, alias.rootName);
+  const rendered = path ?? `${alias.rootName}.…`;
+  ctx.diagnostics.push({
+    code: RozieErrorCode.STRUCTURED_CLONE_REACTIVE,
+    severity: 'warning',
+    message: `structuredClone(${aliasName}) where ${aliasName} = ${rendered} throws on Vue reactive()/Svelte $state proxies — use $clone(…) instead.`,
+    loc,
+    hint: '$clone(x) deep-clones and strips the reactive proxy on all six targets: structuredClone(toRaw(x)) on Vue, $state.snapshot(x) on Svelte, structuredClone(x) elsewhere.',
+  });
+}
+
+/**
  * Visit a parsed expression subtree, flagging every
- * `structuredClone(<member rooted at a reactive accessor>)` call.
+ * `structuredClone(<member rooted at a reactive accessor>)` call AND every
+ * one-hop `structuredClone(<reactive const alias>)` call (WR-03). At most ONE
+ * diagnostic per call; direct-member detection takes precedence.
  */
 function flagStructuredCloneInTree(
   root: t.Node,
   baseOffset: number,
   ctx: ValidatorContext,
 ): void {
-  traverse(root, {
-    CallExpression(path) {
-      const callee = path.node.callee;
-      if (!t.isIdentifier(callee) || callee.name !== 'structuredClone') return;
-      const args = path.node.arguments;
-      if (args.length < 1) return;
-      const arg = args[0]!;
-      if (!t.isMemberExpression(arg) && !t.isOptionalMemberExpression(arg)) {
-        return;
-      }
-      const rootName = memberRoot(arg);
-      if (rootName === null || !REACTIVE_ROOTS.has(rootName)) return;
-      pushStructuredCloneReactive(
-        ctx,
-        rootName,
-        arg,
-        locFromNodeOffset(path.node, baseOffset),
-      );
-    },
-  });
+  // @babel/traverse's scope-binding pass can throw on malformed input (e.g. a
+  // duplicate `const`/`let` in <script>); the parser layer already diagnosed
+  // it. Wrap so the validator never propagates (D-08).
+  try {
+    traverse(root, {
+      CallExpression(path) {
+        const callee = path.node.callee;
+        if (!t.isIdentifier(callee) || callee.name !== 'structuredClone') {
+          return;
+        }
+        const args = path.node.arguments;
+        if (args.length < 1) return;
+        const arg = args[0]!;
+        // Direct-member case — `structuredClone($data.graph)`. Takes precedence.
+        const direct = asReactiveMember(arg);
+        if (direct !== null) {
+          pushStructuredCloneReactive(
+            ctx,
+            direct.rootName,
+            direct.memberNode,
+            locFromNodeOffset(path.node, baseOffset),
+          );
+          return;
+        }
+        // One-hop alias case — `structuredClone(g)` where `const g = $data.graph`.
+        if (t.isIdentifier(arg)) {
+          const alias = ctx.reactiveAliases.get(arg.name);
+          // `undefined` = never declared as a tracked alias; `null` = tombstoned
+          // disqualifier (let/reassigned/multiply-declared). Only a live alias
+          // record fires.
+          if (alias) {
+            pushStructuredCloneReactiveAlias(
+              ctx,
+              arg.name,
+              alias,
+              locFromNodeOffset(path.node, baseOffset),
+            );
+          }
+        }
+      },
+    });
+  } catch {
+    // Swallow — parser-layer diagnostics own malformed input (D-08).
+  }
 }
 
 // ── <script> walk ────────────────────────────────────────────────────────────
@@ -184,6 +354,18 @@ function flagStructuredCloneInTree(
 function validateScript(script: ScriptAST, ctx: ValidatorContext): void {
   // <script> nodes carry absolute .rozie offsets — baseOffset 0.
   flagStructuredCloneInTree(script.program, 0, ctx);
+}
+
+/**
+ * Build the one-hop reactive-alias map from the `<script>` program (WR-03).
+ * Run BEFORE both the script and template flag walks so a `structuredClone(g)`
+ * in either position resolves the same `<script>`-scoped `const g = $data.…`.
+ */
+function collectScriptAliases(
+  script: ScriptAST,
+  ctx: ValidatorContext,
+): void {
+  collectReactiveAliases(script.program, ctx);
 }
 
 // ── <template> walk ──────────────────────────────────────────────────────────
@@ -282,7 +464,14 @@ export function runStructuredCloneReactiveValidator(
   ast: RozieAST,
   diagnostics: Diagnostic[],
 ): void {
-  const ctx: ValidatorContext = { diagnostics };
+  const ctx: ValidatorContext = {
+    diagnostics,
+    reactiveAliases: new Map<string, ReactiveAlias | null>(),
+  };
+  // Pre-pass: collect one-hop reactive const aliases from <script> first, so
+  // both the script and template flag walks can resolve `structuredClone(g)`
+  // against the same alias map (WR-03).
+  if (ast.script) collectScriptAliases(ast.script, ctx);
   if (ast.script) validateScript(ast.script, ctx);
   if (ast.template) validateTemplate(ast.template, ctx);
 }
