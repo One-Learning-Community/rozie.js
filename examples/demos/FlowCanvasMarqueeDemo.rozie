@@ -1,0 +1,138 @@
+<!--
+  FlowCanvasMarqueeDemo.rozie — BEHAVIORAL consumer for the Phase-44 T2.4 marquee select
+  behind the pan↔select `mode` toggle (D-05) on the controlled-graph FlowCanvas.
+
+  A DEDICATED marquee cell (NOT folded into FlowCanvasDemo / FlowCanvasScreenshot) so the
+  existing rete-flow cells + the pixel baseline stay byte-untouched. It binds the same
+  r-model:graph controlled graph + a single `task` <NodeType>, drives `mode` INTERNALLY via
+  r-model:mode + a `mode-btn` toggle button (the uniform two-way driver), and turns
+  `:marquee="true"` ON (so the built-in 4th Controls button also appears — though the spec
+  drives the mode through the demo button). :fit-on-mount="false" keeps the seeded node
+  positions stable so the spec's box geometry is deterministic.
+
+  The spec (rete-flow.spec.ts `rete-flow-marquee`) asserts on all 6:
+    - mode='select' (via the mode-btn) → drag a box over the 2 left-column nodes →
+      `selected-count` (fed by @selection-change) settles to ≥ 2,
+    - mode='pan' → the SAME drag pans the viewport → `viewport-x` (fed by @translated)
+      changes AND `selected-count` does NOT increase (no new selection).
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasMarqueeDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // the two-way interaction mode — starts in 'pan' (default), the demo toggles it.
+  mode: 'pan',
+  // settled selected-node count (from @selection-change) — the marquee proof.
+  selectedCount: 0,
+  // last viewport translate x (from @translated) — the pan proof.
+  vx: 0,
+  // THE SINGLE SOURCE OF TRUTH — three `task` nodes; the two in the LEFT column (a, b)
+  // sit close together so a single marquee box can enclose BOTH, while c is far right so
+  // the box does not catch it (proving the hit-test is real, not "select everything").
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 40,  y: 40,  data: { label: 'Alpha' } },
+      { id: 'b', type: 'task', x: 40,  y: 170, data: { label: 'Bravo' } },
+      { id: 'c', type: 'task', x: 520, y: 100, data: { label: 'Charlie' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// @selection-change surfaces the selected node id set ({ ids }) — record the SETTLED count
+// (the marquee box's multi-select result; drag is velocity-flaky so the spec asserts the
+// settled readout, never a mid-drag transform).
+const onSelectionChange = (e) => {
+  $data.selectedCount = e && Array.isArray(e.ids) ? e.ids.length : 0
+}
+// @translated surfaces a viewport pan (x, y) — record x so the spec can prove that in
+// 'pan' mode the same drag PANS (vx changes) instead of selecting.
+const onTranslated = (e) => { $data.vx = e && typeof e.x === 'number' ? Math.round(e.x) : $data.vx }
+// the mode-btn toggles the two-way mode (pan ↔ select) — the uniform two-way driver the
+// spec clicks to enter select mode then back to pan.
+const toggleMode = () => { $data.mode = $data.mode === 'select' ? 'pan' : 'select' }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — marquee select (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="mode-btn" @click="toggleMode">
+      mode: {{ $data.mode }}
+    </button>
+    <span class="readout" data-testid="selected-count">{{ $data.selectedCount }}</span>
+    <span class="readout" data-testid="viewport-x">{{ $data.vx }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 360px; width: 720px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:mode="$data.mode"
+      :marquee="true"
+      :fit-on-mount="false"
+      @selection-change="onSelectionChange"
+      @translated="onTranslated"
+    >
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root (render-by-type bodyRenderer → $portals.body), so on Lit a plain scoped rule
+     cannot reach it — :root emits document-level CSS adopted into the shadow root. */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

@@ -1576,3 +1576,108 @@ for (const target of TARGETS) {
     expect(await readX(), 'redo returns to the post-drag value and holds').toBe(postDragX);
   });
 }
+
+/**
+ * 11. MARQUEE SELECT — the pan↔select `mode` toggle (Phase 44 T2.4, D-05).
+ *
+ * `examples/demos/FlowCanvasMarqueeDemo.rozie` binds a 3-node controlled graph (two nodes
+ * a/b stacked in the LEFT column at x=40, c far right at x=520), drives `mode` INTERNALLY
+ * via a `mode-btn` toggle (with `:marquee` ON), and exposes `selected-count` (fed by
+ * `@selection-change`) + `viewport-x` (fed by `@translated`). Proves on all 6:
+ *
+ *   1. SELECT MODE — click `mode-btn` to enter 'select', then drag a rubber-band box over
+ *      the two LEFT-column nodes (empty-canvas drag) → `selected-count` SETTLES to ≥ 2 (the
+ *      box multi-selected both via the selectableNodes select handle → @selection-change).
+ *   2. PAN MODE — click `mode-btn` back to 'pan', do the SAME empty-canvas drag → the
+ *      viewport PANS: `viewport-x` (= Math.round of the @translated x) CHANGES, and
+ *      `selected-count` does NOT increase (the drag pans, it does not select).
+ *
+ * The drag starts on EMPTY canvas (a gap not over any node) so it is a marquee/pan gesture,
+ * never a node drag. Asserts the SETTLED readouts only (drag velocity is flaky) — never a
+ * mid-drag transform. No `toHaveScreenshot` — behavioral cell.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-marquee [${target}]: select mode rubber-bands ≥2 nodes; pan mode pans the same drag`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasMarquee&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // the 3 nodes render (a/b left column, c far right).
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const selectedCount = page.getByTestId('selected-count');
+    const viewportX = page.getByTestId('viewport-x');
+    const modeBtn = page.getByTestId('mode-btn');
+    const readCount = async (): Promise<number> =>
+      Number((await selectedCount.textContent())?.trim() ?? 'NaN');
+    const readVx = async (): Promise<number> =>
+      Number((await viewportX.textContent())?.trim() ?? 'NaN');
+
+    // initial state: nothing selected, viewport at 0.
+    await expect(selectedCount).toHaveText('0');
+    const cb = await canvas.boundingBox();
+    if (!cb) throw new Error('canvas bounding box unavailable');
+
+    // A marquee box over the LEFT column (nodes a/b sit at graph x≈40, stacked y≈40/170).
+    // Drag from an empty point ABOVE-LEFT of node a down PAST node b — the box encloses
+    // both. Start the drag on EMPTY canvas (top-left gutter, clear of any node) so it is a
+    // marquee/pan gesture. Coordinates are canvas-relative; the seeded nodes are near the
+    // top-left because :fit-on-mount=false keeps the seeded positions.
+    const x0 = cb.x + 8;
+    const y0 = cb.y + 8;
+    const x1 = cb.x + 230;
+    const y1 = cb.y + 300;
+
+    // ---- 1. SELECT MODE: enter select, drag the box over ≥2 nodes ----
+    await modeBtn.click(); // pan → select
+    await expect(modeBtn).toContainText('select', { timeout: 5_000 });
+
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 8 });
+    await page.mouse.move(x1, y1, { steps: 8 });
+    await page.mouse.up();
+
+    // the rubber-band multi-selected the 2 left-column nodes → @selection-change → ≥2.
+    await expect
+      .poll(readCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBeGreaterThanOrEqual(2);
+    // settle + re-sample: the selected count holds (no oscillation).
+    await page.waitForTimeout(400);
+    const selectedSettled = await readCount();
+    expect(selectedSettled).toBeGreaterThanOrEqual(2);
+
+    // ---- 2. PAN MODE: back to pan, the SAME empty-canvas drag PANS (no new selection) ----
+    await modeBtn.click(); // select → pan
+    await expect(modeBtn).toContainText('pan', { timeout: 5_000 });
+    const vxBefore = await readVx();
+
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 8 });
+    await page.mouse.move(x1, y1, { steps: 8 });
+    await page.mouse.up();
+
+    // the viewport panned: viewport-x changed from its pre-pan value.
+    await expect
+      .poll(readVx, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe(vxBefore);
+    // and the same drag did NOT add a selection (pan mode never marquee-selects). The
+    // selected count must not exceed the select-mode result.
+    await page.waitForTimeout(400);
+    expect(
+      await readCount(),
+      'pan-mode drag must not increase the selection',
+    ).toBeLessThanOrEqual(selectedSettled);
+  });
+}

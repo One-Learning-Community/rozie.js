@@ -390,6 +390,14 @@ export const EXAMPLES = [
   // pre-drag value exactly), then redo (x returns to post-drag). One gesture = one undo
   // step. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasUndo',
+  // Phase 44 T2.4 (D-05, marquee select) — FlowCanvasMarquee is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasMarqueeDemo.rozie): a ≥2-node graph driving `mode`
+  // INTERNALLY via a `mode-btn` toggle (with :marquee ON) + readouts `selected-count` (fed
+  // by @selection-change) and `viewport-x` (fed by @translated). The spec (rete-flow-marquee)
+  // sets mode='select' and drags a box over ≥2 nodes → asserts selected-count ≥ 2 (settled),
+  // then sets mode='pan' and does the same drag → asserts viewport-x changed (panned) with no
+  // new selection. Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasMarquee',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -561,6 +569,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasEdgeTypes: 'rozie-flow-canvas-edge-types',
   // Phase 44 undo/redo cell — '-demo' appended → 'rozie-flow-canvas-undo-demo'.
   FlowCanvasUndo: 'rozie-flow-canvas-undo',
+  // Phase 44 marquee cell — '-demo' appended → 'rozie-flow-canvas-marquee-demo'.
+  FlowCanvasMarquee: 'rozie-flow-canvas-marquee',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -758,6 +768,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasEdgeTypes: {},
   // Phase 44 — FlowCanvasUndoDemo is self-contained (seeds its own 2-node graph).
   FlowCanvasUndo: {},
+  // Phase 44 — FlowCanvasMarqueeDemo is self-contained (seeds its own graph, drives `mode`
+  // internally via r-model:mode + a mode-btn toggle, :marquee ON). No parent props; no
+  // MODEL_PROPS entry (mode is bound internally — the FlowCanvas/MapLibre precedent).
+  FlowCanvasMarquee: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
