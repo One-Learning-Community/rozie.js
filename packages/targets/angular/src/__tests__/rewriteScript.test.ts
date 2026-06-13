@@ -543,6 +543,33 @@ describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
     );
   });
 
+  it('$clone(x) → structuredClone(x) (deep-copy lowering)', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const c = $clone(payload);', ir);
+    expect(code).toContain('structuredClone(payload)');
+    expect(code).not.toContain('$clone');
+    expect(code).not.toContain('toRaw');
+    expect(code).not.toContain('$state.snapshot');
+  });
+
+  it('$clone with non-single args is left untouched', () => {
+    const ir = buildIR();
+    expect(rewrite('$clone(a, b);', ir).code).toContain('$clone(a, b)');
+  });
+
+  it('$clone with a spread (non-expression) argument is left untouched', () => {
+    const ir = buildIR();
+    expect(rewrite('const c = $clone(...x);', ir).code).toContain(
+      '$clone(...x)',
+    );
+  });
+
+  it("$clone's argument reactive reads still lower (no path.skip)", () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    const { code } = rewrite('const c = $clone($data.count);', ir);
+    expect(code).toContain('structuredClone(this.count())');
+  });
+
   it('a call whose callee is not an identifier passes through', () => {
     const ir = buildIR();
     expect(rewrite('obj.method();', ir).code).toContain('obj.method()');

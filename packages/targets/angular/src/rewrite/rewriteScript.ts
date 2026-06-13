@@ -1058,6 +1058,26 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // $clone(x) → structuredClone(x) — Phase 45 (D-01). Angular signal reads
+      // via `this.X()` yield plain values, so there is no reactive proxy to
+      // unwrap; a direct structuredClone gives an independent deep copy safe
+      // for undo/history stacks. No `toRaw` (Vue-only) / `$state.snapshot`
+      // (Svelte-only) here. Do NOT path.skip() — the single argument may carry
+      // $props.X / $data.X reactive reads (e.g. $clone($data.graph)) that still
+      // need rewriting to the `this.X()` value form.
+      if (callee.name === '$clone') {
+        const args = path.node.arguments;
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) {
+            path.replaceWith(
+              t.callExpression(t.identifier('structuredClone'), [arg]),
+            );
+          }
+        }
+        return;
+      }
+
       // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
       // the sigil exists for the Lit target only — Angular's keyed reconciler
       // diffs against live DOM at patch time, so the in-source DOM-restore
