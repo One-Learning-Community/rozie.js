@@ -262,9 +262,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
   // history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
   // cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
-  // serializable graph JSON (Pattern 7; `cloneGraph` — JSON round-trip with a
-  // `structuredClone` fallback — strips the Vue/Svelte reactivity Proxy that a bare
-  // `structuredClone` THROWS on) — no external input, so the restore (T-44-03-2 accept)
+  // serializable graph JSON (Pattern 7; the `$clone` sigil — a deep, de-proxied copy
+  // that strips the Vue/Svelte reactivity Proxy that a bare `structuredClone` THROWS
+  // on) — no external input, so the restore (T-44-03-2 accept)
   // cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
   // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
   // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
@@ -300,26 +300,16 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     nodes: [],
     connections: []
   }, [graph]);
-  const cloneGraph = useCallback((g: any) => {
-    if (g == null) return null;
-    try {
-      return JSON.parse(JSON.stringify(g));
-    } catch (e: any) {}
-    try {
-      return structuredClone(g);
-    } catch (e: any) {}
-    return null;
-  }, []);
   function commitGraph(g: any) {
-    const c = cloneGraph(g);
+    const c = structuredClone(g);
     lastWrittenGraph.current = c != null ? c : g;
     selfWriteInFlight.current = true;
     setGraph(g);
   }
   const snapshotCurrent = useCallback(() => {
     const src = lastWrittenGraph.current != null ? lastWrittenGraph.current : currentGraph();
-    return cloneGraph(src);
-  }, [cloneGraph, currentGraph]);
+    return structuredClone(src);
+  }, [currentGraph]);
   function baseGraph() {
     return lastWrittenGraph.current != null ? lastWrittenGraph.current : currentGraph();
   }
@@ -529,9 +519,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
     const newId = freshNodeId(src.id, g.nodes);
-    const clonedData = src.data != null ? (cloneGraph({
-      d: src.data
-    }) || {
+    const clonedData = src.data != null ? structuredClone({
       d: src.data
     }).d : undefined;
     const clone = {
@@ -547,7 +535,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       nodes: [...(g.nodes || []), clone]
     });
     return newId;
-  }, [baseGraph, cloneGraph, commitGraph, freshNodeId, pushHistory]);
+  }, [baseGraph, commitGraph, freshNodeId, pushHistory]);
   const selectedNodeIds = useCallback(() => {
     if (!selector.current || !selector.current.entities) return [];
     const ids = [];
@@ -2689,7 +2677,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     (async () => {
       // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
       // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
-      lastWrittenGraph.current = cloneGraph(currentGraph());
+      lastWrittenGraph.current = structuredClone(currentGraph());
       await reconcileNodes.current();
       await reconcileConnections.current();
       if (typeof _zoomRef.current === 'number' && _zoomRef.current !== 1) {
@@ -2832,7 +2820,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
       selfWriteInFlight.current = false;
     } else if (!programmatic.current) {
-      const c = cloneGraph(currentGraph());
+      const c = structuredClone(currentGraph());
       if (c != null) lastWrittenGraph.current = c;
     }
     if (reconcileNodes.current) {

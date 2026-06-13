@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
+import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, toRaw, useSlots, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ validateTypes?: boolean; pannable?: boolean; zoomable?: boolean; selectable?: boolean; readonly?: boolean; minZoom?: number; maxZoom?: number; snapGrid?: number; accumulateOnCtrl?: boolean; curvature?: number; fitOnMount?: boolean; controls?: boolean; minimap?: boolean; canConnect?: ((...args: any[]) => any) | null; history?: boolean; marquee?: boolean; nodeToolbar?: boolean }>(),
@@ -332,9 +332,9 @@ let edgeClickGuard = false;
 // restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
 // history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
 // cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
-// serializable graph JSON (Pattern 7; `cloneGraph` — JSON round-trip with a
-// `structuredClone` fallback — strips the Vue/Svelte reactivity Proxy that a bare
-// `structuredClone` THROWS on) — no external input, so the restore (T-44-03-2 accept)
+// serializable graph JSON (Pattern 7; the `$clone` sigil — a deep, de-proxied copy
+// that strips the Vue/Svelte reactivity Proxy that a bare `structuredClone` THROWS
+// on) — no external input, so the restore (T-44-03-2 accept)
 // cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
 // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
 // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
@@ -348,9 +348,9 @@ let edgeClickGuard = false;
 // restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
 // history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
 // cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
-// serializable graph JSON (Pattern 7; `cloneGraph` — JSON round-trip with a
-// `structuredClone` fallback — strips the Vue/Svelte reactivity Proxy that a bare
-// `structuredClone` THROWS on) — no external input, so the restore (T-44-03-2 accept)
+// serializable graph JSON (Pattern 7; the `$clone` sigil — a deep, de-proxied copy
+// that strips the Vue/Svelte reactivity Proxy that a bare `structuredClone` THROWS
+// on) — no external input, so the restore (T-44-03-2 accept)
 // cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
 // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
 // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
@@ -489,26 +489,16 @@ const currentGraph = () => graph.value || {
 
 // T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
 // primitives), so JSON round-trip is the robust path: it strips framework reactivity
-// wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that `structuredClone`
-// THROWS on ("could not be cloned"), the silent vue/svelte-only failure that left the
-// history stack empty. `structuredClone` is the fallback for any value JSON can't represent
-// (it won't be hit for a plain graph). Returns null only if BOTH fail.
-// T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
-// primitives), so JSON round-trip is the robust path: it strips framework reactivity
-// wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that `structuredClone`
-// THROWS on ("could not be cloned"), the silent vue/svelte-only failure that left the
-// history stack empty. `structuredClone` is the fallback for any value JSON can't represent
-// (it won't be hit for a plain graph). Returns null only if BOTH fail.
-const cloneGraph = (g: any) => {
-  if (g == null) return null;
-  try {
-    return JSON.parse(JSON.stringify(g));
-  } catch (e: any) {}
-  try {
-    return structuredClone(g);
-  } catch (e: any) {}
-  return null;
-};
+// wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that a bare
+// `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
+// failure that left the history stack empty. Phase 45 replaced the hand-rolled
+// JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
+// lowers to `structuredClone(toRaw(x))` on Vue, `$state.snapshot(x)` on Svelte,
+// and `structuredClone(x)` on the other four — a deep, independent, de-proxied
+// copy on all six (and `$clone(null)` → `null` on all six, preserving the old
+// `g == null` early-return implicitly). The Rete graph is JSON-serializable, so
+// `$clone` never throws here; the former null-return fallbacks at the call sites
+// are now dead but harmless.
 
 // T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
 // `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
@@ -517,6 +507,19 @@ const cloneGraph = (g: any) => {
 // two-way re-bind is async / batched), so reading it at undo time captured an
 // INTERMEDIATE drag position. `lastWrittenGraph` is exact + synchronous. Seeded from the
 // bound graph in $onMount.
+// T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
+// primitives), so JSON round-trip is the robust path: it strips framework reactivity
+// wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that a bare
+// `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
+// failure that left the history stack empty. Phase 45 replaced the hand-rolled
+// JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
+// lowers to `structuredClone(toRaw(x))` on Vue, `$state.snapshot(x)` on Svelte,
+// and `structuredClone(x)` on the other four — a deep, independent, de-proxied
+// copy on all six (and `$clone(null)` → `null` on all six, preserving the old
+// `g == null` early-return implicitly). The Rete graph is JSON-serializable, so
+// `$clone` never throws here; the former null-return fallbacks at the call sites
+// are now dead but harmless.
+
 // T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
 // `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
 // use THIS (not the round-tripped `$props.graph`) as the "current" state to push onto the
@@ -540,7 +543,7 @@ let lastWrittenGraph: any = null;
 // prop value — the value we just wrote IS the truth.
 let selfWriteInFlight = false;
 const commitGraph = (g: any) => {
-  const c = cloneGraph(g);
+  const c = structuredClone(toRaw(g));
   lastWrittenGraph = c != null ? c : g;
   selfWriteInFlight = true;
   graph.value = g;
@@ -552,7 +555,7 @@ const commitGraph = (g: any) => {
 // prop before the first write). Always a fresh deep clone.
 const snapshotCurrent = () => {
   const src = lastWrittenGraph != null ? lastWrittenGraph : currentGraph();
-  return cloneGraph(src);
+  return structuredClone(toRaw(src));
 };
 
 // The BASE graph a write-back builds its fresh object from: the canvas's own last write if
@@ -894,14 +897,14 @@ const freshNodeId = (baseId: any, existing: any) => {
 
 // T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
 // into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
-// contract — never an in-place push). The clone's `data` is deep-cloned (cloneGraph strips
+// contract — never an in-place push). The clone's `data` is deep-cloned ($clone strips
 // any reactivity proxy) so the copy is independent of the source. Connections are NOT cloned
 // (a duplicate is an isolated node — the React-Flow default). One history entry per
 // duplicate gesture (pushHistory, gated on !programmatic + history). Returns the new id, or
 // null if the source isn't found. NOT echo-guarded — a duplicate SHOULD update the model.
 // T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
 // into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
-// contract — never an in-place push). The clone's `data` is deep-cloned (cloneGraph strips
+// contract — never an in-place push). The clone's `data` is deep-cloned ($clone strips
 // any reactivity proxy) so the copy is independent of the source. Connections are NOT cloned
 // (a duplicate is an isolated node — the React-Flow default). One history entry per
 // duplicate gesture (pushHistory, gated on !programmatic + history). Returns the new id, or
@@ -913,11 +916,9 @@ const duplicateNode = (id: any) => {
   const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
   if (!src) return null;
   const newId = freshNodeId(src.id, g.nodes);
-  const clonedData = src.data != null ? (cloneGraph({
+  const clonedData = src.data != null ? structuredClone(toRaw({
     d: src.data
-  }) || {
-    d: src.data
-  }).d : undefined;
+  })).d : undefined;
   const clone = {
     ...src,
     id: newId,
@@ -3269,7 +3270,7 @@ onMounted(() => {
   (async () => {
     // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
     // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
-    lastWrittenGraph = cloneGraph(currentGraph());
+    lastWrittenGraph = structuredClone(toRaw(currentGraph()));
     await reconcileNodes();
     await reconcileConnections();
     if (typeof zoom.value === 'number' && zoom.value !== 1) {
@@ -3411,7 +3412,7 @@ watch(() => graph.value, () => {
     // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
     selfWriteInFlight = false;
   } else if (!programmatic) {
-    const c = cloneGraph(currentGraph());
+    const c = structuredClone(toRaw(currentGraph()));
     if (c != null) lastWrittenGraph = c;
   }
   if (reconcileNodes) {

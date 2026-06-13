@@ -447,7 +447,7 @@ export class FlowCanvas {
         // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
         this.selfWriteInFlight = false;
       } else if (!this.programmatic) {
-        const c = this.cloneGraph(this.currentGraph());
+        const c = structuredClone(this.currentGraph());
         if (c != null) this.lastWrittenGraph = c;
       }
       if (this.reconcileNodes) {
@@ -2391,7 +2391,7 @@ export class FlowCanvas {
     (async () => {
       // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
       // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
-      this.lastWrittenGraph = this.cloneGraph(this.currentGraph());
+      this.lastWrittenGraph = structuredClone(this.currentGraph());
       await this.reconcileNodes();
       await this.reconcileConnections();
       if (typeof this.zoom() === 'number' && this.zoom() !== 1) {
@@ -2597,27 +2597,17 @@ export class FlowCanvas {
     nodes: [],
     connections: []
   };
-  cloneGraph = (g: any) => {
-    if (g == null) return null;
-    try {
-      return JSON.parse(JSON.stringify(g));
-    } catch (e: any) {}
-    try {
-      return structuredClone(g);
-    } catch (e: any) {}
-    return null;
-  };
   lastWrittenGraph: any = null;
   selfWriteInFlight = false;
   commitGraph = (g: any) => {
-    const c = this.cloneGraph(g);
+    const c = structuredClone(g);
     this.lastWrittenGraph = c != null ? c : g;
     this.selfWriteInFlight = true;
     this.graph.set(g);
   };
   snapshotCurrent = () => {
     const src = this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
-    return this.cloneGraph(src);
+    return structuredClone(src);
   };
   baseGraph = () => this.lastWrittenGraph != null ? this.lastWrittenGraph : this.currentGraph();
   pushHistorySnapshot = (snap: any) => {
@@ -2821,9 +2811,7 @@ export class FlowCanvas {
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
     const newId = this.freshNodeId(src.id, g.nodes);
-    const clonedData = src.data != null ? (this.cloneGraph({
-      d: src.data
-    }) || {
+    const clonedData = src.data != null ? structuredClone({
       d: src.data
     }).d : undefined;
     const clone = {
