@@ -323,6 +323,21 @@ export const RozieErrorCode = {
   // the sole declarator of its const. Error severity; emitted from
   // runContextValidator. ROZ134 is the next free code after ROZ133.
   INJECT_MIXED_DECLARATION: 'ROZ134', // error — $inject(...) shares a `const` declaration with other declarators; it must be the sole declarator (const x = $inject('k')).
+  // Phase 45 (D-02) — a `structuredClone(<member rooted at $props/$data/$model>)`
+  // call. `structuredClone` THROWS ("could not be cloned") on a Vue reactive()
+  // proxy and on a Svelte $state proxy — a silent, target-asymmetric footgun
+  // (works on React/Solid/Lit/Angular, throws on Vue/Svelte ONLY). The new
+  // `$clone(x)` sigil deep-clones AND strips the proxy on all six targets
+  // (structuredClone(toRaw(x)) on Vue, $state.snapshot(x) on Svelte,
+  // structuredClone(x) elsewhere). Warn (not error) so a legitimate
+  // structuredClone(someKnownPlainLocal) still compiles — the match is purely
+  // syntactic (argument is a member rooted at $props/$data/$model), no dep-graph
+  // analysis, so zero false positives. Auto-rewrite is explicitly rejected
+  // (D-02 — warn, never silently rewrite). Emitted from
+  // structuredCloneReactiveValidator, wired into analyzeAST so it fires once for
+  // both compile() and @rozie/unplugin (both route through lowerToIR).
+  // ROZ135 is the next free code after ROZ134 in the 100 semantic-binding cluster.
+  STRUCTURED_CLONE_REACTIVE: 'ROZ135', // warn — structuredClone($props/$data/$model.x) throws on Vue reactive()/Svelte $state proxies; use $clone(x).
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

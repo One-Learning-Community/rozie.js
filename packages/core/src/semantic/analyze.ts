@@ -39,6 +39,7 @@ import { runExposeValidator } from './validators/exposeValidator.js';
 import { runContextValidator } from './validators/contextValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
+import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
 export interface AnalyzeResult {
@@ -73,6 +74,10 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runEmitNameValidator(ast, diagnostics);
   // Quick 260602-dv1 — ROZ123: $refs read in a pre-mount eval position ($computed body / $watch getter / template binding/interpolation/r-if/r-show/r-for-iterable expr). No binding dependency.
   runRefsPreMountValidator(ast, diagnostics);
+  // Phase 45 (D-02) — ROZ135 (warning): structuredClone($data.x/$props.x/$model.x)
+  // throws on Vue reactive()/Svelte $state proxies — steer authors to $clone(x).
+  // No binding dependency.
+  runStructuredCloneReactiveValidator(ast, diagnostics);
   // Phase 26 (SPEC-5, D-04/D-05/D-14) — ROZ978: a bare whole-object
   // $props/$data/$refs/$slots identifier (not a member access; $attrs/$listeners
   // exempt) used across template/script/listeners expressions. Always-on,
