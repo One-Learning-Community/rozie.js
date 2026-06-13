@@ -53,6 +53,7 @@ el.addEventListener('connection-created', (e) => console.log('connected', e.deta
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |
 | `marquee` | `Boolean` | `false` |  |  |
+| `nodeToolbar` | `Boolean` | `false` |  |  |
 
 ## Events
 
@@ -110,4 +111,5 @@ const editor = el.getEditor();
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| toolbar | node, emit |
 | (default) |  |

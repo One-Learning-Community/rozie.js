@@ -65,3 +65,29 @@
   touch-action: none;
 }
 .rozie-flow-minimap__svg[data-rozie-s-cd396d6a] { display: block; width: 100%; height: 100%; }
+.rozie-flow-toolbar[data-rozie-s-cd396d6a] {
+  position: absolute;
+  display: none;
+  z-index: 11;
+  gap: 4px;
+  padding: 3px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a] {
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: #eef2f7; }
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
+.rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: #b91c1c; }

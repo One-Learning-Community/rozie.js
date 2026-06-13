@@ -20,6 +20,8 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 
 interface NodeCtx { node: any; selected: any; emit: any; }
 
+interface ToolbarCtx { node: any; emit: any; }
+
 interface FlowCanvasProps {
   graph?: Record<string, any>;
   defaultGraph?: Record<string, any>;
@@ -46,6 +48,7 @@ interface FlowCanvasProps {
   defaultMode?: string;
   onModeChange?: (mode: string) => void;
   marquee?: boolean;
+  nodeToolbar?: boolean;
   onEdgeClick?: (...args: any[]) => void;
   onEdgeSelected?: (...args: any[]) => void;
   onSelectionChange?: (...args: any[]) => void;
@@ -58,6 +61,7 @@ interface FlowCanvasProps {
   onTranslated?: (...args: any[]) => void;
   onContextMenu?: (...args: any[]) => void;
   renderNode?: (ctx: NodeCtx) => ReactNode;
+  renderToolbar?: (ctx: ToolbarCtx) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -88,7 +92,7 @@ export interface FlowCanvasHandle {
 const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(_props: FlowCanvasProps, ref): JSX.Element {
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'minimap' | 'canConnect' | 'history' | 'marquee'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; controls: boolean; minimap: boolean; canConnect: ((...args: any[]) => any) | null; history: boolean; marquee: boolean } = {
+  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'minimap' | 'canConnect' | 'history' | 'marquee' | 'nodeToolbar'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; controls: boolean; minimap: boolean; canConnect: ((...args: any[]) => any) | null; history: boolean; marquee: boolean; nodeToolbar: boolean } = {
     ..._props,
     validateTypes: _props.validateTypes ?? true,
     pannable: _props.pannable ?? true,
@@ -106,9 +110,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     canConnect: _props.canConnect ?? null,
     history: _props.history ?? true,
     marquee: _props.marquee ?? false,
+    nodeToolbar: _props.nodeToolbar ?? false,
   };
   const _renderNodeRef = useRef(props.renderNode);
   _renderNodeRef.current = props.renderNode;
+  const _renderToolbarRef = useRef(props.renderToolbar);
+  _renderToolbarRef.current = props.renderToolbar;
   const lastPropNodeIds = useRef<any>(null);
   const lastPropConnIds = useRef<any>(null);
   const editor = useRef<any>(null);
@@ -130,6 +137,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const dragGestureActive = useRef(false);
   const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
+  const scheduleToolbarTrack = useRef<any>(null);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
   const reconcileNodesRunning = useRef(false);
@@ -142,6 +150,15 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const minimapPanning = useRef(false);
   const onMinimapPointerMove = useRef<any>(null);
   const onMinimapPointerUp = useRef<any>(null);
+  const toolbarTrackRaf = useRef(0);
+  const toolbarHost = useRef<any>(null);
+  const toolbarSelectedId = useRef<any>(null);
+  const toolbarHandle = useRef<any>(null);
+  const syncToolbarSelection = useRef<any>(null);
+  const toolbarDeleteBtn = useRef<any>(null);
+  const toolbarDuplicateBtn = useRef<any>(null);
+  const onToolbarDelete = useRef<any>(null);
+  const onToolbarDup = useRef<any>(null);
   const marqueeBox = useRef<any>(null);
   const marqueeStart = useRef<any>(null);
   const marqueeCur = useRef<any>(null);
@@ -185,6 +202,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const canvasEl = useRef<HTMLDivElement | null>(null);
   const minimapEl = useRef<HTMLDivElement | null>(null);
   const marqueeEl = useRef<HTMLDivElement | null>(null);
+  const toolbarEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
@@ -479,6 +497,43 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
     return true;
   }, [baseGraph, commitGraph, pushHistory]);
+  function freshNodeId(baseId: any, existing: any) {
+    const taken = new Set((existing || []).map((n: any) => n && n.id != null ? String(n.id) : ''));
+    const root = baseId != null ? String(baseId) : 'node';
+    let i = 1;
+    let candidate = root + '-copy';
+    while (taken.has(candidate)) {
+      i++;
+      candidate = root + '-copy-' + i;
+    }
+    return candidate;
+  }
+  const duplicateNode = useCallback((id: any) => {
+    if (id == null) return null;
+    const g = baseGraph();
+    const sid = String(id);
+    const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
+    if (!src) return null;
+    const newId = freshNodeId(src.id, g.nodes);
+    const clonedData = src.data != null ? (cloneGraph({
+      d: src.data
+    }) || {
+      d: src.data
+    }).d : undefined;
+    const clone = {
+      ...src,
+      id: newId,
+      x: (typeof src.x === 'number' ? src.x : 0) + 28,
+      y: (typeof src.y === 'number' ? src.y : 0) + 28,
+      data: clonedData
+    };
+    pushHistory();
+    commitGraph({
+      ...g,
+      nodes: [...(g.nodes || []), clone]
+    });
+    return newId;
+  }, [baseGraph, cloneGraph, commitGraph, freshNodeId, pushHistory]);
   const selectedNodeIds = useCallback(() => {
     if (!selector.current || !selector.current.entities) return [];
     const ids = [];
@@ -498,6 +553,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
     // the selected set changed → repaint the minimap (selected nodes are highlighted).
     if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
+    // T2.8 — the selection changed → re-track the NodeToolbar (it follows the single
+    // selected node; hides on multi-select / empty selection). No-op when :node-toolbar off.
+    if (syncToolbarSelection.current) syncToolbarSelection.current();
   }
   const scheduleSelectionEmit = useCallback(() => {
     Promise.resolve().then(maybeEmitSelectionChange);
@@ -854,6 +912,27 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       portalRoots.current.add(root);
       return {
         update: (s: { node: unknown; selected: unknown; emit: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+      const slot = _renderToolbarRef.current ?? props.slots?.['toolbar'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal toolbar { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+      const root = createRoot(container);
+      const renderScope = (s: { node: unknown; emit: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { node: unknown; emit: unknown }): void => renderScope(s),
         dispose: (): void => {
           root.unmount();
           portalRoots.current.delete(root);
@@ -1721,6 +1800,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
         // a node moved → its minimap rect moves (works during a programmatic translate too).
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
+        // T2.8 — the selected node moved → re-track its toolbar overlay (no-op if off).
+        if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
       } else if (context.type === 'translated') {
         props.onTranslated && props.onTranslated({
           x: context.data.position.x,
@@ -1728,6 +1809,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         });
         // the viewport window moved → redraw the minimap viewport rect + mask.
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
+        // T2.8 — a pan shifts the node's screen rect → re-track the toolbar (no-op if off).
+        if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
       } else if (context.type === 'zoomed') {
         if (!programmatic.current) {
           const k = area.current.area.transform.k;
@@ -1735,6 +1818,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
         // the viewport window resized (zoom) → redraw the minimap viewport rect + mask.
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
+        // T2.8 — a zoom changes the node's screen rect/size → re-track the toolbar (no-op if off).
+        if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
       } else if (context.type === 'contextmenu') {
         // suppress the native browser menu over the canvas; surface a hook instead.
         context.data.event.preventDefault();
@@ -2138,6 +2223,169 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       minimapHost.current.addEventListener('pointerup', onMinimapPointerUp.current);
     }
 
+    // ─── T2.8 NodeToolbar (opt-in :node-toolbar) ─────────────────────────────────
+    // A floating component-template overlay over the SELECTED node. The host div
+    // (ref="toolbarEl") carries the [data-rozie-s-*] scope attr → PLAIN scoped CSS positions
+    // it absolutely (NOT the :root engine-DOM escape hatch — it's component DOM, like the
+    // marquee box + Controls). It is positioned from the engine node-view ELEMENT's rect
+    // (which the AreaPlugin transforms for pan/zoom/drag) relative to the canvas container, so
+    // the area transform is honored automatically — we read getBoundingClientRect() and
+    // subtract the container's rect (the screenToFlowPosition discipline, but the other way).
+    // Re-tracked on translated/zoomed/nodetranslated (the pipe branches that schedule the
+    // minimap redraw) + on every selection emit. OPT-IN (default OFF) → existing demos +
+    // FlowCanvasScreenshot are pixel-identical (the host div is r-if'd off when :node-toolbar
+    // is false; selecting a node never pops it).
+
+    // Resolve the SINGLE selected node id the toolbar should track: the one picked node when
+    // EXACTLY one is selected, else null (no toolbar over a multi-select or empty selection —
+    // a per-node action needs an unambiguous target). Read-only.
+    const singleSelectedNodeId = () => {
+      const ids = selectedNodeIds();
+      return ids.length === 1 ? ids[0] : null;
+    };
+
+    // Position the toolbar host over the tracked node's engine element, or hide it. The
+    // node-view element is already transformed by the AreaPlugin (pan/zoom/drag), so its
+    // client rect minus the container's client rect gives the toolbar's container-relative
+    // px — no manual transform math. Placed just ABOVE the node (bottom of the toolbar at the
+    // node's top edge); clamped so it never goes off the top of the container.
+    const trackToolbar = () => {
+      toolbarTrackRaf.current = 0;
+      if (!props.nodeToolbar || !toolbarHost.current || !area.current || !container) return;
+      const id = toolbarSelectedId.current;
+      if (id == null) {
+        toolbarHost.current.style.display = 'none';
+        return;
+      }
+      const view = area.current.nodeViews ? area.current.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+      if (!rect) {
+        toolbarHost.current.style.display = 'none';
+        return;
+      }
+      const cbox = container.getBoundingClientRect();
+      // container-relative px of the node's top-left + width.
+      const nx = rect.left - cbox.left;
+      const ny = rect.top - cbox.top;
+      const tbH = toolbarHost.current.offsetHeight || 30;
+      let top = ny - tbH - 6;
+      if (top < 2) top = ny + rect.height + 6; // flip below if it would clip the top
+      toolbarHost.current.style.left = nx + 'px';
+      toolbarHost.current.style.top = top + 'px';
+      toolbarHost.current.style.display = 'flex';
+    };
+    scheduleToolbarTrack.current = () => {
+      if (!props.nodeToolbar || toolbarTrackRaf.current) return;
+      if (typeof requestAnimationFrame === 'function') {
+        toolbarTrackRaf.current = requestAnimationFrame(trackToolbar);
+      } else {
+        toolbarTrackRaf.current = 1;
+        Promise.resolve().then(trackToolbar);
+      }
+    };
+
+    // Recompute the tracked node from the live selection + (re)mount the toolbar content for
+    // it. Called from the selection emit (a pick/unpick changed the selection). When the
+    // tracked id changes: if the consumer fills `#toolbar`, (re)render the reactive portal
+    // with the new node scope; else the default buttons stay put (they read the live tracked
+    // id at click time, so no re-mount needed). Then reposition.
+    const syncToolbar = () => {
+      if (!props.nodeToolbar || !toolbarHost.current) return;
+      const id = singleSelectedNodeId();
+      if (id === toolbarSelectedId.current && id == null === (toolbarSelectedId.current == null)) {
+        // same target — just reposition (e.g. after a drag).
+        scheduleToolbarTrack.current();
+        return;
+      }
+      toolbarSelectedId.current = id;
+      if ((props.renderToolbar ?? props.slots?.["toolbar"]) && id != null) {
+        const meta = nodeMeta.get(id) || {
+          id,
+          type: undefined,
+          data: {}
+        };
+        const scope = {
+          node: meta,
+          emit: toolbarEmit
+        };
+        if (toolbarHandle.current && toolbarHandle.current.update) {
+          toolbarHandle.current.update(scope);
+        } else {
+          toolbarHandle.current = portals.toolbar(toolbarHost.current, scope);
+        }
+      }
+      scheduleToolbarTrack.current();
+    };
+    syncToolbarSelection.current = syncToolbar;
+
+    // The @node-action emit helper for the toolbar's actions (the EXISTING emit — no new emit,
+    // T2.8). Carries the tracked node id. Handed to the `#toolbar` slot scope so a consumer
+    // override can raise its own actions too.
+    const toolbarEmit = (name: any, detail: any) => {
+      const id = toolbarSelectedId.current;
+      props.onNodeAction && props.onNodeAction({
+        id,
+        name,
+        detail
+      });
+    };
+    if (props.nodeToolbar && toolbarEl.current) {
+      toolbarHost.current = toolbarEl.current;
+      toolbarHost.current.style.display = 'none';
+      if (!(props.renderToolbar ?? props.slots?.["toolbar"])) {
+        // default chrome: delete + duplicate buttons. Static literal labels (Threat
+        // T-44-06-1: no node-derived text rendered via innerHTML — these are fixed strings
+        // set via textContent). Both fire @node-action on the tracked node.
+        toolbarDeleteBtn.current = document.createElement('button');
+        toolbarDeleteBtn.current.type = 'button';
+        toolbarDeleteBtn.current.className = 'rozie-flow-toolbar__btn rozie-flow-toolbar__btn--delete';
+        toolbarDeleteBtn.current.setAttribute('data-testid', 'flow-toolbar-delete');
+        toolbarDeleteBtn.current.setAttribute('aria-label', 'Delete node');
+        toolbarDeleteBtn.current.textContent = 'Delete';
+        toolbarDuplicateBtn.current = document.createElement('button');
+        toolbarDuplicateBtn.current.type = 'button';
+        toolbarDuplicateBtn.current.className = 'rozie-flow-toolbar__btn rozie-flow-toolbar__btn--duplicate';
+        toolbarDuplicateBtn.current.setAttribute('data-testid', 'flow-toolbar-duplicate');
+        toolbarDuplicateBtn.current.setAttribute('aria-label', 'Duplicate node');
+        toolbarDuplicateBtn.current.textContent = 'Duplicate';
+        onToolbarDelete.current = (e: any) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          const id = toolbarSelectedId.current;
+          if (id == null) return;
+          toolbarEmit('delete', {
+            id
+          });
+          toolbarSelectedId.current = null;
+          deleteNode(id);
+          scheduleToolbarTrack.current();
+        };
+        onToolbarDup.current = (e: any) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          const id = toolbarSelectedId.current;
+          if (id == null) return;
+          const newId = duplicateNode(id);
+          toolbarEmit('duplicate', {
+            id,
+            newId
+          });
+          scheduleToolbarTrack.current();
+        };
+        // pointerup (NOT click — Rete swallows clicks during node interaction; the §6a item-7
+        // discipline) on the COMPONENT-template buttons.
+        toolbarDeleteBtn.current.addEventListener('pointerup', onToolbarDelete.current);
+        toolbarDuplicateBtn.current.addEventListener('pointerup', onToolbarDup.current);
+        toolbarHost.current.appendChild(toolbarDeleteBtn.current);
+        toolbarHost.current.appendChild(toolbarDuplicateBtn.current);
+      }
+    }
+
     // ─── T2.4 MARQUEE select (mode:'select') ─────────────────────────────────────
     // A Figma-style rubber-band box. RESTORE-PATH resolution (RESEARCH Q2/A8): rete's
     // internal `Drag` class is NOT exported, so setDragHandler(null) can't be cleanly
@@ -2346,6 +2594,31 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         } catch (e: any) {}
       }
       minimapRedrawRaf.current = 0;
+      // T2.8 NodeToolbar teardown — remove the default-button listeners, dispose the optional
+      // `#toolbar` reactive portal handle, and cancel a pending reposition.
+      if (toolbarDeleteBtn.current && onToolbarDelete.current) {
+        try {
+          toolbarDeleteBtn.current.removeEventListener('pointerup', onToolbarDelete.current);
+        } catch (e: any) {}
+      }
+      if (toolbarDuplicateBtn.current && onToolbarDup.current) {
+        try {
+          toolbarDuplicateBtn.current.removeEventListener('pointerup', onToolbarDup.current);
+        } catch (e: any) {}
+      }
+      if (toolbarHandle.current && toolbarHandle.current.dispose) {
+        try {
+          toolbarHandle.current.dispose();
+        } catch (e: any) {}
+      }
+      toolbarHandle.current = null;
+      toolbarSelectedId.current = null;
+      if (toolbarTrackRaf.current && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(toolbarTrackRaf.current);
+        } catch (e: any) {}
+      }
+      toolbarTrackRaf.current = 0;
       // T2.4 Marquee teardown — remove the capture-phase pointerdown guard + window listeners.
       if (keydownContainer.current) {
         if (onCanvasPointerDownCapture.current) {
@@ -2497,7 +2770,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-fit" aria-label="Fit view" onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
         
         {(props.marquee) && <button type="button" className={clsx("rozie-flow-controls__btn", { "is-active": mode === 'select' })} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>}</div>}{(props.minimap) && <div className={"rozie-flow-minimap"} ref={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a="" />}<div className={"rozie-flow-marquee"} ref={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
-    </div>
+      
+      {(props.nodeToolbar) && <div className={"rozie-flow-toolbar"} ref={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" />}</div>
+
+
 
 
 

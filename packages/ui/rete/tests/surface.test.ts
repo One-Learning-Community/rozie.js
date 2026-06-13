@@ -37,11 +37,14 @@ const EXPECT = {
   // `mode` (Phase 44 T2.4, D-05) = the two-way pan↔select interaction mode (String,
   // default 'pan'); `marquee` gates the 4th Controls mode button (Boolean, default OFF
   // → FlowCanvasScreenshot byte-identical).
+  // `nodeToolbar` (Phase 44 T2.8, D-06) = the opt-in floating per-node toolbar (Boolean,
+  // default OFF → existing demos + FlowCanvasScreenshot pixel-identical; selecting a node
+  // pops nothing unless enabled).
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
     'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history',
-    'mode', 'marquee',
+    'mode', 'marquee', 'nodeToolbar',
   ],
   // `graph` + `zoom` + `mode` are two-way (the bound graph is the source of truth +
   // write-back target; zoom is the viewport binding; mode is the pan↔select toggle).
@@ -63,7 +66,9 @@ const EXPECT = {
   // 'node' = the reactive multi-instance portal slot (the low-level render-by-type
   // escape hatch); '' = the default slot that hosts the Phase 41 declarative
   // <NodeType>/<Port> children. Both coexist.
-  slots: ['', 'node'],
+  // 'toolbar' (Phase 44 T2.8, D-06) = the opt-in reactive portal slot for a per-node
+  // toolbar override (default = delete/duplicate buttons). ROZ127-clean (≠ any prop name).
+  slots: ['', 'node', 'toolbar'],
   // `deleteNode` (Win 1, quick-260611-sqa) = the PUBLIC controlled-graph cascading
   // delete (fresh-graph write-back), distinct from `removeNode` (engine-only escape
   // hatch). Also wired to the Delete/Backspace key.
@@ -95,7 +100,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (19 props)', () => {
+  it('props surface matches (20 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

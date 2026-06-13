@@ -69,6 +69,7 @@ export class DemoComponent {
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |
 | `marquee` | `Boolean` | `false` |  |  |
+| `nodeToolbar` | `Boolean` | `false` |  |  |
 
 ## Events
 
@@ -127,4 +128,5 @@ export class DemoComponent {
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| toolbar | node, emit |
 | (default) |  |

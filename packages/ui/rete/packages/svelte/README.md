@@ -60,6 +60,7 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |
 | `marquee` | `Boolean` | `false` |  |  |
+| `nodeToolbar` | `Boolean` | `false` |  |  |
 
 ## Events
 
@@ -118,4 +119,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| toolbar | node, emit |
 | (default) |  |

@@ -63,6 +63,7 @@ export function Demo() {
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |
 | `marquee` | `Boolean` | `false` |  |  |
+| `nodeToolbar` | `Boolean` | `false` |  |  |
 
 ## Events
 
@@ -123,4 +124,5 @@ const editor = flow.current?.getEditor();
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| toolbar | node, emit |
 | (default) |  |

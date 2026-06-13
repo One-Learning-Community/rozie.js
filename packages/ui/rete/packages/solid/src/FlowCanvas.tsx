@@ -82,6 +82,32 @@ __rozieInjectStyle('FlowCanvas-cd396d6a', `.rozie-flow-canvas[data-rozie-s-cd396
   touch-action: none;
 }
 .rozie-flow-minimap__svg[data-rozie-s-cd396d6a] { display: block; width: 100%; height: 100%; }
+.rozie-flow-toolbar[data-rozie-s-cd396d6a] {
+  position: absolute;
+  display: none;
+  z-index: 11;
+  gap: 4px;
+  padding: 3px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a] {
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: #eef2f7; }
+.rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
+.rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: #b91c1c; }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -203,6 +229,8 @@ __rozieInjectStyle('FlowCanvas-cd396d6a', `.rozie-flow-canvas[data-rozie-s-cd396
 
 interface NodeSlotCtx { node: any; selected: any; emit: any; }
 
+interface ToolbarSlotCtx { node: any; emit: any; }
+
 interface FlowCanvasProps {
   graph?: Record<string, any>;
   defaultGraph?: Record<string, any>;
@@ -229,6 +257,7 @@ interface FlowCanvasProps {
   defaultMode?: string;
   onModeChange?: (mode: string) => void;
   marquee?: boolean;
+  nodeToolbar?: boolean;
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -241,6 +270,7 @@ interface FlowCanvasProps {
   onTranslated?: (...args: unknown[]) => void;
   onContextMenu?: (...args: unknown[]) => void;
   nodeSlot?: (ctx: () => NodeSlotCtx) => JSX.Element;
+  toolbarSlot?: (ctx: () => ToolbarSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
@@ -271,8 +301,8 @@ export interface FlowCanvasHandle {
 }
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
-  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true, marquee: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history', 'mode', 'marquee', 'children', 'ref']);
+  const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true, marquee: false, nodeToolbar: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history', 'mode', 'marquee', 'nodeToolbar', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, undo, redo, canUndo, canRedo }); });
 
@@ -298,6 +328,24 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       container.setAttribute('data-rozie-portal-node', 'cd396d6a');
       const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });
       const dispose = render(() => slot(scopeSig as unknown as (() => { node: unknown; selected: unknown; emit: unknown })), container);
+      portalDisposers.add(dispose);
+      return {
+        update: (s: unknown): void => {
+          setScopeSig(s);
+        },
+        dispose: (): void => {
+          dispose();
+          portalDisposers.delete(dispose);
+        },
+      };
+    },
+    toolbar: (container: HTMLElement, scope: { node: unknown; emit: unknown }): ReactivePortalHandle => {
+      const slot = _props.toolbarSlot ?? _props.slots?.['toolbar'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-toolbar', 'cd396d6a');
+      const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });
+      const dispose = render(() => slot(scopeSig as unknown as (() => { node: unknown; emit: unknown })), container);
       portalDisposers.add(dispose);
       return {
         update: (s: unknown): void => {
@@ -1176,6 +1224,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         }
         // a node moved → its minimap rect moves (works during a programmatic translate too).
         if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+        // T2.8 — the selected node moved → re-track its toolbar overlay (no-op if off).
+        if (scheduleToolbarTrack) scheduleToolbarTrack();
       } else if (context.type === 'translated') {
         _props.onTranslated?.({
           x: context.data.position.x,
@@ -1183,6 +1233,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         });
         // the viewport window moved → redraw the minimap viewport rect + mask.
         if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+        // T2.8 — a pan shifts the node's screen rect → re-track the toolbar (no-op if off).
+        if (scheduleToolbarTrack) scheduleToolbarTrack();
       } else if (context.type === 'zoomed') {
         if (!programmatic) {
           const k = area.area.transform.k;
@@ -1190,6 +1242,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         }
         // the viewport window resized (zoom) → redraw the minimap viewport rect + mask.
         if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+        // T2.8 — a zoom changes the node's screen rect/size → re-track the toolbar (no-op if off).
+        if (scheduleToolbarTrack) scheduleToolbarTrack();
       } else if (context.type === 'contextmenu') {
         // suppress the native browser menu over the canvas; surface a hook instead.
         context.data.event.preventDefault();
@@ -1593,6 +1647,169 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       minimapHost.addEventListener('pointerup', onMinimapPointerUp);
     }
 
+    // ─── T2.8 NodeToolbar (opt-in :node-toolbar) ─────────────────────────────────
+    // A floating component-template overlay over the SELECTED node. The host div
+    // (ref="toolbarEl") carries the [data-rozie-s-*] scope attr → PLAIN scoped CSS positions
+    // it absolutely (NOT the :root engine-DOM escape hatch — it's component DOM, like the
+    // marquee box + Controls). It is positioned from the engine node-view ELEMENT's rect
+    // (which the AreaPlugin transforms for pan/zoom/drag) relative to the canvas container, so
+    // the area transform is honored automatically — we read getBoundingClientRect() and
+    // subtract the container's rect (the screenToFlowPosition discipline, but the other way).
+    // Re-tracked on translated/zoomed/nodetranslated (the pipe branches that schedule the
+    // minimap redraw) + on every selection emit. OPT-IN (default OFF) → existing demos +
+    // FlowCanvasScreenshot are pixel-identical (the host div is r-if'd off when :node-toolbar
+    // is false; selecting a node never pops it).
+
+    // Resolve the SINGLE selected node id the toolbar should track: the one picked node when
+    // EXACTLY one is selected, else null (no toolbar over a multi-select or empty selection —
+    // a per-node action needs an unambiguous target). Read-only.
+    const singleSelectedNodeId = () => {
+      const ids = selectedNodeIds();
+      return ids.length === 1 ? ids[0] : null;
+    };
+
+    // Position the toolbar host over the tracked node's engine element, or hide it. The
+    // node-view element is already transformed by the AreaPlugin (pan/zoom/drag), so its
+    // client rect minus the container's client rect gives the toolbar's container-relative
+    // px — no manual transform math. Placed just ABOVE the node (bottom of the toolbar at the
+    // node's top edge); clamped so it never goes off the top of the container.
+    const trackToolbar = () => {
+      toolbarTrackRaf = 0;
+      if (!local.nodeToolbar || !toolbarHost || !area || !container) return;
+      const id = toolbarSelectedId;
+      if (id == null) {
+        toolbarHost.style.display = 'none';
+        return;
+      }
+      const view = area.nodeViews ? area.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+      if (!rect) {
+        toolbarHost.style.display = 'none';
+        return;
+      }
+      const cbox = container.getBoundingClientRect();
+      // container-relative px of the node's top-left + width.
+      const nx = rect.left - cbox.left;
+      const ny = rect.top - cbox.top;
+      const tbH = toolbarHost.offsetHeight || 30;
+      let top = ny - tbH - 6;
+      if (top < 2) top = ny + rect.height + 6; // flip below if it would clip the top
+      toolbarHost.style.left = nx + 'px';
+      toolbarHost.style.top = top + 'px';
+      toolbarHost.style.display = 'flex';
+    };
+    scheduleToolbarTrack = () => {
+      if (!local.nodeToolbar || toolbarTrackRaf) return;
+      if (typeof requestAnimationFrame === 'function') {
+        toolbarTrackRaf = requestAnimationFrame(trackToolbar);
+      } else {
+        toolbarTrackRaf = 1;
+        Promise.resolve().then(trackToolbar);
+      }
+    };
+
+    // Recompute the tracked node from the live selection + (re)mount the toolbar content for
+    // it. Called from the selection emit (a pick/unpick changed the selection). When the
+    // tracked id changes: if the consumer fills `#toolbar`, (re)render the reactive portal
+    // with the new node scope; else the default buttons stay put (they read the live tracked
+    // id at click time, so no re-mount needed). Then reposition.
+    const syncToolbar = () => {
+      if (!local.nodeToolbar || !toolbarHost) return;
+      const id = singleSelectedNodeId();
+      if (id === toolbarSelectedId && id == null === (toolbarSelectedId == null)) {
+        // same target — just reposition (e.g. after a drag).
+        scheduleToolbarTrack();
+        return;
+      }
+      toolbarSelectedId = id;
+      if ((_props.toolbarSlot ?? _props.slots?.["toolbar"]) && id != null) {
+        const meta = nodeMeta.get(id) || {
+          id,
+          type: undefined,
+          data: {}
+        };
+        const scope = {
+          node: meta,
+          emit: toolbarEmit
+        };
+        if (toolbarHandle && toolbarHandle.update) {
+          toolbarHandle.update(scope);
+        } else {
+          toolbarHandle = portals.toolbar(toolbarHost, scope);
+        }
+      }
+      scheduleToolbarTrack();
+    };
+    syncToolbarSelection = syncToolbar;
+
+    // The @node-action emit helper for the toolbar's actions (the EXISTING emit — no new emit,
+    // T2.8). Carries the tracked node id. Handed to the `#toolbar` slot scope so a consumer
+    // override can raise its own actions too.
+    const toolbarEmit = (name: any, detail: any) => {
+      const id = toolbarSelectedId;
+      _props.onNodeAction?.({
+        id,
+        name,
+        detail
+      });
+    };
+    if (local.nodeToolbar && toolbarElRef) {
+      toolbarHost = toolbarElRef;
+      toolbarHost.style.display = 'none';
+      if (!(_props.toolbarSlot ?? _props.slots?.["toolbar"])) {
+        // default chrome: delete + duplicate buttons. Static literal labels (Threat
+        // T-44-06-1: no node-derived text rendered via innerHTML — these are fixed strings
+        // set via textContent). Both fire @node-action on the tracked node.
+        toolbarDeleteBtn = document.createElement('button');
+        toolbarDeleteBtn.type = 'button';
+        toolbarDeleteBtn.className = 'rozie-flow-toolbar__btn rozie-flow-toolbar__btn--delete';
+        toolbarDeleteBtn.setAttribute('data-testid', 'flow-toolbar-delete');
+        toolbarDeleteBtn.setAttribute('aria-label', 'Delete node');
+        toolbarDeleteBtn.textContent = 'Delete';
+        toolbarDuplicateBtn = document.createElement('button');
+        toolbarDuplicateBtn.type = 'button';
+        toolbarDuplicateBtn.className = 'rozie-flow-toolbar__btn rozie-flow-toolbar__btn--duplicate';
+        toolbarDuplicateBtn.setAttribute('data-testid', 'flow-toolbar-duplicate');
+        toolbarDuplicateBtn.setAttribute('aria-label', 'Duplicate node');
+        toolbarDuplicateBtn.textContent = 'Duplicate';
+        onToolbarDelete = (e: any) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          const id = toolbarSelectedId;
+          if (id == null) return;
+          toolbarEmit('delete', {
+            id
+          });
+          toolbarSelectedId = null;
+          deleteNode(id);
+          scheduleToolbarTrack();
+        };
+        onToolbarDup = (e: any) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          const id = toolbarSelectedId;
+          if (id == null) return;
+          const newId = duplicateNode(id);
+          toolbarEmit('duplicate', {
+            id,
+            newId
+          });
+          scheduleToolbarTrack();
+        };
+        // pointerup (NOT click — Rete swallows clicks during node interaction; the §6a item-7
+        // discipline) on the COMPONENT-template buttons.
+        toolbarDeleteBtn.addEventListener('pointerup', onToolbarDelete);
+        toolbarDuplicateBtn.addEventListener('pointerup', onToolbarDup);
+        toolbarHost.appendChild(toolbarDeleteBtn);
+        toolbarHost.appendChild(toolbarDuplicateBtn);
+      }
+    }
+
     // ─── T2.4 MARQUEE select (mode:'select') ─────────────────────────────────────
     // A Figma-style rubber-band box. RESTORE-PATH resolution (RESEARCH Q2/A8): rete's
     // internal `Drag` class is NOT exported, so setDragHandler(null) can't be cleanly
@@ -1801,6 +2018,31 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       } catch (e: any) {}
     }
     minimapRedrawRaf = 0;
+    // T2.8 NodeToolbar teardown — remove the default-button listeners, dispose the optional
+    // `#toolbar` reactive portal handle, and cancel a pending reposition.
+    if (toolbarDeleteBtn && onToolbarDelete) {
+      try {
+        toolbarDeleteBtn.removeEventListener('pointerup', onToolbarDelete);
+      } catch (e: any) {}
+    }
+    if (toolbarDuplicateBtn && onToolbarDup) {
+      try {
+        toolbarDuplicateBtn.removeEventListener('pointerup', onToolbarDup);
+      } catch (e: any) {}
+    }
+    if (toolbarHandle && toolbarHandle.dispose) {
+      try {
+        toolbarHandle.dispose();
+      } catch (e: any) {}
+    }
+    toolbarHandle = null;
+    toolbarSelectedId = null;
+    if (toolbarTrackRaf && typeof cancelAnimationFrame === 'function') {
+      try {
+        cancelAnimationFrame(toolbarTrackRaf);
+      } catch (e: any) {}
+    }
+    toolbarTrackRaf = 0;
     // T2.4 Marquee teardown — remove the capture-phase pointerdown guard + window listeners.
     if (keydownContainer) {
       if (onCanvasPointerDownCapture) {
@@ -1882,6 +2124,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   let canvasElRef: HTMLElement | null = null;
   let minimapElRef: HTMLElement | null = null;
   let marqueeElRef: HTMLElement | null = null;
+  let toolbarElRef: HTMLElement | null = null;
 
   // ── engine instances — null-lets so typeNeutralize types them `any` (the
   // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
@@ -1937,6 +2180,32 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   let onCanvasPointerDownCapture: any = null;
   let onMarqueePointerMove: any = null;
   let onMarqueePointerUp: any = null;
+
+  // T2.8 NodeToolbar (opt-in :node-toolbar) — a floating component-template overlay (scoped
+  // CSS, like the marquee box + Controls) over the SELECTED node, positioned from the engine
+  // node-view element's rect relative to the canvas container + the area transform. COMPONENT-
+  // scope (NOT $onMount-local) so the Solid-hoisted teardown sees them. `toolbarHost` is the
+  // absolute overlay <div> (the $refs.toolbarEl element); `toolbarSelectedId` is the id of the
+  // node the toolbar currently tracks (the SINGLE selected node — null when nothing or >1 is
+  // selected, or selection is empty); `toolbarHandle` is the optional `#toolbar` reactive-
+  // portal handle ({ update, dispose }) when the consumer fills the slot; `scheduleToolbarTrack`
+  // is the rAF-coalesced reposition bridge (assigned in $onMount, called by the area pipes +
+  // the selection emit, like scheduleMinimapRedraw); `toolbarTrackRaf` coalesces it to one per
+  // frame. `toolbarDeleteBtn`/`toolbarDuplicateBtn` are the default buttons (kept so teardown
+  // can removeEventListener them); their pointerup handlers are `onToolbarDelete`/`onToolbarDup`.
+  let toolbarHost: any = null;
+  let toolbarSelectedId: any = null;
+  let toolbarHandle: any = null;
+  let scheduleToolbarTrack: any = null;
+  // component-scope bridge to the $onMount-local syncToolbar (the scheduleMinimapRedraw
+  // discipline) — called from maybeEmitSelectionChange + the area pipes so a pick/unpick /
+  // pan / zoom / drag re-tracks the toolbar over the selected node.
+  let syncToolbarSelection: any = null;
+  let toolbarTrackRaf = 0;
+  let toolbarDeleteBtn: any = null;
+  let toolbarDuplicateBtn: any = null;
+  let onToolbarDelete: any = null;
+  let onToolbarDup: any = null;
 
   // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
   const MINIMAP_W = 200;
@@ -2410,6 +2679,56 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     return true;
   }
 
+  // T2.8 — a fresh unique node id for a duplicated node. Derived from the source id + an
+  // incrementing suffix, skipping any id already present in the live graph so a repeated
+  // duplicate never collides (Threat T-44-06-2: a NEW unique id, never a forged/colliding
+  // one). String ids only (mirrors the graph contract).
+  function freshNodeId(baseId: any, existing: any) {
+    const taken = new Set((existing || []).map((n: any) => n && n.id != null ? String(n.id) : ''));
+    const root = baseId != null ? String(baseId) : 'node';
+    let i = 1;
+    let candidate = root + '-copy';
+    while (taken.has(candidate)) {
+      i++;
+      candidate = root + '-copy-' + i;
+    }
+    return candidate;
+  }
+
+  // T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
+  // into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
+  // contract — never an in-place push). The clone's `data` is deep-cloned (cloneGraph strips
+  // any reactivity proxy) so the copy is independent of the source. Connections are NOT cloned
+  // (a duplicate is an isolated node — the React-Flow default). One history entry per
+  // duplicate gesture (pushHistory, gated on !programmatic + history). Returns the new id, or
+  // null if the source isn't found. NOT echo-guarded — a duplicate SHOULD update the model.
+  function duplicateNode(id: any) {
+    if (id == null) return null;
+    const g = baseGraph();
+    const sid = String(id);
+    const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
+    if (!src) return null;
+    const newId = freshNodeId(src.id, g.nodes);
+    const clonedData = src.data != null ? (cloneGraph({
+      d: src.data
+    }) || {
+      d: src.data
+    }).d : undefined;
+    const clone = {
+      ...src,
+      id: newId,
+      x: (typeof src.x === 'number' ? src.x : 0) + 28,
+      y: (typeof src.y === 'number' ? src.y : 0) + 28,
+      data: clonedData
+    };
+    pushHistory();
+    commitGraph({
+      ...g,
+      nodes: [...(g.nodes || []), clone]
+    });
+    return newId;
+  }
+
   // Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
   // AreaExtensions.selector() `entities` Map holds the picked entities ({ label, id });
   // for selectable nodes each entity's `id` is the node id. Empty when nothing is picked
@@ -2442,6 +2761,9 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     });
     // the selected set changed → repaint the minimap (selected nodes are highlighted).
     if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+    // T2.8 — the selection changed → re-track the NodeToolbar (it follows the single
+    // selected node; hides on multi-select / empty selection). No-op when :node-toolbar off.
+    if (syncToolbarSelection) syncToolbarSelection();
   }
 
   // Schedule the selection recompute AFTER the engine's own async selection update has
@@ -2884,7 +3206,10 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         <button type="button" data-testid="flow-fit" aria-label="Fit view" class={"rozie-flow-controls__btn"} onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
         
         {<Show when={local.marquee}><button type="button" data-testid="flow-mode" aria-label={rozieAttr(mode() === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} class={"rozie-flow-controls__btn"} classList={{ 'is-active': mode() === 'select' }} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode() === 'select' ? '▢' : '✥')}</button></Show>}</div></Show>}{<Show when={local.minimap}><div class={"rozie-flow-minimap"} ref={(el) => { minimapElRef = el as HTMLElement; }} data-testid="flow-minimap" data-rozie-s-cd396d6a="" /></Show>}<div class={"rozie-flow-marquee"} ref={(el) => { marqueeElRef = el as HTMLElement; }} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
-    </div>
+      
+      {<Show when={local.nodeToolbar}><div class={"rozie-flow-toolbar"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" /></Show>}</div>
+
+
 
 
 

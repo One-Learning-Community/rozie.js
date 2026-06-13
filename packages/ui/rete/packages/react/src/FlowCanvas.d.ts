@@ -28,6 +28,7 @@ export interface FlowCanvasProps {
   defaultMode?: string;
   onModeChange?: (next: string) => void;
   marquee?: boolean;
+  nodeToolbar?: boolean;
   onEdgeClick?: (...args: unknown[]) => void;
   onEdgeSelected?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -40,6 +41,7 @@ export interface FlowCanvasProps {
   onTranslated?: (...args: unknown[]) => void;
   onContextMenu?: (...args: unknown[]) => void;
   renderNode?: (params: { node: () => void; selected: () => void; emit: () => void }) => ReactNode;
+  renderToolbar?: (params: { node: () => void; emit: () => void }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

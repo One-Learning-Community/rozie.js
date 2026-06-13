@@ -63,6 +63,7 @@ const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInpu
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |
 | `marquee` | `Boolean` | `false` |  |  |
+| `nodeToolbar` | `Boolean` | `false` |  |  |
 
 ## Events
 
@@ -124,4 +125,5 @@ const flow = ref();         // template ref
 | Slot | Params |
 | --- | --- |
 | node | node, selected, emit |
+| toolbar | node, emit |
 | (default) |  |
