@@ -7,7 +7,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, toRaw } from 'vue';
+import { onMounted, ref } from 'vue';
+import { rozieDeepClone } from '@rozie/runtime-vue';
 
 const state = ref({
   count: 0,
@@ -16,7 +17,7 @@ const state = ref({
 const cloned = ref<any>(null);
 
 onMounted(() => {
-  cloned.value = structuredClone(toRaw(state.value));
+  cloned.value = rozieDeepClone(state.value);
 });
 </script>
 

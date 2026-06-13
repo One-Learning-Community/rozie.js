@@ -1,29 +1,41 @@
 // tests/visual-regression/scripts/clone-nested-probe.mjs — Phase 45-07 runtime
-// probe for WR-02 / WR-06.
+// probe + pinned regression for WR-02 / WR-06.
 //
-// PURPOSE: prove or disprove the WR-02 hazard empirically. Does the Vue `$clone`
-// lowering `structuredClone(toRaw(x))` actually THROW when `x` holds an
-// INDEPENDENT nested reactive proxy / ref (not just a plain reactive() tree)?
+// HISTORY: Task 1 used this probe to PROVE the WR-02 hazard empirically — the
+// original Vue `$clone` lowering `structuredClone(toRaw(x))` THREW whenever `x`
+// held an INDEPENDENT nested reactive proxy / ref (not just a plain reactive()
+// tree), because a single top-level `toRaw` leaves nested proxies live and
+// `structuredClone` rejects a Proxy. Svelte's `$state.snapshot` did NOT share
+// the hole (it recursively de-proxies).
 //
-// This executes the EXACT emitted Vue shape `structuredClone(toRaw(x))` and the
-// Svelte shape `$state.snapshot(x)` at runtime against real Vue reactive proxies
-// across the scenarios WR-02 / WR-06 call out:
+// Task 2 (DIRECTION A — FIX) replaced the Vue lowering with `rozieDeepClone(x)`
+// from `@rozie/runtime-vue` — `structuredClone(deepToRaw(x))`, a recursive
+// proxy-safe deep clone. This probe now executes the NEW emitted Vue shape
+// (`rozieDeepClone`) against the same scenarios and asserts Vue is SAFE on ALL
+// of them, bringing it to parity with Svelte. It is kept as the pinned
+// regression: every scenario declares its expected verdict and the probe exits
+// non-zero on any divergence.
 //
-//   S1  plain reactive() tree (the COMMON / documented-safe case)
+//   S1  plain reactive() tree (the COMMON / always-safe case)
 //   S2  reactive() tree with a nested INDEPENDENT reactive() proxy member
 //   S3  reactive() tree with a nested ref()
 //   S4  array of independent reactive() items
-//   S5  FlowCanvas dogfood shape: $clone({ d: src.data }).d where src.data is a
-//       nested reactive proxy (object-literal wrapper, then unwrap .d)
+//   S5  FlowCanvas dogfood shape: clone src.data where src.data is a nested
+//       reactive proxy (now $clone(src.data) directly — the historical
+//       `{ d: src.data }).d` object-literal wrapper was removed in 45-07)
 //
-// Lives in tests/visual-regression because that package has `vue` + `svelte` as
-// direct deps (Node module resolution is by file location, not cwd). Run:
+// Lives in tests/visual-regression because that package has `vue` + `svelte` +
+// `@rozie/runtime-vue` as direct deps (Node module resolution is by file
+// location, not cwd). The probe imports the REAL `rozieDeepClone` helper so it
+// executes the exact runtime the emitted Vue SFCs call. Run:
 //   node tests/visual-regression/scripts/clone-nested-probe.mjs
+// (requires `turbo run build --filter @rozie/runtime-vue` first so dist exists).
 //
 // Node 22 provides a global structuredClone — the same algorithm the browser
 // uses — so the verdict is environment-faithful.
 
-import { reactive, toRaw, ref } from 'vue';
+import { reactive, ref } from 'vue';
+import { rozieDeepClone } from '@rozie/runtime-vue';
 
 let svelteSnapshot, svelteProxy;
 try {
@@ -63,10 +75,13 @@ function run(name, expect, build, cloneFn) {
   results.push({ name, expect, verdict, independent, detail, ok: verdict === expect });
 }
 
-// ---- Vue: structuredClone(toRaw(x)) — the EMITTED shape ----------------------
-const vueClone = (x) => structuredClone(toRaw(x));
+// ---- Vue: rozieDeepClone(x) — the NEW EMITTED shape (Phase 45-07) -----------
+// Every scenario is now SAFE: the recursive deepToRaw walk inside rozieDeepClone
+// strips nested INDEPENDENT reactive proxies / refs before structuredClone runs,
+// so none of S2..S5 throws anymore. This is the regression pin for the fix.
+const vueClone = (x) => rozieDeepClone(x);
 
-// S1 — plain reactive() tree of plain nested objects (documented-safe case).
+// S1 — plain reactive() tree of plain nested objects (always-safe case).
 run('Vue S1 plain reactive() tree', 'SAFE', () => {
   const state = reactive({ count: 1, nested: { label: 'a', deep: { n: 2 } } });
   return {
@@ -79,52 +94,82 @@ run('Vue S1 plain reactive() tree', 'SAFE', () => {
 }, vueClone);
 
 // S2 — reactive() tree whose nested member is an INDEPENDENT reactive() proxy.
-run('Vue S2 nested INDEPENDENT reactive() proxy', 'THROWS', () => {
+// PREVIOUSLY THREW under structuredClone(toRaw(x)); now SAFE + independent.
+run('Vue S2 nested INDEPENDENT reactive() proxy', 'SAFE', () => {
   const inner = reactive({ label: 'a', deep: { n: 2 } });
   const state = reactive({ count: 1, box: { inner } });
-  return { value: state };
+  return {
+    value: state,
+    checkIndependent: (clone) => {
+      clone.box.inner.label = 'MUTATED';
+      return inner.label === 'a';
+    },
+  };
 }, vueClone);
 
-// S3 — reactive() tree whose nested member is a ref().
-run('Vue S3 nested ref()', 'THROWS', () => {
+// S3 — reactive() tree whose nested member is a ref(). PREVIOUSLY THREW; now
+// SAFE with the ref unwrapped to its inner value.
+run('Vue S3 nested ref()', 'SAFE', () => {
   const r = ref({ label: 'a' });
   const state = reactive({ count: 1, box: { inner: r } });
-  return { value: state };
+  return {
+    value: state,
+    checkIndependent: (clone) => {
+      // ref unwrapped: clone.box.inner is the plain { label } value.
+      clone.box.inner.label = 'MUTATED';
+      return r.value.label === 'a';
+    },
+  };
 }, vueClone);
 
-// S4 — array of independent reactive() items.
-run('Vue S4 array of independent reactive() items', 'THROWS', () => {
+// S4 — array of independent reactive() items. PREVIOUSLY THREW; now SAFE.
+run('Vue S4 array of independent reactive() items', 'SAFE', () => {
   const state = reactive({ items: [reactive({ id: 1 }), reactive({ id: 2 })] });
-  return { value: state };
+  return {
+    value: state,
+    checkIndependent: (clone) => {
+      clone.items[0].id = 99;
+      return state.items[0].id === 1;
+    },
+  };
 }, vueClone);
 
-// S5 — FlowCanvas dogfood shape: $clone({ d: src.data }).d where src.data is a
-// nested INDEPENDENT reactive proxy.
-// Emitted Vue: structuredClone(toRaw({ d: src.data })).d
-run('Vue S5 FlowCanvas $clone({ d: src.data }).d, src.data = nested reactive', 'THROWS', () => {
+// S5 — FlowCanvas dogfood shape, now simplified to $clone(src.data) directly
+// (the historical `{ d: src.data }).d` wrapper was removed in 45-07). src.data
+// is a nested INDEPENDENT reactive proxy. PREVIOUSLY THREW; now SAFE.
+run('Vue S5 FlowCanvas $clone(src.data), src.data = nested reactive', 'SAFE', () => {
   const srcData = reactive({ label: 'node A', meta: reactive({ tag: 'x' }) });
-  return { value: { d: srcData } };
-}, (x) => structuredClone(toRaw(x)).d);
+  return {
+    value: srcData,
+    checkIndependent: (clone) => {
+      clone.meta.tag = 'MUTATED';
+      return srcData.meta.tag === 'x';
+    },
+  };
+}, vueClone);
 
-// S5b — same shape but src.data is a SINGLE reactive() tree of plain objects
-// (the benign case the wrapper was likely written for).
-run('Vue S5b FlowCanvas $clone({ d: src.data }).d, src.data = plain reactive tree', 'THROWS', () => {
+// S5b — same call shape but src.data is a SINGLE reactive() tree of plain
+// objects (the benign case). SAFE + independent.
+run('Vue S5b FlowCanvas $clone(src.data), src.data = plain reactive tree', 'SAFE', () => {
   const srcData = reactive({ label: 'node A', meta: { tag: 'x' } });
   return {
-    value: { d: srcData },
+    value: srcData,
     checkIndependent: (clone) => {
       clone.label = 'MUTATED';
       return srcData.label === 'node A';
     },
   };
-}, (x) => structuredClone(toRaw(x)).d);
+}, vueClone);
 
-// ---- FlowCanvas reachability (WR-06) — mount vs duplicate-fallthrough -------
+// ---- FlowCanvas reachability (WR-06) — mount + duplicate, all SAFE now ------
 // Faithful reproduction of packages/ui/rete/src/FlowCanvas.rozie:
 //   currentGraph() = $props.graph (a reactive prop on Vue)
 //   lastWrittenGraph = $clone(currentGraph())   (seeded at mount)
 //   baseGraph() = lastWrittenGraph ?? currentGraph()
-//   duplicateNode: $clone({ d: src.data }).d  where src = baseGraph().nodes.find(...)
+//   duplicateNode: $clone(src.data)  where src = baseGraph().nodes.find(...)
+// The historical hazard window (3) — duplicate while lastWrittenGraph == null
+// so src.data is a LIVE proxy — is now SAFE because rozieDeepClone de-proxies
+// recursively. The latent FlowCanvas throw is ELIMINATED, not merely masked.
 {
   const consumerData = reactive({
     graph: {
@@ -135,30 +180,37 @@ run('Vue S5b FlowCanvas $clone({ d: src.data }).d, src.data = plain reactive tre
   const propsGraph = consumerData.graph; // $props.graph as the canvas sees it (reactive)
   const currentGraph = () => propsGraph || { nodes: [], connections: [] };
 
-  // (1) MOUNT: lastWrittenGraph = $clone(currentGraph()) → structuredClone(toRaw($props.graph))
+  // (1) MOUNT: lastWrittenGraph = $clone(currentGraph()) → rozieDeepClone($props.graph)
   let lastWrittenGraph = null;
-  run('FlowCanvas (1) MOUNT $clone(currentGraph()) [top-level toRaw]', 'SAFE', () => ({
+  run('FlowCanvas (1) MOUNT $clone(currentGraph())', 'SAFE', () => ({
     value: currentGraph(),
   }), (x) => {
-    const c = structuredClone(toRaw(x));
+    const c = rozieDeepClone(x);
     lastWrittenGraph = c; // seed, as the real mount IIFE does
     return c;
   });
 
-  // (2) duplicateNode AFTER mount: baseGraph() = plain lastWrittenGraph → src.data plain → SAFE
+  // (2) duplicateNode AFTER mount: baseGraph() = plain lastWrittenGraph → SAFE.
   run('FlowCanvas (2) duplicate AFTER mount [lastWrittenGraph plain]', 'SAFE', () => {
     const g = lastWrittenGraph != null ? lastWrittenGraph : currentGraph();
     const src = g.nodes.find((n) => n.id === 'a');
-    return { value: { d: src.data } };
-  }, (x) => structuredClone(toRaw(x)).d);
+    return { value: src.data };
+  }, vueClone);
 
-  // (3) HAZARD WINDOW: duplicate when lastWrittenGraph == null → baseGraph() falls
-  // through to currentGraph() = $props.graph → src.data is a LIVE proxy → THROWS.
-  run('FlowCanvas (3) duplicate w/ lastWrittenGraph=null [src.data LIVE proxy]', 'THROWS', () => {
+  // (3) FORMER HAZARD WINDOW: duplicate when lastWrittenGraph == null → baseGraph()
+  // falls through to currentGraph() = $props.graph → src.data is a LIVE proxy.
+  // PREVIOUSLY THREW; now SAFE — the latent FlowCanvas throw is eliminated.
+  run('FlowCanvas (3) duplicate w/ lastWrittenGraph=null [src.data LIVE proxy]', 'SAFE', () => {
     const g = currentGraph(); // the fallthrough branch
     const src = g.nodes.find((n) => n.id === 'a');
-    return { value: { d: src.data } };
-  }, (x) => structuredClone(toRaw(x)).d);
+    return {
+      value: src.data,
+      checkIndependent: (clone) => {
+        clone.meta.tag = 'MUTATED';
+        return src.data.meta.tag === 'x';
+      },
+    };
+  }, vueClone);
 }
 
 // ---- Svelte: $state.snapshot(x) — the EMITTED shape -------------------------
@@ -180,9 +232,9 @@ if (svelteSnapshot) {
     return { value: obj };
   }, (x) => svelteSnapshot(x));
 
-  // The decisive cross-target contrast: a REAL nested $state proxy. Svelte's
-  // snapshot RECURSIVELY de-proxies (where Vue's single top-level toRaw does
-  // not) — proving Svelte does NOT share the Vue hole.
+  // Svelte's snapshot RECURSIVELY de-proxies a REAL nested $state proxy. This
+  // was the original reference behavior Vue lacked under single-top-level-toRaw;
+  // Vue now matches it via rozieDeepClone (see the Vue S2..S5 scenarios above).
   if (svelteProxy) {
     run('Svelte $state.snapshot REAL nested $state proxy', 'SAFE', () => {
       const inner = svelteProxy({ tag: 'x', deep: { n: 2 } });
@@ -231,13 +283,14 @@ for (const r of results) {
   );
 }
 console.log(
-  `\nWR-02/WR-06 HAZARD: ${vueThrowCount > 0 ? 'CONFIRMED' : 'NOT observed'} — ` +
-    `${vueThrowCount} Vue scenario(s) throw "could not be cloned" under structuredClone(toRaw(x)) ` +
-    `when x is / contains a live nested reactive proxy.`,
+  `\nWR-02/WR-06 HAZARD: ${vueThrowCount > 0 ? 'PRESENT' : 'ELIMINATED'} — ` +
+    `${vueThrowCount} Vue scenario(s) threw under the rozieDeepClone lowering. ` +
+    `Expected 0: rozieDeepClone recursively de-proxies, so no nested reactive ` +
+    `proxy survives into structuredClone (Vue now at parity with Svelte).`,
 );
 console.log(
   `REGRESSION PIN: ${anyMismatch ? 'FAIL — a scenario diverged from its documented verdict' : 'PASS — all scenarios matched expectation'}\n`,
 );
-// Exit non-zero ONLY on a regression (verdict != documented expectation), not on
-// the (expected, documented) hazard throws.
-process.exit(anyMismatch ? 1 : 0);
+// Exit non-zero on ANY regression: a scenario diverged from its documented
+// verdict, OR a Vue scenario threw (the 45-07 fix guarantees zero Vue throws).
+process.exit(anyMismatch || vueThrowCount > 0 ? 1 : 0);

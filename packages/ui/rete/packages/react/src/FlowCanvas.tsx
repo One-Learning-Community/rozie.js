@@ -519,9 +519,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
     const newId = freshNodeId(src.id, g.nodes);
-    const clonedData = src.data != null ? structuredClone({
-      d: src.data
-    }).d : undefined;
+    // Phase 45-07 (WR-02/WR-06): `$clone` is now a recursive proxy-safe deep clone
+    // on every target (Vue's lowering de-proxies nested reactive members via the
+    // `rozieDeepClone` runtime helper). The historical `$clone({ d: src.data }).d`
+    // object-literal wrapper — which never actually dodged the old single-toRaw
+    // throw on a live nested proxy — is no longer needed; clone `src.data` directly.
+    const clonedData = src.data != null ? structuredClone(src.data) : undefined;
     const clone = {
       ...src,
       id: newId,

@@ -527,12 +527,13 @@ const currentGraph = () => graph || {
 // `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
 // failure that left the history stack empty. Phase 45 replaced the hand-rolled
 // JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
-// lowers to `structuredClone(toRaw(x))` on Vue, `$state.snapshot(x)` on Svelte,
-// and `structuredClone(x)` on the other four — a deep, independent, de-proxied
-// copy on all six (and `$clone(null)` → `null` on all six, preserving the old
-// `g == null` early-return implicitly). The Rete graph is JSON-serializable, so
-// `$clone` never throws here; the former null-return fallbacks at the call sites
-// are now dead but harmless.
+// lowers to `rozieDeepClone(x)` on Vue (Phase 45-07 — a recursive proxy-safe deep
+// clone in @rozie/runtime-vue that de-proxies nested INDEPENDENT reactive members,
+// not just the top level), `$state.snapshot(x)` on Svelte, and `structuredClone(x)`
+// on the other four — a deep, independent, de-proxied copy on all six (and
+// `$clone(null)` → `null` on all six, preserving the old `g == null` early-return
+// implicitly). The Rete graph is JSON-serializable, so `$clone` never throws here;
+// the former null-return fallbacks at the call sites are now dead but harmless.
 
 // T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
 // `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
@@ -547,12 +548,13 @@ const currentGraph = () => graph || {
 // `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
 // failure that left the history stack empty. Phase 45 replaced the hand-rolled
 // JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
-// lowers to `structuredClone(toRaw(x))` on Vue, `$state.snapshot(x)` on Svelte,
-// and `structuredClone(x)` on the other four — a deep, independent, de-proxied
-// copy on all six (and `$clone(null)` → `null` on all six, preserving the old
-// `g == null` early-return implicitly). The Rete graph is JSON-serializable, so
-// `$clone` never throws here; the former null-return fallbacks at the call sites
-// are now dead but harmless.
+// lowers to `rozieDeepClone(x)` on Vue (Phase 45-07 — a recursive proxy-safe deep
+// clone in @rozie/runtime-vue that de-proxies nested INDEPENDENT reactive members,
+// not just the top level), `$state.snapshot(x)` on Svelte, and `structuredClone(x)`
+// on the other four — a deep, independent, de-proxied copy on all six (and
+// `$clone(null)` → `null` on all six, preserving the old `g == null` early-return
+// implicitly). The Rete graph is JSON-serializable, so `$clone` never throws here;
+// the former null-return fallbacks at the call sites are now dead but harmless.
 
 // T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
 // `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
@@ -950,9 +952,12 @@ const duplicateNode = (id: any) => {
   const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
   if (!src) return null;
   const newId = freshNodeId(src.id, g.nodes);
-  const clonedData = src.data != null ? $state.snapshot({
-    d: src.data
-  }).d : undefined;
+  // Phase 45-07 (WR-02/WR-06): `$clone` is now a recursive proxy-safe deep clone
+  // on every target (Vue's lowering de-proxies nested reactive members via the
+  // `rozieDeepClone` runtime helper). The historical `$clone({ d: src.data }).d`
+  // object-literal wrapper — which never actually dodged the old single-toRaw
+  // throw on a live nested proxy — is no longer needed; clone `src.data` directly.
+  const clonedData = src.data != null ? $state.snapshot(src.data) : undefined;
   const clone = {
     ...src,
     id: newId,

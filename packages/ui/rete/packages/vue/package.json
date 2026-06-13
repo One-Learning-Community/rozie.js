@@ -38,6 +38,9 @@
   "files": [
     "src"
   ],
+  "dependencies": {
+    "@rozie/runtime-vue": "workspace:^"
+  },
   "peerDependencies": {
     "vue": "^3.4",
     "rete": "^2",
