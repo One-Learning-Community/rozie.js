@@ -227,6 +227,13 @@ const EXAMPLES = [
   'ThemeButton',
   'Tabs',
   'Tab',
+  // Phase 45 ($clone sigil) — the single-file $clone proving probe. $clone(x)
+  // lowers per-target: structuredClone(toRaw(x)) (Vue) / $state.snapshot(x)
+  // (Svelte) / structuredClone(x) (React/Solid/Angular/Lit), over nested
+  // reactive state containing a Date. Drift on rebless is confined to the new
+  // CloneProbe.* fixtures (+ the FlowCanvas dogfood). Single-file; no sibling
+  // .rozie producers — stays OUT of RESOLVER_ROOT.
+  'CloneProbe',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

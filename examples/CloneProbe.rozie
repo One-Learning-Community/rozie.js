@@ -1,0 +1,51 @@
+<!--
+  CloneProbe.rozie — Phase 45 dist-parity proving fixture for the `$clone` sigil.
+
+  Single-file (no sibling `.rozie` producers) — stays OUT of RESOLVER_ROOT.
+
+  Byte-locks the 6-target × 4-entrypoint `$clone` emit shape:
+    - Vue:    $clone(x) → structuredClone(toRaw(x))   (toRaw auto-imported)
+    - Svelte: $clone(x) → $state.snapshot(x)          (bare, already deep+de-proxied)
+    - React/Solid/Angular/Lit: $clone(x) → structuredClone(x)
+
+  Exercises `$clone($data.state)` from a `<script>` `$onMount` over NESTED reactive
+  state containing a `Date` — proving the clone is deep + independent + de-proxied
+  AND that the `Date` survives as a `Date` (vs JSON-first lossiness, which would
+  corrupt it to an ISO string). The template reads a primitive off the source plus
+  an `r-if="$data.cloned"` element to confirm the clone landed.
+-->
+
+<rozie name="CloneProbe">
+
+<data>
+{
+  state: { count: 0, created: new Date(0) },
+  cloned: null
+}
+</data>
+
+<script>
+// script-position deep clone of nested reactive state — exercises the
+// rewriteScript.ts `$clone` branch in each emitter. The clone is an independent,
+// de-proxied deep copy where `created` survives as a Date (structuredClone /
+// $state.snapshot, NOT a JSON round-trip).
+$onMount(() => {
+  $data.cloned = $clone($data.state)
+})
+</script>
+
+<template>
+<div class="probe">
+  <span class="count">count: {{ $data.state.count }}</span>
+  <span class="cloned" r-if="$data.cloned">cloned</span>
+</div>
+</template>
+
+<style>
+.probe {
+  display: block;
+  padding: 0.5rem;
+}
+</style>
+
+</rozie>
