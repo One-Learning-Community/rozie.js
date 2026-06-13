@@ -182,10 +182,13 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `node-moved` | `{ id, x, y }` | A node finished a user drag to a new position. |
 | `node-picked` | `{ id }` | A node was picked (pointer-down). |
 | `selection-change` | `{ ids }` | The set of selected node ids changed — fired on pick / re-pick / deselect (background click clears it). Deduped (only on an actual change) and echo-guarded against the wrapper's own programmatic unselects. The #1 hook for an inspector panel. Selection is surfaced purely via this event — it is **not** written into the bound `graph`. |
-| `node-action` | `{ id, name, detail }` | A `<NodeType>` `#body` fill called its `emit(name, detail)` helper (e.g. an in-node button). |
+| `edge-click` | `{ id }` | A committed connection's path was clicked. Fired only when `selectable && !readonly`. The raw click intent — pair with `edge-selected` (which both fire on the same gesture). |
+| `edge-selected` | `{ id }` | The selected edge changed to `id` (the edge analogue of `selection-change`). Edge selection is kept purely in the wrapper and surfaced via this event — **not** written into the bound `graph`. The hook for an edge inspector / "delete this edge" UI. |
+| `node-action` | `{ id, name, detail }` | A `<NodeType>` `#body` fill called its `emit(name, detail)` helper (e.g. an in-node button), or a default **NodeToolbar** button fired (`name: 'delete' | 'duplicate'`). |
 | `connection-created` | `{ id, source, sourceOutput, target, targetInput }` | A user drew a new connection (not fired for programmatic / props-driven adds). |
 | `connection-removed` | `{ id }` | A connection was removed (not fired for programmatic / props-driven removes). |
 | `connection-rejected` | `{ source, sourceOutput, target, targetInput }` | A connection was rejected by `canConnect` (no edge committed). Not fired for programmatic / props-driven adds. |
+| `connect-end` | `{ source, sourceOutput, position }` | A connection drag started at an **output** socket and ended on **empty canvas** (no target socket, no edge created). `position` is `{ x, y }` in graph coordinates. A **pure signal** — the canvas creates no node and shows no menu; the consumer owns what happens next (a "create node here" picker, a quick-add menu). The React Flow `onConnectEnd` parity. |
 | `translated` | `{ x, y }` | The viewport was panned. |
 | `context-menu` | `{ id }` | Right-click on the canvas (`id` is the node id, or `null` for the background). The native browser menu is suppressed. |
 
@@ -218,6 +221,83 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `autoArrange(opts?)` | Relayout the graph into a non-overlapping layered arrangement (elkjs-backed), then read the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). **Verb-only — never auto-triggered.** `await`-able; `opts.options` forwards elk layout options (direction / spacing). No-op before mount. |
 
 > The method is `zoomTo`, not `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom` state setter that a `setZoom` verb would collide with (the same collision discipline as the rest of `@rozie-ui`).
+
+## Editing the graph
+
+`FlowCanvas` is an **editor**, not just a viewer. Selection, deletion, undo/redo, edge styling, reconnection, marquee selection, a per-node toolbar, and auto-layout all ship in the box, and every edit flows through the **same controlled-graph contract** as drag and connect: the canvas writes a fresh `graph` object back through the two-way model, and the consumer never hand-reconciles. The full bundle is on by default behind the existing gates — `:readonly="true"` turns the whole canvas into a static viewer (no selection, no delete, no editing), and the individual opt-outs / opt-ins below let you trim it to taste.
+
+### Selecting and deleting edges
+
+Clicking a committed connection's path selects it (the edge gets an `.is-selected` class you can style through the `:root {}` engine-DOM hatch) and fires `@edge-click` + `@edge-selected` with `{ id }`. With an edge selected, **Delete** / **Backspace** removes it — written back through the bound `graph` as a fresh `connections` array. Node deletion takes precedence: if a node is selected, the key deletes the node (and its incident edges) first. Edge selection is gated `selectable && !readonly` and, like node selection, is surfaced purely via events — it is never written into `graph`.
+
+```html
+<FlowCanvas r-model:graph="$data.graph" @edge-selected="onEdgeSelected" />
+```
+
+### Edge types — step / smoothstep / straight
+
+Each connection carries an optional **`type`** on the bound graph — `'bezier'` (default), `'step'`, `'smoothstep'`, or `'straight'` — selecting the path shape, matching React Flow's edge types. It is a per-edge property, so a single graph can mix orthogonal routing for some edges and curves for others; editing `connection.type` on the bound graph re-renders just that edge in place (the same restyle path as `label` / `stroke` / `dashed`). An unknown value falls back to the unchanged bezier.
+
+```js
+$data.graph = {
+  nodes: [/* … */],
+  connections: [
+    { source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in', type: 'smoothstep' },
+  ],
+}
+```
+
+### Undo / redo
+
+On by default (`history` prop). Every gesture — drag, connect, disconnect, delete, reconnect, auto-arrange — pushes **one** capped (~100) snapshot of the bound graph (nodes incl. `x`/`y` + connections; **not** the viewport). **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** / **Ctrl/Cmd+Y** redo, and the `undo()` / `redo()` / `canUndo()` / `canRedo()` handle verbs drive the same stack from your own toolbar. One gesture = one step; a fresh edit after an undo discards the redo branch. Restores are echo-guarded through the `graph` model. Opt out with `:history="false"` (the stack stays empty; the verbs no-op).
+
+> **Snapshotting note (cross-framework):** the wrapper clones graph snapshots JSON-first — a bare `structuredClone()` throws on Vue's `reactive()` and Svelte's `$state` proxies, so it is never used on the bound graph. If you keep your own history outside the component, clone the same way.
+
+### Marquee selection and the pan ↔ select mode
+
+The two-way **`mode`** prop is a Figma-style toggle. `'pan'` (default) pans the viewport on an empty-canvas drag — unchanged. `'select'` draws a rubber-band **marquee** box on an empty-canvas drag and multi-selects the intersecting nodes (surfacing `@selection-change`); a node drag still drags the node in both modes. Bind it with `r-model:mode` and drive it from your own UI, or set **`:marquee="true"`** to render a built-in 4th Controls button that toggles the mode for you. `marquee` defaults OFF so the default Controls overlay keeps its three buttons (the screenshot baseline is byte-identical); the marquee *behavior* works whenever `mode === 'select'`, independent of the button.
+
+```html
+<FlowCanvas r-model:graph="$data.graph" r-model:mode="$data.mode" :marquee="true" />
+```
+
+### Reconnectable edges
+
+Dragging an existing edge's endpoint onto a different compatible socket **rewrites** that connection rather than dropping it — the edge count is unchanged and it counts as **one** undoable gesture (the internal remove + add are coalesced into a single history snapshot). Reconnection is on whenever `!readonly` and honors the same `:validate-types` / `canConnect` rules as drawing a fresh edge.
+
+### Node toolbar
+
+Set **`:node-toolbar="true"`** to float a small toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan / zoom / drag). The default content is **Delete** (cascading controlled-graph `deleteNode`) and **Duplicate** (clone the node spec at an offset with a new id into a fresh `graph`); both fire `@node-action` with `name: 'delete' | 'duplicate'`. Fill the **`#toolbar`** reactive slot (scope `{ node, emit }`) to replace the buttons with your own. Default OFF, so existing canvases are pixel-identical — selecting a node pops nothing until you opt in.
+
+```html
+<FlowCanvas r-model:graph="$data.graph" :node-toolbar="true">
+  <template #toolbar="{ node, emit }">
+    <button @click="emit('rename', { id: node.id })">Rename</button>
+    <button @click="emit('delete')">✕</button>
+  </template>
+</FlowCanvas>
+```
+
+### Auto-layout
+
+The **`autoArrange(opts?)`** handle verb relayouts the whole graph into a non-overlapping layered arrangement (elkjs-backed) and writes the arranged positions back through the two-way `graph` model as one undoable gesture. It is **verb-only and never auto-triggered** — nothing reflows unless you call it (e.g. from a "Tidy up" button). It is `await`-able, and `opts.options` forwards elk layout options (direction, spacing). The three layout packages (`rete-auto-arrange-plugin`, `elkjs`, `web-worker`) are **optional peers** — only consumers who call `autoArrange()` need them installed.
+
+```js
+await $refs.flow.autoArrange()
+// or with options:
+await $refs.flow.autoArrange({ options: { 'elk.direction': 'RIGHT' } })
+```
+
+### Connect-end-on-pane (quick-add menus)
+
+When a connection drag starts at an **output** socket and ends on **empty canvas** (no target socket), `FlowCanvas` fires **`@connect-end`** with `{ source, sourceOutput, position }` — `position` in graph coordinates. This is a **pure signal**, the React Flow `onConnectEnd` parity: the canvas creates no node and shows no menu. The consumer decides what happens — pop a node picker at `position`, quick-add a default node, or ignore the drop. Because `position` is already in graph space, a node you push into `graph` at that point lands exactly where the drag ended.
+
+```js
+const onConnectEnd = ({ source, sourceOutput, position }) => {
+  // open your own "create node" menu at `position`, then write the new node
+  // (and an edge from source/sourceOutput) back into $data.graph.
+}
+```
 
 ### Palette drag-drop (`screenToFlowPosition`)
 
