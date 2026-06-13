@@ -1,0 +1,114 @@
+<!--
+  FlowCanvasArrangeDemo.rozie — BEHAVIORAL consumer for Phase 44 T2.6 (D-08): auto-layout.
+  Seeds TWO heavily-overlapping connected nodes (near-identical x/y) so the graph starts
+  tangled. Clicking the `arrange` button calls the canvas's `autoArrange()` $expose verb,
+  which runs the elkjs-backed AutoArrangePlugin (after setting node dims — Pitfall 3) and
+  reads the arranged positions BACK into the bound `graph` model (echo-guarded, one undoable
+  gesture). Verb-only — NO auto-trigger (the MapLibre verb-first stance).
+
+  `data-testid="node0-x"` / `node1-x` read `Math.round($data.graph.nodes[i].x)` — the BOUND
+  model's x positions, so the spec (`rete-flow-arrange`) reads the SETTLED readout. The
+  assertion is RELATIVE (not exact px, which is layout-engine-dependent): after arrange the
+  two nodes' x readouts differ by ≥ a node width (non-overlapping LAYERED layout — a→b is a
+  source→target edge, so elkjs's classic layered preset puts them in adjacent columns), and
+  re-sampling after a tick shows the positions are STABLE (no oscillation). Behavioral-only;
+  NOT a screenshot cell (autoArrange is verb-only → FlowCanvasScreenshot stays byte-identical).
+-->
+
+<rozie name="FlowCanvasArrangeDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // THE SINGLE SOURCE OF TRUTH — two `step` nodes seeded ON TOP OF each other (same x/y)
+  // and connected a→b, so the start state is fully overlapping (x readouts equal). After
+  // autoArrange() the layered preset must separate them into adjacent columns.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'step', x: 80, y: 80, data: { label: 'A' } },
+      { id: 'b', type: 'step', x: 80, y: 80, data: { label: 'B' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive autoArrange() — read in the
+// button handler (post-mount), never eagerly (ROZ123-safe). autoArrange() is async (elkjs
+// layout); we don't await in the handler — the bound `graph` re-binds when it resolves and
+// the node0-x/node1-x readouts update (the spec waits on the settled readout).
+const doArrange = () => { const c = $refs.canvas; if (c && c.autoArrange) c.autoArrange() }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — auto-layout (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="arrange-btn" @click="doArrange">arrange</button>
+    <span class="readout">A x: <b data-testid="node0-x">{{ Math.round($data.graph.nodes[0].x) }}</b></span>
+    <span class="readout">B x: <b data-testid="node1-x">{{ Math.round($data.graph.nodes[1].x) }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.controls button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

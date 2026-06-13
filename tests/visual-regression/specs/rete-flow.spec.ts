@@ -1578,6 +1578,87 @@ for (const target of TARGETS) {
 }
 
 /**
+ * 14. AUTO-LAYOUT — verb-only elkjs relayout (Phase 44 T2.6, D-08).
+ *
+ * `examples/demos/FlowCanvasArrangeDemo.rozie` (2 `step` nodes A,B seeded ON TOP of each
+ * other at the same x/y + one edge a→b; an `arrange-btn` calling the canvas's
+ * `autoArrange()` $expose verb). autoArrange() runs the elkjs-backed AutoArrangePlugin
+ * (after setting node dims from the measured node-view element — Pitfall 3) and reads the
+ * arranged positions back into the bound `$data.graph` (echo-guarded, one undoable gesture).
+ * Exercises the elkjs bundle on all 6 incl. Angular AOT + Lit (the high-risk legs). Proves:
+ *
+ *   1. START OVERLAPPING — `node0-x` and `node1-x` (= Math.round(graph.nodes[i].x)) are
+ *      seeded EQUAL (both 80) — the tangled start state.
+ *   2. ARRANGE — clicking `arrange-btn` runs autoArrange(); the two x readouts SETTLE to
+ *      values that differ by ≥ a node width (the layered preset puts a source→target pair in
+ *      ADJACENT columns) — a RELATIVE non-overlap assertion (not exact px, which is
+ *      layout-engine-dependent).
+ *   3. STABLE — re-sampling after a tick shows the positions HOLD (no oscillation / no
+ *      write-back loop).
+ *
+ * Asserts the SETTLED readouts only. No `toHaveScreenshot` — autoArrange is verb-only, so
+ * FlowCanvasScreenshot stays byte-identical (a separate matrix cell guards that).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-arrange [${target}]: autoArrange() relayouts overlapping nodes into a non-overlapping layered layout`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasArrange&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+
+    const node0x = page.getByTestId('node0-x');
+    const node1x = page.getByTestId('node1-x');
+    const readX = async (loc: typeof node0x): Promise<number> =>
+      Number((await loc.textContent())?.trim() ?? 'NaN');
+
+    // ---- 1. START OVERLAPPING: both nodes seeded at x=80 (the tangled start) ----
+    await expect(node0x).toHaveText('80');
+    await expect(node1x).toHaveText('80');
+    expect(await readX(node0x)).toBe(await readX(node1x));
+
+    // measure the rendered node width (the non-overlap threshold = "≥ a node width").
+    const nodeA = page.locator('.rozie-flow-node', { hasText: 'A' }).first();
+    await expect(nodeA).toBeVisible({ timeout: 10_000 });
+    const ab = await nodeA.boundingBox();
+    if (!ab) throw new Error('node A bounding box unavailable');
+    const nodeWidth = ab.width;
+    expect(nodeWidth).toBeGreaterThan(0);
+
+    // ---- 2. ARRANGE: click → the two x readouts settle to a ≥ node-width separation ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(
+        async () => Math.abs((await readX(node0x)) - (await readX(node1x))),
+        { timeout: 15_000, intervals: [100, 300, 600, 1000, 2000] },
+      )
+      .toBeGreaterThanOrEqual(nodeWidth);
+
+    // settle, then capture the arranged positions.
+    await page.waitForTimeout(500);
+    const x0 = await readX(node0x);
+    const x1 = await readX(node1x);
+    expect(Math.abs(x0 - x1), 'arranged nodes are non-overlapping (≥ node width apart)')
+      .toBeGreaterThanOrEqual(nodeWidth);
+
+    // ---- 3. STABLE: re-sample after a tick → the positions HOLD (no oscillation) ----
+    await page.waitForTimeout(400);
+    expect(await readX(node0x), 'node0-x is stable after arrange (no write-back loop)').toBe(x0);
+    expect(await readX(node1x), 'node1-x is stable after arrange (no write-back loop)').toBe(x1);
+  });
+}
+
+/**
  * 11. MARQUEE SELECT — the pan↔select `mode` toggle (Phase 44 T2.4, D-05).
  *
  * `examples/demos/FlowCanvasMarqueeDemo.rozie` binds a 3-node controlled graph (two nodes

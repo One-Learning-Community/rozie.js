@@ -415,6 +415,16 @@ export const EXAMPLES = [
   // node-count decremented, @node-action fired 'delete'; ALSO asserts the FlowCanvas
   // (default demo, no flag) shows NO toolbar on select (pixel-safe). Behavioral-only.
   'FlowCanvasToolbar',
+  // Phase 44 T2.6 (D-08, auto-layout) — FlowCanvasArrange is the BEHAVIORAL cell (loader →
+  // examples/demos/FlowCanvasArrangeDemo.rozie): two `step` nodes seeded ON TOP of each
+  // other (same x/y) + connected a→b, with `node0-x`/`node1-x` readouts and an `arrange-btn`
+  // calling the canvas's autoArrange() $expose verb. The spec (rete-flow-arrange) asserts the
+  // two x readouts START overlapping, then after arrange differ by ≥ a node width (the elkjs
+  // layered preset separates source→target into adjacent columns — a RELATIVE assertion, not
+  // exact px) and are STABLE on re-sample (no oscillation). Exercises the elkjs bundle on all
+  // 6 incl Angular AOT + Lit. Behavioral-only — autoArrange is verb-only so FlowCanvasScreenshot
+  // stays byte-identical.
+  'FlowCanvasArrange',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -592,6 +602,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasReconnect: 'rozie-flow-canvas-reconnect',
   // Phase 44 toolbar cell — '-demo' appended → 'rozie-flow-canvas-toolbar-demo'.
   FlowCanvasToolbar: 'rozie-flow-canvas-toolbar',
+  // Phase 44 auto-layout cell — '-demo' appended → 'rozie-flow-canvas-arrange-demo'.
+  FlowCanvasArrange: 'rozie-flow-canvas-arrange',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -801,6 +813,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // :node-toolbar ON internally). No parent props; no MODEL_PROPS entry (graph/zoom bound
   // internally — the FlowCanvas precedent).
   FlowCanvasToolbar: {},
+  // Phase 44 — FlowCanvasArrangeDemo is self-contained (seeds its own 2 overlapping nodes;
+  // graph/zoom bound internally — the FlowCanvas precedent). No parent props.
+  FlowCanvasArrange: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
