@@ -1,0 +1,119 @@
+<!--
+  FlowCanvasConnectEndDemo.rozie — BEHAVIORAL consumer for Phase 44 T2.7 (D-07):
+  connect-end-on-pane. Seeds ONE node with an OUTPUT socket. Dragging FROM that output
+  socket and dropping on EMPTY canvas (no target socket, no edge created) fires the
+  canvas's `@connect-end { source, sourceOutput, position }` emit — the n8n "drag a
+  connection off a port → drop on the pane → create a node" hook.
+
+  PURE EMIT / CONSUMER-OWNS-CREATION (D-07): the canvas creates NO node and shows NO
+  picker — it surfaces ONLY the hook. This demo's `onConnectEnd` handler is the consumer's
+  own creation flow stand-in: it just records the payload into readouts (a real consumer
+  would open its picker at `position` and append a fresh node into the bound `graph`).
+
+  `data-testid="connect-end-source"` = the source node id; `connect-end-x` / `connect-end-y`
+  = the rounded graph-coord drop position. The spec (`rete-flow-connect-end`) drags from
+  the output socket to an empty region of the canvas and asserts the readout shows the
+  source id ('src') and FINITE, in-canvas-range x/y (NOT exact coords — the synthetic drop
+  point is flaky). It also asserts the node COUNT is unchanged (no auto-creation). The
+  `connect-count` readout proves the emit fired exactly once per pane-drop. Behavioral-only;
+  NOT a screenshot cell.
+-->
+
+<rozie name="FlowCanvasConnectEndDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  // THE SINGLE SOURCE OF TRUTH — one `src` node with an output socket, placed near the
+  // top-left so there is plenty of EMPTY canvas to the right/bottom to drop a connection
+  // onto (the connect-end pane region).
+  graph: {
+    nodes: [
+      { id: 'src', type: 'src', x: 60, y: 60, data: { label: 'Source' } },
+    ],
+    connections: [],
+  },
+  // @connect-end readouts (the consumer's own creation-flow stand-in — D-07).
+  ceSource: '',
+  ceX: '',
+  ceY: '',
+  ceCount: 0,
+}
+</data>
+
+<script>
+// The connect-end hook handler — the CONSUMER's creation flow (D-07). The canvas owns ONLY
+// the emit; here we record the payload (a real consumer would open its node-picker at
+// `position` and append a fresh node into the bound `graph`). We deliberately do NOT create
+// a node, so the spec can prove the canvas auto-creates nothing.
+const onConnectEnd = (e) => {
+  if (!e) return
+  $data.ceSource = e.source != null ? String(e.source) : ''
+  $data.ceX = e.position && typeof e.position.x === 'number' ? String(Math.round(e.position.x)) : ''
+  $data.ceY = e.position && typeof e.position.y === 'number' ? String(Math.round(e.position.y)) : ''
+  $data.ceCount = $data.ceCount + 1
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — connect-end-on-pane (behavioral)</h3>
+
+  <div class="controls">
+    <span class="readout">src: <b data-testid="connect-end-source">{{ $data.ceSource }}</b></span>
+    <span class="readout">x: <b data-testid="connect-end-x">{{ $data.ceX }}</b></span>
+    <span class="readout">y: <b data-testid="connect-end-y">{{ $data.ceY }}</b></span>
+    <span class="readout">n: <b data-testid="connect-count">{{ $data.ceCount }}</b></span>
+    <span class="readout">nodes: <b data-testid="node-count">{{ $data.graph.nodes.length }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+      @connect-end="onConnectEnd"
+    >
+      <NodeType type="src">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

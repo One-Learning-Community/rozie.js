@@ -1659,6 +1659,102 @@ for (const target of TARGETS) {
 }
 
 /**
+ * 15. CONNECT-END-ON-PANE — pure emit, consumer owns creation (Phase 44 T2.7, D-07).
+ *
+ * `examples/demos/FlowCanvasConnectEndDemo.rozie` (one `src` node with an OUTPUT socket near
+ * the top-left; an `onConnectEnd` handler fed by the canvas's `@connect-end` emit writes the
+ * payload into `connect-end-source` / `connect-end-x` / `connect-end-y` / `connect-count`
+ * readouts; `node-count` = the bound graph's node count). The spec drags FROM the output
+ * socket and drops on EMPTY canvas (no target socket, no edge created) → the ConnectionPlugin
+ * fires `connectiondrop { socket:null, created:false, initial.side:'output' }`, which the
+ * canvas surfaces as `@connect-end { source, sourceOutput, position }`. Proves on all 6:
+ *
+ *   1. EMIT FIRED — `connect-count` reaches ≥ 1 (the pane-drop surfaced the hook).
+ *   2. PAYLOAD — `connect-end-source` shows the source node id ('src'); `connect-end-x` /
+ *      `connect-end-y` are FINITE numbers within the canvas range (NOT exact coords — the
+ *      synthetic drop point is flaky; we assert plausibility, not equality — the
+ *      area.area.pointer graph-coord projection is what we're proving cross-target).
+ *   3. CONSUMER OWNS CREATION — `node-count` is UNCHANGED (still 1): the canvas auto-creates
+ *      NOTHING (D-07, no built-in picker); the handler is the consumer's own stand-in.
+ *
+ * Behavioral-only — @connect-end is a pure emit, so FlowCanvasScreenshot stays byte-identical.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-connect-end [${target}]: dropping a connection on empty canvas fires @connect-end; consumer owns creation`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasConnectEnd&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(1);
+
+    // sanity: nothing surfaced yet, the one seed node is bound.
+    await expect(page.getByTestId('connect-count')).toHaveText('0');
+    await expect(page.getByTestId('node-count')).toHaveText('1');
+
+    // the source node's OUTPUT socket — the drag start.
+    const sourceOut = page
+      .locator('.rozie-flow-node', { hasText: 'Source' })
+      .locator('.rozie-flow-socket--output')
+      .first();
+    await expect(sourceOut).toBeVisible({ timeout: 10_000 });
+    const out = await sourceOut.boundingBox();
+    if (!out) throw new Error('output socket bounding box unavailable');
+    const outCx = out.x + out.width / 2;
+    const outCy = out.y + out.height / 2;
+
+    // the EMPTY drop point — the canvas's bottom-right region, well clear of the
+    // top-left source node + its sockets (so it is a pane-drop, never a socket-drop).
+    const cbox = await canvas.boundingBox();
+    if (!cbox) throw new Error('canvas bounding box unavailable');
+    const paneX = cbox.x + cbox.width * 0.78;
+    const paneY = cbox.y + cbox.height * 0.78;
+
+    // drag from the output socket → release on empty canvas.
+    await page.mouse.move(outCx, outCy);
+    await page.mouse.down();
+    await page.mouse.move((outCx + paneX) / 2, (outCy + paneY) / 2, { steps: 6 });
+    await page.mouse.move(paneX, paneY, { steps: 6 });
+    await page.mouse.up();
+
+    // ---- 1. EMIT FIRED: the pane-drop surfaced @connect-end ----
+    await expect
+      .poll(async () => Number((await page.getByTestId('connect-count').textContent())?.trim() ?? '0'), {
+        timeout: 10_000,
+        intervals: [100, 200, 300, 500],
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    // ---- 2. PAYLOAD: source id + finite, in-range graph-coord drop position ----
+    await expect(page.getByTestId('connect-end-source')).toHaveText('src');
+    const x = Number((await page.getByTestId('connect-end-x').textContent())?.trim() ?? 'NaN');
+    const y = Number((await page.getByTestId('connect-end-y').textContent())?.trim() ?? 'NaN');
+    expect(Number.isFinite(x), `connect-end x is finite (got ${x})`).toBe(true);
+    expect(Number.isFinite(y), `connect-end y is finite (got ${y})`).toBe(true);
+    // plausibility: graph coords for a drop inside a ~620×320 canvas with zoom 1 and a
+    // node seeded at (60,60) — generously bounded (NOT exact; the drop point is synthetic).
+    expect(x, `connect-end x in plausible range (got ${x})`).toBeGreaterThan(-200);
+    expect(x, `connect-end x in plausible range (got ${x})`).toBeLessThan(2000);
+    expect(y, `connect-end y in plausible range (got ${y})`).toBeGreaterThan(-200);
+    expect(y, `connect-end y in plausible range (got ${y})`).toBeLessThan(2000);
+
+    // ---- 3. CONSUMER OWNS CREATION: the canvas auto-created NO node (D-07) ----
+    await page.waitForTimeout(400);
+    await expect(page.getByTestId('node-count')).toHaveText('1');
+    expect(await page.locator('.rozie-flow-node').count()).toBe(1);
+  });
+}
+
+/**
  * 11. MARQUEE SELECT — the pan↔select `mode` toggle (Phase 44 T2.4, D-05).
  *
  * `examples/demos/FlowCanvasMarqueeDemo.rozie` binds a 3-node controlled graph (two nodes

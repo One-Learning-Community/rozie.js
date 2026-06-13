@@ -425,6 +425,14 @@ export const EXAMPLES = [
   // 6 incl Angular AOT + Lit. Behavioral-only — autoArrange is verb-only so FlowCanvasScreenshot
   // stays byte-identical.
   'FlowCanvasArrange',
+  // Phase 44 T2.7 (D-07, connect-end-on-pane) — FlowCanvasConnectEnd is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasConnectEndDemo.rozie): one `src` node with an output
+  // socket. The spec (rete-flow-connect-end) drags FROM the output socket and drops on EMPTY
+  // canvas → asserts the @connect-end readout shows the source id ('src') + FINITE in-range
+  // graph-coord x/y (NOT exact — synthetic drop is flaky), the emit fired (connect-count ≥ 1),
+  // and the node count is UNCHANGED (the canvas auto-creates nothing — consumer owns creation).
+  // Behavioral-only — connect-end is a pure emit so FlowCanvasScreenshot stays byte-identical.
+  'FlowCanvasConnectEnd',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -604,6 +612,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasToolbar: 'rozie-flow-canvas-toolbar',
   // Phase 44 auto-layout cell — '-demo' appended → 'rozie-flow-canvas-arrange-demo'.
   FlowCanvasArrange: 'rozie-flow-canvas-arrange',
+  // Phase 44 connect-end cell — '-demo' appended → 'rozie-flow-canvas-connect-end-demo'.
+  FlowCanvasConnectEnd: 'rozie-flow-canvas-connect-end',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -816,6 +826,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 44 — FlowCanvasArrangeDemo is self-contained (seeds its own 2 overlapping nodes;
   // graph/zoom bound internally — the FlowCanvas precedent). No parent props.
   FlowCanvasArrange: {},
+  // Phase 44 — FlowCanvasConnectEndDemo is self-contained (seeds its own 1-node graph;
+  // graph/zoom bound internally — the FlowCanvas precedent). No parent props.
+  FlowCanvasConnectEnd: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
