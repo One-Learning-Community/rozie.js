@@ -7,6 +7,17 @@ import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
 import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
+// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
+// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
+// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
+// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
+// a consumer calling autoArrange() pulls these in.
+// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
+// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
+// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
+// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
+// a consumer calling autoArrange() pulls these in.
+import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
 
 // ── engine instances — null-lets so typeNeutralize types them `any` (the
 // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
@@ -782,6 +793,24 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.renderScope = new Scope('rozie-vanilla-render');
     this.area.use(this.renderScope);
     this.socketWatcher.attach(this.renderScope);
+
+    // ── T2.6 auto-layout (D-08, verb-only) ──
+    // Wire the AutoArrangePlugin (elkjs classic preset) so the top-level autoArrange() verb
+    // can run a layered relayout on demand. area.use(arrange) installs it as an area-scope
+    // plugin; arrange.layout() mutates the engine node positions directly (calls area.translate
+    // internally). The verb reads the arranged positions BACK into a FRESH $model.graph (the
+    // controlled-graph contract — the engine is never the source of truth). NO auto-trigger —
+    // the consumer calls autoArrange() (the MapLibre verb-first stance).
+    // ── T2.6 auto-layout (D-08, verb-only) ──
+    // Wire the AutoArrangePlugin (elkjs classic preset) so the top-level autoArrange() verb
+    // can run a layered relayout on demand. area.use(arrange) installs it as an area-scope
+    // plugin; arrange.layout() mutates the engine node positions directly (calls area.translate
+    // internally). The verb reads the arranged positions BACK into a FRESH $model.graph (the
+    // controlled-graph contract — the engine is never the source of truth). NO auto-trigger —
+    // the consumer calls autoArrange() (the MapLibre verb-first stance).
+    this.arrange = new AutoArrangePlugin();
+    this.arrange.addPreset(ArrangePresets.classic.setup());
+    this.area.use(this.arrange);
 
     // ── selection (selectableNodes) ──
     // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
@@ -2558,6 +2587,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   selector: any = null;
 
+  arrange: any = null;
+
   keydownContainer: any = null;
 
   onCanvasKeydown: any = null;
@@ -3267,6 +3298,51 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       x: (clientX - rect.left - t.x) / k,
       y: (clientY - rect.top - t.y) / k
     };
+  }
+
+  async autoArrange(opts: any) {
+    if (!this.arrange || !this.area) return;
+    // Set elkjs dimensions on every live node instance from its measured node-view element
+    // (Pitfall 3) — without dims the classic preset stacks all nodes at (0,0).
+    for (const [id, node] of this.nodeInstances as any) {
+      const view = this.area.nodeViews ? this.area.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      node.width = el && el.offsetWidth ? el.offsetWidth : this.MINIMAP_DEFAULT_NODE_W;
+      node.height = el && el.offsetHeight ? el.offsetHeight : this.MINIMAP_DEFAULT_NODE_H;
+    }
+    // ONE history entry for the arrange gesture, captured BEFORE the write (pushHistory reads
+    // lastWrittenGraph, still the pre-arrange state). Gated on !programmatic + history.
+    this.pushHistory();
+    this.programmatic++;
+    try {
+      await this.arrange.layout(opts && opts.options ? {
+        options: opts.options
+      } : undefined);
+    } finally {
+      this.programmatic--;
+    }
+    // Read the arranged positions back into a FRESH graph object (controlled-graph contract).
+    // Echo-guarded: commitGraph → $model.graph re-bind must not re-enter the reconcile as a new
+    // gesture. (The arrange already moved the engine to these coords, so the reconcile is a
+    // no-op diff; the guard is belt-and-braces + suppresses any history re-entry.)
+    this.programmatic++;
+    try {
+      const g = this.baseGraph();
+      const nodes = (g.nodes || []).map((n: any) => {
+        const v = n && n.id != null && this.area.nodeViews ? this.area.nodeViews.get(n.id) : null;
+        return v && v.position ? {
+          ...n,
+          x: v.position.x,
+          y: v.position.y
+        } : n;
+      });
+      this.commitGraph({
+        ...g,
+        nodes
+      });
+    } finally {
+      this.programmatic--;
+    }
   }
 
   get graph(): any { return this._graphControllable.read(); }

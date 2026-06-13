@@ -113,6 +113,7 @@ const editor = handle?.getEditor();
 | `getNodes` | Return a serialized snapshot of all nodes as `[{ id, label, x, y }]` (live positions from the area). |
 | `getConnections` | Return a serialized snapshot of all connections as `[{ id, source, sourceOutput, target, targetInput }]`. |
 | `getTransform` | Return the current viewport transform `{ x, y, k }` (pan offset + zoom), or null before mount. |
+| `autoArrange` | Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` forwards elk layout options (direction / spacing). No-op before mount. |
 | `undo` | Undo the most recent graph edit (drag / connect / disconnect / delete) — `undo()` restores the previous snapshot through the two-way `graph` model (echo-guarded). Graph-only (nodes + connections), NOT the viewport. One gesture = one step. No-op when there is nothing to undo. Also bound to Ctrl/Cmd+Z. Opt out with `:history="false"`. |
 | `redo` | Redo the edit most recently undone — `redo()` re-applies the snapshot through the `graph` model (echo-guarded). A fresh edit after an undo discards the redo branch. No-op when there is nothing to redo. Also bound to Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y. |
 | `canUndo` | Return whether there is an edit to undo — `canUndo()` → boolean. |

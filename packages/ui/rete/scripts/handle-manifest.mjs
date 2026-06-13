@@ -34,6 +34,7 @@ export const handleManifest = {
   redo: 'Redo the edit most recently undone — `redo()` re-applies the snapshot through the `graph` model (echo-guarded). A fresh edit after an undo discards the redo branch. No-op when there is nothing to redo. Also bound to Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y.',
   canUndo: 'Return whether there is an edit to undo — `canUndo()` → boolean.',
   canRedo: 'Return whether there is an edit to redo — `canRedo()` → boolean.',
+  autoArrange: 'Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` forwards elk layout options (direction / spacing). No-op before mount.',
 };
 
 export default handleManifest;

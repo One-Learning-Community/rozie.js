@@ -215,6 +215,7 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `redo()` | Re-apply the edit most recently undone. A fresh edit after an undo discards the redo branch. No-op when there's nothing to redo. Also **Ctrl/Cmd+Shift+Z** and **Ctrl/Cmd+Y**. |
 | `canUndo()` | Whether there is an edit to undo → `boolean`. |
 | `canRedo()` | Whether there is an edit to redo → `boolean`. |
+| `autoArrange(opts?)` | Relayout the graph into a non-overlapping layered arrangement (elkjs-backed), then read the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). **Verb-only — never auto-triggered.** `await`-able; `opts.options` forwards elk layout options (direction / spacing). No-op before mount. |
 
 > The method is `zoomTo`, not `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom` state setter that a `setZoom` verb would collide with (the same collision discipline as the rest of `@rozie-ui`).
 

@@ -9,6 +9,17 @@ import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
 import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
+// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
+// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
+// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
+// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
+// a consumer calling autoArrange() pulls these in.
+// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
+// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
+// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
+// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
+// a consumer calling autoArrange() pulls these in.
+import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
 
 // ── engine instances — null-lets so typeNeutralize types them `any` (the
 // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
@@ -83,6 +94,7 @@ export interface FlowCanvasHandle {
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;
+  autoArrange: (...args: any[]) => any;
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   canUndo: (...args: any[]) => any;
@@ -128,6 +140,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const reconnectDidWriteBack = useRef(false);
   const reconnectCloseScheduled = useRef(false);
   const renderScope = useRef<any>(null);
+  const arrange = useRef<any>(null);
   const selector = useRef<any>(null);
   const nodeSelectApi = useRef<any>(null);
   const onCanvasKeydown = useRef<any>(null);
@@ -891,6 +904,99 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     };
   }
 
+  // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
+  // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
+  // AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
+  // FRESH `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
+  // contract — the engine is never the source of truth, mirroring the drag write-back).
+  //
+  // PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
+  // plain `ClassicPreset.Node` with no dimensions, so without dims the classic preset collapses
+  // every node to (0,0). We set `node.width`/`node.height` from the MEASURED engine node-view
+  // element (area.nodeViews.get(id).element offsetW/H — target-agnostic, the measureNodeSize
+  // discipline) BEFORE layout, falling back to MINIMAP_DEFAULT_NODE_W/H for Lit's unmeasured
+  // first paint. (measureNodeSize itself is $onMount-local; the verb is top-level, so the same
+  // measure is inlined here over the component-scope `area` + `nodeInstances`.)
+  //
+  // Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
+  // the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
+  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). The
+  // optional `opts.options` (elk layout options — direction/spacing) is forwarded to
+  // arrange.layout() (D-01 discretion — default-only is fine; the arg stays optional).
+  //
+  // Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
+  // updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
+  // NOT an emit (node-*/connection-*/translated/context-menu/selection-change/edge-*/node-action),
+  // NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
+  // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
+  // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
+  // AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
+  // FRESH `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
+  // contract — the engine is never the source of truth, mirroring the drag write-back).
+  //
+  // PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
+  // plain `ClassicPreset.Node` with no dimensions, so without dims the classic preset collapses
+  // every node to (0,0). We set `node.width`/`node.height` from the MEASURED engine node-view
+  // element (area.nodeViews.get(id).element offsetW/H — target-agnostic, the measureNodeSize
+  // discipline) BEFORE layout, falling back to MINIMAP_DEFAULT_NODE_W/H for Lit's unmeasured
+  // first paint. (measureNodeSize itself is $onMount-local; the verb is top-level, so the same
+  // measure is inlined here over the component-scope `area` + `nodeInstances`.)
+  //
+  // Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
+  // the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
+  // snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). The
+  // optional `opts.options` (elk layout options — direction/spacing) is forwarded to
+  // arrange.layout() (D-01 discretion — default-only is fine; the arg stays optional).
+  //
+  // Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
+  // updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
+  // NOT an emit (node-*/connection-*/translated/context-menu/selection-change/edge-*/node-action),
+  // NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
+  async function autoArrange(opts: any) {
+    if (!arrange.current || !area.current) return;
+    // Set elkjs dimensions on every live node instance from its measured node-view element
+    // (Pitfall 3) — without dims the classic preset stacks all nodes at (0,0).
+    for (const [id, node] of nodeInstances as any) {
+      const view = area.current.nodeViews ? area.current.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      node.width = el && el.offsetWidth ? el.offsetWidth : MINIMAP_DEFAULT_NODE_W;
+      node.height = el && el.offsetHeight ? el.offsetHeight : MINIMAP_DEFAULT_NODE_H;
+    }
+    // ONE history entry for the arrange gesture, captured BEFORE the write (pushHistory reads
+    // lastWrittenGraph, still the pre-arrange state). Gated on !programmatic + history.
+    pushHistory();
+    programmatic.current++;
+    try {
+      await arrange.current.layout(opts && opts.options ? {
+        options: opts.options
+      } : undefined);
+    } finally {
+      programmatic.current--;
+    }
+    // Read the arranged positions back into a FRESH graph object (controlled-graph contract).
+    // Echo-guarded: commitGraph → $model.graph re-bind must not re-enter the reconcile as a new
+    // gesture. (The arrange already moved the engine to these coords, so the reconcile is a
+    // no-op diff; the guard is belt-and-braces + suppresses any history re-entry.)
+    programmatic.current++;
+    try {
+      const g = baseGraph();
+      const nodes = (g.nodes || []).map((n: any) => {
+        const v = n && n.id != null && area.current.nodeViews ? area.current.nodeViews.get(n.id) : null;
+        return v && v.position ? {
+          ...n,
+          x: v.position.x,
+          y: v.position.y
+        } : n;
+      });
+      commitGraph({
+        ...g,
+        nodes
+      });
+    } finally {
+      programmatic.current--;
+    }
+  }
+
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -1045,6 +1151,17 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     renderScope.current = new Scope('rozie-vanilla-render');
     area.current.use(renderScope.current);
     socketWatcher.current.attach(renderScope.current);
+
+    // ── T2.6 auto-layout (D-08, verb-only) ──
+    // Wire the AutoArrangePlugin (elkjs classic preset) so the top-level autoArrange() verb
+    // can run a layered relayout on demand. area.use(arrange) installs it as an area-scope
+    // plugin; arrange.layout() mutates the engine node positions directly (calls area.translate
+    // internally). The verb reads the arranged positions BACK into a FRESH $model.graph (the
+    // controlled-graph contract — the engine is never the source of truth). NO auto-trigger —
+    // the consumer calls autoArrange() (the MapLibre verb-first stance).
+    arrange.current = new AutoArrangePlugin();
+    arrange.current.addPreset(ArrangePresets.classic.setup());
+    area.current.use(arrange.current);
 
     // ── selection (selectableNodes) ──
     // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
@@ -2703,7 +2820,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
   }, [zoom]);
 
-  useImperativeHandle(ref, () => ({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, undo, redo, canUndo, canRedo }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <__ctx_rete_canvas.Provider value={{

@@ -75,11 +75,14 @@ const EXPECT = {
   // `undo`/`redo` + `canUndo`/`canRedo` (Phase 44 T1.3, D-02) = the snapshot-stack
   // imperative handle (collision-clean: not a Lit lifecycle / emit / prop / React
   // model-setter / inherited-DOM-method name).
+  // `autoArrange` (Phase 44 T2.6, D-08) = the elkjs-backed auto-layout verb (verb-only,
+  // no auto-trigger; reads arranged positions back through the `graph` model). Collision-
+  // clean (not a Lit lifecycle / inherited-DOM-method / emit / prop / React model-setter).
   expose: [
     'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'addConnection',
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'setCenter', 'setViewport',
     'screenToFlowPosition', 'getNodes', 'getConnections', 'getTransform',
-    'undo', 'redo', 'canUndo', 'canRedo',
+    'undo', 'redo', 'canUndo', 'canRedo', 'autoArrange',
   ],
 } as const;
 
@@ -129,7 +132,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (20 verbs)', () => {
+  it('expose surface matches (21 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

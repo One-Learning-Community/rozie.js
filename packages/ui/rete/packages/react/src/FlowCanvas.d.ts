@@ -63,6 +63,7 @@ export interface FlowCanvasHandle {
   getNodes: (...args: any[]) => any;
   getConnections: (...args: any[]) => any;
   getTransform: (...args: any[]) => any;
+  autoArrange: (...args: any[]) => any;
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   canUndo: (...args: any[]) => any;
