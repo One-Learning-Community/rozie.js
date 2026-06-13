@@ -407,6 +407,14 @@ export const EXAMPLES = [
   // (proving the reconnect coalesced into ONE history entry). Behavioral-only; NOT a
   // screenshot cell.
   'FlowCanvasReconnect',
+  // Phase 44 T2.8 (D-06, NodeToolbar) — FlowCanvasToolbar is the BEHAVIORAL cell (loader →
+  // examples/demos/FlowCanvasToolbarDemo.rozie): a 2-node graph with :node-toolbar ON +
+  // readouts `node-count` (bound model) and `node-action-readout` (fed by @node-action).
+  // The spec (rete-flow-toolbar) selects a node → asserts `.rozie-flow-toolbar` is visible
+  // near it → clicks its Delete button → asserts the node is gone (toHaveCount(0)),
+  // node-count decremented, @node-action fired 'delete'; ALSO asserts the FlowCanvas
+  // (default demo, no flag) shows NO toolbar on select (pixel-safe). Behavioral-only.
+  'FlowCanvasToolbar',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -582,6 +590,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasMarquee: 'rozie-flow-canvas-marquee',
   // Phase 44 reconnect cell — '-demo' appended → 'rozie-flow-canvas-reconnect-demo'.
   FlowCanvasReconnect: 'rozie-flow-canvas-reconnect',
+  // Phase 44 toolbar cell — '-demo' appended → 'rozie-flow-canvas-toolbar-demo'.
+  FlowCanvasToolbar: 'rozie-flow-canvas-toolbar',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -787,6 +797,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // with a two-input sink + one edge into in1). No parent props; no MODEL_PROPS entry
   // (graph/zoom are bound internally — the FlowCanvas precedent).
   FlowCanvasReconnect: {},
+  // Phase 44 — FlowCanvasToolbarDemo is self-contained (seeds its own 2-node graph,
+  // :node-toolbar ON internally). No parent props; no MODEL_PROPS entry (graph/zoom bound
+  // internally — the FlowCanvas precedent).
+  FlowCanvasToolbar: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

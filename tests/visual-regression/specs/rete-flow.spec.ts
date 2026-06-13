@@ -1796,3 +1796,104 @@ for (const target of TARGETS) {
     await expect(connCount).toHaveText('1');
   });
 }
+
+/**
+ * 13. NODE TOOLBAR — opt-in floating per-node toolbar (Phase 44 T2.8, D-06).
+ *
+ * `examples/demos/FlowCanvasToolbarDemo.rozie` binds a 2-node graph with `:node-toolbar`
+ * ON + a single `step` <NodeType>. Selecting a node pops a floating `.rozie-flow-toolbar`
+ * over it (positioned from the engine node-view rect + the area transform); its default
+ * Delete button drives the controlled-graph `deleteNode` and fires `@node-action`. Proves
+ * on all 6:
+ *
+ *   1. OPT-IN OVERLAY — clicking the 'Alpha' node body pops `.rozie-flow-toolbar` (visible),
+ *      and it sits NEAR the node (its box overlaps/abuts the node rect — not parked at 0,0).
+ *   2. DELETE ACTS ON THE BOUND GRAPH — clicking the toolbar's Delete button removes the
+ *      node (`toHaveCount(0)` for the 'Alpha' body — NOT a count-only delta), `node-count`
+ *      decrements 2→1, and `node-action-readout` shows 'delete' (the @node-action emit).
+ *   3. PIXEL-SAFE — the DEFAULT `FlowCanvas` demo (NO :node-toolbar) shows NO
+ *      `.rozie-flow-toolbar` on select → existing canvases are untouched (the
+ *      FlowCanvasScreenshot baseline is byte-identical; toolbar is strictly opt-in).
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-toolbar [${target}]: opt-in NodeToolbar pops over the selected node; Delete acts on the bound graph; off by default`, async ({
+    page,
+  }) => {
+    // ---- 1+2. WITH :node-toolbar — select a node → toolbar pops → Delete removes it ----
+    await page.goto(`/?example=FlowCanvasToolbar&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+
+    const nodeCount = page.getByTestId('node-count');
+    const actionReadout = page.getByTestId('node-action-readout');
+    await expect(nodeCount).toHaveText('2');
+    await expect(actionReadout).toHaveText('—');
+
+    // toolbar is ABSENT until a node is selected (display:none / not visible).
+    const toolbar = page.locator('.rozie-flow-toolbar');
+    await expect(toolbar).toBeHidden();
+
+    // SELECT the 'Alpha' node body (click near the label, away from the output socket).
+    const alpha = page.locator('.rozie-flow-node', { hasText: 'Alpha' });
+    await expect(alpha).toHaveCount(1);
+    const ab = await alpha.first().boundingBox();
+    if (!ab) throw new Error('Alpha node bounding box unavailable');
+    await page.mouse.click(ab.x + 14, ab.y + 10);
+
+    // selection settles — the `.is-selected` class lands on the node box.
+    await expect(
+      page.locator('.rozie-flow-node.is-selected', { hasText: 'Alpha' }),
+    ).toHaveCount(1, { timeout: 5_000 });
+
+    // ---- 1. the toolbar pops over the selected node ----
+    await expect(toolbar).toBeVisible({ timeout: 5_000 });
+    // it sits NEAR the node (overlaps/abuts the node rect — not parked at the origin).
+    const tb = await toolbar.first().boundingBox();
+    const ab2 = await alpha.first().boundingBox();
+    if (!tb || !ab2) throw new Error('toolbar / node bounding box unavailable');
+    // horizontal overlap with the node, and vertically within ~80px of the node top edge.
+    const horizOverlap = tb.x < ab2.x + ab2.width && tb.x + tb.width > ab2.x;
+    expect(horizOverlap, `toolbar x ${tb.x.toFixed(0)} not over node x ${ab2.x.toFixed(0)}..${(ab2.x + ab2.width).toFixed(0)}`).toBe(true);
+    expect(
+      Math.abs(tb.y + tb.height - ab2.y) < 90 || Math.abs(tb.y - (ab2.y + ab2.height)) < 90,
+      `toolbar y ${tb.y.toFixed(0)} not adjacent to node y ${ab2.y.toFixed(0)}/${(ab2.y + ab2.height).toFixed(0)}`,
+    ).toBe(true);
+
+    // ---- 2. Delete button removes the node from the bound graph + fires @node-action ----
+    await page.getByTestId('flow-toolbar-delete').dispatchEvent('pointerup');
+    await expect(alpha).toHaveCount(0, { timeout: 10_000 });
+    await expect(nodeCount).toHaveText('1', { timeout: 10_000 });
+    await expect(actionReadout).toHaveText('delete', { timeout: 10_000 });
+
+    // ---- 3. PIXEL-SAFE — the DEFAULT FlowCanvas demo has NO toolbar on select ----
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount2 = page.getByTestId('rozie-mount');
+    await expect(mount2).toBeVisible();
+    const canvas2 = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas2).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(2);
+    // the toolbar host is NOT rendered at all (r-if off when :node-toolbar is false).
+    await expect(page.locator('.rozie-flow-toolbar')).toHaveCount(0);
+    // selecting a node still pops nothing.
+    const someNode = page.locator('.rozie-flow-node').first();
+    const sb = await someNode.boundingBox();
+    if (!sb) throw new Error('node bounding box unavailable');
+    await page.mouse.click(sb.x + 14, sb.y + 10);
+    await page.waitForTimeout(500);
+    await expect(page.locator('.rozie-flow-toolbar')).toHaveCount(0);
+  });
+}

@@ -1,0 +1,106 @@
+<!--
+  FlowCanvasToolbarDemo.rozie — BEHAVIORAL consumer for Phase 44 T2.8 (D-06): the opt-in
+  NodeToolbar. With :node-toolbar ON, selecting a node pops a floating toolbar OVER it
+  (positioned from the engine node-view rect + the area transform). The default toolbar
+  carries Delete + Duplicate buttons: Delete drives the controlled-graph deleteNode (the
+  node + its incident edges leave the bound graph); Duplicate clones the selected node spec
+  at an offset with a NEW id into a FRESH graph object. Both fire @node-action (the EXISTING
+  emit — no new emit), surfaced here via `node-action-readout`.
+
+  `data-testid="node-count"` reads the BOUND model's node count (so the spec asserts the
+  write-back, not just DOM); `node-action-readout` shows the last @node-action name. The
+  spec (`rete-flow-toolbar`) selects a node → asserts `.rozie-flow-toolbar` is visible near
+  it → clicks Delete → asserts that node is gone (toHaveCount(0)), `node-count` decremented,
+  and `node-action-readout` fired 'delete'. The pixel-safe counterpart is the EXISTING
+  FlowCanvasScreenshot demo (no :node-toolbar → no toolbar on select). Behavioral-only.
+-->
+
+<rozie name="FlowCanvasToolbarDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  lastAction: '—',
+  graph: {
+    nodes: [
+      { id: 'a', type: 'step', x: 40,  y: 60,  data: { label: 'Alpha' } },
+      { id: 'b', type: 'step', x: 340, y: 180, data: { label: 'Bravo' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// @node-action surfaces the toolbar's Delete/Duplicate. Rozie delivers the emit PAYLOAD
+// object directly as the handler's first arg ({ id, name, detail } — like @selection-change
+// → { ids }), NOT a wrapped CustomEvent (.detail). Record the last action name. Tolerate the
+// wrapped form too (a Lit consumer DOM event under .detail) for cross-target robustness.
+const onNodeAction = (e) => {
+  const p = e && e.name == null && e.detail ? e.detail : e
+  $data.lastAction = p && p.name != null ? String(p.name) : '—'
+}
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — NodeToolbar (behavioral)</h3>
+
+  <div class="controls">
+    <span class="readout">nodes: <b data-testid="node-count">{{ $data.graph.nodes.length }}</b></span>
+    <span class="readout">last action: <b data-testid="node-action-readout">{{ $data.lastAction }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :node-toolbar="true"
+      :fit-on-mount="false"
+      @node-action="onNodeAction"
+    >
+      <NodeType type="step">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+        <Port input="in" label="in" :multiple="true" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>
