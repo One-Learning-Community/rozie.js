@@ -387,30 +387,41 @@ const markDecoMount = (from) => {
   font-size: 0.875rem;
 }
 
-.cm-panel-fill {
-  font-weight: 600;
-  font-size: 0.78rem;
-}
+:root {
+  /* Engine-DOM escape hatch — the five `.cm-*-fill` subjects are the demo's OWN
+     custom markup teleported into CodeMirror's extension-mounted hosts via the
+     panel / topPanel / tooltip / gutter / decoration portal slots
+     ($portals.panel/topPanel/tooltip/gutter/decoration), so on Lit they land in
+     the wrapper's shadow root where a plain scoped rule's [data-rozie-s-*] scope
+     attr is absent. :root emits document-level CSS the wrapper adopts into its
+     shadow root; host-qualified by .rozie-codemirror so they stay scoped to this
+     wrapper. These `.cm-*-fill` are the demo's own classes (NOT CM6 built-ins
+     like .cm-panel), so no engine-chrome broadening. NOT :global() (ROZ128). */
+  .rozie-codemirror .cm-panel-fill {
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
 
-.cm-toppanel-fill {
-  font-weight: 600;
-  font-size: 0.78rem;
-  color: #2563eb;
-}
+  .rozie-codemirror .cm-toppanel-fill {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: #2563eb;
+  }
 
-.cm-tooltip-fill {
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-}
+  .rozie-codemirror .cm-tooltip-fill {
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+  }
 
-.cm-gutter-fill {
-  color: #dc2626;
-  font-size: 0.7rem;
-}
+  .rozie-codemirror .cm-gutter-fill {
+    color: #dc2626;
+    font-size: 0.7rem;
+  }
 
-.cm-deco-fill {
-  color: #7c3aed;
-  font-size: 0.7rem;
+  .rozie-codemirror .cm-deco-fill {
+    color: #7c3aed;
+    font-size: 0.7rem;
+  }
 }
 
 .state-pane {

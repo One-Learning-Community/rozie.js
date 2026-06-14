@@ -45,7 +45,7 @@
     <CodeMirror r-model:value="$data.source" language="javascript" theme="dark" />
 -->
 
-<rozie name="CodeMirror" inherit-attrs="false" inherit-listeners="false">
+<rozie name="CodeMirror" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
 <props>
 {

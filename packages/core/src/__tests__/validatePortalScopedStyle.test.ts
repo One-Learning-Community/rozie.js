@@ -503,7 +503,14 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
   // Sorted basenames of every demo currently flagged by ROZ088 (the pre-fix
   // baseline — empirically derived, see header comment). Keep sorted.
   const EXPECTED_ROZ088_FILES = [
-    'CodeMirrorDemo.rozie',
+    // CodeMirrorDemo.rozie REMOVED in the Wave-3 ROZ088 CodeMirror family batch —
+    // its five portal-exclusive cosmetics (`.cm-panel-fill` / `.cm-toppanel-fill`
+    // / `.cm-tooltip-fill` / `.cm-gutter-fill` / `.cm-deco-fill`, the demo's own
+    // custom markup filled into the panel / topPanel / tooltip / gutter /
+    // decoration portal slots) were moved into a host-qualified `:root {}`
+    // escape-hatch block (.rozie-codemirror .cm-*-fill) + `adopt-document-styles`
+    // on the CodeMirror wrapper (now ROZ088-clean, a D2-style negative). Lockstep
+    // tightening per the audit's own contract.
     // ChartBehaviorDemo.rozie REMOVED in the Wave-3 ROZ088 Chart family batch —
     // its portal-exclusive cosmetic (`.rozie-demo-tip`, the demo's external-HTML
     // tooltip markup filled into the `tooltip` portal slot) was moved into a
