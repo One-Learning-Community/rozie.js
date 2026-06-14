@@ -60,6 +60,26 @@
  * and writes would not trigger a re-render (the original bug behind Counter
  * and Dropdown not re-rendering on internal state changes).
  *
+ * **Authoritative-at-render in controlled mode (nested-Kanban reset fix)**:
+ * in CONTROLLED mode `read()` returns a plain, NON-reactive `controlledValue`
+ * latch — NOT the `_state` signal. This is deliberate. A `SignalWatcher`
+ * render that reads a tracked signal re-renders whenever that signal changes,
+ * including at a moment when the value is STALE relative to the parent's true
+ * bound value — e.g. a reactively-scheduled re-render firing BEFORE the parent
+ * has flushed its latest `.prop=${…}` binding down. That stale re-render then
+ * re-propagates the old value into the producer's own children (the nested
+ * SortableList Kanban whole-board reset: the outer controlled list re-passed
+ * SEED `scope.item.cards` into a child column, clobbering a just-committed
+ * card move). Mirrors `@rozie/runtime-react`'s `useControllableState`, where a
+ * controlled component reads `currentValue === opts.value` — the LIVE prop —
+ * and never a lagging copy. To preserve reactivity without a stale mirror, the
+ * parent's authoritative flush (`notifyPropertyWrite` / `notifyAttributeChange`)
+ * updates the latch AND calls `host.requestUpdate()`, so in controlled mode the
+ * producer re-renders STRICTLY AFTER — and driven solely by — the parent's
+ * value landing. Uncontrolled mode is unchanged: it keeps the tracked `_state`
+ * signal so a producer-owned `write()` re-renders the standalone component
+ * (Counter / Dropdown).
+ *
  * @public — runtime API consumed by emitted Lit `.ts` files.
  */
 import { signal } from '@preact/signals-core';
@@ -99,7 +119,15 @@ export interface LitControllableProperty<T> {
 }
 
 export interface CreateLitControllablePropertyOpts<T> {
-  /** The Lit element instance — dispatchEvent target. */
+  /**
+   * The Lit element instance — `dispatchEvent` target AND the re-render driver
+   * in controlled mode. The helper duck-types `requestUpdate()` off the host
+   * (every `LitElement` has it) so that, when controlled, the producer's
+   * re-render is scheduled by the PARENT's authoritative property/attribute
+   * flush rather than by an internal signal mirror that can be read stale
+   * mid-flush. See the "Authoritative-at-render in controlled mode" note on
+   * the factory below.
+   */
   host: HTMLElement;
   /** Event name to dispatch on `write` — e.g. `'value-change'`. */
   eventName: string;
@@ -112,18 +140,47 @@ export interface CreateLitControllablePropertyOpts<T> {
   initialControlledValue: T | undefined;
 }
 
+/**
+ * Minimal duck-typed shape of the re-render driver the helper needs in
+ * controlled mode. Every `LitElement` satisfies it; the emitter always passes
+ * `host: this`. Typed separately (rather than widening `host`) so the public
+ * `HTMLElement` contract is preserved and a non-Lit host (test mocks) degrades
+ * gracefully via the optional-call.
+ */
+interface RequestUpdateCapable {
+  requestUpdate?: () => void;
+}
+
 export function createLitControllableProperty<T>(
   opts: CreateLitControllablePropertyOpts<T>,
 ): LitControllableProperty<T> {
   const { host, eventName, defaultValue, initialControlledValue } = opts;
 
+  // The re-render driver (controlled mode). Duck-typed — every LitElement has
+  // `requestUpdate`; a plain test-mock host simply degrades to no scheduled
+  // update (the unit tests assert state directly, not renders).
+  const updatable = host as unknown as RequestUpdateCapable;
+  const scheduleRender = (): void => {
+    updatable.requestUpdate?.();
+  };
+
   // Closure state — replaces React's useRef/useState (class-based environment).
-  // Backed by a preact Signal so SignalWatcher tracks read() calls from
-  // inside render() and re-renders on write().
+  // UNCONTROLLED reads/writes go through this preact Signal so SignalWatcher
+  // tracks read() calls from inside render() and re-renders on write().
   let wasControlled = initialControlledValue !== undefined;
   const _state = signal<T>(
     wasControlled ? (initialControlledValue as T) : defaultValue,
   );
+  // CONTROLLED authoritative latch — the value the PARENT last pushed down via
+  // a property/attribute binding. `read()` returns THIS (not the tracked
+  // signal) while controlled, so a stale reactively-scheduled re-render can
+  // never read-and-re-propagate a value older than the parent's last flush.
+  // Updated in lockstep with `_state` on every controlled write so the two
+  // never diverge; the signal stays maintained for the controlled→uncontrolled
+  // flip path (where reads switch back to the tracked signal).
+  let controlledValue: T = wasControlled
+    ? (initialControlledValue as T)
+    : defaultValue;
   // Tracks whether the user has interacted with the component via write()
   // since mount. Used to gate the HTML-parser-seed window — see notify
   // implementation below.
@@ -138,7 +195,14 @@ export function createLitControllableProperty<T>(
   // value` from arbitrary JS) still fires a change event.
   let pendingRoundTripValue: { v: T } | undefined;
 
-  const currentValue = (): T => _state.value;
+  // Non-reactive read of the current value for functional-updater resolution
+  // (`write(prev => …)`). In controlled mode this is the parent-authoritative
+  // latch; in uncontrolled mode it peeks the signal. Either way it must NOT
+  // establish a SignalWatcher dependency (it is called from inside `write`,
+  // not from `render`), which `_state.peek()` guarantees for the uncontrolled
+  // branch.
+  const currentValue = (): T =>
+    wasControlled ? controlledValue : _state.peek();
 
   const dispatchChange = (next: T): void => {
     // WR-04: scope the round-trip suppression token to the SAME synchronous
@@ -180,7 +244,14 @@ export function createLitControllableProperty<T>(
 
   return {
     read(): T {
-      return currentValue();
+      // CONTROLLED: return the parent-authoritative latch WITHOUT touching the
+      // tracked signal — so a `SignalWatcher` render does not subscribe to the
+      // internal mirror and can never be reactively re-scheduled to read a
+      // stale value ahead of the parent's flush. Re-renders in controlled mode
+      // are driven exclusively by `scheduleRender()` on the parent's flush.
+      // UNCONTROLLED: read the tracked signal so producer-owned `write()`s
+      // re-render the standalone component.
+      return wasControlled ? controlledValue : _state.value;
     },
     write(next: T | ((prev: T) => T)): void {
       userHasWritten = true;
@@ -189,13 +260,19 @@ export function createLitControllableProperty<T>(
           ? (next as (prev: T) => T)(currentValue())
           : next;
       if (!wasControlled) {
-        // Uncontrolled mode — update internal state.
+        // Uncontrolled mode — update internal state (tracked signal → the
+        // SignalWatcher re-renders the standalone component).
         _state.value = resolved;
       }
+      // Controlled mode: the parent owns the value. We do NOT mutate the
+      // `controlledValue` latch here — the parent re-asserts the authoritative
+      // value via `notifyAttributeChange` / `notifyPropertyWrite` from its
+      // event handler, which both updates the latch and schedules the render.
+      // This is what keeps the producer's render strictly downstream of the
+      // parent's flush (authoritative-at-render).
+      //
       // Both modes — fire the change event so parent observers / two-way
-      // binding helpers see the update. Controlled-mode parents typically
-      // re-assert via `notifyAttributeChange` / `notifyPropertyWrite` from
-      // their event handler.
+      // binding helpers see the update.
       dispatchChange(resolved);
     },
     notifyAttributeChange(next: T | undefined): void {
@@ -209,7 +286,11 @@ export function createLitControllableProperty<T>(
       // user JS removing the controlled mirror, which is a real mode flip
       // and must warn even before any write().
       if (!userHasWritten && !wasControlled && nextIsControlled) {
+        // Seeding window — element stays uncontrolled, so reads still go
+        // through the tracked signal. Mirror the seed into the latch too so a
+        // subsequent flip to controlled has a coherent starting value.
         _state.value = next as T;
+        controlledValue = next as T;
         return;
       }
       if (wasControlled !== nextIsControlled) {
@@ -226,8 +307,20 @@ export function createLitControllableProperty<T>(
         wasControlled = nextIsControlled;
       }
       if (nextIsControlled) {
+        // CONTROLLED flush: update the authoritative latch (which `read()`
+        // returns) AND keep the signal in sync for the flip path. Because
+        // controlled reads no longer subscribe to `_state`, the render must be
+        // scheduled explicitly — this is what orders the producer's re-render
+        // strictly AFTER the parent's authoritative value lands.
+        controlledValue = next as T;
         _state.value = next as T;
+        scheduleRender();
       }
+      // When `nextIsControlled` is false the incoming value is `undefined`
+      // (the controlled mirror was removed). We do NOT write `undefined` into
+      // `_state` — the element has flipped to uncontrolled and now reads the
+      // signal's last real value (matching the pre-fix behavior, which only
+      // touched `_state` on the controlled path).
     },
     notifyPropertyWrite(next: T): void {
       // A `.prop=${…}` Lit binding always carries a DEFINED value (the parent's
@@ -267,9 +360,22 @@ export function createLitControllableProperty<T>(
       //   value bumps — fire the event once, on actual change. Matches the
       //   "fire change events only on actual change" semantics shared by the
       //   other 5 target frameworks.
-      const prev = _state.value;
+      // `prev` is the value the component currently shows — the controlled
+      // latch if already controlled, else the uncontrolled signal's current
+      // value (a fresh element receiving its FIRST property binding after an
+      // uncontrolled `write()` must compare against that written value, not the
+      // never-touched latch). `currentValue()` resolves the right source
+      // because `wasControlled` has not been flipped yet at this point.
+      const prev = currentValue();
       wasControlled = true;
+      controlledValue = next;
       _state.value = next;
+      // Schedule the producer's re-render off the parent's authoritative flush.
+      // Controlled reads no longer subscribe to the `_state` signal, so the
+      // property-binding flush is the sole render trigger — guaranteeing the
+      // producer renders AFTER (and from) the value the parent just pushed,
+      // never from a stale mirror (the nested-Kanban whole-board reset fix).
+      scheduleRender();
       if (
         pendingRoundTripValue !== undefined &&
         Object.is(pendingRoundTripValue.v, next)
