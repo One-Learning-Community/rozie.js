@@ -53,10 +53,15 @@ const REPO_ROOT = resolve(__dirname, '../../../../');
 // The live-POSITIVE was PortalListDemo until the Wave-3 ROZ088 pilot fixed it the same
 // way (moved its portal `.portal-list-demo__*` cosmetics into a `:root {}` block +
 // `adopt-document-styles` on the PortalList wrapper) — so PortalListDemo is now ROZ088-
-// CLEAN too (a D2-style negative). The live-POSITIVE is now PortalListStyledDemo, which
-// the audit header explicitly designates as STAYS-flagged: its scoped portal-exclusive
-// cosmetic `.swatch`/`.id`/`.label` rules target the `#item` fill content — a genuine
-// portal-exclusive scoped-style flag.
+// CLEAN too (a D2-style negative). The live-POSITIVE is now PortalListStyledDemo — the
+// PERMANENT ROZ088 canary (Wave-3 complete, 2026-06-14). It is deliberately NOT fixed:
+// its `.row { display: contents }` rule is the subject of the 260520-bu7 cross-target
+// @portal CSS-specificity fixture (it must stay a SCOPED rule to compete with the
+// wrapper's `@portal item { div { display:flex } }`), and the demo already renders
+// byte-identical on Lit (PortalListStyled.png 6/6 — no visible bug). It legitimately
+// flags ROZ088 on its scoped portal-exclusive rules, making it the natural live-positive
+// that proves the detector still fires. DO NOT "fix" it — that would defeat the fixture
+// (decision: Dan, 2026-06-14).
 const POS_PATH = resolve(REPO_ROOT, 'examples/demos/PortalListStyledDemo.rozie');
 const NEG_PATH = resolve(REPO_ROOT, 'examples/demos/FlowCanvasDemo.rozie');
 
@@ -466,37 +471,39 @@ describe('validatePortalScopedStyle [Phase 38] — live validation through compi
 // resolution threads filler.isPortal) and assert the set of ROZ088-flagged
 // files exactly equals a pinned baseline.
 //
-// ─── PRE-FIX BASELINE (Wave 2 of Phase 38) ─────────────────────────────────
-// This baseline encodes the CURRENT pre-fix reality, NOT the desired end
-// state. The ROZ088 pass is CORRECT: each of these 11 files has a plain scoped
-// `<style>` rule whose subject is portal-exclusive — a genuine latent Lit
-// shadow-DOM styling bug invisible to every behavioral/typecheck/screenshot
-// gate. Plan 38-02 is the emit-neutral DIAGNOSTIC deliverable; it does NOT fix
-// any demo `.rozie` (D-02). The fixes are a SEPARATE Wave 3 effort (proper
-// plan→execute→verify→human-pixel-gate cycle), tracked in
+// ─── BASELINE — Wave-3 ROZ088 fixes COMPLETE (2026-06-14) ──────────────────
+// The Wave-3 effort (quick-task 260614-ky0) fixed all 10 latent portal-styling
+// demos: each had a plain scoped `<style>` rule whose subject is portal-
+// exclusive (a latent Lit shadow-DOM styling bug invisible to every behavioral/
+// typecheck/screenshot gate), now routed through the `:root {}` escape hatch +
+// `adopt-document-styles` on the wrapper, and each verified byte-identical 6/6
+// in the pinned Linux container (no rebless needed). The original diagnostic was
+// Plan 38-02 (Phase 38, emit-neutral D-02); the worklist was
 // `.planning/todos/pending/portal-scoped-style-lit-wave3-fixes.md`.
+// EXACTLY ONE entry remains, by design — the permanent canary (see below).
 //
-//   - PortalListDemo is the SPEC's named live-POSITIVE (D1 above); it is a
-//     member of the expected set (re-anchored in Phase 41).
-//   - FlowCanvasDemo is the SPEC's named live-NEGATIVE (Phase 41 reworked it to
-//     style its portal `.rozie-demo-node` chrome via `:root {}`, D2 above); it
-//     MUST NOT be a member. (FlowCanvasDeclarativeDemo, the former negative, was
+//   - PortalListStyledDemo is the named live-POSITIVE (D1/E2 below) and the SOLE
+//     permanent member of the expected set.
+//   - FlowCanvasDemo is the named live-NEGATIVE (Phase 41 reworked it to style
+//     its portal `.rozie-demo-node` chrome via `:root {}`, D2 below); it MUST
+//     NOT be a member. (FlowCanvasDeclarativeDemo, the former negative, was
 //     retired in Phase 41.)
-//   - 10 of these 11 are slated for fix in Wave 3 (convert the portal-content
-//     scoped rules to the `:root {}` escape hatch + `adopt-document-styles`,
-//     then rebless Lit pixel baselines under human /compare.html review).
-//   - PortalListStyledDemo is the one genuinely AMBIGUOUS case: it carries
-//     `@portal item { ... }` LAYOUT rules (escape-hatched, safe) AND plain
-//     scoped COSMETIC rules (.row/.swatch/.id/.label) whose cosmetics WOULD
-//     drop on Lit. It stays flagged and is cataloged "confirm intentional vs
-//     bug" in the Wave 3 todo — NOT fixed here.
+//   - All 10 fixable demos were fixed in Wave 3 (portal-content scoped rules
+//     moved to the `:root {}` escape hatch + `adopt-document-styles`; each
+//     verified byte-identical 6/6 in the pinned Linux container).
+//   - PortalListStyledDemo is the PERMANENT CANARY — deliberately NOT fixed.
+//     Its `.row { display: contents }` rule is the subject of the 260520-bu7
+//     cross-target @portal CSS-specificity fixture (must stay a SCOPED rule to
+//     compete with the wrapper's `@portal item { div { display:flex } }`), and
+//     it already renders byte-identical on Lit (no visible bug). It legitimately
+//     flags ROZ088, serving as the live-positive that proves the detector fires.
+//     DO NOT fix it (decision: Dan, 2026-06-14).
 //
-// After Wave 3 lands, the EXPECTED set reduces accordingly and this baseline
-// must be tightened in lockstep (remove each fixed file). The assertion fails
-// loudly on BOTH a NEW unexpected positive (a freshly-introduced latent bug,
-// or a precision regression in the pass) AND an unexpected DISAPPEARANCE (a
-// file silently stopped flagging — e.g. a threading regression making the pass
-// vacuous, or an out-of-band fix that didn't update this baseline).
+// Wave 3 has landed: the EXPECTED set is now its permanent floor (the canary).
+// The assertion still fails loudly on BOTH a NEW unexpected positive (a freshly-
+// introduced latent bug, or a precision regression in the pass) AND an unexpected
+// DISAPPEARANCE (the canary silently stopped flagging — e.g. a threading
+// regression making the pass vacuous, or someone "fixed" the canary).
 // ===========================================================================
 
 describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
@@ -540,6 +547,12 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     // `.portal-list-demo__*` cosmetics were moved into a `:root {}` escape-hatch
     // block + `adopt-document-styles` on the PortalList wrapper (now ROZ088-clean,
     // a D2-style negative). Lockstep tightening per the audit's own contract.
+    //
+    // PortalListStyledDemo.rozie — the PERMANENT ROZ088 canary (NOT a pending fix).
+    // Its `.row { display: contents }` is the 260520-bu7 @portal CSS-specificity
+    // fixture and MUST stay a SCOPED rule; the demo already renders byte-identical
+    // on Lit (no visible bug). Kept flagged on purpose as the live-positive that
+    // proves the detector still fires — DO NOT remove or "fix" (decision: Dan 2026-06-14).
     'PortalListStyledDemo.rozie',
     // TipTapBubbleMenuDemo / TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo
     // REMOVED in the Wave-3 ROZ088 TipTap family batch — their portal-exclusive
