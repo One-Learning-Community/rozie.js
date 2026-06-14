@@ -39,8 +39,31 @@ body {
   min-height: 1px;
 }
 
-/* RESEARCH Pitfall 2 — kill animation/transition non-determinism at the source. */
-*,
+/* RESEARCH Pitfall 2 — kill animation/transition non-determinism at the source.
+ *
+ * SCOPED EXEMPTION (debug: sortable-nested-lit-card-reset, Symptom B):
+ * SortableJS animates a reorder via FLIP by writing a NORMAL inline
+ * `transition: transform 150ms` on each displaced row. An `!important`
+ * document rule beats inline declarations in the cascade, so the universal
+ * `transition: none !important` below was forcing the computed transition to
+ * `none` on the 5 light-DOM targets — the row JUMPED between slots instead of
+ * gliding. Lit renders inside a shadow root that this light-DOM stylesheet
+ * cannot pierce (and entry.lit.ts's SHADOW_RESET_CSS omits the transition
+ * killer), so Lit alone animated — the "only Lit animates" asymmetry.
+ *
+ * Exempting the sortable rows (`.rozie-sortable-item`) and their FLIP
+ * container (`.rozie-sortable-list`) from the killer lets the inline
+ * SortableJS transition win on every target, restoring cross-target parity in
+ * the comparison host (matching real-app behavior, where no such reset exists).
+ * The exclusion is NARROW — every other element keeps `transition: none
+ * !important`, so all other VR cells' transition-determinism is untouched.
+ * Screenshot determinism is unaffected regardless: Playwright captures with
+ * `animations: 'disabled'`, which forces transitions to their end-state at
+ * capture time, so the live during-drag glide is never sampled by the
+ * screenshot gate. The `[class*=...]` form also catches React's bare-class +
+ * data-attribute-scoped emission (the class literal is present; scoping is a
+ * layered attribute, see the dropdown/modal note below). */
+*:not([class*='rozie-sortable-item']):not([class*='rozie-sortable-list']),
 *::before,
 *::after {
   transition: none !important;
