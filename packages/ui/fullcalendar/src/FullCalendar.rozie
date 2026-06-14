@@ -34,7 +34,7 @@
     - Rich $expose imperative handle: getApi + 7 navigation/mutation verbs
 -->
 
-<rozie name="FullCalendar" inherit-attrs="false" inherit-listeners="false">
+<rozie name="FullCalendar" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
 <props>
 {

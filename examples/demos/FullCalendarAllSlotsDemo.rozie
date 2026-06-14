@@ -271,11 +271,6 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   background: white;
 }
 
-.fc-slot-marker {
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
 .torn-down {
   margin: 0;
   padding: 1rem;
@@ -310,6 +305,21 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   background: rgba(0, 0, 0, 0.04);
   padding: 0.0625rem 0.25rem;
   border-radius: 2px;
+}
+
+:root {
+  /* Engine-DOM escape hatch — `.fc-slot-marker` is the demo's marker markup
+     teleported into FullCalendar's engine-owned cells via the portal slots
+     (event/dayCell/dayHeader/slotLabel/… → $portals.*), so on Lit it lands in
+     the wrapper's shadow root where a plain scoped rule's [data-rozie-s-*] scope
+     attr is absent. :root emits document-level CSS the wrapper adopts into its
+     shadow root; host-qualified by .rozie-fullcalendar so it stays scoped to
+     this wrapper, NOT FullCalendar's own non-portal .fc-* chrome.
+     NOT :global() (ROZ128). */
+  .rozie-fullcalendar .fc-slot-marker {
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
 }
 </style>
 

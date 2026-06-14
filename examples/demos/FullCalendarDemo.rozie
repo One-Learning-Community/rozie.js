@@ -264,11 +264,6 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   background: white;
 }
 
-.fc-event-title {
-  font-weight: 500;
-  font-size: 0.78rem;
-}
-
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -414,6 +409,21 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   border: 1px dashed rgba(0, 0, 0, 0.1);
   border-radius: 6px;
   font-size: 0.875rem;
+}
+
+:root {
+  /* Engine-DOM escape hatch — `.fc-event-title` is the demo's own custom event
+     markup teleported into FullCalendar's engine-owned event cell via the
+     `event` portal slot ($portals.event), so on Lit it lands in the wrapper's
+     shadow root where a plain scoped rule (the consumer's [data-rozie-s-*] scope
+     attr) can never reach it. :root emits document-level CSS the wrapper adopts
+     into its shadow root; host-qualified by .rozie-fullcalendar so it stays
+     scoped to this wrapper, NOT FullCalendar's own non-portal .fc-* chrome.
+     NOT :global() (ROZ128). */
+  .rozie-fullcalendar .fc-event-title {
+    font-weight: 500;
+    font-size: 0.78rem;
+  }
 }
 </style>
 

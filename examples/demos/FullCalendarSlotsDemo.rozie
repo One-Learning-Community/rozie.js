@@ -122,17 +122,27 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   background: white;
 }
 
-.fc-slot-event {
-  font-weight: 500;
-  font-size: 0.78rem;
-}
-.fc-slot-daycell {
-  font-weight: 600;
-}
-.fc-slot-dayheader {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+:root {
+  /* Engine-DOM escape hatch — the three `.fc-slot-*` subjects are the demo's
+     own markup teleported into FullCalendar's engine-owned cells via the
+     event / dayCell / dayHeader portal slots ($portals.event/dayCell/dayHeader),
+     so on Lit they land in the wrapper's shadow root where a plain scoped rule's
+     [data-rozie-s-*] scope attr is absent. :root emits document-level CSS the
+     wrapper adopts into its shadow root; host-qualified by .rozie-fullcalendar
+     so they stay scoped to this wrapper, NOT FullCalendar's own non-portal
+     .fc-* chrome. NOT :global() (ROZ128). */
+  .rozie-fullcalendar .fc-slot-event {
+    font-weight: 500;
+    font-size: 0.78rem;
+  }
+  .rozie-fullcalendar .fc-slot-daycell {
+    font-weight: 600;
+  }
+  .rozie-fullcalendar .fc-slot-dayheader {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
 }
 </style>
 

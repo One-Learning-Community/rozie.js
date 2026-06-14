@@ -508,9 +508,13 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     // FlowCanvasDemo.rozie REMOVED in Phase 41 — reworked to style its portal
     // `.rozie-demo-node` chrome via the `:root {}` escape hatch (now ROZ088-clean,
     // the D2 live-negative). Lockstep tightening per the audit's own contract.
-    'FullCalendarAllSlotsDemo.rozie',
-    'FullCalendarDemo.rozie',
-    'FullCalendarSlotsDemo.rozie',
+    // FullCalendarDemo / FullCalendarAllSlotsDemo / FullCalendarSlotsDemo
+    // REMOVED in the Wave-3 ROZ088 FullCalendar family batch — their portal-
+    // exclusive cosmetics (`.fc-event-title`, `.fc-slot-marker`, `.fc-slot-event`
+    // / `.fc-slot-daycell` / `.fc-slot-dayheader`) were moved into host-qualified
+    // `:root {}` escape-hatch blocks + `adopt-document-styles` on the FullCalendar
+    // wrapper (now ROZ088-clean, D2-style negatives). Lockstep tightening per the
+    // audit's own contract.
     'MapLibreDemo.rozie',
     // PortalListDemo.rozie REMOVED in the Wave-3 ROZ088 pilot — its portal
     // `.portal-list-demo__*` cosmetics were moved into a `:root {}` escape-hatch
