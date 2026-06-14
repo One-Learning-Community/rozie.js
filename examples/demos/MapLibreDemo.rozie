@@ -141,30 +141,38 @@ const controlZoomIn = () => { $refs.map?.flyTo?.({ zoom: ($refs.map?.getZoom?.()
   font-size: 0.875rem;
   min-width: 2ch;
 }
-.rozie-demo-pin {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #dc2626;
-  color: white;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  font-size: 0.7rem;
-  font-weight: 700;
-  border: 2px solid white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-.demo-ctrl-btn {
-  width: 29px;
-  height: 29px;
-  border: none;
-  background: white;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 700;
-  line-height: 1;
+:root {
+  /* Engine-DOM escape hatch — the #marker and #control chrome teleports into the
+     MapLibre marker/control host elements inside <rozie-maplibre>'s shadow root
+     (reactive multi-instance marker portal + mount-once control portal →
+     $portals.marker / $portals.control), so on Lit a plain scoped rule cannot
+     reach it. :root emits document-level CSS adopted into the shadow root
+     (the wrapper has `adopt-document-styles`). NOT :global() (ROZ128). */
+  .rozie-maplibre .rozie-demo-pin {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #dc2626;
+    color: white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    font-size: 0.7rem;
+    font-weight: 700;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+  .rozie-maplibre .demo-ctrl-btn {
+    width: 29px;
+    height: 29px;
+    border: none;
+    background: white;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
 }
 </style>
 

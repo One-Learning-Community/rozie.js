@@ -527,7 +527,15 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     // `:root {}` escape-hatch blocks + `adopt-document-styles` on the FullCalendar
     // wrapper (now ROZ088-clean, D2-style negatives). Lockstep tightening per the
     // audit's own contract.
-    'MapLibreDemo.rozie',
+    // MapLibreDemo.rozie REMOVED in the Wave-3 ROZ088 MapLibre family batch —
+    // its two portal-exclusive cosmetics (`.rozie-demo-pin`, the demo's pin
+    // markup filled into the reactive multi-instance `marker` portal slot, and
+    // `.demo-ctrl-btn`, the demo's button filled into the mount-once `control`
+    // portal slot) were moved into a host-qualified `:root {}` escape-hatch block
+    // (.rozie-maplibre .rozie-demo-pin / .rozie-maplibre .demo-ctrl-btn). The
+    // MapLibre wrapper already carries `adopt-document-styles` (no wrapper edit —
+    // now ROZ088-clean, a D2-style negative). Lockstep tightening per the audit's
+    // own contract.
     // PortalListDemo.rozie REMOVED in the Wave-3 ROZ088 pilot — its portal
     // `.portal-list-demo__*` cosmetics were moved into a `:root {}` escape-hatch
     // block + `adopt-document-styles` on the PortalList wrapper (now ROZ088-clean,
