@@ -517,9 +517,12 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
     // block + `adopt-document-styles` on the PortalList wrapper (now ROZ088-clean,
     // a D2-style negative). Lockstep tightening per the audit's own contract.
     'PortalListStyledDemo.rozie',
-    'TipTapBubbleMenuDemo.rozie',
-    'TipTapNodeViewDemo.rozie',
-    'TipTapNodeViewScreenshotDemo.rozie',
+    // TipTapBubbleMenuDemo / TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo
+    // REMOVED in the Wave-3 ROZ088 TipTap family batch — their portal-exclusive
+    // cosmetics (`.rozie-menu`, `.rozie-mention-chip`, `.rozie-callout*`) were
+    // moved into host-qualified `:root {}` escape-hatch blocks + `adopt-document-
+    // styles` on the TipTap wrapper (now ROZ088-clean, D2-style negatives).
+    // Lockstep tightening per the audit's own contract.
   ];
 
   const DEMOS_DIR = resolve(REPO_ROOT, 'examples/demos');

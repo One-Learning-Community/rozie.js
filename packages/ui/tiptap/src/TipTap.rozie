@@ -47,7 +47,7 @@
   the per-target bridge (Spike 008 / REQ-23). See docs/guide/tiptap-comparison.md.
 -->
 
-<rozie name="TipTap" inherit-attrs="false" inherit-listeners="false">
+<rozie name="TipTap" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
 <props>
 {

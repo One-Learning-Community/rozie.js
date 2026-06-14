@@ -79,36 +79,44 @@ const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
   padding: 1rem;
   max-width: 720px;
 }
-.rozie-nodeview-frag.is-mention .rozie-callout { display: none; }
-.rozie-nodeview-frag.is-callout .rozie-mention-chip { display: none; }
-.rozie-mention-chip {
-  display: inline-block;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 999px;
-  background: #e0e7ff;
-  color: #3730a3;
-  font-weight: 600;
-  font-size: 0.85em;
+
+:root {
+  /* Engine-DOM escape hatch — the nodeView fragment teleports into the engine-
+     owned ProseMirror node DOM inside <rozie-tiptap>'s shadow root (the reactive
+     $portals.nodeView mounts the consumer fragment in-engine), so on Lit a plain
+     scoped rule cannot reach it. :root emits document-level CSS adopted into the
+     shadow root (adopt-document-styles on the wrapper). NOT :global() (ROZ128). */
+  .rozie-tiptap .rozie-nodeview-frag.is-mention .rozie-callout { display: none; }
+  .rozie-tiptap .rozie-nodeview-frag.is-callout .rozie-mention-chip { display: none; }
+  .rozie-tiptap .rozie-mention-chip {
+    display: inline-block;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 999px;
+    background: #e0e7ff;
+    color: #3730a3;
+    font-weight: 600;
+    font-size: 0.85em;
+  }
+  .rozie-tiptap .rozie-mention-chip::before { content: '@'; }
+  .rozie-tiptap .rozie-callout {
+    display: block;
+    border-left: 3px solid #6366f1;
+    background: #eef2ff;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+  }
+  .rozie-tiptap .rozie-callout-badge {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #4338ca;
+    margin-bottom: 0.25rem;
+  }
+  .rozie-tiptap .rozie-callout-body { display: block; outline: none; }
 }
-.rozie-mention-chip::before { content: '@'; }
-.rozie-callout {
-  display: block;
-  border-left: 3px solid #6366f1;
-  background: #eef2ff;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  margin: 0.5rem 0;
-}
-.rozie-callout-badge {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #4338ca;
-  margin-bottom: 0.25rem;
-}
-.rozie-callout-body { display: block; outline: none; }
 </style>
 
 </rozie>

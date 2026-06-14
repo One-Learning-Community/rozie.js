@@ -76,26 +76,36 @@
 }
 .tiptap-bubble-demo h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 .tiptap-bubble-demo .hint { margin: 0 0 0.75rem; color: rgba(0, 0, 0, 0.55); font-size: 0.8125rem; }
-.rozie-menu {
-  display: inline-flex;
-  gap: 0.125rem;
-  padding: 0.1875rem;
-  background: #1a1a1a;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+:root {
+  /* Engine-DOM escape hatch — the bubbleMenu / floatingMenu fragments teleport
+     into the engine-owned menu host inside <rozie-tiptap>'s shadow root (the
+     Floating-UI menu extension appends the host to the editor parent →
+     $portals.bubbleMenu / .floatingMenu), so on Lit a plain scoped rule cannot
+     reach them. :root emits document-level CSS adopted into the shadow root
+     (adopt-document-styles on the wrapper). NOT :global() (ROZ128). */
+  .rozie-tiptap .rozie-menu {
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    background: #1a1a1a;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  .rozie-tiptap .rozie-menu button {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    background: transparent;
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8125rem;
+    min-width: 1.75rem;
+  }
+  .rozie-tiptap .rozie-menu button:hover { background: rgba(255, 255, 255, 0.15); }
 }
-.rozie-menu button {
-  padding: 0.25rem 0.5rem;
-  border: none;
-  background: transparent;
-  color: white;
-  border-radius: 3px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.8125rem;
-  min-width: 1.75rem;
-}
-.rozie-menu button:hover { background: rgba(255, 255, 255, 0.15); }
+
 .bound-html {
   margin: 0.75rem 0 0;
   padding: 0.5rem 0.625rem;
