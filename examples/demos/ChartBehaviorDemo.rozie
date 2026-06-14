@@ -129,8 +129,18 @@ const onClick = (payload) => {
   border-radius: 6px;
   background: #fff;
 }
-.rozie-demo-tip {
-  font-size: 12px;
+
+:root {
+  /* Engine-DOM escape hatch — `.rozie-demo-tip` is the demo's own external-HTML
+     tooltip markup teleported into Chart's engine-owned tooltip host via the
+     `tooltip` portal slot ($portals.tooltip), so on Lit it lands in the
+     wrapper's shadow root where a plain scoped rule's [data-rozie-s-*] scope
+     attr is absent. :root emits document-level CSS the wrapper adopts into its
+     shadow root; host-qualified by .rozie-chart so it stays scoped to this
+     wrapper, NOT Chart's own non-portal chrome. NOT :global() (ROZ128). */
+  .rozie-chart .rozie-demo-tip {
+    font-size: 12px;
+  }
 }
 </style>
 

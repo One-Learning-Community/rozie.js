@@ -503,8 +503,13 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
   // Sorted basenames of every demo currently flagged by ROZ088 (the pre-fix
   // baseline — empirically derived, see header comment). Keep sorted.
   const EXPECTED_ROZ088_FILES = [
-    'ChartBehaviorDemo.rozie',
     'CodeMirrorDemo.rozie',
+    // ChartBehaviorDemo.rozie REMOVED in the Wave-3 ROZ088 Chart family batch —
+    // its portal-exclusive cosmetic (`.rozie-demo-tip`, the demo's external-HTML
+    // tooltip markup filled into the `tooltip` portal slot) was moved into a
+    // host-qualified `:root {}` escape-hatch block (.rozie-chart .rozie-demo-tip)
+    // + `adopt-document-styles` on the Chart wrapper (now ROZ088-clean, a
+    // D2-style negative). Lockstep tightening per the audit's own contract.
     // FlowCanvasDemo.rozie REMOVED in Phase 41 — reworked to style its portal
     // `.rozie-demo-node` chrome via the `:root {}` escape hatch (now ROZ088-clean,
     // the D2 live-negative). Lockstep tightening per the audit's own contract.

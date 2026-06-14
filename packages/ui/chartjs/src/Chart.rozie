@@ -48,7 +48,7 @@
   $refs outside the mount hook — ROZ123 / project_refs_only_safe_in_onmount).
 -->
 
-<rozie name="Chart" inherit-attrs="false" inherit-listeners="false">
+<rozie name="Chart" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
 
 <props>
 {
