@@ -30,7 +30,7 @@
   idiom (see docs/examples/portal-list.md "Per-target output" sections).
 -->
 
-<rozie name="PortalList">
+<rozie name="PortalList" adopt-document-styles>
 
 <props>
 {

@@ -69,21 +69,29 @@
   max-width: 360px;
 }
 
-.portal-list-demo__swatch {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
+:root {
+  /* Engine-DOM escape hatch — the `.portal-list-demo__*` chrome lives ONLY inside
+     the `#item` portal fill, which teleports into <rozie-portal-list>'s shadow root
+     ($portals.item per row), so on Lit a plain scoped rule cannot reach it (the
+     consumer's scope attribute is absent in the shadow root). :root emits
+     document-level CSS adopted into the shadow root via `adopt-document-styles`.
+     NOT :global() (ROZ128). */
+  .rozie-portal-list .portal-list-demo__swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
 
-.portal-list-demo__id {
-  font-family: ui-monospace, monospace;
-  color: rgba(0, 0, 0, 0.55);
-  font-size: 0.8125rem;
-}
-.portal-list-demo__label {
-  font-weight: 600;
+  .rozie-portal-list .portal-list-demo__id {
+    font-family: ui-monospace, monospace;
+    color: rgba(0, 0, 0, 0.55);
+    font-size: 0.8125rem;
+  }
+  .rozie-portal-list .portal-list-demo__label {
+    font-weight: 600;
+  }
 }
 </style>
 
