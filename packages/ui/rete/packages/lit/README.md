@@ -107,6 +107,11 @@ const editor = el.getEditor();
 | `redo` | Redo the edit most recently undone — `redo()` re-applies the snapshot through the `graph` model (echo-guarded). A fresh edit after an undo discards the redo branch. No-op when there is nothing to redo. Also bound to Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y. |
 | `canUndo` | Return whether there is an edit to undo — `canUndo()` → boolean. |
 | `canRedo` | Return whether there is an edit to redo — `canRedo()` → boolean. |
+| `getSelectedNodes` | Return the currently-selected nodes as `[{ id, label, x, y }]` (the `getNodes()` shape, filtered to the live selection). Empty when nothing is selected. Complements the push-only `selection-change` event with an on-demand read. |
+| `selectNode` | Programmatically select a node by id — `selectNode(id, accumulate?)` (accumulate=true adds to the selection; falsy replaces it). Drives selection from a sidebar/search. No-op when selection is disabled (readonly / !selectable). NOT named bare `select` (inherited HTMLElement method → Lit shadow). |
+| `clearSelection` | Clear the current node selection (and any selected edge) — `clearSelection()`. |
+| `selectAll` | Select every node — `selectAll()` (Ctrl+A is not bound; the marquee only covers a dragged region). No-op when selection is disabled. |
+| `centerOnNode` | Pan (and optionally zoom via `opts.zoom`) to center the viewport on a node by id — `await centerOnNode(id, opts?)`. Measures the node to find its center in graph coords. No-op before mount or for an unknown id. |
 
 ## Slots
 

@@ -87,6 +87,7 @@ const EXPECT = {
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'setCenter', 'setViewport',
     'screenToFlowPosition', 'getNodes', 'getConnections', 'getTransform',
     'undo', 'redo', 'canUndo', 'canRedo', 'autoArrange',
+    'getSelectedNodes', 'selectNode', 'clearSelection', 'selectAll', 'centerOnNode',
   ],
 } as const;
 
@@ -136,7 +137,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (21 verbs)', () => {
+  it('expose surface matches (26 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

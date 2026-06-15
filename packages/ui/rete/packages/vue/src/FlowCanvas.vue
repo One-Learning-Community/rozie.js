@@ -1524,6 +1524,91 @@ async function autoArrange(opts: any) {
   }
 }
 
+// ─── imperative selection control ────────────────────────────────────────────
+// Selection was previously PUSH-ONLY (the `selection-change` emit fires on change,
+// but a consumer couldn't READ or DRIVE selection). These reuse the internal
+// `selector` / `nodeSelectApi` (AreaExtensions.selector + selectableNodes) already
+// wired for the marquee — no new engine state. All no-op when selection is off
+// (readonly / !selectable, when `nodeSelectApi` is null). Each schedules the same
+// post-settle `selection-change` recompute the marquee uses, so an imperative
+// select keeps the consumer's bound state in sync (the zoomTo→$model.zoom echo
+// stance). Collision discipline: `selectNode` is NOT bare `select` — `select` is
+// an inherited HTMLElement method (Lit shadow, the Embla scrollTo lesson) AND a
+// FullCalendar-style emit hazard; getSelectedNodes/clearSelection/selectAll/
+// centerOnNode are NOT emits (selection-change/node-*/edge-*), NOT props, NOT
+// React model-setters (graph/zoom → setGraph/setZoom), NOT Lit lifecycle.
+//
+// getSelectedNodes() — the currently-selected nodes as { id, label, x, y } (the
+// getNodes() shape, filtered to the live selection). Empty when nothing selected.
+// ─── imperative selection control ────────────────────────────────────────────
+// Selection was previously PUSH-ONLY (the `selection-change` emit fires on change,
+// but a consumer couldn't READ or DRIVE selection). These reuse the internal
+// `selector` / `nodeSelectApi` (AreaExtensions.selector + selectableNodes) already
+// wired for the marquee — no new engine state. All no-op when selection is off
+// (readonly / !selectable, when `nodeSelectApi` is null). Each schedules the same
+// post-settle `selection-change` recompute the marquee uses, so an imperative
+// select keeps the consumer's bound state in sync (the zoomTo→$model.zoom echo
+// stance). Collision discipline: `selectNode` is NOT bare `select` — `select` is
+// an inherited HTMLElement method (Lit shadow, the Embla scrollTo lesson) AND a
+// FullCalendar-style emit hazard; getSelectedNodes/clearSelection/selectAll/
+// centerOnNode are NOT emits (selection-change/node-*/edge-*), NOT props, NOT
+// React model-setters (graph/zoom → setGraph/setZoom), NOT Lit lifecycle.
+//
+// getSelectedNodes() — the currently-selected nodes as { id, label, x, y } (the
+// getNodes() shape, filtered to the live selection). Empty when nothing selected.
+function getSelectedNodes() {
+  const sel = new Set(selectedNodeIds().map((x: any) => String(x)));
+  return getNodes().filter((n: any) => sel.has(String(n.id)));
+}
+// selectNode(id, accumulate?) — programmatically select a node (sidebar/search →
+// highlight). accumulate=true adds to the current selection; falsy replaces it.
+// selectNode(id, accumulate?) — programmatically select a node (sidebar/search →
+// highlight). accumulate=true adds to the current selection; falsy replaces it.
+function selectNode(id: any, accumulate: any) {
+  if (!nodeSelectApi || id == null) return;
+  nodeSelectApi.select(id, !!accumulate);
+  scheduleSelectionEmit();
+}
+// clearSelection() — unselect every selected node (and any selected edge).
+// clearSelection() — unselect every selected node (and any selected edge).
+function clearSelection() {
+  if (nodeSelectApi) {
+    for (const id of selectedNodeIds() as any) nodeSelectApi.unselect(id);
+  }
+  clearEdgeSelection();
+  scheduleSelectionEmit();
+}
+// selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
+// dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
+// selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
+// dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
+function selectAll() {
+  if (!nodeSelectApi) return;
+  let first = true;
+  for (const n of getNodes() as any) {
+    nodeSelectApi.select(n.id, !first);
+    first = false;
+  }
+  scheduleSelectionEmit();
+}
+// centerOnNode(id, opts?) — pan (and optionally zoom via opts.zoom) to center the
+// viewport on a node by id. setCenter is coordinate-based; this measures the node
+// to compute its center in GRAPH coords (position is the top-left; offsetW/H are
+// unscaled graph units), falling back to the minimap default dims pre-measure.
+// centerOnNode(id, opts?) — pan (and optionally zoom via opts.zoom) to center the
+// viewport on a node by id. setCenter is coordinate-based; this measures the node
+// to compute its center in GRAPH coords (position is the top-left; offsetW/H are
+// unscaled graph units), falling back to the minimap default dims pre-measure.
+async function centerOnNode(id: any, opts: any) {
+  if (!area || id == null) return;
+  const view = area.nodeViews ? area.nodeViews.get(id) : null;
+  if (!view || !view.position) return;
+  const el = view.element;
+  const w = el && el.offsetWidth ? el.offsetWidth : MINIMAP_DEFAULT_NODE_W;
+  const h = el && el.offsetHeight ? el.offsetHeight : MINIMAP_DEFAULT_NODE_H;
+  await setCenter(view.position.x + w / 2, view.position.y + h / 2, opts);
+}
+
 provide('rete:canvas', {
   // Register/replace a node TYPE template. `spec` carries an optional
   // `bodyRenderer(host, { node })` — the render-by-type projection (mounted per graph
@@ -3448,7 +3533,7 @@ watch(() => zoom.value, (v: any) => {
   });
 });
 
-defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo });
+defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode });
 </script>
 
 <style scoped>

@@ -35,6 +35,11 @@ export const handleManifest = {
   canUndo: 'Return whether there is an edit to undo — `canUndo()` → boolean.',
   canRedo: 'Return whether there is an edit to redo — `canRedo()` → boolean.',
   autoArrange: 'Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` forwards elk layout options (direction / spacing). No-op before mount.',
+  getSelectedNodes: 'Return the currently-selected nodes as `[{ id, label, x, y }]` (the `getNodes()` shape, filtered to the live selection). Empty when nothing is selected. Complements the push-only `selection-change` event with an on-demand read.',
+  selectNode: 'Programmatically select a node by id — `selectNode(id, accumulate?)` (accumulate=true adds to the selection; falsy replaces it). Drives selection from a sidebar/search. No-op when selection is disabled (readonly / !selectable). NOT named bare `select` (inherited HTMLElement method → Lit shadow).',
+  clearSelection: 'Clear the current node selection (and any selected edge) — `clearSelection()`.',
+  selectAll: 'Select every node — `selectAll()` (Ctrl+A is not bound; the marquee only covers a dragged region). No-op when selection is disabled.',
+  centerOnNode: 'Pan (and optionally zoom via `opts.zoom`) to center the viewport on a node by id — `await centerOnNode(id, opts?)`. Measures the node to find its center in graph coords. No-op before mount or for an unknown id.',
 };
 
 export default handleManifest;

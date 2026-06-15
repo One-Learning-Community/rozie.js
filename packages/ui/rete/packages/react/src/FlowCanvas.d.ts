@@ -69,6 +69,11 @@ export interface FlowCanvasHandle {
   redo: (...args: any[]) => any;
   canUndo: (...args: any[]) => any;
   canRedo: (...args: any[]) => any;
+  getSelectedNodes: (...args: any[]) => any;
+  selectNode: (...args: any[]) => any;
+  clearSelection: (...args: any[]) => any;
+  selectAll: (...args: any[]) => any;
+  centerOnNode: (...args: any[]) => any;
 }
 
 declare const FlowCanvas: React.ForwardRefExoticComponent<FlowCanvasProps & React.RefAttributes<FlowCanvasHandle>>;

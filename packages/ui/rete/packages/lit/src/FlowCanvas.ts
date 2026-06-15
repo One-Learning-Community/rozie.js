@@ -3384,6 +3384,45 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     }
   }
 
+  getSelectedNodes() {
+    const sel = new Set(this.selectedNodeIds().map((x: any) => String(x)));
+    return this.getNodes().filter((n: any) => sel.has(String(n.id)));
+  }
+
+  selectNode(id: any, accumulate: any) {
+    if (!this.nodeSelectApi || id == null) return;
+    this.nodeSelectApi.select(id, !!accumulate);
+    this.scheduleSelectionEmit();
+  }
+
+  clearSelection() {
+    if (this.nodeSelectApi) {
+      for (const id of this.selectedNodeIds() as any) this.nodeSelectApi.unselect(id);
+    }
+    this.clearEdgeSelection();
+    this.scheduleSelectionEmit();
+  }
+
+  selectAll() {
+    if (!this.nodeSelectApi) return;
+    let first = true;
+    for (const n of this.getNodes() as any) {
+      this.nodeSelectApi.select(n.id, !first);
+      first = false;
+    }
+    this.scheduleSelectionEmit();
+  }
+
+  async centerOnNode(id: any, opts: any) {
+    if (!this.area || id == null) return;
+    const view = this.area.nodeViews ? this.area.nodeViews.get(id) : null;
+    if (!view || !view.position) return;
+    const el = view.element;
+    const w = el && el.offsetWidth ? el.offsetWidth : this.MINIMAP_DEFAULT_NODE_W;
+    const h = el && el.offsetHeight ? el.offsetHeight : this.MINIMAP_DEFAULT_NODE_H;
+    await this.setCenter(view.position.x + w / 2, view.position.y + h / 2, opts);
+  }
+
   get graph(): any { return this._graphControllable.read(); }
   set graph(v: any) { this._graphControllable.notifyPropertyWrite(v); }
   get zoom(): number { return this._zoomControllable.read(); }
