@@ -1352,21 +1352,29 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       // within that root — no cross-root reference (Lit-safe). markerUnits="userSpaceOnUse"
       // keeps a constant pixel size under the area zoom transform. Inline fill (#64748b,
       // matching the connection stroke) is the cross-target-safe choice — no scoped-CSS /
-      // :root rule needed for the marker DOM. The marker is purely decorative — it does
-      // NOT touch the path `d` / socket alignment (the rete-flow-align cell stays green).
+      // :root rule needed for the marker DOM. The marker does NOT change the path `d`
+      // or the socket geometry (the rete-flow-align cell stays green) — redraw() only
+      // sets the head's `orient` and a `stroke-dasharray` that visually trims the last
+      // ARROW_LEN of the stroke so the line meets the head without poking through it.
       const markerId = 'rozie-arrow-' + String(id);
       const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
       const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
       marker.setAttribute('id', markerId);
-      marker.setAttribute('markerWidth', '7');
-      marker.setAttribute('markerHeight', '7');
-      marker.setAttribute('refX', '6');
-      marker.setAttribute('refY', '3');
+      // Sized in userSpaceOnUse (constant pixels under zoom). A 12×10 head reads
+      // clearly at default zoom (the old 6×6 was barely visible). refX=12 sits the
+      // TIP exactly at the path-end vertex (the socket); refY=5 centers it. `orient`
+      // is recomputed per-redraw from the path's final-segment tangent, and the
+      // visible stroke is trimmed back to the arrow base, so the head points along
+      // the edge's actual approach AND the line meets it cleanly — see redraw().
+      marker.setAttribute('markerWidth', '13');
+      marker.setAttribute('markerHeight', '10');
+      marker.setAttribute('refX', '12');
+      marker.setAttribute('refY', '5');
       marker.setAttribute('orient', 'auto');
       marker.setAttribute('markerUnits', 'userSpaceOnUse');
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arrow.setAttribute('class', 'rozie-flow-connection__arrow');
-      arrow.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+      arrow.setAttribute('d', 'M0,0 L12,5 L0,10 Z');
       arrow.setAttribute('fill', '#64748b');
       marker.appendChild(arrow);
       defs.appendChild(marker);
@@ -1418,6 +1426,14 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       // entry, so it stays bezier too.
       const rawType = emeta && emeta.type != null ? String(emeta.type) : 'bezier';
       const edgeType = rawType === 'step' || rawType === 'smoothstep' || rawType === 'straight' ? rawType : 'bezier';
+      // Arrowhead geometry (redraw): the head is oriented along the path's tangent
+      // over its LAST `ARROW_LEN` (angled for a descending edge, aligned with where
+      // the line actually meets the head — unlike the chord, which diverges from the
+      // bezier's flattened end tangent), and the visible stroke is trimmed back to
+      // the arrow base on SOLID edges so the line's width can't poke past the
+      // tapering tip (the "square tip"). Dashed edges keep their pattern untrimmed.
+      const ARROW_LEN = 12;
+      const isDashed = !!(emeta && emeta.dashed === true);
       let labelEl: any = null;
       const edgeLabel = emeta && emeta.label != null ? String(emeta.label) : null;
       if (edgeLabel) {
@@ -1438,6 +1454,36 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         // classicConnectionPath UNCHANGED → byte-identical bezier output.
         const d = edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature);
         path.setAttribute('d', d);
+        // Orient the head and trim the visible stroke back to the arrow base (solid
+        // edges) so the line meets the head without poking through the tip.
+        // getTotalLength/getPointAtLength are SVGGeometryElement methods unavailable
+        // in a non-rendering env (jsdom) → guard and fall back to orient='auto' / untrimmed.
+        let pathLen = 0;
+        try {
+          pathLen = path.getTotalLength();
+        } catch (e: any) {
+          pathLen = 0;
+        }
+        if (pathLen > ARROW_LEN + 1) {
+          // BACKWARD edge (target socket left of the source socket): the classic
+          // bezier overshoots both control points, looping the curve into tight
+          // u-turns right at the sockets, so a sampled local tangent is unstable and
+          // the head curls. Use the path's TRUE end tangent (orient='auto' — the
+          // horizontal entry into the input) for a stable, standard arrow. FORWARD
+          // edges keep the final-ARROW_LEN tangent, which follows a descending edge
+          // AND aligns with where the line meets the head.
+          if (end.x < start.x) {
+            marker.setAttribute('orient', 'auto');
+          } else {
+            const tip = path.getPointAtLength(pathLen);
+            const back = path.getPointAtLength(pathLen - ARROW_LEN);
+            marker.setAttribute('orient', String(Math.atan2(tip.y - back.y, tip.x - back.x) * 180 / Math.PI));
+          }
+          if (!isDashed) path.setAttribute('stroke-dasharray', pathLen - ARROW_LEN + ' ' + pathLen);
+        } else {
+          marker.setAttribute('orient', 'auto');
+          if (!isDashed) path.removeAttribute('stroke-dasharray');
+        }
         if (labelEl) {
           labelEl.setAttribute('x', String((start.x + end.x) / 2));
           labelEl.setAttribute('y', String((start.y + end.y) / 2));
