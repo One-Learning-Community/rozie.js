@@ -31,6 +31,13 @@ export interface ChartHandle {
   stopChart: (...args: any[]) => any;
   clearChart: (...args: any[]) => any;
   toBase64Image: (...args: any[]) => any;
+  setDatasetVisibility: (...args: any[]) => any;
+  isDatasetVisible: (...args: any[]) => any;
+  hideDataset: (...args: any[]) => any;
+  showDataset: (...args: any[]) => any;
+  setActiveElements: (...args: any[]) => any;
+  getActiveElements: (...args: any[]) => any;
+  getDatasetMeta: (...args: any[]) => any;
 }
 
 declare const Chart: React.ForwardRefExoticComponent<ChartProps & React.RefAttributes<ChartHandle>>;

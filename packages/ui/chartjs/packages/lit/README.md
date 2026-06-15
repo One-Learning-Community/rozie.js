@@ -84,6 +84,13 @@ const png = el.toBase64Image();
 | `stopChart` | Stop the current animation loop (returns the instance). |
 | `clearChart` | Clear the chart canvas (returns the instance). |
 | `toBase64Image` | Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`. |
+| `setDatasetVisibility` | Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend. |
+| `isDatasetVisible` | Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling. |
+| `hideDataset` | Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`). |
+| `showDataset` | Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`). |
+| `setActiveElements` | Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`. |
+| `getActiveElements` | Return the currently active/hovered elements (mirror hover state into sibling UI). |
+| `getDatasetMeta` | Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`. |
 
 ## Slots
 

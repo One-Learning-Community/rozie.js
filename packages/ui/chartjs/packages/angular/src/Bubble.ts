@@ -369,6 +369,27 @@ export class Bubble {
   toBase64Image = (type: any, quality: any) => {
     return this.instance ? this.instance.toBase64Image(type, quality) : null;
   };
+  setDatasetVisibility = (datasetIndex: any, visible: any) => {
+    this.instance?.setDatasetVisibility(datasetIndex, visible);
+  };
+  isDatasetVisible = (datasetIndex: any) => {
+    return this.instance ? this.instance.isDatasetVisible(datasetIndex) : false;
+  };
+  hideDataset = (datasetIndex: any, dataIndex: any) => {
+    this.instance?.hide(datasetIndex, dataIndex);
+  };
+  showDataset = (datasetIndex: any, dataIndex: any) => {
+    this.instance?.show(datasetIndex, dataIndex);
+  };
+  setActiveElements = (elements: any) => {
+    this.instance?.setActiveElements(elements ?? []);
+  };
+  getActiveElements = () => {
+    return this.instance ? this.instance.getActiveElements() : [];
+  };
+  getDatasetMeta = (datasetIndex: any) => {
+    return this.instance ? this.instance.getDatasetMeta(datasetIndex) : null;
+  };
 
   static ngTemplateContextGuard(
     _dir: Bubble,

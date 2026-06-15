@@ -56,6 +56,13 @@ export interface LineHandle {
   stopChart: (...args: any[]) => any;
   clearChart: (...args: any[]) => any;
   toBase64Image: (...args: any[]) => any;
+  setDatasetVisibility: (...args: any[]) => any;
+  isDatasetVisible: (...args: any[]) => any;
+  hideDataset: (...args: any[]) => any;
+  showDataset: (...args: any[]) => any;
+  setActiveElements: (...args: any[]) => any;
+  getActiveElements: (...args: any[]) => any;
+  getDatasetMeta: (...args: any[]) => any;
 }
 
 export default function Line(_props: LineProps): JSX.Element {
@@ -64,7 +71,7 @@ export default function Line(_props: LineProps): JSX.Element {
   datasets: []
 }))(), options: (() => ({}))(), height: 240, width: undefined, plugins: (() => [])(), updateMode: undefined, redraw: false, ariaLabel: undefined, datasetIdKey: 'label', destroyDelay: 0 }, _props);
   const [local, attrs] = splitProps(_merged, ['data', 'options', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'datasetIdKey', 'destroyDelay', 'ref']);
-  onMount(() => { local.ref?.({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image }); });
+  onMount(() => { local.ref?.({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image, setDatasetVisibility, isDatasetVisible, hideDataset, showDataset, setActiveElements, getActiveElements, getDatasetMeta }); });
 
   const portalDisposers = new Set<() => void>();
   const portals = {
@@ -340,13 +347,28 @@ export default function Line(_props: LineProps): JSX.Element {
   // the Chart.js-supported runtime path — re-creating on every data tick would
   // flicker and leak. (When `redraw` is set, re-create wholesale instead.)
 
-  // Imperative handle (Phase 21 $expose). The verbs are SUFFIXED with `Chart`
-  // because bare `update`/`render` collide with LitElement's reactive-lifecycle
-  // methods (`update(changedProperties)` / `render()`) and would shadow them on
-  // the Lit leaf; `resize`/`reset`/`stop`/`clear` are suffixed too for a
-  // consistent, unambiguous handle. `getChart` returns the live instance for
-  // direct API access; `toBase64Image` is the marquee PNG-export capability.
-  // Collision-clear: none of the 8 names collide with the 9 props.
+  // Imperative handle (Phase 21 $expose). The lifecycle/redraw verbs are SUFFIXED
+  // with `Chart` because bare `update`/`render` collide with LitElement's
+  // reactive-lifecycle methods (`update(changedProperties)` / `render()`) and
+  // would shadow them on the Lit leaf; `resize`/`reset`/`stop`/`clear` are
+  // suffixed too for a consistent, unambiguous handle. `getChart` returns the live
+  // instance for direct API access; `toBase64Image` is the marquee PNG-export.
+  //
+  // The visibility + active-element family (added later) is the #1 reason a
+  // consumer reaches for a chart handle — custom legends, externally-driven
+  // tooltips/highlights, overlay positioning — none reachable via prop/event:
+  //   - setDatasetVisibility / isDatasetVisible: drive a custom legend's series
+  //     show/hide (INSTANT toggle).
+  //   - hideDataset / showDataset: the ANIMATED hide/show (Chart.js hide()/show()).
+  //     SUFFIXED with `Dataset` both to dodge inherited HTMLElement-ish ambiguity
+  //     and to disambiguate the dataset-vs-element overload.
+  //   - setActiveElements / getActiveElements: programmatically open/read the
+  //     hovered/active points (sync hover from a table row, a map pin, a sibling
+  //     chart) — events only REPORT hover, they cannot SET it.
+  //   - getDatasetMeta: read computed geometry (pixel coords, controller) to
+  //     position custom overlays/annotations over the canvas.
+  // Collision-clear: none of the 15 names collide with the 11 props or the 3
+  // emits (click/datasetClick/hover).
   function getChart() {
     return instance;
   }
@@ -370,6 +392,27 @@ export default function Line(_props: LineProps): JSX.Element {
   }
   function toBase64Image(type: any, quality: any) {
     return instance ? instance.toBase64Image(type, quality) : null;
+  }
+  function setDatasetVisibility(datasetIndex: any, visible: any) {
+    instance?.setDatasetVisibility(datasetIndex, visible);
+  }
+  function isDatasetVisible(datasetIndex: any) {
+    return instance ? instance.isDatasetVisible(datasetIndex) : false;
+  }
+  function hideDataset(datasetIndex: any, dataIndex: any) {
+    instance?.hide(datasetIndex, dataIndex);
+  }
+  function showDataset(datasetIndex: any, dataIndex: any) {
+    instance?.show(datasetIndex, dataIndex);
+  }
+  function setActiveElements(elements: any) {
+    instance?.setActiveElements(elements ?? []);
+  }
+  function getActiveElements() {
+    return instance ? instance.getActiveElements() : [];
+  }
+  function getDatasetMeta(datasetIndex: any) {
+    return instance ? instance.getDatasetMeta(datasetIndex) : null;
   }
 
   return (
