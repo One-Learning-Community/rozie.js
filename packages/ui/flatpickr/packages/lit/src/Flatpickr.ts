@@ -273,6 +273,22 @@ private __rozieFirstUpdateDone = false;
     this.instance?.jumpToDate(date);
   }
 
+  getSelectedDates() {
+    return this.instance ? this.instance.selectedDates : [];
+  }
+
+  togglePicker() {
+    this.instance?.toggle();
+  }
+
+  changeMonth(value: any, isOffset: any) {
+    this.instance?.changeMonth(value, isOffset);
+  }
+
+  changeYear(year: any) {
+    this.instance?.changeYear(year);
+  }
+
   get date(): string { return this._dateControllable.read(); }
   set date(v: string) { this._dateControllable.notifyPropertyWrite(v); }
 

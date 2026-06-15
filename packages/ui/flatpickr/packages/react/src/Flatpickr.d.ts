@@ -54,6 +54,10 @@ export interface FlatpickrHandle {
   closePicker: (...args: any[]) => any;
   selectDate: (...args: any[]) => any;
   jumpToDate: (...args: any[]) => any;
+  getSelectedDates: (...args: any[]) => any;
+  togglePicker: (...args: any[]) => any;
+  changeMonth: (...args: any[]) => any;
+  changeYear: (...args: any[]) => any;
 }
 
 declare const Flatpickr: React.ForwardRefExoticComponent<FlatpickrProps & React.RefAttributes<FlatpickrHandle>>;

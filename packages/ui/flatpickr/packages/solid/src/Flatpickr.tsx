@@ -69,12 +69,16 @@ export interface FlatpickrHandle {
   closePicker: (...args: any[]) => any;
   selectDate: (...args: any[]) => any;
   jumpToDate: (...args: any[]) => any;
+  getSelectedDates: (...args: any[]) => any;
+  togglePicker: (...args: any[]) => any;
+  changeMonth: (...args: any[]) => any;
+  changeYear: (...args: any[]) => any;
 }
 
 export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: (() => [])(), enable: (() => [])(), locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: (() => [])() }, _props);
   const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'staticPosition', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'disable', 'enable', 'locale', 'firstDayOfWeek', 'parseDate', 'formatDate', 'plugins', 'ref']);
-  onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate }); });
+  onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear }); });
 
   const [date, setDate] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'date', '');
   onMount(() => {
@@ -210,7 +214,7 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   let inputElRef: HTMLElement | null = null;
 
   let instance: any = null;
-  // Imperative handle (Phase 21 $expose). The five flatpickr instance methods a
+  // Imperative handle (Phase 21 $expose). The flatpickr instance methods a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets
   // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
   // Angular+Lit public method / Solid callback ref). Each guards on `instance`
@@ -249,6 +253,29 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   }
   function jumpToDate(date: any) {
     instance?.jumpToDate(date);
+  }
+  // getSelectedDates closes a real asymmetry: the two-way `date` model is a
+  // formatted STRING, but the parsed Date[] is otherwise only delivered on the
+  // `change` event payload — a consumer needing the current Date objects on demand
+  // (range bounds, multi-select, validation) had no path. `[]` before mount.
+  function getSelectedDates() {
+    return instance ? instance.selectedDates : [];
+  }
+  // togglePicker = open-or-close in one call (natural for a single trigger button).
+  // `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
+  // openPicker/closePicker.
+  function togglePicker() {
+    instance?.toggle();
+  }
+  // Programmatic calendar navigation for custom prev/next / "jump N months" UI.
+  // changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
+  // `monthChange`, which is the emitted event (so ROZ121-clear).
+  function changeMonth(value: any, isOffset: any) {
+    instance?.changeMonth(value, isOffset);
+  }
+  // changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
+  function changeYear(year: any) {
+    instance?.changeYear(year);
   }
 
   return (

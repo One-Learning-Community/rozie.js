@@ -55,6 +55,10 @@ export interface FlatpickrHandle {
   closePicker: (...args: any[]) => any;
   selectDate: (...args: any[]) => any;
   jumpToDate: (...args: any[]) => any;
+  getSelectedDates: (...args: any[]) => any;
+  togglePicker: (...args: any[]) => any;
+  changeMonth: (...args: any[]) => any;
+  changeYear: (...args: any[]) => any;
 }
 
 const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr(_props: FlatpickrProps, ref): JSX.Element {
@@ -140,7 +144,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   const _watch8First = useRef(true);
   const _watch9First = useRef(true);
 
-  // Imperative handle (Phase 21 $expose). The five flatpickr instance methods a
+  // Imperative handle (Phase 21 $expose). The flatpickr instance methods a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets
   // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
   // Angular+Lit public method / Solid callback ref). Each guards on `instance`
@@ -179,6 +183,40 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   }
   function jumpToDate(date: any) {
     instance.current?.jumpToDate(date);
+  }
+  // getSelectedDates closes a real asymmetry: the two-way `date` model is a
+  // formatted STRING, but the parsed Date[] is otherwise only delivered on the
+  // `change` event payload — a consumer needing the current Date objects on demand
+  // (range bounds, multi-select, validation) had no path. `[]` before mount.
+  // getSelectedDates closes a real asymmetry: the two-way `date` model is a
+  // formatted STRING, but the parsed Date[] is otherwise only delivered on the
+  // `change` event payload — a consumer needing the current Date objects on demand
+  // (range bounds, multi-select, validation) had no path. `[]` before mount.
+  function getSelectedDates() {
+    return instance.current ? instance.current.selectedDates : [];
+  }
+  // togglePicker = open-or-close in one call (natural for a single trigger button).
+  // `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
+  // openPicker/closePicker.
+  // togglePicker = open-or-close in one call (natural for a single trigger button).
+  // `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
+  // openPicker/closePicker.
+  function togglePicker() {
+    instance.current?.toggle();
+  }
+  // Programmatic calendar navigation for custom prev/next / "jump N months" UI.
+  // changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
+  // `monthChange`, which is the emitted event (so ROZ121-clear).
+  // Programmatic calendar navigation for custom prev/next / "jump N months" UI.
+  // changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
+  // `monthChange`, which is the emitted event (so ROZ121-clear).
+  function changeMonth(value: any, isOffset: any) {
+    instance.current?.changeMonth(value, isOffset);
+  }
+  // changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
+  // changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
+  function changeYear(year: any) {
+    instance.current?.changeYear(year);
   }
 
   useEffect(() => {
@@ -345,7 +383,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   });
   }, [props.firstDayOfWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

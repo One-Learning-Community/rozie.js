@@ -246,6 +246,18 @@ export class Flatpickr {
   jumpToDate = (date: any) => {
     this.instance?.jumpToDate(date);
   };
+  getSelectedDates = () => {
+    return this.instance ? this.instance.selectedDates : [];
+  };
+  togglePicker = () => {
+    this.instance?.toggle();
+  };
+  changeMonth = (value: any, isOffset: any) => {
+    this.instance?.changeMonth(value, isOffset);
+  };
+  changeYear = (year: any) => {
+    this.instance?.changeYear(year);
+  };
 
   private __rozieCvaOnChange: (v: string) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

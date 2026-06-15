@@ -100,3 +100,7 @@ fp.current?.openPicker();
 | `closePicker` | Close the calendar popover. |
 | `selectDate` | Set the selected date programmatically — `selectDate(date, triggerChange?)`. Pass `true` as the second argument to also fire `change`. |
 | `jumpToDate` | Navigate the calendar view to a date — `jumpToDate(date)` — without changing the selection. |
+| `getSelectedDates` | Return the currently selected dates as a `Date[]` on demand (the two-way `date` model is a formatted string; the parsed dates are otherwise only on the `change` payload). `[]` before mount. |
+| `togglePicker` | Open the calendar if closed, close it if open — `togglePicker()` (single-trigger button). |
+| `changeMonth` | Move the calendar by `value` months (or to an absolute month) — `changeMonth(value, isOffset?)` (isOffset defaults to true). |
+| `changeYear` | Jump the calendar to an absolute year — `changeYear(year)`. |
