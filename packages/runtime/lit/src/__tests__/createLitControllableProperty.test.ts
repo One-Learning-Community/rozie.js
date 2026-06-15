@@ -19,6 +19,7 @@
  *     spuriously flip a fresh element into controlled mode.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { effect } from '@preact/signals-core';
 import { createLitControllableProperty } from '../createLitControllableProperty.js';
 
 afterEach(() => {
@@ -224,6 +225,118 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
     expect(cp.read()).toBe(0);
     cp.write(5);
     expect(cp.read()).toBe(5);
+  });
+});
+
+describe('createLitControllableProperty — controlled read() reactivity (rete / FullCalendar $watch regression)', () => {
+  // Regression guard for the d7e7dde1 follow-up: the emitted Lit output lowers
+  // `$watch(controlledProp)` into a `@preact/signals-core` effect() whose ONLY
+  // change-trigger is the value it reads through the controlled getter →
+  // read(). rete FlowCanvas (`$watch(graph)` → reconcileNodes) and FullCalendar
+  // (`$watch(view)` → instance.changeView) both depend on this. d7e7dde1 made
+  // controlled read() return a plain NON-reactive latch, so the effect
+  // subscribed to nothing and never re-ran after mount — the engine / view
+  // stopped reconciling on parent flushes (rete-flow nodeCount + full-calendar
+  // -slots VR cells went red). Controlled read() must re-establish a reactive
+  // dependency while still returning the authoritative latch.
+
+  it('a preact effect() reading a controlled read() re-runs when the parent flushes via notifyPropertyWrite', () => {
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      // Start uncontrolled (exactly like rete `graph` / FullCalendar `view`,
+      // which are emitted with initialControlledValue: undefined and pushed
+      // into controlled mode by the parent's `.prop=${…}` property binding).
+      initialControlledValue: undefined,
+    });
+    // Parent's first property binding establishes controlled mode BEFORE the
+    // effect is wired (mirrors firstUpdated running after the first flush).
+    cp.notifyPropertyWrite(1);
+
+    const seen: number[] = [];
+    const dispose = effect(() => {
+      // The emitted `$watch` tracks the controlled getter exactly like this.
+      seen.push(cp.read());
+    });
+    // First effect run observes the current flushed value.
+    expect(seen).toEqual([1]);
+
+    // Parent flushes a new value — the effect MUST re-run (this is what was
+    // broken: a non-reactive latch left the effect with no subscription).
+    cp.notifyPropertyWrite(2);
+    expect(seen).toEqual([1, 2]);
+
+    cp.notifyPropertyWrite(3);
+    expect(seen).toEqual([1, 2, 3]);
+
+    dispose();
+  });
+
+  it('a preact effect() reading a controlled read() re-runs when the parent flushes via notifyAttributeChange', () => {
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      // Constructed controlled (attribute-driven path).
+      initialControlledValue: 10,
+    });
+    const seen: number[] = [];
+    const dispose = effect(() => {
+      seen.push(cp.read());
+    });
+    expect(seen).toEqual([10]);
+
+    cp.notifyAttributeChange(11);
+    cp.notifyAttributeChange(12);
+    expect(seen).toEqual([10, 11, 12]);
+
+    dispose();
+  });
+
+  it('controlled read() always returns the LATEST flushed value (authoritative-at-render, no lagging mirror)', () => {
+    // The Kanban authoritative-at-render guarantee: even though read() now
+    // re-subscribes reactively, it must NEVER return a value older than the
+    // parent's last flush. Each flush updates the returned latch in lockstep.
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number[]>({
+      host,
+      eventName: 'items-change',
+      defaultValue: [],
+      initialControlledValue: undefined,
+    });
+    cp.notifyPropertyWrite([1]);
+    expect(cp.read()).toEqual([1]);
+    cp.notifyPropertyWrite([1, 2]);
+    expect(cp.read()).toEqual([1, 2]);
+    // A producer-side write() in controlled mode does NOT mutate the returned
+    // value — the parent stays the single source of truth.
+    cp.write([9, 9, 9]);
+    expect(cp.read()).toEqual([1, 2]);
+    // The parent's authoritative re-assert wins and is reflected immediately.
+    cp.notifyAttributeChange([1, 2, 3]);
+    expect(cp.read()).toEqual([1, 2, 3]);
+  });
+
+  it('an UNCONTROLLED effect() is unaffected — producer write() still re-runs it (Counter / Dropdown)', () => {
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+    const seen: number[] = [];
+    const dispose = effect(() => {
+      seen.push(cp.read());
+    });
+    expect(seen).toEqual([0]);
+    cp.write(1);
+    cp.write(2);
+    expect(seen).toEqual([0, 1, 2]);
+    dispose();
   });
 });
 

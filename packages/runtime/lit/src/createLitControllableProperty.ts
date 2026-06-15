@@ -60,23 +60,38 @@
  * and writes would not trigger a re-render (the original bug behind Counter
  * and Dropdown not re-rendering on internal state changes).
  *
- * **Authoritative-at-render in controlled mode (nested-Kanban reset fix)**:
- * in CONTROLLED mode `read()` returns a plain, NON-reactive `controlledValue`
- * latch — NOT the `_state` signal. This is deliberate. A `SignalWatcher`
- * render that reads a tracked signal re-renders whenever that signal changes,
- * including at a moment when the value is STALE relative to the parent's true
- * bound value — e.g. a reactively-scheduled re-render firing BEFORE the parent
- * has flushed its latest `.prop=${…}` binding down. That stale re-render then
- * re-propagates the old value into the producer's own children (the nested
- * SortableList Kanban whole-board reset: the outer controlled list re-passed
- * SEED `scope.item.cards` into a child column, clobbering a just-committed
- * card move). Mirrors `@rozie/runtime-react`'s `useControllableState`, where a
- * controlled component reads `currentValue === opts.value` — the LIVE prop —
- * and never a lagging copy. To preserve reactivity without a stale mirror, the
- * parent's authoritative flush (`notifyPropertyWrite` / `notifyAttributeChange`)
- * updates the latch AND calls `host.requestUpdate()`, so in controlled mode the
- * producer re-renders STRICTLY AFTER — and driven solely by — the parent's
- * value landing. Uncontrolled mode is unchanged: it keeps the tracked `_state`
+ * **Authoritative-at-render in controlled mode (nested-Kanban reset fix) +
+ * reactive controlled consumers (rete / FullCalendar regression fix)**:
+ * in CONTROLLED mode `read()` reads the tracked `_state` signal purely to
+ * ESTABLISH a reactive dependency, but RETURNS the parent-authoritative
+ * `controlledValue` latch (NOT `_state.value`). Two facts are reconciled here:
+ *
+ *   - **Authoritative-at-render (Kanban):** a render must read the FRESH bound
+ *     value, never a lagging mirror. The latch is updated in the SAME flush
+ *     (`notifyPropertyWrite` / `notifyAttributeChange`) that bumps `_state` and
+ *     calls `host.requestUpdate()`, so it is never older than `_state`.
+ *     `@lit-labs/preact-signals` coalesces every signal-triggered render
+ *     through `requestUpdate()` — the SAME path the explicit `scheduleRender()`
+ *     uses — so a controlled render reads the latch at its coalesced run time =
+ *     the freshest flushed value, and can never re-propagate a stale value into
+ *     the producer's own children (the nested SortableList Kanban whole-board
+ *     reset, where the outer controlled list re-passed SEED `scope.item.cards`
+ *     into a child column). Mirrors `@rozie/runtime-react`'s
+ *     `useControllableState`, where a controlled component reads the LIVE prop.
+ *   - **Reactive controlled consumers (rete / FullCalendar):** the emitted Lit
+ *     output lowers `$watch(controlledProp)` into a `@preact/signals-core`
+ *     `effect()` whose ONLY change-trigger is the value it reads through
+ *     `read()` (rete FlowCanvas's `$watch(graph)` engine reconciler;
+ *     FullCalendar's `$watch(view) → instance.changeView`). If controlled
+ *     `read()` returned a plain latch WITHOUT touching `_state`, that effect
+ *     would subscribe to nothing and never re-run after mount — the engine /
+ *     view would stop reconciling on parent flushes. Reading `_state` here
+ *     re-subscribes the effect (and the render) on every run.
+ *
+ * The `_state` read adds NO render trigger beyond the flush's own
+ * `scheduleRender()` (both route through `requestUpdate()`), so the Kanban
+ * authoritative-at-render guarantee is preserved while reactivity is restored.
+ * Uncontrolled mode is unchanged: it reads (and returns) the tracked `_state`
  * signal so a producer-owned `write()` re-renders the standalone component
  * (Counter / Dropdown).
  *
@@ -244,14 +259,39 @@ export function createLitControllableProperty<T>(
 
   return {
     read(): T {
-      // CONTROLLED: return the parent-authoritative latch WITHOUT touching the
-      // tracked signal — so a `SignalWatcher` render does not subscribe to the
-      // internal mirror and can never be reactively re-scheduled to read a
-      // stale value ahead of the parent's flush. Re-renders in controlled mode
-      // are driven exclusively by `scheduleRender()` on the parent's flush.
+      if (wasControlled) {
+        // CONTROLLED: read `_state.value` purely to ESTABLISH a reactive
+        // dependency, but RETURN the parent-authoritative `controlledValue`
+        // latch. Two consumers reach the controlled value through this single
+        // `read()` and BOTH must re-run on the parent's flush:
+        //
+        //   1. A `$watch`-lowered `@preact/signals-core` `effect()` — e.g. rete
+        //      FlowCanvas's `$watch(graph)` engine reconciler and FullCalendar's
+        //      `$watch(view) → instance.changeView(v)`. Such an effect's ONLY
+        //      change-trigger is the signal it reads through `read()`. If
+        //      `read()` returns a plain latch without touching `_state`, the
+        //      effect subscribes to nothing and NEVER re-runs after mount, so
+        //      the engine/view stops reconciling on parent updates (the
+        //      rete-flow nodeCount + full-calendar-slots regressions).
+        //   2. The `SignalWatcher` render.
+        //
+        // Reading `_state` re-subscribes both. The latch is the RETURNED value
+        // because it is written in the SAME flush that bumps `_state` and calls
+        // `scheduleRender()` (see notifyAttributeChange / notifyPropertyWrite),
+        // so it is never older than `_state`. `@lit-labs/preact-signals`
+        // coalesces every signal-triggered render through `requestUpdate()` —
+        // the SAME path the explicit `scheduleRender()` uses — so a render reads
+        // the latch at its (coalesced) run time = the freshest flushed value,
+        // and can never re-seed a child from a lagging mirror (the nested-Kanban
+        // authoritative-at-render guarantee from d7e7dde1 is preserved: the
+        // subscription adds no render trigger beyond the flush's own
+        // `scheduleRender()`, and the returned value is always the latch).
+        void _state.value;
+        return controlledValue;
+      }
       // UNCONTROLLED: read the tracked signal so producer-owned `write()`s
-      // re-render the standalone component.
-      return wasControlled ? controlledValue : _state.value;
+      // re-render the standalone component (Counter / Dropdown).
+      return _state.value;
     },
     write(next: T | ((prev: T) => T)): void {
       userHasWritten = true;
