@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
 import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from '@codemirror/state';
 // `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
@@ -214,6 +214,8 @@ private _portalContainers = new Set<HTMLElement>();
   }
 
   firstUpdated(): void {
+    adoptDocumentStyles(this);
+
     this._armListeners();
 
     interface ReactivePortalHandle {

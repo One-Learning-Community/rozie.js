@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { injectGlobalStyles } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, injectGlobalStyles } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
 import { Chart as ChartJS, ScatterController, PointElement, LinearScale, Legend, Tooltip, Colors } from 'chart.js';
 // Scatter registers only its own Chart.js controller/element/scale set
@@ -95,6 +95,8 @@ private _portalContainers = new Set<HTMLElement>();
   }
 
   firstUpdated(): void {
+    adoptDocumentStyles(this);
+
     this._armListeners();
 
     const portals = {

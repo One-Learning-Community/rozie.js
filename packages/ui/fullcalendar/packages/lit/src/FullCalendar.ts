@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty } from '@rozie/runtime-lit';
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -244,6 +244,8 @@ private _portalContainers = new Set<HTMLElement>();
   }
 
   firstUpdated(): void {
+    adoptDocumentStyles(this);
+
     this._armListeners();
 
     const portals = {
