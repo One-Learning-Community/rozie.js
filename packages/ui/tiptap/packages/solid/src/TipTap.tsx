@@ -122,6 +122,7 @@ export interface TipTapHandle {
   blurEditor: (...args: any[]) => any;
   getHTML: (...args: any[]) => any;
   getJSON: (...args: any[]) => any;
+  getText: (...args: any[]) => any;
   setContent: (...args: any[]) => any;
   clearContent: (...args: any[]) => any;
   toggleBold: (...args: any[]) => any;
@@ -131,12 +132,15 @@ export interface TipTapHandle {
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;
+  isActive: (...args: any[]) => any;
+  can: (...args: any[]) => any;
+  isEmpty: (...args: any[]) => any;
 }
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
   const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))(), extensions: (() => [])() }, _props);
   const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'ref']);
-  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain }); });
+  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');
   const [active, setActive] = createSignal({
@@ -615,6 +619,12 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   function getJSON() {
     return editor ? editor.getJSON() : null;
   }
+  // Plain-text extraction — word/char counts, search indexing, plaintext export.
+  // Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+  // alongside getHTML/getJSON but never wired; now first-class.
+  function getText() {
+    return editor ? editor.getText() : '';
+  }
   // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
   // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
   // reflect into the model so a programmatic set keeps the bound state in sync.
@@ -666,6 +676,24 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
   function chain() {
     return editor ? editor.chain().focus() : null;
+  }
+  // Read-side toolbar primitives. These are precisely what a bring-your-own
+  // toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+  // the component already computes internally via refreshActive() — exposing them
+  // removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+  //   - isActive(name, attrs?): is a mark/node active in the current selection
+  //     (drive toolbar button active styling). False before mount.
+  //   - can(): the command-availability chain (editor.can().chain()…run()) for
+  //     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+  //   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+  function isActive(name: any, attrs: any) {
+    return editor ? editor.isActive(name, attrs) : false;
+  }
+  function can() {
+    return editor ? editor.can() : null;
+  }
+  function isEmpty() {
+    return editor ? editor.isEmpty : true;
   }
 
   return (

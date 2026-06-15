@@ -30,6 +30,7 @@ export interface TipTapHandle {
   blurEditor: (...args: any[]) => any;
   getHTML: (...args: any[]) => any;
   getJSON: (...args: any[]) => any;
+  getText: (...args: any[]) => any;
   setContent: (...args: any[]) => any;
   clearContent: (...args: any[]) => any;
   toggleBold: (...args: any[]) => any;
@@ -39,6 +40,9 @@ export interface TipTapHandle {
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;
+  isActive: (...args: any[]) => any;
+  can: (...args: any[]) => any;
+  isEmpty: (...args: any[]) => any;
 }
 
 declare const TipTap: React.ForwardRefExoticComponent<TipTapProps & React.RefAttributes<TipTapHandle>>;

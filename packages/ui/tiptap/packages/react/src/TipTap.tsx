@@ -63,6 +63,7 @@ export interface TipTapHandle {
   blurEditor: (...args: any[]) => any;
   getHTML: (...args: any[]) => any;
   getJSON: (...args: any[]) => any;
+  getText: (...args: any[]) => any;
   setContent: (...args: any[]) => any;
   clearContent: (...args: any[]) => any;
   toggleBold: (...args: any[]) => any;
@@ -72,6 +73,9 @@ export interface TipTapHandle {
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;
+  isActive: (...args: any[]) => any;
+  can: (...args: any[]) => any;
+  isEmpty: (...args: any[]) => any;
 }
 
 const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: TipTapProps, ref): JSX.Element {
@@ -322,6 +326,15 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   function getJSON() {
     return editor.current ? editor.current.getJSON() : null;
   }
+  // Plain-text extraction — word/char counts, search indexing, plaintext export.
+  // Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+  // alongside getHTML/getJSON but never wired; now first-class.
+  // Plain-text extraction — word/char counts, search indexing, plaintext export.
+  // Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+  // alongside getHTML/getJSON but never wired; now first-class.
+  function getText() {
+    return editor.current ? editor.current.getText() : '';
+  }
   // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
   // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
   // reflect into the model so a programmatic set keeps the bound state in sync.
@@ -378,6 +391,33 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
   function chain() {
     return editor.current ? editor.current.chain().focus() : null;
+  }
+  // Read-side toolbar primitives. These are precisely what a bring-your-own
+  // toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+  // the component already computes internally via refreshActive() — exposing them
+  // removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+  //   - isActive(name, attrs?): is a mark/node active in the current selection
+  //     (drive toolbar button active styling). False before mount.
+  //   - can(): the command-availability chain (editor.can().chain()…run()) for
+  //     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+  //   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+  // Read-side toolbar primitives. These are precisely what a bring-your-own
+  // toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+  // the component already computes internally via refreshActive() — exposing them
+  // removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+  //   - isActive(name, attrs?): is a mark/node active in the current selection
+  //     (drive toolbar button active styling). False before mount.
+  //   - can(): the command-availability chain (editor.can().chain()…run()) for
+  //     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+  //   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+  function isActive(name: any, attrs: any) {
+    return editor.current ? editor.current.isActive(name, attrs) : false;
+  }
+  function can() {
+    return editor.current ? editor.current.can() : null;
+  }
+  function isEmpty() {
+    return editor.current ? editor.current.isEmpty : true;
   }
 
   useEffect(() => {
@@ -598,7 +638,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.setEditable(v, false);
   }, [props.editable]);
 
-  useImperativeHandle(ref, () => ({ getEditor, focusEditor, blurEditor, getHTML, getJSON, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

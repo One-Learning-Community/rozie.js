@@ -391,6 +391,15 @@ export function getHTML() {
 export function getJSON() {
   return editor ? editor.getJSON() : null;
 }
+// Plain-text extraction — word/char counts, search indexing, plaintext export.
+// Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+// alongside getHTML/getJSON but never wired; now first-class.
+// Plain-text extraction — word/char counts, search indexing, plaintext export.
+// Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+// alongside getHTML/getJSON but never wired; now first-class.
+export function getText() {
+  return editor ? editor.getText() : '';
+}
 // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
 // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
 // reflect into the model so a programmatic set keeps the bound state in sync.
@@ -447,6 +456,33 @@ export function redo() {
 // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
 export function chain() {
   return editor ? editor.chain().focus() : null;
+}
+// Read-side toolbar primitives. These are precisely what a bring-your-own
+// toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+// the component already computes internally via refreshActive() — exposing them
+// removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+//   - isActive(name, attrs?): is a mark/node active in the current selection
+//     (drive toolbar button active styling). False before mount.
+//   - can(): the command-availability chain (editor.can().chain()…run()) for
+//     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+//   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+// Read-side toolbar primitives. These are precisely what a bring-your-own
+// toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+// the component already computes internally via refreshActive() — exposing them
+// removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+//   - isActive(name, attrs?): is a mark/node active in the current selection
+//     (drive toolbar button active styling). False before mount.
+//   - can(): the command-availability chain (editor.can().chain()…run()) for
+//     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+//   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+export function isActive(name: any, attrs: any) {
+  return editor ? editor.isActive(name, attrs) : false;
+}
+export function can() {
+  return editor ? editor.can() : null;
+}
+export function isEmpty() {
+  return editor ? editor.isEmpty : true;
 }
 
 interface ReactivePortalHandle {

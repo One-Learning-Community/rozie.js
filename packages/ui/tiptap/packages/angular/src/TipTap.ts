@@ -630,6 +630,9 @@ export class TipTap {
   getJSON = () => {
     return this.editor ? this.editor.getJSON() : null;
   };
+  getText = () => {
+    return this.editor ? this.editor.getText() : '';
+  };
   setContent = (next: any) => {
     if (!this.editor) return;
     const v = next ?? '';
@@ -676,6 +679,15 @@ export class TipTap {
   };
   chain = () => {
     return this.editor ? this.editor.chain().focus() : null;
+  };
+  isActive = (name: any, attrs: any) => {
+    return this.editor ? this.editor.isActive(name, attrs) : false;
+  };
+  can = () => {
+    return this.editor ? this.editor.can() : null;
+  };
+  isEmpty = () => {
+    return this.editor ? this.editor.isEmpty : true;
   };
 
   private __rozieCvaOnChange: (v: string) => void = () => {};

@@ -63,6 +63,7 @@ const html = el.getHTML();
 | `blurEditor` | Blur the editor — remove focus from the document. |
 | `getHTML` | Return the current document serialized as an HTML string. |
 | `getJSON` | Return the current document as a ProseMirror JSON object (`JSONContent`). |
+| `getText` | Return the current document as a plain-text string (word/char counts, search indexing, plaintext export). |
 | `setContent` | Replace the document content — `setContent(html)`. Echo-guarded: reflects into the bound `html` model without bouncing an extra `update`. |
 | `clearContent` | Clear the document to an empty paragraph (reflects the empty value into the bound `html` model). |
 | `toggleBold` | Toggle bold on the current selection. |
@@ -72,6 +73,9 @@ const html = el.getHTML();
 | `undo` | Undo the last change. |
 | `redo` | Redo the last undone change. |
 | `chain` | Return a focused TipTap command chain for composing commands — e.g. `chain().toggleBold().toggleItalic().run()` (null before mount). |
+| `isActive` | Whether a mark/node is active in the current selection — `isActive(name, attrs?)` (e.g. `isActive("heading", { level: 2 })`). Drives custom-toolbar active styling. False before mount. |
+| `can` | Return the command-availability chain — `can().chain().focus().toggleBold().run()` returns a boolean — for enabling/disabling custom-toolbar buttons. null before mount. |
+| `isEmpty` | Whether the document is empty — drives empty-state UI and submit-gating. true before mount. |
 
 ## Slots
 

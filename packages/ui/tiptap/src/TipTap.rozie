@@ -23,9 +23,10 @@
     - props (8):  html[model] / editable / placeholder / autofocus /
                   editorClass / ariaLabel / editorProps / extensions
     - events (4): update / selectionUpdate / focus / blur
-    - $expose (14): getEditor, focusEditor, blurEditor, getHTML, getJSON,
-                  setContent, clearContent, toggleBold, toggleItalic,
-                  toggleHeading, toggleBulletList, undo, redo, chain
+    - $expose (18): getEditor, focusEditor, blurEditor, getHTML, getJSON,
+                  getText, setContent, clearContent, toggleBold, toggleItalic,
+                  toggleHeading, toggleBulletList, undo, redo, chain,
+                  isActive, can, isEmpty
     - slots (4):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
                   to the editor), `bubbleMenu` + `floatingMenu` (selection-anchored
                   menus over @tiptap/extension-bubble-menu / -floating-menu, each
@@ -442,6 +443,10 @@ function focusEditor()      { editor?.commands.focus() }
 function blurEditor()       { editor?.commands.blur() }
 function getHTML()          { return editor ? editor.getHTML() : '' }
 function getJSON()          { return editor ? editor.getJSON() : null }
+// Plain-text extraction — word/char counts, search indexing, plaintext export.
+// Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
+// alongside getHTML/getJSON but never wired; now first-class.
+function getText()          { return editor ? editor.getText() : '' }
 // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
 // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
 // reflect into the model so a programmatic set keeps the bound state in sync.
@@ -473,10 +478,23 @@ function redo()             { editor?.chain().focus().redo().run(); refreshActiv
 // Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
 // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
 function chain()            { return editor ? editor.chain().focus() : null }
+// Read-side toolbar primitives. These are precisely what a bring-your-own
+// toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
+// the component already computes internally via refreshActive() — exposing them
+// removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
+//   - isActive(name, attrs?): is a mark/node active in the current selection
+//     (drive toolbar button active styling). False before mount.
+//   - can(): the command-availability chain (editor.can().chain()…run()) for
+//     enable/disable of toolbar buttons. null before mount (mirrors chain()).
+//   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
+function isActive(name, attrs) { return editor ? editor.isActive(name, attrs) : false }
+function can()                 { return editor ? editor.can() : null }
+function isEmpty()             { return editor ? editor.isEmpty : true }
 
 $expose({
-  getEditor, focusEditor, blurEditor, getHTML, getJSON, setContent, clearContent,
+  getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent,
   toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain,
+  isActive, can, isEmpty,
 })
 </script>
 
