@@ -86,3 +86,6 @@ const total = viewer.current?.getPageCount();
 | `fitPage` | Fit the current page entirely within the container (width and height). |
 | `rotateCW` | Rotate the view 90° clockwise. |
 | `rotateCCW` | Rotate the view 90° counter-clockwise. |
+| `download` | Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads. |
+| `getMetadata` | Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load. |
+| `getOutline` | Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load. |

@@ -286,10 +286,20 @@ const applyFit = async (mode: any) => {
   if (mode === 'width') zoom = cw / vp.width;else zoom = Math.min(cw / vp.width, ch / vp.height);
 };
 // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-// 12 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+// 15 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
 // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-// pagesrendered/passwordrequest); none is a Lit reserved lifecycle. All drive
-// $data (not the props), so they work whether or not the consumer binds `page`.
+// pagesrendered/passwordrequest); none is a Lit reserved lifecycle. The
+// navigation/zoom/rotate verbs drive $data (not the props), so they work whether
+// or not the consumer binds `page`. The document-level verbs below are cheap
+// passthroughs over the held PDFDocumentProxy (`instance`) that a consumer can't
+// reach otherwise without `getDocument()` + pdf.js knowledge:
+//   - download(filename?): save the original PDF bytes (instance.getData() ->
+//     Blob -> anchor click) — the single most-expected viewer affordance.
+//   - getMetadata(): document title/author/page-labels (tab title / info panel).
+//   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
+//     dests map onto goToPage).
+// (Text search/find is intentionally DEFERRED — it's a real find-controller
+// build over the text layer, not a passthrough; tracked as a follow-up.)
 export function getDocument() {
   return instance;
 }
@@ -326,6 +336,35 @@ export function rotateCW() {
 }
 export function rotateCCW() {
   rot = (rot + 270) % 360;
+}
+// Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
+// Blob and trigger a download via a transient anchor. Resolves false before mount.
+// Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
+// Blob and trigger a download via a transient anchor. Resolves false before mount.
+export async function download(filename: any) {
+  if (!instance) return false;
+  const bytes = await instance.getData();
+  const url = URL.createObjectURL(new Blob([bytes], {
+    type: 'application/pdf'
+  }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'document.pdf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  return true;
+}
+// Document info (title/author/page labels) — resolves null before mount.
+// Document info (title/author/page labels) — resolves null before mount.
+export function getMetadata() {
+  return instance ? instance.getMetadata() : null;
+}
+// Bookmark / table-of-contents tree — resolves null when absent or before mount.
+// Bookmark / table-of-contents tree — resolves null when absent or before mount.
+export function getOutline() {
+  return instance ? instance.getOutline() : null;
 }
 
 onMount(() => {

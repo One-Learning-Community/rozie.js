@@ -35,6 +35,9 @@ export interface PdfViewerHandle {
   fitPage: (...args: any[]) => any;
   rotateCW: (...args: any[]) => any;
   rotateCCW: (...args: any[]) => any;
+  download: (...args: any[]) => any;
+  getMetadata: (...args: any[]) => any;
+  getOutline: (...args: any[]) => any;
 }
 
 declare const PdfViewer: React.ForwardRefExoticComponent<PdfViewerProps & React.RefAttributes<PdfViewerHandle>>;

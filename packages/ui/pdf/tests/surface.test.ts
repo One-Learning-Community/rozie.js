@@ -35,6 +35,7 @@ const EXPECT = {
   expose: [
     'getDocument', 'getPageCount', 'goToPage', 'nextPage', 'prevPage',
     'setScale', 'zoomIn', 'zoomOut', 'fitWidth', 'fitPage', 'rotateCW', 'rotateCCW',
+    'download', 'getMetadata', 'getOutline',
   ],
 } as const;
 
@@ -76,7 +77,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (12 verbs)', () => {
+  it('expose surface matches (15 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

@@ -82,12 +82,15 @@ export interface PdfViewerHandle {
   fitPage: (...args: any[]) => any;
   rotateCW: (...args: any[]) => any;
   rotateCCW: (...args: any[]) => any;
+  download: (...args: any[]) => any;
+  getMetadata: (...args: any[]) => any;
+  getOutline: (...args: any[]) => any;
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options', 'ref']);
-  onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW }); });
+  onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline }); });
 
   const [page, setPage] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'page', 1);
   const [current, setCurrent] = createSignal(1);
@@ -375,10 +378,20 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     if (mode === 'width') setZoom(cw / vp.width);else setZoom(Math.min(cw / vp.width, ch / vp.height));
   }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-  // 12 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+  // 15 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
   // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-  // pagesrendered/passwordrequest); none is a Lit reserved lifecycle. All drive
-  // $data (not the props), so they work whether or not the consumer binds `page`.
+  // pagesrendered/passwordrequest); none is a Lit reserved lifecycle. The
+  // navigation/zoom/rotate verbs drive $data (not the props), so they work whether
+  // or not the consumer binds `page`. The document-level verbs below are cheap
+  // passthroughs over the held PDFDocumentProxy (`instance`) that a consumer can't
+  // reach otherwise without `getDocument()` + pdf.js knowledge:
+  //   - download(filename?): save the original PDF bytes (instance.getData() ->
+  //     Blob -> anchor click) — the single most-expected viewer affordance.
+  //   - getMetadata(): document title/author/page-labels (tab title / info panel).
+  //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
+  //     dests map onto goToPage).
+  // (Text search/find is intentionally DEFERRED — it's a real find-controller
+  // build over the text layer, not a passthrough; tracked as a follow-up.)
   function getDocument() {
     return instance;
   }
@@ -415,6 +428,31 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   }
   function rotateCCW() {
     setRot((rot() + 270) % 360);
+  }
+  // Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
+  // Blob and trigger a download via a transient anchor. Resolves false before mount.
+  async function download(filename: any) {
+    if (!instance) return false;
+    const bytes = await instance.getData();
+    const url = URL.createObjectURL(new Blob([bytes], {
+      type: 'application/pdf'
+    }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  }
+  // Document info (title/author/page labels) — resolves null before mount.
+  function getMetadata() {
+    return instance ? instance.getMetadata() : null;
+  }
+  // Bookmark / table-of-contents tree — resolves null when absent or before mount.
+  function getOutline() {
+    return instance ? instance.getOutline() : null;
   }
 
   return (

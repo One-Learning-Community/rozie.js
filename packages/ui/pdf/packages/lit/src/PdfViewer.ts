@@ -444,6 +444,30 @@ private __rozieFirstUpdateDone = false;
     this._rot.value = (this._rot.value + 270) % 360;
   }
 
+  async download(filename: any) {
+    if (!this.instance) return false;
+    const bytes = await this.instance.getData();
+    const url = URL.createObjectURL(new Blob([bytes], {
+      type: 'application/pdf'
+    }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  }
+
+  getMetadata() {
+    return this.instance ? this.instance.getMetadata() : null;
+  }
+
+  getOutline() {
+    return this.instance ? this.instance.getOutline() : null;
+  }
+
   get page(): number { return this._pageControllable.read(); }
   set page(v: number) { this._pageControllable.notifyPropertyWrite(v); }
 

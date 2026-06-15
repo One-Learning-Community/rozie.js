@@ -9,7 +9,7 @@
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every exposed
  * method name has an entry here and throws if one is missing.
  *
- * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 12 verbs
+ * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 15 verbs
  * collides with an emitted event name (NO bare `load`/`error`/`pagechange`/
  * `pagesrendered`/`passwordrequest`), the React `page`-model auto-setter (NO
  * `setPage` — navigate via `goToPage(n)`; the two-way `page` binding reads it),
@@ -30,6 +30,12 @@ export const handleManifest = {
   fitPage: 'Fit the current page entirely within the container (width and height).',
   rotateCW: 'Rotate the view 90° clockwise.',
   rotateCCW: 'Rotate the view 90° counter-clockwise.',
+  download:
+    'Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads.',
+  getMetadata:
+    'Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load.',
+  getOutline:
+    'Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load.',
 };
 
 export default handleManifest;
