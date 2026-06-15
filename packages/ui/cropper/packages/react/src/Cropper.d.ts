@@ -24,6 +24,7 @@ export interface CropperProps {
   autoCrop?: boolean;
   autoCropArea?: number;
   responsive?: boolean;
+  preview?: unknown;
   options?: Record<string, unknown>;
   onReady?: (...args: unknown[]) => void;
   onCropstart?: (...args: unknown[]) => void;
@@ -36,6 +37,10 @@ export interface CropperProps {
 export interface CropperHandle {
   getCropper: (...args: any[]) => any;
   getData: (...args: any[]) => any;
+  getCanvasData: (...args: any[]) => any;
+  getCropBoxData: (...args: any[]) => any;
+  getImageData: (...args: any[]) => any;
+  getContainerData: (...args: any[]) => any;
   getCroppedCanvas: (...args: any[]) => any;
   getCroppedDataURL: (...args: any[]) => any;
   reset: (...args: any[]) => any;
@@ -48,6 +53,11 @@ export interface CropperHandle {
   zoomBy: (...args: any[]) => any;
   scaleX: (...args: any[]) => any;
   scaleY: (...args: any[]) => any;
+  scale: (...args: any[]) => any;
+  setCanvasData: (...args: any[]) => any;
+  setCropBoxData: (...args: any[]) => any;
+  moveTo: (...args: any[]) => any;
+  move: (...args: any[]) => any;
   enable: (...args: any[]) => any;
   disable: (...args: any[]) => any;
   setAspectRatio: (...args: any[]) => any;

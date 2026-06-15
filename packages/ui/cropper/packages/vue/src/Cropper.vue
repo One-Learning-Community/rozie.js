@@ -10,8 +10,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ src?: string; aspectRatio?: number; viewMode?: number; dragMode?: string; disabled?: boolean; guides?: boolean; center?: boolean; background?: boolean; movable?: boolean; rotatable?: boolean; scalable?: boolean; zoomable?: boolean; zoomOnWheel?: boolean; cropBoxMovable?: boolean; cropBoxResizable?: boolean; autoCrop?: boolean; autoCropArea?: number; responsive?: boolean; options?: Record<string, any> }>(),
-  { src: '', aspectRatio: NaN, viewMode: 0, dragMode: 'crop', disabled: false, guides: true, center: true, background: true, movable: true, rotatable: true, scalable: true, zoomable: true, zoomOnWheel: true, cropBoxMovable: true, cropBoxResizable: true, autoCrop: true, autoCropArea: 0.8, responsive: true, options: () => ({}) }
+  defineProps<{ src?: string; aspectRatio?: number; viewMode?: number; dragMode?: string; disabled?: boolean; guides?: boolean; center?: boolean; background?: boolean; movable?: boolean; rotatable?: boolean; scalable?: boolean; zoomable?: boolean; zoomOnWheel?: boolean; cropBoxMovable?: boolean; cropBoxResizable?: boolean; autoCrop?: boolean; autoCropArea?: number; responsive?: boolean; preview?: unknown; options?: Record<string, any> }>(),
+  { src: '', aspectRatio: NaN, viewMode: 0, dragMode: 'crop', disabled: false, guides: true, center: true, background: true, movable: true, rotatable: true, scalable: true, zoomable: true, zoomOnWheel: true, cropBoxMovable: true, cropBoxResizable: true, autoCrop: true, autoCropArea: 0.8, responsive: true, preview: undefined, options: () => ({}) }
 );
 
 const data = defineModel<unknown>('data', { default: undefined });
@@ -112,6 +112,9 @@ const buildCropper = (restoreData: any) => {
     autoCrop: props.autoCrop,
     autoCropArea: props.autoCropArea,
     responsive: props.responsive,
+    // construction-time only — read DIRECTLY (NOT $snapshot'd): structuredClone
+    // throws on the DOM element(s) a `preview` selector/ref resolves to.
+    preview: props.preview,
     ready: (e: any) => {
       if (restoreData) instance.setData(restoreData);else if (data.value) instance.setData(data.value);
       if (props.disabled) instance.disable();
@@ -153,16 +156,32 @@ const buildCropper = (restoreData: any) => {
   instance = new CropperEngine(imgEl, cfg);
 };
 // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-// 18 verbs, all collision-clear across the three classes documented at the top:
+// 27 verbs, all collision-clear across the three classes documented at the top:
 // no bare `crop`/`zoom` (event⇄verb ROZ121 — exposed as showCropBox/zoomTo/zoomBy),
-// no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`), and
+// no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`; the new
+// setCanvasData/setCropBoxData are DISTINCT names, NOT the model auto-setter), and
 // none match a Lit reserved lifecycle name (update/render/firstUpdated/updated/
-// willUpdate/requestUpdate).
+// willUpdate/requestUpdate). The added geometry getters (getCanvasData/getCropBoxData/
+// getImageData/getContainerData) and movement setters (setCanvasData/setCropBoxData/
+// moveTo/move/scale) expose v1's full canvas/crop-box geometry surface; getData and
+// zoomTo gain their optional v1 args (rounded, pivot).
 function getCropper() {
   return instance;
 }
-function getData() {
-  return instance ? instance.getData() : null;
+function getData(rounded: any) {
+  return instance ? instance.getData(rounded) : null;
+}
+function getCanvasData() {
+  return instance ? instance.getCanvasData() : null;
+}
+function getCropBoxData() {
+  return instance ? instance.getCropBoxData() : null;
+}
+function getImageData() {
+  return instance ? instance.getImageData() : null;
+}
+function getContainerData() {
+  return instance ? instance.getContainerData() : null;
 }
 function getCroppedCanvas(opts: any) {
   return instance ? instance.getCroppedCanvas(opts) : null;
@@ -190,8 +209,8 @@ function rotateTo(deg: any) {
 function rotateBy(deg: any) {
   if (instance) instance.rotate(deg);
 }
-function zoomTo(ratio: any) {
-  if (instance) instance.zoomTo(ratio);
+function zoomTo(ratio: any, pivot: any) {
+  if (instance) instance.zoomTo(ratio, pivot);
 }
 function zoomBy(ratio: any) {
   if (instance) instance.zoom(ratio);
@@ -201,6 +220,21 @@ function scaleX(n: any) {
 }
 function scaleY(n: any) {
   if (instance) instance.scaleY(n);
+}
+function scale(x: any, y: any) {
+  if (instance) instance.scale(x, y);
+}
+function setCanvasData(d: any) {
+  if (instance) instance.setCanvasData(d);
+}
+function setCropBoxData(d: any) {
+  if (instance) instance.setCropBoxData(d);
+}
+function moveTo(x: any, y: any) {
+  if (instance) instance.moveTo(x, y);
+}
+function move(offsetX: any, offsetY: any) {
+  if (instance) instance.move(offsetX, offsetY);
 }
 function enable() {
   if (instance) instance.enable();
@@ -248,7 +282,7 @@ watch(() => data.value, (v: any) => {
   instance.setData(v);
 });
 
-defineExpose({ getCropper, getData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, enable, disable, setAspectRatio, setDragMode });
+defineExpose({ getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale, setCanvasData, setCropBoxData, moveTo, move, enable, disable, setAspectRatio, setDragMode });
 </script>
 
 <style scoped>

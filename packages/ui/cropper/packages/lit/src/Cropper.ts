@@ -48,6 +48,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) autoCrop: boolean = true;
   @property({ type: Number, reflect: true }) autoCropArea: number = 0.8;
   @property({ type: Boolean, reflect: true }) responsive: boolean = true;
+  @property({ type: Object }) preview: unknown = undefined;
   @property({ type: Object }) options: any = {};
   @query('[data-rozie-ref="imageEl"]') private _refImageEl!: HTMLElement;
 private __rozieWatchInitial_4 = true;
@@ -150,6 +151,9 @@ private __rozieFirstUpdateDone = false;
     autoCrop: this.autoCrop,
     autoCropArea: this.autoCropArea,
     responsive: this.responsive,
+    // construction-time only — read DIRECTLY (NOT $snapshot'd): structuredClone
+    // throws on the DOM element(s) a `preview` selector/ref resolves to.
+    preview: this.preview,
     ready: (e: any) => {
       if (restoreData) this.instance.setData(restoreData);else if (this.data) this.instance.setData(this.data);
       if (this.disabled) this.instance.disable();
@@ -219,8 +223,24 @@ private __rozieFirstUpdateDone = false;
     return this.instance;
   }
 
-  getData() {
-    return this.instance ? this.instance.getData() : null;
+  getData(rounded: any) {
+    return this.instance ? this.instance.getData(rounded) : null;
+  }
+
+  getCanvasData() {
+    return this.instance ? this.instance.getCanvasData() : null;
+  }
+
+  getCropBoxData() {
+    return this.instance ? this.instance.getCropBoxData() : null;
+  }
+
+  getImageData() {
+    return this.instance ? this.instance.getImageData() : null;
+  }
+
+  getContainerData() {
+    return this.instance ? this.instance.getContainerData() : null;
   }
 
   getCroppedCanvas(opts: any) {
@@ -257,8 +277,8 @@ private __rozieFirstUpdateDone = false;
     if (this.instance) this.instance.rotate(deg);
   }
 
-  zoomTo(ratio: any) {
-    if (this.instance) this.instance.zoomTo(ratio);
+  zoomTo(ratio: any, pivot: any) {
+    if (this.instance) this.instance.zoomTo(ratio, pivot);
   }
 
   zoomBy(ratio: any) {
@@ -271,6 +291,26 @@ private __rozieFirstUpdateDone = false;
 
   scaleY(n: any) {
     if (this.instance) this.instance.scaleY(n);
+  }
+
+  scale(x: any, y: any) {
+    if (this.instance) this.instance.scale(x, y);
+  }
+
+  setCanvasData(d: any) {
+    if (this.instance) this.instance.setCanvasData(d);
+  }
+
+  setCropBoxData(d: any) {
+    if (this.instance) this.instance.setCropBoxData(d);
+  }
+
+  moveTo(x: any, y: any) {
+    if (this.instance) this.instance.moveTo(x, y);
+  }
+
+  move(offsetX: any, offsetY: any) {
+    if (this.instance) this.instance.move(offsetX, offsetY);
   }
 
   enable() {
@@ -305,7 +345,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'data', 'aspect-ratio', 'aspectratio', 'view-mode', 'viewmode', 'drag-mode', 'dragmode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoom-on-wheel', 'zoomonwheel', 'crop-box-movable', 'cropboxmovable', 'crop-box-resizable', 'cropboxresizable', 'auto-crop', 'autocrop', 'auto-crop-area', 'autocroparea', 'responsive', 'options']);
+    const __skip = new Set<string>(['src', 'data', 'aspect-ratio', 'aspectratio', 'view-mode', 'viewmode', 'drag-mode', 'dragmode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoom-on-wheel', 'zoomonwheel', 'crop-box-movable', 'cropboxmovable', 'crop-box-resizable', 'cropboxresizable', 'auto-crop', 'autocrop', 'auto-crop-area', 'autocroparea', 'responsive', 'preview', 'options']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

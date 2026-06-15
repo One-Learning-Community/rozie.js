@@ -37,6 +37,7 @@ interface CropperProps {
   autoCrop?: boolean;
   autoCropArea?: number;
   responsive?: boolean;
+  preview?: unknown;
   options?: Record<string, any>;
   onReady?: (...args: any[]) => void;
   onCropstart?: (...args: any[]) => void;
@@ -49,6 +50,10 @@ interface CropperProps {
 export interface CropperHandle {
   getCropper: (...args: any[]) => any;
   getData: (...args: any[]) => any;
+  getCanvasData: (...args: any[]) => any;
+  getCropBoxData: (...args: any[]) => any;
+  getImageData: (...args: any[]) => any;
+  getContainerData: (...args: any[]) => any;
   getCroppedCanvas: (...args: any[]) => any;
   getCroppedDataURL: (...args: any[]) => any;
   reset: (...args: any[]) => any;
@@ -61,6 +66,11 @@ export interface CropperHandle {
   zoomBy: (...args: any[]) => any;
   scaleX: (...args: any[]) => any;
   scaleY: (...args: any[]) => any;
+  scale: (...args: any[]) => any;
+  setCanvasData: (...args: any[]) => any;
+  setCropBoxData: (...args: any[]) => any;
+  moveTo: (...args: any[]) => any;
+  move: (...args: any[]) => any;
   enable: (...args: any[]) => any;
   disable: (...args: any[]) => any;
   setAspectRatio: (...args: any[]) => any;
@@ -69,7 +79,7 @@ export interface CropperHandle {
 
 const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props: CropperProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<CropperProps, 'src' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'options'> & { src: string; aspectRatio: number; viewMode: number; dragMode: string; disabled: boolean; guides: boolean; center: boolean; background: boolean; movable: boolean; rotatable: boolean; scalable: boolean; zoomable: boolean; zoomOnWheel: boolean; cropBoxMovable: boolean; cropBoxResizable: boolean; autoCrop: boolean; autoCropArea: number; responsive: boolean; options: Record<string, any> } = {
+  const props: Omit<CropperProps, 'src' | 'aspectRatio' | 'viewMode' | 'dragMode' | 'disabled' | 'guides' | 'center' | 'background' | 'movable' | 'rotatable' | 'scalable' | 'zoomable' | 'zoomOnWheel' | 'cropBoxMovable' | 'cropBoxResizable' | 'autoCrop' | 'autoCropArea' | 'responsive' | 'preview' | 'options'> & { src: string; aspectRatio: number; viewMode: number; dragMode: string; disabled: boolean; guides: boolean; center: boolean; background: boolean; movable: boolean; rotatable: boolean; scalable: boolean; zoomable: boolean; zoomOnWheel: boolean; cropBoxMovable: boolean; cropBoxResizable: boolean; autoCrop: boolean; autoCropArea: number; responsive: boolean; preview: unknown; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? '',
     aspectRatio: _props.aspectRatio ?? NaN,
@@ -89,11 +99,12 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     autoCrop: _props.autoCrop ?? true,
     autoCropArea: _props.autoCropArea ?? 0.8,
     responsive: _props.responsive ?? true,
+    preview: _props.preview ?? undefined,
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, data, aspectRatio, viewMode, dragMode, disabled, guides, center, background, movable, rotatable, scalable, zoomable, zoomOnWheel, cropBoxMovable, cropBoxResizable, autoCrop, autoCropArea, responsive, options, defaultValue, onDataChange, defaultData, ...rest } = _props as CropperProps & Record<string, unknown>;
-    void src; void data; void aspectRatio; void viewMode; void dragMode; void disabled; void guides; void center; void background; void movable; void rotatable; void scalable; void zoomable; void zoomOnWheel; void cropBoxMovable; void cropBoxResizable; void autoCrop; void autoCropArea; void responsive; void options; void defaultValue; void onDataChange; void defaultData;
+    const { src, data, aspectRatio, viewMode, dragMode, disabled, guides, center, background, movable, rotatable, scalable, zoomable, zoomOnWheel, cropBoxMovable, cropBoxResizable, autoCrop, autoCropArea, responsive, preview, options, defaultValue, onDataChange, defaultData, ...rest } = _props as CropperProps & Record<string, unknown>;
+    void src; void data; void aspectRatio; void viewMode; void dragMode; void disabled; void guides; void center; void background; void movable; void rotatable; void scalable; void zoomable; void zoomOnWheel; void cropBoxMovable; void cropBoxResizable; void autoCrop; void autoCropArea; void responsive; void preview; void options; void defaultValue; void onDataChange; void defaultData;
     return rest;
   })();
   const imgEl = useRef<any>(null);
@@ -151,6 +162,9 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
       autoCrop: props.autoCrop,
       autoCropArea: props.autoCropArea,
       responsive: props.responsive,
+      // construction-time only — read DIRECTLY (NOT $snapshot'd): structuredClone
+      // throws on the DOM element(s) a `preview` selector/ref resolves to.
+      preview: props.preview,
       ready: (e: any) => {
         if (restoreData) instance.current.setData(restoreData);else if (data) instance.current.setData(data);
         if (props.disabled) instance.current.disable();
@@ -190,18 +204,34 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
       })
     };
     instance.current = new CropperEngine(imgEl.current, cfg);
-  }, [_rozieProp_onCrop, _rozieProp_onCropend, _rozieProp_onCropmove, _rozieProp_onCropstart, _rozieProp_onReady, _rozieProp_onZoom, data, props.aspectRatio, props.autoCrop, props.autoCropArea, props.background, props.center, props.cropBoxMovable, props.cropBoxResizable, props.disabled, props.dragMode, props.guides, props.movable, props.options, props.responsive, props.rotatable, props.scalable, props.viewMode, props.zoomOnWheel, props.zoomable, setData]);
+  }, [_rozieProp_onCrop, _rozieProp_onCropend, _rozieProp_onCropmove, _rozieProp_onCropstart, _rozieProp_onReady, _rozieProp_onZoom, data, props.aspectRatio, props.autoCrop, props.autoCropArea, props.background, props.center, props.cropBoxMovable, props.cropBoxResizable, props.disabled, props.dragMode, props.guides, props.movable, props.options, props.preview, props.responsive, props.rotatable, props.scalable, props.viewMode, props.zoomOnWheel, props.zoomable, setData]);
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-  // 18 verbs, all collision-clear across the three classes documented at the top:
+  // 27 verbs, all collision-clear across the three classes documented at the top:
   // no bare `crop`/`zoom` (event⇄verb ROZ121 — exposed as showCropBox/zoomTo/zoomBy),
-  // no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`), and
+  // no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`; the new
+  // setCanvasData/setCropBoxData are DISTINCT names, NOT the model auto-setter), and
   // none match a Lit reserved lifecycle name (update/render/firstUpdated/updated/
-  // willUpdate/requestUpdate).
+  // willUpdate/requestUpdate). The added geometry getters (getCanvasData/getCropBoxData/
+  // getImageData/getContainerData) and movement setters (setCanvasData/setCropBoxData/
+  // moveTo/move/scale) expose v1's full canvas/crop-box geometry surface; getData and
+  // zoomTo gain their optional v1 args (rounded, pivot).
   function getCropper() {
     return instance.current;
   }
-  function getData() {
-    return instance.current ? instance.current.getData() : null;
+  function getData(rounded: any) {
+    return instance.current ? instance.current.getData(rounded) : null;
+  }
+  function getCanvasData() {
+    return instance.current ? instance.current.getCanvasData() : null;
+  }
+  function getCropBoxData() {
+    return instance.current ? instance.current.getCropBoxData() : null;
+  }
+  function getImageData() {
+    return instance.current ? instance.current.getImageData() : null;
+  }
+  function getContainerData() {
+    return instance.current ? instance.current.getContainerData() : null;
   }
   function getCroppedCanvas(opts: any) {
     return instance.current ? instance.current.getCroppedCanvas(opts) : null;
@@ -229,8 +259,8 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
   function rotateBy(deg: any) {
     if (instance.current) instance.current.rotate(deg);
   }
-  function zoomTo(ratio: any) {
-    if (instance.current) instance.current.zoomTo(ratio);
+  function zoomTo(ratio: any, pivot: any) {
+    if (instance.current) instance.current.zoomTo(ratio, pivot);
   }
   function zoomBy(ratio: any) {
     if (instance.current) instance.current.zoom(ratio);
@@ -240,6 +270,21 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
   }
   function scaleY(n: any) {
     if (instance.current) instance.current.scaleY(n);
+  }
+  function scale(x: any, y: any) {
+    if (instance.current) instance.current.scale(x, y);
+  }
+  function setCanvasData(d: any) {
+    if (instance.current) instance.current.setCanvasData(d);
+  }
+  function setCropBoxData(d: any) {
+    if (instance.current) instance.current.setCropBoxData(d);
+  }
+  function moveTo(x: any, y: any) {
+    if (instance.current) instance.current.moveTo(x, y);
+  }
+  function move(offsetX: any, offsetY: any) {
+    if (instance.current) instance.current.move(offsetX, offsetY);
   }
   function enable() {
     if (instance.current) instance.current.enable();
@@ -294,7 +339,7 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     instance.current.setData(v);
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useImperativeHandle(ref, () => ({ getCropper, getData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, enable, disable, setAspectRatio, setDragMode }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale, setCanvasData, setCropBoxData, moveTo, move, enable, disable, setAspectRatio, setDragMode }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

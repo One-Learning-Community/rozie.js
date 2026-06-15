@@ -63,6 +63,7 @@ export class Cropper {
   autoCrop = input<boolean>(true);
   autoCropArea = input<number>(0.8);
   responsive = input<boolean>(true);
+  preview = input<unknown>(undefined);
   options = input<Record<string, any>>((() => ({}))());
   imageEl = viewChild<ElementRef<HTMLElement>>('imageEl');
   ready = output<void>();
@@ -138,6 +139,9 @@ export class Cropper {
       autoCrop: this.autoCrop(),
       autoCropArea: this.autoCropArea(),
       responsive: this.responsive(),
+      // construction-time only — read DIRECTLY (NOT $snapshot'd): structuredClone
+      // throws on the DOM element(s) a `preview` selector/ref resolves to.
+      preview: this.preview(),
       ready: (e: any) => {
         if (restoreData) this.instance.setData(restoreData);else if (this.data()) this.instance.setData(this.data());
         if ((this.disabled() || this.__rozieCvaDisabled())) this.instance.disable();
@@ -181,8 +185,20 @@ export class Cropper {
   getCropper = () => {
     return this.instance;
   };
-  getData = () => {
-    return this.instance ? this.instance.getData() : null;
+  getData = (rounded: any) => {
+    return this.instance ? this.instance.getData(rounded) : null;
+  };
+  getCanvasData = () => {
+    return this.instance ? this.instance.getCanvasData() : null;
+  };
+  getCropBoxData = () => {
+    return this.instance ? this.instance.getCropBoxData() : null;
+  };
+  getImageData = () => {
+    return this.instance ? this.instance.getImageData() : null;
+  };
+  getContainerData = () => {
+    return this.instance ? this.instance.getContainerData() : null;
   };
   getCroppedCanvas = (opts: any) => {
     return this.instance ? this.instance.getCroppedCanvas(opts) : null;
@@ -210,8 +226,8 @@ export class Cropper {
   rotateBy = (deg: any) => {
     if (this.instance) this.instance.rotate(deg);
   };
-  zoomTo = (ratio: any) => {
-    if (this.instance) this.instance.zoomTo(ratio);
+  zoomTo = (ratio: any, pivot: any) => {
+    if (this.instance) this.instance.zoomTo(ratio, pivot);
   };
   zoomBy = (ratio: any) => {
     if (this.instance) this.instance.zoom(ratio);
@@ -221,6 +237,21 @@ export class Cropper {
   };
   scaleY = (n: any) => {
     if (this.instance) this.instance.scaleY(n);
+  };
+  scale = (x: any, y: any) => {
+    if (this.instance) this.instance.scale(x, y);
+  };
+  setCanvasData = (d: any) => {
+    if (this.instance) this.instance.setCanvasData(d);
+  };
+  setCropBoxData = (d: any) => {
+    if (this.instance) this.instance.setCropBoxData(d);
+  };
+  moveTo = (x: any, y: any) => {
+    if (this.instance) this.instance.moveTo(x, y);
+  };
+  move = (offsetX: any, offsetY: any) => {
+    if (this.instance) this.instance.move(offsetX, offsetY);
   };
   enable = () => {
     if (this.instance) this.instance.enable();

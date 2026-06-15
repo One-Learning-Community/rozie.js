@@ -97,6 +97,12 @@
   autoCrop:         { type: Boolean, default: true },
   autoCropArea:     { type: Number,  default: 0.8 },
   responsive:       { type: Boolean, default: true },
+  // Cropper.js `preview` (selector string OR element ref(s)) — live crop thumbnail(s).
+  // Construction-time (v1 has no setPreview); read DIRECTLY in buildCropper (NOT through
+  // the $snapshot(options) path — structuredClone throws on DOM elements). On Lit an
+  // element ref is more robust than a selector (a document selector can't cross the
+  // wrapper's shadow boundary). Untyped like `data` so it accepts string | element(s).
+  preview:          { default: undefined },
   // passthrough — spread into the Cropper constructor BEFORE the curated keys
   // (explicit props win), so power users can set any v1 option not surfaced here.
   options:          { type: Object,  default: () => ({}) },
@@ -173,6 +179,9 @@ const buildCropper = (restoreData) => {
     autoCrop: $props.autoCrop,
     autoCropArea: $props.autoCropArea,
     responsive: $props.responsive,
+    // construction-time only — read DIRECTLY (NOT $snapshot'd): structuredClone
+    // throws on the DOM element(s) a `preview` selector/ref resolves to.
+    preview: $props.preview,
     ready: (e) => {
       if (restoreData) instance.setData(restoreData)
       else if ($props.data) instance.setData($snapshot($props.data))
@@ -241,13 +250,21 @@ $watch(() => $props.data, (v) => {
 })
 
 // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-// 18 verbs, all collision-clear across the three classes documented at the top:
+// 27 verbs, all collision-clear across the three classes documented at the top:
 // no bare `crop`/`zoom` (event⇄verb ROZ121 — exposed as showCropBox/zoomTo/zoomBy),
-// no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`), and
+// no `setData` (React data-model auto-setter ROZ524 — set via two-way `data`; the new
+// setCanvasData/setCropBoxData are DISTINCT names, NOT the model auto-setter), and
 // none match a Lit reserved lifecycle name (update/render/firstUpdated/updated/
-// willUpdate/requestUpdate).
+// willUpdate/requestUpdate). The added geometry getters (getCanvasData/getCropBoxData/
+// getImageData/getContainerData) and movement setters (setCanvasData/setCropBoxData/
+// moveTo/move/scale) expose v1's full canvas/crop-box geometry surface; getData and
+// zoomTo gain their optional v1 args (rounded, pivot).
 function getCropper() { return instance }
-function getData() { return instance ? instance.getData() : null }
+function getData(rounded) { return instance ? instance.getData(rounded) : null }
+function getCanvasData() { return instance ? instance.getCanvasData() : null }
+function getCropBoxData() { return instance ? instance.getCropBoxData() : null }
+function getImageData() { return instance ? instance.getImageData() : null }
+function getContainerData() { return instance ? instance.getContainerData() : null }
 function getCroppedCanvas(opts) { return instance ? instance.getCroppedCanvas(opts) : null }
 function getCroppedDataURL(opts) {
   if (!instance) return null
@@ -260,19 +277,26 @@ function showCropBox() { if (instance) instance.crop() }
 function replace(url) { if (instance) instance.replace(url) }
 function rotateTo(deg) { if (instance) instance.rotateTo(deg) }
 function rotateBy(deg) { if (instance) instance.rotate(deg) }
-function zoomTo(ratio) { if (instance) instance.zoomTo(ratio) }
+function zoomTo(ratio, pivot) { if (instance) instance.zoomTo(ratio, pivot) }
 function zoomBy(ratio) { if (instance) instance.zoom(ratio) }
 function scaleX(n) { if (instance) instance.scaleX(n) }
 function scaleY(n) { if (instance) instance.scaleY(n) }
+function scale(x, y) { if (instance) instance.scale(x, y) }
+function setCanvasData(d) { if (instance) instance.setCanvasData(d) }
+function setCropBoxData(d) { if (instance) instance.setCropBoxData(d) }
+function moveTo(x, y) { if (instance) instance.moveTo(x, y) }
+function move(offsetX, offsetY) { if (instance) instance.move(offsetX, offsetY) }
 function enable() { if (instance) instance.enable() }
 function disable() { if (instance) instance.disable() }
 function setAspectRatio(ratio) { if (instance) instance.setAspectRatio(ratio) }
 function setDragMode(mode) { if (instance) instance.setDragMode(mode) }
 
 $expose({
-  getCropper, getData, getCroppedCanvas, getCroppedDataURL,
+  getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData,
+  getCroppedCanvas, getCroppedDataURL,
   reset, clear, showCropBox, replace,
-  rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY,
+  rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale,
+  setCanvasData, setCropBoxData, moveTo, move,
   enable, disable, setAspectRatio, setDragMode,
 })
 </script>

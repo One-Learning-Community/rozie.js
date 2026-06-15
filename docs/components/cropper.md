@@ -162,7 +162,7 @@ el.addEventListener('crop', (e) => console.log(e.detail));
 
 ### Props
 
-`data` is the lone **two-way** model prop (bind with `r-model` / `v-model` / `bind:` / `[(…)]` / `onDataChange`). Five props reconcile into the live cropper on change — `src` (via `replace`), `aspectRatio` (`setAspectRatio`), `dragMode` (`setDragMode`), `disabled` (`enable` / `disable`) and `data` (`setData`). The remaining options are **set at construction** (Cropper.js v1 ships no runtime setter for them); anything not surfaced here can be passed through the `options` bag.
+`data` is the lone **two-way** model prop (bind with `r-model` / `v-model` / `bind:` / `[(…)]` / `onDataChange`). Five props reconcile into the live cropper on change — `src` (via `replace`), `aspectRatio` (`setAspectRatio`), `dragMode` (`setDragMode`), `disabled` (`enable` / `disable`) and `data` (`setData`). The remaining options are **set at construction** (Cropper.js v1 ships no runtime setter for them), including `preview` (the live crop-thumbnail target(s) — a selector string or element ref(s); v1 has no `setPreview`); anything not surfaced here can be passed through the `options` bag.
 
 | Name | Type | Default | Two-way (model) | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | :---: | --- |
@@ -185,6 +185,7 @@ el.addEventListener('crop', (e) => console.log(e.detail));
 | `autoCrop` | `Boolean` | `true` | | | Render a crop box automatically on init. **Construction-only.** |
 | `autoCropArea` | `Number` | `0.8` | | | Initial crop-box size as a fraction of the canvas (`0`–`1`). **Construction-only.** |
 | `responsive` | `Boolean` | `true` | | | Re-render the cropper on window resize. **Construction-only.** |
+| `preview` | `unknown` | `undefined` | | | Live crop-thumbnail target(s) — a selector string **or** element ref(s) (`HTMLElement` / array / `NodeList`). **Construction-only** (v1 has no `setPreview`). On Lit prefer an element ref: a document selector can't cross the wrapper's shadow boundary. |
 | `options` | `Object` | `{}` | | | Raw [Cropper.js `Options`](https://github.com/fengyuanchen/cropperjs#options) passthrough — spread into the constructor **before** the curated keys (explicit props win). Use it for any v1 option not surfaced above (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …). |
 
 ### Events
@@ -207,7 +208,11 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | Method | Description |
 | --- | --- |
 | `getCropper` | Return the underlying Cropper.js instance for direct API access (the raw-engine escape hatch). `null` before mount. |
-| `getData` | Return the current crop box as `{ x, y, width, height, rotate, scaleX, scaleY }`, or `null` before mount. |
+| `getData` | Return the current crop box as `{ x, y, width, height, rotate, scaleX, scaleY }` — `getData(rounded?)` (pass `true` to round to whole pixels). `null` before mount. |
+| `getCanvasData` | Return the canvas (wrapped image) position/size as `{ left, top, width, height, naturalWidth, naturalHeight }`. `null` before mount. |
+| `getCropBoxData` | Return the crop-box position/size in canvas pixels as `{ left, top, width, height }`. `null` before mount. |
+| `getImageData` | Return the image data — `{ left, top, width, height, rotate, scaleX, scaleY, naturalWidth, naturalHeight, aspectRatio }`. `null` before mount. |
+| `getContainerData` | Return the container size as `{ width, height }`. `null` before mount. |
 | `getCroppedCanvas` | Return an `HTMLCanvasElement` drawn from the cropped area — `getCroppedCanvas(opts?)`. |
 | `getCroppedDataURL` | Convenience: the cropped area as a `toDataURL()` string — `getCroppedDataURL(opts?)`. |
 | `reset` | Reset the image and crop box to their initial states. |
@@ -216,17 +221,22 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `replace` | Replace the image with a new source URL — `replace(url)`. |
 | `rotateTo` | Rotate the image to an absolute degree — `rotateTo(deg)`. |
 | `rotateBy` | Rotate the image by a relative degree — `rotateBy(deg)`. |
-| `zoomTo` | Zoom the canvas to an absolute ratio — `zoomTo(ratio)`. |
+| `zoomTo` | Zoom the canvas to an absolute ratio — `zoomTo(ratio, pivot?)` (optional `{ x, y }` zoom pivot). |
 | `zoomBy` | Zoom the canvas by a relative ratio — `zoomBy(ratio)`. |
 | `scaleX` | Flip/scale the image horizontally — `scaleX(n)` (e.g. `-1`). |
 | `scaleY` | Flip/scale the image vertically — `scaleY(n)`. |
+| `scale` | Scale (flip) the image on both axes — `scale(scaleX, scaleY?)` (`scaleY` defaults to `scaleX`). |
+| `setCanvasData` | Set the canvas position/size — `setCanvasData({ left?, top?, width?, height? })`. |
+| `setCropBoxData` | Set the crop-box position/size — `setCropBoxData({ left?, top?, width?, height? })`. |
+| `moveTo` | Move the canvas to an absolute position — `moveTo(x, y?)` (`y` defaults to `x`). |
+| `move` | Move the canvas by a relative offset — `move(offsetX, offsetY?)` (`offsetY` defaults to `offsetX`). |
 | `enable` | Enable (unfreeze) the cropper. |
 | `disable` | Disable (freeze) the cropper. |
 | `setAspectRatio` | Set the crop box aspect ratio — `setAspectRatio(ratio)` (`NaN` for free). |
 | `setDragMode` | Set the drag mode — `setDragMode('crop' \| 'move' \| 'none')`. |
 
 ::: tip Why `crop`/`zoom` are not `$expose` verbs
-Cropper.js names `crop` and `zoom` as **both** events and methods, and `data` is a model prop (so React auto-generates an internal `setData` setter). A bare `crop`/`zoom` verb would collide with the same-named emit (ROZ121) and a `setData` verb with the model setter (ROZ524). So the imperative crop/zoom are exposed under collision-free names — `showCropBox`, `zoomTo`/`zoomBy` — and the crop box is set through the two-way `data` binding (`getData` reads it). None of the 18 verbs shadows a Lit lifecycle method either.
+Cropper.js names `crop` and `zoom` as **both** events and methods, and `data` is a model prop (so React auto-generates an internal `setData` setter). A bare `crop`/`zoom` verb would collide with the same-named emit (ROZ121) and a `setData` verb with the model setter (ROZ524). So the imperative crop/zoom are exposed under collision-free names — `showCropBox`, `zoomTo`/`zoomBy` — and the crop box is set through the two-way `data` binding (`getData` reads it). The geometry setters `setCanvasData`/`setCropBoxData` are **distinct names** from the model auto-setter (`setData`), so they don't collide either. None of the 27 verbs shadows a Lit lifecycle method.
 :::
 
 **React example:**
