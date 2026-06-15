@@ -29,15 +29,18 @@ const EXPECT = {
     'src', 'data', 'aspectRatio', 'viewMode', 'dragMode', 'disabled', 'guides',
     'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable',
     'zoomOnWheel', 'cropBoxMovable', 'cropBoxResizable', 'autoCrop',
-    'autoCropArea', 'responsive', 'options',
+    'autoCropArea', 'responsive', 'preview', 'options',
   ],
   models: ['data'],
   emits: ['ready', 'crop', 'cropstart', 'cropmove', 'cropend', 'zoom'],
   slots: [] as string[],
   expose: [
-    'getCropper', 'getData', 'getCroppedCanvas', 'getCroppedDataURL', 'reset',
-    'clear', 'showCropBox', 'replace', 'rotateTo', 'rotateBy', 'zoomTo', 'zoomBy',
-    'scaleX', 'scaleY', 'enable', 'disable', 'setAspectRatio', 'setDragMode',
+    'getCropper', 'getData', 'getCanvasData', 'getCropBoxData', 'getImageData',
+    'getContainerData', 'getCroppedCanvas', 'getCroppedDataURL',
+    'reset', 'clear', 'showCropBox', 'replace',
+    'rotateTo', 'rotateBy', 'zoomTo', 'zoomBy', 'scaleX', 'scaleY', 'scale',
+    'setCanvasData', 'setCropBoxData', 'moveTo', 'move',
+    'enable', 'disable', 'setAspectRatio', 'setDragMode',
   ],
 } as const;
 
@@ -58,7 +61,7 @@ describe('Cropper.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (20 props)', () => {
+  it('props surface matches (21 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -79,7 +82,7 @@ describe('Cropper.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (18 verbs)', () => {
+  it('expose surface matches (27 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });
