@@ -18,6 +18,21 @@ import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from 
 // no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
 import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+// Namespace import for the command functions exposed as verbs (undo/redo/
+// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
+// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
+// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
+// MemberExpression — a latent emitter limitation. The namespace form keeps the
+// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
+// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
+// Namespace import for the command functions exposed as verbs (undo/redo/
+// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
+// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
+// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
+// MemberExpression — a latent emitter limitation. The namespace form keeps the
+// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
+// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
+import * as cmCommands from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 // Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
@@ -875,6 +890,27 @@ private _portalContainers = new Set<HTMLElement>();
     const sel = typeof range === 'number' ? EditorSelection.single(range) : EditorSelection.single(range.anchor, range.head);
     this.view.dispatch({
       selection: sel
+    });
+  }
+
+  undo() {
+    if (this.view) cmCommands.undo(this.view);
+  }
+
+  redo() {
+    if (this.view) cmCommands.redo(this.view);
+  }
+
+  selectAll() {
+    if (this.view) cmCommands.selectAll(this.view);
+  }
+
+  scrollToPos(pos: any, opts: any) {
+    if (!this.view) return;
+    this.view.dispatch({
+      effects: EditorView.scrollIntoView(pos, opts ?? {
+        y: 'center'
+      })
     });
   }
 

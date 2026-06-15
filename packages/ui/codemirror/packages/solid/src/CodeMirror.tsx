@@ -17,6 +17,21 @@ import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from 
 // no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
 import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+// Namespace import for the command functions exposed as verbs (undo/redo/
+// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
+// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
+// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
+// MemberExpression — a latent emitter limitation. The namespace form keeps the
+// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
+// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
+// Namespace import for the command functions exposed as verbs (undo/redo/
+// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
+// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
+// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
+// MemberExpression — a latent emitter limitation. The namespace form keeps the
+// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
+// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
+import * as cmCommands from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 // Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
@@ -120,12 +135,16 @@ export interface CodeMirrorHandle {
   insertText: (...args: any[]) => any;
   getSelection: (...args: any[]) => any;
   setSelection: (...args: any[]) => any;
+  undo: (...args: any[]) => any;
+  redo: (...args: any[]) => any;
+  selectAll: (...args: any[]) => any;
+  scrollToPos: (...args: any[]) => any;
 }
 
 export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   const _merged = mergeProps({ language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: (() => [])(), basicSetup: false, gutterLines: (() => [])(), decorations: (() => [])() }, _props);
   const [local, attrs] = splitProps(_merged, ['value', 'language', 'theme', 'readOnly', 'height', 'placeholder', 'extensions', 'basicSetup', 'gutterLines', 'decorations', 'ref']);
-  onMount(() => { local.ref?.({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection }); });
+  onMount(() => { local.ref?.({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection, undo, redo, selectAll, scrollToPos }); });
 
   const [value, setValue] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'value', '');
   interface ReactivePortalHandle {
@@ -720,11 +739,18 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
 
   // Consumer-driven value writes: reflect into the live editor (echo-guarded).
 
-  // Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
+  // Imperative handle (Phase 21 $expose). The 12 editor verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets. Each guards
-  // the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
-  // collide with the 8 props (value/language/theme/readOnly/height/placeholder/
-  // extensions/basicSetup) and there are no events (D-08).
+  // the pre-mount/destroyed `view = null`. Collision-clear: none of the names
+  // collide with the props (value/language/theme/readOnly/height/placeholder/
+  // extensions/basicSetup/gutterLines/decorations) and there are no events (D-08).
+  //
+  // undo/redo/selectAll are the basic editor-command verbs a toolbar needs (history
+  // ships with basicSetup / the bundled `history()` extension); the @codemirror/
+  // commands functions are reached via the `cmCommands` namespace import so the
+  // public verb names don't self-shadow the imports. scrollToPos reveals a document
+  // position — it is NOT named `scrollIntoView`/`scrollTo` (both inherited
+  // HTMLElement methods → would shadow on the Lit leaf, the embla scrollTo lesson).
   function getView() {
     return view;
   }
@@ -769,6 +795,26 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
     const sel = typeof range === 'number' ? EditorSelection.single(range) : EditorSelection.single(range.anchor, range.head);
     view.dispatch({
       selection: sel
+    });
+  }
+  function undo() {
+    if (view) cmCommands.undo(view);
+  }
+  function redo() {
+    if (view) cmCommands.redo(view);
+  }
+  function selectAll() {
+    if (view) cmCommands.selectAll(view);
+  }
+  // Reveal a document position (jump-to-line, scroll-to-match/error). setSelection
+  // moves the caret but does not guarantee scroll; this dispatches the scroll
+  // effect. opts default centers the position vertically.
+  function scrollToPos(pos: any, opts: any) {
+    if (!view) return;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(pos, opts ?? {
+        y: 'center'
+      })
     });
   }
 

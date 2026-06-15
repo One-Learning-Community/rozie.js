@@ -32,6 +32,10 @@ export interface CodeMirrorHandle {
   insertText: (...args: any[]) => any;
   getSelection: (...args: any[]) => any;
   setSelection: (...args: any[]) => any;
+  undo: (...args: any[]) => any;
+  redo: (...args: any[]) => any;
+  selectAll: (...args: any[]) => any;
+  scrollToPos: (...args: any[]) => any;
 }
 
 declare const CodeMirror: React.ForwardRefExoticComponent<CodeMirrorProps & React.RefAttributes<CodeMirrorHandle>>;

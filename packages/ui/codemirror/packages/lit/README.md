@@ -63,6 +63,10 @@ const text = el.getValue();
 | `insertText` | Insert text at the current main selection — `insertText(text)`. |
 | `getSelection` | Return the main selection range (`{ anchor, head, from, to }`) or null. |
 | `setSelection` | Set the selection — `setSelection(posNumber | { anchor, head })`. |
+| `undo` | Undo the last change (CodeMirror history command). |
+| `redo` | Redo the last undone change. |
+| `selectAll` | Select the entire document. |
+| `scrollToPos` | Scroll a document position into view — `scrollToPos(pos, opts?)` (defaults to vertically centering). Not named `scrollIntoView`/`scrollTo` to avoid the Lit inherited-method shadow. |
 
 ## Slots
 

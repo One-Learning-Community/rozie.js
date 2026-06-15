@@ -11,9 +11,11 @@
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every
  * exposed method name has an entry here and throws if one is missing.
  *
- * Collision discipline (ROZ121): none of these 8 verbs collides with a declared
- * prop name (`value/language/theme/readOnly/height/placeholder/extensions`) and
- * there are no events (D-08), so ROZ121 is clear. NOTE: the value-setter verb is
+ * Collision discipline (ROZ121): none of these 12 verbs collides with a declared
+ * prop name (`value/language/theme/readOnly/height/placeholder/extensions/
+ * basicSetup/gutterLines/decorations`) and there are no events (D-08), so ROZ121
+ * is clear. `scrollToPos` is deliberately NOT named `scrollIntoView`/`scrollTo`
+ * (both inherited HTMLElement methods → Lit shadow). NOTE: the value-setter verb is
  * named `replaceValue` (NOT `setValue`) — a `value` model prop makes React
  * auto-generate a `setValue` state setter, so a `setValue` $expose verb is a hard
  * React ROZ524 collision. `replaceValue` preserves the value-setter semantics
@@ -30,6 +32,11 @@ export const handleManifest = {
   insertText: 'Insert text at the current main selection — `insertText(text)`.',
   getSelection: 'Return the main selection range (`{ anchor, head, from, to }`) or null.',
   setSelection: 'Set the selection — `setSelection(posNumber | { anchor, head })`.',
+  undo: 'Undo the last change (CodeMirror history command).',
+  redo: 'Redo the last undone change.',
+  selectAll: 'Select the entire document.',
+  scrollToPos:
+    'Scroll a document position into view — `scrollToPos(pos, opts?)` (defaults to vertically centering). Not named `scrollIntoView`/`scrollTo` to avoid the Lit inherited-method shadow.',
 };
 
 export default handleManifest;
