@@ -590,9 +590,15 @@ describe('validatePortalScopedStyle [Phase 38] — repo-wide audit', () => {
   // cold-build race-flake surface.
   let cachedFlagged: string[];
 
+  // Compiling the whole examples/demos corpus for the Lit target is a heavy
+  // one-shot setup (dozens of demos through compile() with producer-resolution
+  // threading). On slower CI runners it can exceed vitest's DEFAULT 10s hook
+  // timeout — it green-passed on fast runners (Vue/Lit) but timed out on others
+  // (React/Solid/Svelte/Angular) after the Wave-3 demos grew. Give the hook an
+  // explicit, generous budget so this setup never flakes the whole core suite.
   beforeAll(() => {
     cachedFlagged = flaggedCorpusFiles();
-  });
+  }, 60_000);
 
   it('(E1) the ROZ088-flagged corpus set EXACTLY equals the pinned pre-fix baseline', () => {
     const flagged = cachedFlagged;
