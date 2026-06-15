@@ -51,6 +51,14 @@ export interface FullCalendarHandle {
   prev: (...args: any[]) => any;
   next: (...args: any[]) => any;
   gotoDate: (...args: any[]) => any;
+  getDate: (...args: any[]) => any;
+  getEvents: (...args: any[]) => any;
+  scrollToTime: (...args: any[]) => any;
+  updateSize: (...args: any[]) => any;
+  prevYear: (...args: any[]) => any;
+  nextYear: (...args: any[]) => any;
+  selectRange: (...args: any[]) => any;
+  clearSelection: (...args: any[]) => any;
 }
 
 declare const FullCalendar: React.ForwardRefExoticComponent<FullCalendarProps & React.RefAttributes<FullCalendarHandle>>;

@@ -118,7 +118,7 @@ const normalizeEvent = (e: any) => {
     color: e.color || defaultColor
   };
 };
-// Imperative handle (Phase 21 $expose). The 8 calendar verbs a consumer can't
+// Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets
 // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
 // Angular+Lit public method / Solid callback ref). Each delegates to the
@@ -126,11 +126,17 @@ const normalizeEvent = (e: any) => {
 // destroy — callers handle the pre-mount null.
 //
 // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
-// collide with an emitted event (eventClick/dateClick/eventDrop/select/
-// eventResize/datesSet) or a declared prop. The 8 verbs below are clear on both
-// axes — getApi/changeView/addEvent/removeEvent/today/prev/next/gotoDate are
-// none of the 6 events nor the 12 props. getApi returns the raw Calendar
-// instance per REQ-27-4 (NOT guard-nulled).
+// collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
+// datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
+// a declared prop. This is why the selection verbs are NAMED `selectRange`
+// (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
+// `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
+// is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
+//
+// Read-back gap closed: getDate (current anchor — the `view` model only carries
+// the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
+// event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
+// scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
 export function getApi() {
   return instance;
 }
@@ -154,6 +160,30 @@ export function next() {
 }
 export function gotoDate(...a: any[]) {
   instance?.gotoDate(...a);
+}
+export function getDate() {
+  return instance ? instance.getDate() : null;
+}
+export function getEvents() {
+  return instance ? instance.getEvents() : [];
+}
+export function scrollToTime(...a: any[]) {
+  instance?.scrollToTime(...a);
+}
+export function updateSize() {
+  instance?.updateSize();
+}
+export function prevYear() {
+  instance?.prevYear();
+}
+export function nextYear() {
+  instance?.nextYear();
+}
+export function selectRange(...a: any[]) {
+  instance?.select(...a);
+}
+export function clearSelection() {
+  instance?.unselect();
 }
 
 const portalInstances = new Set<Record<string, unknown>>();

@@ -86,6 +86,14 @@ const cal = ref();          // template ref
 | `prev` | Navigate to the previous date range. |
 | `next` | Navigate to the next date range. |
 | `gotoDate` | Navigate to a specific date — `gotoDate(date)`. |
+| `getDate` | Return the calendar’s current anchor `Date` (the `view` model carries only the view type). null before mount. |
+| `getEvents` | Return all current events as an `EventApi[]` (synchronous read; `eventsSet` is push-only). `[]` before mount. |
+| `scrollToTime` | Scroll a timeGrid view to a time of day — `scrollToTime(duration)` (e.g. `"09:00"`). |
+| `updateSize` | Force a relayout after the container resized outside FullCalendar’s knowledge (tab reveal, sidebar collapse). |
+| `prevYear` | Navigate to the previous year. |
+| `nextYear` | Navigate to the next year. |
+| `selectRange` | Programmatically select a date/time range — `selectRange(dateOrObj, endDate?)` (CalendarApi.select). |
+| `clearSelection` | Clear the current selection (CalendarApi.unselect). |
 
 ## Slots
 

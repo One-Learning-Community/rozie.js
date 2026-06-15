@@ -11,9 +11,12 @@
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every
  * exposed method name has an entry here and throws if one is missing.
  *
- * Collision discipline (ROZ121): none of these 8 verbs collides with an
- * emitted event name (`eventClick,dateClick,eventDrop,select,eventResize,
- * datesSet`) or a declared prop name — `prev`/`next`/`today` are confirmed safe.
+ * Collision discipline (ROZ121): none of these 16 verbs collides with an
+ * emitted event name (`eventClick,dateClick,eventDrop,eventResize,datesSet,
+ * eventMouseEnter,eventMouseLeave,eventsSet,loading,select,unselect`) or a
+ * declared prop. The selection verbs are NAMED `selectRange` (CalendarApi.select)
+ * and `clearSelection` (CalendarApi.unselect) precisely because bare `select`/
+ * `unselect` collide with the same-named emits — `prev`/`next`/`today` are safe.
  */
 export const handleManifest = {
   getApi: 'Return the underlying FullCalendar `Calendar` instance for direct API access.',
@@ -24,6 +27,14 @@ export const handleManifest = {
   prev: 'Navigate to the previous date range.',
   next: 'Navigate to the next date range.',
   gotoDate: 'Navigate to a specific date — `gotoDate(date)`.',
+  getDate: 'Return the calendar’s current anchor `Date` (the `view` model carries only the view type). null before mount.',
+  getEvents: 'Return all current events as an `EventApi[]` (synchronous read; `eventsSet` is push-only). `[]` before mount.',
+  scrollToTime: 'Scroll a timeGrid view to a time of day — `scrollToTime(duration)` (e.g. `"09:00"`).',
+  updateSize: 'Force a relayout after the container resized outside FullCalendar’s knowledge (tab reveal, sidebar collapse).',
+  prevYear: 'Navigate to the previous year.',
+  nextYear: 'Navigate to the next year.',
+  selectRange: 'Programmatically select a date/time range — `selectRange(dateOrObj, endDate?)` (CalendarApi.select).',
+  clearSelection: 'Clear the current selection (CalendarApi.unselect).',
 };
 
 export default handleManifest;

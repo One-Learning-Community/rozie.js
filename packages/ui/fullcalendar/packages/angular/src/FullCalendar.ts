@@ -689,6 +689,30 @@ export class FullCalendar {
   gotoDate = (...a: any[]) => {
     this.instance?.gotoDate(...a);
   };
+  getDate = () => {
+    return this.instance ? this.instance.getDate() : null;
+  };
+  getEvents = () => {
+    return this.instance ? this.instance.getEvents() : [];
+  };
+  scrollToTime = (...a: any[]) => {
+    this.instance?.scrollToTime(...a);
+  };
+  updateSize = () => {
+    this.instance?.updateSize();
+  };
+  prevYear = () => {
+    this.instance?.prevYear();
+  };
+  nextYear = () => {
+    this.instance?.nextYear();
+  };
+  selectRange = (...a: any[]) => {
+    this.instance?.select(...a);
+  };
+  clearSelection = () => {
+    this.instance?.unselect();
+  };
 
   static ngTemplateContextGuard(
     _dir: FullCalendar,

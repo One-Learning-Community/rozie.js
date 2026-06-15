@@ -77,7 +77,7 @@ const normalizeEvent = (e: any) => {
     color: e.color || props.defaultColor
   };
 };
-// Imperative handle (Phase 21 $expose). The 8 calendar verbs a consumer can't
+// Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets
 // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
 // Angular+Lit public method / Solid callback ref). Each delegates to the
@@ -85,11 +85,17 @@ const normalizeEvent = (e: any) => {
 // destroy — callers handle the pre-mount null.
 //
 // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
-// collide with an emitted event (eventClick/dateClick/eventDrop/select/
-// eventResize/datesSet) or a declared prop. The 8 verbs below are clear on both
-// axes — getApi/changeView/addEvent/removeEvent/today/prev/next/gotoDate are
-// none of the 6 events nor the 12 props. getApi returns the raw Calendar
-// instance per REQ-27-4 (NOT guard-nulled).
+// collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
+// datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
+// a declared prop. This is why the selection verbs are NAMED `selectRange`
+// (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
+// `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
+// is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
+//
+// Read-back gap closed: getDate (current anchor — the `view` model only carries
+// the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
+// event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
+// scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
 function getApi() {
   return instance;
 }
@@ -113,6 +119,30 @@ function next() {
 }
 function gotoDate(...a: any[]) {
   instance?.gotoDate(...a);
+}
+function getDate() {
+  return instance ? instance.getDate() : null;
+}
+function getEvents() {
+  return instance ? instance.getEvents() : [];
+}
+function scrollToTime(...a: any[]) {
+  instance?.scrollToTime(...a);
+}
+function updateSize() {
+  instance?.updateSize();
+}
+function prevYear() {
+  instance?.prevYear();
+}
+function nextYear() {
+  instance?.nextYear();
+}
+function selectRange(...a: any[]) {
+  instance?.select(...a);
+}
+function clearSelection() {
+  instance?.unselect();
 }
 
 const portalContainers = new Set<HTMLElement>();
@@ -593,7 +623,7 @@ watch(() => props.options, (v: any) => {
   for (const k in v) instance.setOption(k, v[k]);
 });
 
-defineExpose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate });
+defineExpose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection });
 </script>
 
 <style scoped>

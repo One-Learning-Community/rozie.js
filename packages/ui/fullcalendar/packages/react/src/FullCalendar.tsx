@@ -78,6 +78,14 @@ export interface FullCalendarHandle {
   prev: (...args: any[]) => any;
   next: (...args: any[]) => any;
   gotoDate: (...args: any[]) => any;
+  getDate: (...args: any[]) => any;
+  getEvents: (...args: any[]) => any;
+  scrollToTime: (...args: any[]) => any;
+  updateSize: (...args: any[]) => any;
+  prevYear: (...args: any[]) => any;
+  nextYear: (...args: any[]) => any;
+  selectRange: (...args: any[]) => any;
+  clearSelection: (...args: any[]) => any;
 }
 
 const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function FullCalendar(_props: FullCalendarProps, ref): JSX.Element {
@@ -180,7 +188,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       color: e.color || props.defaultColor
     };
   }, [props.defaultColor]);
-  // Imperative handle (Phase 21 $expose). The 8 calendar verbs a consumer can't
+  // Imperative handle (Phase 21 $expose). The 16 calendar verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets
   // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
   // Angular+Lit public method / Solid callback ref). Each delegates to the
@@ -188,11 +196,17 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   // destroy — callers handle the pre-mount null.
   //
   // Collision discipline (the load-bearing flatpickr lesson): no exposed name may
-  // collide with an emitted event (eventClick/dateClick/eventDrop/select/
-  // eventResize/datesSet) or a declared prop. The 8 verbs below are clear on both
-  // axes — getApi/changeView/addEvent/removeEvent/today/prev/next/gotoDate are
-  // none of the 6 events nor the 12 props. getApi returns the raw Calendar
-  // instance per REQ-27-4 (NOT guard-nulled).
+  // collide with an emitted event (eventClick/dateClick/eventDrop/eventResize/
+  // datesSet/eventMouseEnter/eventMouseLeave/eventsSet/loading/select/unselect) or
+  // a declared prop. This is why the selection verbs are NAMED `selectRange`
+  // (CalendarApi.select) and `clearSelection` (CalendarApi.unselect) — bare
+  // `select`/`unselect` collide with the same-named emits (ROZ121), and `select`
+  // is also Lit-risky. getApi returns the raw Calendar instance (NOT guard-nulled).
+  //
+  // Read-back gap closed: getDate (current anchor — the `view` model only carries
+  // the view TYPE, datesSet only the visible RANGE) and getEvents (synchronous
+  // event read — eventsSet is push-only). scrollToTime/updateSize cover timeGrid
+  // scroll + container-resize relayout; prevYear/nextYear mirror prev/next.
   function getApi() {
     return instance.current;
   }
@@ -216,6 +230,30 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   }
   function gotoDate(...a: any[]) {
     instance.current?.gotoDate(...a);
+  }
+  function getDate() {
+    return instance.current ? instance.current.getDate() : null;
+  }
+  function getEvents() {
+    return instance.current ? instance.current.getEvents() : [];
+  }
+  function scrollToTime(...a: any[]) {
+    instance.current?.scrollToTime(...a);
+  }
+  function updateSize() {
+    instance.current?.updateSize();
+  }
+  function prevYear() {
+    instance.current?.prevYear();
+  }
+  function nextYear() {
+    instance.current?.nextYear();
+  }
+  function selectRange(...a: any[]) {
+    instance.current?.select(...a);
+  }
+  function clearSelection() {
+    instance.current?.unselect();
   }
 
   useEffect(() => {
@@ -733,7 +771,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     for (const k in v) instance.current.setOption(k, v[k]);
   }, [props.options]);
 
-  useImperativeHandle(ref, () => ({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
