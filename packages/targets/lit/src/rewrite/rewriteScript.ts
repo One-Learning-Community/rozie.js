@@ -513,6 +513,21 @@ export function rewriteScript(
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       if (parentPath.isFunctionDeclaration() && parentPath.node.id === path.node) return;
 
+      // Skip import/export specifier NAME slots — `imported`/`local`/`exported`
+      // are module-binding names, never value references. An aliased import whose
+      // imported name equals a promoted verb (`import { undo as undoCmd }` where
+      // `undo` is an $expose verb) would otherwise have its `imported` Identifier
+      // rewritten to `this.undo` — an invalid `ImportSpecifier.imported` node that
+      // throws in @babel/types ("expected Identifier|StringLiteral but got
+      // MemberExpression"). Same class as the ObjectMethod-key guard below: an
+      // identifier sitting in a non-reference slot must not be rewritten.
+      if (
+        parentPath.isImportSpecifier() ||
+        parentPath.isImportDefaultSpecifier() ||
+        parentPath.isImportNamespaceSpecifier() ||
+        parentPath.isExportSpecifier()
+      ) return;
+
       // Skip property keys + member-expression property references.
       // OptionalMemberExpression (`obj?.X`) has the same shape — guard both,
       // otherwise method-name property positions like `instance?.upload()`

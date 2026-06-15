@@ -1,0 +1,24 @@
+<rozie name="AliasedImportExposeVerb">
+<!--
+  Regression repro: an aliased NAMED import whose IMPORTED name equals an
+  $expose verb. Before the fix, the Lit emitter's promoted-name → `this.X`
+  identifier rewrite walked the ImportSpecifier's `imported` Identifier
+  (`undo` / `redo`) and replaced it with `this.undo` — an invalid
+  `ImportSpecifier.imported` node → @babel/types threw
+  ("expected Identifier|StringLiteral but got MemberExpression").
+  The fix skips import/export specifier name slots in that rewrite.
+-->
+<script>
+import { undo as undoCmd, redo as redoCmd } from 'fake-editor-commands'
+
+let view = null
+
+function undo() { if (view) undoCmd(view) }
+function redo() { if (view) redoCmd(view) }
+
+$expose({ undo, redo })
+</script>
+<template>
+<div ref="viewEl"></div>
+</template>
+</rozie>

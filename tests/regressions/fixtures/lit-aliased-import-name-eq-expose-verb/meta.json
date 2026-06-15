@@ -1,0 +1,9 @@
+{
+  "id": "REG-EXPOSE-001",
+  "source": "expose-coverage-expansion 2026-06-15 (codemirror undo/redo $expose verbs)",
+  "sourceKind": "commit",
+  "phase": "post-7",
+  "desc": "Lit emitter must NOT rewrite an ImportSpecifier's `imported` name to `this.X` when an aliased import's imported name (`undo`/`redo`) equals an $expose verb — the promoted-name rewrite skips import/export specifier name slots",
+  "targets": ["lit"],
+  "discoveredBy": "regenerating @rozie-ui/codemirror with undo/redo $expose verbs imported as `{ undo as undoCmd }` — codegen threw in @babel/types"
+}
