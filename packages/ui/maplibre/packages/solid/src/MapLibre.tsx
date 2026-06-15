@@ -98,13 +98,20 @@ export interface MapLibreHandle {
   getCenter: (...args: any[]) => any;
   getZoom: (...args: any[]) => any;
   resize: (...args: any[]) => any;
+  queryRenderedFeatures: (...args: any[]) => any;
+  project: (...args: any[]) => any;
+  unproject: (...args: any[]) => any;
+  getBounds: (...args: any[]) => any;
+  zoomIn: (...args: any[]) => any;
+  zoomOut: (...args: any[]) => any;
+  panBy: (...args: any[]) => any;
 }
 
 export default function MapLibre(_props: MapLibreProps): JSX.Element {
   const _merged = mergeProps({ mapStyle: undefined, minZoom: 0, maxZoom: 22, maxBounds: undefined, bounds: undefined, fitBoundsOptions: (() => ({}))(), dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: (() => [])(), popups: (() => [])(), sources: (() => [])(), layers: (() => [])(), interactiveLayerIds: (() => [])(), controls: (() => [])(), options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }); });
+  onMount(() => { local.ref?.({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy }); });
 
   const __ctx_maplibre_sources = rozieContext("maplibre:sources");
   const __ctx_maplibre_layers = rozieContext("maplibre:layers");
@@ -732,13 +739,25 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     appliedSourceIds = wantSourceIds;
   }
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-  // 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+  // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
   // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
   // NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
   // requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
   // idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
-  // differ). The camera verbs deliberately omit PROGRAMMATIC so an imperative move
-  // echoes into $model (the prop $watch then no-ops, getCenter already matching).
+  // differ; zoomIn/zoomOut differ from the `zoomend` emit). The camera verbs
+  // deliberately omit PROGRAMMATIC so an imperative move echoes into $model (the
+  // prop $watch then no-ops, getCenter already matching).
+  //
+  // Camera control is well-covered above; the read/hit-test/projection family
+  // below is what a consumer needs to build custom controls, overlays, and click
+  // interactivity — none reachable via prop/model/event:
+  //   - queryRenderedFeatures: hit-test "what's under this pixel/box" (click-to-
+  //     inspect, selection beyond per-layer mouseenter/leave).
+  //   - project / unproject: convert geo<->screen for positioning framework DOM
+  //     overlays over map coordinates.
+  //   - getBounds: read the live visible viewport bbox (lazy-fetch data for the
+  //     current view) — distinct from the construction-only `bounds` prop.
+  //   - zoomIn / zoomOut / panBy: ergonomic nudges for a consumer's own controls.
   function getMap() {
     return instance;
   }
@@ -764,6 +783,27 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   }
   function resize() {
     if (instance) instance.resize();
+  }
+  function queryRenderedFeatures(geometry: any, options: any) {
+    return instance ? instance.queryRenderedFeatures(geometry, options) : [];
+  }
+  function project(lngLat: any) {
+    return instance ? instance.project(lngLat) : null;
+  }
+  function unproject(point: any) {
+    return instance ? instance.unproject(point) : null;
+  }
+  function getBounds() {
+    return instance ? instance.getBounds() : null;
+  }
+  function zoomIn(opts: any) {
+    if (instance) instance.zoomIn(opts);
+  }
+  function zoomOut(opts: any) {
+    if (instance) instance.zoomOut(opts);
+  }
+  function panBy(offset: any, opts: any) {
+    if (instance) instance.panBy(offset, opts);
   }
 
   return (

@@ -1000,6 +1000,34 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     if (this.instance) this.instance.resize();
   }
 
+  queryRenderedFeatures(geometry: any, options: any) {
+    return this.instance ? this.instance.queryRenderedFeatures(geometry, options) : [];
+  }
+
+  project(lngLat: any) {
+    return this.instance ? this.instance.project(lngLat) : null;
+  }
+
+  unproject(point: any) {
+    return this.instance ? this.instance.unproject(point) : null;
+  }
+
+  getBounds() {
+    return this.instance ? this.instance.getBounds() : null;
+  }
+
+  zoomIn(opts: any) {
+    if (this.instance) this.instance.zoomIn(opts);
+  }
+
+  zoomOut(opts: any) {
+    if (this.instance) this.instance.zoomOut(opts);
+  }
+
+  panBy(offset: any, opts: any) {
+    if (this.instance) this.instance.panBy(offset, opts);
+  }
+
   get center(): any[] { return this._centerControllable.read(); }
   set center(v: any[]) { this._centerControllable.notifyPropertyWrite(v); }
   get zoom(): number { return this._zoomControllable.read(); }

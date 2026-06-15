@@ -109,6 +109,13 @@ const raw = el.getMap();
 | `getCenter` | Return the current map center as `[lng, lat]` (lng FIRST), or null before mount. |
 | `getZoom` | Return the current zoom level as a number, or null before mount. |
 | `resize` | Re-read the container size and resize the map — call after a layout change reveals the container. |
+| `queryRenderedFeatures` | Hit-test rendered features at a point/box (or the whole viewport) — `queryRenderedFeatures(geometry?, options?)`. Click-to-inspect, selection, custom tooltips. `[]` before mount. |
+| `project` | Project a geographic `[lng, lat]` / `LngLat` to pixel `{ x, y }` container coordinates — for positioning framework DOM overlays. null before mount. |
+| `unproject` | Unproject pixel `[x, y]` / `Point` container coordinates back to a geographic `LngLat`. null before mount. |
+| `getBounds` | Return the current visible viewport as a `LngLatBounds` (lazy-fetch data for the live view) — distinct from the construction-only `bounds` prop. null before mount. |
+| `zoomIn` | Increase the zoom by one level with animation — `zoomIn(opts?)` (for a consumer’s own zoom control). |
+| `zoomOut` | Decrease the zoom by one level with animation — `zoomOut(opts?)`. |
+| `panBy` | Pan the map by a pixel offset — `panBy([x, y], opts?)` — not expressible through the absolute-center model. |
 
 ## Slots
 

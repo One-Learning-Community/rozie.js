@@ -72,6 +72,13 @@ export interface MapLibreHandle {
   getCenter: (...args: any[]) => any;
   getZoom: (...args: any[]) => any;
   resize: (...args: any[]) => any;
+  queryRenderedFeatures: (...args: any[]) => any;
+  project: (...args: any[]) => any;
+  unproject: (...args: any[]) => any;
+  getBounds: (...args: any[]) => any;
+  zoomIn: (...args: any[]) => any;
+  zoomOut: (...args: any[]) => any;
+  panBy: (...args: any[]) => any;
 }
 
 declare const MapLibre: React.ForwardRefExoticComponent<MapLibreProps & React.RefAttributes<MapLibreHandle>>;

@@ -3,5 +3,5 @@ export { default } from './MapLibre';
 export { default as Source } from './Source';
 export { default as Layer } from './Layer';
 
-/** The `$expose` imperative handle received via `ref` — { getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }. */
+/** The `$expose` imperative handle received via `ref` — { getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy }. */
 export type { MapLibreHandle } from './MapLibre';

@@ -637,13 +637,25 @@ $watch(() => $props.touchZoomRotate, () => applyInteractionToggles())
 $watch(() => $props.touchPitch, () => applyInteractionToggles())
 
 // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-// 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+// 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
 // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
 // NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
 // requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
 // idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
-// differ). The camera verbs deliberately omit PROGRAMMATIC so an imperative move
-// echoes into $model (the prop $watch then no-ops, getCenter already matching).
+// differ; zoomIn/zoomOut differ from the `zoomend` emit). The camera verbs
+// deliberately omit PROGRAMMATIC so an imperative move echoes into $model (the
+// prop $watch then no-ops, getCenter already matching).
+//
+// Camera control is well-covered above; the read/hit-test/projection family
+// below is what a consumer needs to build custom controls, overlays, and click
+// interactivity — none reachable via prop/model/event:
+//   - queryRenderedFeatures: hit-test "what's under this pixel/box" (click-to-
+//     inspect, selection beyond per-layer mouseenter/leave).
+//   - project / unproject: convert geo<->screen for positioning framework DOM
+//     overlays over map coordinates.
+//   - getBounds: read the live visible viewport bbox (lazy-fetch data for the
+//     current view) — distinct from the construction-only `bounds` prop.
+//   - zoomIn / zoomOut / panBy: ergonomic nudges for a consumer's own controls.
 function getMap()                { return instance }
 function flyTo(opts)             { if (instance) instance.flyTo(opts) }
 function easeTo(opts)            { if (instance) instance.easeTo(opts) }
@@ -652,8 +664,18 @@ function fitBounds(bounds, opts) { if (instance) instance.fitBounds(bounds, opts
 function getCenter()             { if (!instance) return null; const c = instance.getCenter(); return [c.lng, c.lat] }
 function getZoom()               { return instance ? instance.getZoom() : null }
 function resize()                { if (instance) instance.resize() }
+function queryRenderedFeatures(geometry, options) { return instance ? instance.queryRenderedFeatures(geometry, options) : [] }
+function project(lngLat)         { return instance ? instance.project(lngLat) : null }
+function unproject(point)        { return instance ? instance.unproject(point) : null }
+function getBounds()             { return instance ? instance.getBounds() : null }
+function zoomIn(opts)            { if (instance) instance.zoomIn(opts) }
+function zoomOut(opts)           { if (instance) instance.zoomOut(opts) }
+function panBy(offset, opts)     { if (instance) instance.panBy(offset, opts) }
 
-$expose({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize })
+$expose({
+  getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize,
+  queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy,
+})
 </script>
 
 <template>

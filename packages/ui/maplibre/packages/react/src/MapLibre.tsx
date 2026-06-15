@@ -83,6 +83,13 @@ export interface MapLibreHandle {
   getCenter: (...args: any[]) => any;
   getZoom: (...args: any[]) => any;
   resize: (...args: any[]) => any;
+  queryRenderedFeatures: (...args: any[]) => any;
+  project: (...args: any[]) => any;
+  unproject: (...args: any[]) => any;
+  getBounds: (...args: any[]) => any;
+  zoomIn: (...args: any[]) => any;
+  zoomOut: (...args: any[]) => any;
+  panBy: (...args: any[]) => any;
 }
 
 const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_props: MapLibreProps, ref): JSX.Element {
@@ -399,13 +406,25 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     appliedSourceIds.current = wantSourceIds;
   }, [layerReg, props.layers, props.sources, sourceReg]);
   // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-  // 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+  // 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
   // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
   // NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
   // requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
   // idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
-  // differ). The camera verbs deliberately omit PROGRAMMATIC so an imperative move
-  // echoes into $model (the prop $watch then no-ops, getCenter already matching).
+  // differ; zoomIn/zoomOut differ from the `zoomend` emit). The camera verbs
+  // deliberately omit PROGRAMMATIC so an imperative move echoes into $model (the
+  // prop $watch then no-ops, getCenter already matching).
+  //
+  // Camera control is well-covered above; the read/hit-test/projection family
+  // below is what a consumer needs to build custom controls, overlays, and click
+  // interactivity — none reachable via prop/model/event:
+  //   - queryRenderedFeatures: hit-test "what's under this pixel/box" (click-to-
+  //     inspect, selection beyond per-layer mouseenter/leave).
+  //   - project / unproject: convert geo<->screen for positioning framework DOM
+  //     overlays over map coordinates.
+  //   - getBounds: read the live visible viewport bbox (lazy-fetch data for the
+  //     current view) — distinct from the construction-only `bounds` prop.
+  //   - zoomIn / zoomOut / panBy: ergonomic nudges for a consumer's own controls.
   function getMap() {
     return instance.current;
   }
@@ -431,6 +450,27 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   }
   function resize() {
     if (instance.current) instance.current.resize();
+  }
+  function queryRenderedFeatures(geometry: any, options: any) {
+    return instance.current ? instance.current.queryRenderedFeatures(geometry, options) : [];
+  }
+  function project(lngLat: any) {
+    return instance.current ? instance.current.project(lngLat) : null;
+  }
+  function unproject(point: any) {
+    return instance.current ? instance.current.unproject(point) : null;
+  }
+  function getBounds() {
+    return instance.current ? instance.current.getBounds() : null;
+  }
+  function zoomIn(opts: any) {
+    if (instance.current) instance.current.zoomIn(opts);
+  }
+  function zoomOut(opts: any) {
+    if (instance.current) instance.current.zoomOut(opts);
+  }
+  function panBy(offset: any, opts: any) {
+    if (instance.current) instance.current.panBy(offset, opts);
   }
 
   useEffect(() => {
@@ -879,7 +919,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     applyInteractionToggles();
   }, [props.touchPitch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useImperativeHandle(ref, () => ({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <__ctx_maplibre_sources.Provider value={{

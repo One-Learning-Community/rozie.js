@@ -319,13 +319,25 @@ const applyLayers = () => {
   appliedSourceIds = wantSourceIds;
 };
 // ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
-// 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+// 15 verbs. Collision-clear across all 3 classes: NOT a React model-setter
 // (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
 // NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
 // requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
 // idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
-// differ). The camera verbs deliberately omit PROGRAMMATIC so an imperative move
-// echoes into $model (the prop $watch then no-ops, getCenter already matching).
+// differ; zoomIn/zoomOut differ from the `zoomend` emit). The camera verbs
+// deliberately omit PROGRAMMATIC so an imperative move echoes into $model (the
+// prop $watch then no-ops, getCenter already matching).
+//
+// Camera control is well-covered above; the read/hit-test/projection family
+// below is what a consumer needs to build custom controls, overlays, and click
+// interactivity — none reachable via prop/model/event:
+//   - queryRenderedFeatures: hit-test "what's under this pixel/box" (click-to-
+//     inspect, selection beyond per-layer mouseenter/leave).
+//   - project / unproject: convert geo<->screen for positioning framework DOM
+//     overlays over map coordinates.
+//   - getBounds: read the live visible viewport bbox (lazy-fetch data for the
+//     current view) — distinct from the construction-only `bounds` prop.
+//   - zoomIn / zoomOut / panBy: ergonomic nudges for a consumer's own controls.
 function getMap() {
   return instance;
 }
@@ -351,6 +363,27 @@ function getZoom() {
 }
 function resize() {
   if (instance) instance.resize();
+}
+function queryRenderedFeatures(geometry: any, options: any) {
+  return instance ? instance.queryRenderedFeatures(geometry, options) : [];
+}
+function project(lngLat: any) {
+  return instance ? instance.project(lngLat) : null;
+}
+function unproject(point: any) {
+  return instance ? instance.unproject(point) : null;
+}
+function getBounds() {
+  return instance ? instance.getBounds() : null;
+}
+function zoomIn(opts: any) {
+  if (instance) instance.zoomIn(opts);
+}
+function zoomOut(opts: any) {
+  if (instance) instance.zoomOut(opts);
+}
+function panBy(offset: any, opts: any) {
+  if (instance) instance.panBy(offset, opts);
 }
 
 provide('maplibre:sources', {
@@ -786,7 +819,7 @@ watch(() => props.keyboard, () => applyInteractionToggles());
 watch(() => props.touchZoomRotate, () => applyInteractionToggles());
 watch(() => props.touchPitch, () => applyInteractionToggles());
 
-defineExpose({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize });
+defineExpose({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy });
 </script>
 
 <style scoped>

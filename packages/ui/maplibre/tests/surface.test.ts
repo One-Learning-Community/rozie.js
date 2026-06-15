@@ -46,7 +46,10 @@ const EXPECT = {
   // default slot that hosts the Phase 37 declarative <Source>/<Layer> children (added
   // in 37-01). All coexist.
   slots: ['', 'marker', 'popup', 'control'],
-  expose: ['getMap', 'flyTo', 'easeTo', 'jumpTo', 'fitBounds', 'getCenter', 'getZoom', 'resize'],
+  expose: [
+    'getMap', 'flyTo', 'easeTo', 'jumpTo', 'fitBounds', 'getCenter', 'getZoom', 'resize',
+    'queryRenderedFeatures', 'project', 'unproject', 'getBounds', 'zoomIn', 'zoomOut', 'panBy',
+  ],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
@@ -103,7 +106,7 @@ describe('MapLibre.rozie surface gate', () => {
     ).toBe(false);
   });
 
-  it('expose surface matches (8 verbs)', () => {
+  it('expose surface matches (15 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });
