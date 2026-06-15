@@ -56,6 +56,11 @@ export interface CarouselHandle {
   canScrollPrev: (...args: any[]) => any;
   getSelectedIndex: (...args: any[]) => any;
   scrollSnapList: (...args: any[]) => any;
+  scrollProgress: (...args: any[]) => any;
+  slidesInView: (...args: any[]) => any;
+  slidesNotInView: (...args: any[]) => any;
+  previousScrollSnap: (...args: any[]) => any;
+  getPlugins: (...args: any[]) => any;
   getInstance: (...args: any[]) => any;
 }
 
@@ -63,7 +68,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   const _merged = mergeProps({ slides: (() => [])(), loop: false, align: 'center', axis: 'x', slidesToScroll: 1, dragFree: false, draggable: true, containScroll: 'trimSnaps', startIndex: 0, skipSnaps: false, duration: 25, direction: 'ltr', autoplay: false, autoplayDelay: 4000, plugins: (() => [])(), options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['slides', 'loop', 'align', 'axis', 'slidesToScroll', 'dragFree', 'draggable', 'containScroll', 'startIndex', 'skipSnaps', 'duration', 'direction', 'autoplay', 'autoplayDelay', 'plugins', 'options', 'selectedIndex', 'children', 'ref']);
   const resolved = children(() => local.children);
-  onMount(() => { local.ref?.({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, getInstance }); });
+  onMount(() => { local.ref?.({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance }); });
 
   const [selectedIndex, setSelectedIndex] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'selectedIndex', 0);
   onMount(() => {
@@ -140,7 +145,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     return [...builtins, ...local.plugins];
   }
   // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
-  // 9 verbs, each guarding the pre-mount/destroyed `embla = null`.
+  // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
   //  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
   //  - getSelectedIndex ≠ the `selectedIndex` model prop (ROZ524-class — avoids any
   //    setter collision on Lit/Angular; it's a method, the prop is the two-way value).
@@ -150,8 +155,13 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   //    `Element.scrollTo` overloads (TS2416 → the whole class decorator fails to
   //    resolve). This is a NEW collision class: expose-verb shadows an inherited DOM
   //    method on the Lit target. Suffix it (the reInit→reInitCarousel discipline).
-  //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList have no
+  //  - getPlugins ≠ the `plugins` prop (bare `plugins` collides with the prop + its
+  //    React `setPlugins` auto-setter) — the get* getter convention. Returns the
+  //    live plugin API map (e.g. `getPlugins().autoplay.play()/.stop()`).
+  //  - scrollProgress/slidesInView/slidesNotInView/previousScrollSnap drive custom
+  //    progress bars, lazy-load/in-view dots, and directional transitions — no
   //    matching prop, emit, or inherited DOM method — clear.
+  //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
   function scrollNext(jump: any) {
     if (embla) embla.scrollNext(jump);
   }
@@ -175,6 +185,21 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   }
   function scrollSnapList() {
     return embla ? embla.scrollSnapList() : [];
+  }
+  function scrollProgress() {
+    return embla ? embla.scrollProgress() : 0;
+  }
+  function slidesInView() {
+    return embla ? embla.slidesInView() : [];
+  }
+  function slidesNotInView() {
+    return embla ? embla.slidesNotInView() : [];
+  }
+  function previousScrollSnap() {
+    return embla ? embla.previousScrollSnap() : 0;
+  }
+  function getPlugins() {
+    return embla ? embla.plugins() : null;
   }
   function getInstance() {
     return embla;

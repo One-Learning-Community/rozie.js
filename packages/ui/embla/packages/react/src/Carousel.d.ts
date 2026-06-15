@@ -40,6 +40,11 @@ export interface CarouselHandle {
   canScrollPrev: (...args: any[]) => any;
   getSelectedIndex: (...args: any[]) => any;
   scrollSnapList: (...args: any[]) => any;
+  scrollProgress: (...args: any[]) => any;
+  slidesInView: (...args: any[]) => any;
+  slidesNotInView: (...args: any[]) => any;
+  previousScrollSnap: (...args: any[]) => any;
+  getPlugins: (...args: any[]) => any;
   getInstance: (...args: any[]) => any;
 }
 

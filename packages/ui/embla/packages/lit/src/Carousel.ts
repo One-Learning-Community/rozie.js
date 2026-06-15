@@ -235,6 +235,26 @@ private __rozieFirstUpdateDone = false;
     return this.embla ? this.embla.scrollSnapList() : [];
   }
 
+  scrollProgress() {
+    return this.embla ? this.embla.scrollProgress() : 0;
+  }
+
+  slidesInView() {
+    return this.embla ? this.embla.slidesInView() : [];
+  }
+
+  slidesNotInView() {
+    return this.embla ? this.embla.slidesNotInView() : [];
+  }
+
+  previousScrollSnap() {
+    return this.embla ? this.embla.previousScrollSnap() : 0;
+  }
+
+  getPlugins() {
+    return this.embla ? this.embla.plugins() : null;
+  }
+
   getInstance() {
     return this.embla;
   }

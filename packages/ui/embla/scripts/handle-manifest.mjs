@@ -11,8 +11,9 @@
  *
  * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these verbs
  * collides with an emitted event name (`reInitCarousel`, NOT `reInit` — which IS
- * an emit), the React `selectedIndex`-model auto-setter (`getSelectedIndex`, NOT
- * `selectedIndex`), or a Lit reserved lifecycle name.
+ * an emit), a React model/prop auto-setter (`getSelectedIndex`, NOT
+ * `selectedIndex`; `getPlugins`, NOT `plugins` — which is a prop + `setPlugins`
+ * setter), or a Lit reserved lifecycle name.
  */
 export const handleManifest = {
   scrollNext: 'Scroll to the next snap — `scrollNext(jump?)` (jump skips the transition). No-op before mount.',
@@ -26,6 +27,16 @@ export const handleManifest = {
   getSelectedIndex:
     'Return the current scroll-snap index — `getSelectedIndex()` (Embla `selectedScrollSnap()`). 0 before mount. (NOT `selectedIndex`, which is the two-way model prop.)',
   scrollSnapList: 'Return the snap-point progress array — `scrollSnapList()` (numbers in [0, 1]). Empty before mount.',
+  scrollProgress:
+    'Return the overall scroll progress in [0, 1] — `scrollProgress()` — to drive a custom progress bar / scrollbar thumb. 0 before mount.',
+  slidesInView:
+    'Return the indices of slides currently in view — `slidesInView()` — for lazy-loading or highlighting in-view dots. Empty before mount.',
+  slidesNotInView:
+    'Return the indices of slides currently out of view — `slidesNotInView()` — to unload heavy off-screen content. Empty before mount.',
+  previousScrollSnap:
+    'Return the previously selected snap index — `previousScrollSnap()` — to compute transition direction. 0 before mount.',
+  getPlugins:
+    'Return the live plugin API map — `getPlugins()` (e.g. `getPlugins().autoplay?.play()/.stop()`) for imperative autoplay pause/resume. (NOT `plugins`, which is a prop.) Null before mount.',
   getInstance: 'Return the underlying EmblaCarouselType instance for direct API access (the engine escape hatch). Null before mount.',
 };
 

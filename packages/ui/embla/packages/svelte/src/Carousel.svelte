@@ -135,7 +135,7 @@ const emblaPluginsFromProps = () => {
   return [...builtins, ...plugins];
 };
 // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
-// 9 verbs, each guarding the pre-mount/destroyed `embla = null`.
+// 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
 //  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
 //  - getSelectedIndex ≠ the `selectedIndex` model prop (ROZ524-class — avoids any
 //    setter collision on Lit/Angular; it's a method, the prop is the two-way value).
@@ -145,8 +145,13 @@ const emblaPluginsFromProps = () => {
 //    `Element.scrollTo` overloads (TS2416 → the whole class decorator fails to
 //    resolve). This is a NEW collision class: expose-verb shadows an inherited DOM
 //    method on the Lit target. Suffix it (the reInit→reInitCarousel discipline).
-//  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList have no
+//  - getPlugins ≠ the `plugins` prop (bare `plugins` collides with the prop + its
+//    React `setPlugins` auto-setter) — the get* getter convention. Returns the
+//    live plugin API map (e.g. `getPlugins().autoplay.play()/.stop()`).
+//  - scrollProgress/slidesInView/slidesNotInView/previousScrollSnap drive custom
+//    progress bars, lazy-load/in-view dots, and directional transitions — no
 //    matching prop, emit, or inherited DOM method — clear.
+//  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
 export function scrollNext(jump: any) {
   if (embla) embla.scrollNext(jump);
 }
@@ -170,6 +175,21 @@ export function getSelectedIndex() {
 }
 export function scrollSnapList() {
   return embla ? embla.scrollSnapList() : [];
+}
+export function scrollProgress() {
+  return embla ? embla.scrollProgress() : 0;
+}
+export function slidesInView() {
+  return embla ? embla.slidesInView() : [];
+}
+export function slidesNotInView() {
+  return embla ? embla.slidesNotInView() : [];
+}
+export function previousScrollSnap() {
+  return embla ? embla.previousScrollSnap() : 0;
+}
+export function getPlugins() {
+  return embla ? embla.plugins() : null;
 }
 export function getInstance() {
   return embla;

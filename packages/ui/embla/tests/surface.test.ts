@@ -37,6 +37,7 @@ const EXPECT = {
   expose: [
     'scrollNext', 'scrollPrev', 'scrollToIndex', 'reInitCarousel', 'canScrollNext',
     'canScrollPrev', 'getSelectedIndex', 'scrollSnapList', 'getInstance',
+    'scrollProgress', 'slidesInView', 'slidesNotInView', 'previousScrollSnap', 'getPlugins',
   ],
 } as const;
 
@@ -78,7 +79,7 @@ describe('Carousel.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (9 verbs)', () => {
+  it('expose surface matches (14 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

@@ -87,6 +87,11 @@ const i = carousel.current?.getSelectedIndex();
 | `canScrollPrev` | Return whether a previous snap is reachable — `canScrollPrev()`. False before mount. |
 | `getSelectedIndex` | Return the current scroll-snap index — `getSelectedIndex()` (Embla `selectedScrollSnap()`). 0 before mount. (NOT `selectedIndex`, which is the two-way model prop.) |
 | `scrollSnapList` | Return the snap-point progress array — `scrollSnapList()` (numbers in [0, 1]). Empty before mount. |
+| `scrollProgress` | Return the overall scroll progress in [0, 1] — `scrollProgress()` — to drive a custom progress bar / scrollbar thumb. 0 before mount. |
+| `slidesInView` | Return the indices of slides currently in view — `slidesInView()` — for lazy-loading or highlighting in-view dots. Empty before mount. |
+| `slidesNotInView` | Return the indices of slides currently out of view — `slidesNotInView()` — to unload heavy off-screen content. Empty before mount. |
+| `previousScrollSnap` | Return the previously selected snap index — `previousScrollSnap()` — to compute transition direction. 0 before mount. |
+| `getPlugins` | Return the live plugin API map — `getPlugins()` (e.g. `getPlugins().autoplay?.play()/.stop()`) for imperative autoplay pause/resume. (NOT `plugins`, which is a prop.) Null before mount. |
 | `getInstance` | Return the underlying EmblaCarouselType instance for direct API access (the engine escape hatch). Null before mount. |
 
 ## Slots
