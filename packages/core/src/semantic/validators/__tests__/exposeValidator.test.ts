@@ -386,5 +386,11 @@ describe('$expose ROZ121 — compile-level + repo-wide sweep (Quick 260601-jsy)'
     // load-tolerant philosophy as commit 112352c5 (cli-smoke deadlines) and the
     // rozie-timing-tests testTimeout. Does NOT weaken the check: the offenders
     // assertion still genuinely fails on any real latent ROZ121 collision.
-  }, 30_000);
+    // Raised again to 120s (Phase 46): the whole-repo sweep compiles every
+    // committed + demo-synced .rozie through analyzeAST, which now runs two more
+    // validators (ROZ137/ROZ138). Under a full cold `turbo run test` with all
+    // packages building+testing in parallel the sweep was observed at ~67s on a
+    // loaded machine (it completes in ~7s in isolation) — still a pure
+    // CPU-starvation deadline, not an assertion of speed.
+  }, 120_000);
 });

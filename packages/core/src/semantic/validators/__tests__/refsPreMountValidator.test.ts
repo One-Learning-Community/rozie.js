@@ -297,8 +297,13 @@ describe('refsPreMountValidator — repo-wide sweep (ZERO ROZ123)', () => {
     // message. The post-fix FlatpickrBehaviorDemo uses the safe $onMount pattern,
     // so this MUST be empty.
     expect(offenders, `latent ROZ123 ($refs-before-mount) in: ${offenders.join(', ')}`).toEqual([]);
-    // 30s deadline: matches the exposeValidator sweep — @rozie/core's
+    // 120s deadline: matches the exposeValidator sweep — @rozie/core's
     // vitest.config.ts has no global testTimeout, and under `turbo run test`
     // parallel CPU starvation this whole-repo compile races past the 5s default.
-  }, 30_000);
+    // Raised 30s → 120s (Phase 46): analyzeAST now runs two more validators
+    // (ROZ137/ROZ138) per .rozie, and a full cold `turbo run test` sweep was
+    // observed at ~64s on a loaded machine (~7s in isolation) — pure
+    // CPU-starvation headroom, not a speed assertion; the offenders check is
+    // unchanged and still fails on any real latent ROZ123.
+  }, 120_000);
 });
