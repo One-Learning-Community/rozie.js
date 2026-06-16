@@ -184,6 +184,19 @@ const EXAMPLES = [
   'ThemeButton',
   'Tabs',
   'Tab',
+  // Phase 46 (ITEM-2) — the bare-boolean-attr-on-a-component proving PAIR.
+  // BareAttrChild is the LEAF producer (a `combobox` Boolean prop).
+  // BareAttrComponent is the consumer dogfood: it mounts <BareAttrChild combobox />
+  // (a bare value-less attr on a COMPONENT — the Phase-46 IR coercion lowers it
+  // to a `booleanLiteral(true)` binding so every target passes a real `true`,
+  // NOT a falsy `""`) ALONGSIDE a `<div hidden></div>` (a bare attr on a DOM
+  // element — stays a static `hidden=""`, proving the coercion is gated strictly
+  // on component-ness). The committed bytes pin the coercion across all four
+  // entrypoints with ZERO per-target emitter edits. BareAttrComponent references
+  // BareAttrChild via <components> (see EXAMPLE_SIBLING_ROZIE); BareAttrChild is
+  // a LEAF single-rozie producer.
+  'BareAttrChild',
+  'BareAttrComponent',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
@@ -215,6 +228,10 @@ const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
   // babel-plugin Leg 3 needs the sibling staged in tmpDir so the producer
   // resolver can find it (same pattern as ThemedButtonConsumer).
   PartCardConsumer: ['PartCard.rozie'],
+  // Phase 46 (ITEM-2) — BareAttrComponent reaches BareAttrChild.rozie via
+  // <components>; the babel-plugin Leg 3 needs the sibling staged in tmpDir so
+  // the producer resolver can find it (same pattern as ThemedButtonConsumer).
+  BareAttrComponent: ['BareAttrChild.rozie'],
 };
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 // 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity

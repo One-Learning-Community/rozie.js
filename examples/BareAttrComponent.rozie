@@ -1,0 +1,44 @@
+<!--
+  BareAttrComponent.rozie — Phase 46 (ITEM-2) dist-parity consumer dogfood for
+  the bare-boolean-attr-on-a-component IR coercion (Wave 0 gap closure).
+
+  Exercises BOTH sides of the fix in one fixture:
+
+    1. A bare value-less attr on a CHILD COMPONENT — `<BareAttrChild combobox />`.
+       Pre-fix this collapsed to a static `combobox=""` which only Vue+Lit
+       coerce to `true`; React/Svelte/Angular/Solid passed a falsy `""`. The
+       Phase-46 IR coercion lowers it to a `booleanLiteral(true)` binding, so
+       every target emits the per-target boolean-true form
+       (`combobox={true}` / `:combobox="true"` / `[combobox]="true"` /
+       `.combobox=${true}`) — ZERO per-target emitter edits.
+
+    2. A bare value-less attr on a DOM element — `<div hidden></div>`. This
+       stays a static empty-string attribute (`hidden=""` — unchanged HTML).
+       The coercion is gated strictly on component-ness, so the DOM case is
+       byte-untouched.
+
+  The committed per-target bytes are the dist-parity contract that the IR
+  coercion lowers byte-identically across all four entrypoints (compile / CLI
+  / babel-plugin / unplugin) and all six targets, and that the DOM bare attr
+  is NOT coerced.
+
+  Multi-rozie fixture: references BareAttrChild via <components>; registered in
+  EXAMPLES_NEEDING_RESOLVER_ROOT in bootstrap-fixtures.mjs.
+-->
+
+<rozie name="BareAttrComponent">
+
+<components>
+{
+  BareAttrChild: './BareAttrChild.rozie',
+}
+</components>
+
+<template>
+<div class="bare-attr-component">
+  <BareAttrChild combobox />
+  <div hidden></div>
+</div>
+</template>
+
+</rozie>

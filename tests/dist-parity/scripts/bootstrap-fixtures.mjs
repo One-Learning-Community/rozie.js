@@ -245,6 +245,21 @@ const EXAMPLES = [
   // CloneProbe.* fixtures (+ the FlowCanvas dogfood). Single-file; no sibling
   // .rozie producers — stays OUT of RESOLVER_ROOT.
   'CloneProbe',
+  // Phase 46 (ITEM-2) — the bare-boolean-attr-on-a-component proving PAIR.
+  // BareAttrChild is the LEAF producer (declares a `combobox` Boolean prop).
+  // BareAttrComponent is the consumer dogfood: it mounts <BareAttrChild combobox />
+  // (a bare value-less attr on a COMPONENT — the Phase-46 IR coercion lowers it
+  // to a `booleanLiteral(true)` binding so every target passes a real `true`,
+  // NOT a falsy `""`) ALONGSIDE a `<div hidden></div>` (a bare attr on a DOM
+  // element — stays a static `hidden=""`, proving the coercion is gated strictly
+  // on component-ness). Registering both makes the bootstrap compile() them
+  // across all six targets — the dist-parity proof that the coercion lowers
+  // byte-identically across all four entrypoints with ZERO per-target emitter
+  // edits. BareAttrComponent is added to EXAMPLES_NEEDING_RESOLVER_ROOT (it
+  // references ./BareAttrChild.rozie via <components>); BareAttrChild is a LEAF
+  // single-rozie producer and stays OUT of RESOLVER_ROOT.
+  'BareAttrChild',
+  'BareAttrComponent',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -270,6 +285,11 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // root so the IR cache + ProducerResolver locate the sibling producer at
   // compile time. The leaf producer PartCard stays OUT of RESOLVER_ROOT.
   'PartCardConsumer',
+  // Phase 46 (ITEM-2) — references ./BareAttrChild.rozie via <components>;
+  // needs resolver root so the IR cache + ProducerResolver locate the sibling
+  // producer at compile time. The leaf producer BareAttrChild stays OUT of
+  // RESOLVER_ROOT (the same ThemedButton-vs-ThemedButtonConsumer split).
+  'BareAttrComponent',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

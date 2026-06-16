@@ -1,0 +1,30 @@
+<!--
+  BareAttrChild.rozie — Phase 46 (ITEM-2) leaf producer for the bare-boolean-
+  attr-on-a-component dist-parity proof.
+
+  Declares a single `combobox` Boolean prop (default false). The consumer
+  (BareAttrComponent.rozie) mounts this with the author's natural bare form
+  `<BareAttrChild combobox />` — which the Phase-46 IR coercion lowers to a
+  `booleanLiteral(true)` binding so every target passes a real `true` (not a
+  falsy `""`). The body renders the prop so the boolean's truthiness is
+  observable in the emitted output.
+
+  Single-file LEAF producer; it IS the component BareAttrComponent composes.
+  Stays OUT of EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="BareAttrChild">
+
+<props>
+{
+  combobox: { type: Boolean, default: false },
+}
+</props>
+
+<template>
+<div class="bare-attr-child" :data-combobox="$props.combobox">
+  combobox = {{ $props.combobox }}
+</div>
+</template>
+
+</rozie>

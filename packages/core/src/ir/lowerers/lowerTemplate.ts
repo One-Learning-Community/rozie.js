@@ -77,6 +77,27 @@ import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js
  *
  * Per-primitive hints provide better DX than a flat ROZ920 message.
  */
+/**
+ * Lightweight component-ness probe used to coerce a bare value-less attribute on
+ * a COMPONENT element (`<Child combobox />`) to a `booleanLiteral(true)` binding
+ * at the IR layer (ITEM-2, Phase 46). Mirrors the PascalCase + outer-name +
+ * components-table classification in `annotateTagKind` WITHOUT emitting any
+ * diagnostics — the full `annotateTagKind` still runs after the attribute loop
+ * (and owns the ROZ920..928 sub-codes). A `tagKind` of `'component'` (a
+ * `<components>`-table entry) or `'self'` (the outer `<rozie name>`) is a
+ * component element; everything else (incl. unmatched PascalCase, which falls
+ * through to `'html'` in annotateTagKind) is not.
+ */
+function isComponentElement(
+  tagName: string,
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
+): boolean {
+  if (!isPascalCase(tagName)) return false;
+  if (tagName === outerName) return true; // tagKind === 'self'
+  return componentsTable.has(tagName); // tagKind === 'component'
+}
+
 function annotateTagKind(
   tagName: string,
   outerName: string,
@@ -258,12 +279,35 @@ function parseInterpolatedSegments(
 function lowerAttribute(
   attr: TemplateAttr,
   bindings: BindingsTable,
+  isComponent: boolean,
 ): AttributeBinding | null {
   if (attr.kind === 'directive' || attr.kind === 'event') {
     return null; // Handled in lowerElement directly.
   }
 
   if (attr.kind === 'static') {
+    // ITEM-2 (Phase 46) — a bare value-less attr (`attr.value === null`) on a
+    // COMPONENT element (`<Child combobox />`) is the author's natural form for
+    // a boolean prop. Coerce it to the SAME `booleanLiteral(true)` binding the
+    // bare `:combobox` arm produces below (:after the static branch) so every
+    // target renders the per-target boolean-true form rather than a falsy `""`
+    // (which only Vue+Lit coerce; React/Svelte/Angular/Solid pass `""`). This
+    // is ZERO per-target emitter edits — all six already render a
+    // `booleanLiteral(true)` binding correctly.
+    //
+    // CRITICAL: branch on `attr.value === null` BEFORE the `?? ''` collapse so
+    // an EXPLICIT `combobox=""` (legitimately falsy) is NEVER coerced. A bare
+    // attr on a DOM element keeps `{ kind: 'static', value: '' }` (unchanged
+    // HTML — renders `hidden=""`).
+    if (attr.value === null && isComponent) {
+      return {
+        kind: 'binding',
+        name: attr.name,
+        expression: t.booleanLiteral(true),
+        deps: [],
+        sourceLoc: attr.loc,
+      };
+    }
     // `{{ }}` mustache is permitted in plain (non-`:`) attribute values too —
     // a deliberate Rozie feature (Vue forbids it; see PROJECT.md). Lower it to
     // the same `interpolated` AttributeBinding the `:`-binding branch produces
@@ -732,6 +776,17 @@ function lowerBareElement(
     return inv;
   }
 
+  // ITEM-2 (Phase 46) — resolve component-ness BEFORE the attribute loop so
+  // `lowerAttribute` can coerce a bare value-less attr on a component to a
+  // `booleanLiteral(true)` binding. The full `annotateTagKind` (which owns the
+  // ROZ920..928 diagnostics) still runs after the loop; this is a diagnostic-
+  // free probe mirroring its component classification.
+  const elementIsComponent = isComponentElement(
+    el.tagName,
+    outerName,
+    componentsTable,
+  );
+
   // Lower attributes + collect template @event listeners.
   const attributes: AttributeBinding[] = [];
   const events: Listener[] = [];
@@ -1065,7 +1120,7 @@ function lowerBareElement(
     }
 
     // static or binding
-    const ab = lowerAttribute(attr, bindings);
+    const ab = lowerAttribute(attr, bindings, elementIsComponent);
     if (ab) attributes.push(ab);
   }
 
