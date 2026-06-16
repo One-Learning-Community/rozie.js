@@ -272,6 +272,81 @@ export function deconflictGeneratedSymbols(
 }
 
 /**
+ * CLASS-TARGET reserved-member deconfliction (Phase 46 ITEM-5 / D-02 — the NEW
+ * collision class). DISTINCT from the bare-ident accessor-shadow above: the
+ * trigger here is "a USER TOP-LEVEL `<script>` binding becomes a CLASS FIELD
+ * whose name is in the target's reserved set" — overriding an inherited
+ * `Object.prototype` member (Angular + Lit) or `HTMLElement`/`Element`/`Node`
+ * member (Lit) breaks assignability (the listbox `valueOf` cascade → TS1240/
+ * TS1271 on every decorator; the Embla `scrollTo` / rete `nodeType` findings).
+ *
+ * Scoped to PROGRAM-LEVEL bindings ONLY: only top-level `<script>` declarations
+ * (`const`/`let`/`var` declarators + `function` declarations) become class
+ * fields/methods on Angular/Lit. A function-LOCAL named `id`/`style`/`focus`
+ * stays a plain local and must NOT be renamed. Same `X$local` suffix, same
+ * only-on-collision discipline (a top-level binding whose name is NOT reserved
+ * is byte-identical).
+ *
+ * MUST run on the freshly-cloned, not-yet-mutated Program (scope cache valid),
+ * the same timing as the accessor-shadow pass.
+ */
+export function deconflictReservedClassFields(
+  program: File,
+  reserved: ReadonlySet<string>,
+  /**
+   * PUBLIC-CONTRACT names that must NEVER be renamed even when they collide with
+   * a reserved member: `$expose` verb names and prop names (D-02). A top-level
+   * `focus` helper that is the EXPOSED `focus()` method stays `focus` — the
+   * public handle is the contract, and the inherited-member override is the
+   * intended Lit/Angular behavior for a deliberately-exposed element method.
+   */
+  protectedNames: ReadonlySet<string> = new Set(),
+): void {
+  if (reserved.size === 0) return;
+  const programBody = program.program.body;
+
+  // Collect the top-level binding names that would become class fields/methods.
+  const renameTargets = new Set<string>();
+  for (const stmt of programBody) {
+    if (t.isVariableDeclaration(stmt)) {
+      for (const decl of stmt.declarations) {
+        const id = decl.id;
+        // Only simple Identifier declarators become a single named class field.
+        // (Destructured top-level declarators are not a Rozie class-field idiom;
+        // leave them untouched.)
+        if (t.isIdentifier(id) && reserved.has(id.name) && !protectedNames.has(id.name)) {
+          renameTargets.add(id.name);
+        }
+      }
+    } else if (
+      t.isFunctionDeclaration(stmt) &&
+      stmt.id &&
+      reserved.has(stmt.id.name) &&
+      !protectedNames.has(stmt.id.name)
+    ) {
+      renameTargets.add(stmt.id.name);
+    }
+  }
+  if (renameTargets.size === 0) return;
+
+  // Rename via the binding's OWN (program) scope so the declaration + every
+  // reference is updated atomically. We traverse so Babel builds the scope graph.
+  traverse(program, {
+    Program(path) {
+      for (const name of renameTargets) {
+        // Only rename if the binding is actually program-scoped (a top-level
+        // declaration). A binding shadowed deeper is handled by its own scope.
+        const binding = path.scope.getBinding(name);
+        if (binding && binding.scope === path.scope) {
+          path.scope.rename(name, alias(name));
+        }
+      }
+      path.stop();
+    },
+  });
+}
+
+/**
  * `Object.prototype` member names — reserved on BOTH class targets (Angular +
  * Lit) because every emitted component class inherits them. A user LOCAL that
  * becomes a class field with one of these names overrides the inherited member;

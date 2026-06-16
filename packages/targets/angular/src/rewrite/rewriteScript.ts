@@ -43,6 +43,10 @@ import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
+  deconflictReservedClassFields,
+  reservedClassMembers,
+} from '../../../../core/src/rewrite/deconflict.js';
+import {
   hasShadowingBinding,
   isInBindingPosition,
 } from './scopeAwareSkip.js';
@@ -768,6 +772,24 @@ export function rewriteRozieIdentifiers(
   // self-contained for any direct caller (e.g. emitAngular's preview rewrite).
   // Idempotent: a second pass finds no `$model`.
   normalizeModelAccessor(program);
+
+  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — CLASS-TARGET sub-case.
+  // Angular's accessors are `this.`-qualified (`this.x()`), so it is structurally
+  // immune to the bare-ident accessor-shadow bug — BUT a top-level user `<script>`
+  // binding becomes a CLASS FIELD, and a field named `valueOf`/`toString`/
+  // `hasOwnProperty`/etc. overrides the inherited `Object.prototype` member and
+  // breaks assignability. Rename such a top-level binding to `X$local` (the
+  // `this.X$local` references follow). Only-on-collision: a non-reserved top-level
+  // name is byte-identical. Runs on the freshly-cloned Program before the lowering
+  // traversal (which qualifies bare names with `this.`).
+  deconflictReservedClassFields(
+    program,
+    reservedClassMembers('angular'),
+    new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...(ir.props ?? []).map((p) => p.name),
+    ]),
+  );
 
   traverse(program, {
     AssignmentExpression(path) {

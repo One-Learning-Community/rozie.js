@@ -109,6 +109,27 @@ const inc = () => { $data.count = $data.count + 1 }
   });
 });
 
+describe('reserved-member name that IS an $expose verb stays public (D-02)', () => {
+  // `focus` is a reserved Lit DOM member AND a deliberately-exposed element
+  // method. The public `focus()` contract must NEVER be renamed to focus$local.
+  const SRC = `
+<rozie name="FocusProbe">
+<script lang="ts">
+const focus = () => { /* focus the field */ }
+$expose({ focus })
+</script>
+<template><div>x</div></template>
+</rozie>
+`;
+  it('Lit + Angular keep the exposed `focus` method (no $local suffix)', () => {
+    for (const target of ['lit', 'angular'] as CompileTarget[]) {
+      const code = compileOk(SRC, target);
+      expect(code, target).not.toMatch(/focus\$local/);
+      expect(code, target).toMatch(/\bfocus\b/);
+    }
+  });
+});
+
 describe('Lit class-target reserved-member sub-case (valueOf footgun)', () => {
   // A user local named `valueOf` becomes a class field on Lit/Angular and
   // breaks Object-assignability → TS1240/TS1271 cascade. Must auto-rename.

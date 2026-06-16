@@ -26,6 +26,10 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import {
+  deconflictGeneratedSymbols,
+  type GeneratedSymbolGroup,
+} from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -191,6 +195,25 @@ export function rewriteRozieIdentifiers(
   // write, same `value()` accessor on read) → byte-identical emit. Reuse, not
   // reimplement (SPEC Req 2).
   normalizeModelAccessor(cloned);
+
+  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — net-new Solid wiring.
+  // Solid lowers `$props.X` / `$data.X` to bare signal-accessor reads `X()` and
+  // mints `setX` setters; a user local/param shadowing a signal accessor name or
+  // a setter name captures the rewritten bare identifier the same way React/Svelte
+  // are exposed. Gated only-on-collision (accessor read for props/data; pure
+  // binding for setters) so the non-colliding Solid corpus stays byte-identical.
+  // Runs on the freshly-cloned, not-yet-mutated Program (scope cache valid) BEFORE
+  // the bare-accessor rewrite below.
+  const solidSetters = new Set<string>();
+  for (const s of ir.state) solidSetters.add('set' + capitalize(s.name));
+  for (const p of ir.props) if (p.isModel) solidSetters.add('set' + capitalize(p.name));
+  const solidProps = new Set<string>([...modelProps, ...nonModelProps]);
+  const solidGroups: GeneratedSymbolGroup[] = [
+    { names: solidProps, trigger: { kind: 'accessor', accessor: '$props' } },
+    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
+    { names: solidSetters, trigger: { kind: 'binding' } },
+  ];
+  deconflictGeneratedSymbols(cloned, solidGroups);
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().

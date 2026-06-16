@@ -26,6 +26,11 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { portalKey } from '../../../../core/src/ir/types.js';
 import type { File, Program, Expression, Statement } from '@babel/types';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import {
+  deconflictReservedClassFields,
+  reservedClassMembers,
+  DECONFLICT_SUFFIX,
+} from '../../../../core/src/rewrite/deconflict.js';
 import { cloneScriptProgram } from './cloneProgram.js';
 import {
   hasShadowingBinding,
@@ -160,6 +165,22 @@ export function collectMethodNamesFromProgram(file: File, ir: IRComponent): Set<
     ...ir.props.map((p) => p.name),
     ...ir.slots.map((s) => (s.name === '' ? 'default' : s.name)),
   ]);
+  // Phase 46 ITEM-5 / D-02 — a top-level user binding whose name is a reserved
+  // class-field member (Object.prototype on Lit+Angular; inherited DOM members
+  // on Lit) is auto-renamed to `<name>$local` by `deconflictReservedClassFields`
+  // in `rewriteScript`. The method-name set MUST reflect that rename so the bare
+  // `<name>` references in lifecycle/watcher FRAGMENTS (which receive this set as
+  // `methodNamesOverride`) rewrite to `this.<name>$local` consistently with the
+  // renamed class field. Same deterministic transform, single source of truth.
+  const litReserved = reservedClassMembers('lit');
+  // PUBLIC-CONTRACT names ($expose verbs + prop names) are NEVER renamed (D-02).
+  const litProtected = new Set<string>([
+    ...(ir.expose ?? []).map((e) => e.name),
+    ...(ir.props ?? []).map((p) => p.name),
+  ]);
+  const classFieldName = (n: string): string =>
+    litReserved.has(n) && !litProtected.has(n) ? `${n}${DECONFLICT_SUFFIX}` : n;
+
   for (const stmt of file.program.body) {
     if (t.isVariableDeclaration(stmt)) {
       for (const decl of stmt.declarations) {
@@ -172,11 +193,11 @@ export function collectMethodNamesFromProgram(file: File, ir: IRComponent): Set<
           ) {
             continue;
           }
-          names.add(decl.id.name);
+          names.add(classFieldName(decl.id.name));
         }
       }
     } else if (t.isFunctionDeclaration(stmt) && stmt.id && !reserved.has(stmt.id.name)) {
-      names.add(stmt.id.name);
+      names.add(classFieldName(stmt.id.name));
     }
   }
   return names;
@@ -261,6 +282,27 @@ export function rewriteScript(
   // write, same `this.<name>` getter on read) → byte-identical emit. Reuse,
   // not reimplement (SPEC Req 2).
   normalizeModelAccessor(cloned);
+
+  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — CLASS-TARGET sub-case.
+  // Lit's accessors are `this.`-qualified (immune to the bare-ident accessor
+  // shadow) BUT its component class `extends LitElement` → `HTMLElement`, so a
+  // top-level user `<script>` binding that becomes a CLASS FIELD named e.g.
+  // `valueOf` (Object.prototype) or `focus`/`scrollTo`/`nodeType` (inherited DOM)
+  // overrides the inherited member and breaks `@property` assignability,
+  // cascading TS1240/TS1271 to every decorator on the class (the listbox
+  // `valueOf` finding — 38 errors from one name). Rename such a top-level binding
+  // to `X$local`; the `this.X$local` references + the methodNames set (which
+  // applies the SAME suffix transform) follow. Only-on-collision: a non-reserved
+  // top-level name is byte-identical. Runs on the freshly-cloned Program before
+  // the lowering traversal.
+  deconflictReservedClassFields(
+    cloned,
+    reservedClassMembers('lit'),
+    new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...(ir.props ?? []).map((p) => p.name),
+    ]),
+  );
 
   traverse(cloned, {
     AssignmentExpression(path) {
