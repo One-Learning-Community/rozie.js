@@ -209,6 +209,13 @@ export default defineConfig({
             { text: 'Embla — live demo', link: '/components/embla-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/listbox',
+          collapsed: true,
+          items: [
+            { text: 'Listbox — headless select / combobox', link: '/components/listbox' },
+          ],
+        },
       ],
       '/compatibility': [
         {

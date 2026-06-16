@@ -50,7 +50,7 @@ Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobo
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Listbox` a value, `Listbox` writes the new selection back, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements [`ControlValueAccessor`](#angular-forms) — a `Listbox` **is** a form control.
+`r-model:value` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Listbox` a value, `Listbox` writes the new selection back, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Listbox` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
