@@ -247,9 +247,9 @@ export class Listbox {
       // separate calls — narrowing one stable local works on every target.
       const arr = Array.isArray(cur) ? cur : [];
       if (arr.length === 0) return '';
-      return __options.filter((o: any) => arr.includes(valueOf$local(o))).map(this.labelOf).join(', ');
+      return __options.filter((o: any) => arr.includes(this.valueOf$local(o))).map(this.labelOf).join(', ');
     }
-    const match = __options.find((o: any) => valueOf$local(o) === cur);
+    const match = __options.find((o: any) => this.valueOf$local(o) === cur);
     return match === undefined ? '' : this.labelOf(match);
   });
   activeDescendant = computed(() => {
@@ -287,7 +287,7 @@ export class Listbox {
     return __options.filter((opt: any) => this.labelOf(opt).toLowerCase().includes(q));
   };
   isSelected = (opt: any) => {
-    const v = valueOf$local(opt);
+    const v = this.valueOf$local(opt);
     const cur = this.value();
     if (this.multiple()) return Array.isArray(cur) && cur.includes(v);
     return cur === v;
@@ -327,7 +327,7 @@ export class Listbox {
   });
   select = (opt: any) => {
     if (this.disabledOf(opt)) return;
-    const v = valueOf$local(opt);
+    const v = this.valueOf$local(opt);
     if (this.multiple()) {
       const cur = this.value();
       const arr = Array.isArray(cur) ? cur : [];
