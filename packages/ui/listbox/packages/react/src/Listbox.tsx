@@ -276,11 +276,15 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     });
   }
   const onInput = useCallback(($event: any) => {
-    setQuery($event.target.value);
+    // Use the fresh input value throughout — a re-read of `$data.query` right
+    // after writing it is STALE on React (setState is async; the closure's
+    // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
+    const q = $event.target.value;
+    setQuery(q);
     if (!expanded) open();
     setActiveIndex(nextEnabled(-1, 1));
-    fireSearch(query);
-  }, [expanded, fireSearch, nextEnabled, open, query]);
+    fireSearch(q);
+  }, [expanded, fireSearch, nextEnabled, open]);
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);

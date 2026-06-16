@@ -439,10 +439,14 @@ export class Listbox {
     query: this.query()
   });
   onInput = ($event: any) => {
-    this.query.set($event.target.value);
+    // Use the fresh input value throughout — a re-read of `$data.query` right
+    // after writing it is STALE on React (setState is async; the closure's
+    // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
+    const q = $event.target.value;
+    this.query.set(q);
     if (!this.expanded()) this.open();
     this.activeIndex.set(this.nextEnabled(-1, 1));
-    this.fireSearch(this.query());
+    this.fireSearch(q);
   };
   onOptionPointerMove = (index: any) => {
     if (this.activeIndex() !== index) this.activeIndex.set(index);

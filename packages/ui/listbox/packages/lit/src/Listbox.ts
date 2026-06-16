@@ -469,10 +469,14 @@ export default class Listbox extends SignalWatcher(LitElement) {
 }));
 
   onInput = ($event: any) => {
-  this._query.value = $event.target.value;
+  // Use the fresh input value throughout — a re-read of `$data.query` right
+  // after writing it is STALE on React (setState is async; the closure's
+  // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
+  const q = $event.target.value;
+  this._query.value = q;
   if (!this._expanded.value) this.open();
   this._activeIndex.value = this.nextEnabled(-1, 1);
-  this.fireSearch(this._query.value);
+  this.fireSearch(q);
 };
 
   onOptionPointerMove = (index: any) => {

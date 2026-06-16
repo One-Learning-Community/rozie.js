@@ -313,10 +313,14 @@ const fireSearch = (query: any) => onsearch?.({
   query
 });
 const onInput = ($event: any) => {
-  query = $event.target.value;
+  // Use the fresh input value throughout — a re-read of `$data.query` right
+  // after writing it is STALE on React (setState is async; the closure's
+  // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
+  const q = $event.target.value;
+  query = q;
   if (!expanded) open();
   activeIndex = nextEnabled(-1, 1);
-  fireSearch(query);
+  fireSearch(q);
 };
 
 // Pointer hover sets the virtual highlight (matches native <select> feel).

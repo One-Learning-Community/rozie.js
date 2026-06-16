@@ -459,6 +459,10 @@ export const EXAMPLES = [
   // listbox.spec.ts. Built for all 6 targets but NOT a screenshot cell —
   // deliberately NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
   'ListboxBehavior',
+  // @rozie-ui/listbox combobox mode — the type-to-filter BEHAVIORAL cell (loader →
+  // examples/demos/ListboxComboboxDemo.rozie). Drives the $computed-derived filter,
+  // the <input role="combobox">, the search event, and a two-way r-model:value.
+  'ListboxCombobox',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -635,6 +639,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
   // 'rozie-listbox'). Behavioral-only, no screenshot cell.
   ListboxBehavior: 'rozie-listbox-behavior',
+  // '-demo' appended → 'rozie-listbox-combobox-demo' = kebab of ListboxComboboxDemo.
+  ListboxCombobox: 'rozie-listbox-combobox',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -857,6 +863,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxBehavior: {},
+  ListboxCombobox: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
