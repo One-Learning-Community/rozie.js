@@ -36,6 +36,10 @@ import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import {
+  deconflictGeneratedSymbols,
+  type GeneratedSymbolGroup,
+} from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -327,154 +331,6 @@ function normalizeModelAccessor(program: File): void {
 }
 
 /**
- * Returns true if a binding-pattern node introduces a binding for `name`.
- *
- * Shared shape with the Svelte target's `patternIntroducesBinding` (the
- * destructuring-aware form ported from React's `hoistModuleLet`). Handles the
- * simple Identifier case plus ObjectPattern / ArrayPattern / AssignmentPattern /
- * RestElement destructured forms.
- */
-function patternIntroducesBinding(pattern: t.Node, name: string): boolean {
-  if (t.isIdentifier(pattern)) return pattern.name === name;
-  if (t.isObjectPattern(pattern)) {
-    for (const prop of pattern.properties) {
-      if (t.isObjectProperty(prop)) {
-        if (patternIntroducesBinding(prop.value as t.Node, name)) return true;
-      } else if (t.isRestElement(prop)) {
-        if (patternIntroducesBinding(prop.argument, name)) return true;
-      }
-    }
-    return false;
-  }
-  if (t.isArrayPattern(pattern)) {
-    for (const el of pattern.elements) {
-      if (el && patternIntroducesBinding(el, name)) return true;
-    }
-    return false;
-  }
-  if (t.isAssignmentPattern(pattern)) {
-    return patternIntroducesBinding(pattern.left, name);
-  }
-  if (t.isRestElement(pattern)) {
-    return patternIntroducesBinding(pattern.argument, name);
-  }
-  return false;
-}
-
-/**
- * Returns true if the subtree rooted at `node` contains a NON-computed
- * `$refs.<name>` read (Member/OptionalMember) — the exact shape the downstream
- * rewrite lowers to `<name>.current`. The trigger condition for the
- * ref-shadow bug: a colliding local/param only mis-captures the rewrite when
- * such a read actually exists within its scope. `$refs['x']` (computed) is
- * excluded (the rewrite skips computed access).
- */
-function subtreeReadsRef(node: t.Node | null | undefined, refName: string): boolean {
-  if (!node) return false;
-  let found = false;
-  // Hand-rolled recursive walk (no Program-rooted Babel traverse required).
-  function walk(n: t.Node | null | undefined): void {
-    if (found || !n || typeof n !== 'object' || !('type' in n)) return;
-    if (t.isMemberExpression(n) || t.isOptionalMemberExpression(n)) {
-      const obj = n.object;
-      const prop = n.property;
-      if (
-        !n.computed &&
-        t.isIdentifier(obj) &&
-        obj.name === '$refs' &&
-        t.isIdentifier(prop) &&
-        prop.name === refName
-      ) {
-        found = true;
-        return;
-      }
-    }
-    for (const key of Object.keys(n)) {
-      if (
-        key === 'loc' ||
-        key === 'start' ||
-        key === 'end' ||
-        key === 'leadingComments' ||
-        key === 'trailingComments' ||
-        key === 'innerComments'
-      ) {
-        continue;
-      }
-      const v = (n as unknown as Record<string, unknown>)[key];
-      if (Array.isArray(v)) {
-        for (const item of v) {
-          if (item && typeof item === 'object' && 'type' in item) walk(item as t.Node);
-        }
-      } else if (v && typeof v === 'object' && 'type' in v) {
-        walk(v as t.Node);
-      }
-    }
-  }
-  walk(node);
-  return found;
-}
-
-/**
- * SCOPE-AWARE PRE-PASS (debug `refs-self-shadow-tdz`).
- *
- * The downstream `$refs.X` → `X.current` rewrite is scope-BLIND: it relies on
- * the bare `X` binding to the `useRef` binding `const X = useRef(...)` that
- * emitScript synthesizes. When a local `const`/`let`/`var` declarator OR a
- * function PARAMETER shadows a ref name, the rewritten `X.current` is captured
- * by that shadow instead of the useRef. The canonical failure is the
- * SELF-REFERENCE runtime TDZ crash: `const flow = $refs.flow` →
- * `const flow = flow.current` (`flow` shadows itself in its own initializer →
- * `ReferenceError: Cannot access 'flow' before initialization`).
- *
- * This is the `$refs` analog of the Svelte target's `deconflictAccessorShadows`
- * prop/param pass (the `$props.X` self-shadow fixed in b4842c44). React keeps
- * non-model props as `props.step` member access (no bare lowering), so React's
- * exposure is narrower than Svelte's — only `$refs.X` bare-`.current` reads
- * collide; this pass covers exactly that.
- *
- * SURGICAL TRIGGER (zero-drift discipline): a name collision alone is NOT
- * enough — we rename only when the binding's scope ACTUALLY contains a
- * non-computed `$refs.<name>` read (`subtreeReadsRef`). A param/local that
- * merely shares a ref name but never reads `$refs.X` is left untouched (it was
- * never buggy), keeping the pass byte-identical on the existing corpus.
- *
- * Runs on the freshly-cloned, not-yet-mutated Program (after the
- * `$model`→`$props` normalization, which renames only `$model` object
- * identifiers — not bindings — so the scope cache is valid). `scope.rename`
- * atomically updates the declaration/param + every reference within its scope.
- */
-function deconflictRefShadows(program: File, refNames: ReadonlySet<string>): void {
-  if (refNames.size === 0) return;
-  const alias = (name: string): string => `${name}$local`;
-  traverse(program, {
-    Function(path) {
-      const body = path.node.body;
-      for (const param of path.node.params) {
-        for (const refName of refNames) {
-          if (
-            patternIntroducesBinding(param, refName) &&
-            subtreeReadsRef(body, refName)
-          ) {
-            path.scope.rename(refName, alias(refName));
-          }
-        }
-      }
-    },
-    VariableDeclarator(path) {
-      const id = path.node.id;
-      for (const refName of refNames) {
-        if (!patternIntroducesBinding(id, refName)) continue;
-        const binding = path.scope.getBinding(refName);
-        const ownerScope = binding ? binding.scope : path.scope;
-        if (subtreeReadsRef(ownerScope.block, refName)) {
-          ownerScope.rename(refName, alias(refName));
-        }
-      }
-    },
-  });
-}
-
-/**
  * Detect whether a MemberExpression LHS represents a NESTED write
  * (e.g., `$data.todo.title = X`). Returns the root `$data`/`$props`
  * Identifier name when so; null otherwise.
@@ -547,14 +403,37 @@ export function rewriteRozieIdentifiers(
   // is byte-identical to the prior `$props.X` model form, proven in Wave 3.
   normalizeModelAccessor(program);
 
-  // SCOPE-AWARE PRE-PASS (debug `refs-self-shadow-tdz`): rename any local
-  // binding that shadows a REF name to `<name>$local` BEFORE the scope-blind
-  // `$refs.X` → `X.current` rewrite below. Prevents the
-  // `const X = $refs.X` → `const X = X.current` self-reference TDZ crash. The
-  // `$refs` analog of Svelte's prop/param deconflict pass. Surgically gated on
-  // an actual `$refs.<name>` read so it stays byte-identical on the existing
-  // corpus. See deconflictRefShadows for the full rationale.
-  deconflictRefShadows(program, refNames);
+  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — the single shared,
+  // target-parameterized, collision-aware rename pass in @rozie/core. Runs on
+  // the freshly-cloned, not-yet-mutated Program (after the $model→$props
+  // normalization, which renames only $model object identifiers — not bindings —
+  // so the scope cache is valid) BEFORE the scope-blind bare-identifier rewrite
+  // below. Subsumes the former React-local `deconflictRefShadows` AND the ROZ524
+  // setter-collision ERROR (now an auto-rename of the user side).
+  //
+  // React's generated-symbol set (RESEARCH Pattern 3):
+  //   - `$refs.X` → bare `X` (`.current`): accessor-shadow, gated on a real
+  //     `$refs.X` read (the canonical `const flow = $refs.flow` TDZ).
+  //   - `$data.X` → bare `X` (useState value): accessor-shadow, gated on a real
+  //     `$data.X` read (e.g. the listbox `open` $data key whose local shadows
+  //     the useState binding; the $expose verb `open` is NEVER renamed).
+  //   - model-prop → bare `X` (useControllableState value): accessor-shadow on
+  //     `$props` (model props read via `$props.X` after $model normalization).
+  //   - `setX` setter (per state + per model prop): a pure binding collision —
+  //     a user helper named `setX` (the ROZ524 case) auto-renames to
+  //     `setX$local`; the generated `setX` setter is the contract.
+  //   NOT non-model props — React keeps those as `props.X` member access, so a
+  //   like-named local never collides.
+  const setterNames = new Set<string>();
+  for (const s of ir.state) setterNames.add('set' + capitalize(s.name));
+  for (const p of ir.props) if (p.isModel) setterNames.add('set' + capitalize(p.name));
+  const reactGroups: GeneratedSymbolGroup[] = [
+    { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
+    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
+    { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
+    { names: setterNames, trigger: { kind: 'binding' } },
+  ];
+  deconflictGeneratedSymbols(program, reactGroups);
 
   traverse(program, {
     AssignmentExpression(path) {

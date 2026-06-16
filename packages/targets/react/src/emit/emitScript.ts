@@ -2713,16 +2713,24 @@ export function emitScript(
   // 260519 linechart-watch-recreate so the watcher loop's callback-body walk
   // can consult it. See the pre-scan block before `lifecycleEffectLines`.
 
-  // Phase 07.7 — ROZ524 collision detection. React auto-generates `set<Cap>`
-  // setters for every state / model-prop via `useState` / `useControllableState`
-  // destructure. If the user authors a top-level helper with the same name
-  // (e.g. `const setView = (v) => { $data.view = v }` when `view` is a model
-  // prop), the emitted code has TWO `setView` bindings — useState's destructure
-  // AND the user's const — producing "Identifier 'setView' has already been
-  // declared". Worse, the user's body `$data.view = v` rewrites to `setView(v)`
-  // which then targets the user's own wrapper → infinite recursion. Detect at
-  // compile time; emit ROZ524; user must rename. Surfaced by FullCalendarDemo's
-  // `setView` wrapper for `view: { model: true }`.
+  // Phase 07.7 → Phase 46 ITEM-5 (D-02): the former ROZ524 `setX` collision.
+  //
+  // React auto-generates `set<Cap>` setters for every state / model-prop via the
+  // `useState` / `useControllableState` destructure. A user helper authored with
+  // the SAME name (e.g. `const setView = (v) => { $model.view = v }` when `view`
+  // is a model prop) previously produced a HARD ERROR (ROZ524) the author had to
+  // rename by hand.
+  //
+  // As of Phase 46 ITEM-5 the unified deconfliction pass (the `{ kind: 'binding' }`
+  // setter group in rewrite/rewriteScript.ts) AUTO-RENAMES the user helper to
+  // `setView$local` on the freshly-cloned Program BEFORE this point. The
+  // renameable side is the USER HELPER — `setX` IS the generated setter contract.
+  //
+  // ROZ524 is KEPT here as a defense-in-depth assertion: post-rename, NO entry of
+  // `allHelperNames` should still equal a generated setter name. If one does, the
+  // deconfliction pass failed to fire (a bug in the pass, not the author's
+  // source), and surfacing the error is preferable to emitting a double-binding /
+  // infinite-recursion. In normal operation this loop never fires.
   const autoSetters = new Set<string>();
   for (const p of ir.props) {
     if (p.isModel) autoSetters.add('set' + capitalize(p.name));
@@ -2737,11 +2745,10 @@ export function emitScript(
         code: RozieErrorCode.TARGET_REACT_SETTER_NAME_COLLISION,
         severity: 'error',
         message:
-          `User-defined function '${name}' collides with the React auto-generated setter for the same-named state/model prop. ` +
-          `React's \`useState\` / \`useControllableState\` destructure binds '${name}' from the IR's state/model props, ` +
-          `and a top-level user helper with the same identifier produces "Identifier '${name}' has already been declared" at runtime, ` +
-          `plus the user's body rewrite ('$data.${name.slice(3, 4).toLowerCase()}${name.slice(4)} = v' → '${name}(v)') becomes infinite recursion. ` +
-          `Rename the user function — e.g. '${name}' → 'select${name.slice(3)}'.`,
+          `INTERNAL: user-defined function '${name}' still collides with the React auto-generated setter after the Phase 46 deconfliction pass. ` +
+          `This indicates the unified deconfliction pass (rewrite/rewriteScript.ts setter group) failed to rename the user helper to '${name}$local'. ` +
+          `Expected the pass to auto-rename '${name}' → '${name}$local' on the cloned Program. ` +
+          `If you are seeing this, please file a Rozie compiler bug.`,
         loc: loc ? { start: loc.start, end: loc.end } : { start: 0, end: 0 },
       });
     }
