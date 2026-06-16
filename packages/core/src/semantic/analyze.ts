@@ -40,6 +40,8 @@ import { runContextValidator } from './validators/contextValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
 import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
+import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
+import { runReactStaleReadValidator } from './validators/reactStaleReadValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
 export interface AnalyzeResult {
@@ -78,6 +80,16 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // throws on Vue reactive()/Svelte $state proxies — steer authors to $clone(x).
   // No binding dependency.
   runStructuredCloneReactiveValidator(ast, diagnostics);
+  // Phase 46 (ITEM-3, D-02/D-03b) — ROZ137 (warning): an $expose verb whose name
+  // shadows an inherited Object.prototype member (Angular+Lit) or HTMLElement/
+  // Element/Node member (Lit) — the exposed method becomes a colliding class
+  // member on the class-based targets. Reads bindings.expose.
+  runExposeReservedMemberValidator(ast, bindings, diagnostics);
+  // Phase 46 (ITEM-4, D-03b/A3) — ROZ138 (warning): within one <script> function
+  // body, a read of $data/$model/$props.x dominated by an earlier write to the
+  // same key (React setState is async → the read binds the pre-write value).
+  // Conservative same-body write-before-read scan; no binding dependency.
+  runReactStaleReadValidator(ast, diagnostics);
   // Phase 26 (SPEC-5, D-04/D-05/D-14) — ROZ978: a bare whole-object
   // $props/$data/$refs/$slots identifier (not a member access; $attrs/$listeners
   // exempt) used across template/script/listeners expressions. Always-on,

@@ -353,6 +353,35 @@ export const RozieErrorCode = {
   // lowerToIR). ROZ136 is the next free code after ROZ135 in the 100
   // semantic-binding cluster.
   CLONE_BAD_ARITY: 'ROZ136', // error — $clone(value) requires exactly one non-spread argument; the per-target lowering cannot interpret any other arity.
+  // Phase 46 (ITEM-3, D-02/D-03b) — an `$expose` verb whose name shadows an
+  // INHERITED member of the emitted class. On the class-based targets (Angular +
+  // Lit) the exposed method becomes a class method; if its name is an
+  // `Object.prototype` member (`valueOf`/`toString`/`hasOwnProperty`/…) it
+  // breaks the legacy `@property` decorator's `Object`-assignability and cascades
+  // TS1240/TS1271 to EVERY decorator on the Lit class (the listbox `valueOf`
+  // finding — 38 errors from one name). On Lit ALSO an `HTMLElement`/`Element`/
+  // `Node` inherited member (`focus`/`blur`/`scrollTo`/`nodeType`/…) collides
+  // with the LitElement base-class method (the Embla `scrollTo`→TS2416 finding).
+  // Warn (not error) so a legitimate non-class-target build still compiles —
+  // it is a target-asymmetric footgun, not a universal break. Emitted from
+  // exposeReservedMemberValidator, wired into analyzeAST so it fires once for
+  // both compile() and @rozie/unplugin (both route through lowerToIR).
+  // ROZ137 is the next free code after ROZ136 in the 100 authoring cluster.
+  EXPOSE_RESERVED_MEMBER: 'ROZ137', // warn — an $expose verb shadows an inherited Object.prototype member (Angular+Lit) or HTMLElement/Element/Node member (Lit); suffix-rename it (e.g. readValue).
+  // Phase 46 (ITEM-4, D-03b/A3) — a React stale-read: within ONE <script>
+  // function body, a read of `$data.x`/`$model.x`/`$props.x` that is dominated by
+  // (textually after) an earlier WRITE to the SAME key. On React the write lowers
+  // to an async `setState`, so the dominated read in the same synchronous body
+  // binds the PRE-write value (the listbox combobox `onInput`:
+  // `$data.query = e.target.value; fireSearch($data.query)` searched the stale
+  // query). The other five targets assign reactively/synchronously, so the same
+  // source works there — a target-asymmetric React footgun. Warn (not error):
+  // the scan is conservative-syntactic (same-body, no control-flow graph) and
+  // false-positive-aware (A3); a warning is non-blocking and never mutates emit.
+  // Emitted from reactStaleReadValidator, wired into analyzeAST so it fires once
+  // for both compile() and @rozie/unplugin (both route through lowerToIR).
+  // ROZ138 is the next free code after ROZ137 in the 100 authoring cluster.
+  REACT_STALE_READ: 'ROZ138', // warn — read of $data/$model/$props.x dominated by an earlier write to the same key in one function body; React setState is async so the read binds the pre-write value. Capture the fresh local instead.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
