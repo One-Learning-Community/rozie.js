@@ -1,0 +1,104 @@
+<!--
+  ListboxBehaviorDemo.rozie — BEHAVIORAL consumer for the pure-Rozie Listbox.
+
+  The first @rozie-ui family with NO third-party engine, so this demo proves the
+  NATIVE behaviour authored entirely in Rozie works identically across all 6
+  targets (listbox.spec.ts):
+
+    - :options is a fixed 5-entry object array; single-select (combobox off).
+    - r-model:value two-way binds the selection to $data.value; the live
+      `readout-value` proves the bound value round-trips OUT (the component writes
+      $model.value → $data.value → readout).
+    - Keyboard navigation: ArrowDown opens + roves the virtual-focus highlight
+      (aria-activedescendant), Enter commits the active option (selection +
+      close), Escape closes. DOM focus never leaves the control.
+    - A `set-value` button writes $data.value DIRECTLY (the uniform two-way
+      driver); reopening shows the matching option carries aria-selected — the
+      model write flowed INTO the component.
+    - A scoped #option slot renders each option label (exercises scoped slots).
+
+  This is the BEHAVIORAL cell — no screenshot stabilization here.
+-->
+
+<rozie name="ListboxBehaviorDemo">
+
+<components>
+{
+  Listbox: '../../packages/ui/listbox/src/Listbox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana' },
+  { label: 'Cherry', value: 'cherry' },
+  { label: 'Date', value: 'date' },
+  { label: 'Elderberry', value: 'elderberry' },
+]
+
+// The uniform two-way driver: write the bound value directly. The model write
+// flows into the wrapper → the matching option gets aria-selected, and the
+// readout (bound to the same $data.value) reflects it. Works on all 6 targets.
+const pickValue = (v) => { $data.value = v }
+</script>
+
+<template>
+<div class="listbox-demo">
+  <h3>Listbox — behavioral</h3>
+
+  <div class="controls">
+    <!-- Direct model write (the uniform two-way driver across all 6) -->
+    <button type="button" data-testid="set-value" @click="pickValue('elderberry')">Set Elderberry</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Listbox
+    :options="OPTIONS"
+    r-model:value="$data.value"
+    id="demo-listbox"
+    aria-label="Choose a fruit"
+  >
+    <template #option="{ option, selected }">
+      <span class="opt" :class="{ 'opt-selected': selected }">{{ option.label }}</span>
+    </template>
+  </Listbox>
+</div>
+</template>
+
+<style>
+.listbox-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.listbox-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-weight: 600;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

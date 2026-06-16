@@ -451,6 +451,14 @@ export const EXAMPLES = [
   // Built-in carousel navigation (dots + arrows + synced thumbnail strip) — the
   // content-STABLE pixel cell (loader → examples/demos/CarouselNavScreenshotDemo.rozie).
   'CarouselNavScreenshot',
+  // @rozie-ui/listbox (pure-Rozie WAI-ARIA listbox/combobox, NO engine) — the
+  // BEHAVIORAL cell (loader → examples/demos/ListboxBehaviorDemo.rozie, which
+  // imports ../../packages/ui/listbox/src/Listbox.rozie). It drives single-select
+  // with a two-way r-model:value (live readout), keyboard navigation
+  // (ArrowDown/Enter/Escape), and a `set-value` direct-model-write button — see
+  // listbox.spec.ts. Built for all 6 targets but NOT a screenshot cell —
+  // deliberately NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
+  'ListboxBehavior',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -623,6 +631,10 @@ export const LIT_TAGS: Record<Example, string> = {
   Carousel: 'rozie-carousel',
   CarouselScreenshot: 'rozie-carousel-screenshot',
   CarouselNavScreenshot: 'rozie-carousel-nav-screenshot',
+  // @rozie-ui/listbox — '-demo' appended → tag 'rozie-listbox-behavior-demo' =
+  // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
+  // 'rozie-listbox'). Behavioral-only, no screenshot cell.
+  ListboxBehavior: 'rozie-listbox-behavior',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -841,6 +853,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   Carousel: {},
   CarouselScreenshot: {},
   CarouselNavScreenshot: {},
+  // @rozie-ui/listbox — ListboxBehaviorDemo is self-contained: it seeds OPTIONS in
+  // <script> + value:null in <data> and binds r-model:value internally (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
+  ListboxBehavior: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

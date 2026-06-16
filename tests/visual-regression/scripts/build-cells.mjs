@@ -147,6 +147,17 @@ const EMBLA_SRC = resolve(
   'embla',
   'src',
 );
+// Same packaging move for @rozie-ui/listbox: Listbox.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Listbox.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const LISTBOX_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'listbox',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -405,6 +416,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // embla src always exists post-port — defensive only
   }
   rmSync(resolve(EMBLA_SRC, 'Carousel.ts'), { force: true });
+  // Same sweep for @rozie-ui/listbox's package src (ListboxBehaviorDemo composes
+  // Listbox via <components>, so the Angular sub-build emits Listbox.rozie.ts +
+  // the Listbox.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(LISTBOX_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(LISTBOX_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // listbox src always exists post-port — defensive only
+  }
+  rmSync(resolve(LISTBOX_SRC, 'Listbox.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
