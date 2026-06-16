@@ -329,6 +329,14 @@ function tryWrapEscapingHelperUseCallback(
   ir: IRComponent,
   allHelperNames: Set<string>,
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
+  // ITEM-1 (Phase 46) — prop names whose `_rozieProp_*` destructure is HOISTED
+  // to a single combined `const { … } = props;` at the top of the user-arrows
+  // section (because 2+ escaping helpers call the same `props.X`). When a name
+  // is in this set, this helper does NOT mint its own per-helper destructure
+  // prefix for it (avoids the duplicate `const` → TS2451). The body rewrite to
+  // the bare `_rozieProp_*` local still happens (the hoisted destructure binds
+  // it in the enclosing scope). Empty set = the byte-identical pre-fix path.
+  hoistedPropNames: ReadonlySet<string> = new Set(),
 ): string | null {
   if (!t.isVariableDeclaration(stmt)) return null;
   if (stmt.declarations.length !== 1) return null;
@@ -361,10 +369,22 @@ function tryWrapEscapingHelperUseCallback(
   let initToEmit: t.Node = init;
   let destructurePrefix = '';
   if (destructureNames.size > 0) {
+    // The body rewrite ALWAYS happens for every renamed name — `props.X` →
+    // `_rozieProp_X`. The destructure that BINDS the bare local is either the
+    // per-helper prefix (below) or the hoisted combined line (ITEM-1).
     initToEmit = rewritePropsToBareLocals(init, renameMap);
-    const sortedNames = [...renameMap.keys()].sort();
-    const renamedPairs = sortedNames.map((n) => `${n}: ${renameMap.get(n)}`);
-    destructurePrefix = `const { ${renamedPairs.join(', ')} } = props;\n  `;
+    // ITEM-1 — names that are hoisted to the combined destructure must NOT be
+    // re-declared here (a duplicate `const` in the same scope = TS2451). Only
+    // emit the per-helper prefix for the names NOT hoisted. When NO names are
+    // hoisted (the common single-emit-site case), this is byte-identical to the
+    // pre-fix path.
+    const perHelperNames = [...renameMap.keys()]
+      .filter((n) => !hoistedPropNames.has(n))
+      .sort();
+    if (perHelperNames.length > 0) {
+      const renamedPairs = perHelperNames.map((n) => `${n}: ${renameMap.get(n)}`);
+      destructurePrefix = `const { ${renamedPairs.join(', ')} } = props;\n  `;
+    }
   }
 
   // Compute body deps using the ORIGINAL body so the walker classifies
@@ -670,6 +690,30 @@ function collectPropsCallsToDestructure(body: t.Node): Set<string> {
     },
   });
   return names;
+}
+
+/**
+ * ITEM-1 (Phase 46) — pre-scan: for an escaping-helper statement, return the
+ * set of `props.X` call-names it would destructure to a `_rozieProp_X` local
+ * (the SAME `collectPropsCallsToDestructure` set used by the wrap). Returns an
+ * empty set for any statement that is not an escaping-helper arrow/fn const.
+ * Used to compute the cross-helper duplicate set BEFORE the wrap loop runs.
+ */
+function escapingHelperDestructureNames(
+  stmt: t.Statement,
+  escapingHelperNames: Set<string>,
+): Set<string> {
+  if (!t.isVariableDeclaration(stmt)) return new Set();
+  if (stmt.declarations.length !== 1) return new Set();
+  const decl = stmt.declarations[0]!;
+  if (!t.isIdentifier(decl.id)) return new Set();
+  const init = decl.init;
+  if (!init) return new Set();
+  if (!t.isArrowFunctionExpression(init) && !t.isFunctionExpression(init)) {
+    return new Set();
+  }
+  if (!escapingHelperNames.has(decl.id.name)) return new Set();
+  return collectPropsCallsToDestructure(init.body);
 }
 
 /**
@@ -2703,7 +2747,39 @@ export function emitScript(
     }
   }
 
+  // ITEM-1 (Phase 46) — pre-scan all escaping-helper statements to find which
+  // `_rozieProp_*` prop-names are destructured by 2+ helpers. Those names get
+  // ONE combined `const { … } = props;` hoisted above the user-arrows section;
+  // each helper then omits its per-helper prefix for them (avoids the duplicate
+  // `const` that produced TS2451). Gated on ACTUAL duplication: a name used by
+  // a single helper stays on the per-helper path (byte-identical to pre-fix).
+  const propDestructureCounts = new Map<string, number>();
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecyclePairing.consumedIndices.has(i)) continue;
+    if (watcherPairing.consumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i]!;
+    const names = escapingHelperDestructureNames(stmt, escapingHelperNames);
+    for (const n of names) {
+      propDestructureCounts.set(n, (propDestructureCounts.get(n) ?? 0) + 1);
+    }
+  }
+  const hoistedPropNames = new Set<string>(
+    [...propDestructureCounts.entries()]
+      .filter(([, count]) => count >= 2)
+      .map(([n]) => n),
+  );
+
   const userArrowsLines: string[] = [];
+  // ITEM-1 — when there are shared prop-destructures, hoist the single combined
+  // `const { onOpenChange: _rozieProp_onOpenChange, … } = props;` line FIRST so
+  // every wrapped helper's body can read the bare `_rozieProp_*` local from the
+  // enclosing scope. Deterministic ordering (sorted) matches the per-helper
+  // `[...renameMap.keys()].sort()` discipline.
+  if (hoistedPropNames.size > 0) {
+    const sorted = [...hoistedPropNames].sort();
+    const pairs = sorted.map((n) => `${n}: _rozieProp_${n}`);
+    userArrowsLines.push(`const { ${pairs.join(', ')} } = props;`);
+  }
   // Collect statements that are emitted as-is (not wrapped by
   // tryWrapEscapingHelperUseCallback) so we can generate a unified source map
   // from them. Wrapped statements produce string output (not AST) and have no
@@ -2798,6 +2874,7 @@ export function emitScript(
       ir,
       allHelperNames,
       collectors,
+      hoistedPropNames,
     );
     if (wrapped) {
       userArrowsLines.push(wrapped);
