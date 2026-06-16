@@ -601,6 +601,91 @@ $onMount(() => {
 
 Source order is preserved per-target so the framework's lifecycle ordering is predictable.
 
+## `$computed(() => ...)` — derived reactive values
+
+`$computed(() => expr)` declares a value derived from other reactive state — re-evaluated automatically whenever a reactive read inside the getter changes. Each target compiles it to its native derived-reactivity primitive, and **you read it by its bare name** everywhere — in templates, interpolations, and `<script>`:
+
+```rozie
+<data>{ query: '', options: [] }</data>
+
+<script>
+const visibleOptions = $computed(() =>
+  $data.options.filter((o) => o.label.includes($data.query))
+)
+
+const hasMatches = $computed(() => visibleOptions.length > 0)
+</script>
+
+<template>
+  <ul>
+    <li r-for="opt in visibleOptions" :key="opt.id">{{ opt.label }}</li>
+  </ul>
+  <p r-if="!hasMatches">No matches</p>
+</template>
+```
+
+Note the bare reads — `visibleOptions`, never `visibleOptions()`. The emitter rewrites each bare reference to the per-target access form for you, so the same source reads correctly on all six:
+
+| Target | Primitive | Bare read `visibleOptions` lowers to |
+| --- | --- | --- |
+| Vue | `computed()` → `Ref<T>` | `visibleOptions.value` |
+| React | inlined `useMemo` value | the memoized value (value form) |
+| Svelte 5 | `$derived` | the derived value (value form) |
+| Angular | `computed()` signal | `this.visibleOptions()` |
+| Solid | `createMemo` → **accessor function** | `visibleOptions()` |
+| Lit | preact-signal | `this.visibleOptions.value` |
+
+### Read it bare — don't alias the memo into a local
+
+There is one target-divergence to know about, and it has a clean rule that sidesteps it entirely: **never alias a `$computed` into a local in `<script>` and then index or call the alias.** The emitter rewrites *bare reads* of a computed name, but it does **not** rewrite the right-hand side of an assignment — and on Solid a `$computed` is backed by a `createMemo` **accessor function**, not a value:
+
+```rozie
+<script>
+// ❌ Target-divergent — the alias captures different things per target:
+const o = visibleOptions
+// On React/Vue/Svelte/Angular/Lit, `o` is the derived VALUE → `o.length` works.
+// On Solid, `o` is the memo ACCESSOR FUNCTION → `o.length` is `undefined`
+//   and `o.findIndex(...)` / `o[i]` are type errors (TS2339) — you'd have to
+//   write `o()` on Solid and bare `o` on the other five. There is no single
+//   source form that works on all six.
+const first = o[0]
+</script>
+```
+
+The same divergence bites if you pass a `$computed` name as a plain value into other code that indexes or iterates it. As long as you only read the computed **bare** (in a template, an interpolation, an `r-for` iterable, or a simple expression that the emitter rewrites), you never hit this — the access form is handled for you.
+
+### When you need to alias and index — use a plain function
+
+If you genuinely need a derived value that you alias into a local and then index, call, or pass around in handler/`<script>` logic, **don't reach for `$computed` — write a plain function and call it with `()` everywhere.** A normal function is uniform across all six targets (it's a function on every one of them), so `const o = currentOptions()` followed by `o.length` / `o.findIndex(...)` behaves identically:
+
+```rozie
+<data>{ query: '', options: [] }</data>
+
+<script>
+// ✅ A plain function — uniform on all six. Call it with () at every use site,
+//    in <script> and in templates alike.
+const currentOptions = () =>
+  $data.options.filter((o) => o.label.includes($data.query))
+
+const selectFirst = () => {
+  const o = currentOptions()        // a value on every target
+  if (o.length) select(o[0])        // indexes/iterates identically everywhere
+}
+</script>
+
+<template>
+  <li r-for="opt in currentOptions()" :key="opt.id">{{ opt.label }}</li>
+</template>
+```
+
+The trade-off is that a plain function is **not** memoized — it re-runs at every read instead of caching until a dependency changes. For most derivations (filtering a list, computing a flag) that cost is negligible, and the gain is one access form that reads the same on all six targets. Reserve `$computed` for the values you read **bare** and never alias-then-index; reach for a plain function the moment you need to capture a derived value in a local and operate on it.
+
+::: tip Rule of thumb
+Read a `$computed` bare (template, interpolation, simple expression) and the access form is handled for you on all six targets. The moment you want to alias it into a local and index/call/iterate that local, switch to a plain function called with `()` — it's the clearer, target-uniform form.
+:::
+
+Reading `$refs` inside a `$computed` body is a compile error (`ROZ123`) for the same reason it is in a `$watch` getter — the computed evaluates eagerly, before the ref is populated. See [`$refs`](#refs-derived-from-ref) below.
+
 ## `$watch(() => getter, cb)` — react to value transitions
 
 `$watch` is the primitive for "do something whenever this value changes." The getter is what the watcher subscribes to; the callback runs whenever a reactive read inside the getter flips:
