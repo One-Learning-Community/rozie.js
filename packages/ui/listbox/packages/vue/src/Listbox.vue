@@ -1,17 +1,17 @@
 <template>
 
-<div :class="['rozie-listbox', { 'rozie-listbox-open': expanded, 'rozie-listbox-disabled': props.disabled }]" v-bind="$attrs">
+<div :class="['rozie-listbox', { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': props.disabled }]" v-bind="$attrs">
 
   
   <div class="rozie-listbox-control" ref="controlElRef">
-    <input v-if="props.combobox" ref="inputElRef" class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="expanded" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" :placeholder="props.placeholder" :value="query" @input="onInput($event)" @keydown="onControlKeyDown($event)" @focus="open" /><button v-else ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
+    <input v-if="props.combobox" ref="inputElRef" class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" :placeholder="props.placeholder" :value="query" @input="onInput($event)" @keydown="onControlKeyDown($event)" @focus="open" /><button v-else ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
       <slot name="selected" :selected="selectedLabel" :value="value">
         <span v-if="selectedLabel" class="rozie-listbox-selected">{{ selectedLabel }}</span><span v-else class="rozie-listbox-placeholder">{{ props.placeholder }}</span></slot>
       <span class="rozie-listbox-arrow" aria-hidden="true">▾</span>
     </button></div>
 
   
-  <div v-if="expanded" ref="listElRef" class="rozie-listbox-list" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple">
+  <div v-if="open$local" ref="listElRef" class="rozie-listbox-list" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple">
     <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-listbox-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
       <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
         {{ labelOf(opt) }}
@@ -47,7 +47,7 @@ defineSlots<{
   empty(props: { query: any }): any;
 }>();
 
-const expanded = ref(false);
+const open$local = ref(false);
 const activeIndex = ref(-1);
 const query = ref('');
 
@@ -64,13 +64,13 @@ const selectedLabel = computed(() => {
     // separate calls — narrowing one stable local works on every target.
     const arr = Array.isArray(cur) ? cur : [];
     if (arr.length === 0) return '';
-    return props.options.filter((o: any) => arr.includes(readValue(o))).map(labelOf).join(', ');
+    return props.options.filter((o: any) => arr.includes(valueOf(o))).map(labelOf).join(', ');
   }
-  const match = props.options.find((o: any) => readValue(o) === cur);
+  const match = props.options.find((o: any) => valueOf(o) === cur);
   return match === undefined ? '' : labelOf(match);
 });
 const activeDescendant = computed(() => {
-  if (!expanded.value || activeIndex.value < 0) return null;
+  if (!open$local.value || activeIndex.value < 0) return null;
   return optionId(activeIndex.value);
 });
 
@@ -87,7 +87,7 @@ const labelOf = (opt: any) => {
   if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
   return String(opt);
 };
-const readValue = (opt: any) => {
+const valueOf = (opt: any) => {
   if (props.optionValue !== null) return props.optionValue(opt);
   if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
   return opt;
@@ -125,7 +125,7 @@ const visibleOptions = () => {
 // accessor form stays uniform.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
-  const v = readValue(opt);
+  const v = valueOf(opt);
   const cur = value.value;
   if (props.multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
@@ -170,8 +170,8 @@ const scrollActiveIntoView = () => {
 // React prop-destructure for `onOpenChange` hoists exactly once.
 const applyExpanded = (next: any) => {
   if (next && props.disabled) return;
-  if (expanded.value === next) return;
-  expanded.value = next;
+  if (open$local.value === next) return;
+  open$local.value = next;
   activeIndex.value = next ? resolveInitialActive() : -1;
   emit('open-change', {
     open: next
@@ -179,7 +179,7 @@ const applyExpanded = (next: any) => {
 };
 const open = () => applyExpanded(true);
 const close = () => applyExpanded(false);
-const toggle = () => applyExpanded(!expanded.value);
+const toggle = () => applyExpanded(!open$local.value);
 
 // ---- selection ---------------------------------------------------------
 // Single `$emit('change')` site (called from both select + clear).
@@ -191,7 +191,7 @@ const fireChange = (value: any, option: any) => emit('change', {
 });
 const select = (opt: any) => {
   if (disabledOf(opt)) return;
-  const v = readValue(opt);
+  const v = valueOf(opt);
   if (props.multiple) {
     const cur = value.value;
     const arr = Array.isArray(cur) ? cur : [];
@@ -230,7 +230,7 @@ const nextEnabled = (from: any, dir: any) => {
   return from;
 };
 const move = (dir: any) => {
-  if (!expanded.value) {
+  if (!open$local.value) {
     open();
     return;
   }
@@ -239,7 +239,7 @@ const move = (dir: any) => {
   scrollActiveIntoView();
 };
 const moveEdge = (toEnd: any) => {
-  if (!expanded.value) open();
+  if (!open$local.value) open();
   activeIndex.value = toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1);
   scrollActiveIntoView();
 };
@@ -261,7 +261,7 @@ const onTypeahead = (ch: any) => {
   const opts = visibleOptions();
   const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer));
   if (idx !== -1) {
-    if (!expanded.value) open();
+    if (!open$local.value) open();
     activeIndex.value = idx;
     scrollActiveIntoView();
   }
@@ -288,12 +288,12 @@ const onControlKeyDown = ($event: any) => {
     $event.preventDefault();
     moveEdge(true);
   } else if (key === 'Enter') {
-    if (expanded.value) {
+    if (open$local.value) {
       $event.preventDefault();
       commitActive();
     }
   } else if (key === 'Escape') {
-    if (expanded.value) {
+    if (open$local.value) {
       $event.preventDefault();
       close();
       focusControl();
@@ -303,10 +303,10 @@ const onControlKeyDown = ($event: any) => {
     // literal space, so do nothing there.
     if (!props.combobox) {
       $event.preventDefault();
-      if (!expanded.value) open();else commitActive();
+      if (!open$local.value) open();else commitActive();
     }
   } else if (key === 'Tab') {
-    if (expanded.value) close();
+    if (open$local.value) close();
   } else if (!props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     onTypeahead(key);
   }
@@ -325,7 +325,7 @@ const onInput = ($event: any) => {
   // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
   const q = $event.target.value;
   query.value = q;
-  if (!expanded.value) open();
+  if (!open$local.value) open();
   activeIndex.value = nextEnabled(-1, 1);
   fireSearch(q);
 };
@@ -345,7 +345,7 @@ defineExpose({ open, close, toggle, clear, focusControl });
 useOutsideClick(
   [controlElRef, listElRef],
   () => close(),
-  () => expanded.value,
+  () => open$local.value,
 );
 </script>
 

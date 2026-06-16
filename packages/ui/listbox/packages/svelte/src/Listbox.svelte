@@ -58,7 +58,7 @@ const selected = $derived(__selectedProp ?? snippets?.selected);
 const option = $derived(__optionProp ?? snippets?.option);
 const empty = $derived(__emptyProp ?? snippets?.empty);
 
-let expanded = $state(false);
+let open$local = $state(false);
 let activeIndex = $state(-1);
 let query = $state('');
 
@@ -80,7 +80,7 @@ const labelOf = (opt: any) => {
   if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
   return String(opt);
 };
-const readValue = (opt: any) => {
+const valueOf = (opt: any) => {
   if (optionValue !== null) return optionValue(opt);
   if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
   return opt;
@@ -118,7 +118,7 @@ const visibleOptions = () => {
 // accessor form stays uniform.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
-  const v = readValue(opt);
+  const v = valueOf(opt);
   const cur = value;
   if (multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
@@ -163,8 +163,8 @@ const scrollActiveIntoView = () => {
 // React prop-destructure for `onOpenChange` hoists exactly once.
 const applyExpanded = (next: any) => {
   if (next && disabled) return;
-  if (expanded === next) return;
-  expanded = next;
+  if (open$local === next) return;
+  open$local = next;
   activeIndex = next ? resolveInitialActive() : -1;
   onopenchange?.({
     open: next
@@ -172,7 +172,7 @@ const applyExpanded = (next: any) => {
 };
 export const open = () => applyExpanded(true);
 export const close = () => applyExpanded(false);
-export const toggle = () => applyExpanded(!expanded);
+export const toggle = () => applyExpanded(!open$local);
 
 // ---- selection ---------------------------------------------------------
 // Single `$emit('change')` site (called from both select + clear).
@@ -184,7 +184,7 @@ const fireChange = (value: any, option: any) => onchange?.({
 });
 const select = (opt: any) => {
   if (disabledOf(opt)) return;
-  const v = readValue(opt);
+  const v = valueOf(opt);
   if (multiple) {
     const cur = value;
     const arr = Array.isArray(cur) ? cur : [];
@@ -223,7 +223,7 @@ const nextEnabled = (from: any, dir: any) => {
   return from;
 };
 const move = (dir: any) => {
-  if (!expanded) {
+  if (!open$local) {
     open();
     return;
   }
@@ -232,7 +232,7 @@ const move = (dir: any) => {
   scrollActiveIntoView();
 };
 const moveEdge = (toEnd: any) => {
-  if (!expanded) open();
+  if (!open$local) open();
   activeIndex = toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1);
   scrollActiveIntoView();
 };
@@ -254,7 +254,7 @@ const onTypeahead = (ch: any) => {
   const opts = visibleOptions();
   const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer));
   if (idx !== -1) {
-    if (!expanded) open();
+    if (!open$local) open();
     activeIndex = idx;
     scrollActiveIntoView();
   }
@@ -281,12 +281,12 @@ const onControlKeyDown = ($event: any) => {
     $event.preventDefault();
     moveEdge(true);
   } else if (key === 'Enter') {
-    if (expanded) {
+    if (open$local) {
       $event.preventDefault();
       commitActive();
     }
   } else if (key === 'Escape') {
-    if (expanded) {
+    if (open$local) {
       $event.preventDefault();
       close();
       focusControl();
@@ -296,10 +296,10 @@ const onControlKeyDown = ($event: any) => {
     // literal space, so do nothing there.
     if (!combobox) {
       $event.preventDefault();
-      if (!expanded) open();else commitActive();
+      if (!open$local) open();else commitActive();
     }
   } else if (key === 'Tab') {
-    if (expanded) close();
+    if (open$local) close();
   } else if (!combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     onTypeahead(key);
   }
@@ -318,7 +318,7 @@ const onInput = ($event: any) => {
   // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
   const q = $event.target.value;
   query = q;
-  if (!expanded) open();
+  if (!open$local) open();
   activeIndex = nextEnabled(-1, 1);
   fireSearch(q);
 };
@@ -337,13 +337,13 @@ const selectedLabel = $derived.by(() => {
     // separate calls — narrowing one stable local works on every target.
     const arr = Array.isArray(cur) ? cur : [];
     if (arr.length === 0) return '';
-    return options.filter((o: any) => arr.includes(readValue(o))).map(labelOf).join(', ');
+    return options.filter((o: any) => arr.includes(valueOf(o))).map(labelOf).join(', ');
   }
-  const match = options.find((o: any) => readValue(o) === cur);
+  const match = options.find((o: any) => valueOf(o) === cur);
   return match === undefined ? '' : labelOf(match);
 });
 const activeDescendant = $derived.by(() => {
-  if (!expanded || activeIndex < 0) return null;
+  if (!open$local || activeIndex < 0) return null;
   return optionId(activeIndex);
 });
 
@@ -352,7 +352,7 @@ onDestroy(() => (() => {
 })());
 
 $effect(() => {
-  if (!(expanded)) return;
+  if (!(open$local)) return;
   const handler = ($event: MouseEvent) => {
     const target = $event.target as Node;
     if (controlEl?.contains(target) || listEl?.contains(target)) return;
@@ -363,7 +363,7 @@ $effect(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-listbox", { 'rozie-listbox-open': expanded, 'rozie-listbox-disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-b576227a><div class="rozie-listbox-control" bind:this={controlEl} data-rozie-s-b576227a>{#if combobox}<input bind:this={inputEl} class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={expanded} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} placeholder={placeholder} value={query} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onControlKeyDown($event); }} onfocus={open} data-rozie-s-b576227a />{:else}<button bind:this={triggerEl} type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={expanded} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} onclick={toggle} onkeydown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-listbox-selected" data-rozie-s-b576227a>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>{placeholder}</span>{/if}{/if}<span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span></button>{/if}</div>{#if expanded}<div bind:this={listEl} class="rozie-listbox-list" role="listbox" id={rozieAttr(id + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-b576227a>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-listbox-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-listbox-empty" role="presentation" data-rozie-s-b576227a>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-listbox", { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-b576227a><div class="rozie-listbox-control" bind:this={controlEl} data-rozie-s-b576227a>{#if combobox}<input bind:this={inputEl} class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} placeholder={placeholder} value={query} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onControlKeyDown($event); }} onfocus={open} data-rozie-s-b576227a />{:else}<button bind:this={triggerEl} type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} onclick={toggle} onkeydown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-listbox-selected" data-rozie-s-b576227a>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>{placeholder}</span>{/if}{/if}<span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span></button>{/if}</div>{#if open$local}<div bind:this={listEl} class="rozie-listbox-list" role="listbox" id={rozieAttr(id + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-b576227a>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-listbox-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-listbox-empty" role="presentation" data-rozie-s-b576227a>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
 
 <style>
 :global {

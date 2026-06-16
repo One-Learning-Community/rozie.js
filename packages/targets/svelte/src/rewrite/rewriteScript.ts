@@ -217,12 +217,19 @@ export function rewriteRozieIdentifiers(
   // and the silent param-capture wrong-value variant). Each arm is gated on an
   // actual `<accessor>.<name>` read so the corpus stays byte-identical. Ref names
   // are disjoint from prop names (ROZ621), so the groups never double-rename.
+  // PUBLIC-CONTRACT guard: $expose verb names are never renamed — a `const open`
+  // that is the exposed `open()` handle must NOT be renamed even when it shadows
+  // a prop/data accessor. Prop NAMES are deliberately NOT protected here: the
+  // accessor-shadow groups rename a USER LOCAL that shadows a prop (e.g. the
+  // `const src = $props.src` self-shadow), which legitimately shares the prop's
+  // name — that local is the renameable side, not the public contract.
   const propNames = new Set<string>([...modelProps, ...nonModelProps]);
+  const svelteProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
   const svelteGroups: GeneratedSymbolGroup[] = [
     { names: propNames, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
   ];
-  deconflictGeneratedSymbols(program, svelteGroups);
+  deconflictGeneratedSymbols(program, svelteGroups, svelteProtected);
 
   traverse(program, {
     Identifier(path) {

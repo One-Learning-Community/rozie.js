@@ -639,6 +639,26 @@ export function rewriteRozieIdentifiers(
   const refByName = new Map(ir.refs.map((r) => [r.name, r]));
   const propByName = new Map(ir.props.map((p) => [p.name, p]));
 
+  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — CLASS-TARGET sub-case.
+  // Angular's accessors are `this.`-qualified (`this.x()`), so it is structurally
+  // immune to the bare-ident accessor-shadow bug — BUT a top-level user `<script>`
+  // binding becomes a CLASS FIELD, and a field named `valueOf`/`toString`/
+  // `hasOwnProperty`/etc. overrides the inherited `Object.prototype` member and
+  // breaks assignability. Rename such a top-level binding to `X$local`. MUST run
+  // BEFORE `collectUserMethodNames` so the renamed name flows into `classMembers`
+  // (the `this.`-qualification set) — otherwise the renamed `valueOf$local`
+  // references stay bare and ReferenceError at runtime. Only-on-collision:
+  // a non-reserved top-level name is byte-identical. $expose verbs + prop names
+  // are NEVER renamed (public contract).
+  deconflictReservedClassFields(
+    program,
+    reservedClassMembers('angular'),
+    new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...(ir.props ?? []).map((p) => p.name),
+    ]),
+  );
+
   const userMethodNames = collectUserMethodNames(program);
 
   // Compute collision renames: any user method whose name matches an emit.
@@ -772,24 +792,6 @@ export function rewriteRozieIdentifiers(
   // self-contained for any direct caller (e.g. emitAngular's preview rewrite).
   // Idempotent: a second pass finds no `$model`.
   normalizeModelAccessor(program);
-
-  // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — CLASS-TARGET sub-case.
-  // Angular's accessors are `this.`-qualified (`this.x()`), so it is structurally
-  // immune to the bare-ident accessor-shadow bug — BUT a top-level user `<script>`
-  // binding becomes a CLASS FIELD, and a field named `valueOf`/`toString`/
-  // `hasOwnProperty`/etc. overrides the inherited `Object.prototype` member and
-  // breaks assignability. Rename such a top-level binding to `X$local` (the
-  // `this.X$local` references follow). Only-on-collision: a non-reserved top-level
-  // name is byte-identical. Runs on the freshly-cloned Program before the lowering
-  // traversal (which qualifies bare names with `this.`).
-  deconflictReservedClassFields(
-    program,
-    reservedClassMembers('angular'),
-    new Set<string>([
-      ...(ir.expose ?? []).map((e) => e.name),
-      ...(ir.props ?? []).map((p) => p.name),
-    ]),
-  );
 
   traverse(program, {
     AssignmentExpression(path) {

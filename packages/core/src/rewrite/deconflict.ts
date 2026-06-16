@@ -196,6 +196,13 @@ export interface GeneratedSymbolGroup {
 export function deconflictGeneratedSymbols(
   program: File,
   groups: readonly GeneratedSymbolGroup[],
+  /**
+   * PUBLIC-CONTRACT names that must NEVER be renamed even on a collision
+   * (`$expose` verb names + prop names — D-02). Guards against renaming a user
+   * binding that is itself the public handle (e.g. an exposed `open()` function
+   * that also reads `$data.open`).
+   */
+  protectedNames: ReadonlySet<string> = new Set(),
 ): void {
   const active = groups.filter((g) => g.names.size > 0);
   if (active.length === 0) return;
@@ -211,6 +218,7 @@ export function deconflictGeneratedSymbols(
     scopeBlock: t.Node | null | undefined,
   ): boolean => {
     if (!group.names.has(name)) return false;
+    if (protectedNames.has(name)) return false; // public contract — never rename
     if (group.trigger.kind === 'binding') return true;
     return subtreeReads(scopeBlock, group.trigger.accessor, name);
   };
@@ -264,11 +272,115 @@ export function deconflictGeneratedSymbols(
       for (const group of active) {
         if (group.trigger.kind !== 'binding') continue;
         if (!group.names.has(name)) continue;
+        if (protectedNames.has(name)) continue; // public contract — never rename
         const ownerScope = path.scope.parent ?? path.scope;
         ownerScope.rename(name, alias(name));
       }
     },
   });
+}
+
+/**
+ * SHARED IR-LEVEL state-key deconfliction (Phase 46 ITEM-5 / D-02).
+ *
+ * The `$data`-key == `$expose`-verb collision (the listbox `open` footgun): a
+ * `<data>` key `open` and an `$expose` verb `open` BOTH want the bare identifier
+ * `open` on the bare-ident targets (React `useState` value, Svelte/Solid signal
+ * local) and a `this.open` member on the class targets — colliding with the
+ * exposed `open()` function/method. Five of six targets emit a duplicate `open`
+ * binding (or bind the exposed handle to the state value); only Lit escapes via
+ * its `_`-prefixed state field.
+ *
+ * The renameable side is the INTERNAL STATE (D-02 — the `$expose` verb is public
+ * contract). Because EVERY target lowers `$data.X` from `ir.state[].name`, the
+ * single uniform fix is to rename the colliding STATE KEY itself — `open` →
+ * `open$local` — at the IR level, BEFORE per-target lowering. This is the
+ * generated-symbol analog of the user-side rename pass: here the renamed binding
+ * is the one the EMITTER will mint, so renaming the IR source-of-truth (the
+ * state name + every `$data.<key>` reference + every `{scope:'data', path:[key]}`
+ * SignalRef dep) fixes all six targets at once with no per-target edit.
+ *
+ * Mutates `ir` in place. Runs once in `lowerToIR` (shared by compile() AND
+ * unplugin). Only-on-collision: a state key that is NOT an expose verb is
+ * byte-identical (zero corpus drift). `$data.X` member references are renamed by
+ * a deep IR walk (every embedded Babel `MemberExpression{$data.<key>}`); the
+ * `setupBody.scriptProgram` is the SAME node every emitter clones, so the rename
+ * propagates. Also covers the user-side `$data` self-shadow (`const open =
+ * $data.open`) — after the state key becomes `open$local`, the rewrite reads the
+ * renamed key, and the user's `const open` (if any) no longer collides.
+ */
+export function deconflictStateExposeCollision(ir: {
+  state: { name: string }[];
+  expose?: { name: string }[];
+}): void {
+  const exposeVerbs = new Set((ir.expose ?? []).map((e) => e.name));
+  if (exposeVerbs.size === 0) return;
+  const renames = new Map<string, string>();
+  for (const s of ir.state) {
+    if (exposeVerbs.has(s.name)) {
+      const renamed = `${s.name}${DECONFLICT_SUFFIX}`;
+      renames.set(s.name, renamed);
+    }
+  }
+  if (renames.size === 0) return;
+
+  // 1. Rename the state declarations themselves.
+  for (const s of ir.state) {
+    const renamed = renames.get(s.name);
+    if (renamed) s.name = renamed;
+  }
+
+  // 2. Deep-walk the ENTIRE IR. For every embedded Babel node, rename a
+  //    non-computed `$data.<oldKey>` MemberExpression property to the new key.
+  //    For every SignalRef `{ scope: 'data', path: [oldKey, ...] }`, rename
+  //    path[0]. A WeakSet guards against re-visiting shared nodes / cycles.
+  const seen = new WeakSet<object>();
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  const walk = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    // SignalRef data-dep rename: { scope: 'data', path: [key, ...] }.
+    const asDep = value as { scope?: unknown; path?: unknown };
+    if (asDep.scope === 'data' && Array.isArray(asDep.path) && asDep.path.length > 0) {
+      const head = asDep.path[0];
+      const renamed = typeof head === 'string' ? renames.get(head) : undefined;
+      if (renamed) asDep.path[0] = renamed;
+    }
+
+    // `$data.<key>` MemberExpression / OptionalMemberExpression property rename.
+    if (isNode(value)) {
+      const node = value as {
+        type: string;
+        computed?: boolean;
+        object?: { type?: string; name?: string };
+        property?: { type?: string; name?: string };
+      };
+      if (
+        (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+        node.computed !== true &&
+        node.object?.type === 'Identifier' &&
+        node.object.name === '$data' &&
+        node.property?.type === 'Identifier' &&
+        typeof node.property.name === 'string'
+      ) {
+        const renamed = renames.get(node.property.name);
+        if (renamed) node.property.name = renamed;
+      }
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    for (const key of Object.keys(value)) {
+      walk((value as Record<string, unknown>)[key]);
+    }
+  };
+  walk(ir);
 }
 
 /**

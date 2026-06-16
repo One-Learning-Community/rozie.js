@@ -52,6 +52,7 @@ import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateClone } from './validateClone.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
+import { deconflictStateExposeCollision } from '../rewrite/deconflict.js';
 import * as t from '@babel/types';
 
 /**
@@ -360,6 +361,17 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // ROZ974 R9 walk does not self-warn).
     synthesizeListenersFallthrough(ir.template, ir.inheritListeners);
   }
+
+  // Phase 46 ITEM-5 / D-02 — shared state-key deconfliction. A `<data>` key that
+  // collides with an `$expose` verb (the listbox `open` footgun) is renamed at
+  // the GENERATED-state level (`open` → `open$local`) UNIFORMLY across all six
+  // targets, leaving the public exposed verb intact. Runs HERE in lowerToIR (the
+  // chokepoint compile() AND @rozie/unplugin share), AFTER the full IR is
+  // assembled (state/expose/computed/watchers/listeners/template all populated)
+  // and BEFORE per-target emit, so every embedded `$data.<key>` reference and
+  // every `{scope:'data', path:[key]}` SignalRef dep is rewritten consistently.
+  // Only-on-collision: a non-colliding state key is byte-identical (D-02).
+  deconflictStateExposeCollision(ir);
 
   return { ir, diagnostics, depGraph, bindings };
 }

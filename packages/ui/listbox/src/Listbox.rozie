@@ -19,10 +19,17 @@
   virtually via `aria-activedescendant`, and selection commits a fresh value.
 
   Authoring notes (collision classes a no-engine component is the first to hit):
-    - `$data.expanded` (not `open`) — a `$data` key that matches an `$expose`
-      verb collapses onto the same React useState identifier.
-    - The focus verb is `focusControl`, not `focus` — a Lit custom element would
-      otherwise override the inherited HTMLElement.focus method.
+    - `$data.open` collides with the `open` $expose verb — Phase 46 ITEM-5 now
+      auto-renames the INTERNAL state to `open$local` (cross-target; the exposed
+      `open()` verb stays). This file dogfoods that fix by using the natural
+      `$data.open` instead of the old `$data.expanded` workaround.
+    - A local helper named `valueOf` (an Object.prototype member) collides with
+      the inherited member when it becomes a Lit/Angular class field — Phase 46
+      ITEM-5 now auto-renames it to `valueOf$local`. This file dogfoods that fix
+      by using the natural `valueOf` instead of the old `valueOf` workaround.
+    - The focus verb is `focusControl`, not `focus` — a `focus` $expose verb is a
+      DELIBERATE override of the inherited HTMLElement.focus on the Lit custom
+      element (ROZ137 warns, does not auto-rename — the public handle is intended).
     - Every event is fired through ONE wrapper fn so its prop-destructure hoists
       once (a duplicate-emit-site would emit two `const … = props` in React).
 
@@ -85,7 +92,7 @@
 
 <data>
 {
-  expanded: false,
+  open: false,
   // Virtual focus: index into the *visible* (filtered) option list, or -1.
   activeIndex: -1,
   // Combobox filter query.
@@ -106,7 +113,7 @@ const labelOf = (opt) => {
   if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label
   return String(opt)
 }
-const readValue = (opt) => {
+const valueOf = (opt) => {
   if ($props.optionValue !== null) return $props.optionValue(opt)
   if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value
   return opt
@@ -143,21 +150,21 @@ const selectedLabel = $computed(() => {
     // separate calls — narrowing one stable local works on every target.
     const arr = Array.isArray(cur) ? cur : []
     if (arr.length === 0) return ''
-    return $props.options.filter((o) => arr.includes(readValue(o))).map(labelOf).join(', ')
+    return $props.options.filter((o) => arr.includes(valueOf(o))).map(labelOf).join(', ')
   }
-  const match = $props.options.find((o) => readValue(o) === cur)
+  const match = $props.options.find((o) => valueOf(o) === cur)
   return match === undefined ? '' : labelOf(match)
 })
 
 // The id of the active option, for aria-activedescendant. null when none.
 const activeDescendant = $computed(() => {
-  if (!$data.expanded || $data.activeIndex < 0) return null
+  if (!$data.open || $data.activeIndex < 0) return null
   return optionId($data.activeIndex)
 })
 
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt) => {
-  const v = readValue(opt)
+  const v = valueOf(opt)
   const cur = $props.value
   if ($props.multiple) return Array.isArray(cur) && cur.includes(v)
   return cur === v
@@ -192,14 +199,14 @@ const scrollActiveIntoView = () => {
 // React prop-destructure for `onOpenChange` hoists exactly once.
 const applyExpanded = (next) => {
   if (next && $props.disabled) return
-  if ($data.expanded === next) return
-  $data.expanded = next
+  if ($data.open === next) return
+  $data.open = next
   $data.activeIndex = next ? resolveInitialActive() : -1
   $emit('open-change', { open: next })
 }
 const open = () => applyExpanded(true)
 const close = () => applyExpanded(false)
-const toggle = () => applyExpanded(!$data.expanded)
+const toggle = () => applyExpanded(!$data.open)
 
 // ---- selection ---------------------------------------------------------
 // Single `$emit('change')` site (called from both select + clear).
@@ -207,7 +214,7 @@ const fireChange = (value, option) => $emit('change', { value, option })
 
 const select = (opt) => {
   if (disabledOf(opt)) return
-  const v = readValue(opt)
+  const v = valueOf(opt)
   if ($props.multiple) {
     const cur = $props.value
     const arr = Array.isArray(cur) ? cur : []
@@ -245,14 +252,14 @@ const nextEnabled = (from, dir) => {
 }
 
 const move = (dir) => {
-  if (!$data.expanded) { open(); return }
+  if (!$data.open) { open(); return }
   const start = $data.activeIndex < 0 ? (dir > 0 ? -1 : 0) : $data.activeIndex
   $data.activeIndex = nextEnabled(start, dir)
   scrollActiveIntoView()
 }
 
 const moveEdge = (toEnd) => {
-  if (!$data.expanded) open()
+  if (!$data.open) open()
   $data.activeIndex = toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1)
   scrollActiveIntoView()
 }
@@ -271,7 +278,7 @@ const onTypeahead = (ch) => {
   const opts = visibleOptions()
   const idx = opts.findIndex((o) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer))
   if (idx !== -1) {
-    if (!$data.expanded) open()
+    if (!$data.open) open()
     $data.activeIndex = idx
     scrollActiveIntoView()
   }
@@ -286,18 +293,18 @@ const onControlKeyDown = ($event) => {
   else if (key === 'ArrowUp') { $event.preventDefault(); move(-1) }
   else if (key === 'Home') { $event.preventDefault(); moveEdge(false) }
   else if (key === 'End') { $event.preventDefault(); moveEdge(true) }
-  else if (key === 'Enter') { if ($data.expanded) { $event.preventDefault(); commitActive() } }
-  else if (key === 'Escape') { if ($data.expanded) { $event.preventDefault(); close(); focusControl() } }
+  else if (key === 'Enter') { if ($data.open) { $event.preventDefault(); commitActive() } }
+  else if (key === 'Escape') { if ($data.open) { $event.preventDefault(); close(); focusControl() } }
   else if (key === ' ' || key === 'Spacebar') {
     // Space toggles / commits in select-only mode; a combobox input needs the
     // literal space, so do nothing there.
     if (!$props.combobox) {
       $event.preventDefault()
-      if (!$data.expanded) open()
+      if (!$data.open) open()
       else commitActive()
     }
   }
-  else if (key === 'Tab') { if ($data.expanded) close() }
+  else if (key === 'Tab') { if ($data.open) close() }
   else if (!$props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     onTypeahead(key)
   }
@@ -312,7 +319,7 @@ const onInput = ($event) => {
   // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
   const q = $event.target.value
   $data.query = q
-  if (!$data.expanded) open()
+  if (!$data.open) open()
   $data.activeIndex = nextEnabled(-1, 1)
   fireSearch(q)
 }
@@ -330,11 +337,11 @@ $expose({ open, close, toggle, clear, focusControl })
 </script>
 
 <listeners>
-  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.expanded" />
+  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.open" />
 </listeners>
 
 <template>
-<div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.expanded, 'rozie-listbox-disabled': $props.disabled }">
+<div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.open, 'rozie-listbox-disabled': $props.disabled }">
 
   <!-- Control: an editable combobox input OR a select-only button. Both carry
        role="combobox" per the modern ARIA APG. -->
@@ -347,7 +354,7 @@ $expose({ open, close, toggle, clear, focusControl })
       role="combobox"
       autocomplete="off"
       aria-autocomplete="list"
-      :aria-expanded="$data.expanded"
+      :aria-expanded="$data.open"
       :aria-controls="$props.id + '-list'"
       :aria-activedescendant="activeDescendant"
       :aria-label="$props.ariaLabel"
@@ -365,7 +372,7 @@ $expose({ open, close, toggle, clear, focusControl })
       class="rozie-listbox-trigger"
       role="combobox"
       aria-haspopup="listbox"
-      :aria-expanded="$data.expanded"
+      :aria-expanded="$data.open"
       :aria-controls="$props.id + '-list'"
       :aria-activedescendant="activeDescendant"
       :aria-label="$props.ariaLabel"
@@ -384,7 +391,7 @@ $expose({ open, close, toggle, clear, focusControl })
   <!-- Popup listbox. aria-activedescendant on the control points at the
        highlighted option id; DOM focus never leaves the control. -->
   <div
-    r-if="$data.expanded"
+    r-if="$data.open"
     ref="listEl"
     class="rozie-listbox-list"
     role="listbox"

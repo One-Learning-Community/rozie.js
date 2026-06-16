@@ -204,16 +204,22 @@ export function rewriteRozieIdentifiers(
   // binding for setters) so the non-colliding Solid corpus stays byte-identical.
   // Runs on the freshly-cloned, not-yet-mutated Program (scope cache valid) BEFORE
   // the bare-accessor rewrite below.
+  // NOT `$data` keys here — a `$data` key colliding with an `$expose` verb is
+  // renamed at the GENERATED-state level by the shared deconflictStateExposeCollision
+  // IR pass (uniform across all 6 targets). PUBLIC-CONTRACT guard: $expose verbs +
+  // prop names are never renamed.
   const solidSetters = new Set<string>();
   for (const s of ir.state) solidSetters.add('set' + capitalize(s.name));
   for (const p of ir.props) if (p.isModel) solidSetters.add('set' + capitalize(p.name));
   const solidProps = new Set<string>([...modelProps, ...nonModelProps]);
+  // Protected = $expose verbs ONLY (prop names are the collision target, not the
+  // renameable side — see the React/Svelte rationale).
+  const solidProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
   const solidGroups: GeneratedSymbolGroup[] = [
     { names: solidProps, trigger: { kind: 'accessor', accessor: '$props' } },
-    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
     { names: solidSetters, trigger: { kind: 'binding' } },
   ];
-  deconflictGeneratedSymbols(cloned, solidGroups);
+  deconflictGeneratedSymbols(cloned, solidGroups, solidProtected);
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().

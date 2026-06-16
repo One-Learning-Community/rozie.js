@@ -48,14 +48,14 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-listbox" [ngClass]="{ 'rozie-listbox-open': expanded(), 'rozie-listbox-disabled': (disabled() || this.__rozieCvaDisabled()) }" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-listbox" [ngClass]="{ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': (disabled() || this.__rozieCvaDisabled()) }" #rozieSpread_0 #rozieListenersTarget_1>
 
       
       <div class="rozie-listbox-control" #controlEl>
         @if (combobox()) {
-    <input #inputEl class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" [attr.aria-expanded]="expanded()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" [placeholder]="placeholder()" [value]="query()" (input)="onInput($event)" (keydown)="onControlKeyDown($event)" (focus)="open()" />
+    <input #inputEl class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" [placeholder]="placeholder()" [value]="query()" (input)="onInput($event)" (keydown)="onControlKeyDown($event)" (focus)="open()" />
     } @else {
-    <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="expanded()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
+    <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
           @if ((selectedTpl ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -71,7 +71,7 @@ function __rozieAttr(v: unknown): string | null {
     }</div>
 
       
-      @if (expanded()) {
+      @if (open$local()) {
     <div #listEl class="rozie-listbox-list" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="ariaLabel()" [attr.aria-multiselectable]="multiple()">
         @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
@@ -204,7 +204,7 @@ export class Listbox {
   optionDisabled = input<((...args: unknown[]) => unknown) | null>(null);
   id = input<string>('rozie-listbox');
   ariaLabel = input<(string) | null>(null);
-  expanded = signal(false);
+  open$local = signal(false);
   activeIndex = signal(-1);
   query = signal('');
   controlEl = viewChild<ElementRef<HTMLDivElement>>('controlEl');
@@ -223,7 +223,7 @@ export class Listbox {
       const renderer = inject(Renderer2);
 
       effect((onCleanup) => {
-        if (!(this.expanded())) return;
+        if (!(this.open$local())) return;
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.controlEl()?.nativeElement?.contains(target) || this.listEl()?.nativeElement?.contains(target)) return;
@@ -247,14 +247,14 @@ export class Listbox {
       // separate calls — narrowing one stable local works on every target.
       const arr = Array.isArray(cur) ? cur : [];
       if (arr.length === 0) return '';
-      return __options.filter((o: any) => arr.includes(this.readValue(o))).map(this.labelOf).join(', ');
+      return __options.filter((o: any) => arr.includes(valueOf$local(o))).map(this.labelOf).join(', ');
     }
-    const match = __options.find((o: any) => this.readValue(o) === cur);
+    const match = __options.find((o: any) => valueOf$local(o) === cur);
     return match === undefined ? '' : this.labelOf(match);
   });
   activeDescendant = computed(() => {
     const __activeIndex = this.activeIndex();
-    if (!this.expanded() || __activeIndex < 0) return null;
+    if (!this.open$local() || __activeIndex < 0) return null;
     return this.optionId(__activeIndex);
   });
 
@@ -266,7 +266,7 @@ export class Listbox {
     if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
     return String(opt);
   };
-  readValue = (opt: any) => {
+  valueOf$local = (opt: any) => {
     const __optionValue = this.optionValue();
     if (__optionValue !== null) return __optionValue(opt);
     if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
@@ -287,7 +287,7 @@ export class Listbox {
     return __options.filter((opt: any) => this.labelOf(opt).toLowerCase().includes(q));
   };
   isSelected = (opt: any) => {
-    const v = this.readValue(opt);
+    const v = valueOf$local(opt);
     const cur = this.value();
     if (this.multiple()) return Array.isArray(cur) && cur.includes(v);
     return cur === v;
@@ -311,8 +311,8 @@ export class Listbox {
   };
   applyExpanded = (next: any) => {
     if (next && (this.disabled() || this.__rozieCvaDisabled())) return;
-    if (this.expanded() === next) return;
-    this.expanded.set(next);
+    if (this.open$local() === next) return;
+    this.open$local.set(next);
     this.activeIndex.set(next ? this.resolveInitialActive() : -1);
     this.openChange.emit({
       open: next
@@ -320,14 +320,14 @@ export class Listbox {
   };
   open = () => this.applyExpanded(true);
   close = () => this.applyExpanded(false);
-  toggle = () => this.applyExpanded(!this.expanded());
+  toggle = () => this.applyExpanded(!this.open$local());
   fireChange = (value: any, option: any) => this.change.emit({
     value: this.value(),
     option
   });
   select = (opt: any) => {
     if (this.disabledOf(opt)) return;
-    const v = this.readValue(opt);
+    const v = valueOf$local(opt);
     if (this.multiple()) {
       const cur = this.value();
       const arr = Array.isArray(cur) ? cur : [];
@@ -363,7 +363,7 @@ export class Listbox {
     return from;
   };
   move = (dir: any) => {
-    if (!this.expanded()) {
+    if (!this.open$local()) {
       this.open();
       return;
     }
@@ -372,7 +372,7 @@ export class Listbox {
     this.scrollActiveIntoView();
   };
   moveEdge = (toEnd: any) => {
-    if (!this.expanded()) this.open();
+    if (!this.open$local()) this.open();
     this.activeIndex.set(toEnd ? this.nextEnabled(-1, -1) : this.nextEnabled(-1, 1));
     this.scrollActiveIntoView();
   };
@@ -390,13 +390,13 @@ export class Listbox {
     const opts = this.visibleOptions();
     const idx = opts.findIndex((o: any) => !this.disabledOf(o) && this.labelOf(o).toLowerCase().startsWith(this.typeBuffer));
     if (idx !== -1) {
-      if (!this.expanded()) this.open();
+      if (!this.open$local()) this.open();
       this.activeIndex.set(idx);
       this.scrollActiveIntoView();
     }
   };
   onControlKeyDown = ($event: any) => {
-    const __expanded = this.expanded();
+    const __open$local = this.open$local();
     const __combobox = this.combobox();
     const key = $event.key;
     if (key === 'ArrowDown') {
@@ -412,12 +412,12 @@ export class Listbox {
       $event.preventDefault();
       this.moveEdge(true);
     } else if (key === 'Enter') {
-      if (__expanded) {
+      if (__open$local) {
         $event.preventDefault();
         this.commitActive();
       }
     } else if (key === 'Escape') {
-      if (__expanded) {
+      if (__open$local) {
         $event.preventDefault();
         this.close();
         this.focusControl();
@@ -427,10 +427,10 @@ export class Listbox {
       // literal space, so do nothing there.
       if (!__combobox) {
         $event.preventDefault();
-        if (!__expanded) this.open();else this.commitActive();
+        if (!__open$local) this.open();else this.commitActive();
       }
     } else if (key === 'Tab') {
-      if (__expanded) this.close();
+      if (__open$local) this.close();
     } else if (!__combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       this.onTypeahead(key);
     }
@@ -444,7 +444,7 @@ export class Listbox {
     // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
     const q = $event.target.value;
     this.query.set(q);
-    if (!this.expanded()) this.open();
+    if (!this.open$local()) this.open();
     this.activeIndex.set(this.nextEnabled(-1, 1));
     this.fireSearch(q);
   };

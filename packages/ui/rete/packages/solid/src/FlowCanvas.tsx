@@ -1063,12 +1063,12 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       element.appendChild(svg);
       let start: any = null;
       let end: any = null;
-      const curvature = typeof local.curvature === 'number' ? local.curvature : 0.3;
+      const curvature$local = typeof local.curvature === 'number' ? local.curvature : 0.3;
       const redraw = () => {
         if (!start || !end) return;
         // branch on the resolved edge type; default (bezier/unknown) stays
         // classicConnectionPath UNCHANGED → byte-identical bezier output.
-        const d = edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature);
+        const d = edgeType === 'step' ? stepPath(start, end) : edgeType === 'smoothstep' ? smoothstepPath(start, end) : edgeType === 'straight' ? straightPath(start, end) : classicConnectionPath([start, end], curvature$local);
         path.setAttribute('d', d);
         // Orient the head and trim the visible stroke back to the arrow base (solid
         // edges) so the line meets the head without poking through the tip.

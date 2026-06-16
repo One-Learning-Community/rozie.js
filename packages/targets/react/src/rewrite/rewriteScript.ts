@@ -414,26 +414,35 @@ export function rewriteRozieIdentifiers(
   // React's generated-symbol set (RESEARCH Pattern 3):
   //   - `$refs.X` → bare `X` (`.current`): accessor-shadow, gated on a real
   //     `$refs.X` read (the canonical `const flow = $refs.flow` TDZ).
-  //   - `$data.X` → bare `X` (useState value): accessor-shadow, gated on a real
-  //     `$data.X` read (e.g. the listbox `open` $data key whose local shadows
-  //     the useState binding; the $expose verb `open` is NEVER renamed).
   //   - model-prop → bare `X` (useControllableState value): accessor-shadow on
   //     `$props` (model props read via `$props.X` after $model normalization).
   //   - `setX` setter (per state + per model prop): a pure binding collision —
   //     a user helper named `setX` (the ROZ524 case) auto-renames to
   //     `setX$local`; the generated `setX` setter is the contract.
   //   NOT non-model props — React keeps those as `props.X` member access, so a
-  //   like-named local never collides.
+  //   like-named local never collides. NOT `$data` keys here — a `$data` key that
+  //   collides with an `$expose` verb is renamed at the GENERATED-state level by
+  //   the shared `deconflictStateExposeCollision` IR pass (which renames the
+  //   state key `open`→`open$local` UNIFORMLY across all 6 targets, leaving the
+  //   exposed verb intact). The user-side `$data` self-shadow (`const open =
+  //   $data.open`) is folded into that same IR rename.
+  //
+  // PUBLIC-CONTRACT guard: `$expose` verb names + prop names are NEVER renamed,
+  // even on a model-prop accessor collision.
   const setterNames = new Set<string>();
   for (const s of ir.state) setterNames.add('set' + capitalize(s.name));
   for (const p of ir.props) if (p.isModel) setterNames.add('set' + capitalize(p.name));
+  // Protected = $expose verbs ONLY. Prop names are NOT protected — the accessor
+  // groups rename a USER LOCAL shadowing a prop/ref, which shares that name and
+  // IS the renameable side. (The exposed-function case `const open` is guarded
+  // because `open` is an $expose verb.)
+  const reactProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
   const reactGroups: GeneratedSymbolGroup[] = [
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
-    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
     { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: setterNames, trigger: { kind: 'binding' } },
   ];
-  deconflictGeneratedSymbols(program, reactGroups);
+  deconflictGeneratedSymbols(program, reactGroups, reactProtected);
 
   traverse(program, {
     AssignmentExpression(path) {

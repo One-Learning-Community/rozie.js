@@ -122,7 +122,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   @property({ type: Function }) optionDisabled: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: String, reflect: true }) id: string = 'rozie-listbox';
   @property({ type: String, reflect: true }) ariaLabel: string = null;
-  private _expanded = signal(false);
+  private _open$local = signal(false);
   private _activeIndex = signal(-1);
   private _query = signal('');
   @query('[data-rozie-ref="controlEl"]') private _refControlEl!: HTMLElement;
@@ -146,7 +146,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   private _rozieTornDown = false;
 
   private _armListeners(): void {
-    const _u0 = attachOutsideClickListener([() => this._refControlEl, () => this._refListEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this._expanded.value));
+    const _u0 = attachOutsideClickListener([() => this._refControlEl, () => this._refListEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this._open$local.value));
     this._disconnectCleanups.push(_u0);
 
     {
@@ -216,18 +216,18 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-listbox": true, 'rozie-listbox-open': this._expanded.value, 'rozie-listbox-disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-b576227a>
+<div class="${Object.entries({ "rozie-listbox": true, 'rozie-listbox-open': this._open$local.value, 'rozie-listbox-disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-b576227a>
 
   
   <div class="rozie-listbox-control" data-rozie-ref="controlEl" data-rozie-s-b576227a>
-    ${this.combobox ? html`<input class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded=${this._expanded.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} @focus=${this.open} data-rozie-ref="inputEl" data-rozie-s-b576227a />` : html`<button class="rozie-listbox-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${this._expanded.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-b576227a>
+    ${this.combobox ? html`<input class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded=${this._open$local.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} @focus=${this.open} data-rozie-ref="inputEl" data-rozie-s-b576227a />` : html`<button class="rozie-listbox-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${this._open$local.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-b576227a>
       ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
         ${this.selectedLabel ? html`<span class="rozie-listbox-selected" data-rozie-s-b576227a>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>${this.placeholder}</span>`}</slot>`}
       <span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span>
     </button>`}</div>
 
   
-  ${this._expanded.value ? html`<div class="rozie-listbox-list" role="listbox" id=${rozieAttr(this.id + '-list')} aria-label=${this.ariaLabel} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-b576227a>
+  ${this._open$local.value ? html`<div class="rozie-listbox-list" role="listbox" id=${rozieAttr(this.id + '-list')} aria-label=${this.ariaLabel} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-b576227a>
     ${repeat<any>(this.visibleOptions(), (opt, index) => this.optionId(index), (opt, index) => html`<div class="${Object.entries({ "rozie-listbox-option": true, 'is-active': this._activeIndex.value === index, 'is-selected': this.isSelected(opt), 'is-disabled': this.disabledOf(opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(this.optionId(index))} id=${rozieAttr(this.optionId(index))} role="option" aria-selected=${!!this.isSelected(opt)} aria-disabled=${!!this.disabledOf(opt)} @click=${($event: Event) => { this.select(opt); }} @mousemove=${($event: Event) => { this.onOptionPointerMove(index); }} data-rozie-s-b576227a>
       ${this.option !== undefined ? this.option({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}); } catch { return '{}'; } })()}>
         ${rozieDisplay(this.labelOf(opt))}
@@ -250,7 +250,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   return String(opt);
 };
 
-  readValue = (opt: any) => {
+  valueOf$local = (opt: any) => {
   if (this.optionValue !== null) return this.optionValue(opt);
   if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
   return opt;
@@ -279,19 +279,19 @@ export default class Listbox extends SignalWatcher(LitElement) {
       // separate calls — narrowing one stable local works on every target.
       const arr = Array.isArray(cur) ? cur : [];
       if (arr.length === 0) return '';
-      return this.options.filter((o: any) => arr.includes(this.readValue(o))).map(this.labelOf).join(', ');
+      return this.options.filter((o: any) => arr.includes(this.valueOf$local(o))).map(this.labelOf).join(', ');
     }
-    const match = this.options.find((o: any) => this.readValue(o) === cur);
+    const match = this.options.find((o: any) => this.valueOf$local(o) === cur);
     return match === undefined ? '' : this.labelOf(match);
   }
 
   get activeDescendant() {
-    if (!this._expanded.value || this._activeIndex.value < 0) return null;
+    if (!this._open$local.value || this._activeIndex.value < 0) return null;
     return this.optionId(this._activeIndex.value);
   }
 
   isSelected = (opt: any) => {
-  const v = this.readValue(opt);
+  const v = this.valueOf$local(opt);
   const cur = this.value;
   if (this.multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
@@ -318,8 +318,8 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   applyExpanded = (next: any) => {
   if (next && this.disabled) return;
-  if (this._expanded.value === next) return;
-  this._expanded.value = next;
+  if (this._open$local.value === next) return;
+  this._open$local.value = next;
   this._activeIndex.value = next ? this.resolveInitialActive() : -1;
   this.dispatchEvent(new CustomEvent("open-change", {
     detail: {
@@ -334,7 +334,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   close = () => this.applyExpanded(false);
 
-  toggle = () => this.applyExpanded(!this._expanded.value);
+  toggle = () => this.applyExpanded(!this._open$local.value);
 
   fireChange = (value: any, option: any) => this.dispatchEvent(new CustomEvent("change", {
   detail: {
@@ -347,7 +347,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   select = (opt: any) => {
   if (this.disabledOf(opt)) return;
-  const v = this.readValue(opt);
+  const v = this.valueOf$local(opt);
   if (this.multiple) {
     const cur = this.value;
     const arr = Array.isArray(cur) ? cur : [];
@@ -386,7 +386,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 };
 
   move = (dir: any) => {
-  if (!this._expanded.value) {
+  if (!this._open$local.value) {
     this.open();
     return;
   }
@@ -396,7 +396,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 };
 
   moveEdge = (toEnd: any) => {
-  if (!this._expanded.value) this.open();
+  if (!this._open$local.value) this.open();
   this._activeIndex.value = toEnd ? this.nextEnabled(-1, -1) : this.nextEnabled(-1, 1);
   this.scrollActiveIntoView();
 };
@@ -415,7 +415,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   const opts = this.visibleOptions();
   const idx = opts.findIndex((o: any) => !this.disabledOf(o) && this.labelOf(o).toLowerCase().startsWith(this.typeBuffer));
   if (idx !== -1) {
-    if (!this._expanded.value) this.open();
+    if (!this._open$local.value) this.open();
     this._activeIndex.value = idx;
     this.scrollActiveIntoView();
   }
@@ -436,12 +436,12 @@ export default class Listbox extends SignalWatcher(LitElement) {
     $event.preventDefault();
     this.moveEdge(true);
   } else if (key === 'Enter') {
-    if (this._expanded.value) {
+    if (this._open$local.value) {
       $event.preventDefault();
       this.commitActive();
     }
   } else if (key === 'Escape') {
-    if (this._expanded.value) {
+    if (this._open$local.value) {
       $event.preventDefault();
       this.close();
       this.focusControl();
@@ -451,10 +451,10 @@ export default class Listbox extends SignalWatcher(LitElement) {
     // literal space, so do nothing there.
     if (!this.combobox) {
       $event.preventDefault();
-      if (!this._expanded.value) this.open();else this.commitActive();
+      if (!this._open$local.value) this.open();else this.commitActive();
     }
   } else if (key === 'Tab') {
-    if (this._expanded.value) this.close();
+    if (this._open$local.value) this.close();
   } else if (!this.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     this.onTypeahead(key);
   }
@@ -474,7 +474,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
   const q = $event.target.value;
   this._query.value = q;
-  if (!this._expanded.value) this.open();
+  if (!this._open$local.value) this.open();
   this._activeIndex.value = this.nextEnabled(-1, 1);
   this.fireSearch(q);
 };

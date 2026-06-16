@@ -61,11 +61,55 @@ $expose({ open: () => { $data.open = true } })
   it('all six targets compile without error', () => {
     for (const target of ALL) compileOk(SRC, target);
   });
-  it('the $expose verb `open` is preserved (never $local-suffixed)', () => {
+  it('the $expose verb `open` is preserved; the colliding state is renamed open$local', () => {
     for (const target of ALL) {
       const code = compileOk(SRC, target);
-      expect(code, target).not.toMatch(/open\$local\s*[:(]/);
+      // The colliding state key is renamed to open$local (the renameable side).
+      expect(code, `${target} state should be open$local`).toMatch(/open\$local/);
+      // The exposed verb `open` (the public handle key) is preserved unsuffixed.
+      // (React useImperativeHandle / Vue defineExpose / Svelte export / etc.)
+      expect(code, `${target} exposed verb should stay 'open'`).toMatch(/\bopen\b/);
     }
+  });
+});
+
+describe('$data-key == $expose-verb with a NAMED exposed function (listbox `open`)', () => {
+  // The HARD case the listbox `expanded` workaround avoids: a `<data>` key `open`
+  // AND a top-level `const open = () => ...` function that IS the `$expose` verb.
+  // Five of six targets would otherwise emit a duplicate `open` binding or bind
+  // the handle to the state value. The shared state-key rename moves the STATE to
+  // `open$local`, leaving the exposed `open()` function intact on all six.
+  const SRC = `
+<rozie name="OpenFn">
+<data>{ open: false }</data>
+<script lang="ts">
+const setOpenState = (n: boolean) => { $data.open = n }
+const open = () => { setOpenState(true) }
+const close = () => { setOpenState(false) }
+const toggle = () => { setOpenState(!$data.open) }
+$expose({ open, close })
+</script>
+<template><button @click="toggle">{{ $data.open ? 'y' : 'n' }}</button></template>
+</rozie>
+`;
+  it('all six targets compile without error (no duplicate binding)', () => {
+    for (const target of ALL) compileOk(SRC, target);
+  });
+  it('the state key is renamed open$local; the exposed open verb is preserved', () => {
+    for (const target of ALL) {
+      const code = compileOk(SRC, target);
+      // State moved to open$local (the bare-ident + class targets all reflect it
+      // somewhere — useState/$state/signal/this.open$local).
+      expect(code, `${target} should rename state to open$local`).toMatch(/open\$local/);
+    }
+  });
+  it('React binds the exposed handle to the open() function, not the state value', () => {
+    const code = compileOk(SRC, 'react');
+    // The exposed `open` must be the user function (un-suffixed), and the state
+    // is `open$local`. The function must NOT be renamed to open$local.
+    expect(code).toMatch(/useImperativeHandle\([^)]*\(\)\s*=>\s*\(\{\s*open\s*,/);
+    expect(code).toMatch(/const\s+\[open\$local\s*,\s*setOpen\$local\]\s*=\s*useState/);
+    expect(code).not.toMatch(/function open\$local|const open\$local\s*=\s*\(\)/);
   });
 });
 

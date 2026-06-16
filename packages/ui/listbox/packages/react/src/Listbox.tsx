@@ -70,7 +70,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     defaultValue: props.defaultValue ?? null,
     onValueChange: props.onValueChange,
   });
-  const [expanded, setExpanded] = useState(false);
+  const [open$local, setOpen$local] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
   const controlEl = useRef<HTMLDivElement | null>(null);
@@ -85,15 +85,15 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       // separate calls — narrowing one stable local works on every target.
       const arr = Array.isArray(cur) ? cur : [];
       if (arr.length === 0) return '';
-      return props.options.filter((o: any) => arr.includes(readValue(o))).map(labelOf).join(', ');
+      return props.options.filter((o: any) => arr.includes(valueOf(o))).map(labelOf).join(', ');
     }
-    const match = props.options.find((o: any) => readValue(o) === cur);
+    const match = props.options.find((o: any) => valueOf(o) === cur);
     return match === undefined ? '' : labelOf(match);
-  }, [Array, labelOf, props.multiple, props.options, readValue, value]);
+  }, [Array, labelOf, props.multiple, props.options, value, valueOf]);
   const activeDescendant = useMemo(() => {
-    if (!expanded || activeIndex < 0) return null;
+    if (!open$local || activeIndex < 0) return null;
     return optionId(activeIndex);
-  }, [activeIndex, expanded, optionId]);
+  }, [activeIndex, open$local, optionId]);
 
   // Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
@@ -104,7 +104,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
     return String(opt);
   }
-  function readValue(opt: any) {
+  function valueOf(opt: any) {
     if (props.optionValue !== null) return props.optionValue(opt);
     if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
     return opt;
@@ -124,7 +124,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return props.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
   }
   function isSelected(opt: any) {
-    const v = readValue(opt);
+    const v = valueOf(opt);
     const cur = value;
     if (props.multiple) return Array.isArray(cur) && cur.includes(v);
     return cur === v;
@@ -147,8 +147,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }
   function applyExpanded(next: any) {
     if (next && props.disabled) return;
-    if (expanded === next) return;
-    setExpanded(next);
+    if (open$local === next) return;
+    setOpen$local(next);
     setActiveIndex(next ? resolveInitialActive() : -1);
     props.onOpenChange && props.onOpenChange({
       open: next
@@ -156,7 +156,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }
   const open = useCallback(() => applyExpanded(true), [applyExpanded]);
   const close = useCallback(() => applyExpanded(false), [applyExpanded]);
-  const toggle = useCallback(() => applyExpanded(!expanded), [applyExpanded, expanded]);
+  const toggle = useCallback(() => applyExpanded(!open$local), [applyExpanded, open$local]);
   function fireChange(value: any, option: any) {
     return props.onChange && props.onChange({
       value,
@@ -165,7 +165,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }
   const select = useCallback((opt: any) => {
     if (disabledOf(opt)) return;
-    const v = readValue(opt);
+    const v = valueOf(opt);
     if (props.multiple) {
       const cur = value;
       const arr = Array.isArray(cur) ? cur : [];
@@ -182,7 +182,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
         focusControl();
       }
     }
-  }, [close, disabledOf, fireChange, focusControl, props.closeOnSelect, props.multiple, readValue, setValue, value]);
+  }, [close, disabledOf, fireChange, focusControl, props.closeOnSelect, props.multiple, setValue, value, valueOf]);
   function clear() {
     const empty = props.multiple ? [] : null;
     setValue(empty);
@@ -201,7 +201,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return from;
   }
   function move(dir: any) {
-    if (!expanded) {
+    if (!open$local) {
       open();
       return;
     }
@@ -210,7 +210,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     scrollActiveIntoView();
   }
   function moveEdge(toEnd: any) {
-    if (!expanded) open();
+    if (!open$local) open();
     setActiveIndex(toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1));
     scrollActiveIntoView();
   }
@@ -227,7 +227,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     const opts = visibleOptions();
     const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer));
     if (idx !== -1) {
-      if (!expanded) open();
+      if (!open$local) open();
       setActiveIndex(idx);
       scrollActiveIntoView();
     }
@@ -247,12 +247,12 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       $event.preventDefault();
       moveEdge(true);
     } else if (key === 'Enter') {
-      if (expanded) {
+      if (open$local) {
         $event.preventDefault();
         commitActive();
       }
     } else if (key === 'Escape') {
-      if (expanded) {
+      if (open$local) {
         $event.preventDefault();
         close();
         focusControl();
@@ -262,14 +262,14 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       // literal space, so do nothing there.
       if (!props.combobox) {
         $event.preventDefault();
-        if (!expanded) open();else commitActive();
+        if (!open$local) open();else commitActive();
       }
     } else if (key === 'Tab') {
-      if (expanded) close();
+      if (open$local) close();
     } else if (!props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       onTypeahead(key);
     }
-  }, [close, commitActive, expanded, focusControl, move, moveEdge, onTypeahead, open, props.combobox]);
+  }, [close, commitActive, focusControl, move, moveEdge, onTypeahead, open, open$local, props.combobox]);
   function fireSearch(query: any) {
     return props.onSearch && props.onSearch({
       query
@@ -281,10 +281,10 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
     const q = $event.target.value;
     setQuery(q);
-    if (!expanded) open();
+    if (!open$local) open();
     setActiveIndex(nextEnabled(-1, 1));
     fireSearch(q);
-  }, [expanded, fireSearch, nextEnabled, open]);
+  }, [fireSearch, nextEnabled, open, open$local]);
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
@@ -298,24 +298,24 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   useOutsideClick(
     [controlEl, listEl],
     close,
-    () => !!(expanded),
+    () => !!(open$local),
   );
 
   useImperativeHandle(ref, () => ({ open, close, toggle, clear, focusControl }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": expanded, "rozie-listbox-disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
+    <div {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": open$local, "rozie-listbox-disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
 
       
       <div className={"rozie-listbox-control"} ref={controlEl} data-rozie-s-b576227a="">
-        {(props.combobox) ? <input ref={inputEl} className={"rozie-listbox-input"} type="text" role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={expanded} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} placeholder={props.placeholder} value={query} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /> : <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={expanded} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        {(props.combobox) ? <input ref={inputEl} className={"rozie-listbox-input"} type="text" role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} placeholder={props.placeholder} value={query} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /> : <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : (selectedLabel) ? <span className={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{props.placeholder}</span>}
           <span className={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
         </button>}</div>
 
       
-      {(expanded) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
+      {(open$local) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
         {visibleOptions().map((opt, index) => <div key={optionId(index)} id={rozieAttr(optionId(index))} className={clsx("rozie-listbox-option", { "is-active": activeIndex === index, "is-selected": isSelected(opt), "is-disabled": disabledOf(opt) })} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a="">
           {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) }) : rozieDisplay(labelOf(opt))}
         </div>)}

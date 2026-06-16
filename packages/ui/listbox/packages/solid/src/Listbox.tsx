@@ -131,7 +131,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
-  const [expanded, setExpanded] = createSignal(false);
+  const [open$local, setOpen$local] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [query, setQuery] = createSignal('');
   const selectedLabel = createMemo(() => {
@@ -142,13 +142,13 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       // separate calls — narrowing one stable local works on every target.
       const arr = Array.isArray(cur) ? cur : [];
       if (arr.length === 0) return '';
-      return local.options.filter((o: any) => arr.includes(readValue(o))).map(labelOf).join(', ');
+      return local.options.filter((o: any) => arr.includes(valueOf(o))).map(labelOf).join(', ');
     }
-    const match = local.options.find((o: any) => readValue(o) === cur);
+    const match = local.options.find((o: any) => valueOf(o) === cur);
     return match === undefined ? '' : labelOf(match);
   });
   const activeDescendant = createMemo(() => {
-    if (!expanded() || activeIndex() < 0) return null;
+    if (!open$local() || activeIndex() < 0) return null;
     return optionId(activeIndex());
   });
   onCleanup(() => {
@@ -171,7 +171,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
     return String(opt);
   }
-  function readValue(opt: any) {
+  function valueOf(opt: any) {
     if (local.optionValue !== null) return local.optionValue(opt);
     if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
     return opt;
@@ -205,7 +205,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
   // Is a given option currently selected? Multi compares array membership.
   function isSelected(opt: any) {
-    const v = readValue(opt);
+    const v = valueOf(opt);
     const cur = value();
     if (local.multiple) return Array.isArray(cur) && cur.includes(v);
     return cur === v;
@@ -241,8 +241,8 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   // React prop-destructure for `onOpenChange` hoists exactly once.
   function applyExpanded(next: any) {
     if (next && local.disabled) return;
-    if (expanded() === next) return;
-    setExpanded(next);
+    if (open$local() === next) return;
+    setOpen$local(next);
     setActiveIndex(next ? resolveInitialActive() : -1);
     _props.onOpenChange?.({
       open: next
@@ -255,7 +255,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     return applyExpanded(false);
   }
   function toggle() {
-    return applyExpanded(!expanded());
+    return applyExpanded(!open$local());
   }
 
   // ---- selection ---------------------------------------------------------
@@ -268,7 +268,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   }
   function select(opt: any) {
     if (disabledOf(opt)) return;
-    const v = readValue(opt);
+    const v = valueOf(opt);
     if (local.multiple) {
       const cur = value();
       const arr = Array.isArray(cur) ? cur : [];
@@ -306,7 +306,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     return from;
   }
   function move(dir: any) {
-    if (!expanded()) {
+    if (!open$local()) {
       open();
       return;
     }
@@ -315,7 +315,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     scrollActiveIntoView();
   }
   function moveEdge(toEnd: any) {
-    if (!expanded()) open();
+    if (!open$local()) open();
     setActiveIndex(toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1));
     scrollActiveIntoView();
   }
@@ -335,7 +335,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     const opts = visibleOptions();
     const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer));
     if (idx !== -1) {
-      if (!expanded()) open();
+      if (!open$local()) open();
       setActiveIndex(idx);
       scrollActiveIntoView();
     }
@@ -359,12 +359,12 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       $event.preventDefault();
       moveEdge(true);
     } else if (key === 'Enter') {
-      if (expanded()) {
+      if (open$local()) {
         $event.preventDefault();
         commitActive();
       }
     } else if (key === 'Escape') {
-      if (expanded()) {
+      if (open$local()) {
         $event.preventDefault();
         close();
         focusControl();
@@ -374,10 +374,10 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       // literal space, so do nothing there.
       if (!local.combobox) {
         $event.preventDefault();
-        if (!expanded()) open();else commitActive();
+        if (!open$local()) open();else commitActive();
       }
     } else if (key === 'Tab') {
-      if (expanded()) close();
+      if (open$local()) close();
     } else if (!local.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       onTypeahead(key);
     }
@@ -396,7 +396,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
     const q = $event.target.value;
     setQuery(q);
-    if (!expanded()) open();
+    if (!open$local()) open();
     setActiveIndex(nextEnabled(-1, 1));
     fireSearch(q);
   }
@@ -409,22 +409,22 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   createOutsideClick(
     [() => controlElRef, () => listElRef],
     close,
-    () => expanded(),
+    () => open$local(),
   );
 
   return (
     <>
-    <div classList={{ 'rozie-listbox-open': expanded(), 'rozie-listbox-disabled': local.disabled }} {...attrs} class={"rozie-listbox" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
+    <div classList={{ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled }} {...attrs} class={"rozie-listbox" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">
-        {<Show when={local.combobox} fallback={<button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={expanded()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        {<Show when={local.combobox} fallback={<button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(_props.selectedSlot ?? _props.slots?.['selected'])?.({ selected: selectedLabel(), value: value() }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{local.placeholder}</span>}><span class={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel())}</span></Show>}
           <span class={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
-        </button>}><input type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={expanded()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-listbox-input"} disabled={local.disabled} placeholder={local.placeholder} value={query()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /></Show>}</div>
+        </button>}><input type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-listbox-input"} disabled={local.disabled} placeholder={local.placeholder} value={query()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /></Show>}</div>
 
       
-      {<Show when={expanded()}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
+      {<Show when={open$local()}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
         <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-listbox-option"} classList={{ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index()); }} data-rozie-s-b576227a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt, index: index(), active: activeIndex() === index(), selected: isSelected(opt), disabled: disabledOf(opt) }) ?? rozieDisplay(labelOf(opt))}
         </div>}</For>
