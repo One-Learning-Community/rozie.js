@@ -1,0 +1,32 @@
+/*
+ * @rozie-ui/listbox — Material Design 3 bridge.
+ *
+ * Maps the listbox tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/listbox-react/themes/material.css';
+ */
+.rozie-listbox {
+  --rozie-listbox-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-listbox-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-listbox-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-listbox-border-width: 1px;
+  --rozie-listbox-radius: 4px;
+  --rozie-listbox-placeholder: var(--md-sys-color-on-surface-variant, #49454f);
+
+  --rozie-listbox-accent: var(--md-sys-color-primary, #6750a4);
+  --rozie-listbox-ring: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-listbox-popup-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+  --rozie-listbox-active-bg: var(--md-sys-color-secondary-container, #e8def8);
+  --rozie-listbox-active-fg: var(--md-sys-color-on-secondary-container, #1d192b);
+  --rozie-listbox-selected-bg: var(--md-sys-color-secondary-container, #e8def8);
+  --rozie-listbox-selected-fg: var(--md-sys-color-on-secondary-container, #1d192b);
+  --rozie-listbox-check-color: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-listbox-popup-radius: 4px;
+  --rozie-listbox-shadow: 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3);
+  --rozie-listbox-empty-fg: var(--md-sys-color-on-surface-variant, #49454f);
+}

@@ -1,0 +1,61 @@
+{
+  "name": "@rozie-ui/listbox-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless WAI-ARIA listbox / combobox (single + multi-select, type-ahead, keyboard nav) — one accessible Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "listbox",
+    "combobox",
+    "select",
+    "dropdown",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/listbox/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/Listbox.svelte",
+      "types": "./src/Listbox.svelte",
+      "import": "./src/Listbox.svelte",
+      "default": "./src/Listbox.svelte"
+    },
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

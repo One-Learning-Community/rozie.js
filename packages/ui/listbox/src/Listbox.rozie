@@ -1,0 +1,511 @@
+<!--
+  Listbox.rozie — a headless, WAI-ARIA Listbox / Combobox.
+
+  The first @rozie-ui family with NO third-party vanilla engine: every line of
+  behaviour — roving virtual focus (aria-activedescendant), full keyboard
+  navigation, type-ahead, combobox type-to-filter, single + multi select — is
+  authored in Rozie itself. It exists to stress the *native* author-side
+  primitives the engine-wrapper families never exercise on their own:
+
+    - $computed-derived state          → the filtered + active-resolved option list
+    - parameterized @keydown modifiers → arrow/home/end/enter/escape navigation
+    - $refs-driven focus management     → input/listbox/option focus, read post-mount only
+    - two-way r-model:value            → selection is a controlled form value (Angular CVA)
+    - scoped slots                     → #option / #selected / #empty render props
+    - $expose imperative handle        → open / close / toggle / clear / focusControl
+
+  It follows the ARIA APG "Select-Only Combobox" and "Editable Combobox"
+  patterns: DOM focus stays on the control, the highlighted option is tracked
+  virtually via `aria-activedescendant`, and selection commits a fresh value.
+
+  Authoring notes (collision classes a no-engine component is the first to hit):
+    - `$data.expanded` (not `open`) — a `$data` key that matches an `$expose`
+      verb collapses onto the same React useState identifier.
+    - The focus verb is `focusControl`, not `focus` — a Lit custom element would
+      otherwise override the inherited HTMLElement.focus method.
+    - Every event is fired through ONE wrapper fn so its prop-destructure hoists
+      once (a duplicate-emit-site would emit two `const … = props` in React).
+
+  Consumer example (combobox):
+
+    <Listbox r-model:value="$data.fruit" :options="$data.fruits" combobox placeholder="Search fruit…">
+      <template #option="{ option, active, selected }">
+        <span :class="{ active, selected }">{{ option.label }}</span>
+      </template>
+    </Listbox>
+-->
+
+<rozie name="Listbox">
+
+<props>
+{
+  // The option set. Each entry is either a primitive (string/number) or an
+  // object; objects resolve their label/value/disabled via the option* props
+  // (falling back to `.label` / `.value` / `.disabled`).
+  options:        { type: Array,    default: () => [] },
+
+  // The selected value (two-way). Scalar in single-select; an array of values
+  // in multi-select. As the sole `model:true` prop it drives the Angular CVA —
+  // a Listbox IS a form control.
+  value:          { type: null,     default: null, model: true },
+
+  // Multi-select: `value` becomes an array; selecting toggles membership and
+  // keeps the popup open.
+  multiple:       { type: Boolean,  default: false },
+
+  // Combobox mode: render a text <input role="combobox"> and filter options by
+  // the typed query. Off → a select-only combobox (a button trigger).
+  combobox:       { type: Boolean,  default: false },
+
+  // Whether combobox mode filters the options client-side. Turn off for
+  // remote/async filtering — listen to the `search` event and update `options`.
+  filterable:     { type: Boolean,  default: true },
+
+  disabled:       { type: Boolean,  default: false },
+  placeholder:    { type: String,   default: '' },
+
+  // Close the popup after a selection. Defaults true; multi-select callers
+  // usually want it open — pass :closeOnSelect="false".
+  closeOnSelect:  { type: Boolean,  default: true },
+
+  // Resolver overrides for object options.
+  optionLabel:    { type: Function, default: null },
+  optionValue:    { type: Function, default: null },
+  optionDisabled: { type: Function, default: null },
+
+  // Stable id base for the ARIA wiring (listbox id + per-option ids +
+  // aria-activedescendant). Required-distinct for multiple instances on one
+  // page (the standard ARIA-widget contract).
+  id:             { type: String,   default: 'rozie-listbox' },
+
+  // Accessible name for the control when there is no visible <label for>.
+  ariaLabel:      { type: String,   default: null },
+}
+</props>
+
+<data>
+{
+  expanded: false,
+  // Virtual focus: index into the *visible* (filtered) option list, or -1.
+  activeIndex: -1,
+  // Combobox filter query.
+  query: '',
+}
+</data>
+
+<script>
+// Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
+// `let`s reassigned from handlers → the React emitter hoists them to `useRef`
+// so they persist across renders (the setup-once guarantee); no-op elsewhere.
+let typeBuffer = ''
+let typeTimer = null
+
+// ---- option resolvers --------------------------------------------------
+const labelOf = (opt) => {
+  if ($props.optionLabel !== null) return $props.optionLabel(opt)
+  if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label
+  return String(opt)
+}
+const readValue = (opt) => {
+  if ($props.optionValue !== null) return $props.optionValue(opt)
+  if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value
+  return opt
+}
+const disabledOf = (opt) => {
+  if ($props.optionDisabled !== null) return !!$props.optionDisabled(opt)
+  if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled
+  return false
+}
+const optionId = (index) => $props.id + '-opt-' + index
+
+// ---- derived state -----------------------------------------------------
+// The visible option list: identity in select-only / non-filtering mode,
+// a case-insensitive substring filter when a combobox query is present.
+// A plain function (not `$computed`) so it reads uniformly across all six
+// targets — a `$computed` is a value on React but an accessor on Solid, so
+// aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
+// plain function is identical everywhere.
+const visibleOptions = () => {
+  if (!$props.combobox || !$props.filterable) return $props.options
+  const q = $data.query.trim().toLowerCase()
+  if (q === '') return $props.options
+  return $props.options.filter((opt) => labelOf(opt).toLowerCase().includes(q))
+}
+
+// The label shown in the (select-only) trigger when closed. A real `$computed`
+// — read bare in the template, never aliased in script, so the per-target
+// accessor form stays uniform.
+const selectedLabel = $computed(() => {
+  const cur = $props.value
+  if ($props.multiple) {
+    // Read the model value into a local before narrowing: `$props.value` lowers
+    // to a `value()` accessor on Solid, and Array.isArray() can't narrow two
+    // separate calls — narrowing one stable local works on every target.
+    const arr = Array.isArray(cur) ? cur : []
+    if (arr.length === 0) return ''
+    return $props.options.filter((o) => arr.includes(readValue(o))).map(labelOf).join(', ')
+  }
+  const match = $props.options.find((o) => readValue(o) === cur)
+  return match === undefined ? '' : labelOf(match)
+})
+
+// The id of the active option, for aria-activedescendant. null when none.
+const activeDescendant = $computed(() => {
+  if (!$data.expanded || $data.activeIndex < 0) return null
+  return optionId($data.activeIndex)
+})
+
+// Is a given option currently selected? Multi compares array membership.
+const isSelected = (opt) => {
+  const v = readValue(opt)
+  const cur = $props.value
+  if ($props.multiple) return Array.isArray(cur) && cur.includes(v)
+  return cur === v
+}
+
+// First enabled visible index, preferring the currently-selected option.
+const resolveInitialActive = () => {
+  const opts = visibleOptions()
+  const sel = opts.findIndex((o) => isSelected(o) && !disabledOf(o))
+  if (sel !== -1) return sel
+  return opts.findIndex((o) => !disabledOf(o))
+}
+
+// ---- focus / scroll helpers (post-mount $refs only) --------------------
+// Named `focusControl` (not `focus`): a `focus` $expose verb would override the
+// inherited HTMLElement.focus method on the Lit custom element.
+const focusControl = () => {
+  if ($props.combobox) $refs.inputEl?.focus()
+  else $refs.triggerEl?.focus()
+}
+
+// Keep the active option visible inside the scrolling listbox. Reads $refs in
+// a post-mount callback only (never eagerly — ROZ123).
+const scrollActiveIntoView = () => {
+  if (!$refs.listEl || $data.activeIndex < 0) return
+  const el = $refs.listEl.querySelector('#' + CSS.escape(optionId($data.activeIndex)))
+  el?.scrollIntoView({ block: 'nearest' })
+}
+
+// ---- open / close ------------------------------------------------------
+// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
+// React prop-destructure for `onOpenChange` hoists exactly once.
+const applyExpanded = (next) => {
+  if (next && $props.disabled) return
+  if ($data.expanded === next) return
+  $data.expanded = next
+  $data.activeIndex = next ? resolveInitialActive() : -1
+  $emit('open-change', { open: next })
+}
+const open = () => applyExpanded(true)
+const close = () => applyExpanded(false)
+const toggle = () => applyExpanded(!$data.expanded)
+
+// ---- selection ---------------------------------------------------------
+// Single `$emit('change')` site (called from both select + clear).
+const fireChange = (value, option) => $emit('change', { value, option })
+
+const select = (opt) => {
+  if (disabledOf(opt)) return
+  const v = readValue(opt)
+  if ($props.multiple) {
+    const cur = $props.value
+    const arr = Array.isArray(cur) ? cur : []
+    // Fresh array on every commit — in-place mutation is dropped by the
+    // React/Solid/Lit/Angular change detectors.
+    const next = arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
+    $model.value = next
+    fireChange(next, opt)
+  } else {
+    $model.value = v
+    fireChange(v, opt)
+    if ($props.closeOnSelect) { close(); focusControl() }
+  }
+}
+
+const clear = () => {
+  const empty = $props.multiple ? [] : null
+  $model.value = empty
+  $data.query = ''
+  fireChange(empty, null)
+}
+
+// ---- keyboard navigation over the VISIBLE list -------------------------
+const nextEnabled = (from, dir) => {
+  const opts = visibleOptions()
+  if (opts.length === 0) return -1
+  let i = from
+  for (let step = 0; step < opts.length; step++) {
+    i += dir
+    if (i < 0) i = opts.length - 1
+    else if (i >= opts.length) i = 0
+    if (!disabledOf(opts[i])) return i
+  }
+  return from
+}
+
+const move = (dir) => {
+  if (!$data.expanded) { open(); return }
+  const start = $data.activeIndex < 0 ? (dir > 0 ? -1 : 0) : $data.activeIndex
+  $data.activeIndex = nextEnabled(start, dir)
+  scrollActiveIntoView()
+}
+
+const moveEdge = (toEnd) => {
+  if (!$data.expanded) open()
+  $data.activeIndex = toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1)
+  scrollActiveIntoView()
+}
+
+const commitActive = () => {
+  const opts = visibleOptions()
+  if ($data.activeIndex >= 0 && $data.activeIndex < opts.length) select(opts[$data.activeIndex])
+}
+
+// Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
+// first option whose label starts with the buffer.
+const onTypeahead = (ch) => {
+  if (typeTimer !== null) clearTimeout(typeTimer)
+  typeBuffer += ch.toLowerCase()
+  typeTimer = setTimeout(() => { typeBuffer = '' }, 600)
+  const opts = visibleOptions()
+  const idx = opts.findIndex((o) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer))
+  if (idx !== -1) {
+    if (!$data.expanded) open()
+    $data.activeIndex = idx
+    scrollActiveIntoView()
+  }
+}
+
+// Key handler shared by the trigger and the combobox input. The printable-
+// character branch is reached only in select-only mode (the combobox input
+// types through @input).
+const onControlKeyDown = ($event) => {
+  const key = $event.key
+  if (key === 'ArrowDown') { $event.preventDefault(); move(1) }
+  else if (key === 'ArrowUp') { $event.preventDefault(); move(-1) }
+  else if (key === 'Home') { $event.preventDefault(); moveEdge(false) }
+  else if (key === 'End') { $event.preventDefault(); moveEdge(true) }
+  else if (key === 'Enter') { if ($data.expanded) { $event.preventDefault(); commitActive() } }
+  else if (key === 'Escape') { if ($data.expanded) { $event.preventDefault(); close(); focusControl() } }
+  else if (key === ' ' || key === 'Spacebar') {
+    // Space toggles / commits in select-only mode; a combobox input needs the
+    // literal space, so do nothing there.
+    if (!$props.combobox) {
+      $event.preventDefault()
+      if (!$data.expanded) open()
+      else commitActive()
+    }
+  }
+  else if (key === 'Tab') { if ($data.expanded) close() }
+  else if (!$props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+    onTypeahead(key)
+  }
+}
+
+// Combobox input handler: keep the popup open while typing, reset the active
+// highlight to the first match, and surface the query for remote filtering.
+const fireSearch = (query) => $emit('search', { query })
+const onInput = ($event) => {
+  $data.query = $event.target.value
+  if (!$data.expanded) open()
+  $data.activeIndex = nextEnabled(-1, 1)
+  fireSearch($data.query)
+}
+
+// Pointer hover sets the virtual highlight (matches native <select> feel).
+const onOptionPointerMove = (index) => {
+  if ($data.activeIndex !== index) $data.activeIndex = index
+}
+
+$onUnmount(() => { if (typeTimer !== null) clearTimeout(typeTimer) })
+
+// Imperative handle. Shorthand keys (aliased `{ open: fn }` keys are dropped by
+// the React emitter) — every function is named exactly as its verb.
+$expose({ open, close, toggle, clear, focusControl })
+</script>
+
+<listeners>
+  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.expanded" />
+</listeners>
+
+<template>
+<div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.expanded, 'rozie-listbox-disabled': $props.disabled }">
+
+  <!-- Control: an editable combobox input OR a select-only button. Both carry
+       role="combobox" per the modern ARIA APG. -->
+  <div class="rozie-listbox-control" ref="controlEl">
+    <input
+      r-if="$props.combobox"
+      ref="inputEl"
+      class="rozie-listbox-input"
+      type="text"
+      role="combobox"
+      autocomplete="off"
+      aria-autocomplete="list"
+      :aria-expanded="$data.expanded"
+      :aria-controls="$props.id + '-list'"
+      :aria-activedescendant="activeDescendant"
+      :aria-label="$props.ariaLabel"
+      :disabled="$props.disabled"
+      :placeholder="$props.placeholder"
+      :value="$data.query"
+      @input="onInput($event)"
+      @keydown="onControlKeyDown($event)"
+      @focus="open"
+    />
+    <button
+      r-else
+      ref="triggerEl"
+      type="button"
+      class="rozie-listbox-trigger"
+      role="combobox"
+      aria-haspopup="listbox"
+      :aria-expanded="$data.expanded"
+      :aria-controls="$props.id + '-list'"
+      :aria-activedescendant="activeDescendant"
+      :aria-label="$props.ariaLabel"
+      :disabled="$props.disabled"
+      @click="toggle"
+      @keydown="onControlKeyDown($event)"
+    >
+      <slot name="selected" :selected="selectedLabel" :value="$props.value">
+        <span r-if="selectedLabel" class="rozie-listbox-selected">{{ selectedLabel }}</span>
+        <span r-else class="rozie-listbox-placeholder">{{ $props.placeholder }}</span>
+      </slot>
+      <span class="rozie-listbox-arrow" aria-hidden="true">▾</span>
+    </button>
+  </div>
+
+  <!-- Popup listbox. aria-activedescendant on the control points at the
+       highlighted option id; DOM focus never leaves the control. -->
+  <div
+    r-if="$data.expanded"
+    ref="listEl"
+    class="rozie-listbox-list"
+    role="listbox"
+    :id="$props.id + '-list'"
+    :aria-label="$props.ariaLabel"
+    :aria-multiselectable="$props.multiple"
+  >
+    <div
+      r-for="opt, index in visibleOptions()"
+      :key="optionId(index)"
+      :id="optionId(index)"
+      class="rozie-listbox-option"
+      :class="{ 'is-active': $data.activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }"
+      role="option"
+      :aria-selected="!!isSelected(opt)"
+      :aria-disabled="!!disabledOf(opt)"
+      @click="select(opt)"
+      @mousemove="onOptionPointerMove(index)"
+    >
+      <slot name="option" :option="opt" :index="index" :active="$data.activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
+        {{ labelOf(opt) }}
+      </slot>
+    </div>
+
+    <div r-if="visibleOptions().length === 0" class="rozie-listbox-empty" role="presentation">
+      <slot name="empty" :query="$data.query">No options</slot>
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven. EVERY value is a `var(--rozie-listbox-*, <fallback>)`, so
+  the component renders with zero configuration yet is completely re-skinnable
+  by setting tokens at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+  `.rozie-listbox` element itself). The shipped `themes/*.css` presets do exactly
+  that — mapping these tokens onto shadcn/Radix, Material 3, and Bootstrap 5.
+  Nested var() fallbacks let one token derive from another (ring ← accent,
+  popup-bg ← bg) while staying independently overridable.
+*/
+.rozie-listbox {
+  position: relative;
+  display: inline-block;
+  min-width: var(--rozie-listbox-min-width, 12rem);
+  font: var(--rozie-listbox-font, inherit);
+}
+.rozie-listbox-control { display: block; }
+
+.rozie-listbox-input,
+.rozie-listbox-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-listbox-gap, 0.5rem);
+  padding: var(--rozie-listbox-control-padding, 0.5rem 0.75rem);
+  font: inherit;
+  text-align: left;
+  background: var(--rozie-listbox-bg, #fff);
+  color: var(--rozie-listbox-fg, #1a1a1a);
+  border: var(--rozie-listbox-border-width, 1px) solid var(--rozie-listbox-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--rozie-listbox-radius, 6px);
+  cursor: pointer;
+}
+.rozie-listbox-input { cursor: text; }
+.rozie-listbox-input:focus-visible,
+.rozie-listbox-input:focus,
+.rozie-listbox-trigger:focus-visible,
+.rozie-listbox-trigger:focus {
+  outline: var(--rozie-listbox-ring-width, 2px) solid var(--rozie-listbox-ring, var(--rozie-listbox-accent, #0066cc));
+  outline-offset: var(--rozie-listbox-ring-offset, 1px);
+}
+.rozie-listbox-disabled { opacity: var(--rozie-listbox-disabled-opacity, 0.6); pointer-events: none; }
+.rozie-listbox-placeholder { color: var(--rozie-listbox-placeholder, rgba(0, 0, 0, 0.45)); }
+.rozie-listbox-arrow {
+  font-size: 0.75em;
+  color: var(--rozie-listbox-arrow-color, currentColor);
+  opacity: var(--rozie-listbox-arrow-opacity, 0.7);
+}
+
+.rozie-listbox-list {
+  position: absolute;
+  z-index: var(--rozie-listbox-z, 1000);
+  top: calc(100% + var(--rozie-listbox-popup-offset, 4px));
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--rozie-listbox-popup-padding, 0.25rem);
+  max-height: var(--rozie-listbox-max-height, 16rem);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--rozie-listbox-popup-bg, var(--rozie-listbox-bg, #fff));
+  color: var(--rozie-listbox-fg, #1a1a1a);
+  border: var(--rozie-listbox-border-width, 1px) solid var(--rozie-listbox-popup-border, var(--rozie-listbox-border, rgba(0, 0, 0, 0.15)));
+  border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
+  box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
+}
+.rozie-listbox-option {
+  padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);
+  border-radius: var(--rozie-listbox-option-radius, 4px);
+  color: var(--rozie-listbox-option-fg, inherit);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-listbox-gap, 0.5rem);
+}
+.rozie-listbox-option.is-active {
+  background: var(--rozie-listbox-active-bg, rgba(0, 102, 204, 0.12));
+  color: var(--rozie-listbox-active-fg, inherit);
+}
+.rozie-listbox-option.is-selected {
+  background: var(--rozie-listbox-selected-bg, transparent);
+  color: var(--rozie-listbox-selected-fg, inherit);
+  font-weight: var(--rozie-listbox-selected-weight, 600);
+}
+.rozie-listbox-option.is-selected::after {
+  content: var(--rozie-listbox-check, '✓');
+  color: var(--rozie-listbox-check-color, var(--rozie-listbox-accent, #0066cc));
+}
+.rozie-listbox-option.is-disabled { opacity: var(--rozie-listbox-disabled-opacity, 0.45); cursor: not-allowed; }
+.rozie-listbox-empty { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }
+</style>
+
+</rozie>

@@ -1,0 +1,35 @@
+/*
+ * @rozie-ui/listbox — Bootstrap 5 bridge.
+ *
+ * Maps the listbox tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the listbox follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/listbox-react/themes/bootstrap.css';
+ */
+.rozie-listbox {
+  --rozie-listbox-bg: var(--bs-body-bg, #fff);
+  --rozie-listbox-fg: var(--bs-body-color, #212529);
+  --rozie-listbox-border: var(--bs-border-color, #dee2e6);
+  --rozie-listbox-border-width: var(--bs-border-width, 1px);
+  --rozie-listbox-radius: var(--bs-border-radius, 0.375rem);
+  --rozie-listbox-placeholder: var(--bs-secondary-color, #6c757d);
+
+  --rozie-listbox-accent: var(--bs-primary, #0d6efd);
+  --rozie-listbox-ring: var(--bs-primary, #0d6efd);
+  --rozie-listbox-ring-width: 0.25rem;
+  --rozie-listbox-ring-offset: 0;
+
+  --rozie-listbox-popup-bg: var(--bs-body-bg, #fff);
+  --rozie-listbox-popup-border: var(--bs-border-color, #dee2e6);
+  --rozie-listbox-active-bg: var(--bs-tertiary-bg, #f8f9fa);
+  --rozie-listbox-active-fg: var(--bs-body-color, #212529);
+  --rozie-listbox-selected-bg: var(--bs-primary, #0d6efd);
+  --rozie-listbox-selected-fg: #fff;
+  --rozie-listbox-check-color: #fff;
+
+  --rozie-listbox-popup-radius: var(--bs-border-radius, 0.375rem);
+  --rozie-listbox-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --rozie-listbox-empty-fg: var(--bs-secondary-color, #6c757d);
+}

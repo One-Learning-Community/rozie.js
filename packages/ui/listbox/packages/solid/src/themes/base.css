@@ -1,0 +1,61 @@
+/*
+ * @rozie-ui/listbox — base token reference.
+ *
+ * Every visual value the component renders is a `--rozie-listbox-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-listbox` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-listbox {
+  /* layout / typography */
+  --rozie-listbox-min-width: 12rem;
+  --rozie-listbox-font: inherit;
+  --rozie-listbox-gap: 0.5rem;
+  --rozie-listbox-control-padding: 0.5rem 0.75rem;
+
+  /* control + popup surface */
+  --rozie-listbox-bg: #fff;
+  --rozie-listbox-fg: #1a1a1a;
+  --rozie-listbox-border: rgba(0, 0, 0, 0.2);
+  --rozie-listbox-border-width: 1px;
+  --rozie-listbox-radius: 6px;
+  --rozie-listbox-placeholder: rgba(0, 0, 0, 0.45);
+  --rozie-listbox-disabled-opacity: 0.6;
+
+  /* focus ring (defaults to accent) */
+  --rozie-listbox-accent: #0066cc;
+  --rozie-listbox-ring: var(--rozie-listbox-accent);
+  --rozie-listbox-ring-width: 2px;
+  --rozie-listbox-ring-offset: 1px;
+
+  /* trailing arrow (select-only trigger) */
+  --rozie-listbox-arrow-color: currentColor;
+  --rozie-listbox-arrow-opacity: 0.7;
+
+  /* popup */
+  --rozie-listbox-popup-bg: var(--rozie-listbox-bg);
+  --rozie-listbox-popup-border: var(--rozie-listbox-border);
+  --rozie-listbox-popup-radius: var(--rozie-listbox-radius);
+  --rozie-listbox-popup-padding: 0.25rem;
+  --rozie-listbox-popup-offset: 4px;
+  --rozie-listbox-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  --rozie-listbox-z: 1000;
+  --rozie-listbox-max-height: 16rem;
+
+  /* options */
+  --rozie-listbox-option-padding: 0.4rem 0.6rem;
+  --rozie-listbox-option-radius: 4px;
+  --rozie-listbox-option-fg: inherit;
+  --rozie-listbox-active-bg: rgba(0, 102, 204, 0.12);
+  --rozie-listbox-active-fg: inherit;
+  --rozie-listbox-selected-bg: transparent;
+  --rozie-listbox-selected-fg: inherit;
+  --rozie-listbox-selected-weight: 600;
+  --rozie-listbox-check: '✓';
+  --rozie-listbox-check-color: var(--rozie-listbox-accent);
+  --rozie-listbox-empty-fg: rgba(0, 0, 0, 0.5);
+}
