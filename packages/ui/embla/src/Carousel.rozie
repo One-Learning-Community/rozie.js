@@ -56,6 +56,18 @@
   // Autoplay plugin toggle + delay.
   autoplay:       { type: Boolean, default: false },
   autoplayDelay:  { type: Number,  default: 4000 },
+  // ─── built-in navigation UI (all opt-in, default off) ───────────────────────
+  // dot pagination (one dot per scroll snap; the selected snap is highlighted;
+  // clicking a dot scrolls to it).
+  dots:           { type: Boolean, default: false },
+  // prev/next arrow buttons overlaid on the viewport (disabled at the ends unless
+  // `loop`).
+  arrows:         { type: Boolean, default: false },
+  // a synced thumbnail strip below the carousel — its OWN Embla instance, one
+  // thumb per slide (config-array mode). Fill the `thumb` scoped slot for custom
+  // thumb content (falls back to the slide value). Clicking a thumb scrolls the
+  // main carousel; the main selection highlights + scrolls the active thumb.
+  thumbnails:     { type: Boolean, default: false },
   // Escape hatches: extra Embla plugins appended verbatim; raw EmblaOptionsType
   // spread last (the SortableList ...$props.options precedent).
   plugins:        { type: Array,   default: () => [] },
@@ -68,6 +80,20 @@
 }
 </props>
 
+<data>
+{
+  // reactive nav state — driven from the engine on select/reInit by syncNav() so
+  // the built-in dots/arrows render reactively across all six targets.
+  //   snaps:    one entry per scroll snap (an index array → one dot per snap).
+  //   selected: the current snap index (highlights the active dot/thumb).
+  //   canPrev / canNext: arrow enabled state (false at the ends unless `loop`).
+  snaps: [],
+  selected: 0,
+  canPrev: false,
+  canNext: false,
+}
+</data>
+
 <script>
 import EmblaCarousel from 'embla-carousel'
 import Autoplay from 'embla-carousel-autoplay'
@@ -75,6 +101,9 @@ import Autoplay from 'embla-carousel-autoplay'
 // Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
 // useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
 let embla = null
+// The SECOND Embla instance powering the optional synced thumbnail strip (null
+// when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
+let emblaThumbs = null
 
 // Stable key for config-array slides — prefer an object id, fall back to value/index.
 const keyFor = (slide, i) => {
@@ -118,21 +147,90 @@ const emblaPluginsFromProps = () => {
   return [...builtins, ...$props.plugins]
 }
 
+// Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
+// snap reachable + free dragging so the strip scrolls independently of the main
+// carousel, sharing the main axis. Built into a pre-nulled let for the same
+// literal-union laundering reason as emblaOptionsFromProps (axis is a `string`).
+const thumbsOptionsFromProps = () => {
+  let opts = null
+  opts = { containScroll: 'keepSnaps', dragFree: true, axis: $props.axis }
+  return opts
+}
+
+// Mirror the engine's live nav state into reactive $data so the built-in dots /
+// arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
+// scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
+// the thumbnail strip's scroll position in sync with the main selection.
+const syncNav = () => {
+  if (!embla) return
+  const i = embla.selectedScrollSnap()
+  $data.snaps = embla.scrollSnapList().map((_, n) => n)
+  $data.selected = i
+  $data.canPrev = embla.canScrollPrev()
+  $data.canNext = embla.canScrollNext()
+  if (emblaThumbs) emblaThumbs.scrollTo(i)
+}
+
+// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
+// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
+// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
+// invoking them arg-light from the template would trip TS2554 on the leaves).
+const navPrev = () => { if (embla) embla.scrollPrev() }
+const navNext = () => { if (embla) embla.scrollNext() }
+const navTo = (i) => { if (embla) embla.scrollTo(i) }
+
+// Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
+// clickAllowed() so a drag of the strip doesn't register as a click (the Embla
+// thumbs idiom).
+const selectThumb = (i) => {
+  if (emblaThumbs && !emblaThumbs.clickAllowed()) return
+  navTo(i)
+}
+
 $onMount(() => {
   embla = EmblaCarousel($refs.viewportEl, emblaOptionsFromProps(), emblaPluginsFromProps())
 
+  // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+  // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+  // only $refs-safe site). Stays null otherwise (zero overhead).
+  if ($props.thumbnails && $refs.thumbsViewportEl) {
+    emblaThumbs = EmblaCarousel($refs.thumbsViewportEl, thumbsOptionsFromProps())
+  }
+
   // engine → consumer: on every snap change write the two-way model AND fire the
-  // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+  // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+  // refreshes the built-in dots/arrows + thumb sync.
   embla.on('select', () => {
     const i = embla.selectedScrollSnap()
     $model.selectedIndex = i
     $emit('select', i)
+    syncNav()
   })
   embla.on('settle', () => $emit('settle'))
-  embla.on('reInit', () => $emit('reInit'))
+  embla.on('reInit', () => { $emit('reInit'); syncNav() })
   embla.on('pointerDown', () => $emit('pointer-down'))
+  // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+  // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+  // at init is stale — and a slide-size change (vs a viewport resize or slide
+  // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+  // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+  // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+  embla.on('resize', () => syncNav())
 
-  return () => embla?.destroy()
+  // seed the nav state immediately (covers the already-laid-out case)…
+  syncNav()
+  // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+  // width via attribute fallthrough can land a couple of frames after $onMount;
+  // Embla caches slide sizes at init and a slide-size change alone fires no
+  // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+  // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+  if (typeof requestAnimationFrame === 'function') {
+    const remeasure = () => { if (embla) embla.reInit(emblaOptionsFromProps(), emblaPluginsFromProps()) }
+    requestAnimationFrame(() => requestAnimationFrame(remeasure))
+    setTimeout(remeasure, 0)
+  }
+
+  return () => { embla?.destroy(); emblaThumbs?.destroy() }
 })
 
 // consumer → engine (echo-guarded, the MapLibre camera precedent): when the bound
@@ -165,8 +263,27 @@ $watch(
 
 // Config-array slide-count backstop: Embla's native `watchSlides` self-reInits on
 // default-slot child add/remove, but the config-array (r-for) path needs an
-// explicit length watch so a data-driven slide add/remove recomputes snaps.
-$watch(() => $props.slides.length, () => embla?.reInit(emblaOptionsFromProps()))
+// explicit length watch so a data-driven slide add/remove recomputes snaps. The
+// thumbnail strip iterates the same slides, so reInit it too, then resync nav.
+$watch(() => $props.slides.length, () => {
+  embla?.reInit(emblaOptionsFromProps())
+  emblaThumbs?.reInit(thumbsOptionsFromProps())
+  syncNav()
+})
+
+// Runtime toggle of `thumbnails`: build/tear down the strip's Embla instance so the
+// feature can be switched on/off after mount. $refs is safe to read in a $watch
+// CALLBACK (post-mount; only the GETTER is ROZ123-restricted). The r-if mounts/
+// unmounts the viewport element in the same tick.
+$watch(() => $props.thumbnails, (on) => {
+  if (on && !emblaThumbs && $refs.thumbsViewportEl) {
+    emblaThumbs = EmblaCarousel($refs.thumbsViewportEl, thumbsOptionsFromProps())
+    syncNav()
+  } else if (!on && emblaThumbs) {
+    emblaThumbs.destroy()
+    emblaThumbs = null
+  }
+})
 
 // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
 // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
@@ -210,25 +327,77 @@ $expose({
 
 <template>
 <div class="rozie-embla" :class="{ 'rozie-embla--vertical': $props.axis === 'y' }">
-  <div class="rozie-embla__viewport" ref="viewportEl">
-    <div class="rozie-embla__container">
-      <!-- (a) config-array mode: render slides from $props.slides.
-           NOTE the loop var is `item`, NOT `slide` — a `slide`-named r-for
-           variable shadows the `slide` SLOT (which the Svelte emitter lowers to a
-           top-level `const slide = $derived(__slideProp ?? snippets?.slide)`), so
-           inside `{#each slides as slide}` the `{@render slide(...)}` would render
-           the each-ITEM (a string) instead of the snippet and throw on mount. This
-           is the slot-name == loop-binding shadow collision (the rete `node`→
-           `reteNode` lesson) — keep the iteration variable distinct from any slot. -->
-      <div
-        r-for="item, i in $props.slides"
-        :key="keyFor(item, i)"
-        class="rozie-embla__slide"
-      >
-        <slot name="slide" :slide="item" :index="i">{{ item }}</slot>
+  <!-- stage = the viewport + the overlaid prev/next arrows (position context so
+       the absolute arrows align to the VIEWPORT, not the dots/thumbs below). -->
+  <div class="rozie-embla__stage">
+    <button
+      type="button"
+      class="rozie-embla__arrow rozie-embla__arrow--prev"
+      r-if="$props.arrows"
+      :disabled="!$data.canPrev"
+      @click="navPrev()"
+      aria-label="Previous slide"
+    >‹</button>
+    <div class="rozie-embla__viewport" ref="viewportEl">
+      <div class="rozie-embla__container">
+        <!-- (a) config-array mode: render slides from $props.slides.
+             NOTE the loop var is `item`, NOT `slide` — a `slide`-named r-for
+             variable shadows the `slide` SLOT (which the Svelte emitter lowers to a
+             top-level `const slide = $derived(__slideProp ?? snippets?.slide)`), so
+             inside `{#each slides as slide}` the `{@render slide(...)}` would render
+             the each-ITEM (a string) instead of the snippet and throw on mount. This
+             is the slot-name == loop-binding shadow collision (the rete `node`→
+             `reteNode` lesson) — keep the iteration variable distinct from any slot. -->
+        <div
+          r-for="item, i in $props.slides"
+          :key="keyFor(item, i)"
+          class="rozie-embla__slide"
+        >
+          <slot name="slide" :slide="item" :index="i">{{ item }}</slot>
+        </div>
+        <!-- (b) declarative mode: consumer drops slide DOM directly -->
+        <slot />
       </div>
-      <!-- (b) declarative mode: consumer drops slide DOM directly -->
-      <slot />
+    </div>
+    <button
+      type="button"
+      class="rozie-embla__arrow rozie-embla__arrow--next"
+      r-if="$props.arrows"
+      :disabled="!$data.canNext"
+      @click="navNext()"
+      aria-label="Next slide"
+    >›</button>
+  </div>
+
+  <!-- dot pagination — one button per scroll snap; the selected snap is active. -->
+  <div class="rozie-embla__dots" r-if="$props.dots">
+    <button
+      r-for="di in $data.snaps"
+      :key="di"
+      type="button"
+      class="rozie-embla__dot"
+      :class="{ 'is-selected': di === $data.selected }"
+      @click="navTo(di)"
+      :aria-label="'Go to slide ' + (di + 1)"
+    />
+  </div>
+
+  <!-- synced thumbnail strip — its own Embla instance (thumbsViewportEl), one thumb
+       per slide. Fill the `thumb` scoped slot for custom content (falls back to the
+       slide value). Clicking a thumb scrolls the main carousel. -->
+  <div class="rozie-embla__thumbs" r-if="$props.thumbnails">
+    <div class="rozie-embla__thumbs-viewport" ref="thumbsViewportEl">
+      <div class="rozie-embla__thumbs-container">
+        <div
+          r-for="item, i in $props.slides"
+          :key="keyFor(item, i)"
+          class="rozie-embla__thumb"
+          :class="{ 'is-selected': i === $data.selected }"
+          @click="selectThumb(i)"
+        >
+          <slot name="thumb" :slide="item" :index="i">{{ item }}</slot>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -236,6 +405,7 @@ $expose({
 
 <style>
 .rozie-embla { position: relative; }
+.rozie-embla__stage { position: relative; }
 .rozie-embla__viewport { overflow: hidden; }
 .rozie-embla__container { display: flex; }
 .rozie-embla__slide { flex: 0 0 100%; min-width: 0; }
@@ -243,6 +413,77 @@ $expose({
 /* Vertical axis: stack slides in a column inside a height-constrained viewport. */
 .rozie-embla--vertical .rozie-embla__container { flex-direction: column; height: 100%; }
 .rozie-embla--vertical .rozie-embla__slide { flex: 0 0 100%; min-height: 0; }
+
+/* ─── prev/next arrows (opt-in via `arrows`) ──────────────────────────────────
+   Overlaid on the viewport, vertically centered on the STAGE (so the dots/thumbs
+   below don't shift them). Consumers restyle via these classes or the :deep hatch. */
+.rozie-embla__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.rozie-embla__arrow:hover { background: #fff; }
+.rozie-embla__arrow:disabled { opacity: 0.35; cursor: default; }
+.rozie-embla__arrow--prev { left: 0.5rem; }
+.rozie-embla__arrow--next { right: 0.5rem; }
+
+/* ─── dot pagination (opt-in via `dots`) ──────────────────────────────────────── */
+.rozie-embla__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.625rem 0;
+}
+.rozie-embla__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.rozie-embla__dot:hover { background: rgba(0, 0, 0, 0.45); }
+.rozie-embla__dot.is-selected {
+  background: #1a1a1a;
+  transform: scale(1.25);
+}
+
+/* ─── synced thumbnail strip (opt-in via `thumbnails`) ────────────────────────── */
+.rozie-embla__thumbs { margin-top: 0.5rem; }
+.rozie-embla__thumbs-viewport { overflow: hidden; }
+.rozie-embla__thumbs-container { display: flex; gap: 0.5rem; }
+.rozie-embla__thumb {
+  flex: 0 0 auto;
+  cursor: pointer;
+  opacity: 0.5;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.rozie-embla__thumb:hover { opacity: 0.8; }
+.rozie-embla__thumb.is-selected {
+  opacity: 1;
+  border-color: #1a1a1a;
+}
 </style>
 
 </rozie>

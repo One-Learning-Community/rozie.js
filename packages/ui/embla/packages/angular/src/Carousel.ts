@@ -16,6 +16,12 @@ interface SlideCtx {
 
 interface DefaultCtx {}
 
+interface ThumbCtx {
+  $implicit: { slide: any; index: any };
+  slide: any;
+  index: any;
+}
+
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v;
@@ -43,32 +49,127 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     <div class="rozie-embla" [ngClass]="{ 'rozie-embla--vertical': axis() === 'y' }" #rozieSpread_0 #rozieListenersTarget_1>
-      <div class="rozie-embla__viewport" #viewportEl>
-        <div class="rozie-embla__container">
-          
-          @for (item of slides(); track keyFor(item, i); let i = $index) {
+      
+      <div class="rozie-embla__stage">
+        @if (arrows()) {
+    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" [disabled]="!canPrev()" aria-label="Previous slide" (click)="navPrev()">‹</button>
+    }<div class="rozie-embla__viewport" #viewportEl>
+          <div class="rozie-embla__container">
+            
+            @for (item of slides(); track keyFor(item, i); let i = $index) {
     <div class="rozie-embla__slide">
-            @if ((slideTpl ?? templates()?.['slide'])) {
+              @if ((slideTpl ?? templates()?.['slide'])) {
     <ng-container *ngTemplateOutlet="(slideTpl ?? templates()?.['slide']); context: { $implicit: { slide: item, index: i }, slide: item, index: i }" />
     } @else {
     {{ rozieDisplay(item) }}
     }
-          </div>
+            </div>
     }
-          
-          <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+            
+            <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+          </div>
+        </div>
+        @if (arrows()) {
+    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" [disabled]="!canNext()" aria-label="Next slide" (click)="navNext()">›</button>
+    }</div>
+
+      
+      @if (dots()) {
+    <div class="rozie-embla__dots">
+        @for (di of snaps(); track di) {
+    <button type="button" class="rozie-embla__dot" [ngClass]="{ 'is-selected': di === selected() }" [attr.aria-label]="rozieAttr('Go to slide ' + (di + 1))" (click)="navTo(di)"></button>
+    }
+      </div>
+    }@if (thumbnails()) {
+    <div class="rozie-embla__thumbs">
+        <div class="rozie-embla__thumbs-viewport" #thumbsViewportEl>
+          <div class="rozie-embla__thumbs-container">
+            @for (item of slides(); track keyFor(item, i); let i = $index) {
+    <div class="rozie-embla__thumb" [ngClass]="{ 'is-selected': i === selected() }" (click)="selectThumb(i)">
+              @if ((thumbTpl ?? templates()?.['thumb'])) {
+    <ng-container *ngTemplateOutlet="(thumbTpl ?? templates()?.['thumb']); context: { $implicit: { slide: item, index: i }, slide: item, index: i }" />
+    } @else {
+    {{ rozieDisplay(item) }}
+    }
+            </div>
+    }
+          </div>
         </div>
       </div>
-    </div>
+    }</div>
 
   `,
   styles: [`
     .rozie-embla { position: relative; }
+    .rozie-embla__stage { position: relative; }
     .rozie-embla__viewport { overflow: hidden; }
     .rozie-embla__container { display: flex; }
     .rozie-embla__slide { flex: 0 0 100%; min-width: 0; }
     .rozie-embla--vertical .rozie-embla__container { flex-direction: column; height: 100%; }
     .rozie-embla--vertical .rozie-embla__slide { flex: 0 0 100%; min-height: 0; }
+    .rozie-embla__arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      color: #1a1a1a;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      transition: opacity 0.15s ease, background 0.15s ease;
+    }
+    .rozie-embla__arrow:hover { background: #fff; }
+    .rozie-embla__arrow:disabled { opacity: 0.35; cursor: default; }
+    .rozie-embla__arrow--prev { left: 0.5rem; }
+    .rozie-embla__arrow--next { right: 0.5rem; }
+    .rozie-embla__dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.625rem 0;
+    }
+    .rozie-embla__dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.25);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .rozie-embla__dot:hover { background: rgba(0, 0, 0, 0.45); }
+    .rozie-embla__dot.is-selected {
+      background: #1a1a1a;
+      transform: scale(1.25);
+    }
+    .rozie-embla__thumbs { margin-top: 0.5rem; }
+    .rozie-embla__thumbs-viewport { overflow: hidden; }
+    .rozie-embla__thumbs-container { display: flex; gap: 0.5rem; }
+    .rozie-embla__thumb {
+      flex: 0 0 auto;
+      cursor: pointer;
+      opacity: 0.5;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      overflow: hidden;
+      transition: opacity 0.15s ease, border-color 0.15s ease;
+    }
+    .rozie-embla__thumb:hover { opacity: 0.8; }
+    .rozie-embla__thumb.is-selected {
+      opacity: 1;
+      border-color: #1a1a1a;
+    }
   `],
   providers: [
     {
@@ -94,22 +195,32 @@ export class Carousel {
   direction = input<string>('ltr');
   autoplay = input<boolean>(false);
   autoplayDelay = input<number>(4000);
+  dots = input<boolean>(false);
+  arrows = input<boolean>(false);
+  thumbnails = input<boolean>(false);
   plugins = input<any[]>((() => [])());
   options = input<Record<string, any>>((() => ({}))());
   selectedIndex = model<number>(0);
+  snaps = signal<any[]>([]);
+  selected = signal(0);
+  canPrev = signal(false);
+  canNext = signal(false);
   viewportEl = viewChild<ElementRef<HTMLDivElement>>('viewportEl');
+  thumbsViewportEl = viewChild<ElementRef<HTMLDivElement>>('thumbsViewportEl');
   select = output<unknown>();
   settle = output<void>();
   reInit = output<void>();
   pointerDown = output<void>({ alias: 'pointer-down' });
   @ContentChild('slide', { read: TemplateRef }) slideTpl?: TemplateRef<SlideCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  @ContentChild('thumb', { read: TemplateRef }) thumbTpl?: TemplateRef<ThumbCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
   private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.selectedIndex())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
@@ -117,28 +228,95 @@ export class Carousel {
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => [this.loop(), this.align(), this.axis(), this.slidesToScroll(), this.dragFree(), this.draggable(), this.containScroll(), this.skipSnaps(), this.duration(), this.direction()].join('|'))(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }); });
     effect(() => { const __watchVal = (() => `${this.autoplay()}|${this.autoplayDelay()}`)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.embla?.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps()))(); }); });
-    effect(() => { const __watchVal = (() => this.slides().length)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }); });
+    effect(() => { const __watchVal = (() => this.slides().length)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      this.embla?.reInit(this.emblaOptionsFromProps());
+      this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
+      this.syncNav();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.thumbnails())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((on: any) => {
+      if (on && !this.emblaThumbs && this.thumbsViewportEl()?.nativeElement) {
+        this.emblaThumbs = EmblaCarousel(this.thumbsViewportEl()!.nativeElement, this.thumbsOptionsFromProps());
+        this.syncNav();
+      } else if (!on && this.emblaThumbs) {
+        this.emblaThumbs.destroy();
+        this.emblaThumbs = null;
+      }
+    })(__watchVal); }); });
   }
 
   ngAfterViewInit() {
     this.embla = EmblaCarousel(this.viewportEl()!.nativeElement, this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
 
+    // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+    // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+    // only $refs-safe site). Stays null otherwise (zero overhead).
+    // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+    // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+    // only $refs-safe site). Stays null otherwise (zero overhead).
+    if (this.thumbnails() && this.thumbsViewportEl()?.nativeElement) {
+      this.emblaThumbs = EmblaCarousel(this.thumbsViewportEl()!.nativeElement, this.thumbsOptionsFromProps());
+    }
+
     // engine → consumer: on every snap change write the two-way model AND fire the
-    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+    // refreshes the built-in dots/arrows + thumb sync.
     // engine → consumer: on every snap change write the two-way model AND fire the
-    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+    // refreshes the built-in dots/arrows + thumb sync.
     this.embla.on('select', () => {
       const i = this.embla.selectedScrollSnap();
       this.selectedIndex.set(i), this.__rozieCvaOnChange(i);
       this.select.emit(i);
+      this.syncNav();
     });
     this.embla.on('settle', () => this.settle.emit());
-    this.embla.on('reInit', () => this.reInit.emit());
+    this.embla.on('reInit', () => {
+      this.reInit.emit();
+      this.syncNav();
+    });
     this.embla.on('pointerDown', () => this.pointerDown.emit());
-    this.__rozieDestroyRef.onDestroy(() => this.embla?.destroy());
+    // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+    // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+    // at init is stale — and a slide-size change (vs a viewport resize or slide
+    // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+    // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+    // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+    // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+    // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+    // at init is stale — and a slide-size change (vs a viewport resize or slide
+    // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+    // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+    // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+    this.embla.on('resize', () => this.syncNav());
+
+    // seed the nav state immediately (covers the already-laid-out case)…
+    // seed the nav state immediately (covers the already-laid-out case)…
+    this.syncNav();
+    // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+    // width via attribute fallthrough can land a couple of frames after $onMount;
+    // Embla caches slide sizes at init and a slide-size change alone fires no
+    // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+    // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+    // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+    // width via attribute fallthrough can land a couple of frames after $onMount;
+    // Embla caches slide sizes at init and a slide-size change alone fires no
+    // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+    // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+    if (typeof requestAnimationFrame === 'function') {
+      const remeasure = () => {
+        if (this.embla) this.embla.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+      };
+      requestAnimationFrame(() => requestAnimationFrame(remeasure));
+      setTimeout(remeasure, 0);
+    }
+    this.__rozieDestroyRef.onDestroy(() => {
+      this.embla?.destroy();
+      this.emblaThumbs?.destroy();
+    });
   }
 
   embla: any = null;
+  emblaThumbs: any = null;
   keyFor = (slide: any, i: any) => {
     if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
     return slide ?? i;
@@ -166,6 +344,37 @@ export class Carousel {
       delay: this.autoplayDelay()
     })] : [];
     return [...builtins, ...this.plugins()];
+  };
+  thumbsOptionsFromProps = () => {
+    let opts: any = null;
+    opts = {
+      containScroll: 'keepSnaps',
+      dragFree: true,
+      axis: this.axis()
+    };
+    return opts;
+  };
+  syncNav = () => {
+    if (!this.embla) return;
+    const i = this.embla.selectedScrollSnap();
+    this.snaps.set(this.embla.scrollSnapList().map((_: any, n: any) => n));
+    this.selected.set(i);
+    this.canPrev.set(this.embla.canScrollPrev());
+    this.canNext.set(this.embla.canScrollNext());
+    if (this.emblaThumbs) this.emblaThumbs.scrollTo(i);
+  };
+  navPrev = () => {
+    if (this.embla) this.embla.scrollPrev();
+  };
+  navNext = () => {
+    if (this.embla) this.embla.scrollNext();
+  };
+  navTo = (i: any) => {
+    if (this.embla) this.embla.scrollTo(i);
+  };
+  selectThumb = (i: any) => {
+    if (this.emblaThumbs && !this.emblaThumbs.clickAllowed()) return;
+    this.navTo(i);
   };
   scrollNext = (jump: any) => {
     if (this.embla) this.embla.scrollNext(jump);
@@ -233,7 +442,7 @@ export class Carousel {
   static ngTemplateContextGuard(
     _dir: Carousel,
     _ctx: unknown,
-  ): _ctx is SlideCtx | DefaultCtx {
+  ): _ctx is SlideCtx | DefaultCtx | ThumbCtx {
     return true;
   }
 

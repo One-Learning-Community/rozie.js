@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
@@ -19,11 +19,15 @@ interface Props {
   direction?: string;
   autoplay?: boolean;
   autoplayDelay?: number;
+  dots?: boolean;
+  arrows?: boolean;
+  thumbnails?: boolean;
   plugins?: any[];
   options?: any;
   selectedIndex?: number;
   slide?: Snippet<[{ slide: any; index: any }]>;
   children?: Snippet;
+  thumb?: Snippet<[{ slide: any; index: any }]>;
   snippets?: Record<string, any>;
   onselect?: (...args: unknown[]) => void;
   onsettle?: (...args: unknown[]) => void;
@@ -51,11 +55,15 @@ let {
   direction = 'ltr',
   autoplay = false,
   autoplayDelay = 4000,
+  dots = false,
+  arrows = false,
+  thumbnails = false,
   plugins = __defaultPlugins,
   options = __defaultOptions,
   selectedIndex = $bindable(0),
   slide: __slideProp,
   children: __childrenProp,
+  thumb: __thumbProp,
   snippets,
   onselect,
   onsettle,
@@ -66,8 +74,15 @@ let {
 
 const slide = $derived(__slideProp ?? snippets?.slide);
 const children = $derived(__childrenProp ?? snippets?.children);
+const thumb = $derived(__thumbProp ?? snippets?.thumb);
+
+let snaps: any[] = $state([]);
+let selected = $state(0);
+let canPrev = $state(false);
+let canNext = $state(false);
 
 let viewportEl = $state<HTMLElement | undefined>(undefined);
+let thumbsViewportEl = $state<HTMLElement | undefined>(undefined);
 
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
@@ -77,6 +92,11 @@ import Autoplay from 'embla-carousel-autoplay';
 // Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
 // useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
 let embla: any = null;
+// The SECOND Embla instance powering the optional synced thumbnail strip (null
+// when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
+// The SECOND Embla instance powering the optional synced thumbnail strip (null
+// when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
+let emblaThumbs: any = null;
 
 // Stable key for config-array slides — prefer an object id, fall back to value/index.
 // Stable key for config-array slides — prefer an object id, fall back to value/index.
@@ -133,6 +153,71 @@ const emblaPluginsFromProps = () => {
     delay: autoplayDelay
   })] : [];
   return [...builtins, ...plugins];
+};
+
+// Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
+// snap reachable + free dragging so the strip scrolls independently of the main
+// carousel, sharing the main axis. Built into a pre-nulled let for the same
+// literal-union laundering reason as emblaOptionsFromProps (axis is a `string`).
+// Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
+// snap reachable + free dragging so the strip scrolls independently of the main
+// carousel, sharing the main axis. Built into a pre-nulled let for the same
+// literal-union laundering reason as emblaOptionsFromProps (axis is a `string`).
+const thumbsOptionsFromProps = () => {
+  let opts: any = null;
+  opts = {
+    containScroll: 'keepSnaps',
+    dragFree: true,
+    axis: axis
+  };
+  return opts;
+};
+
+// Mirror the engine's live nav state into reactive $data so the built-in dots /
+// arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
+// scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
+// the thumbnail strip's scroll position in sync with the main selection.
+// Mirror the engine's live nav state into reactive $data so the built-in dots /
+// arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
+// scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
+// the thumbnail strip's scroll position in sync with the main selection.
+const syncNav = () => {
+  if (!embla) return;
+  const i = embla.selectedScrollSnap();
+  snaps = embla.scrollSnapList().map((_: any, n: any) => n);
+  selected = i;
+  canPrev = embla.canScrollPrev();
+  canNext = embla.canScrollNext();
+  if (emblaThumbs) emblaThumbs.scrollTo(i);
+};
+
+// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
+// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
+// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
+// invoking them arg-light from the template would trip TS2554 on the leaves).
+// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
+// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
+// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
+// invoking them arg-light from the template would trip TS2554 on the leaves).
+const navPrev = () => {
+  if (embla) embla.scrollPrev();
+};
+const navNext = () => {
+  if (embla) embla.scrollNext();
+};
+const navTo = (i: any) => {
+  if (embla) embla.scrollTo(i);
+};
+
+// Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
+// clickAllowed() so a drag of the strip doesn't register as a click (the Embla
+// thumbs idiom).
+// Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
+// clickAllowed() so a drag of the strip doesn't register as a click (the Embla
+// thumbs idiom).
+const selectThumb = (i: any) => {
+  if (emblaThumbs && !emblaThumbs.clickAllowed()) return;
+  navTo(i);
 };
 // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
 // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
@@ -198,17 +283,54 @@ export function getInstance() {
 onMount(() => {
   embla = EmblaCarousel(viewportEl!, emblaOptionsFromProps(), emblaPluginsFromProps());
 
+  // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+  // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+  // only $refs-safe site). Stays null otherwise (zero overhead).
+  if (thumbnails && thumbsViewportEl) {
+    emblaThumbs = EmblaCarousel(thumbsViewportEl!, thumbsOptionsFromProps());
+  }
+
   // engine → consumer: on every snap change write the two-way model AND fire the
-  // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+  // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+  // refreshes the built-in dots/arrows + thumb sync.
   embla.on('select', () => {
     const i = embla.selectedScrollSnap();
     selectedIndex = i;
     onselect?.(i);
+    syncNav();
   });
   embla.on('settle', () => onsettle?.());
-  embla.on('reInit', () => onreinit?.());
+  embla.on('reInit', () => {
+    onreinit?.();
+    syncNav();
+  });
   embla.on('pointerDown', () => onpointerdown?.());
-  return () => embla?.destroy();
+  // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+  // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+  // at init is stale — and a slide-size change (vs a viewport resize or slide
+  // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+  // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+  // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+  embla.on('resize', () => syncNav());
+
+  // seed the nav state immediately (covers the already-laid-out case)…
+  syncNav();
+  // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+  // width via attribute fallthrough can land a couple of frames after $onMount;
+  // Embla caches slide sizes at init and a slide-size change alone fires no
+  // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+  // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+  if (typeof requestAnimationFrame === 'function') {
+    const remeasure = () => {
+      if (embla) embla.reInit(emblaOptionsFromProps(), emblaPluginsFromProps());
+    };
+    requestAnimationFrame(() => requestAnimationFrame(remeasure));
+    setTimeout(remeasure, 0);
+  }
+  return () => {
+    embla?.destroy();
+    emblaThumbs?.destroy();
+  };
 });
 
 let __rozieWatchInitial_0 = true;
@@ -220,18 +342,96 @@ $effect(() => { (() => [loop, align, axis, slidesToScroll, dragFree, draggable, 
 let __rozieWatchInitial_2 = true;
 $effect(() => { (() => `${autoplay}|${autoplayDelay}`)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => embla?.reInit(emblaOptionsFromProps(), emblaPluginsFromProps()))(); }); });
 let __rozieWatchInitial_3 = true;
-$effect(() => { (() => slides.length)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => embla?.reInit(emblaOptionsFromProps()))(); }); });
+$effect(() => { (() => slides.length)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  embla?.reInit(emblaOptionsFromProps());
+  emblaThumbs?.reInit(thumbsOptionsFromProps());
+  syncNav();
+})(); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => thumbnails)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((on: any) => {
+  if (on && !emblaThumbs && thumbsViewportEl) {
+    emblaThumbs = EmblaCarousel(thumbsViewportEl!, thumbsOptionsFromProps());
+    syncNav();
+  } else if (!on && emblaThumbs) {
+    emblaThumbs.destroy();
+    emblaThumbs = null;
+  }
+})(__watchVal); }); });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide}{@render slide({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}{@render children?.()}</div></div></div>
+<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__stage" data-rozie-s-4143c216>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" disabled={!canPrev} aria-label="Previous slide" onclick={($event) => { navPrev(); }} data-rozie-s-4143c216>‹</button>{/if}<div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide}{@render slide({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}{@render children?.()}</div></div>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" disabled={!canNext} aria-label="Next slide" onclick={($event) => { navNext(); }} data-rozie-s-4143c216>›</button>{/if}</div>{#if dots}<div class="rozie-embla__dots" data-rozie-s-4143c216>{#each snaps as di (di)}<button type="button" class={["rozie-embla__dot", { 'is-selected': di === selected }]} aria-label={rozieAttr('Go to slide ' + (di + 1))} onclick={($event) => { navTo(di); }} data-rozie-s-4143c216></button>{/each}</div>{/if}{#if thumbnails}<div class="rozie-embla__thumbs" data-rozie-s-4143c216><div class="rozie-embla__thumbs-viewport" bind:this={thumbsViewportEl} data-rozie-s-4143c216><div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class={["rozie-embla__thumb", { 'is-selected': i === selected }]} onclick={($event) => { selectThumb(i); }} data-rozie-s-4143c216>{#if thumb}{@render thumb({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}</div></div></div>{/if}</div>
 
 <style>
 :global {
   .rozie-embla[data-rozie-s-4143c216] { position: relative; }
+  .rozie-embla__stage[data-rozie-s-4143c216] { position: relative; }
   .rozie-embla__viewport[data-rozie-s-4143c216] { overflow: hidden; }
   .rozie-embla__container[data-rozie-s-4143c216] { display: flex; }
   .rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-width: 0; }
   .rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__container[data-rozie-s-4143c216] { flex-direction: column; height: 100%; }
   .rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-height: 0; }
+  .rozie-embla__arrow[data-rozie-s-4143c216] {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1a1a1a;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    transition: opacity 0.15s ease, background 0.15s ease;
+  }
+  .rozie-embla__arrow[data-rozie-s-4143c216]:hover { background: #fff; }
+  .rozie-embla__arrow[data-rozie-s-4143c216]:disabled { opacity: 0.35; cursor: default; }
+  .rozie-embla__arrow--prev[data-rozie-s-4143c216] { left: 0.5rem; }
+  .rozie-embla__arrow--next[data-rozie-s-4143c216] { right: 0.5rem; }
+  .rozie-embla__dots[data-rozie-s-4143c216] {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.625rem 0;
+  }
+  .rozie-embla__dot[data-rozie-s-4143c216] {
+    width: 0.5rem;
+    height: 0.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .rozie-embla__dot[data-rozie-s-4143c216]:hover { background: rgba(0, 0, 0, 0.45); }
+  .rozie-embla__dot.is-selected[data-rozie-s-4143c216] {
+    background: #1a1a1a;
+    transform: scale(1.25);
+  }
+  .rozie-embla__thumbs[data-rozie-s-4143c216] { margin-top: 0.5rem; }
+  .rozie-embla__thumbs-viewport[data-rozie-s-4143c216] { overflow: hidden; }
+  .rozie-embla__thumbs-container[data-rozie-s-4143c216] { display: flex; gap: 0.5rem; }
+  .rozie-embla__thumb[data-rozie-s-4143c216] {
+    flex: 0 0 auto;
+    cursor: pointer;
+    opacity: 0.5;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+  .rozie-embla__thumb[data-rozie-s-4143c216]:hover { opacity: 0.8; }
+  .rozie-embla__thumb.is-selected[data-rozie-s-4143c216] {
+    opacity: 1;
+    border-color: #1a1a1a;
+  }
 }
 </style>

@@ -47,6 +47,9 @@ No engine CSS to import — the carousel skeleton styles (`overflow: hidden` vie
 | `direction` | `String` | `"ltr"` |  |  |
 | `autoplay` | `Boolean` | `false` |  |  |
 | `autoplayDelay` | `Number` | `4000` |  |  |
+| `dots` | `Boolean` | `false` |  |  |
+| `arrows` | `Boolean` | `false` |  |  |
+| `thumbnails` | `Boolean` | `false` |  |  |
 | `plugins` | `Array` | `[]` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `selectedIndex` | `Number` | `0` | ✓ |  |
@@ -96,3 +99,4 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | --- | --- |
 | slide | slide, index |
 | (default) |  |
+| thumb | slide, index |

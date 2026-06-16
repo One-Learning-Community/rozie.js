@@ -50,6 +50,9 @@ const index = ref(0);
 | `direction` | `String` | `"ltr"` |  |  |
 | `autoplay` | `Boolean` | `false` |  |  |
 | `autoplayDelay` | `Number` | `4000` |  |  |
+| `dots` | `Boolean` | `false` |  |  |
+| `arrows` | `Boolean` | `false` |  |  |
+| `thumbnails` | `Boolean` | `false` |  |  |
 | `plugins` | `Array` | `[]` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `selectedIndex` | `Number` | `0` | ✓ |  |
@@ -102,3 +105,4 @@ const carousel = ref();      // template ref
 | --- | --- |
 | slide | slide, index |
 | (default) |  |
+| thumb | slide, index |

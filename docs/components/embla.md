@@ -107,6 +107,9 @@ export function Demo() {
 | `direction` | `String` | `"ltr"` | ✓ | Text/scroll direction — `'ltr' \| 'rtl'`. |
 | `autoplay` | `Boolean` | `false` | ✓ | Toggle the `embla-carousel-autoplay` plugin. |
 | `autoplayDelay` | `Number` | `4000` | ✓ | Autoplay delay between snaps (ms). |
+| `dots` | `Boolean` | `false` | ✓ | Show built-in dot pagination (one dot per scroll snap). |
+| `arrows` | `Boolean` | `false` | ✓ | Show built-in prev/next arrow buttons overlaid on the viewport. |
+| `thumbnails` | `Boolean` | `false` | ✓ | Show a synced thumbnail strip (its own Embla instance); fill the `thumb` slot for custom thumbs. |
 | `plugins` | `Array` | `[]` | ✓ | Escape hatch — extra Embla plugins appended verbatim. |
 | `options` | `Object` | `{}` | ✓ | Escape hatch — raw `EmblaOptionsType` spread last. |
 | `selectedIndex` | `Number` | `0` | ✓ | **Two-way** — the current scroll-snap index. Distinct from the `select` emit. |

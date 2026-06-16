@@ -17,6 +17,9 @@ export interface CarouselProps {
   direction?: string;
   autoplay?: boolean;
   autoplayDelay?: number;
+  dots?: boolean;
+  arrows?: boolean;
+  thumbnails?: boolean;
   plugins?: unknown[];
   options?: Record<string, unknown>;
   selectedIndex?: number;
@@ -28,6 +31,7 @@ export interface CarouselProps {
   onPointerDown?: (...args: unknown[]) => void;
   renderSlide?: (params: { slide: () => void; index: () => void }) => ReactNode;
   children?: ReactNode;
+  renderThumb?: (params: { slide: () => void; index: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

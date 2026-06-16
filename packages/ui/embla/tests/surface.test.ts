@@ -28,12 +28,14 @@ const EXPECT = {
   props: [
     'slides', 'loop', 'align', 'axis', 'slidesToScroll', 'dragFree', 'draggable',
     'containScroll', 'startIndex', 'skipSnaps', 'duration', 'direction',
-    'autoplay', 'autoplayDelay', 'plugins', 'options', 'selectedIndex',
+    'autoplay', 'autoplayDelay', 'dots', 'arrows', 'thumbnails',
+    'plugins', 'options', 'selectedIndex',
   ],
   models: ['selectedIndex'],
   emits: ['select', 'settle', 'reInit', 'pointer-down'],
-  // default slot name is '' (empty string); the scoped config-array slot is 'slide'.
-  slots: ['', 'slide'] as string[],
+  // default slot name is '' (empty string); the scoped config-array slot is 'slide';
+  // 'thumb' is the per-slide scoped slot for the synced thumbnail strip.
+  slots: ['', 'slide', 'thumb'] as string[],
   expose: [
     'scrollNext', 'scrollPrev', 'scrollToIndex', 'reInitCarousel', 'canScrollNext',
     'canScrollPrev', 'getSelectedIndex', 'scrollSnapList', 'getInstance',
@@ -58,7 +60,7 @@ describe('Carousel.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (16 props)', () => {
+  it('props surface matches (20 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -74,7 +76,7 @@ describe('Carousel.rozie surface gate', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares default + slide slots', () => {
+  it('declares default + slide + thumb slots', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });

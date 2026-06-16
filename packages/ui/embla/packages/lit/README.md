@@ -45,6 +45,9 @@ el.addEventListener('select', (e) => console.log('snap', e.detail));
 | `direction` | `String` | `"ltr"` |  |  |
 | `autoplay` | `Boolean` | `false` |  |  |
 | `autoplayDelay` | `Number` | `4000` |  |  |
+| `dots` | `Boolean` | `false` |  |  |
+| `arrows` | `Boolean` | `false` |  |  |
+| `thumbnails` | `Boolean` | `false` |  |  |
 | `plugins` | `Array` | `[]` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `selectedIndex` | `Number` | `0` | ✓ |  |
@@ -93,3 +96,4 @@ const i = el.getSelectedIndex();
 | --- | --- |
 | slide | slide, index |
 | (default) |  |
+| thumb | slide, index |

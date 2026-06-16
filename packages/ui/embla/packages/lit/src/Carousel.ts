@@ -1,6 +1,6 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import EmblaCarousel from 'embla-carousel';
@@ -14,15 +14,84 @@ interface RozieSlideSlotCtx {
   index: unknown;
 }
 
+interface RozieThumbSlotCtx {
+  slide: unknown;
+  index: unknown;
+}
+
 @customElement('rozie-carousel')
 export default class Carousel extends SignalWatcher(LitElement) {
   static styles = css`
 .rozie-embla[data-rozie-s-4143c216] { position: relative; }
+.rozie-embla__stage[data-rozie-s-4143c216] { position: relative; }
 .rozie-embla__viewport[data-rozie-s-4143c216] { overflow: hidden; }
 .rozie-embla__container[data-rozie-s-4143c216] { display: flex; }
 .rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-width: 0; }
 .rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__container[data-rozie-s-4143c216] { flex-direction: column; height: 100%; }
 .rozie-embla--vertical[data-rozie-s-4143c216] .rozie-embla__slide[data-rozie-s-4143c216] { flex: 0 0 100%; min-height: 0; }
+.rozie-embla__arrow[data-rozie-s-4143c216] {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.rozie-embla__arrow[data-rozie-s-4143c216]:hover { background: #fff; }
+.rozie-embla__arrow[data-rozie-s-4143c216]:disabled { opacity: 0.35; cursor: default; }
+.rozie-embla__arrow--prev[data-rozie-s-4143c216] { left: 0.5rem; }
+.rozie-embla__arrow--next[data-rozie-s-4143c216] { right: 0.5rem; }
+.rozie-embla__dots[data-rozie-s-4143c216] {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.625rem 0;
+}
+.rozie-embla__dot[data-rozie-s-4143c216] {
+  width: 0.5rem;
+  height: 0.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.rozie-embla__dot[data-rozie-s-4143c216]:hover { background: rgba(0, 0, 0, 0.45); }
+.rozie-embla__dot.is-selected[data-rozie-s-4143c216] {
+  background: #1a1a1a;
+  transform: scale(1.25);
+}
+.rozie-embla__thumbs[data-rozie-s-4143c216] { margin-top: 0.5rem; }
+.rozie-embla__thumbs-viewport[data-rozie-s-4143c216] { overflow: hidden; }
+.rozie-embla__thumbs-container[data-rozie-s-4143c216] { display: flex; gap: 0.5rem; }
+.rozie-embla__thumb[data-rozie-s-4143c216] {
+  flex: 0 0 auto;
+  cursor: pointer;
+  opacity: 0.5;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.rozie-embla__thumb[data-rozie-s-4143c216]:hover { opacity: 0.8; }
+.rozie-embla__thumb.is-selected[data-rozie-s-4143c216] {
+  opacity: 1;
+  border-color: #1a1a1a;
+}
 `;
 
   @property({ type: Array }) slides: any[] = [];
@@ -39,11 +108,19 @@ export default class Carousel extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) direction: string = 'ltr';
   @property({ type: Boolean, reflect: true }) autoplay: boolean = false;
   @property({ type: Number, reflect: true }) autoplayDelay: number = 4000;
+  @property({ type: Boolean, reflect: true }) dots: boolean = false;
+  @property({ type: Boolean, reflect: true }) arrows: boolean = false;
+  @property({ type: Boolean, reflect: true }) thumbnails: boolean = false;
   @property({ type: Array }) plugins: any[] = [];
   @property({ type: Object }) options: any = {};
   @property({ type: Number, attribute: 'selected-index' }) _selectedIndex_attr: number = 0;
   private _selectedIndexControllable = createLitControllableProperty<number>({ host: this, eventName: 'selected-index-change', defaultValue: 0, initialControlledValue: undefined });
+  private _snaps = signal([]);
+  private _selected = signal(0);
+  private _canPrev = signal(false);
+  private _canNext = signal(false);
   @query('[data-rozie-ref="viewportEl"]') private _refViewportEl!: HTMLElement;
+  @query('[data-rozie-ref="thumbsViewportEl"]') private _refThumbsViewportEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 
@@ -52,6 +129,9 @@ private __rozieFirstUpdateDone = false;
   @property({ attribute: false }) slide?: (scope: { slide: unknown; index: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  @state() private _hasSlotThumb = false;
+  @queryAssignedElements({ slot: 'thumb', flatten: true }) private _slotThumbElements!: Element[];
+  @property({ attribute: false }) thumb?: (scope: { slide: unknown; index: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -80,12 +160,24 @@ private __rozieFirstUpdateDone = false;
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="thumb"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotThumb = this._slotThumbElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotSlide = Array.from(this.children).some((el) => el.getAttribute('slot') === 'slide');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._hasSlotThumb = Array.from(this.children).some((el) => el.getAttribute('slot') === 'thumb');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -93,7 +185,10 @@ private __rozieFirstUpdateDone = false;
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push((() => this.embla?.destroy()));
+    this._disconnectCleanups.push((() => {
+      this.embla?.destroy();
+      this.emblaThumbs?.destroy();
+    }));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.selectedIndex)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
       if (this.embla && typeof i === 'number' && i !== this.embla.selectedScrollSnap()) this.embla.scrollTo(i);
@@ -101,10 +196,22 @@ private __rozieFirstUpdateDone = false;
 
     this.embla = EmblaCarousel(this._refViewportEl, this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
 
+    // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+    // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+    // only $refs-safe site). Stays null otherwise (zero overhead).
+    // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
+    // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
+    // only $refs-safe site). Stays null otherwise (zero overhead).
+    if (this.thumbnails && this._refThumbsViewportEl) {
+      this.emblaThumbs = EmblaCarousel(this._refThumbsViewportEl, this.thumbsOptionsFromProps());
+    }
+
     // engine → consumer: on every snap change write the two-way model AND fire the
-    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+    // refreshes the built-in dots/arrows + thumb sync.
     // engine → consumer: on every snap change write the two-way model AND fire the
-    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`).
+    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
+    // refreshes the built-in dots/arrows + thumb sync.
     this.embla.on('select', () => {
       const i = this.embla.selectedScrollSnap();
       this._selectedIndexControllable.write(i);
@@ -113,28 +220,79 @@ private __rozieFirstUpdateDone = false;
         bubbles: true,
         composed: true
       }));
+      this.syncNav();
     });
     this.embla.on('settle', () => this.dispatchEvent(new CustomEvent("settle", {
       detail: undefined,
       bubbles: true,
       composed: true
     })));
-    this.embla.on('reInit', () => this.dispatchEvent(new CustomEvent("reInit", {
-      detail: undefined,
-      bubbles: true,
-      composed: true
-    })));
+    this.embla.on('reInit', () => {
+      this.dispatchEvent(new CustomEvent("reInit", {
+        detail: undefined,
+        bubbles: true,
+        composed: true
+      }));
+      this.syncNav();
+    });
     this.embla.on('pointerDown', () => this.dispatchEvent(new CustomEvent("pointer-down", {
       detail: undefined,
       bubbles: true,
       composed: true
     })));
+    // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+    // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+    // at init is stale — and a slide-size change (vs a viewport resize or slide
+    // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+    // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+    // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+    // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
+    // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
+    // at init is stale — and a slide-size change (vs a viewport resize or slide
+    // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
+    // its own. Re-measure once after the first layout flush via reInit (its `reInit`
+    // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
+    this.embla.on('resize', () => this.syncNav());
+
+    // seed the nav state immediately (covers the already-laid-out case)…
+    // seed the nav state immediately (covers the already-laid-out case)…
+    this.syncNav();
+    // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+    // width via attribute fallthrough can land a couple of frames after $onMount;
+    // Embla caches slide sizes at init and a slide-size change alone fires no
+    // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+    // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+    // …then re-measure after layout fully settles (a consumer's slide CSS / a root
+    // width via attribute fallthrough can land a couple of frames after $onMount;
+    // Embla caches slide sizes at init and a slide-size change alone fires no
+    // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
+    // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
+    if (typeof requestAnimationFrame === 'function') {
+      const remeasure = () => {
+        if (this.embla) this.embla.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+      };
+      requestAnimationFrame(() => requestAnimationFrame(remeasure));
+      setTimeout(remeasure, 0);
+    }
   }
 
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('loop') || changedProperties.has('align') || changedProperties.has('axis') || changedProperties.has('slidesToScroll') || changedProperties.has('dragFree') || changedProperties.has('draggable') || changedProperties.has('containScroll') || changedProperties.has('skipSnaps') || changedProperties.has('duration') || changedProperties.has('direction'))) { const __watchVal = (() => [this.loop, this.align, this.axis, this.slidesToScroll, this.dragFree, this.draggable, this.containScroll, this.skipSnaps, this.duration, this.direction].join('|'))(); (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('autoplay') || changedProperties.has('autoplayDelay'))) { const __watchVal = (() => `${this.autoplay}|${this.autoplayDelay}`)(); (() => this.embla?.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps()))(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('slides'))) { const __watchVal = (() => this.slides.length)(); (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('slides'))) { const __watchVal = (() => this.slides.length)(); (() => {
+      this.embla?.reInit(this.emblaOptionsFromProps());
+      this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
+      this.syncNav();
+    })(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('thumbnails'))) { const __watchVal = (() => this.thumbnails)(); ((on: any) => {
+      if (on && !this.emblaThumbs && this._refThumbsViewportEl) {
+        this.emblaThumbs = EmblaCarousel(this._refThumbsViewportEl, this.thumbsOptionsFromProps());
+        this.syncNav();
+      } else if (!on && this.emblaThumbs) {
+        this.emblaThumbs.destroy();
+        this.emblaThumbs = null;
+      }
+    })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -156,21 +314,38 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="${Object.entries({ "rozie-embla": true, 'rozie-embla--vertical': this.axis === 'y' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-4143c216>
-  <div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
-    <div class="rozie-embla__container" data-rozie-s-4143c216>
-      
-      ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(item, i))} data-rozie-s-4143c216>
-        ${this.slide !== undefined ? this.slide({slide: item, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
-      </div>`)}
-      
-      <slot></slot>
+  
+  <div class="rozie-embla__stage" data-rozie-s-4143c216>
+    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--prev" type="button" ?disabled=${!this._canPrev.value} aria-label="Previous slide" @click=${($event: Event) => { this.navPrev(); }} data-rozie-s-4143c216>‹</button>` : nothing}<div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
+      <div class="rozie-embla__container" data-rozie-s-4143c216>
+        
+        ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(item, i))} data-rozie-s-4143c216>
+          ${this.slide !== undefined ? this.slide({slide: item, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
+        </div>`)}
+        
+        <slot></slot>
+      </div>
     </div>
-  </div>
-</div>
+    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--next" type="button" ?disabled=${!this._canNext.value} aria-label="Next slide" @click=${($event: Event) => { this.navNext(); }} data-rozie-s-4143c216>›</button>` : nothing}</div>
+
+  
+  ${this.dots ? html`<div class="rozie-embla__dots" data-rozie-s-4143c216>
+    ${repeat<any>(this._snaps.value, (di, _idx) => di, (di, _idx) => html`<button class="${Object.entries({ "rozie-embla__dot": true, 'is-selected': di === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(di)} type="button" aria-label=${rozieAttr('Go to slide ' + (di + 1))} @click=${($event: Event) => { this.navTo(di); }} data-rozie-s-4143c216></button>`)}
+  </div>` : nothing}${this.thumbnails ? html`<div class="rozie-embla__thumbs" data-rozie-s-4143c216>
+    <div class="rozie-embla__thumbs-viewport" data-rozie-ref="thumbsViewportEl" data-rozie-s-4143c216>
+      <div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>
+        ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="${Object.entries({ "rozie-embla__thumb": true, 'is-selected': i === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(this.keyFor(item, i))} @click=${($event: Event) => { this.selectThumb(i); }} data-rozie-s-4143c216>
+          ${this.thumb !== undefined ? this.thumb({slide: item, index: i}) : html`<slot name="thumb" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
+        </div>`)}
+      </div>
+    </div>
+  </div>` : nothing}</div>
 `;
   }
 
   embla: any = null;
+
+  emblaThumbs: any = null;
 
   keyFor = (slide: any, i: any) => {
   if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
@@ -201,6 +376,43 @@ private __rozieFirstUpdateDone = false;
     delay: this.autoplayDelay
   })] : [];
   return [...builtins, ...this.plugins];
+};
+
+  thumbsOptionsFromProps = () => {
+  let opts: any = null;
+  opts = {
+    containScroll: 'keepSnaps',
+    dragFree: true,
+    axis: this.axis
+  };
+  return opts;
+};
+
+  syncNav = () => {
+  if (!this.embla) return;
+  const i = this.embla.selectedScrollSnap();
+  this._snaps.value = this.embla.scrollSnapList().map((_: any, n: any) => n);
+  this._selected.value = i;
+  this._canPrev.value = this.embla.canScrollPrev();
+  this._canNext.value = this.embla.canScrollNext();
+  if (this.emblaThumbs) this.emblaThumbs.scrollTo(i);
+};
+
+  navPrev = () => {
+  if (this.embla) this.embla.scrollPrev();
+};
+
+  navNext = () => {
+  if (this.embla) this.embla.scrollNext();
+};
+
+  navTo = (i: any) => {
+  if (this.embla) this.embla.scrollTo(i);
+};
+
+  selectThumb = (i: any) => {
+  if (this.emblaThumbs && !this.emblaThumbs.clickAllowed()) return;
+  this.navTo(i);
 };
 
   scrollNext(jump: any) {
@@ -275,7 +487,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['slides', 'loop', 'align', 'axis', 'slides-to-scroll', 'slidestoscroll', 'drag-free', 'dragfree', 'draggable', 'contain-scroll', 'containscroll', 'start-index', 'startindex', 'skip-snaps', 'skipsnaps', 'duration', 'direction', 'autoplay', 'autoplay-delay', 'autoplaydelay', 'plugins', 'options', 'selected-index', 'selectedindex']);
+    const __skip = new Set<string>(['slides', 'loop', 'align', 'axis', 'slides-to-scroll', 'slidestoscroll', 'drag-free', 'dragfree', 'draggable', 'contain-scroll', 'containscroll', 'start-index', 'startindex', 'skip-snaps', 'skipsnaps', 'duration', 'direction', 'autoplay', 'autoplay-delay', 'autoplaydelay', 'dots', 'arrows', 'thumbnails', 'plugins', 'options', 'selected-index', 'selectedindex']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

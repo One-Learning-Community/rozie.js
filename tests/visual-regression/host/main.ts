@@ -448,6 +448,9 @@ export const EXAMPLES = [
   // matrix.spec.ts (auto-fixme until the Linux PNG lands).
   'Carousel',
   'CarouselScreenshot',
+  // Built-in carousel navigation (dots + arrows + synced thumbnail strip) — the
+  // content-STABLE pixel cell (loader → examples/demos/CarouselNavScreenshotDemo.rozie).
+  'CarouselNavScreenshot',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -619,6 +622,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
   Carousel: 'rozie-carousel',
   CarouselScreenshot: 'rozie-carousel-screenshot',
+  CarouselNavScreenshot: 'rozie-carousel-nav-screenshot',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -836,6 +840,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // No parent props needed.
   Carousel: {},
   CarouselScreenshot: {},
+  CarouselNavScreenshot: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

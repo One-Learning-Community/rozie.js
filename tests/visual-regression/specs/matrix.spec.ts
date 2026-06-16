@@ -343,6 +343,11 @@ const EXAMPLES = [
   // BEHAVIORAL coverage (two-way index, pointer-drag swipe, $expose handle) lives
   // in embla-carousel.spec.ts and is NOT a pixel cell.
   'CarouselScreenshot',
+  // Built-in carousel navigation pixel cell — CarouselNavScreenshotDemo enables
+  // arrows + dots + thumbnails on the same deterministic fixed-width carousel. At
+  // rest (snap 0, no loop) the prev arrow is disabled, dot 0 + thumb 0 active —
+  // a deterministic frame. Same Embla-transform settle as CarouselScreenshot.
+  'CarouselNavScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -761,7 +766,7 @@ async function settleExample(
   // out), then a short settle. autoplay is OFF + startIndex fixed, so once the
   // transform is applied the frame is final. The CSS locators pierce Lit's open
   // shadow root.
-  if (example === 'CarouselScreenshot') {
+  if (example === 'CarouselScreenshot' || example === 'CarouselNavScreenshot') {
     await expect(page.locator('.rozie-embla__viewport').first()).toBeVisible({
       timeout: 15_000,
     });
