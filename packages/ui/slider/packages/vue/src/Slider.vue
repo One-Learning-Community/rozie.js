@@ -8,9 +8,10 @@
 
   
   <div v-if="normalizedMarks().length > 0" class="rozie-slider-marks" aria-hidden="true">
-    <div v-for="mark in normalizedMarks()" :key="mark.value" class="rozie-slider-mark" :style="{ left: pct(mark.value) + '%' }">
-      <slot name="mark" :value="mark.value" :label="mark.label" :position="pct(mark.value)">
-        <span class="rozie-slider-mark-label">{{ mark.label }}</span>
+    
+    <div v-for="tick in normalizedMarks()" :key="tick.value" class="rozie-slider-mark" :style="{ left: pct(tick.value) + '%' }">
+      <slot name="mark" :value="tick.value" :label="tick.label" :position="pct(tick.value)">
+        <span class="rozie-slider-mark-label">{{ tick.label }}</span>
       </slot>
     </div>
   </div><div v-if="props.showValue && !props.range" class="rozie-slider-bubbles" aria-hidden="true">

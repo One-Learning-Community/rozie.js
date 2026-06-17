@@ -59,13 +59,14 @@ function __rozieAttr(v: unknown): string | null {
       
       @if (normalizedMarks().length > 0) {
     <div class="rozie-slider-marks" aria-hidden="true">
-        @for (mark of normalizedMarks(); track mark.value) {
-    <div class="rozie-slider-mark" [style]="{ left: pct(mark.value) + '%' }">
+        
+        @for (tick of normalizedMarks(); track tick.value) {
+    <div class="rozie-slider-mark" [style]="{ left: pct(tick.value) + '%' }">
           @if ((markTpl ?? templates()?.['mark'])) {
-    <ng-container *ngTemplateOutlet="(markTpl ?? templates()?.['mark']); context: { $implicit: { value: mark.value, label: mark.label, position: pct(mark.value) }, value: mark.value, label: mark.label, position: pct(mark.value) }" />
+    <ng-container *ngTemplateOutlet="(markTpl ?? templates()?.['mark']); context: { $implicit: { value: tick.value, label: tick.label, position: pct(tick.value) }, value: tick.value, label: tick.label, position: pct(tick.value) }" />
     } @else {
 
-            <span class="rozie-slider-mark-label">{{ rozieDisplay(mark.label) }}</span>
+            <span class="rozie-slider-mark-label">{{ rozieDisplay(tick.label) }}</span>
           
     }
         </div>
