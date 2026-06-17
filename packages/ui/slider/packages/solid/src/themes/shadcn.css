@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/slider — shadcn/ui (Radix) bridge.
+ *
+ * Maps the slider tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * slider automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/slider-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-slider {
+  --rozie-slider-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-slider-track-bg: hsl(var(--secondary, 210 40% 96.1%));
+  --rozie-slider-fill-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-slider-thumb-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-slider-thumb-border: 2px solid hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-slider-thumb-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+
+  --rozie-slider-mark-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+
+  --rozie-slider-bubble-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-slider-bubble-fg: hsl(var(--primary-foreground, 210 40% 98%));
+  --rozie-slider-bubble-radius: var(--radius, 0.5rem);
+}

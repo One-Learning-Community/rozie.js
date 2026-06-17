@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/slider — Bootstrap 5 bridge.
+ *
+ * Maps the slider tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the slider follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/slider-react/themes/bootstrap.css';
+ */
+.rozie-slider {
+  --rozie-slider-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-slider-track-bg: var(--bs-tertiary-bg, #e9ecef);
+  --rozie-slider-track-radius: var(--bs-border-radius-pill, 50rem);
+  --rozie-slider-fill-bg: var(--bs-primary, #0d6efd);
+
+  --rozie-slider-thumb-bg: var(--bs-primary, #0d6efd);
+  --rozie-slider-thumb-border: 2px solid var(--bs-body-bg, #fff);
+  --rozie-slider-thumb-shadow: 0 0.1rem 0.25rem rgba(0, 0, 0, 0.2);
+
+  --rozie-slider-disabled-opacity: 0.5;
+
+  --rozie-slider-mark-color: var(--bs-secondary-color, #6c757d);
+
+  --rozie-slider-bubble-bg: var(--bs-primary, #0d6efd);
+  --rozie-slider-bubble-fg: #fff;
+  --rozie-slider-bubble-radius: var(--bs-border-radius, 0.375rem);
+}

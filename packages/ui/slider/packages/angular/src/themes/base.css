@@ -1,0 +1,69 @@
+/*
+ * @rozie-ui/slider — base token reference.
+ *
+ * Every COSMETIC value the slider renders is a `--rozie-slider-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * NOTE the split (CONTEXT D-08): the STRUCTURAL rules — the Approach-B
+ * overlapping native inputs, the filled-<div> underlay, the rotate-90 vertical
+ * wrapper, and the per-vendor `::-webkit-*` / `::-moz-*` pseudo-elements — are
+ * behavior-critical and live in the component's scoped `<style>` (per-leaf, NOT
+ * consumer-overridable). Only the values below flow through tokens.
+ *
+ * The two fill vars `--rozie-slider-fill-start` / `--rozie-slider-fill-end` are
+ * NOT theme tokens: the component writes them inline at runtime from the live
+ * value/min/max (the `fillStyle` $computed). They are documented here for
+ * reference only — do not set them in a theme.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-slider` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-slider {
+  /* layout / typography */
+  --rozie-slider-font: inherit;
+  --rozie-slider-pad: 0.5rem 0;
+
+  /* accent — the single color most consumers will set; thumb + fill derive from it */
+  --rozie-slider-accent: #0066cc;
+
+  /* track (the thin bar behind the thumbs) */
+  --rozie-slider-track-height: 0.375rem;
+  --rozie-slider-track-radius: 999px;
+  --rozie-slider-track-bg: rgba(0, 0, 0, 0.18);
+
+  /* fill (the colored <div> underlay; spans the runtime fill-start→fill-end vars) */
+  --rozie-slider-fill-bg: var(--rozie-slider-accent);
+
+  /* thumb (the native input pseudo-element; styled per-vendor in the source) */
+  --rozie-slider-thumb-size: 1rem;
+  --rozie-slider-thumb-bg: var(--rozie-slider-accent);
+  --rozie-slider-thumb-border: 2px solid #fff;
+  --rozie-slider-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  /* WebKit-only: vertical centering of the thumb over the track. Default keeps
+     the thumb centered on the default track height; override if you change the
+     thumb-size / track-height pair. */
+  --rozie-slider-thumb-offset: calc((0.375rem - 1rem) / 2);
+
+  /* disabled */
+  --rozie-slider-disabled-opacity: 0.55;
+
+  /* vertical (rotate-90 wrapper) box sizing */
+  --rozie-slider-thickness: 2.5rem;
+  --rozie-slider-length: 12rem;
+
+  /* marks overlay */
+  --rozie-slider-mark-color: rgba(0, 0, 0, 0.55);
+  --rozie-slider-mark-offset: 0.75rem;
+  --rozie-slider-mark-font-size: 0.6875rem;
+
+  /* value bubble overlay (gated by showValue) */
+  --rozie-slider-bubble-offset: -1.25rem;
+  --rozie-slider-bubble-padding: 0.0625rem 0.375rem;
+  --rozie-slider-bubble-font-size: 0.6875rem;
+  --rozie-slider-bubble-fg: #fff;
+  --rozie-slider-bubble-bg: var(--rozie-slider-accent);
+  --rozie-slider-bubble-radius: 4px;
+}
