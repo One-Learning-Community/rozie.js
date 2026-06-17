@@ -158,6 +158,17 @@ const LISTBOX_SRC = resolve(
   'listbox',
   'src',
 );
+// Same packaging move for @rozie-ui/slider: Slider.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Slider.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const SLIDER_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'slider',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -430,6 +441,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // listbox src always exists post-port — defensive only
   }
   rmSync(resolve(LISTBOX_SRC, 'Listbox.ts'), { force: true });
+  // Same sweep for @rozie-ui/slider's package src (the Slider*Demo cells compose
+  // Slider via <components>, so the Angular sub-build emits Slider.rozie.ts +
+  // the Slider.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(SLIDER_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(SLIDER_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // slider src always exists post-port — defensive only
+  }
+  rmSync(resolve(SLIDER_SRC, 'Slider.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
