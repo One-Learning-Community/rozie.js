@@ -1,0 +1,564 @@
+<!--
+  DataTable.rozie — the CORE @rozie-ui/data-table parent component (Phase 48 core
+  wave). A headless, accessible, cross-framework data table built on a SINGLE inline
+  @tanstack/table-core bridge (NO per-framework adapter — the whole point of the
+  family) marrying table-core's pull-based state machine to all six reactivity
+  systems. table-core owns NO DOM (it is a pure `createTable → setOptions →
+  getRowModel` state machine), so this is the controlled-state HALF of the rete
+  FlowCanvas bridge with none of the DOM-mutation half.
+
+    <DataTable :data="rows" r-model:sorting="$data.sorting" sticky-header>
+      <Column field="name" header="Name" sortable />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" sortable>
+        <template #cell="{ value }"><StatusBadge :status="value" /></template>
+      </Column>
+    </DataTable>
+
+  COLUMN DECLARATION — TWO coexisting forms (req-2), id-keyed LWW union:
+    - `:columns` config array  → lower precedence
+    - `<Column>` children      → override by id (last-write-wins)
+  Both resolve to the SAME internal ColumnDef set via columnDefs() below.
+
+  CELL / HEADER RENDERING (req-3) — the Wave-0 probe locked
+  `plain-scoped-slot-in-keyed-r-for`: the <td>/<th> hosts are FRAMEWORK-OWNED by the
+  keyed r-for (NOT engine-created like rete), so the per-column #cell / #header
+  templates declared on <Column> children mount into those framework-owned hosts via
+  $portals — ONE INDEPENDENT handle PER cell (the Column owns its per-cell handle Set;
+  this parent owns per-cell disposal on re-render). A column with NO #cell template
+  renders the PLAIN accessor value inline (the fast path — no portal, no slot dispatch).
+
+  STATE (req-4 sorting wired HERE; the remaining 8 slices land in Plans 04/05). The
+  bridge is designed to extend cleanly: currentState() assembles the live state object
+  and each slice gets its OWN STATIC-KEY write funnel (A4: a generic dynamic-key funnel
+  `$data[k]=…`/`$model[k]=…` is ROZ106 on all six — never one parametric indexed
+  funnel). onSortingChange → writeSorting(next) emits a FRESH sorting array + fires
+  `sort-change` REGARDLESS of binding (echo-guarded).
+
+  STICKY HEADER (req-12): a pure-CSS `position: sticky; top: 0` on the header row,
+  token-driven and gated by the `stickyHeader` prop.
+
+  Multi-model Angular CVA: with ≥2 model:true props (added in later waves) ROZ125/126
+  fire as WARNINGS (req-14) — not errors. This plan wires ONE model slice so they are
+  not yet emitted; the bridge is shaped so the later slices drop in cleanly.
+
+  ZERO emitter/core change.
+-->
+<rozie name="DataTable" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The row data (required). Stable reference per Rozie's setup-once model — re-feed
+  // it directly into table-core, never map/clone it in the watcher (Pitfall 3
+  // infinite re-render). `required: true` is the sole optionality determinant (a
+  // `default:` would be incoherent → ROZ014); the bridge guards `$props.data || []`
+  // defensively anyway.
+  data: { type: Array, required: true },
+
+  // Config-array column fallback (lower precedence than <Column> children). Each:
+  // { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may be
+  // declared via THIS array OR via <Column> children OR both (id-keyed LWW union).
+  columns: { type: Array, default: () => [] },
+
+  // Row-selection mode chrome seam: 'none' | 'single' | 'multiple'. Reserved here;
+  // the rowSelection state slice is wired in a later wave. Named distinctly from any
+  // future `rowSelection` model prop (no ROZ127 / no slot-name clash).
+  selectionMode: { type: String, default: 'none' },
+
+  // ── State slice wired in THIS plan ───────────────────────────────────────────
+  // sorting (SortingState = [{ id, desc }]). model:true → six native two-way
+  // expansions; uncontrolled fallback is $data.sortingDefault. The remaining eight
+  // slices (globalFilter / columnFilters / pagination / rowSelection /
+  // columnVisibility / columnSizing / columnOrder / columnPinning) drop in here in
+  // Plans 04/05 — each with its own model prop, $data.<slice>Default fallback, and a
+  // STATIC-KEY write funnel (A4: never a generic indexed funnel).
+  sorting: { type: Array, default: () => [], model: true },
+
+  // Pure-CSS sticky header gate (req-12). When true the <thead> sticks to the top of
+  // the scroll container.
+  stickyHeader: { type: Boolean, default: false },
+
+  // FORWARD-COMPAT SEAM (D-02): 'table' (default, row-oriented) | 'grid' (cell
+  // keyboard navigation). RESERVED only — grid cell-nav is NOT implemented in this
+  // plan. Declaring it now keeps the public prop shape stable for the later wave.
+  interactionMode: { type: String, default: 'table' },
+}
+</props>
+
+<data>
+{
+  // Uncontrolled fallback for the sorting slice (used when the consumer did NOT bind
+  // r-model:sorting). Whole-array-replace on write (never in-place push → silent on
+  // React/Solid/Angular/Lit).
+  sortingDefault: [],
+
+  // The id-keyed <Column> registry. WHOLE-OBJECT-REPLACE on every mutation (never
+  // in-place $data.colReg[id] = …). T-48-PP: a column id is consumer-controlled, so
+  // columnDefs() builds the resolved map prototype-safe (Object.create(null) +
+  // __proto__/constructor guard).
+  colReg: {},
+
+  // The current rendered rows (table.getRowModel().rows), refreshed by the re-feed
+  // watcher. Drives the <tbody> keyed r-for. A FRESH array each refresh so the
+  // template re-renders.
+  rows: [],
+
+  // The current header groups (table.getHeaderGroups()), refreshed alongside rows.
+  headerGroups: [],
+
+  // bumps each refreshRowModel() — lets the post-render cell-mount watcher react.
+  rowModelVer: 0,
+}
+</data>
+
+<script lang="ts">
+import {
+  createTable,
+  getCoreRowModel,
+  getSortedRowModel,
+} from '@tanstack/table-core'
+
+// table-core instance — top-level `let` referenced from hooks → React hoists to
+// useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
+// getRowModel-reading closures capture the LIVE instance, NOT an empty initial
+// snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
+// freezes the table at the empty-initial state on React).
+let table = null
+
+// Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
+// the funnel. A counter (not a boolean) so nested writes are safe.
+let programmatic = 0
+
+// Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
+// EXTENSION POINT: add the remaining 8 slices here in Plans 04/05 (each ?? its own
+// $data.<slice>Default). table-core reads this whole object as `state`.
+const currentState = () => ({
+  sorting: $props.sorting != null ? $props.sorting : $data.sortingDefault,
+})
+
+// Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
+// applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
+// byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
+// cannot pollute Object.prototype. Returns the table-core ColumnDef[] PLUS the per-
+// column render metadata (hasCell/cellRenderer/hasHeader/headerRenderer) the template
+// uses to decide plain-value fast path vs per-column slot dispatch.
+const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
+const columnDefs = () => {
+  const byId = Object.create(null)
+  const order = []
+  const cfg = $props.columns || []
+  for (const c of cfg) {
+    if (!c) continue
+    const rawId = c.id != null ? c.id : c.field
+    if (rawId == null) continue
+    const id = String(rawId)
+    if (!isSafeKey(id)) continue
+    if (!(id in byId)) order.push(id)
+    byId[id] = {
+      id,
+      accessorKey: c.field != null ? c.field : id,
+      header: c.header != null ? c.header : id,
+      enableSorting: c.sortable === true,
+      // config-array columns carry no template → plain-value fast path.
+      hasCell: false,
+      cellRenderer: null,
+      hasHeader: false,
+      headerRenderer: null,
+      pinned: c.pinned != null ? c.pinned : '',
+      width: c.width != null ? c.width : '',
+    }
+  }
+  const reg = $data.colReg || {}
+  for (const id in reg) {
+    if (!isSafeKey(id)) continue
+    const spec = reg[id]
+    if (!spec) continue
+    if (!(id in byId)) order.push(id)
+    byId[id] = {
+      id,
+      accessorKey: spec.field != null ? spec.field : id,
+      header: spec.header != null ? spec.header : id,
+      enableSorting: spec.sortable === true,
+      hasCell: spec.hasCell === true,
+      cellRenderer: spec.cellRenderer != null ? spec.cellRenderer : null,
+      hasHeader: spec.hasHeader === true,
+      headerRenderer: spec.headerRenderer != null ? spec.headerRenderer : null,
+      pinned: spec.pinned != null ? spec.pinned : '',
+      width: spec.width != null ? spec.width : '',
+    }
+  }
+  const out = []
+  for (const id of order) if (byId[id]) out.push(byId[id])
+  return out
+}
+
+// ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<SortingState> = value | (old)=>new; the onSortingChange
+// callback applies it against the CURRENT sorting, then this funnel writes a FRESH
+// array to the uncontrolled default + the two-way model + fires the change event
+// REGARDLESS of binding. STATIC key (`$data.sortingDefault` / `$model.sorting`) — a
+// dynamic-key funnel is ROZ106 on all six. The remaining 8 slices each get their own
+// such funnel in Plans 04/05.
+const writeSorting = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.sortingDefault = next   // fresh array only (never in-place)
+  $model.sorting = next          // two-way emit if bound (no-op-diff if not)
+  $emit('sort-change', next)
+  programmatic--
+}
+const applyUpdater = (updater, current) =>
+  (typeof updater === 'function' ? updater(current) : updater)
+
+// Re-read the row model + header groups into $data (fresh arrays → the template
+// re-renders). A plain fn (NOT a $computed — getRowModel() must be pulled AFTER a
+// setOptions re-feed, imperatively). Defined inside $onMount so it captures the live
+// `table`.
+let refreshRowModel = null
+
+// Per-cell / per-header projection bookkeeping: ONE live handle per rendered host,
+// keyed by host element, so a re-render disposes ONLY the handles for hosts that went
+// away (the Column owns its own per-cell handle Set; this parent owns the disposal
+// timing). Module-scope so the Solid-hoisted teardown can sweep it.
+let cellMounts = null
+cellMounts = new Map()
+
+$onMount(() => {
+  // Build the table instance HERE so the closures below capture the live `table`.
+  table = createTable({
+    get data() { return $props.data },
+    columns: columnDefs(),
+    state: currentState(),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
+    // no global onStateChange diff). The remaining slices add onGlobalFilterChange /
+    // onPaginationChange / … in later waves.
+    onSortingChange: (updater) => {
+      const next = applyUpdater(updater, currentState().sorting)
+      writeSorting(next)
+    },
+    renderFallbackValue: null,
+  })
+
+  refreshRowModel = () => {
+    if (!table) return
+    // Capture fresh locals; never write a $data key then re-read it in the same fn
+    // (ROZ138 / React stale-read — setState is async on React, the closure binds the
+    // PRE-write value).
+    const nextRows = table.getRowModel().rows.slice()
+    const nextGroups = table.getHeaderGroups().slice()
+    $data.rows = nextRows
+    $data.headerGroups = nextGroups
+    $data.rowModelVer = $data.rowModelVer + 1
+  }
+
+  // initial pull
+  refreshRowModel()
+  // project the per-column #cell / #header templates into the freshly-rendered
+  // framework-owned hosts (deferred a tick so the r-for DOM exists).
+  reconcileProjections()
+
+  return () => {
+    // dispose every live cell/header projection on unmount.
+    if (cellMounts) {
+      for (const h of cellMounts.values()) { if (h && h.dispose) { try { h.dispose() } catch (e) {} } }
+      cellMounts.clear()
+    }
+  }
+})
+
+// Walk the rendered framework-owned hosts ([data-cell-host] / [data-header-host]) and
+// mount the matching column's cellRenderer / headerRenderer into each — ONE handle per
+// host. Hosts that disappeared get their handle disposed. Columns with no template
+// render the plain value inline (the host element is simply not emitted for them), so
+// this only touches template-bearing columns. $el is the component root; querying it
+// is post-mount safe (called from $onMount + the post-refresh $watch).
+const reconcileProjections = () => {
+  if (!$el || !cellMounts) return
+  const seen = new Set()
+  const defs = columnDefs()
+  const defById = Object.create(null)
+  for (const d of defs) defById[d.id] = d
+  // cells
+  const cellHosts = $el.querySelectorAll('[data-cell-host]')
+  for (const host of cellHosts) {
+    const key = host.getAttribute('data-cell-host')
+    seen.add(key)
+    if (cellMounts.has(key)) continue
+    const colId = host.getAttribute('data-col')
+    const rowId = host.getAttribute('data-row')
+    const def = defById[colId]
+    if (!def || !def.hasCell || !def.cellRenderer) continue
+    const row = ($data.rows || []).find((r) => String(r.id) === String(rowId))
+    if (!row) continue
+    const handle = def.cellRenderer(host, {
+      row: row.original,
+      value: row.getValue(def.accessorKey),
+      column: def,
+    })
+    if (handle) cellMounts.set(key, handle)
+  }
+  // headers
+  const headerHosts = $el.querySelectorAll('[data-header-host]')
+  for (const host of headerHosts) {
+    const key = host.getAttribute('data-header-host')
+    seen.add(key)
+    if (cellMounts.has(key)) continue
+    const colId = host.getAttribute('data-col')
+    const def = defById[colId]
+    if (!def || !def.hasHeader || !def.headerRenderer) continue
+    const handle = def.headerRenderer(host, { column: def })
+    if (handle) cellMounts.set(key, handle)
+  }
+  // dispose handles whose host went away
+  for (const key of Array.from(cellMounts.keys())) {
+    if (!seen.has(key)) {
+      const h = cellMounts.get(key)
+      cellMounts.delete(key)
+      if (h && h.dispose) { try { h.dispose() } catch (e) {} }
+    }
+  }
+}
+
+// Reactive re-feed: when the bound sorting slice OR data length OR the column registry
+// changes, push fresh options into table-core and re-pull the row model. Watch the
+// bound references / a derived primitive — never a freshly-built array (Pitfall 3).
+// Lazy by default ($onMount did the first pull). EXTENSION: add the other bound slices
+// to this getter array as they are wired.
+$watch(
+  () => [$props.sorting, ($props.data || []).length, $data.colReg],
+  () => {
+    if (!table) return
+    table.setOptions((prev) => ({
+      ...prev,
+      data: $props.data,
+      columns: columnDefs(),
+      state: currentState(),
+    }))
+    if (refreshRowModel) refreshRowModel()
+  },
+)
+
+// After every row-model refresh, re-project the per-column templates into the new
+// framework-owned hosts (lazy $watch on the version counter — post-render).
+$watch(
+  () => $data.rowModelVer,
+  () => { reconcileProjections() },
+)
+
+// Header click → toggle sort. Shift-click → ADD a secondary sort (multi-sort). Driven
+// through table-core's column API so the onSortingChange funnel emits the fresh state.
+const onHeaderSort = (colId, evt) => {
+  if (!table) return
+  const col = table.getColumn(colId)
+  if (!col || !col.getCanSort()) return
+  const multi = !!(evt && evt.shiftKey)
+  // toggleSorting(desc?, isMulti?) cycles asc → desc → none; multi accumulates.
+  col.toggleSorting(undefined, multi)
+}
+
+// aria-sort string for a column header: 'ascending' | 'descending' | 'none'. Reads
+// the live sort direction off the table-core column (string-safe — never a bound
+// boolean, the listbox aria lesson).
+const ariaSortFor = (colId) => {
+  if (!table) return 'none'
+  const col = table.getColumn(colId)
+  if (!col) return 'none'
+  const dir = col.getIsSorted()
+  if (dir === 'asc') return 'ascending'
+  if (dir === 'desc') return 'descending'
+  return 'none'
+}
+
+// A small sort-direction glyph for the header (▲/▼/empty). Decorative — aria-hidden.
+const sortIndicator = (colId) => {
+  if (!table) return ''
+  const col = table.getColumn(colId)
+  if (!col) return ''
+  const dir = col.getIsSorted()
+  if (dir === 'asc') return '▲'
+  if (dir === 'desc') return '▼'
+  return ''
+}
+
+// Template helpers reading the resolved column-def metadata by id (plain fns — used
+// in template predicates + interpolation; uniform on all 6, no $computed alias trap).
+const defFor = (colId) => {
+  const defs = columnDefs()
+  for (const d of defs) if (d.id === colId) return d
+  return null
+}
+const columnHasCellTemplate = (colId) => {
+  const d = defFor(colId)
+  return !!(d && d.hasCell && d.cellRenderer)
+}
+const columnHasHeaderTemplate = (colId) => {
+  const d = defFor(colId)
+  return !!(d && d.hasHeader && d.headerRenderer)
+}
+const headerLabel = (colId) => {
+  const d = defFor(colId)
+  return d ? d.header : colId
+}
+
+// The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+$provide('data-table:columns', {
+  registerColumn: (id, spec) => {
+    if (id == null) return
+    const key = String(id)
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return
+    $data.colReg = { ...$data.colReg, [key]: spec }
+  },
+  unregisterColumn: (id) => {
+    if (id == null) return
+    const r = { ...$data.colReg }
+    delete r[String(id)]
+    $data.colReg = r
+  },
+})
+
+// Imperative handle (consumer-callable). Sorting verbs + a fresh column-def readout.
+$expose({
+  sortColumn: (colId, desc) => {
+    if (table) table.getColumn(colId) && table.getColumn(colId).toggleSorting(desc, false)
+  },
+  clearSorting: () => { if (table) table.resetSorting(true) },
+  getColumnDefs: () => columnDefs(),
+})
+</script>
+
+<template>
+<!--
+  Semantic table markup. The header sort BUTTON carries :aria-sort reflecting the live
+  table-core sort state; @click toggles (shift-click adds a secondary sort). The body
+  is a keyed r-for over the pulled row model; the per-row cell r-for loop var is
+  `cellCtx` (NEVER `cell` — a `#cell`-named child slot would shadow it → Svelte mount
+  throw, the embla/rete lesson). A column WITH a #cell template renders into a
+  framework-owned [data-cell-host] span (projected by reconcileProjections); a column
+  WITHOUT one renders the plain accessor value inline (the fast path).
+-->
+<table
+  class="rozie-data-table"
+  :class="{ 'rdt-sticky': $props.stickyHeader }"
+  role="table"
+>
+  <thead class="rdt-thead" role="rowgroup">
+    <tr
+      class="rdt-tr"
+      role="row"
+      r-for="hg in $data.headerGroups"
+      :key="hg.id"
+    >
+      <th
+        class="rdt-th"
+        role="columnheader"
+        r-for="header in hg.headers"
+        :key="header.id"
+        :data-col="header.column.id"
+        :aria-sort="ariaSortFor(header.column.id)"
+      >
+        <!-- sortable header → a button that toggles sort (shift = multi). -->
+        <button
+          r-if="header.column.getCanSort && header.column.getCanSort()"
+          type="button"
+          class="rdt-sort-btn"
+          @click="onHeaderSort(header.column.id, $event)"
+        >
+          <!-- custom #headerTemplate column → framework-owned host; else plain label -->
+          <span
+            r-if="columnHasHeaderTemplate(header.column.id)"
+            class="rdt-header-host"
+            :data-header-host="'h:' + header.column.id"
+            :data-col="header.column.id"
+          ></span>
+          <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
+          <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
+        </button>
+        <!-- non-sortable header. -->
+        <template r-else>
+          <span
+            r-if="columnHasHeaderTemplate(header.column.id)"
+            class="rdt-header-host"
+            :data-header-host="'h:' + header.column.id"
+            :data-col="header.column.id"
+          ></span>
+          <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
+        </template>
+      </th>
+    </tr>
+  </thead>
+
+  <tbody class="rdt-tbody" role="rowgroup">
+    <tr
+      class="rdt-tr"
+      role="row"
+      r-for="row in $data.rows"
+      :key="row.id"
+    >
+      <td
+        class="rdt-td"
+        role="cell"
+        r-for="cellCtx in row.getVisibleCells()"
+        :key="cellCtx.id"
+        :data-col="cellCtx.column.id"
+      >
+        <!-- column WITH a #cell template → framework-owned host (projected per cell);
+             column WITHOUT one → plain accessor value (the fast path). -->
+        <span
+          r-if="columnHasCellTemplate(cellCtx.column.id)"
+          class="rdt-cell-host"
+          :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id"
+          :data-col="cellCtx.column.id"
+          :data-row="row.id"
+        ></span>
+        <span r-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span>
+      </td>
+    </tr>
+  </tbody>
+</table>
+</template>
+
+<style>
+.rozie-data-table {
+  border-collapse: collapse;
+  width: 100%;
+  font: var(--rdt-font, 14px system-ui, sans-serif);
+  color: var(--rdt-color, inherit);
+}
+.rozie-data-table .rdt-th,
+.rozie-data-table .rdt-td {
+  padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
+  text-align: left;
+  border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table .rdt-thead .rdt-th {
+  font-weight: var(--rdt-header-weight, 600);
+  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+}
+.rozie-data-table .rdt-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rdt-sort-gap, 0.35em);
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.rozie-data-table .rdt-sort-ind {
+  font-size: 0.8em;
+  opacity: var(--rdt-sort-ind-opacity, 0.7);
+}
+/* Sticky header (req-12) — token-driven, gated by the stickyHeader prop. */
+.rozie-data-table.rdt-sticky .rdt-thead .rdt-th {
+  position: sticky;
+  top: var(--rdt-sticky-top, 0);
+  z-index: var(--rdt-sticky-z, 2);
+  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+}
+</style>
+
+</rozie>
