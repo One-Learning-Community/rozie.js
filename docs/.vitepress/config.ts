@@ -227,6 +227,15 @@ export default defineConfig({
             { text: 'Slider — live demo', link: '/components/slider-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/data-table',
+          collapsed: true,
+          items: [
+            { text: 'DataTable — showcase & API', link: '/components/data-table' },
+            { text: 'Data table comparison', link: '/components/data-table-comparison' },
+            { text: 'DataTable — live demo', link: '/components/data-table-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

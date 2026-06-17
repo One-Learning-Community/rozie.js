@@ -106,6 +106,9 @@ importers:
       '@rozie-ui/cropper-vue':
         specifier: workspace:*
         version: link:../packages/ui/cropper/packages/vue
+      '@rozie-ui/data-table-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/data-table/packages/vue
       '@rozie-ui/embla-vue':
         specifier: workspace:*
         version: link:../packages/ui/embla/packages/vue
@@ -145,6 +148,9 @@ importers:
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../packages/unplugin
+      '@tanstack/table-core':
+        specifier: ^8.21
+        version: 8.21.3
       '@tiptap/core':
         specifier: ^3.23.5
         version: 3.23.5(@tiptap/pm@3.23.5)

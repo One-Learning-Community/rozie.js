@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "ROZIE_DATA_TABLE_SKIP_GUIDE=1 node scripts/codegen.mjs",
+    "build": "node scripts/codegen.mjs",
     "probe": "node scripts/probe-48-00.mjs",
     "test": "echo 'no unit tests (pure-Rozie component; behaviour covered by the VR matrix)'",
     "typecheck": "echo 'no local TS to check (pure-Rozie source); the emitted leaves typecheck individually'"
