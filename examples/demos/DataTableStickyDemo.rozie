@@ -1,0 +1,74 @@
+<!--
+  DataTableStickyDemo.rozie — BEHAVIORAL consumer proving the sticky header
+  (req-12): with stickyHeader set, the <thead> header cells get
+  `position: sticky; top: 0` so they stay fixed during vertical scroll of a
+  height-constrained scroll container.
+
+  - 20 rows in a fixed-height (180px) overflow:auto scroll container so there is
+    real vertical scroll.
+  - data-table.spec.ts ("sticky" case): the header [role=columnheader] resolves to
+    `position: sticky` (computed style); after scrolling the container down, the
+    header's top stays pinned to the container's top edge (its bounding box top
+    does not drift up out of view).
+
+  Pure-CSS sticky — token-driven (--rdt-sticky-top / --rdt-sticky-z) and gated by
+  the stickyHeader prop (the .rdt-sticky class). No JS scroll listener.
+-->
+
+<rozie name="DataTableStickyDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+}
+</data>
+
+<script>
+// Seed 20 rows so the scroll container actually overflows (the sticky-on-scroll
+// assertion needs real vertical scroll distance).
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 20; i++) out.push({ id: i, name: 'Row ' + i, value: i * 10 })
+  $data.rows = out
+})
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — sticky header</h3>
+
+  <div class="scroll-box" data-testid="scroll-box">
+    <DataTable :data="$data.rows" :stickyHeader="true">
+      <Column field="name" header="Name" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+/* A height-constrained, scrollable viewport so the sticky header has somewhere
+   to stick during vertical scroll. */
+.scroll-box {
+  height: 180px;
+  overflow: auto;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+</style>
+
+</rozie>

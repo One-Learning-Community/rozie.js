@@ -169,6 +169,18 @@ const SLIDER_SRC = resolve(
   'slider',
   'src',
 );
+// Same packaging move for @rozie-ui/data-table: DataTable.rozie + Column.rozie
+// live in the package src; the Angular sub-build walks it via `prebuildExtraRoots`
+// and drops the cross-tree `.rozie.ts` + the `DataTable.ts` / `Column.ts` shim
+// artefacts (a MULTI-component family → TWO shims) that must be swept after the
+// Angular build (see cleanupCrossTreeAngularArtifacts).
+const DATA_TABLE_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'data-table',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -455,6 +467,22 @@ function cleanupCrossTreeAngularArtifacts() {
     // slider src always exists post-port — defensive only
   }
   rmSync(resolve(SLIDER_SRC, 'Slider.ts'), { force: true });
+  // Same sweep for @rozie-ui/data-table's package src (the DataTable*Demo cells
+  // compose DataTable + Column via <components>, so the Angular sub-build emits
+  // DataTable.rozie.ts + Column.rozie.ts + the DataTable.ts / Column.ts shims
+  // here — a MULTI-component family → TWO shims). Leftovers (the emitted
+  // .rozie.ts imports @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(DATA_TABLE_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(DATA_TABLE_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // data-table src always exists post-port — defensive only
+  }
+  rmSync(resolve(DATA_TABLE_SRC, 'DataTable.ts'), { force: true });
+  rmSync(resolve(DATA_TABLE_SRC, 'Column.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

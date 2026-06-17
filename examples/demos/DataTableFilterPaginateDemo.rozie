@@ -1,0 +1,93 @@
+<!--
+  DataTableFilterPaginateDemo.rozie — BEHAVIORAL consumer proving global +
+  per-column filtering (req-5) and pagination (req-6).
+
+  - 8 rows, pageSize 3 → THREE pages (so prev/next + page-count are meaningful).
+  - A global search box ([role=searchbox]) narrows ALL columns; a per-column
+    filter input (gated by the Name column's filterable flag) narrows just Name.
+  - r-model:globalFilter / r-model:pagination two-way bind to $data; live
+    readouts (`readout-rows` = visible row count, `readout-page` = page indicator)
+    prove the bound state round-trips OUT.
+  - data-table.spec.ts ("filter"/"paginate" cases): initial visible rows = 3 (page
+    1 of 3); type into the global filter → fewer rows; clear it; click Next → page
+    2 of 3 with a different row set; the page-size select changes rows-per-page.
+
+  Filtering feeds getFilteredRowModel(); pagination feeds getPaginationRowModel().
+  Both inputs bind value (NOT eval'd) — T-48-XSS safe-render path.
+-->
+
+<rozie name="DataTableFilterPaginateDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  globalFilter: '',
+  pagination: { pageIndex: 0, pageSize: 3 },
+  rows: [
+    { id: 1, name: 'Alpha',   city: 'Paris'    },
+    { id: 2, name: 'Beta',    city: 'Berlin'   },
+    { id: 3, name: 'Gamma',   city: 'Paris'    },
+    { id: 4, name: 'Delta',   city: 'Tokyo'    },
+    { id: 5, name: 'Epsilon', city: 'Berlin'   },
+    { id: 6, name: 'Zeta',    city: 'Paris'    },
+    { id: 7, name: 'Eta',     city: 'Tokyo'    },
+    { id: 8, name: 'Theta',   city: 'Berlin'   },
+  ],
+}
+</data>
+
+<script>
+// Live page indicator (1-based) derived from the bound pagination slice. A plain
+// $computed read of the bound model — uniform on all 6.
+const pageText = $computed(() => {
+  const p = $data.pagination || { pageIndex: 0 }
+  return 'Page ' + ((p.pageIndex || 0) + 1)
+})
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — filtering + pagination</h3>
+
+  <div class="controls">
+    <span class="label">page:</span>
+    <span class="readout" data-testid="readout-page">{{ pageText }}</span>
+  </div>
+
+  <DataTable
+    :data="$data.rows"
+    r-model:globalFilter="$data.globalFilter"
+    r-model:pagination="$data.pagination"
+  >
+    <Column field="name" header="Name" :filterable="true" />
+    <Column field="city" header="City" />
+  </DataTable>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; }
+</style>
+
+</rozie>

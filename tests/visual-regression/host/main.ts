@@ -474,6 +474,24 @@ export const EXAMPLES = [
   'SliderRange',
   'SliderVertical',
   'SliderMarks',
+  // @rozie-ui/data-table (headless, accessible, cross-framework data table on a
+  // single inline @tanstack/table-core bridge — NO per-framework adapter) — the
+  // six BEHAVIORAL cells (loaders → examples/demos/DataTable{Columns,Sort,
+  // FilterPaginate,Selection,ColumnMgmt,Sticky}Demo.rozie, each importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). They drive the two
+  // column-declaration forms + 3-distinct-cell-template (req-2/3), sort cycle +
+  // aria-sort + multi-sort (req-4), global/per-column filter + pagination (req-5/6),
+  // single/multiple selection + select-all indeterminate (req-7), column
+  // visibility/resize/reorder/pin (req-8-11), and the sticky header (req-12) — see
+  // data-table.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel
+  // baseline). Angular cells mount NON-EMPTY via the three-file cross-tree
+  // registration (vite.config.ts + tsconfig.app.json + build-cells.mjs).
+  'DataTableColumns',
+  'DataTableSort',
+  'DataTableFilterPaginate',
+  'DataTableSelection',
+  'DataTableColumnMgmt',
+  'DataTableSticky',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -659,6 +677,16 @@ export const LIT_TAGS: Record<Example, string> = {
   SliderRange: 'rozie-slider-range',
   SliderVertical: 'rozie-slider-vertical',
   SliderMarks: 'rozie-slider-marks',
+  // @rozie-ui/data-table — '-demo' appended on Lit → tags
+  // 'rozie-data-table-columns-demo' etc. = kebab of DataTable*Demo (the wrapper
+  // components are name="DataTable{Columns,...}Demo"). Behavioral-only, no
+  // screenshot cell.
+  DataTableColumns: 'rozie-data-table-columns',
+  DataTableSort: 'rozie-data-table-sort',
+  DataTableFilterPaginate: 'rozie-data-table-filter-paginate',
+  DataTableSelection: 'rozie-data-table-selection',
+  DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
+  DataTableSticky: 'rozie-data-table-sticky',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -889,6 +917,16 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SliderRange: {},
   SliderVertical: {},
   SliderMarks: {},
+  // @rozie-ui/data-table — every DataTable*Demo is self-contained: it seeds its
+  // own rows + column-declaration in <data>/<components> and binds the state
+  // slices via r-model internally (not parent-supplied), so no MODEL_PROPS entry.
+  // No parent props needed.
+  DataTableColumns: {},
+  DataTableSort: {},
+  DataTableFilterPaginate: {},
+  DataTableSelection: {},
+  DataTableColumnMgmt: {},
+  DataTableSticky: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

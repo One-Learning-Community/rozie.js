@@ -1,0 +1,106 @@
+<!--
+  DataTableSelectionDemo.rozie — BEHAVIORAL consumer proving row selection (req-7):
+  the 'multiple' mode auto-injects a leading checkbox column with a select-all
+  header that goes INDETERMINATE on a partial selection, and the 'single' mode
+  caps the selection at one row.
+
+  Two tables share the row data:
+    - #multiple — selectionMode="multiple"; the leading select column renders a
+      per-row checkbox (.rdt-select-row) + a select-all header checkbox
+      (.rdt-select-all) that is indeterminate when SOME (not all) rows are picked.
+    - #single — selectionMode="single"; checking a second row replaces the first
+      (≤1 selected, enableMultiRowSelection:false). No select-all in single mode.
+  - r-model:rowSelection two-way binds the RowSelectionState to $data; a live
+    `readout-count` proves the bound state round-trips OUT (selected-key count).
+  - data-table.spec.ts ("selection" cases): check one row → select-all goes
+    indeterminate; check all → select-all checked; single mode caps at 1.
+
+  Checkbox-only toggle (D-05) — the row body does NOT select. The select-all uses
+  :indeterminate (a DOM property; the component sets it on the native checkbox).
+-->
+
+<rozie name="DataTableSelectionDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  selMulti: {},
+  selSingle: {},
+  rows: [
+    { id: 1, name: 'Alpha' },
+    { id: 2, name: 'Beta'  },
+    { id: 3, name: 'Gamma' },
+  ],
+}
+</data>
+
+<script>
+// Count of selected keys in the bound multiple-selection slice (proves the
+// two-way round-trip OUT). Object.keys over the RowSelectionState map.
+const multiCount = $computed(() => Object.keys($data.selMulti || {}).length)
+const singleCount = $computed(() => Object.keys($data.selSingle || {}).length)
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — row selection</h3>
+
+  <div class="controls">
+    <span class="label">multiple selected:</span>
+    <span class="readout" data-testid="readout-count">{{ multiCount }}</span>
+    <span class="label">single selected:</span>
+    <span class="readout" data-testid="readout-single">{{ singleCount }}</span>
+  </div>
+
+  <section data-testid="multiple-table">
+    <h4>selectionMode="multiple"</h4>
+    <DataTable
+      :data="$data.rows"
+      selectionMode="multiple"
+      r-model:rowSelection="$data.selMulti"
+    >
+      <Column field="name" header="Name" />
+    </DataTable>
+  </section>
+
+  <section data-testid="single-table">
+    <h4>selectionMode="single"</h4>
+    <DataTable
+      :data="$data.rows"
+      selectionMode="single"
+      r-model:rowSelection="$data.selSingle"
+    >
+      <Column field="name" header="Name" />
+    </DataTable>
+  </section>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.dt-demo h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #555; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; min-width: 2ch; }
+</style>
+
+</rozie>

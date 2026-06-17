@@ -1,0 +1,82 @@
+<!--
+  DataTableSortDemo.rozie — BEHAVIORAL consumer proving sorting (req-4):
+  single-column click-to-sort cycling asc → desc → none, the aria-sort attribute
+  on the sorted columnheader, and shift-click MULTI-column sort.
+
+  - Two sortable columns (Name, Score) + one non-sortable (Status).
+  - r-model:sorting two-way binds the SortingState to $data.sorting; a live
+    `readout-sorting` JSON readout proves the bound state round-trips OUT.
+  - data-table.spec.ts ("sort" cases): click the Score header → aria-sort flips to
+    'ascending' on its [role=columnheader]; click again → 'descending'; click again
+    → 'none'. Shift-click a second header builds a two-entry sorting array (order
+    asserted via the readout).
+
+  The sortable header is a native <button> inside the <th role=columnheader>; the
+  :aria-sort reflects table-core's live direction (string-safe 'ascending' |
+  'descending' | 'none' — the listbox aria lesson, never a bound boolean).
+-->
+
+<rozie name="DataTableSortDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  sorting: [],
+  rows: [
+    { id: 1, name: 'Gamma', status: 'active',   score: 41 },
+    { id: 2, name: 'Alpha', status: 'pending',  score: 92 },
+    { id: 3, name: 'Beta',  status: 'inactive', score: 67 },
+    { id: 4, name: 'Delta', status: 'active',   score: 67 },
+  ],
+}
+</data>
+
+<script>
+// Live JSON readout of the bound sorting slice (proves the two-way round-trip
+// OUT). currentState() writes a FRESH array on each sort → the readout updates.
+const sortingText = $computed(() => JSON.stringify($data.sorting))
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — sorting</h3>
+
+  <div class="controls">
+    <span class="label">sorting:</span>
+    <span class="readout" data-testid="readout-sorting">{{ sortingText }}</span>
+  </div>
+
+  <DataTable :data="$data.rows" r-model:sorting="$data.sorting">
+    <Column field="name" header="Name" :sortable="true" />
+    <Column field="status" header="Status" />
+    <Column field="score" header="Score" :sortable="true" />
+  </DataTable>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+</style>
+
+</rozie>

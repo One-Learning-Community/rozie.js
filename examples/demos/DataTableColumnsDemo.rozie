@@ -1,0 +1,112 @@
+<!--
+  DataTableColumnsDemo.rozie — BEHAVIORAL consumer for the @rozie-ui/data-table
+  family proving the TWO column-declaration forms coexist (req-2) and the
+  three-distinct-cell-template render path (req-3).
+
+  Two stacked tables share the SAME row data:
+    - #declarative — columns declared via <Column> children, with THREE distinct
+      #cell templates: a styled status BADGE (status col), a CURRENCY-formatted
+      amount (amount col), and the PLAIN accessor value (name col, no template →
+      the fast path). This is the 3-distinct-cell-template proof.
+    - #config — the SAME columns declared via the :columns config array (no
+      templates → plain values everywhere). Proves the config-array form renders
+      its own header + body independently.
+
+  Behavioral (data-table.spec.ts → "columns" cases): both tables mount with their
+  headers + rows; the declarative table renders the badge span (.dt-badge), the
+  currency cell ($-prefixed), and the plain name; the config table renders the
+  same three columns as plain values. NO screenshot stabilization here.
+
+  The per-row cell r-for loop var inside DataTable is `cellCtx` (NEVER `cell`) —
+  a #cell child slot would shadow it on Svelte mount (the embla/rete lesson). The
+  consumer's slot is `#cell` on the <Column>, which is the column's OWN scoped
+  template, not the parent loop var.
+-->
+
+<rozie name="DataTableColumnsDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, name: 'Alpha',   status: 'active',   amount: 1299 },
+    { id: 2, name: 'Beta',    status: 'pending',  amount: 4250 },
+    { id: 3, name: 'Gamma',   status: 'inactive', amount: 875 },
+  ],
+  // The config-array form (lower precedence; here it stands alone in its own
+  // table). Same three columns, no templates → plain values.
+  configColumns: [
+    { field: 'name',   header: 'Name'   },
+    { field: 'status', header: 'Status' },
+    { field: 'amount', header: 'Amount' },
+  ],
+}
+</data>
+
+<script>
+// Currency formatter for the amount #cell template (a distinct render path from
+// the badge + plain). Pure string fn — uniform on all 6.
+const currency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US')
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — column declaration forms</h3>
+
+  <!-- ─── declarative <Column> children + 3 distinct #cell templates ─── -->
+  <section data-testid="declarative-table">
+    <h4>&lt;Column&gt; children</h4>
+    <DataTable :data="$data.rows">
+      <!-- plain accessor value (no #cell template → the fast path) -->
+      <Column field="name" header="Name" />
+      <!-- distinct template #1 — a styled status BADGE -->
+      <Column field="status" header="Status">
+        <template #cell="{ value }">
+          <span class="dt-badge" :class="'dt-badge-' + value" data-testid="cell-badge">{{ value }}</span>
+        </template>
+      </Column>
+      <!-- distinct template #2 — a CURRENCY-formatted amount -->
+      <Column field="amount" header="Amount">
+        <template #cell="{ value }">
+          <span class="dt-currency" data-testid="cell-currency">{{ currency(value) }}</span>
+        </template>
+      </Column>
+    </DataTable>
+  </section>
+
+  <!-- ─── :columns config array (same three columns, plain values) ─── -->
+  <section data-testid="config-table">
+    <h4>:columns config array</h4>
+    <DataTable :data="$data.rows" :columns="$data.configColumns" />
+  </section>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.dt-demo h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #555; }
+.dt-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8em;
+}
+.dt-badge-active { background: #d1fae5; color: #065f46; }
+.dt-badge-pending { background: #fef3c7; color: #92400e; }
+.dt-badge-inactive { background: #f3f4f6; color: #4b5563; }
+.dt-currency { font-variant-numeric: tabular-nums; font-weight: 600; }
+</style>
+
+</rozie>

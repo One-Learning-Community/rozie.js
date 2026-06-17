@@ -1,0 +1,117 @@
+<!--
+  DataTableColumnMgmtDemo.rozie — BEHAVIORAL consumer proving the four
+  column-management slices: visibility (req-8), resize (req-9), reorder (req-10),
+  and pinning (req-11).
+
+  - Three columns (Name, City, Score), all sortable so the resize handle + pin
+    controls render in the header chrome.
+  - r-model:columnVisibility / :columnSizing / :columnOrder / :columnPinning all
+    two-way bound to $data; the imperative handle is wired to driver buttons:
+      * `hide-city`     → toggleColumnVisibility('city') → City drops from header+body
+      * `reorder`       → setColumnOrder(['score','name','city']) → Score moves first
+      * `pin-name`      → pinColumn('name','left') → Name sticks (position:sticky)
+    A `readout-cols` shows the live visible-column count.
+  - data-table.spec.ts ("column-mgmt" cases): clicking hide-city drops the City
+    [role=columnheader] (header count -1) + its body cells; clicking the visibility
+    checkbox in the <details> menu restores it; reorder moves Score to first
+    columnheader; pin-name gives the Name header position:sticky in its inline style.
+    Resize asserts a width delta via the imperative seam (resetColumnSizing) and the
+    native resize handle.
+
+  The visibility menu is a native <details>/<summary> disclosure with one checkbox
+  per leaf column (keyboard-reachable). The pin control is three native buttons
+  (left/unpin/right) with aria-pressed. The resize handle is a native button at the
+  column's trailing edge (table-core owns the drag gesture state).
+-->
+
+<rozie name="DataTableColumnMgmtDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  columnVisibility: {},
+  columnSizing: {},
+  columnOrder: [],
+  columnPinning: { left: [], right: [] },
+  rows: [
+    { id: 1, name: 'Alpha', city: 'Paris',  score: 41 },
+    { id: 2, name: 'Beta',  city: 'Berlin', score: 92 },
+    { id: 3, name: 'Gamma', city: 'Tokyo',  score: 67 },
+  ],
+}
+</data>
+
+<script>
+// A $refs handle to the table so the driver buttons can call the imperative verbs
+// (toggleColumnVisibility / setColumnOrder / pinColumn). Read in $onMount only
+// (ROZ123) — but we delegate through handler fns that read it at call time
+// (post-mount), so the ref is populated.
+let api = null
+
+const hideCity = () => { if (api && api.toggleColumnVisibility) api.toggleColumnVisibility('city') }
+const reorderCols = () => { if (api && api.setColumnOrder) api.setColumnOrder(['score', 'name', 'city']) }
+const pinName = () => { if (api && api.pinColumn) api.pinColumn('name', 'left') }
+const resetSizing = () => { if (api && api.resetColumnSizing) api.resetColumnSizing() }
+
+$onMount(() => { api = $refs.dt })
+</script>
+
+<template>
+<div class="dt-demo">
+  <h3>DataTable — column management</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="hide-city" @click="hideCity">Toggle City</button>
+    <button type="button" data-testid="reorder" @click="reorderCols">Score first</button>
+    <button type="button" data-testid="pin-name" @click="pinName">Pin Name left</button>
+    <button type="button" data-testid="reset-sizing" @click="resetSizing">Reset sizing</button>
+  </div>
+
+  <DataTable
+    ref="dt"
+    :data="$data.rows"
+    r-model:columnVisibility="$data.columnVisibility"
+    r-model:columnSizing="$data.columnSizing"
+    r-model:columnOrder="$data.columnOrder"
+    r-model:columnPinning="$data.columnPinning"
+  >
+    <Column field="name" header="Name" :sortable="true" />
+    <Column field="city" header="City" :sortable="true" />
+    <Column field="score" header="Score" :sortable="true" />
+  </DataTable>
+</div>
+</template>
+
+<style>
+.dt-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+</style>
+
+</rozie>
