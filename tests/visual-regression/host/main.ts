@@ -463,6 +463,17 @@ export const EXAMPLES = [
   // examples/demos/ListboxComboboxDemo.rozie). Drives the $computed-derived filter,
   // the <input role="combobox">, the search event, and a two-way r-model:value.
   'ListboxCombobox',
+  // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
+  // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
+  // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
+  // ../../packages/ui/slider/src/Slider.rozie). They drive single + range two-way
+  // r-model:value (live readouts), keyboard (Arrow/Home/End/PageUp), set-.value+
+  // dispatch value commits, vertical aria-orientation, and the marks overlay — see
+  // slider.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  'SliderBehavior',
+  'SliderRange',
+  'SliderVertical',
+  'SliderMarks',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -641,6 +652,13 @@ export const LIT_TAGS: Record<Example, string> = {
   ListboxBehavior: 'rozie-listbox-behavior',
   // '-demo' appended → 'rozie-listbox-combobox-demo' = kebab of ListboxComboboxDemo.
   ListboxCombobox: 'rozie-listbox-combobox',
+  // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
+  // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
+  // 'rozie-slider'). Behavioral-only, no screenshot cell.
+  SliderBehavior: 'rozie-slider-behavior',
+  SliderRange: 'rozie-slider-range',
+  SliderVertical: 'rozie-slider-vertical',
+  SliderMarks: 'rozie-slider-marks',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -864,6 +882,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxBehavior: {},
   ListboxCombobox: {},
+  // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
+  // in <data> and binds r-model:value internally (not parent-supplied), so no
+  // MODEL_PROPS entry. No parent props needed.
+  SliderBehavior: {},
+  SliderRange: {},
+  SliderVertical: {},
+  SliderMarks: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
