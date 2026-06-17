@@ -857,6 +857,7 @@ eastasianwidth
 editorconfig
 ee-first
 electron-to-chromium
+elkjs
 embla-carousel
 embla-carousel-autoplay
 emoji-regex
@@ -1353,6 +1354,7 @@ resolve-url-loader
 restore-cursor
 rete
 rete-area-plugin
+rete-auto-arrange-plugin
 rete-connection-plugin
 rete-render-utils
 retext
@@ -1547,6 +1549,7 @@ wbuf
 wcwidth
 weak-lru-cache
 web-namespaces
+web-worker
 webidl-conversions
 webpack
 webpack-dev-middleware
