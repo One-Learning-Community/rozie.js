@@ -1,0 +1,16 @@
+{
+  "name": "@rozie-ui/slider",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/codegen.mjs",
+    "test": "echo 'no unit tests (pure-Rozie component; behaviour covered by the VR matrix)'",
+    "typecheck": "echo 'no local TS to check (pure-Rozie source); the emitted leaves typecheck individually'"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "typescript": "~5.6.0"
+  }
+}
