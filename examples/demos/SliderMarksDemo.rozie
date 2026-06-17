@@ -2,12 +2,13 @@
   SliderMarksDemo.rozie — MARKS overlay consumer for the pure-Rozie Slider.
 
   Proves the marks overlay (one marker per :marks entry), the scoped `#mark` slot
-  override (mirrors the listbox #option slot), and the `#value` bubble slot gated
-  by showValue render across all 6 targets (slider.spec.ts req 7).
+  override (mirrors the listbox #option slot), and the `#bubble` value-bubble slot
+  gated by showValue render across all 6 targets (slider.spec.ts req 7).
 
     - :marks binds a 3-entry {value,label}[] array; one marker renders per entry.
-    - showValue (bare-boolean attr, D-01) → the #value bubble renders, tracking
-      the fill var.
+    - showValue (bare-boolean attr, D-01) → the #bubble value bubble renders,
+      tracking the fill var. (The slot is `bubble`, not `value`: a slot cannot
+      share the declared `value` prop name — ROZ127.)
     - A scoped `#mark` slot renders each mark label (exercises scoped slots — the
       direct analog of the listbox #option slot).
     - r-model:value two-way binds to $data.value; the live `readout-value` proves
@@ -65,7 +66,7 @@ const pickValue = (v) => { $data.value = v }
     <template #mark="{ value, label, position }">
       <span class="mark-label" :style="{ left: position + '%' }">{{ label }}</span>
     </template>
-    <template #value="{ value }">
+    <template #bubble="{ value }">
       <span class="value-bubble">{{ value }}</span>
     </template>
   </Slider>
