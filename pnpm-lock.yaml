@@ -124,6 +124,9 @@ importers:
       '@rozie-ui/rete-vue':
         specifier: workspace:*
         version: link:../packages/ui/rete/packages/vue
+      '@rozie-ui/slider-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/slider/packages/vue
       '@rozie-ui/sortable-list-vue':
         specifier: workspace:*
         version: link:../packages/ui/sortable-list/packages/vue

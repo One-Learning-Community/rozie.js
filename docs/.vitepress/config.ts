@@ -218,6 +218,15 @@ export default defineConfig({
             { text: 'Listbox — live demo', link: '/components/listbox-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/slider',
+          collapsed: true,
+          items: [
+            { text: 'Slider — headless slider / range', link: '/components/slider' },
+            { text: 'Headless slider / range comparison', link: '/components/slider-comparison' },
+            { text: 'Slider — live demo', link: '/components/slider-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

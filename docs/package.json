@@ -38,6 +38,7 @@
     "@rozie-ui/maplibre-vue": "workspace:*",
     "@rozie-ui/pdf-vue": "workspace:*",
     "@rozie-ui/rete-vue": "workspace:*",
+    "@rozie-ui/slider-vue": "workspace:*",
     "@rozie-ui/sortable-list-vue": "workspace:*",
     "@rozie-ui/tiptap-vue": "workspace:*",
     "@rozie/core": "workspace:*",
