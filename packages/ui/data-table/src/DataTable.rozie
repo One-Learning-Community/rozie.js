@@ -28,9 +28,10 @@
   this parent owns per-cell disposal on re-render). A column with NO #cell template
   renders the PLAIN accessor value inline (the fast path — no portal, no slot dispatch).
 
-  STATE (req-4 sorting wired HERE; the remaining 8 slices land in Plans 04/05). The
-  bridge is designed to extend cleanly: currentState() assembles the live state object
-  and each slice gets its OWN STATIC-KEY write funnel (A4: a generic dynamic-key funnel
+  STATE (req-4..req-11 — all NINE slices now wired: sorting, globalFilter, columnFilters,
+  pagination, rowSelection, columnVisibility, columnSizing, columnOrder, columnPinning).
+  currentState() assembles the live state object and each slice gets its OWN STATIC-KEY
+  write funnel (A4: a generic dynamic-key funnel
   `$data[k]=…`/`$model[k]=…` is ROZ106 on all six — never one parametric indexed
   funnel). onSortingChange → writeSorting(next) emits a FRESH sorting array + fires
   `sort-change` REGARDLESS of binding (echo-guarded).
@@ -38,9 +39,28 @@
   STICKY HEADER (req-12): a pure-CSS `position: sticky; top: 0` on the header row,
   token-driven and gated by the `stickyHeader` prop.
 
-  Multi-model Angular CVA: with ≥2 model:true props (added in later waves) ROZ125/126
-  fire as WARNINGS (req-14) — not errors. This plan wires ONE model slice so they are
-  not yet emitted; the bridge is shaped so the later slices drop in cleanly.
+  Multi-model Angular CVA: with the NINE model:true slices now wired (req-14), ROZ125
+  fires as a WARNING — not an error — on the Angular target and NO ControlValueAccessor
+  is auto-emitted (the multi-model condition disables it; do NOT add an
+  `angular:{cva:false}` source workaround — the condition already disables CVA). The
+  nine slices' two-way r-models all still work via the standard per-prop
+  `valueChange.emit(...)` outputs.
+
+  ACCESSIBILITY (req-13, D-01): `role="table"`/`role="rowgroup"`/`role="row"`/
+  `role="columnheader"`/`role="cell"`; `aria-sort` (string-safe 'ascending'|'descending'|
+  'none') on sortable headers; EVERY interactive control is a NATIVE focusable element
+  (sort buttons, select-all + per-row checkboxes, pagination prev/next + page-size
+  select, global + per-column filter inputs, the column-visibility `<details>` toggle,
+  per-header pin buttons, and edge resize handles) with an accessible name — no
+  div-with-click-only control. The keyboard/focus surface is the table-oriented default;
+  the reserved `interactionMode='grid'` seam (D-02) stays INERT in v1 (full APG grid
+  arrow-key cell navigation is a future additive layer, not baked into the core).
+
+  NINE-SLICE SURFACE COMPLETE: sorting, globalFilter, columnFilters, pagination,
+  rowSelection, columnVisibility, columnSizing, columnOrder, columnPinning — each an
+  INDEPENDENT optional two-way r-model with its own $data.<slice>Default uncontrolled
+  fallback, its own STATIC-KEY write funnel, and its own change event firing REGARDLESS
+  of binding (the uncontrolled fallback works when the consumer does not bind the model).
 
   ZERO emitter/core change.
 -->
@@ -202,8 +222,8 @@ let table = null
 let programmatic = 0
 
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
-// EXTENSION POINT: add the remaining 8 slices here in Plans 04/05 (each ?? its own
-// $data.<slice>Default). table-core reads this whole object as `state`.
+// All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
+// this whole object as `state`.
 const currentState = () => ({
   sorting: $props.sorting != null ? $props.sorting : $data.sortingDefault,
   globalFilter: $props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault,
