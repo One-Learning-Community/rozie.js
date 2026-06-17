@@ -20,6 +20,7 @@ interface Props {
   columnPinning?: any;
   stickyHeader?: boolean;
   interactionMode?: string;
+  children?: Snippet;
   selectAll?: Snippet<[{ checked: any; indeterminate: any; toggle: any }]>;
   selectCell?: Snippet<[{ row: any; checked: any; toggle: any }]>;
   snippets?: Record<string, any>;
@@ -57,6 +58,7 @@ let {
 }))()),
   stickyHeader = false,
   interactionMode = 'table',
+  children: __childrenProp,
   selectAll: __selectAllProp,
   selectCell: __selectCellProp,
   snippets,
@@ -70,6 +72,7 @@ let {
   onpinchange
 }: Props = $props();
 
+const children = $derived(__childrenProp ?? snippets?.children);
 const selectAll = $derived(__selectAllProp ?? snippets?.selectAll);
 const selectCell = $derived(__selectCellProp ?? snippets?.selectCell);
 
@@ -87,6 +90,14 @@ let columnOrderDefault: any[] = $state([]);
 let columnPinningDefault = $state({
   left: [],
   right: []
+});
+let columnSizingInfo = $state({
+  startOffset: null,
+  startSize: null,
+  deltaOffset: null,
+  deltaPercentage: null,
+  isResizingColumn: false,
+  columnSizingStart: []
 });
 let colReg = $state({});
 let rows: any[] = $state([]);
@@ -130,7 +141,16 @@ const currentState = () => ({
   columnVisibility: columnVisibility != null ? columnVisibility : columnVisibilityDefault,
   columnSizing: columnSizing != null ? columnSizing : columnSizingDefault,
   columnOrder: columnOrder != null ? columnOrder : columnOrderDefault,
-  columnPinning: columnPinning != null ? columnPinning : columnPinningDefault
+  columnPinning: columnPinning != null ? columnPinning : columnPinningDefault,
+  // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+  // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+  // `column.getIsResizing()` / `getResizeHandler()` read
+  // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+  // absent. Seed the default shape (matches table-core's
+  // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+  // every render. Not a two-way model slice (transient gesture state, not consumer
+  // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+  columnSizingInfo: columnSizingInfo
 });
 
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
@@ -209,18 +229,27 @@ const columnDefs = () => {
 const SELECT_COL_ID = '__rdt_select';
 
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-// user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
-// (D-04). The select column carries enableSorting/enableColumnFilter:false and an
-// isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
-// value). 'single' / 'none' inject nothing.
+// user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+// 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+// and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+// accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+// renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+// ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+// not a select-all, so without injecting the column single mode would expose NO
+// selection UI at all.
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-// user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
-// (D-04). The select column carries enableSorting/enableColumnFilter:false and an
-// isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
-// value). 'single' / 'none' inject nothing.
+// user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+// 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+// and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+// accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+// renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+// ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+// not a select-all, so without injecting the column single mode would expose NO
+// selection UI at all.
+const selectionEnabled = () => selectionMode === 'single' || selectionMode === 'multiple';
 const tableColumns = () => {
   const cols = columnDefs();
-  if (selectionMode === 'multiple') {
+  if (selectionEnabled()) {
     const selectCol = {
       id: SELECT_COL_ID,
       enableSorting: false,
@@ -494,6 +523,39 @@ const reconcileProjections = () => {
         } catch (e: any) {}
       }
     }
+  }
+};
+
+// Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
+// the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
+// do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
+// before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
+// before the first r-for render). A microtask + rAF double-defer lands the
+// projection after the hosts are in the DOM on all six targets (the reactive-portal
+// timing the listbox/rete ports rely on). Coalesced so a burst of state changes
+// projects once.
+// Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
+// the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
+// do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
+// before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
+// before the first r-for render). A microtask + rAF double-defer lands the
+// projection after the hosts are in the DOM on all six targets (the reactive-portal
+// timing the listbox/rete ports rely on). Coalesced so a burst of state changes
+// projects once.
+let reconcilePending = false;
+const scheduleReconcile = () => {
+  if (reconcilePending) return;
+  reconcilePending = true;
+  const run = () => {
+    reconcilePending = false;
+    reconcileProjections();
+  };
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      Promise.resolve().then(run);
+    });
+  } else {
+    Promise.resolve().then(run);
   }
 };
 
@@ -788,6 +850,76 @@ const onToggleRow = (row: any, evt: any) => {
 };
 
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+// Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
+// `const` (the canonical $expose contract — `$expose({ name })` references a
+// binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
+// is dropped on ALL SIX targets, only the by-reference key survives → a
+// runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
+// a fresh column-def readout, selection, pagination, and column-management verbs.
+export const sortColumn = (colId: any, desc: any) => {
+  if (table) table.getColumn(colId) && table.getColumn(colId).toggleSorting(desc, false);
+};
+export const clearSorting = () => {
+  if (table) table.resetSorting(true);
+};
+export const getColumnDefs = () => columnDefs();
+// selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+// emits the fresh state + selection-change.
+// selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+// emits the fresh state + selection-change.
+export const toggleAllRows = (value: any) => {
+  if (table) table.toggleAllRowsSelected(value);
+};
+export const clearSelection = () => {
+  if (table) table.resetRowSelection(true);
+};
+export const getSelectedRows = () => table ? table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+// pagination verbs.
+// pagination verbs.
+export const setPage = (idx: any) => {
+  if (table) table.setPageIndex(idx);
+};
+export const setRowsPerPage = (size: any) => {
+  if (table) table.setPageSize(size);
+};
+// column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+// column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+export const toggleColumnVisibility = (colId: any) => {
+  if (table) {
+    const c = table.getColumn(colId);
+    if (c && c.toggleVisibility) c.toggleVisibility();
+  }
+};
+// NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+// auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+// prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+// deconfliction rename (ROZ524 — the rename target is the verb, which is
+// off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+// new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+// any model prop's setter, so they are collision-free.
+// NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+// auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+// prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+// deconfliction rename (ROZ524 — the rename target is the verb, which is
+// off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+// new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+// any model prop's setter, so they are collision-free.
+export const applyColumnOrder = (order: any) => {
+  if (table) table.setColumnOrder(order);
+};
+export const resetColumnSizing = () => {
+  if (table) table.resetColumnSizing(true);
+};
+// pinColumn: the verb that drives column.pin; distinct from the template handler
+// onPinColumn (no shadow — the deferred-items finding #4 collision check).
+// pinColumn: the verb that drives column.pin; distinct from the template handler
+// onPinColumn (no shadow — the deferred-items finding #4 collision check).
+export const pinColumn = (colId: any, side: any) => {
+  if (table) {
+    const c = table.getColumn(colId);
+    if (c && c.pin) c.pin(side);
+  }
+};
 
 setContext('data-table:columns', {
   registerColumn: (id: any, spec: any) => {
@@ -874,6 +1006,14 @@ onMount(() => {
       const next = applyUpdater(updater, currentState().columnPinning);
       writeColumnPinning(next);
     },
+    // Transient resize-gesture state — table-core drives this during a drag (NOT a
+    // two-way model slice). Write a FRESH object to $data so getState() reflects
+    // the live gesture; gate the row-model refresh on the resizing flag so a drag
+    // re-pulls the sized columns. No change event (it is internal gesture state).
+    onColumnSizingInfoChange: (updater: any) => {
+      const next = applyUpdater(updater, columnSizingInfo);
+      columnSizingInfo = next != null ? next : columnSizingInfo;
+    },
     // Resize mode: 'onChange' so the bound columnSizing model updates live during the
     // drag (the behavioral width-delta assertion observes the in-progress width). Column
     // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -896,8 +1036,10 @@ onMount(() => {
   // initial pull
   refreshRowModel();
   // project the per-column #cell / #header templates into the freshly-rendered
-  // framework-owned hosts (deferred a tick so the r-for DOM exists).
-  reconcileProjections();
+  // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+  // hosts exist before we query for them (a synchronous call here finds zero hosts
+  // on first paint).
+  scheduleReconcile();
   return () => {
     // dispose every live cell/header projection on unmount.
     if (cellMounts) {
@@ -928,11 +1070,11 @@ $effect(() => { (() => [sorting, globalFilter, columnFilters, pagination, rowSel
 })(); }); });
 let __rozieWatchInitial_1 = true;
 $effect(() => { (() => rowModelVer)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
-  reconcileProjections();
+  scheduleReconcile();
 })(); }); });
 </script>
 
-<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role="table" data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<template data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} indeterminate={rozieAttr(isSomeRowsSelected())} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}</template>{:else}<template data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>{#if columnHasHeaderTemplate(header.column.id)}<span class="rdt-header-host" data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-header-label" data-rozie-s-d5dcab4c>{rozieDisplay(headerLabel(header.column.id))}</span>{/if}<span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<template data-rozie-s-d5dcab4c>{#if columnHasHeaderTemplate(header.column.id)}<span class="rdt-header-host" data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-header-label" data-rozie-s-d5dcab4c>{rozieDisplay(headerLabel(header.column.id))}</span>{/if}</template>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { $event.stopPropagation(); (undefined as (...a: any[]) => any)($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'left'); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, false); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'right'); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></template>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each row.getVisibleCells() as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role="cell" data-col={rozieAttr(cellCtx.column.id)} style={pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<template data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</template>{:else}<template data-rozie-s-d5dcab4c>{#if columnHasCellTemplate(cellCtx.column.id)}<span class="rdt-cell-host" data-cell-host={rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col={rozieAttr(cellCtx.column.id)} data-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{rozieDisplay(cellCtx.getValue())}</span>{/if}</template>{/if}</td>{/each}</tr>{/each}</tbody></table><div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div></div>
+<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div><div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role="table" data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<template data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} indeterminate={rozieAttr(isSomeRowsSelected())} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</template>{:else}<template data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>{#if columnHasHeaderTemplate(header.column.id)}<span class="rdt-header-host" data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-header-label" data-rozie-s-d5dcab4c>{rozieDisplay(headerLabel(header.column.id))}</span>{/if}<span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<template data-rozie-s-d5dcab4c>{#if columnHasHeaderTemplate(header.column.id)}<span class="rdt-header-host" data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-header-label" data-rozie-s-d5dcab4c>{rozieDisplay(headerLabel(header.column.id))}</span>{/if}</template>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { $event.stopPropagation(); (undefined as (...a: any[]) => any)($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'left'); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, false); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'right'); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></template>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each row.getVisibleCells() as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role="cell" data-col={rozieAttr(cellCtx.column.id)} style={pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<template data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</template>{:else}<template data-rozie-s-d5dcab4c>{#if columnHasCellTemplate(cellCtx.column.id)}<span class="rdt-cell-host" data-cell-host={rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col={rozieAttr(cellCtx.column.id)} data-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c></span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{rozieDisplay(cellCtx.getValue())}</span>{/if}</template>{/if}</td>{/each}</tr>{/each}</tbody></table><div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div></div>
 
 <style>
 :global {

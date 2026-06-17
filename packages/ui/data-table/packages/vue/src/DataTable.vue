@@ -3,6 +3,8 @@
 
 <div class="rozie-data-table-wrap" ref="__rozieRootRef">
 
+<div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot></slot></div>
+
 <div class="rdt-toolbar">
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" :value="globalFilterValue()" @input="onGlobalFilterInput($event)" />
   
@@ -23,8 +25,7 @@
         
         <template v-if="isSelectColumn(header.column.id)">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
-            <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" @change="onToggleAllRows($event)" />
-          </slot>
+            <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" @change="onToggleAllRows($event)" /></slot>
         </template><template v-else>
           
           <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
@@ -111,6 +112,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  default(props: {  }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
 }>();
@@ -129,6 +131,14 @@ const columnOrderDefault = ref<any[]>([]);
 const columnPinningDefault = ref({
   left: [],
   right: []
+});
+const columnSizingInfo = ref({
+  startOffset: null,
+  startSize: null,
+  deltaOffset: null,
+  deltaPercentage: null,
+  isResizingColumn: false,
+  columnSizingStart: []
 });
 const colReg = ref({});
 const rows = ref<any[]>([]);
@@ -172,7 +182,16 @@ const currentState = () => ({
   columnVisibility: columnVisibility.value != null ? columnVisibility.value : columnVisibilityDefault.value,
   columnSizing: columnSizing.value != null ? columnSizing.value : columnSizingDefault.value,
   columnOrder: columnOrder.value != null ? columnOrder.value : columnOrderDefault.value,
-  columnPinning: columnPinning.value != null ? columnPinning.value : columnPinningDefault.value
+  columnPinning: columnPinning.value != null ? columnPinning.value : columnPinningDefault.value,
+  // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+  // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+  // `column.getIsResizing()` / `getResizeHandler()` read
+  // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+  // absent. Seed the default shape (matches table-core's
+  // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+  // every render. Not a two-way model slice (transient gesture state, not consumer
+  // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+  columnSizingInfo: columnSizingInfo.value
 });
 
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
@@ -251,18 +270,27 @@ const columnDefs = () => {
 const SELECT_COL_ID = '__rdt_select';
 
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-// user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
-// (D-04). The select column carries enableSorting/enableColumnFilter:false and an
-// isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
-// value). 'single' / 'none' inject nothing.
+// user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+// 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+// and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+// accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+// renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+// ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+// not a select-all, so without injecting the column single mode would expose NO
+// selection UI at all.
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-// user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
-// (D-04). The select column carries enableSorting/enableColumnFilter:false and an
-// isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
-// value). 'single' / 'none' inject nothing.
+// user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+// 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+// and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+// accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+// renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+// ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+// not a select-all, so without injecting the column single mode would expose NO
+// selection UI at all.
+const selectionEnabled = () => props.selectionMode === 'single' || props.selectionMode === 'multiple';
 const tableColumns = () => {
   const cols = columnDefs();
-  if (props.selectionMode === 'multiple') {
+  if (selectionEnabled()) {
     const selectCol = {
       id: SELECT_COL_ID,
       enableSorting: false,
@@ -536,6 +564,39 @@ const reconcileProjections = () => {
         } catch (e: any) {}
       }
     }
+  }
+};
+
+// Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
+// the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
+// do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
+// before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
+// before the first r-for render). A microtask + rAF double-defer lands the
+// projection after the hosts are in the DOM on all six targets (the reactive-portal
+// timing the listbox/rete ports rely on). Coalesced so a burst of state changes
+// projects once.
+// Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
+// the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
+// do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
+// before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
+// before the first r-for render). A microtask + rAF double-defer lands the
+// projection after the hosts are in the DOM on all six targets (the reactive-portal
+// timing the listbox/rete ports rely on). Coalesced so a burst of state changes
+// projects once.
+let reconcilePending = false;
+const scheduleReconcile = () => {
+  if (reconcilePending) return;
+  reconcilePending = true;
+  const run = () => {
+    reconcilePending = false;
+    reconcileProjections();
+  };
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      Promise.resolve().then(run);
+    });
+  } else {
+    Promise.resolve().then(run);
   }
 };
 
@@ -830,6 +891,76 @@ const onToggleRow = (row: any, evt: any) => {
 };
 
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
+// Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
+// `const` (the canonical $expose contract — `$expose({ name })` references a
+// binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
+// is dropped on ALL SIX targets, only the by-reference key survives → a
+// runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
+// a fresh column-def readout, selection, pagination, and column-management verbs.
+const sortColumn = (colId: any, desc: any) => {
+  if (table) table.getColumn(colId) && table.getColumn(colId).toggleSorting(desc, false);
+};
+const clearSorting = () => {
+  if (table) table.resetSorting(true);
+};
+const getColumnDefs = () => columnDefs();
+// selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+// emits the fresh state + selection-change.
+// selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+// emits the fresh state + selection-change.
+const toggleAllRows = (value: any) => {
+  if (table) table.toggleAllRowsSelected(value);
+};
+const clearSelection = () => {
+  if (table) table.resetRowSelection(true);
+};
+const getSelectedRows = () => table ? table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+// pagination verbs.
+// pagination verbs.
+const setPage = (idx: any) => {
+  if (table) table.setPageIndex(idx);
+};
+const setRowsPerPage = (size: any) => {
+  if (table) table.setPageSize(size);
+};
+// column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+// column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+const toggleColumnVisibility = (colId: any) => {
+  if (table) {
+    const c = table.getColumn(colId);
+    if (c && c.toggleVisibility) c.toggleVisibility();
+  }
+};
+// NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+// auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+// prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+// deconfliction rename (ROZ524 — the rename target is the verb, which is
+// off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+// new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+// any model prop's setter, so they are collision-free.
+// NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+// auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+// prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+// deconfliction rename (ROZ524 — the rename target is the verb, which is
+// off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+// new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+// any model prop's setter, so they are collision-free.
+const applyColumnOrder = (order: any) => {
+  if (table) table.setColumnOrder(order);
+};
+const resetColumnSizing = () => {
+  if (table) table.resetColumnSizing(true);
+};
+// pinColumn: the verb that drives column.pin; distinct from the template handler
+// onPinColumn (no shadow — the deferred-items finding #4 collision check).
+// pinColumn: the verb that drives column.pin; distinct from the template handler
+// onPinColumn (no shadow — the deferred-items finding #4 collision check).
+const pinColumn = (colId: any, side: any) => {
+  if (table) {
+    const c = table.getColumn(colId);
+    if (c && c.pin) c.pin(side);
+  }
+};
 
 provide('data-table:columns', {
   registerColumn: (id: any, spec: any) => {
@@ -917,6 +1048,14 @@ onMounted(() => {
       const next = applyUpdater(updater, currentState().columnPinning);
       writeColumnPinning(next);
     },
+    // Transient resize-gesture state — table-core drives this during a drag (NOT a
+    // two-way model slice). Write a FRESH object to $data so getState() reflects
+    // the live gesture; gate the row-model refresh on the resizing flag so a drag
+    // re-pulls the sized columns. No change event (it is internal gesture state).
+    onColumnSizingInfoChange: (updater: any) => {
+      const next = applyUpdater(updater, columnSizingInfo.value);
+      columnSizingInfo.value = next != null ? next : columnSizingInfo.value;
+    },
     // Resize mode: 'onChange' so the bound columnSizing model updates live during the
     // drag (the behavioral width-delta assertion observes the in-progress width). Column
     // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -939,8 +1078,10 @@ onMounted(() => {
   // initial pull
   refreshRowModel();
   // project the per-column #cell / #header templates into the freshly-rendered
-  // framework-owned hosts (deferred a tick so the r-for DOM exists).
-  reconcileProjections();
+  // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+  // hosts exist before we query for them (a synchronous call here finds zero hosts
+  // on first paint).
+  scheduleReconcile();
   _cleanup_0 = () => {
     // dispose every live cell/header projection on unmount.
     if (cellMounts) {
@@ -970,10 +1111,10 @@ watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.
   if (refreshRowModel) refreshRowModel();
 });
 watch(() => rowModelVer.value, () => {
-  reconcileProjections();
+  scheduleReconcile();
 });
 
-defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, setColumnOrder, resetColumnSizing, pinColumn });
+defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn });
 </script>
 
 <style scoped>

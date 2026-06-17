@@ -27,12 +27,16 @@
 <data>
 {
   rows: [],
+  // pageSize 100 so all 20 rows render on one page (the default pageSize 10 would
+  // cap the visible rows at 10 — not enough rows below the sticky header to prove
+  // the scroll behavior). Bound via r-model:pagination so it takes effect.
+  pagination: { pageIndex: 0, pageSize: 100 },
 }
 </data>
 
 <script>
 // Seed 20 rows so the scroll container actually overflows (the sticky-on-scroll
-// assertion needs real vertical scroll distance).
+// assertion needs real vertical scroll distance, all on one page).
 $onMount(() => {
   const out = []
   for (let i = 1; i <= 20; i++) out.push({ id: i, name: 'Row ' + i, value: i * 10 })
@@ -45,7 +49,7 @@ $onMount(() => {
   <h3>DataTable — sticky header</h3>
 
   <div class="scroll-box" data-testid="scroll-box">
-    <DataTable :data="$data.rows" :stickyHeader="true">
+    <DataTable :data="$data.rows" :stickyHeader="true" r-model:pagination="$data.pagination">
       <Column field="name" header="Name" />
       <Column field="value" header="Value" />
     </DataTable>

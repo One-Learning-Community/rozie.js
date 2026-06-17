@@ -31,8 +31,8 @@ export const handleManifest = {
   setRowsPerPage: 'Set the page size — `setRowsPerPage(size)`. Fires `page-change` with the fresh pagination object.',
   toggleColumnVisibility:
     'Show/hide a column — `toggleColumnVisibility(colId)`. Drives table-core so `visibility-change` fires with the fresh `VisibilityState`.',
-  setColumnOrder:
-    'Set the full column order — `setColumnOrder(order)` where `order` is a fresh `string[]`. Fires `reorder-change`.',
+  applyColumnOrder:
+    'Set the full column order — `applyColumnOrder(order)` where `order` is a fresh `string[]`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`: a `set<ModelProp>` verb collides with React`s auto-generated `columnOrder` setter and an $expose verb is rename-protected — ROZ524.)',
   resetColumnSizing: 'Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`.',
   pinColumn:
     "Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` | `'right'` | `false`. Fires `pin-change` with the fresh `ColumnPinningState`.",

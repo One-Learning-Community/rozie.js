@@ -70,7 +70,7 @@ import '@rozie-ui/data-table-svelte/themes/shadcn.css';    // or material.css, b
 | `selection-change` | Fired when the row selection changes (a row/select-all checkbox toggle or a `toggleAllRows`/`clearSelection` call). Payload is the fresh `RowSelectionState` `{ [rowId]: true }` object. |
 | `visibility-change` | Fired when a column is shown/hidden (the column-toggle menu or a `toggleColumnVisibility` call). Payload is the fresh `VisibilityState` `{ [colId]: boolean }` object. |
 | `resize-change` | Fired live during a column resize drag (`columnResizeMode: "onChange"`). Payload is the fresh `ColumnSizingState` `{ [colId]: number }` object. |
-| `reorder-change` | Fired when the column order changes (a `setColumnOrder` call or a header reorder). Payload is the fresh `ColumnOrderState` `string[]`. |
+| `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload is the fresh `ColumnOrderState` `string[]`. |
 | `pin-change` | Fired when a column is pinned/unpinned (the per-header pin buttons or a `pinColumn` call). Payload is the fresh `ColumnPinningState` `{ left: string[], right: string[] }` object. |
 
 ## Imperative handle
@@ -88,7 +88,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `setPage` | Go to a 0-based page index — `setPage(idx)`. Drives table-core so `page-change` fires with the fresh `{ pageIndex, pageSize }`. |
 | `setRowsPerPage` | Set the page size — `setRowsPerPage(size)`. Fires `page-change` with the fresh pagination object. |
 | `toggleColumnVisibility` | Show/hide a column — `toggleColumnVisibility(colId)`. Drives table-core so `visibility-change` fires with the fresh `VisibilityState`. |
-| `setColumnOrder` | Set the full column order — `setColumnOrder(order)` where `order` is a fresh `string[]`. Fires `reorder-change`. |
+| `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)` where `order` is a fresh `string[]`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`: a `set<ModelProp>` verb collides with React`s auto-generated `columnOrder` setter and an $expose verb is rename-protected — ROZ524.) |
 | `resetColumnSizing` | Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`. |
 | `pinColumn` | Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` | `'right'` | `false`. Fires `pin-change` with the fresh `ColumnPinningState`. |
 
@@ -107,5 +107,6 @@ The `<Column>` child declares per-column `#cell` / `#header` render templates; t
 
 | Slot | Params |
 | --- | --- |
+| (default) |  |
 | selectAll | checked, indeterminate, toggle |
 | selectCell | row, checked, toggle |

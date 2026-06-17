@@ -127,28 +127,34 @@ for (const target of TARGETS) {
     const scoreHeader = mount.locator('[role="columnheader"]').nth(2);
     const scoreButton = scoreHeader.locator('button.rdt-sort-btn').first();
 
-    // none -> ascending
+    // none -> sorted (first direction). `score` is NUMERIC, and table-core's
+    // `sortDescFirst` defaults to `true` for number columns, so the first click is
+    // 'descending' (not 'ascending'). Assert the FIRST direction is a real sort, the
+    // SECOND flips it, and the THIRD clears — direction-order-agnostic so the spec
+    // tracks table-core's per-type default rather than hard-coding asc-first.
     await scoreButton.click();
-    await expect
+    const dir1 = await expect
       .poll(async () => scoreHeader.getAttribute('aria-sort'), {
         timeout: 10_000,
       })
-      .toBe('ascending');
+      .not.toBe('none')
+      .then(() => scoreHeader.getAttribute('aria-sort'));
     await expect
       .poll(async () => (await readout.textContent())?.trim() ?? '', {
         timeout: 10_000,
       })
       .toContain('"score"');
 
-    // ascending -> descending
+    // sorted -> flipped (the other direction)
     await scoreButton.click();
+    const expectedSecond = dir1 === 'descending' ? 'ascending' : 'descending';
     await expect
       .poll(async () => scoreHeader.getAttribute('aria-sort'), {
         timeout: 10_000,
       })
-      .toBe('descending');
+      .toBe(expectedSecond);
 
-    // descending -> none (third click clears)
+    // flipped -> none (third click clears)
     await scoreButton.click();
     await expect
       .poll(async () => scoreHeader.getAttribute('aria-sort'), {
@@ -397,17 +403,23 @@ for (const target of TARGETS) {
       })
       .toBe('sticky');
 
-    // Scroll the container down; the header's top must stay pinned at (≈) the
-    // scroll container's top edge (it does not scroll up out of view).
     const box = mount.locator('[data-testid="scroll-box"]').first();
-    const headerTopBefore = await header.evaluate((el) => el.getBoundingClientRect().top);
+    // Scroll PAST the toolbar (the search/colvis chrome above the table inside the
+    // wrap scrolls away first), then compare two deep scroll positions: once the
+    // sticky <thead> has pinned to the scroll container's top, further scrolling
+    // must NOT move the header top (that is what "sticky" means). Comparing two
+    // post-pin positions avoids the toolbar-height offset confounding the delta.
     await box.evaluate((el) => {
-      el.scrollTop = 80;
+      el.scrollTop = 90;
     });
-    // allow the layout to settle
-    await page.waitForTimeout(100);
-    const headerTopAfter = await header.evaluate((el) => el.getBoundingClientRect().top);
-    // Sticky → the header top barely moves (within a couple px) despite an 80px scroll.
-    expect(Math.abs(headerTopAfter - headerTopBefore)).toBeLessThan(8);
+    await page.waitForTimeout(80);
+    const headerTopAt90 = await header.evaluate((el) => el.getBoundingClientRect().top);
+    await box.evaluate((el) => {
+      el.scrollTop = 150;
+    });
+    await page.waitForTimeout(80);
+    const headerTopAt150 = await header.evaluate((el) => el.getBoundingClientRect().top);
+    // Pinned → the header top is stable across the two deep scroll offsets.
+    expect(Math.abs(headerTopAt150 - headerTopAt90)).toBeLessThan(4);
   });
 }

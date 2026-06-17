@@ -9,6 +9,8 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 
+interface DefaultCtx {}
+
 interface SelectAllCtx {
   $implicit: { checked: any; indeterminate: any; toggle: any };
   checked: any;
@@ -66,6 +68,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
     <div class="rozie-data-table-wrap" #__rozieRoot>
 
+    <div class="rdt-column-defs" style="display:none" aria-hidden="true"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
+
     <div class="rdt-toolbar">
       <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" [value]="globalFilterValue()" (input)="onGlobalFilterInput($event)" />
       
@@ -96,8 +100,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
     } @else {
 
-                <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" [attr.indeterminate]="rozieAttr(isSomeRowsSelected())" (change)="onToggleAllRows($event)" />
-              
+                @if (selectionMode() === 'multiple') {
+    <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" [attr.indeterminate]="rozieAttr(isSomeRowsSelected())" (change)="onToggleAllRows($event)" />
+    }
     }
             </template>
     } @else {
@@ -428,6 +433,14 @@ export class DataTable {
     left: [],
     right: []
   });
+  columnSizingInfo = signal({
+    startOffset: null,
+    startSize: null,
+    deltaOffset: null,
+    deltaPercentage: null,
+    isResizingColumn: false,
+    columnSizingStart: []
+  });
   colReg = signal({});
   rows = signal<any[]>([]);
   headerGroups = signal<any[]>([]);
@@ -441,6 +454,7 @@ export class DataTable {
   resizeChange = output<unknown>({ alias: 'resize-change' });
   reorderChange = output<unknown>({ alias: 'reorder-change' });
   pinChange = output<unknown>({ alias: 'pin-change' });
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -463,7 +477,7 @@ export class DataTable {
       if (this.refreshRowModel) this.refreshRowModel();
     })(); }); });
     effect(() => { const __watchVal = (() => this.rowModelVer())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      this.reconcileProjections();
+      this.scheduleReconcile();
     })(); }); });
   }
 
@@ -534,6 +548,14 @@ export class DataTable {
         const next = this.applyUpdater(updater, this.currentState().columnPinning);
         this.writeColumnPinning(next);
       },
+      // Transient resize-gesture state — table-core drives this during a drag (NOT a
+      // two-way model slice). Write a FRESH object to $data so getState() reflects
+      // the live gesture; gate the row-model refresh on the resizing flag so a drag
+      // re-pulls the sized columns. No change event (it is internal gesture state).
+      onColumnSizingInfoChange: (updater: any) => {
+        const next = this.applyUpdater(updater, this.columnSizingInfo());
+        this.columnSizingInfo.set(next != null ? next : this.columnSizingInfo());
+      },
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -557,10 +579,14 @@ export class DataTable {
     // initial pull
     this.refreshRowModel();
     // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts (deferred a tick so the r-for DOM exists).
+    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+    // hosts exist before we query for them (a synchronous call here finds zero hosts
+    // on first paint).
     // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts (deferred a tick so the r-for DOM exists).
-    this.reconcileProjections();
+    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+    // hosts exist before we query for them (a synchronous call here finds zero hosts
+    // on first paint).
+    this.scheduleReconcile();
     this.__rozieDestroyRef.onDestroy(() => {
       // dispose every live cell/header projection on unmount.
       if (this.cellMounts) {
@@ -587,7 +613,16 @@ export class DataTable {
     columnVisibility: this.columnVisibility() != null ? this.columnVisibility() : this.columnVisibilityDefault(),
     columnSizing: this.columnSizing() != null ? this.columnSizing() : this.columnSizingDefault(),
     columnOrder: this.columnOrder() != null ? this.columnOrder() : this.columnOrderDefault(),
-    columnPinning: this.columnPinning() != null ? this.columnPinning() : this.columnPinningDefault()
+    columnPinning: this.columnPinning() != null ? this.columnPinning() : this.columnPinningDefault(),
+    // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+    // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+    // `column.getIsResizing()` / `getResizeHandler()` read
+    // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+    // absent. Seed the default shape (matches table-core's
+    // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+    // every render. Not a two-way model slice (transient gesture state, not consumer
+    // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+    columnSizingInfo: this.columnSizingInfo()
   });
   isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
   columnDefs = () => {
@@ -646,9 +681,10 @@ export class DataTable {
     return out;
   };
   SELECT_COL_ID = '__rdt_select';
+  selectionEnabled = () => this.selectionMode() === 'single' || this.selectionMode() === 'multiple';
   tableColumns = () => {
     const cols = this.columnDefs();
-    if (this.selectionMode() === 'multiple') {
+    if (this.selectionEnabled()) {
       const selectCol = {
         id: this.SELECT_COL_ID,
         enableSorting: false,
@@ -810,6 +846,22 @@ export class DataTable {
           } catch (e: any) {}
         }
       }
+    }
+  };
+  reconcilePending = false;
+  scheduleReconcile = () => {
+    if (this.reconcilePending) return;
+    this.reconcilePending = true;
+    const run = () => {
+      this.reconcilePending = false;
+      this.reconcileProjections();
+    };
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        Promise.resolve().then(run);
+      });
+    } else {
+      Promise.resolve().then(run);
     }
   };
   onHeaderSort = (colId: any, evt: any) => {
@@ -1000,11 +1052,49 @@ export class DataTable {
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   };
+  sortColumn = (colId: any, desc: any) => {
+    if (this.table) this.table.getColumn(colId) && this.table.getColumn(colId).toggleSorting(desc, false);
+  };
+  clearSorting = () => {
+    if (this.table) this.table.resetSorting(true);
+  };
+  getColumnDefs = () => this.columnDefs();
+  toggleAllRows = (value: any) => {
+    if (this.table) this.table.toggleAllRowsSelected(value);
+  };
+  clearSelection = () => {
+    if (this.table) this.table.resetRowSelection(true);
+  };
+  getSelectedRows = () => this.table ? this.table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+  setPage = (idx: any) => {
+    if (this.table) this.table.setPageIndex(idx);
+  };
+  setRowsPerPage = (size: any) => {
+    if (this.table) this.table.setPageSize(size);
+  };
+  toggleColumnVisibility = (colId: any) => {
+    if (this.table) {
+      const c = this.table.getColumn(colId);
+      if (c && c.toggleVisibility) c.toggleVisibility();
+    }
+  };
+  applyColumnOrder = (order: any) => {
+    if (this.table) this.table.setColumnOrder(order);
+  };
+  resetColumnSizing = () => {
+    if (this.table) this.table.resetColumnSizing(true);
+  };
+  pinColumn = (colId: any, side: any) => {
+    if (this.table) {
+      const c = this.table.getColumn(colId);
+      if (c && c.pin) c.pin(side);
+    }
+  };
 
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is SelectAllCtx | SelectCellCtx {
+  ): _ctx is DefaultCtx | SelectAllCtx | SelectCellCtx {
     return true;
   }
 

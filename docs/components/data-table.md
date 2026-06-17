@@ -149,7 +149,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `selection-change` | Fired when the row selection changes (a row/select-all checkbox toggle or a `toggleAllRows`/`clearSelection` call). Payload: the fresh `RowSelectionState`. |
 | `visibility-change` | Fired when a column is shown/hidden (the column-toggle menu or a `toggleColumnVisibility` call). Payload: the fresh `VisibilityState`. |
 | `resize-change` | Fired live during a column resize drag (`columnResizeMode: 'onChange'`). Payload: the fresh `ColumnSizingState`. |
-| `reorder-change` | Fired when the column order changes (a `setColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
+| `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
 | `pin-change` | Fired when a column is pinned/unpinned (the per-header pin buttons or a `pinColumn` call). Payload: the fresh `ColumnPinningState`. |
 
 ### Imperative handle
@@ -167,7 +167,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `setPage` | Go to a 0-based page index — `setPage(idx)`. Fires `page-change`. |
 | `setRowsPerPage` | Set the page size — `setRowsPerPage(size)`. Fires `page-change`. |
 | `toggleColumnVisibility` | Show/hide a column — `toggleColumnVisibility(colId)`. Fires `visibility-change`. |
-| `setColumnOrder` | Set the full column order — `setColumnOrder(order)`. Fires `reorder-change`. |
+| `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`, to avoid colliding with React's auto-generated `columnOrder` model setter — ROZ524.) |
 | `resetColumnSizing` | Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`. |
 | `pinColumn` | Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` \| `'right'` \| `false`. Fires `pin-change`. |
 

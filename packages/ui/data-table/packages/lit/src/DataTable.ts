@@ -263,6 +263,14 @@ export default class DataTable extends SignalWatcher(LitElement) {
   left: [],
   right: []
 });
+  private _columnSizingInfo = signal({
+  startOffset: null,
+  startSize: null,
+  deltaOffset: null,
+  deltaPercentage: null,
+  isResizingColumn: false,
+  columnSizingStart: []
+});
   private _colReg = signal({});
   private _rows = signal([]);
   private _headerGroups = signal([]);
@@ -290,6 +298,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   }
 }))(this) });
 
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotSelectAll = false;
   @queryAssignedElements({ slot: 'selectAll', flatten: true }) private _slotSelectAllElements!: Element[];
   @property({ attribute: false }) selectAll?: (scope: { checked: unknown; indeterminate: unknown; toggle: unknown }) => unknown;
@@ -303,6 +313,17 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   private _rozieTornDown = false;
 
   private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="selectAll"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -328,6 +349,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotSelectAll = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectAll');
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
     super.connectedCallback();
@@ -366,7 +388,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       if (this.refreshRowModel) this.refreshRowModel();
     })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rowModelVer.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      this.reconcileProjections();
+      this.scheduleReconcile();
     })(); }); }));
 
     this._disconnectCleanups.push(effect(() => { void this._colReg.value; this.__rozieCtxProvider_data_table_columns.setValue(((__rozieCtxHost) => ({
@@ -453,6 +475,14 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         const next = this.applyUpdater(updater, this.currentState().columnPinning);
         this.writeColumnPinning(next);
       },
+      // Transient resize-gesture state — table-core drives this during a drag (NOT a
+      // two-way model slice). Write a FRESH object to $data so getState() reflects
+      // the live gesture; gate the row-model refresh on the resizing flag so a drag
+      // re-pulls the sized columns. No change event (it is internal gesture state).
+      onColumnSizingInfoChange: (updater: any) => {
+        const next = this.applyUpdater(updater, this._columnSizingInfo.value);
+        this._columnSizingInfo.value = next != null ? next : this._columnSizingInfo.value;
+      },
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -476,10 +506,14 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // initial pull
     this.refreshRowModel();
     // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts (deferred a tick so the r-for DOM exists).
+    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+    // hosts exist before we query for them (a synchronous call here finds zero hosts
+    // on first paint).
     // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts (deferred a tick so the r-for DOM exists).
-    this.reconcileProjections();
+    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+    // hosts exist before we query for them (a synchronous call here finds zero hosts
+    // on first paint).
+    this.scheduleReconcile();
   }
 
   disconnectedCallback(): void {
@@ -510,6 +544,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
 <div class="rozie-data-table-wrap" data-rozie-ref="__rozieRoot" data-rozie-s-d5dcab4c>
 
+<div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c><slot></slot></div>
+
 <div class="rdt-toolbar" data-rozie-s-d5dcab4c>
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" .value=${this.globalFilterValue()} @input=${($event: Event) => { this.onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />
   
@@ -530,8 +566,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         
         ${this.isSelectColumn(header.column.id) ? html`<template data-rozie-s-d5dcab4c>
           ${this.selectAll !== undefined ? this.selectAll({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected(), toggle: this.onToggleAllRows}) : html`<slot name="selectAll" data-rozie-params=${(() => { try { return JSON.stringify({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected()}); } catch { return '{}'; } })()} @rozie-select-all-toggle=${($event: CustomEvent) => ((this.onToggleAllRows) as (...args: any[]) => any)($event.detail)}>
-            <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} indeterminate=${rozieAttr(this.isSomeRowsSelected())} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />
-          </slot>`}
+            ${this.selectionMode === 'multiple' ? html`<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} indeterminate=${rozieAttr(this.isSomeRowsSelected())} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />` : nothing}</slot>`}
         </template>` : html`<template data-rozie-s-d5dcab4c>
           
           ${header.column.getCanSort && header.column.getCanSort() ? html`<button class="rdt-sort-btn" type="button" @click=${($event: Event) => { this.onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>
@@ -595,7 +630,16 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   columnVisibility: this.columnVisibility != null ? this.columnVisibility : this._columnVisibilityDefault.value,
   columnSizing: this.columnSizing != null ? this.columnSizing : this._columnSizingDefault.value,
   columnOrder: this.columnOrder != null ? this.columnOrder : this._columnOrderDefault.value,
-  columnPinning: this.columnPinning != null ? this.columnPinning : this._columnPinningDefault.value
+  columnPinning: this.columnPinning != null ? this.columnPinning : this._columnPinningDefault.value,
+  // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+  // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+  // `column.getIsResizing()` / `getResizeHandler()` read
+  // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+  // absent. Seed the default shape (matches table-core's
+  // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+  // every render. Not a two-way model slice (transient gesture state, not consumer
+  // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+  columnSizingInfo: this._columnSizingInfo.value
 });
 
   isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
@@ -658,9 +702,11 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   SELECT_COL_ID = '__rdt_select';
 
+  selectionEnabled = () => this.selectionMode === 'single' || this.selectionMode === 'multiple';
+
   tableColumns = () => {
   const cols = this.columnDefs();
-  if (this.selectionMode === 'multiple') {
+  if (this.selectionEnabled()) {
     const selectCol = {
       id: this.SELECT_COL_ID,
       enableSorting: false,
@@ -873,6 +919,24 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         } catch (e: any) {}
       }
     }
+  }
+};
+
+  reconcilePending = false;
+
+  scheduleReconcile = () => {
+  if (this.reconcilePending) return;
+  this.reconcilePending = true;
+  const run = () => {
+    this.reconcilePending = false;
+    this.reconcileProjections();
+  };
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      Promise.resolve().then(run);
+    });
+  } else {
+    Promise.resolve().then(run);
   }
 };
 
@@ -1098,6 +1162,56 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   onToggleRow = (row: any, evt: any) => {
   if (!row || !row.toggleSelected) return;
   row.toggleSelected(!!(evt && evt.target && evt.target.checked));
+};
+
+  sortColumn = (colId: any, desc: any) => {
+  if (this.table) this.table.getColumn(colId) && this.table.getColumn(colId).toggleSorting(desc, false);
+};
+
+  clearSorting = () => {
+  if (this.table) this.table.resetSorting(true);
+};
+
+  getColumnDefs = () => this.columnDefs();
+
+  toggleAllRows = (value: any) => {
+  if (this.table) this.table.toggleAllRowsSelected(value);
+};
+
+  clearSelection = () => {
+  if (this.table) this.table.resetRowSelection(true);
+};
+
+  getSelectedRows = () => this.table ? this.table.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+
+  setPage = (idx: any) => {
+  if (this.table) this.table.setPageIndex(idx);
+};
+
+  setRowsPerPage = (size: any) => {
+  if (this.table) this.table.setPageSize(size);
+};
+
+  toggleColumnVisibility = (colId: any) => {
+  if (this.table) {
+    const c = this.table.getColumn(colId);
+    if (c && c.toggleVisibility) c.toggleVisibility();
+  }
+};
+
+  applyColumnOrder = (order: any) => {
+  if (this.table) this.table.setColumnOrder(order);
+};
+
+  resetColumnSizing = () => {
+  if (this.table) this.table.resetColumnSizing(true);
+};
+
+  pinColumn = (colId: any, side: any) => {
+  if (this.table) {
+    const c = this.table.getColumn(colId);
+    if (c && c.pin) c.pin(side);
+  }
 };
 
   get sorting(): any[] { return this._sortingControllable.read(); }

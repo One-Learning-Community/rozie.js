@@ -56,6 +56,7 @@ interface DataTableProps {
   onResizeChange?: (...args: any[]) => void;
   onReorderChange?: (...args: any[]) => void;
   onPinChange?: (...args: any[]) => void;
+  children?: ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -71,7 +72,7 @@ export interface DataTableHandle {
   setPage: (...args: any[]) => any;
   setRowsPerPage: (...args: any[]) => any;
   toggleColumnVisibility: (...args: any[]) => any;
-  setColumnOrder: (...args: any[]) => any;
+  applyColumnOrder: (...args: any[]) => any;
   resetColumnSizing: (...args: any[]) => any;
   pinColumn: (...args: any[]) => any;
 }
@@ -160,10 +161,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     left: [],
     right: []
   });
+  const [columnSizingInfo, setColumnSizingInfo] = useState({
+    startOffset: null,
+    startSize: null,
+    deltaOffset: null,
+    deltaPercentage: null,
+    isResizingColumn: false,
+    columnSizingStart: []
+  });
   const [colReg, setColReg] = useState({});
   const [rows, setRows] = useState<any[]>([]);
   const [headerGroups, setHeaderGroups] = useState<any[]>([]);
   const [rowModelVer, setRowModelVer] = useState(0);
+  const _columnSizingInfoRef = useRef(columnSizingInfo);
+  _columnSizingInfoRef.current = columnSizingInfo;
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
@@ -185,8 +196,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     columnVisibility: columnVisibility != null ? columnVisibility : columnVisibilityDefault,
     columnSizing: columnSizing != null ? columnSizing : columnSizingDefault,
     columnOrder: columnOrder != null ? columnOrder : columnOrderDefault,
-    columnPinning: columnPinning != null ? columnPinning : columnPinningDefault
-  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnVisibility, columnVisibilityDefault, globalFilter, globalFilterDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
+    columnPinning: columnPinning != null ? columnPinning : columnPinningDefault,
+    // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+    // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+    // `column.getIsResizing()` / `getResizeHandler()` read
+    // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+    // absent. Seed the default shape (matches table-core's
+    // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+    // every render. Not a two-way model slice (transient gesture state, not consumer
+    // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+    columnSizingInfo: columnSizingInfo
+  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, globalFilter, globalFilterDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
   }
@@ -250,13 +270,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const SELECT_COL_ID = '__rdt_select';
 
   // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
-  // user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
-  // (D-04). The select column carries enableSorting/enableColumnFilter:false and an
-  // isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
-  // value). 'single' / 'none' inject nothing.
+  // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+  // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+  // and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+  // accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+  // renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+  // ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+  // not a select-all, so without injecting the column single mode would expose NO
+  // selection UI at all.
+  function selectionEnabled() {
+    return props.selectionMode === 'single' || props.selectionMode === 'multiple';
+  }
   const tableColumns = useCallback(() => {
     const cols = columnDefs();
-    if (props.selectionMode === 'multiple') {
+    if (selectionEnabled()) {
       const selectCol = {
         id: SELECT_COL_ID,
         enableSorting: false,
@@ -273,7 +300,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       return [selectCol].concat(cols);
     }
     return cols;
-  }, [columnDefs, props.selectionMode]);
+  }, [columnDefs, selectionEnabled]);
   const { onSortChange: _rozieProp_onSortChange } = props;
     const writeSorting = useCallback((next: any) => {
     if (programmatic) return;
@@ -374,7 +401,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     writeColumnFilters(next);
   }
   cellMounts.current = new Map();
-  const reconcileProjections = useCallback(() => {
+  function reconcileProjections() {
     if (!__rozieRoot.current || !cellMounts.current) return;
     const seen = new Set();
     const defs = columnDefs();
@@ -425,7 +452,31 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         }
       }
     }
-  }, [columnDefs, rows]);
+  }
+  // Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
+  // the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
+  // do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
+  // before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
+  // before the first r-for render). A microtask + rAF double-defer lands the
+  // projection after the hosts are in the DOM on all six targets (the reactive-portal
+  // timing the listbox/rete ports rely on). Coalesced so a burst of state changes
+  // projects once.
+  let reconcilePending = false;
+  const scheduleReconcile = useCallback(() => {
+    if (reconcilePending) return;
+    reconcilePending = true;
+    const run = () => {
+      reconcilePending = false;
+      reconcileProjections();
+    };
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        Promise.resolve().then(run);
+      });
+    } else {
+      Promise.resolve().then(run);
+    }
+  }, [reconcileProjections]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -626,6 +677,48 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
+  function sortColumn(colId: any, desc: any) {
+    if (table.current) table.current.getColumn(colId) && table.current.getColumn(colId).toggleSorting(desc, false);
+  }
+  function clearSorting() {
+    if (table.current) table.current.resetSorting(true);
+  }
+  function getColumnDefs() {
+    return columnDefs();
+  }
+  function toggleAllRows(value: any) {
+    if (table.current) table.current.toggleAllRowsSelected(value);
+  }
+  function clearSelection() {
+    if (table.current) table.current.resetRowSelection(true);
+  }
+  function getSelectedRows() {
+    return table.current ? table.current.getSelectedRowModel().rows.map((r: any) => r.original) : [];
+  }
+  function setPage(idx: any) {
+    if (table.current) table.current.setPageIndex(idx);
+  }
+  function setRowsPerPage(size: any) {
+    if (table.current) table.current.setPageSize(size);
+  }
+  function toggleColumnVisibility(colId: any) {
+    if (table.current) {
+      const c = table.current.getColumn(colId);
+      if (c && c.toggleVisibility) c.toggleVisibility();
+    }
+  }
+  function applyColumnOrder(order: any) {
+    if (table.current) table.current.setColumnOrder(order);
+  }
+  function resetColumnSizing() {
+    if (table.current) table.current.resetColumnSizing(true);
+  }
+  function pinColumn(colId: any, side: any) {
+    if (table.current) {
+      const c = table.current.getColumn(colId);
+      if (c && c.pin) c.pin(side);
+    }
+  }
 
   useEffect(() => {
     // Build the table instance HERE so the closures below capture the live `table`.
@@ -692,6 +785,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         const next = applyUpdater(updater, currentState().columnPinning);
         writeColumnPinning(next);
       },
+      // Transient resize-gesture state — table-core drives this during a drag (NOT a
+      // two-way model slice). Write a FRESH object to $data so getState() reflects
+      // the live gesture; gate the row-model refresh on the resizing flag so a drag
+      // re-pulls the sized columns. No change event (it is internal gesture state).
+      onColumnSizingInfoChange: (updater: any) => {
+        const next = applyUpdater(updater, _columnSizingInfoRef.current);
+        setColumnSizingInfo(prev => next != null ? next : prev);
+      },
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -714,8 +815,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // initial pull
     refreshRowModel.current();
     // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts (deferred a tick so the r-for DOM exists).
-    reconcileProjections();
+    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
+    // hosts exist before we query for them (a synchronous call here finds zero hosts
+    // on first paint).
+    scheduleReconcile();
     return () => {
       // dispose every live cell/header projection on unmount.
       if (cellMounts.current) {
@@ -745,10 +848,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, globalFilter, pagination, props.data, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    reconcileProjections();
+    scheduleReconcile();
   }, [rowModelVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useImperativeHandle(ref, () => ({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, setColumnOrder, resetColumnSizing, pinColumn }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useImperativeHandle(ref, () => ({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <__ctx_data_table_columns.Provider value={{
@@ -774,6 +877,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
 
     <div className={"rozie-data-table-wrap"} ref={__rozieRoot} data-rozie-s-d5dcab4c="">
 
+    <div className={"rdt-column-defs"} style={{ display: "none" }} aria-hidden="true" data-rozie-s-d5dcab4c="">{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</div>
+
     <div className={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
       <input className={"rdt-global-filter"} type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} onInput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
       
@@ -793,7 +898,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             
             {(isSelectColumn(header.column.id)) ? <template data-rozie-s-d5dcab4c="">
-              {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} indeterminate={rozieAttr(isSomeRowsSelected())} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
+              {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : (props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} indeterminate={rozieAttr(isSomeRowsSelected())} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
             </template> : <template data-rozie-s-d5dcab4c="">
               
               {(header.column.getCanSort && header.column.getCanSort()) ? <button type="button" className={"rdt-sort-btn"} onClick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c="">

@@ -44,6 +44,7 @@ export interface DataTableProps {
   onResizeChange?: (...args: unknown[]) => void;
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
+  children?: ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
@@ -59,7 +60,7 @@ export interface DataTableHandle {
   setPage: (...args: any[]) => any;
   setRowsPerPage: (...args: any[]) => any;
   toggleColumnVisibility: (...args: any[]) => any;
-  setColumnOrder: (...args: any[]) => any;
+  applyColumnOrder: (...args: any[]) => any;
   resetColumnSizing: (...args: any[]) => any;
   pinColumn: (...args: any[]) => any;
 }

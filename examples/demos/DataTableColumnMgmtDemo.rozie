@@ -55,7 +55,7 @@
 let api = null
 
 const hideCity = () => { if (api && api.toggleColumnVisibility) api.toggleColumnVisibility('city') }
-const reorderCols = () => { if (api && api.setColumnOrder) api.setColumnOrder(['score', 'name', 'city']) }
+const reorderCols = () => { if (api && api.applyColumnOrder) api.applyColumnOrder(['score', 'name', 'city']) }
 const pinName = () => { if (api && api.pinColumn) api.pinColumn('name', 'left') }
 const resetSizing = () => { if (api && api.resetColumnSizing) api.resetColumnSizing() }
 
