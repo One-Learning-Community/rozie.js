@@ -202,7 +202,6 @@ let refreshRowModel = null
 $onMount(() => {
   // Build the table instance HERE so the closures below capture the live `table`.
   table = createTable({
-    _features: {},
     data: $props.data,
     columns: resolvedColumnDefs(),
     state: currentState(),
