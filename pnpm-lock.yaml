@@ -2998,6 +2998,88 @@ importers:
         specifier: ^1.2.0
         version: 1.5.0
 
+  packages/ui/slider:
+    devDependencies:
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../core
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+
+  packages/ui/slider/packages/angular:
+    dependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+
+  packages/ui/slider/packages/lit:
+    dependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@preact/signals-core':
+        specifier: ^1.3.0
+        version: 1.14.2
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../../../runtime/lit
+      lit:
+        specifier: ^3.2
+        version: 3.3.2
+
+  packages/ui/slider/packages/react:
+    dependencies:
+      '@rozie/runtime-react':
+        specifier: workspace:*
+        version: link:../../../../runtime/react
+      react:
+        specifier: ^18.2 || ^19
+        version: 19.2.6
+      react-dom:
+        specifier: ^18.2 || ^19
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/react':
+        specifier: ^18
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18
+        version: 18.3.7(@types/react@18.3.28)
+
+  packages/ui/slider/packages/solid:
+    dependencies:
+      '@rozie/runtime-solid':
+        specifier: workspace:*
+        version: link:../../../../runtime/solid
+      solid-js:
+        specifier: ^1.8
+        version: 1.9.12
+
+  packages/ui/slider/packages/svelte:
+    dependencies:
+      '@rozie/runtime-svelte':
+        specifier: workspace:*
+        version: link:../../../../runtime/svelte
+      svelte:
+        specifier: ^5
+        version: 5.55.5(@typescript-eslint/types@8.59.2)
+
+  packages/ui/slider/packages/vue:
+    dependencies:
+      '@rozie/runtime-vue':
+        specifier: workspace:*
+        version: link:../../../../runtime/vue
+      vue:
+        specifier: ^3.4
+        version: 3.5.33(typescript@5.9.3)
+
   packages/ui/sortable-list:
     devDependencies:
       '@rozie/core':
