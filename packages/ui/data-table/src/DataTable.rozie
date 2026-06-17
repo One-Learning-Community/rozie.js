@@ -99,6 +99,35 @@
   // row body does NOT select.
   rowSelection: { type: Object, default: () => ({}), model: true },
 
+  // ── Column-management slices (feature wave b, req-8/9/10/11) ──────────────────
+  // columnVisibility (VisibilityState = { [colId]: boolean }) — req-8. model:true →
+  // two-way. Hidden columns drop AUTOMATICALLY from header + body (the body iterates
+  // row.getVisibleCells() and the header groups expose only visible leaf columns).
+  // onColumnVisibilityChange funnels a FRESH object → visibility-change (regardless of
+  // binding). Uncontrolled fallback $data.columnVisibilityDefault.
+  columnVisibility: { type: Object, default: () => ({}), model: true },
+
+  // columnSizing (ColumnSizingState = { [colId]: number }) — req-9. model:true →
+  // two-way. A pointer-drag resize handle on resizable headers (table-core's
+  // header.getResizeHandler() under columnResizeMode:'onChange') writes a FRESH sizing
+  // object; the <th> applies header.getSize(). onColumnSizingChange → resize-change
+  // regardless of binding. Behavioral assertion = width delta. Fallback
+  // $data.columnSizingDefault.
+  columnSizing: { type: Object, default: () => ({}), model: true },
+
+  // columnOrder (ColumnOrderState = string[]) — req-10. model:true → two-way. A header
+  // drag writes a FRESH order array (immutable — never an in-place splice → silent on
+  // React/Solid/Angular/Lit). onColumnOrderChange → reorder-change regardless of
+  // binding. Fallback $data.columnOrderDefault.
+  columnOrder: { type: Array, default: () => [], model: true },
+
+  // columnPinning (ColumnPinningState = { left: string[], right: string[] }) — req-11.
+  // model:true → two-way. A per-header pin control writes columnPinning; pinned columns
+  // get position:sticky + computed left/right offsets (column.getStart('left') /
+  // getAfter('right')) so they stay during horizontal scroll. onColumnPinningChange →
+  // pin-change regardless of binding. Fallback $data.columnPinningDefault.
+  columnPinning: { type: Object, default: () => ({ left: [], right: [] }), model: true },
+
   // Pure-CSS sticky header gate (req-12). When true the <thead> sticks to the top of
   // the scroll container.
   stickyHeader: { type: Boolean, default: false },
@@ -124,6 +153,14 @@
   columnFiltersDefault: [],
   paginationDefault: { pageIndex: 0, pageSize: 10 },
   rowSelectionDefault: {},
+
+  // Uncontrolled fallbacks for the column-management slices (used when the consumer
+  // did NOT bind the matching r-model). Each is whole-value-replace on write (never
+  // in-place mutation → silent on React/Solid/Angular/Lit).
+  columnVisibilityDefault: {},
+  columnSizingDefault: {},
+  columnOrderDefault: [],
+  columnPinningDefault: { left: [], right: [] },
 
   // The id-keyed <Column> registry. WHOLE-OBJECT-REPLACE on every mutation (never
   // in-place $data.colReg[id] = …). T-48-PP: a column id is consumer-controlled, so
@@ -173,6 +210,10 @@ const currentState = () => ({
   columnFilters: $props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault,
   pagination: $props.pagination != null ? $props.pagination : $data.paginationDefault,
   rowSelection: $props.rowSelection != null ? $props.rowSelection : $data.rowSelectionDefault,
+  columnVisibility: $props.columnVisibility != null ? $props.columnVisibility : $data.columnVisibilityDefault,
+  columnSizing: $props.columnSizing != null ? $props.columnSizing : $data.columnSizingDefault,
+  columnOrder: $props.columnOrder != null ? $props.columnOrder : $data.columnOrderDefault,
+  columnPinning: $props.columnPinning != null ? $props.columnPinning : $data.columnPinningDefault,
 })
 
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
@@ -334,6 +375,55 @@ const writeRowSelection = (next) => {
   programmatic--
 }
 
+// ── columnVisibility slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──
+// table-core hands VisibilityState = { [colId]: boolean }; write a FRESH object (never
+// in-place key-set) + fire `visibility-change` REGARDLESS of binding.
+const writeColumnVisibility = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnVisibilityDefault = next
+  $model.columnVisibility = next
+  $emit('visibility-change', next)
+  programmatic--
+}
+
+// ── columnSizing slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────
+// table-core hands ColumnSizingState = { [colId]: number }; the pointer-drag resize
+// handle funnels a FRESH sizing object + fires `resize-change` REGARDLESS of binding.
+const writeColumnSizing = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnSizingDefault = next
+  $model.columnSizing = next
+  $emit('resize-change', next)
+  programmatic--
+}
+
+// ── columnOrder slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ────────
+// table-core hands ColumnOrderState = string[]; write a FRESH order array (never an
+// in-place splice) + fire `reorder-change` REGARDLESS of binding.
+const writeColumnOrder = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnOrderDefault = next
+  $model.columnOrder = next
+  $emit('reorder-change', next)
+  programmatic--
+}
+
+// ── columnPinning slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+// table-core hands ColumnPinningState = { left: string[], right: string[] }; write a
+// FRESH object (never in-place push into left/right) + fire `pin-change` REGARDLESS of
+// binding.
+const writeColumnPinning = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnPinningDefault = next
+  $model.columnPinning = next
+  $emit('pin-change', next)
+  programmatic--
+}
+
 // Read the live columnFilters value for a given column id (string-safe; drives the
 // per-column filter input's bound value). Reads currentState() (NOT a $data re-read
 // of a just-written key → React stale-read safe).
@@ -411,6 +501,30 @@ $onMount(() => {
       const next = applyUpdater(updater, currentState().rowSelection)
       writeRowSelection(next)
     },
+    // Column-management callbacks (req-8/9/10/11) — each applies the table-core Updater
+    // against the CURRENT slice value, then funnels a FRESH value through its
+    // echo-guarded writer (same A4 STATIC-key discipline as the slices above).
+    onColumnVisibilityChange: (updater) => {
+      const next = applyUpdater(updater, currentState().columnVisibility)
+      writeColumnVisibility(next)
+    },
+    onColumnSizingChange: (updater) => {
+      const next = applyUpdater(updater, currentState().columnSizing)
+      writeColumnSizing(next)
+    },
+    onColumnOrderChange: (updater) => {
+      const next = applyUpdater(updater, currentState().columnOrder)
+      writeColumnOrder(next)
+    },
+    onColumnPinningChange: (updater) => {
+      const next = applyUpdater(updater, currentState().columnPinning)
+      writeColumnPinning(next)
+    },
+    // Resize mode: 'onChange' so the bound columnSizing model updates live during the
+    // drag (the behavioral width-delta assertion observes the in-progress width). Column
+    // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
+    columnResizeMode: 'onChange',
+    enableColumnResizing: true,
     renderFallbackValue: null,
   })
 
@@ -506,6 +620,10 @@ $watch(
     $props.columnFilters,
     $props.pagination,
     $props.rowSelection,
+    $props.columnVisibility,
+    $props.columnSizing,
+    $props.columnOrder,
+    $props.columnPinning,
     $props.selectionMode,
     ($props.data || []).length,
     $data.colReg,
@@ -588,6 +706,111 @@ const columnIsFilterable = (colId) => {
 const headerLabel = (colId) => {
   const d = defFor(colId)
   return d ? d.header : colId
+}
+
+// ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
+// Live header width (px) for a column — drives the <th> :style width binding. Reads the
+// table-core column size (post-mount) with a fallback to undefined (auto width).
+const headerWidth = (colId) => {
+  if (!table) return null
+  const col = table.getColumn(colId)
+  if (!col) return null
+  const w = col.getSize()
+  return w != null && w > 0 ? w + 'px' : null
+}
+
+// Pointer-drag resize handler for a resizable header — table-core's getResizeHandler()
+// returns a function bound to a pointerdown/touchstart event that drives the column
+// size through onColumnSizingChange (our writeColumnSizing funnel) under
+// columnResizeMode:'onChange'. Pure delegation; no scratch gesture state held in a
+// top-level const (the React fragile-binding rule — table-core owns the gesture state).
+const onResizeStart = (colId, evt) => {
+  if (!table) return
+  const header = findHeader(colId)
+  if (!header || !header.getResizeHandler) return
+  const handler = header.getResizeHandler()
+  if (handler) handler(evt)
+}
+// Find the live header object for a column id across the rendered header groups.
+const findHeader = (colId) => {
+  const groups = $data.headerGroups || []
+  for (const hg of groups) {
+    const hs = hg.headers || []
+    for (const h of hs) if (h && h.column && h.column.id === colId) return h
+  }
+  return null
+}
+const columnIsResizing = (colId) => {
+  if (!table) return false
+  const header = findHeader(colId)
+  return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing())
+}
+
+// Visibility toggle (req-8) — drive table-core's column.toggleVisibility so the
+// onColumnVisibilityChange funnel emits the fresh state.
+const columnIsVisible = (colId) => {
+  if (!table) return true
+  const col = table.getColumn(colId)
+  return !!(col && (col.getIsVisible ? col.getIsVisible() : true))
+}
+const onToggleVisibility = (colId) => {
+  if (!table) return
+  const col = table.getColumn(colId)
+  if (col && col.toggleVisibility) col.toggleVisibility()
+}
+// The full set of leaf columns (for the visibility-toggle menu) — id + header label +
+// current visibility. Excludes the auto-injected select column (always present).
+const allLeafColumns = () => {
+  if (!table) return []
+  const cols = table.getAllLeafColumns ? table.getAllLeafColumns() : []
+  const out = []
+  for (const c of cols) {
+    if (!c || c.id === SELECT_COL_ID) continue
+    out.push({ id: c.id, label: headerLabel(c.id), visible: !!(c.getIsVisible && c.getIsVisible()) })
+  }
+  return out
+}
+
+// Pinning (req-11) — drive table-core's column.pin('left'|'right'|false) so the
+// onColumnPinningChange funnel emits a fresh state. Sticky offsets read the live column
+// start/after positions (table-core computes them from the pinned column sizes).
+const columnPinSide = (colId) => {
+  if (!table) return false
+  const col = table.getColumn(colId)
+  if (!col || !col.getIsPinned) return false
+  return col.getIsPinned()
+}
+const onPinColumn = (colId, side) => {
+  if (!table) return
+  const col = table.getColumn(colId)
+  if (col && col.pin) col.pin(side)
+}
+// Sticky inline style for a pinned header/cell — position:sticky + the computed left or
+// right offset. Returns '' (no sticky) for unpinned columns. Returned as a STRING (the
+// :style binding is value-driven — never an eval'd attr).
+const pinStyle = (colId) => {
+  if (!table) return ''
+  const col = table.getColumn(colId)
+  if (!col || !col.getIsPinned) return ''
+  const side = col.getIsPinned()
+  if (side === 'left') {
+    const left = col.getStart ? col.getStart('left') : 0
+    return 'position:sticky;left:' + left + 'px;z-index:1;'
+  }
+  if (side === 'right') {
+    const right = col.getAfter ? col.getAfter('right') : 0
+    return 'position:sticky;right:' + right + 'px;z-index:1;'
+  }
+  return ''
+}
+// Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
+// uniform on all 6, no bound-object trap.
+const thStyle = (colId) => {
+  let s = ''
+  const w = headerWidth(colId)
+  if (w) s += 'width:' + w + ';'
+  s += pinStyle(colId)
+  return s
 }
 
 // ── Filter chrome handlers ─────────────────────────────────────────────────────────
@@ -689,6 +912,15 @@ $expose({
   // pagination verbs.
   setPage: (idx) => { if (table) table.setPageIndex(idx) },
   setRowsPerPage: (size) => { if (table) table.setPageSize(size) },
+  // column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+  toggleColumnVisibility: (colId) => {
+    if (table) { const c = table.getColumn(colId); if (c && c.toggleVisibility) c.toggleVisibility() }
+  },
+  setColumnOrder: (order) => { if (table) table.setColumnOrder(order) },
+  resetColumnSizing: () => { if (table) table.resetColumnSizing(true) },
+  pinColumn: (colId, side) => {
+    if (table) { const c = table.getColumn(colId); if (c && c.pin) c.pin(side) }
+  },
 })
 </script>
 
@@ -713,6 +945,27 @@ $expose({
     :value="globalFilterValue()"
     @input="onGlobalFilterInput($event)"
   />
+  <!-- Column-visibility toggle menu (req-8) — a native <details>/<summary> disclosure
+       (keyboard-reachable, no JS open-state) with one checkbox per leaf column. Toggling
+       a checkbox drives table-core's column.toggleVisibility → visibility-change. -->
+  <details class="rdt-colvis" r-if="allLeafColumns().length">
+    <summary class="rdt-colvis-summary">Columns</summary>
+    <div class="rdt-colvis-menu" role="group" aria-label="Toggle columns">
+      <label
+        class="rdt-colvis-item"
+        r-for="lc in allLeafColumns()"
+        :key="lc.id"
+      >
+        <input
+          type="checkbox"
+          class="rdt-colvis-checkbox"
+          :checked="lc.visible"
+          @change="onToggleVisibility(lc.id)"
+        />
+        <span class="rdt-colvis-label">{{ lc.label }}</span>
+      </label>
+    </div>
+  </details>
 </div>
 
 <table
@@ -733,8 +986,9 @@ $expose({
         r-for="header in hg.headers"
         :key="header.id"
         :data-col="header.column.id"
-        :class="{ 'rdt-select-th': isSelectColumn(header.column.id) }"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
+        :style="thStyle(header.column.id)"
       >
         <!-- auto-injected select-all header (D-04) — slot-overridable via #selectAll;
              default = a select-all checkbox (indeterminate when partial, D-06). -->
@@ -794,6 +1048,44 @@ $expose({
             @input="onColumnFilterInput(header.column.id, $event)"
             @click.stop
           />
+          <!-- Pin control (req-11) — three native buttons (left / unpin / right), each
+               keyboard-reachable with an accessible name. Drives column.pin(side|false)
+               → pin-change. The active side is reflected with aria-pressed. -->
+          <span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-left"
+              :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'"
+              :aria-pressed="columnPinSide(header.column.id) === 'left'"
+              @click.stop="onPinColumn(header.column.id, 'left')"
+            >⇤</button>
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-none"
+              :aria-label="'Unpin ' + headerLabel(header.column.id)"
+              :aria-pressed="!columnPinSide(header.column.id)"
+              @click.stop="onPinColumn(header.column.id, false)"
+            >⇔</button>
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-right"
+              :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'"
+              :aria-pressed="columnPinSide(header.column.id) === 'right'"
+              @click.stop="onPinColumn(header.column.id, 'right')"
+            >⇥</button>
+          </span>
+          <!-- Resize handle (req-9) — a keyboard-reachable button positioned at the
+               column's trailing edge; pointerdown/touchstart hand off to table-core's
+               resize handler (columnResizeMode:'onChange' → live width delta →
+               resize-change). The drag gesture state is owned by table-core, NOT a
+               top-level scratch const (the React fragile-binding rule). -->
+          <button
+            type="button"
+            class="rdt-resize-handle"
+            :aria-label="'Resize ' + headerLabel(header.column.id)"
+            @pointerdown.stop="onResizeStart(header.column.id, $event)"
+            @touchstart.stop="onResizeStart(header.column.id, $event)"
+          ><span class="rdt-resize-grip" aria-hidden="true"></span></button>
         </template>
       </th>
     </tr>
@@ -813,6 +1105,7 @@ $expose({
         :key="cellCtx.id"
         :data-col="cellCtx.column.id"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
+        :style="pinStyle(cellCtx.column.id)"
       >
         <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
              #selectCell; checkbox-only toggle (row body does NOT select). -->
@@ -975,6 +1268,90 @@ $expose({
   border-radius: var(--rdt-page-size-radius, 4px);
   background: var(--rdt-page-size-bg, transparent);
   color: inherit;
+}
+/* Column-management chrome (req-8/9/10/11) — token-driven. */
+/* The <th> is the positioning context for the trailing resize handle. */
+.rozie-data-table .rdt-th {
+  position: relative;
+}
+/* Resize handle (req-9) — a thin grab strip at the column's trailing edge. */
+.rozie-data-table .rdt-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: var(--rdt-resize-handle-width, 6px);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.rozie-data-table .rdt-resize-grip {
+  display: block;
+  width: var(--rdt-resize-grip-width, 2px);
+  height: 100%;
+  margin: 0 auto;
+  background: var(--rdt-resize-grip-color, rgba(0, 0, 0, 0.12));
+}
+.rozie-data-table .rdt-resize-handle:hover .rdt-resize-grip,
+.rozie-data-table .rdt-th-resizing .rdt-resize-grip {
+  background: var(--rdt-resize-grip-active, rgba(0, 0, 0, 0.4));
+}
+/* Pin controls (req-11) — compact button group. */
+.rozie-data-table .rdt-pin-controls {
+  display: inline-flex;
+  gap: var(--rdt-pin-gap, 0.1em);
+  margin-left: var(--rdt-pin-margin, 0.35em);
+}
+.rozie-data-table .rdt-pin-btn {
+  font: inherit;
+  font-size: var(--rdt-pin-btn-size, 0.8em);
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--rdt-pin-btn-padding, 0.1em 0.25em);
+  border: var(--rdt-pin-btn-border, 1px solid rgba(0, 0, 0, 0.15));
+  border-radius: var(--rdt-pin-btn-radius, 3px);
+  background: var(--rdt-pin-btn-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table .rdt-pin-btn[aria-pressed='true'] {
+  background: var(--rdt-pin-btn-active-bg, rgba(0, 0, 0, 0.1));
+  font-weight: 700;
+}
+/* Column-visibility toggle menu (req-8) — native <details> disclosure. */
+.rozie-data-table-wrap .rdt-colvis {
+  position: relative;
+}
+.rozie-data-table-wrap .rdt-colvis-summary {
+  cursor: pointer;
+  font: inherit;
+  padding: var(--rdt-colvis-summary-padding, 0.25rem 0.6rem);
+  border: var(--rdt-colvis-summary-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-colvis-summary-radius, 4px);
+  list-style: none;
+  user-select: none;
+}
+.rozie-data-table-wrap .rdt-colvis-menu {
+  position: absolute;
+  z-index: var(--rdt-colvis-menu-z, 5);
+  margin-top: var(--rdt-colvis-menu-gap, 0.25rem);
+  padding: var(--rdt-colvis-menu-padding, 0.4rem 0.6rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-colvis-item-gap, 0.25rem);
+  border: var(--rdt-colvis-menu-border, 1px solid rgba(0, 0, 0, 0.15));
+  border-radius: var(--rdt-colvis-menu-radius, 4px);
+  background: var(--rdt-colvis-menu-bg, #fff);
+  box-shadow: var(--rdt-colvis-menu-shadow, 0 2px 8px rgba(0, 0, 0, 0.12));
+}
+.rozie-data-table-wrap .rdt-colvis-item {
+  display: flex;
+  align-items: center;
+  gap: var(--rdt-colvis-label-gap, 0.4em);
+  cursor: pointer;
+  white-space: nowrap;
 }
 /* Auto-injected select column (req-7, D-04) — token-driven, narrow checkbox cell. */
 .rozie-data-table .rdt-select-th,
