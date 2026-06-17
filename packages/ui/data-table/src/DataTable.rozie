@@ -1101,7 +1101,13 @@ $expose({
              default select-all checkbox renders ONLY in 'multiple' mode — a 'single'
              select has no "select all" (it caps at ≤1), so its select-column header
              stays empty (the slot still fires for a consumer override). -->
-        <template r-if="isSelectColumn(header.column.id)">
+        <!-- display:contents <span> wrappers instead of `<template r-if>` grouping —
+             a `<template>` grouping wrapper renders as a LITERAL inert `<template>`
+             DOM element on svelte/solid/lit/angular in this component's nesting (its
+             children land in the .content DocumentFragment → never displayed → empty
+             headers). A real element with r-if/r-else lowers cleanly on all six;
+             display:contents keeps it layout-transparent. -->
+        <span style="display:contents" r-if="isSelectColumn(header.column.id)">
           <slot
             name="selectAll"
             :checked="isAllRowsSelected()"
@@ -1118,8 +1124,8 @@ $expose({
               @change="onToggleAllRows($event)"
             />
           </slot>
-        </template>
-        <template r-else>
+        </span>
+        <span style="display:contents" r-else>
           <!-- sortable header → a button that toggles sort (shift = multi). -->
           <button
             r-if="header.column.getCanSort && header.column.getCanSort()"
@@ -1137,8 +1143,8 @@ $expose({
             <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
             <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
           </button>
-          <!-- non-sortable header. -->
-          <template r-else>
+          <!-- non-sortable header (display:contents span, NOT <template r-else>). -->
+          <span style="display:contents" r-else>
             <span
               r-if="columnHasHeaderTemplate(header.column.id)"
               class="rdt-header-host"
@@ -1146,7 +1152,7 @@ $expose({
               :data-col="header.column.id"
             ></span>
             <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
-          </template>
+          </span>
           <!-- per-column filter input (req-5) — gated by the column's filterable flag.
                Bound value, NOT eval'd (T-48-XSS). -->
           <input
@@ -1196,7 +1202,7 @@ $expose({
             @pointerdown.stop="onResizeStart(header.column.id, $event)"
             @touchstart.stop="onResizeStart(header.column.id, $event)"
           ><span class="rdt-resize-grip" aria-hidden="true"></span></button>
-        </template>
+        </span>
       </th>
     </tr>
   </thead>
@@ -1218,8 +1224,15 @@ $expose({
         :style="pinStyle(cellCtx.column.id)"
       >
         <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
-             #selectCell; checkbox-only toggle (row body does NOT select). -->
-        <template r-if="isSelectColumn(cellCtx.column.id)">
+             #selectCell; checkbox-only toggle (row body does NOT select). The
+             conditional branches use `display:contents` <span> wrappers (NOT
+             `<template r-if>` grouping): a `<template>` grouping wrapper renders as a
+             LITERAL inert `<template>` DOM element on svelte/solid/lit/angular in this
+             component's nesting (its children land in the template's .content
+             DocumentFragment → never displayed → empty cells). A real element with
+             r-if/r-else lowers cleanly on all six; `display:contents` keeps it
+             layout-transparent so the <td> box is unaffected. -->
+        <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
           <slot
             name="selectCell"
             :row="row.original"
@@ -1234,19 +1247,17 @@ $expose({
               @change="onToggleRow(row, $event)"
             />
           </slot>
-        </template>
-        <template r-else>
-          <!-- column WITH a #cell template → framework-owned host (projected per cell);
-               column WITHOUT one → plain accessor value (the fast path). -->
-          <span
-            r-if="columnHasCellTemplate(cellCtx.column.id)"
-            class="rdt-cell-host"
-            :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id"
-            :data-col="cellCtx.column.id"
-            :data-row="row.id"
-          ></span>
-          <span r-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span>
-        </template>
+        </span>
+        <!-- column WITH a #cell template → framework-owned host (projected per cell);
+             column WITHOUT one → plain accessor value (the fast path). -->
+        <span
+          r-else-if="columnHasCellTemplate(cellCtx.column.id)"
+          class="rdt-cell-host"
+          :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id"
+          :data-col="cellCtx.column.id"
+          :data-row="row.id"
+        ></span>
+        <span r-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span>
       </td>
     </tr>
   </tbody>

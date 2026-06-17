@@ -23,23 +23,24 @@
     <tr v-for="hg in headerGroups" :key="hg.id" class="rdt-tr" role="row">
       <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         
-        <template v-if="isSelectColumn(header.column.id)">
+        
+        <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" @change="onToggleAllRows($event)" /></slot>
-        </template><template v-else>
+        </span><span v-else style="display:contents">
           
           <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
             
             <span v-if="columnHasHeaderTemplate(header.column.id)" class="rdt-header-host" :data-header-host="'h:' + header.column.id" :data-col="header.column.id"></span><span v-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span><span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
-          </button><template v-else>
-            <span v-if="columnHasHeaderTemplate(header.column.id)" class="rdt-header-host" :data-header-host="'h:' + header.column.id" :data-col="header.column.id"></span><span v-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span></template><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click.stop="undefined" /><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
+          </button><span v-else style="display:contents">
+            <span v-if="columnHasHeaderTemplate(header.column.id)" class="rdt-header-host" :data-header-host="'h:' + header.column.id" :data-col="header.column.id"></span><span v-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span></span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click.stop="undefined" /><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click.stop="onPinColumn(header.column.id, 'left')">⇤</button>
             <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click.stop="onPinColumn(header.column.id, false)">⇔</button>
             <button type="button" class="rdt-pin-btn rdt-pin-right" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click.stop="onPinColumn(header.column.id, 'right')">⇥</button>
           </span>
           
           <button type="button" class="rdt-resize-handle" :aria-label="'Resize ' + headerLabel(header.column.id)" @pointerdown.stop="onResizeStart(header.column.id, $event)" @touchstart.stop="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
-        </template></th>
+        </span></th>
     </tr>
   </thead>
 
@@ -47,13 +48,11 @@
     <tr v-for="row in rows" :key="row.id" class="rdt-tr" role="row">
       <td v-for="cellCtx in row.getVisibleCells()" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]" role="cell" :data-col="cellCtx.column.id" :style="pinStyle(cellCtx.column.id)">
         
-        <template v-if="isSelectColumn(cellCtx.column.id)">
+        <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="row.original" :checked="rowIsSelected(row)" :toggle="e => onToggleRow(row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(row)" @change="onToggleRow(row, $event)" />
           </slot>
-        </template><template v-else>
-          
-          <span v-if="columnHasCellTemplate(cellCtx.column.id)" class="rdt-cell-host" :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id" :data-col="cellCtx.column.id" :data-row="row.id"></span><span v-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span></template></td>
+        </span><span v-else-if="columnHasCellTemplate(cellCtx.column.id)" class="rdt-cell-host" :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id" :data-col="cellCtx.column.id" :data-row="row.id"></span><span v-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span></td>
     </tr>
   </tbody>
 </table>

@@ -94,8 +94,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
           @for (header of hg.headers; track header.id) {
     <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             
+            
             @if (isSelectColumn(header.column.id)) {
-    <template>
+    <span style="display:contents">
               @if ((selectAllTpl ?? templates()?.['selectAll'])) {
     <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
     } @else {
@@ -104,9 +105,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" [attr.indeterminate]="rozieAttr(isSomeRowsSelected())" (change)="onToggleAllRows($event)" />
     }
     }
-            </template>
+            </span>
     } @else {
-    <template>
+    <span style="display:contents">
               
               @if (header.column.getCanSort && header.column.getCanSort()) {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
@@ -118,12 +119,12 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }<span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(header.column.id)) }}</span>
               </button>
     } @else {
-    <template>
+    <span style="display:contents">
                 @if (columnHasHeaderTemplate(header.column.id)) {
     <span class="rdt-header-host" [attr.data-header-host]="rozieAttr('h:' + header.column.id)" [attr.data-col]="rozieAttr(header.column.id)"></span>
     } @else {
     <span class="rdt-header-label">{{ rozieDisplay(headerLabel(header.column.id)) }}</span>
-    }</template>
+    }</span>
     }@if (columnIsFilterable(header.column.id)) {
     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="_guardedUndefined($event)" />
     }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
@@ -133,7 +134,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
               </span>
               
               <button type="button" class="rdt-resize-handle" [attr.aria-label]="rozieAttr('Resize ' + headerLabel(header.column.id))" (pointerdown)="_guardedHandler4_4($event)" (touchstart)="_guardedHandler5_5($event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
-            </template>
+            </span>
     }</th>
     }
         </tr>
@@ -147,7 +148,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" role="cell" [attr.data-col]="rozieAttr(cellCtx.column.id)" [style]="pinStyle(cellCtx.column.id)">
             
             @if (isSelectColumn(cellCtx.column.id)) {
-    <template>
+    <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
     <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_6(row, cellCtx)" />
     } @else {
@@ -155,15 +156,11 @@ function rozieToken(key: string): InjectionToken<unknown> {
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(row)" (change)="onToggleRow(row, $event)" />
               
     }
-            </template>
-    } @else {
-    <template>
-              
-              @if (columnHasCellTemplate(cellCtx.column.id)) {
+            </span>
+    } @else if (columnHasCellTemplate(cellCtx.column.id)) {
     <span class="rdt-cell-host" [attr.data-cell-host]="rozieAttr('c:' + row.id + ':' + cellCtx.column.id)" [attr.data-col]="rozieAttr(cellCtx.column.id)" [attr.data-row]="rozieAttr(row.id)"></span>
     } @else {
     <span class="rdt-cell-value">{{ rozieDisplay(cellCtx.getValue()) }}</span>
-    }</template>
     }</td>
     }
         </tr>

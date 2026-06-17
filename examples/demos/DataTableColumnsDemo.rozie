@@ -97,16 +97,24 @@ const currency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US')
 }
 .dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 .dt-demo h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #555; }
-.dt-badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8em;
+
+/* The .dt-badge / .dt-currency rules style content rendered into the <Column>'s
+   #cell portal slot. Portal content teleports into the engine's shadow root on
+   Lit, where a SCOPED rule can't reach it (ROZ088). Use the :root{} engine-DOM
+   escape hatch (the §9 portal-styling pattern) so the badge/currency styling
+   reaches the projected cells on all six targets — Lit included. */
+:root {
+  .dt-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8em;
+  }
+  .dt-badge-active { background: #d1fae5; color: #065f46; }
+  .dt-badge-pending { background: #fef3c7; color: #92400e; }
+  .dt-badge-inactive { background: #f3f4f6; color: #4b5563; }
+  .dt-currency { font-variant-numeric: tabular-nums; font-weight: 600; }
 }
-.dt-badge-active { background: #d1fae5; color: #065f46; }
-.dt-badge-pending { background: #fef3c7; color: #92400e; }
-.dt-badge-inactive { background: #f3f4f6; color: #4b5563; }
-.dt-currency { font-variant-numeric: tabular-nums; font-weight: 600; }
 </style>
 
 </rozie>

@@ -564,23 +564,24 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
         
-        ${this.isSelectColumn(header.column.id) ? html`<template data-rozie-s-d5dcab4c>
+        
+        ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectAll !== undefined ? this.selectAll({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected(), toggle: this.onToggleAllRows}) : html`<slot name="selectAll" data-rozie-params=${(() => { try { return JSON.stringify({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected()}); } catch { return '{}'; } })()} @rozie-select-all-toggle=${($event: CustomEvent) => ((this.onToggleAllRows) as (...args: any[]) => any)($event.detail)}>
             ${this.selectionMode === 'multiple' ? html`<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} indeterminate=${rozieAttr(this.isSomeRowsSelected())} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />` : nothing}</slot>`}
-        </template>` : html`<template data-rozie-s-d5dcab4c>
+        </span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
           
           ${header.column.getCanSort && header.column.getCanSort() ? html`<button class="rdt-sort-btn" type="button" @click=${($event: Event) => { this.onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>
             
             ${this.columnHasHeaderTemplate(header.column.id) ? html`<span class="rdt-header-host" data-header-host=${rozieAttr('h:' + header.column.id)} data-col=${rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-header-label" data-rozie-s-d5dcab4c>${rozieDisplay(this.headerLabel(header.column.id))}</span>`}<span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>${rozieDisplay(this.sortIndicator(header.column.id))}</span>
-          </button>` : html`<template data-rozie-s-d5dcab4c>
-            ${this.columnHasHeaderTemplate(header.column.id) ? html`<span class="rdt-header-host" data-header-host=${rozieAttr('h:' + header.column.id)} data-col=${rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-header-label" data-rozie-s-d5dcab4c>${rozieDisplay(this.headerLabel(header.column.id))}</span>`}</template>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent) => { $event.stopPropagation(); ((undefined) as (...args: any[]) => any)($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
+          </button>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.columnHasHeaderTemplate(header.column.id) ? html`<span class="rdt-header-host" data-header-host=${rozieAttr('h:' + header.column.id)} data-col=${rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-header-label" data-rozie-s-d5dcab4c>${rozieDisplay(this.headerLabel(header.column.id))}</span>`}</span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent) => { $event.stopPropagation(); ((undefined) as (...args: any[]) => any)($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
             <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, 'left'); }} data-rozie-s-d5dcab4c>⇤</button>
             <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, false); }} data-rozie-s-d5dcab4c>⇔</button>
             <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, 'right'); }} data-rozie-s-d5dcab4c>⇥</button>
           </span>
           
           <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: PointerEvent) => { $event.stopPropagation(); this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: TouchEvent) => { $event.stopPropagation(); this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
-        </template>`}</th>`)}
+        </span>`}</th>`)}
     </tr>`)}
   </thead>
 
@@ -588,13 +589,11 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(row.getVisibleCells(), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="cell" key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
         
-        ${this.isSelectColumn(cellCtx.column.id) ? html`<template data-rozie-s-d5dcab4c>
+        ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(row)} @change=${($event: Event) => { this.onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
-        </template>` : html`<template data-rozie-s-d5dcab4c>
-          
-          ${this.columnHasCellTemplate(cellCtx.column.id) ? html`<span class="rdt-cell-host" data-cell-host=${rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col=${rozieAttr(cellCtx.column.id)} data-row=${rozieAttr(row.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>${rozieDisplay(cellCtx.getValue())}</span>`}</template>`}</td>`)}
+        </span>` : this.columnHasCellTemplate(cellCtx.column.id) ? html`<span class="rdt-cell-host" data-cell-host=${rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col=${rozieAttr(cellCtx.column.id)} data-row=${rozieAttr(row.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>${rozieDisplay(cellCtx.getValue())}</span>`}</td>`)}
     </tr>`)}
   </tbody>
 </table>
