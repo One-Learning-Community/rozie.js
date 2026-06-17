@@ -1,0 +1,74 @@
+{
+  "name": "@rozie-ui/data-table-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular headless WAI-ARIA data table (sorting, filtering, pagination, selection, column visibility/resize/reorder/pinning) on @tanstack/table-core — one accessible Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "data-table",
+    "table",
+    "datagrid",
+    "tanstack-table",
+    "table-core",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/data-table/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19 || ^20 || ^21",
+    "@angular/common": "^19 || ^20 || ^21",
+    "@angular/forms": "^19 || ^20 || ^21",
+    "@tanstack/table-core": "^8.21"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
+      "optional": false
+    },
+    "@tanstack/table-core": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ]
+}

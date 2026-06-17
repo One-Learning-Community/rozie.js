@@ -1,0 +1,70 @@
+{
+  "name": "@rozie-ui/data-table-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless WAI-ARIA data table (sorting, filtering, pagination, selection, column visibility/resize/reorder/pinning) on @tanstack/table-core — one accessible Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "data-table",
+    "table",
+    "datagrid",
+    "tanstack-table",
+    "table-core",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/data-table/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@tanstack/table-core": "^8.21"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@tanstack/table-core": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ]
+}
