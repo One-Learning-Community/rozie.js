@@ -528,6 +528,7 @@
 @swc/counter
 @swc/helpers
 @swc/types
+@tanstack/table-core
 @testing-library/dom
 @testing-library/jest-dom
 @testing-library/react
