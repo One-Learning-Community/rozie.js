@@ -15,14 +15,6 @@ interface RozieBubbleSlotCtx {
   value: unknown;
 }
 
-interface RozieBubbleSlotCtx {
-  value: unknown;
-}
-
-interface RozieBubbleSlotCtx {
-  value: unknown;
-}
-
 @customElement('rozie-slider')
 export default class Slider extends SignalWatcher(LitElement) {
   static styles = css`
@@ -200,12 +192,6 @@ export default class Slider extends SignalWatcher(LitElement) {
   @state() private _hasSlotBubble = false;
   @queryAssignedElements({ slot: 'bubble', flatten: true }) private _slotBubbleElements!: Element[];
   @property({ attribute: false }) bubble?: (scope: { value: unknown }) => unknown;
-  @state() private _hasSlotBubble = false;
-  @queryAssignedElements({ slot: 'bubble', flatten: true }) private _slotBubbleElements!: Element[];
-  @property({ attribute: false }) bubble?: (scope: { value: unknown }) => unknown;
-  @state() private _hasSlotBubble = false;
-  @queryAssignedElements({ slot: 'bubble', flatten: true }) private _slotBubbleElements!: Element[];
-  @property({ attribute: false }) bubble?: (scope: { value: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -234,35 +220,11 @@ export default class Slider extends SignalWatcher(LitElement) {
         update();
       }
     }
-
-    {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="bubble"]');
-      if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotBubble = this._slotBubbleElements.length > 0; };
-        slotEl.addEventListener('slotchange', update);
-        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
-        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
-        update();
-      }
-    }
-
-    {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="bubble"]');
-      if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotBubble = this._slotBubbleElements.length > 0; };
-        slotEl.addEventListener('slotchange', update);
-        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
-        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
-        update();
-      }
-    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotMark = Array.from(this.children).some((el) => el.getAttribute('slot') === 'mark');
-    this._hasSlotBubble = Array.from(this.children).some((el) => el.getAttribute('slot') === 'bubble');
-    this._hasSlotBubble = Array.from(this.children).some((el) => el.getAttribute('slot') === 'bubble');
     this._hasSlotBubble = Array.from(this.children).some((el) => el.getAttribute('slot') === 'bubble');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }

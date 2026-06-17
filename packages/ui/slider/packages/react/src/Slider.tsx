@@ -25,8 +25,6 @@ interface SliderProps {
   onChange?: (...args: any[]) => void;
   renderMark?: (ctx: MarkCtx) => ReactNode;
   renderBubble?: (ctx: BubbleCtx) => ReactNode;
-  renderBubble?: (ctx: BubbleCtx) => ReactNode;
-  renderBubble?: (ctx: BubbleCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 

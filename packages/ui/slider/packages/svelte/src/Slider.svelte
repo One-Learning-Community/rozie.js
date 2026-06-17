@@ -18,8 +18,6 @@ interface Props {
   showValue?: boolean;
   mark?: Snippet<[{ value: any; label: any; position: any }]>;
   bubble?: Snippet<[{ value: any }]>;
-  bubble?: Snippet<[{ value: any }]>;
-  bubble?: Snippet<[{ value: any }]>;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
   [key: string]: unknown;
@@ -42,16 +40,12 @@ let {
   showValue = false,
   mark: __markProp,
   bubble: __bubbleProp,
-  bubble: __bubbleProp,
-  bubble: __bubbleProp,
   snippets,
   onchange,
   ...__rozieAttrs
 }: Props = $props();
 
 const mark = $derived(__markProp ?? snippets?.mark);
-const bubble = $derived(__bubbleProp ?? snippets?.bubble);
-const bubble = $derived(__bubbleProp ?? snippets?.bubble);
 const bubble = $derived(__bubbleProp ?? snippets?.bubble);
 
 let inputEl = $state<HTMLInputElement | undefined>(undefined);

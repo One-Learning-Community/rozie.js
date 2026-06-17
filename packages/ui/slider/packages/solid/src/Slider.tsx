@@ -176,8 +176,6 @@ interface SliderProps {
   onChange?: (...args: unknown[]) => void;
   markSlot?: (ctx: MarkSlotCtx) => JSX.Element;
   bubbleSlot?: (ctx: BubbleSlotCtx) => JSX.Element;
-  bubbleSlot?: (ctx: BubbleSlotCtx) => JSX.Element;
-  bubbleSlot?: (ctx: BubbleSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: SliderHandle) => void;
 }
