@@ -1,6 +1,6 @@
 # Components
 
-The `@rozie-ui` families are Rozie's flagship demonstration: pre-compiled, per-framework component packages where **one `.rozie` source compiles to idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers**. Each wraps a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or — for Lit and friends — entirely missing.
+The `@rozie-ui` families are Rozie's flagship demonstration: pre-compiled, per-framework component packages where **one `.rozie` source compiles to idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers**. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or — for Lit and friends — entirely missing. Two newer families (**Listbox** and **Slider**) carry no engine at all: they are headless, fully-accessible components authored from scratch in a single `.rozie` file, proving Rozie carries rich interaction on its own.
 
 Consumers install only the package for their framework. No Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency — just the compiled output for the framework they already use.
 
@@ -21,6 +21,8 @@ Every family below ships six packages (`-react`, `-vue`, `-svelte`, `-angular`, 
 | **PdfViewer** | [pdf.js](https://mozilla.github.io/pdf.js/) PDF rendering | [/components/pdf](/components/pdf) |
 | **FlowCanvas** | [Rete.js](https://retejs.org/) node-flow editor | [/components/rete](/components/rete) |
 | **Carousel** | [Embla Carousel](https://www.embla-carousel.com) carousel engine | [/components/embla](/components/embla) |
+| **Listbox** | *(no engine)* headless WAI-ARIA listbox / combobox | [/components/listbox](/components/listbox) |
+| **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 
 ## Why these exist
 
