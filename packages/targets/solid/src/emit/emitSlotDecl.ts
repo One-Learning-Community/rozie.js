@@ -39,8 +39,17 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
   const ctxInterfaces: string[] = [];
   const diagnostics: Diagnostic[] = [];
   const seenInterfaces = new Set<string>();
+  // Dedupe by distinct slot name — a template may legitimately declare the same
+  // `<slot name="X">` more than once (e.g. one value-bubble per thumb in a range
+  // slider). The render-time invocation is emitted per-occurrence by
+  // emitSlotInvocation, but the slot-prop field (`XSlot?: (ctx) => JSX.Element`)
+  // must be declared EXACTLY ONCE per distinct slot name, otherwise the props
+  // type has a duplicate identifier (TS2300). Matches the ctx-interface dedup.
+  const seenSlotNames = new Set<string>();
 
   for (const slot of ir.slots) {
+    if (seenSlotNames.has(slot.name)) continue;
+    seenSlotNames.add(slot.name);
     if (slot.name === '') {
       // Default slot → children (D-131): Solid's children() accessor reads this.
       // Comment per plan instruction Step H.

@@ -44,7 +44,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
-import { buildSlotTypeFields } from './refineSlotTypes.js';
+import { buildSlotTypeFields, distinctSlotsByName } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
@@ -379,7 +379,9 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
   // When `ir.slots.length === 0` we keep the legacy no-snippets shape — no
   // rename and no `snippets` entry, so non-slotted components are unaffected.
   if (ir.slots.length > 0) {
-    for (const s of ir.slots) {
+    // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
+    // exactly ONE `X: __XProp` destructure binding (see distinctSlotsByName).
+    for (const s of distinctSlotsByName(ir.slots)) {
       const key = s.name === '' ? 'children' : s.name;
       entries.push(`${key}: __${key}Prop`);
     }
@@ -388,7 +390,7 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     // Default-slot sentinel still maps to `children`; bare names per Svelte
     // magic-prop convention. (Loop body is unreachable when slots.length === 0
     // but kept for clarity / future-proofing.)
-    for (const s of ir.slots) {
+    for (const s of distinctSlotsByName(ir.slots)) {
       const key = s.name === '' ? 'children' : s.name;
       entries.push(key);
     }
@@ -439,7 +441,9 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
 function emitSlotDerivedMerges(ir: IRComponent): string[] {
   if (ir.slots.length === 0) return [];
   const lines: string[] = [];
-  for (const s of ir.slots) {
+  // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
+  // exactly ONE `$derived` merge declaration (see distinctSlotsByName).
+  for (const s of distinctSlotsByName(ir.slots)) {
     const key = s.name === '' ? 'children' : s.name;
     // Collision-gated `Slot` suffix on the merge IDENTIFIER only: when the slot
     // name equals a declared `<props>` name, the props destructure already binds

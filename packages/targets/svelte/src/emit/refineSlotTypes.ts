@@ -24,6 +24,29 @@
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 
 /**
+ * Dedupe SlotDecls by DISTINCT slot name (first occurrence wins).
+ *
+ * A template may legitimately declare the same `<slot name="X">` more than once
+ * (e.g. one value-bubble per thumb in a range slider), in which case `ir.slots`
+ * carries one SlotDecl per OCCURRENCE. The render-time `{@render X?.()}`
+ * invocation markup is emitted per-occurrence by emitSlotInvocation (each site
+ * renders the same snippet) — but the Props-interface field, the `$props()`
+ * destructure rename (`X: __XProp`) and the `$derived` merge must be emitted
+ * EXACTLY ONCE per distinct slot name, otherwise the compiled `.svelte` has a
+ * duplicate `__XProp` binding and fails Svelte's parser ("Identifier '__XProp'
+ * has already been declared"). Matches the single-declaration behavior of the
+ * other targets.
+ */
+export function distinctSlotsByName(slots: SlotDecl[]): SlotDecl[] {
+  const seen = new Set<string>();
+  return slots.filter((s) => {
+    if (seen.has(s.name)) return false;
+    seen.add(s.name);
+    return true;
+  });
+}
+
+/**
  * Build per-slot Snippet field declarations for the Props interface.
  *
  * Default slot (`name === ''`) emits as `children` per Svelte 5 magic-prop
@@ -34,7 +57,7 @@ import type { SlotDecl } from '../../../../core/src/ir/types.js';
  */
 export function buildSlotTypeFields(slots: SlotDecl[]): string[] {
   const lines: string[] = [];
-  for (const s of slots) {
+  for (const s of distinctSlotsByName(slots)) {
     const slotKey = s.name === '' ? 'children' : s.name;
     // Phase 07.3.1 D-02 — object-tuple matches the object-shape snippet args
     // emitted by emitSlotInvocation.ts. Single-element tuple wrapping a struct

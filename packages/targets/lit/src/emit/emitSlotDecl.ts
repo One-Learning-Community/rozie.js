@@ -227,7 +227,28 @@ export function emitSlotDecl(
   const preSeedLinesArr: string[] = [];
   const methodNameSet = collectMethodNamesFromIR(ir);
 
-  const fields = slots
+  // Dedupe by DISTINCT slot name before emitting the class-field declarations,
+  // slotchange wiring, pre-seed lines and ctx interfaces. A template may
+  // legitimately declare the same `<slot name="X">` more than once (e.g. one
+  // value-bubble per thumb in a range slider), in which case `ir.slots` carries
+  // one SlotDecl entry per OCCURRENCE. The render-time `<slot name="X">` markup
+  // is emitted per-occurrence by emitTemplate (Lit supports multiple `<slot
+  // name="X">` projecting the same assigned nodes) — but the backing
+  // `@state _hasSlot<X>` / `@queryAssignedElements _slot<X>Elements` /
+  // `@property <X>` class members and their slotchange listener registration
+  // must be emitted EXACTLY ONCE per distinct slot name, otherwise the emitted
+  // class has duplicate identifier declarations and fails to compile.
+  // The first occurrence wins (slot params/portal-ness are identical across
+  // same-named occurrences in practice; first-wins is deterministic and matches
+  // the other five targets' single-declaration behavior).
+  const seenSlotNames = new Set<string>();
+  const distinctSlots = slots.filter((slot) => {
+    if (seenSlotNames.has(slot.name)) return false;
+    seenSlotNames.add(slot.name);
+    return true;
+  });
+
+  const fields = distinctSlots
     .map((slot) =>
       emitOneSlot(
         slot,
