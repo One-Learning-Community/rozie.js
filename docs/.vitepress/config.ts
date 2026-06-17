@@ -214,6 +214,8 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Listbox — headless select / combobox', link: '/components/listbox' },
+            { text: 'Headless select / combobox comparison', link: '/components/listbox-comparison' },
+            { text: 'Listbox — live demo', link: '/components/listbox-demo' },
           ],
         },
       ],

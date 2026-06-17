@@ -34,6 +34,7 @@
     "@rozie-ui/embla-vue": "workspace:*",
     "@rozie-ui/flatpickr-vue": "workspace:*",
     "@rozie-ui/fullcalendar-vue": "workspace:*",
+    "@rozie-ui/listbox-vue": "workspace:*",
     "@rozie-ui/maplibre-vue": "workspace:*",
     "@rozie-ui/pdf-vue": "workspace:*",
     "@rozie-ui/rete-vue": "workspace:*",

@@ -112,6 +112,9 @@ importers:
       '@rozie-ui/fullcalendar-vue':
         specifier: workspace:*
         version: link:../packages/ui/fullcalendar/packages/vue
+      '@rozie-ui/listbox-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/listbox/packages/vue
       '@rozie-ui/maplibre-vue':
         specifier: workspace:*
         version: link:../packages/ui/maplibre/packages/vue
