@@ -195,7 +195,7 @@ export default function Slider(_props: SliderProps): JSX.Element {
   const fillStyle = createMemo(() => {
     let start, end;
     if (local.range) {
-      const arr = Array.isArray(value()) && value().length === 2 ? value() : [local.min, local.max];
+      const arr = Array.isArray(value()) && (value() as any).length === 2 ? value() : [local.min, local.max];
       start = pct(arr[0]);
       end = pct(arr[1]);
     } else {
