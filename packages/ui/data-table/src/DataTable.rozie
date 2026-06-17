@@ -91,6 +91,14 @@
   // rows verbatim and only emits the change events (the consumer fetches the page).
   manual: { type: Boolean, default: false },
 
+  // rowSelection (RowSelectionState = { [rowId]: true }) — req-7. model:true → two-way.
+  // selectionMode drives the chrome: 'none' injects no column; 'single' keeps ≤1
+  // (enableMultiRowSelection:false); 'multiple' auto-injects a LEADING checkbox column
+  // (D-04) with a select-all header (indeterminate when partial, D-06: filtered rows).
+  // selection-change fires regardless of binding. Checkbox-only toggle (D-05) — the
+  // row body does NOT select.
+  rowSelection: { type: Object, default: () => ({}), model: true },
+
   // Pure-CSS sticky header gate (req-12). When true the <thead> sticks to the top of
   // the scroll container.
   stickyHeader: { type: Boolean, default: false },
@@ -115,6 +123,7 @@
   globalFilterDefault: '',
   columnFiltersDefault: [],
   paginationDefault: { pageIndex: 0, pageSize: 10 },
+  rowSelectionDefault: {},
 
   // The id-keyed <Column> registry. WHOLE-OBJECT-REPLACE on every mutation (never
   // in-place $data.colReg[id] = …). T-48-PP: a column id is consumer-controlled, so
@@ -163,6 +172,7 @@ const currentState = () => ({
   globalFilter: $props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault,
   columnFilters: $props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault,
   pagination: $props.pagination != null ? $props.pagination : $data.paginationDefault,
+  rowSelection: $props.rowSelection != null ? $props.rowSelection : $data.rowSelectionDefault,
 })
 
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
@@ -228,6 +238,36 @@ const columnDefs = () => {
   return out
 }
 
+// The constant id of the auto-injected leading checkbox column (D-04). Distinct from
+// any consumer column id (the registry/config guard never produces a leading "__").
+const SELECT_COL_ID = '__rdt_select'
+
+// The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
+// user columns, PLUS a LEADING checkbox column when selectionMode === 'multiple'
+// (D-04). The select column carries enableSorting/enableColumnFilter:false and an
+// isSelectColumn marker the template uses to render checkbox chrome (NOT an accessor
+// value). 'single' / 'none' inject nothing.
+const tableColumns = () => {
+  const cols = columnDefs()
+  if ($props.selectionMode === 'multiple') {
+    const selectCol = {
+      id: SELECT_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isSelectColumn: true,
+      hasCell: false,
+      cellRenderer: null,
+      hasHeader: false,
+      headerRenderer: null,
+      pinned: '',
+      width: '',
+    }
+    return [selectCol].concat(cols)
+  }
+  return cols
+}
+
 // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
 // table-core hands an Updater<SortingState> = value | (old)=>new; the onSortingChange
 // callback applies it against the CURRENT sorting, then this funnel writes a FRESH
@@ -282,6 +322,18 @@ const writePagination = (next) => {
   programmatic--
 }
 
+// ── rowSelection slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+// table-core hands RowSelectionState = { [rowId]: true }; write a FRESH object (never
+// in-place key-set) + fire `selection-change` REGARDLESS of binding.
+const writeRowSelection = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.rowSelectionDefault = next
+  $model.rowSelection = next
+  $emit('selection-change', next)
+  programmatic--
+}
+
 // Read the live columnFilters value for a given column id (string-safe; drives the
 // per-column filter input's bound value). Reads currentState() (NOT a $data re-read
 // of a just-written key → React stale-read safe).
@@ -319,7 +371,7 @@ $onMount(() => {
   // Build the table instance HERE so the closures below capture the live `table`.
   table = createTable({
     get data() { return $props.data },
-    columns: columnDefs(),
+    columns: tableColumns(),
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -331,6 +383,11 @@ $onMount(() => {
     manualPagination: $props.manual === true,
     manualFiltering: $props.manual === true,
     manualSorting: $props.manual === true,
+    // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
+    // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
+    // default, D-06 — NOT overridden).
+    enableRowSelection: $props.selectionMode !== 'none',
+    enableMultiRowSelection: $props.selectionMode === 'multiple',
     // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
     // no global onStateChange diff). Each applies the table-core Updater against the
     // CURRENT slice value, then funnels a FRESH value through the echo-guarded writer.
@@ -349,6 +406,10 @@ $onMount(() => {
     onPaginationChange: (updater) => {
       const next = applyUpdater(updater, currentState().pagination)
       writePagination(next)
+    },
+    onRowSelectionChange: (updater) => {
+      const next = applyUpdater(updater, currentState().rowSelection)
+      writeRowSelection(next)
     },
     renderFallbackValue: null,
   })
@@ -444,6 +505,8 @@ $watch(
     $props.globalFilter,
     $props.columnFilters,
     $props.pagination,
+    $props.rowSelection,
+    $props.selectionMode,
     ($props.data || []).length,
     $data.colReg,
   ],
@@ -452,8 +515,10 @@ $watch(
     table.setOptions((prev) => ({
       ...prev,
       data: $props.data,
-      columns: columnDefs(),
+      columns: tableColumns(),
       state: currentState(),
+      enableRowSelection: $props.selectionMode !== 'none',
+      enableMultiRowSelection: $props.selectionMode === 'multiple',
     }))
     if (refreshRowModel) refreshRowModel()
   },
@@ -574,6 +639,25 @@ const onPageSizeChange = (evt) => {
   table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10)
 }
 
+// ── Row-selection chrome (req-7) ───────────────────────────────────────────────────
+// Detect the auto-injected leading checkbox column by its constant id (template uses
+// this to render checkbox chrome instead of an accessor value).
+const isSelectColumn = (colId) => colId === SELECT_COL_ID
+// select-all header state (D-06: scopes to all filtered rows = TanStack default).
+// `!!`-coerced booleans (the listbox aria lesson — never a bound rozieAttr string).
+const isAllRowsSelected = () => !!(table && table.getIsAllRowsSelected())
+const isSomeRowsSelected = () => !!(table && table.getIsSomeRowsSelected())
+const onToggleAllRows = (evt) => {
+  if (!table) return
+  table.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked))
+}
+// per-row checkbox state + toggle (checkbox-only, D-05 — row body does NOT select).
+const rowIsSelected = (row) => !!(row && row.getIsSelected && row.getIsSelected())
+const onToggleRow = (row, evt) => {
+  if (!row || !row.toggleSelected) return
+  row.toggleSelected(!!(evt && evt.target && evt.target.checked))
+}
+
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
 $provide('data-table:columns', {
   registerColumn: (id, spec) => {
@@ -597,6 +681,14 @@ $expose({
   },
   clearSorting: () => { if (table) table.resetSorting(true) },
   getColumnDefs: () => columnDefs(),
+  // selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+  // emits the fresh state + selection-change.
+  toggleAllRows: (value) => { if (table) table.toggleAllRowsSelected(value) },
+  clearSelection: () => { if (table) table.resetRowSelection(true) },
+  getSelectedRows: () => (table ? table.getSelectedRowModel().rows.map((r) => r.original) : []),
+  // pagination verbs.
+  setPage: (idx) => { if (table) table.setPageIndex(idx) },
+  setRowsPerPage: (size) => { if (table) table.setPageSize(size) },
 })
 </script>
 
@@ -641,46 +733,68 @@ $expose({
         r-for="header in hg.headers"
         :key="header.id"
         :data-col="header.column.id"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
       >
-        <!-- sortable header → a button that toggles sort (shift = multi). -->
-        <button
-          r-if="header.column.getCanSort && header.column.getCanSort()"
-          type="button"
-          class="rdt-sort-btn"
-          @click="onHeaderSort(header.column.id, $event)"
-        >
-          <!-- custom #headerTemplate column → framework-owned host; else plain label -->
-          <span
-            r-if="columnHasHeaderTemplate(header.column.id)"
-            class="rdt-header-host"
-            :data-header-host="'h:' + header.column.id"
-            :data-col="header.column.id"
-          ></span>
-          <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
-          <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
-        </button>
-        <!-- non-sortable header. -->
-        <template r-else>
-          <span
-            r-if="columnHasHeaderTemplate(header.column.id)"
-            class="rdt-header-host"
-            :data-header-host="'h:' + header.column.id"
-            :data-col="header.column.id"
-          ></span>
-          <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
+        <!-- auto-injected select-all header (D-04) — slot-overridable via #selectAll;
+             default = a select-all checkbox (indeterminate when partial, D-06). -->
+        <template r-if="isSelectColumn(header.column.id)">
+          <slot
+            name="selectAll"
+            :checked="isAllRowsSelected()"
+            :indeterminate="isSomeRowsSelected()"
+            :toggle="onToggleAllRows"
+          >
+            <input
+              class="rdt-select-all"
+              type="checkbox"
+              aria-label="Select all rows"
+              :checked="isAllRowsSelected()"
+              :indeterminate="isSomeRowsSelected()"
+              @change="onToggleAllRows($event)"
+            />
+          </slot>
         </template>
-        <!-- per-column filter input (req-5) — gated by the column's filterable flag.
-             Bound value, NOT eval'd (T-48-XSS). -->
-        <input
-          r-if="columnIsFilterable(header.column.id)"
-          class="rdt-col-filter"
-          type="text"
-          :aria-label="'Filter ' + headerLabel(header.column.id)"
-          :value="columnFilterValue(header.column.id)"
-          @input="onColumnFilterInput(header.column.id, $event)"
-          @click.stop
-        />
+        <template r-else>
+          <!-- sortable header → a button that toggles sort (shift = multi). -->
+          <button
+            r-if="header.column.getCanSort && header.column.getCanSort()"
+            type="button"
+            class="rdt-sort-btn"
+            @click="onHeaderSort(header.column.id, $event)"
+          >
+            <!-- custom #headerTemplate column → framework-owned host; else plain label -->
+            <span
+              r-if="columnHasHeaderTemplate(header.column.id)"
+              class="rdt-header-host"
+              :data-header-host="'h:' + header.column.id"
+              :data-col="header.column.id"
+            ></span>
+            <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
+            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
+          </button>
+          <!-- non-sortable header. -->
+          <template r-else>
+            <span
+              r-if="columnHasHeaderTemplate(header.column.id)"
+              class="rdt-header-host"
+              :data-header-host="'h:' + header.column.id"
+              :data-col="header.column.id"
+            ></span>
+            <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
+          </template>
+          <!-- per-column filter input (req-5) — gated by the column's filterable flag.
+               Bound value, NOT eval'd (T-48-XSS). -->
+          <input
+            r-if="columnIsFilterable(header.column.id)"
+            class="rdt-col-filter"
+            type="text"
+            :aria-label="'Filter ' + headerLabel(header.column.id)"
+            :value="columnFilterValue(header.column.id)"
+            @input="onColumnFilterInput(header.column.id, $event)"
+            @click.stop
+          />
+        </template>
       </th>
     </tr>
   </thead>
@@ -698,17 +812,38 @@ $expose({
         r-for="cellCtx in row.getVisibleCells()"
         :key="cellCtx.id"
         :data-col="cellCtx.column.id"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
       >
-        <!-- column WITH a #cell template → framework-owned host (projected per cell);
-             column WITHOUT one → plain accessor value (the fast path). -->
-        <span
-          r-if="columnHasCellTemplate(cellCtx.column.id)"
-          class="rdt-cell-host"
-          :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id"
-          :data-col="cellCtx.column.id"
-          :data-row="row.id"
-        ></span>
-        <span r-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span>
+        <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
+             #selectCell; checkbox-only toggle (row body does NOT select). -->
+        <template r-if="isSelectColumn(cellCtx.column.id)">
+          <slot
+            name="selectCell"
+            :row="row.original"
+            :checked="rowIsSelected(row)"
+            :toggle="(e) => onToggleRow(row, e)"
+          >
+            <input
+              class="rdt-select-row"
+              type="checkbox"
+              aria-label="Select row"
+              :checked="rowIsSelected(row)"
+              @change="onToggleRow(row, $event)"
+            />
+          </slot>
+        </template>
+        <template r-else>
+          <!-- column WITH a #cell template → framework-owned host (projected per cell);
+               column WITHOUT one → plain accessor value (the fast path). -->
+          <span
+            r-if="columnHasCellTemplate(cellCtx.column.id)"
+            class="rdt-cell-host"
+            :data-cell-host="'c:' + row.id + ':' + cellCtx.column.id"
+            :data-col="cellCtx.column.id"
+            :data-row="row.id"
+          ></span>
+          <span r-else class="rdt-cell-value">{{ cellCtx.getValue() }}</span>
+        </template>
       </td>
     </tr>
   </tbody>
@@ -840,6 +975,18 @@ $expose({
   border-radius: var(--rdt-page-size-radius, 4px);
   background: var(--rdt-page-size-bg, transparent);
   color: inherit;
+}
+/* Auto-injected select column (req-7, D-04) — token-driven, narrow checkbox cell. */
+.rozie-data-table .rdt-select-th,
+.rozie-data-table .rdt-select-td {
+  width: var(--rdt-select-col-width, 1%);
+  text-align: var(--rdt-select-col-align, center);
+  white-space: nowrap;
+}
+.rozie-data-table .rdt-select-all,
+.rozie-data-table .rdt-select-row {
+  cursor: pointer;
+  accent-color: var(--rdt-select-accent, currentColor);
 }
 </style>
 
