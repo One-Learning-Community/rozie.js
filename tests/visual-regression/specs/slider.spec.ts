@@ -50,9 +50,24 @@ const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
 >();
 
+// The Slider source is built by Plan 02. Until it exists, the four demos cannot
+// mount (their <components> import resolves to a missing file), so EVERY cell
+// must `test.fixme`-skip — the failing behavioral contract is STAGED but green.
+// We cannot rely solely on the per-target `entry.${target}.html` guard the way
+// listbox.spec.ts does: those host bundles already exist from prior (non-slider)
+// builds, so they are present-but-slider-unaware. Gate additionally on the slider
+// SOURCE existing — the precise Wave-0 → execution boundary (Nyquist).
+const SLIDER_SOURCE = resolve(
+  __dirname,
+  '../../../packages/ui/slider/src/Slider.rozie',
+);
+
 function builtFor(target: (typeof TARGETS)[number]): boolean {
-  return existsSync(
-    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  return (
+    existsSync(SLIDER_SOURCE) &&
+    existsSync(
+      resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+    )
   );
 }
 
