@@ -35,6 +35,7 @@
  *
  * @public — runtime API consumed by emitted .tsx files.
  */
+import type { CSSProperties } from 'react';
 import styleToJS from 'style-to-js';
 
 const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
@@ -75,14 +76,33 @@ export function toStyleObjectKey(prop: string): string {
 }
 
 /**
- * Parse an inline-style string into a style-object suitable for React /
- * Solid `style` props. Returns `{}` for empty, whitespace-only, or
- * unparseable input — never throws (see crash-safety note above).
+ * Parse an inline-style value into a style-object suitable for React's
+ * `style` prop.
+ *
+ * A dynamic `:style` binding's runtime value is NOT statically known to the
+ * emitter, so this helper accepts the union the author may produce:
+ *   - a CSS string (`'opacity: 0.5; color: red'`) → parsed via `style-to-js`;
+ *   - an already-built style object (a `$computed` returning a
+ *     CSS-custom-property map such as `{ '--rozie-slider-fill-start': '50%' }`,
+ *     or a plain `CSSProperties`) → passed through verbatim;
+ *   - `null` / `undefined` → `{}`.
+ *
+ * Returning `CSSProperties` keeps the value assignable to React's `style`
+ * JSX prop, and the object branch permits CSS custom properties (`--x`) which
+ * `CSSProperties` accepts via its index signature. Returns `{}` for empty,
+ * whitespace-only, or unparseable input — never throws (see crash-safety note
+ * above).
  */
-export function parseInlineStyle(text: string): Record<string, string> {
-  if (text.length === 0 || /^\s*$/.test(text)) return {};
+export function parseInlineStyle(
+  value: string | CSSProperties | Record<string, string | number> | null | undefined,
+): CSSProperties {
+  if (value == null) return {};
+  // Already an object (e.g. a CSS-custom-property map from a `$computed`) —
+  // pass through; React's `style` prop accepts custom properties.
+  if (typeof value === 'object') return value as CSSProperties;
+  if (value.length === 0 || /^\s*$/.test(value)) return {};
   try {
-    return styleToJS(text, { reactCompat: true });
+    return styleToJS(value, { reactCompat: true }) as CSSProperties;
   } catch {
     return {};
   }

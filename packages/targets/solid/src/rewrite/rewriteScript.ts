@@ -31,6 +31,7 @@ import {
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { renderType } from '../emit/emitPropsInterface.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -176,6 +177,21 @@ export function rewriteRozieIdentifiers(
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
+  // Model props whose declared `type` resolves to `unknown` (i.e. `type: null`)
+  // — their `createControllableSignal<unknown>` accessor returns `unknown`. A
+  // member read off the accessor (`value().length`, `value()[0]`) is TS2339 on
+  // `unknown`, and a control-flow guard (`Array.isArray(value()) && value().length`)
+  // does NOT narrow across two separate accessor CALLS the way React's stable
+  // destructured local does. Wrapping the accessor read `(value() as any)` when
+  // it is the OBJECT of a member access defeats the `unknown` exactly as
+  // `typeNeutralizeScript` wraps a `for...of` iterable `as any` (Phase 9 WR-05)
+  // — a pure type assertion, byte-runtime-neutral, gated to the unknown-typed
+  // model accessor only so the typed-prop corpus stays untouched.
+  const unknownModelProps = new Set(
+    ir.props
+      .filter((p) => p.isModel && renderType(p.typeAnnotation) === 'unknown')
+      .map((p) => p.name),
+  );
   const dataNames = new Set(ir.state.map((s) => s.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
@@ -365,7 +381,21 @@ export function rewriteRozieIdentifiers(
         if (modelProps.has(property.name)) {
           // Model prop: createControllableSignal returns [Accessor<T>, Setter<T>]
           // The accessor is the signal name itself; call it: value()
-          path.replaceWith(t.callExpression(t.identifier(property.name), []));
+          let accessorCall: t.Expression = t.callExpression(
+            t.identifier(property.name),
+            [],
+          );
+          // An `unknown`-typed model accessor read used as the OBJECT of a
+          // member access (`$props.value.length`, `$props.value[0]`) is TS2339
+          // on `unknown`. Defeat it with a pure `(value() as any)` assertion,
+          // mirroring the `for...of` iterable `as any` neutralization.
+          if (
+            unknownModelProps.has(property.name) &&
+            path.parentPath?.isMemberExpression({ object: path.node })
+          ) {
+            accessorCall = t.tsAsExpression(accessorCall, t.tsAnyKeyword());
+          }
+          path.replaceWith(accessorCall);
           path.skip();
           return;
         }

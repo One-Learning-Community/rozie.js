@@ -35,6 +35,7 @@
  *
  * @public — runtime API consumed by emitted .tsx files.
  */
+import type { JSX } from 'solid-js';
 import styleToJS from 'style-to-js';
 
 const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
@@ -75,14 +76,32 @@ export function toStyleObjectKey(prop: string): string {
 }
 
 /**
- * Parse an inline-style string into a style-object suitable for React /
- * Solid `style` props. Returns `{}` for empty, whitespace-only, or
- * unparseable input — never throws (see crash-safety note above).
+ * Parse an inline-style value into a style-object suitable for Solid's
+ * `style` prop.
+ *
+ * A dynamic `:style` binding's runtime value is NOT statically known to the
+ * emitter, so this helper accepts the union the author may produce:
+ *   - a CSS string (`'opacity: 0.5; color: red'`) → parsed via `style-to-js`;
+ *   - an already-built style object (a `$computed` returning a
+ *     CSS-custom-property map such as `{ '--rozie-slider-fill-start': '50%' }`,
+ *     or a plain style object) → passed through verbatim;
+ *   - `null` / `undefined` → `{}`.
+ *
+ * Returning `JSX.CSSProperties` keeps the value assignable to Solid's `style`
+ * JSX prop, whose index signature permits CSS custom properties (`--x`).
+ * Returns `{}` for empty, whitespace-only, or unparseable input — never throws
+ * (see crash-safety note above).
  */
-export function parseInlineStyle(text: string): Record<string, string> {
-  if (text.length === 0 || /^\s*$/.test(text)) return {};
+export function parseInlineStyle(
+  value: string | JSX.CSSProperties | Record<string, string | number> | null | undefined,
+): JSX.CSSProperties {
+  if (value == null) return {};
+  // Already an object (e.g. a CSS-custom-property map from a `$computed`) —
+  // pass through; Solid's `style` prop accepts custom properties.
+  if (typeof value === 'object') return value as JSX.CSSProperties;
+  if (value.length === 0 || /^\s*$/.test(value)) return {};
   try {
-    return styleToJS(text, { reactCompat: true });
+    return styleToJS(value, { reactCompat: true }) as JSX.CSSProperties;
   } catch {
     return {};
   }
