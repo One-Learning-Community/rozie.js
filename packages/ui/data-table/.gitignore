@@ -2,7 +2,10 @@
 scripts/probe-48/dist/
 scripts/probe-48/*.rozie.ts
 scripts/probe-48/*.rozie.js
-# distribution-wave codegen output (lands in Plan 06)
-packages/
+# The per-framework leaves under packages/<fw>/ ARE committed (the slider/rete
+# precedent — codegen-generated src is source-controlled so the published
+# packages ship without a build step). Only build/runtime artifacts are ignored.
+packages/*/dist/
+packages/*/.turbo/
 dist/
 node_modules/

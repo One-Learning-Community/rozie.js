@@ -1,0 +1,41 @@
+/*
+ * @rozie-ui/data-table — shadcn/ui (Radix) bridge.
+ *
+ * Maps the public `--rozie-data-table-*` tokens onto the shadcn/ui CSS variables
+ * defined on `:root` / `.dark` (the classic HSL-channel convention:
+ * `--background: 0 0% 100%` consumed as `hsl(var(--background))`). Because it
+ * reads those vars live, the table automatically follows light/dark theme
+ * switches and accent changes.
+ *
+ *   import '@rozie-ui/data-table-react/themes/shadcn.css';
+ *
+ * Import this AFTER base.css (base.css wires the public tokens onto the internal
+ * `--rdt-*` the component reads; this file only remaps the public tokens):
+ *
+ *   import '@rozie-ui/data-table-react/themes/base.css';
+ *   import '@rozie-ui/data-table-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-data-table-wrap,
+.rozie-data-table {
+  --rozie-data-table-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
+  --rozie-data-table-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-data-table-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-data-table-control-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-data-table-radius: var(--radius, 0.5rem);
+
+  --rozie-data-table-header-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rozie-data-table-header-weight: 600;
+
+  --rozie-data-table-resize-grip-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-data-table-resize-grip-active: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-data-table-pin-active-bg: hsl(var(--accent, 210 40% 96.1%));
+
+  --rozie-data-table-menu-bg: hsl(var(--popover, 0 0% 100%));
+  --rozie-data-table-menu-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+
+  --rozie-data-table-select-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+}

@@ -1,0 +1,35 @@
+/*
+ * @rozie-ui/data-table — Material Design 3 bridge.
+ *
+ * Maps the public `--rozie-data-table-*` tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars are
+ * absent, so it renders correctly even without a generated theme.
+ *
+ * Import this AFTER base.css (base.css wires the public tokens onto the internal
+ * `--rdt-*` the component reads):
+ *
+ *   import '@rozie-ui/data-table-react/themes/base.css';
+ *   import '@rozie-ui/data-table-react/themes/material.css';
+ */
+.rozie-data-table-wrap,
+.rozie-data-table {
+  --rozie-data-table-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-data-table-accent: var(--md-sys-color-primary, #6750a4);
+  --rozie-data-table-border-color: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-data-table-control-border-color: var(--md-sys-color-outline, #79747e);
+  --rozie-data-table-radius: 4px;
+
+  --rozie-data-table-header-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+  --rozie-data-table-header-weight: 500;
+
+  --rozie-data-table-resize-grip-color: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-data-table-resize-grip-active: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-data-table-pin-active-bg: var(--md-sys-color-secondary-container, #e8def8);
+
+  --rozie-data-table-menu-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-data-table-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+
+  --rozie-data-table-select-accent: var(--md-sys-color-primary, #6750a4);
+}
