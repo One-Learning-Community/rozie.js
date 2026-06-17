@@ -1,0 +1,115 @@
+<!--
+  SliderMarksDemo.rozie — MARKS overlay consumer for the pure-Rozie Slider.
+
+  Proves the marks overlay (one marker per :marks entry), the scoped `#mark` slot
+  override (mirrors the listbox #option slot), and the `#value` bubble slot gated
+  by showValue render across all 6 targets (slider.spec.ts req 7).
+
+    - :marks binds a 3-entry {value,label}[] array; one marker renders per entry.
+    - showValue (bare-boolean attr, D-01) → the #value bubble renders, tracking
+      the fill var.
+    - A scoped `#mark` slot renders each mark label (exercises scoped slots — the
+      direct analog of the listbox #option slot).
+    - r-model:value two-way binds to $data.value; the live `readout-value` proves
+      the bound value round-trips OUT.
+
+  This is the BEHAVIORAL cell — no screenshot stabilization here.
+-->
+
+<rozie name="SliderMarksDemo">
+
+<components>
+{
+  Slider: '../../packages/ui/slider/src/Slider.rozie',
+}
+</components>
+
+<data>
+{
+  value: 50,
+}
+</data>
+
+<script>
+const MARKS = [
+  { value: 25, label: 'Low' },
+  { value: 50, label: 'Mid' },
+  { value: 75, label: 'High' },
+]
+
+// The uniform two-way driver: write the bound value directly. The model write
+// flows into the wrapper → the thumb moves + the #value bubble tracks it, and the
+// readout (bound to the same $data.value) reflects it. Works on all 6 targets.
+const pickValue = (v) => { $data.value = v }
+</script>
+
+<template>
+<div class="slider-demo">
+  <h3>Slider — marks</h3>
+
+  <div class="controls">
+    <!-- Direct model write (the uniform two-way driver across all 6) -->
+    <button type="button" data-testid="set-value" @click="pickValue(75)">Set 75</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Slider
+    showValue
+    r-model:value="$data.value"
+    :marks="MARKS"
+    min="0"
+    max="100"
+    step="1"
+    ariaLabel="Quality"
+  >
+    <template #mark="{ value, label, position }">
+      <span class="mark-label" :style="{ left: position + '%' }">{{ label }}</span>
+    </template>
+    <template #value="{ value }">
+      <span class="value-bubble">{{ value }}</span>
+    </template>
+  </Slider>
+</div>
+</template>
+
+<style>
+.slider-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.slider-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-weight: 600;
+  min-width: 6ch;
+}
+.mark-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.6875rem;
+  color: #555;
+}
+.value-bubble {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+</style>
+
+</rozie>

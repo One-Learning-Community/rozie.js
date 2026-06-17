@@ -1,0 +1,91 @@
+<!--
+  SliderBehaviorDemo.rozie — BEHAVIORAL consumer for the pure-Rozie Slider.
+
+  The SECOND @rozie-ui family with NO third-party engine (the engine IS the
+  browser's native <input type="range">). This demo proves the single-value,
+  two-way behaviour authored entirely in Rozie works identically across all 6
+  targets (slider.spec.ts):
+
+    - A single scalar value, [0,100] step 1, ariaLabel="Volume".
+    - r-model:value two-way binds the slider value to $data.value; the live
+      `readout-value` proves the bound value round-trips OUT (the component
+      writes $model.value → $data.value → readout) — for both the drag commit
+      (set-.value + dispatch input/change) and keyboard (Arrow/Home/End/PageUp).
+    - A `set-value` button writes $data.value DIRECTLY (the uniform two-way
+      driver); the slider thumb + readout reflect it — the model write flowed
+      INTO the component.
+
+  This is the BEHAVIORAL cell — no screenshot stabilization here.
+-->
+
+<rozie name="SliderBehaviorDemo">
+
+<components>
+{
+  Slider: '../../packages/ui/slider/src/Slider.rozie',
+}
+</components>
+
+<data>
+{
+  value: 50,
+}
+</data>
+
+<script>
+// The uniform two-way driver: write the bound value directly. The model write
+// flows into the wrapper → the slider thumb moves, and the readout (bound to the
+// same $data.value) reflects it. Works on all 6 targets.
+const pickValue = (v) => { $data.value = v }
+</script>
+
+<template>
+<div class="slider-demo">
+  <h3>Slider — behavioral</h3>
+
+  <div class="controls">
+    <!-- Direct model write (the uniform two-way driver across all 6) -->
+    <button type="button" data-testid="set-value" @click="pickValue(30)">Set 30</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Slider
+    r-model:value="$data.value"
+    min="0"
+    max="100"
+    step="1"
+    ariaLabel="Volume"
+  />
+</div>
+</template>
+
+<style>
+.slider-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.slider-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-weight: 600;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

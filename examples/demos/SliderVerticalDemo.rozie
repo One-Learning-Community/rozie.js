@@ -1,0 +1,88 @@
+<!--
+  SliderVerticalDemo.rozie — VERTICAL (rotate-90) consumer for the pure-Rozie Slider.
+
+  Proves the `orientation="vertical"` rotate-90 wrapper renders an explicit
+  `aria-orientation="vertical"` (the native input reports horizontal — the source
+  sets it explicitly) and that up=increase: ArrowUp raises the value across all 6
+  targets (slider.spec.ts req 6).
+
+    - orientation="vertical" → the rotate-90 wrapper + explicit aria-orientation.
+    - r-model:value two-way binds to $data.value; the live `readout-value` proves
+      the keyboard (ArrowUp) commit round-trips OUT.
+    - A `set-value` button writes $data.value DIRECTLY (the uniform two-way driver).
+
+  This is the BEHAVIORAL cell — no screenshot stabilization here.
+-->
+
+<rozie name="SliderVerticalDemo">
+
+<components>
+{
+  Slider: '../../packages/ui/slider/src/Slider.rozie',
+}
+</components>
+
+<data>
+{
+  value: 50,
+}
+</data>
+
+<script>
+// The uniform two-way driver: write the bound value directly. The model write
+// flows into the wrapper → the thumb moves, and the readout (bound to the same
+// $data.value) reflects it. Works on all 6 targets.
+const pickValue = (v) => { $data.value = v }
+</script>
+
+<template>
+<div class="slider-demo">
+  <h3>Slider — vertical</h3>
+
+  <div class="controls">
+    <!-- Direct model write (the uniform two-way driver across all 6) -->
+    <button type="button" data-testid="set-value" @click="pickValue(70)">Set 70</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Slider
+    orientation="vertical"
+    r-model:value="$data.value"
+    min="0"
+    max="100"
+    step="1"
+    ariaLabel="Brightness"
+  />
+</div>
+</template>
+
+<style>
+.slider-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.slider-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-weight: 600;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>
