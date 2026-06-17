@@ -1,0 +1,99 @@
+/*
+ * @rozie-ui/data-table — base token reference.
+ *
+ * Every COSMETIC value the table renders flows through a `--rozie-data-table-*`
+ * PUBLIC token. The component's scoped `<style>` reads short internal `--rdt-*`
+ * tokens with inline `var(--rdt-x, <fallback>)` defaults, so the table renders
+ * ZERO-CONFIG without importing this file — it already paints a sensible default.
+ * Importing this file simply makes the full public token surface explicit in one
+ * place and wires each public `--rozie-data-table-*` token onto the internal
+ * `--rdt-*` the component consumes, so a design-system bridge (shadcn / material /
+ * bootstrap) can re-skin the whole table by remapping ONLY the public tokens.
+ *
+ * NOTE the split (CONTEXT "Claude's Discretion" + the slider D-08 precedent): the
+ * STRUCTURAL rules — `border-collapse`, the keyed-r-for layout, `position: sticky`
+ * for the header + pinned columns, the resize-handle positioning, the
+ * `<details>` disclosure box — are behavior-critical and live in the component's
+ * scoped `<style>` (per-leaf, NOT consumer-overridable). Only the values below
+ * flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-data-table` / `.rozie-data-table-wrap` element). See
+ * themes/shadcn.css, themes/material.css and themes/bootstrap.css for the
+ * design-system bridges.
+ */
+.rozie-data-table-wrap,
+.rozie-data-table {
+  /* ── palette (the few values most consumers will set) ───────────────────── */
+  --rozie-data-table-fg: inherit;
+  --rozie-data-table-accent: #0066cc;
+  --rozie-data-table-border-color: rgba(0, 0, 0, 0.08);
+  --rozie-data-table-control-border-color: rgba(0, 0, 0, 0.2);
+  --rozie-data-table-radius: 4px;
+
+  /* ── typography / cell metrics ──────────────────────────────────────────── */
+  --rozie-data-table-font: 14px system-ui, sans-serif;
+  --rozie-data-table-cell-padding: 0.5rem 0.75rem;
+
+  /* ── header ─────────────────────────────────────────────────────────────── */
+  --rozie-data-table-header-bg: rgba(0, 0, 0, 0.03);
+  --rozie-data-table-header-weight: 600;
+
+  /* ── sort indicator ─────────────────────────────────────────────────────── */
+  --rozie-data-table-sort-indicator-opacity: 0.7;
+
+  /* ── resize handle (req-9) ──────────────────────────────────────────────── */
+  --rozie-data-table-resize-grip-color: rgba(0, 0, 0, 0.12);
+  --rozie-data-table-resize-grip-active: var(--rozie-data-table-accent);
+
+  /* ── pin controls (req-11) ──────────────────────────────────────────────── */
+  --rozie-data-table-pin-active-bg: rgba(0, 0, 0, 0.1);
+
+  /* ── column-visibility menu (req-8) ─────────────────────────────────────── */
+  --rozie-data-table-menu-bg: #fff;
+  --rozie-data-table-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+
+  /* ── selection checkboxes (req-7) ───────────────────────────────────────── */
+  --rozie-data-table-select-accent: var(--rozie-data-table-accent);
+
+  /* ── disabled pagination controls ──────────────────────────────────────── */
+  --rozie-data-table-disabled-opacity: 0.4;
+
+  /* ─────────────────────────────────────────────────────────────────────────
+   * Wire the PUBLIC tokens onto the INTERNAL `--rdt-*` the component reads. A
+   * bridge only needs to remap the public tokens above; these passthroughs do
+   * the rest. (The component still renders zero-config without this file via its
+   * own inline `var(--rdt-x, <fallback>)` defaults.)
+   * ───────────────────────────────────────────────────────────────────────── */
+  --rdt-font: var(--rozie-data-table-font);
+  --rdt-color: var(--rozie-data-table-fg);
+  --rdt-cell-padding: var(--rozie-data-table-cell-padding);
+  --rdt-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-header-bg: var(--rozie-data-table-header-bg);
+  --rdt-header-weight: var(--rozie-data-table-header-weight);
+  --rdt-sort-ind-opacity: var(--rozie-data-table-sort-indicator-opacity);
+
+  --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-filter-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-btn-radius: var(--rozie-data-table-radius);
+  --rdt-page-btn-disabled-opacity: var(--rozie-data-table-disabled-opacity);
+  --rdt-page-size-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-page-size-radius: var(--rozie-data-table-radius);
+
+  --rdt-resize-grip-color: var(--rozie-data-table-resize-grip-color);
+  --rdt-resize-grip-active: var(--rozie-data-table-resize-grip-active);
+
+  --rdt-pin-btn-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-pin-btn-radius: var(--rozie-data-table-radius);
+  --rdt-pin-btn-active-bg: var(--rozie-data-table-pin-active-bg);
+
+  --rdt-colvis-summary-border: 1px solid var(--rozie-data-table-control-border-color);
+  --rdt-colvis-summary-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-border: 1px solid var(--rozie-data-table-border-color);
+  --rdt-colvis-menu-radius: var(--rozie-data-table-radius);
+  --rdt-colvis-menu-bg: var(--rozie-data-table-menu-bg);
+  --rdt-colvis-menu-shadow: var(--rozie-data-table-menu-shadow);
+
+  --rdt-select-accent: var(--rozie-data-table-select-accent);
+}
