@@ -1,0 +1,82 @@
+<!--
+  ColumnProbe.rozie — Phase 48 Wave-0 probe (THROWAWAY) renderless <Column> child.
+
+  The <NodeType>/<Port> analog: a renderless child that $injects the parent
+  DataTableProbe's `data-table:columns` registry and registers ONE column spec
+  ({ id, field, header }) on $onMount, unregisters on teardown. It carries the
+  `#cell` template the parent projects per cell (in portal mode). It draws NOTHING
+  of its own — it MUST be in the component tree so its $onMount fires and
+  registerColumn()s against the id-keyed (prototype-safe) registry.
+
+  REQ-30 (Lit async first-paint): the injected registry may be undefined on Lit's
+  first paint, so registration is guarded + re-attempted in $onUpdate once the
+  ContextConsumer re-publishes (the NodeType idiom).
+
+  ZERO emitter/core change expected.
+-->
+<rozie name="ColumnProbe" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // the column id (required) — graph cells key off it. Consumer-controlled, so the
+  // parent registry guards __proto__/constructor (T-48-PP).
+  id:     { type: String, required: true },
+  // the row field this column reads (table-core accessorKey).
+  field:  { type: String, default: '' },
+  // the header label.
+  header: { type: String, default: '' },
+}
+</props>
+
+<script lang="ts">
+// The nearest provided registry API from DataTableProbe. Guarded everywhere (Lit
+// async first paint, REQ-30 — the NodeType idiom).
+const registry = $inject('data-table:columns')
+
+// $inject is typed `unknown` — alias through a module-scope null-let so the strict
+// bundled-leaf tsc treats it as `any` (the typeNeutralize idiom). Module scope so
+// the Solid-hoisted teardown can see it.
+let reg = null
+reg = registry
+
+// idempotency: a Lit late-context $onUpdate registration + the $onMount one must
+// never double-register.
+let registered = false
+
+const spec = () => ({
+  id: $props.id,
+  field: $props.field !== '' ? $props.field : $props.id,
+  header: $props.header !== '' ? $props.header : $props.id,
+})
+
+$onMount(() => {
+  if (reg && !registered) {
+    registered = true
+    reg.registerColumn($props.id, spec())
+  }
+  return () => {
+    if (reg) reg.unregisterColumn($props.id)
+  }
+})
+
+// LIT ASYNC CONTEXT (REQ-30): the injected registry may resolve AFTER $onMount.
+// $onUpdate lowers to Lit's updated() and re-runs when the ContextConsumer
+// re-publishes; register exactly once. No-op on the 5 sync targets (registered is
+// already true).
+$onUpdate(() => {
+  if (registered) return
+  const live = registry
+  if (live == null) return
+  reg = live
+  registered = true
+  reg.registerColumn($props.id, spec())
+})
+</script>
+
+<template>
+<!-- renderless: the #cell template the parent projects per cell. Hidden 0×0 so the
+     child mounts (its $onMount registers the column) without adding chrome. -->
+<div class="rozie-column-probe" style="display:none"><slot /></div>
+</template>
+
+</rozie>

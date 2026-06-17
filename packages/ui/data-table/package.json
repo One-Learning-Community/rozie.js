@@ -1,0 +1,17 @@
+{
+  "name": "@rozie-ui/data-table",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'codegen.mjs lands in the distribution wave (Plan 06) — Wave-0 is probe-only'",
+    "probe": "node scripts/probe-48-00.mjs",
+    "test": "echo 'no unit tests yet (Wave-0 probe-only; behaviour covered by the VR matrix in a later wave)'",
+    "typecheck": "echo 'no local TS to check yet (Wave-0 probe sources are .rozie; emitted leaves typecheck individually later)'"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "@tanstack/table-core": "^8.21",
+    "typescript": "~5.6.0"
+  }
+}

@@ -1,0 +1,389 @@
+<!--
+  DataTableProbe.rozie — Phase 48 Wave-0 de-risk probe (THROWAWAY).
+
+  Proves the TWO load-bearing unknowns of the @rozie-ui/data-table phase BEFORE
+  the bulk build (D-08 hard gate), on the SMALLEST possible bridge — NOT the full
+  Rich-v1 surface:
+
+  (a) ONE colocated table-core bridge marries @tanstack/table-core's pull-based
+      `createTable()` + `getRowModel()` + per-slice `on<Slice>Change` callbacks to
+      all six reactivity systems. table-core owns NO DOM — it is a pure state
+      machine — so this is the controlled-state HALF of the rete FlowCanvas bridge
+      with none of the DOM-mutation half (RESEARCH Pattern 1). We hold the THREE
+      slices most likely to surface a multi-`model:true` footgun (A4) — `sorting`,
+      `globalFilter`, `pagination` — as `model:true` props with an uncontrolled
+      `$data.<slice>Default` fallback, wire the per-slice
+      `onSortingChange`/`onGlobalFilterChange`/`onPaginationChange` callbacks each
+      to a FRESH-object, echo-guarded `writeSlice` funnel, and re-feed
+      `table.setOptions` via a lazy `$watch` so the next `getRowModel()` is current.
+
+  (b) Per-cell rendering is performant. We author the cell render TWO ways behind a
+      `:cellMode` prop:
+        - "portal" → ONE reactive-portal handle PER CELL via a per-instance Set
+          (copy NodeType's `bodyHandles = new Set()` — never a shared handle that
+          disposes siblings; the count-only-VR-masking landmine from rete 41-05).
+        - "slot"   → a plain scoped slot inside the keyed r-for (RESEARCH Open-Q2:
+          the <td> host is FRAMEWORK-owned here, unlike rete's engine-created host,
+          so a normal scoped slot may sidestep the per-cell portal cost entirely).
+      The probe driver measures the smooth row-count ceiling for BOTH.
+
+  COLLISION TRAPS avoided up front (RESEARCH Anti-Patterns + §6 catalogue):
+    - r-for loop var is `cellCtx`, NEVER `cell` (a `#cell`-named slot would shadow
+      it → Svelte mount throw, D-09 / embla `slide`→`item` lesson).
+    - No slot name equals a declared prop/model name (no ROZ127).
+    - In-place state mutation is NEVER used — every write is a FRESH slice object.
+    - getRowModel-reading closures are defined INSIDE $onMount (the rete stale-
+      closure anti-pattern: a top-level $computed/useCallback freezes the empty
+      initial table on React).
+
+  ZERO emitter/core change expected (the no-emitter-change hypothesis the probe
+  smokes for multi-model A4). Engine-less + throwaway under scripts/probe-48/.
+-->
+<rozie name="DataTableProbe" inherit-attrs="false" inherit-listeners="false">
+
+<!--
+  NOTE: <ColumnProbe> is supplied by the CONSUMER as default-slot children and
+  registers itself via $inject — DataTableProbe never references it in its OWN
+  template, so it is intentionally NOT declared in a <components> block (declaring
+  it would emit ROZ924 "declared but unused"). The consumer's .rozie declares
+  ColumnProbe in its own <components>.
+-->
+
+<props>
+{
+  // The row data (stable reference per Rozie's setup-once model — re-feed it
+  // directly, never map/clone it in the watcher → Pitfall 3 infinite re-render).
+  data: { type: Array, default: () => [] },
+  // A config-array column fallback (lower precedence than <ColumnProbe> children).
+  columns: { type: Array, default: () => [] },
+  // "portal" (one reactive-portal handle per cell) | "slot" (plain scoped slot in
+  // the keyed r-for). The probe driver flips this to measure both ceilings.
+  cellMode: { type: String, default: 'slot' },
+
+  // ── The THREE state slices held as model:true (A4 multi-model smoke) ──────────
+  // Each: bound r-model value if the consumer provided it, else the internal
+  // $data.<slice>Default uncontrolled fallback. Nine in Rich-v1; three here is
+  // already MORE than any shipped family (rete has ~3 total) and enough to surface
+  // a per-slice emitter footgun.
+  sorting:      { type: Array,  default: () => [],            model: true },
+  globalFilter: { type: String, default: '',                 model: true },
+  pagination:   { type: Object, default: () => ({ pageIndex: 0, pageSize: 25 }), model: true },
+}
+</props>
+
+<data>
+{
+  // Uncontrolled fallbacks (mirror each model slice; used when the consumer did
+  // NOT bind the corresponding r-model).
+  sortingDefault: [],
+  globalFilterDefault: '',
+  paginationDefault: { pageIndex: 0, pageSize: 25 },
+
+  // The id-keyed <ColumnProbe> registry. WHOLE-OBJECT-REPLACE on every mutation
+  // (never in-place $data.colReg[id] = … which is silent on React/Solid/Angular/
+  // Lit). Threat T-48-PP: the registry MAP is built prototype-safe in
+  // resolvedColumnDefs() below (Object.create(null) + __proto__/constructor guard)
+  // because a column id is consumer-controlled.
+  colReg: {},
+
+  // The current rendered rows (table.getRowModel().rows), refreshed by the
+  // re-feed watcher. Drives the template r-for.
+  rows: [],
+
+  // Instrumentation the driver reads from the mounted DOM / window bridge.
+  rowModelVer: 0,        // bumps each refreshRowModel() — proves the pull re-ran
+  sortFires: 0,          // onSortingChange funnel invocations
+  filterFires: 0,        // onGlobalFilterChange funnel invocations
+  pageFires: 0,          // onPaginationChange funnel invocations
+  lastRowCount: 0,       // rendered row count after the latest pull
+}
+</data>
+
+<script lang="ts">
+import {
+  createTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+} from '@tanstack/table-core'
+
+// table-core instance — top-level `let` referenced from hooks → React hoists to
+// useRef (hoistModuleLet). NULL until $onMount (createTable lives in $onMount so
+// its getRowModel-reading closures capture the live instance, NOT an empty
+// initial snapshot — the rete stale-closure anti-pattern).
+let table = null
+
+// The injected/registered column registry API — provided to <ColumnProbe> kids.
+// (Renderless children register their { id, header, cellRenderer? } spec here.)
+
+// Echo-guard: while WE are writing a slice back, the re-feed watcher must not
+// re-enter the funnel. A counter (not a boolean) so nested writes are safe.
+let programmatic = 0
+
+// Assemble the live state object from bound r-model slices (?? uncontrolled).
+const currentState = () => ({
+  sorting:      $props.sorting      != null ? $props.sorting      : $data.sortingDefault,
+  globalFilter: $props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault,
+  pagination:   $props.pagination   != null ? $props.pagination   : $data.paginationDefault,
+})
+
+// Prototype-safe id-keyed column resolution (T-48-PP): config array first (lower
+// precedence), <ColumnProbe> registry overrides by id (LWW). byId is a
+// null-prototype object so a consumer column id of "__proto__"/"constructor"
+// cannot pollute Object.prototype.
+const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
+const resolvedColumnDefs = () => {
+  const byId = Object.create(null)
+  const cfg = $props.columns || []
+  for (const c of cfg) {
+    if (!c) continue
+    const id = c.id != null ? c.id : c.field
+    if (id == null || !isSafeKey(String(id))) continue
+    byId[id] = { id: String(id), accessorKey: c.field != null ? c.field : id, header: c.header != null ? c.header : String(id) }
+  }
+  const reg = $data.colReg || {}
+  for (const id in reg) {
+    if (!isSafeKey(id)) continue
+    const spec = reg[id]
+    byId[id] = { id, accessorKey: spec.field != null ? spec.field : id, header: spec.header != null ? spec.header : id }
+  }
+  const out = []
+  for (const id in byId) out.push(byId[id])
+  return out
+}
+
+// Per-slice FRESH-object echo-guarded write-back funnel. table-core hands an
+// Updater<T> = value | (old)=>new; apply it against the CURRENT slice, capture
+// the fresh local (never write-then-reread the same $data key in one fn — the
+// React stale-read Pitfall 2), write the uncontrolled default + emit the model +
+// fire the change event REGARDLESS of binding.
+const applyUpdater = (updater, current) =>
+  (typeof updater === 'function' ? updater(current) : updater)
+
+// FINDING (probe, A4): a GENERIC write funnel using DYNAMIC keys —
+// `$data[defaultKey] = next` / `$model[sliceName] = next` — is ROZ106 on ALL SIX
+// (magic accessors require STATIC keys; the dynamic-bracket access is rejected).
+// So the multi-slice bridge CANNOT share one parametric writeSlice over a
+// `sliceName` arg; each slice needs its own STATIC-key write. This is load-bearing
+// for the core wave's nine-slice bridge: write nine small per-slice funnels (or a
+// switch with static-key arms), NOT one generic indexed funnel. Recorded in the
+// probe report.
+const writeSorting = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.sortingDefault = next   // fresh object only (never in-place)
+  $model.sorting = next          // two-way emit if bound (no-op-diff if not)
+  $emit('sort-change', next)
+  programmatic--
+}
+const writeGlobalFilter = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.globalFilterDefault = next
+  $model.globalFilter = next
+  $emit('filter-change', next)
+  programmatic--
+}
+const writePagination = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.paginationDefault = next
+  $model.pagination = next
+  $emit('page-change', next)
+  programmatic--
+}
+
+// Re-read the row model into $data.rows (a fresh array → the template re-renders).
+// Defined as a plain fn (not a $computed — getRowModel() must be pulled AFTER a
+// setOptions re-feed, imperatively).
+let refreshRowModel = null
+
+$onMount(() => {
+  // Build the table instance HERE so the closures below capture the live `table`.
+  table = createTable({
+    _features: {},
+    data: $props.data,
+    columns: resolvedColumnDefs(),
+    state: currentState(),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    // PER-SLICE callbacks (RESEARCH Open-Q1 recommendation — each maps 1:1 to a
+    // slice's r-model + change event, no global-onStateChange diff logic).
+    onSortingChange: (updater) => {
+      $data.sortFires = $data.sortFires + 1
+      const next = applyUpdater(updater, currentState().sorting)
+      writeSorting(next)
+    },
+    onGlobalFilterChange: (updater) => {
+      $data.filterFires = $data.filterFires + 1
+      const next = applyUpdater(updater, currentState().globalFilter)
+      writeGlobalFilter(next)
+    },
+    onPaginationChange: (updater) => {
+      $data.pageFires = $data.pageFires + 1
+      const next = applyUpdater(updater, currentState().pagination)
+      writePagination(next)
+    },
+    renderFallbackValue: null,
+  })
+
+  refreshRowModel = () => {
+    if (!table) return
+    const rm = table.getRowModel()
+    // Capture the fresh local; never write $data.rows then re-read it in the same
+    // fn (ROZ138 / React stale-read Pitfall 2 — setState is async on React, the
+    // closure binds the PRE-write value).
+    const nextRows = rm.rows.slice() // fresh array reference (template re-renders)
+    $data.rows = nextRows
+    $data.rowModelVer = $data.rowModelVer + 1
+    $data.lastRowCount = nextRows.length
+  }
+
+  // initial pull
+  refreshRowModel()
+})
+
+// Reactive re-feed: when any bound slice OR data length OR the column registry
+// changes, push fresh options into table-core and re-pull the row model. Watch a
+// DERIVED PRIMITIVE / the bound references — never a freshly-built array (Pitfall
+// 3). Lazy by default (fires on transitions, not initial — $onMount did the first
+// pull).
+$watch(
+  () => [$props.sorting, $props.globalFilter, $props.pagination, ($props.data || []).length, $data.colReg],
+  () => {
+    if (!table) return
+    table.setOptions((prev) => ({
+      ...prev,
+      data: $props.data,
+      columns: resolvedColumnDefs(),
+      state: currentState(),
+    }))
+    if (refreshRowModel) refreshRowModel()
+  },
+)
+
+// The registry API handed to <ColumnProbe> children (whole-object-replace).
+$provide('data-table:columns', {
+  registerColumn: (id, spec) => {
+    if (id == null) return
+    const key = String(id)
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return
+    $data.colReg = { ...$data.colReg, [key]: spec }
+  },
+  unregisterColumn: (id) => {
+    if (id == null) return
+    const r = { ...$data.colReg }
+    delete r[String(id)]
+    $data.colReg = r
+  },
+})
+
+// ── cell-render PORTAL machinery (cellMode === "portal") ─────────────────────
+// ONE INDEPENDENT handle PER rendered cell — copy NodeType's per-instance Set.
+// A shared handle torn down per call would dispose siblings → only the last cell
+// of a column renders (the count-only-VR-masking bug, rete 41-05). Each mount adds
+// an independent handle and disposes NONE of its siblings.
+let cellHandles = null
+cellHandles = new Set()
+
+// Mount one cell portal into a framework-owned <td> host ref. Stored as a fn so
+// the template's r-if/@-driven mount can call it; returns a { dispose } that
+// removes ITSELF from the live set (per-cell disposal correctness).
+const mountCell = (host, scope) => {
+  if (!host) return null
+  const h = $portals.cellPortal(host, { row: scope.row, value: scope.value, columnId: scope.columnId })
+  if (!h) return null
+  cellHandles.add(h)
+  return {
+    dispose: () => {
+      cellHandles.delete(h)
+      if (h && h.dispose) { try { h.dispose() } catch (e) {} }
+    },
+  }
+}
+
+// Driver-facing instrumentation: live rendered-cell handle count (proves per-cell
+// disposal — count returns to the rendered-cell count after a re-render, siblings
+// not torn down).
+$expose({
+  cellHandleCount: () => (cellHandles ? cellHandles.size : 0),
+  rowCount: () => $data.lastRowCount,
+  // drive a sort programmatically (the driver ticks this to time a re-render).
+  tickSort: (colId) => {
+    if (table) table.setSorting((old) => [{ id: colId, desc: !(old && old[0] && old[0].desc) }])
+  },
+  tickFilter: (q) => { if (table) table.setGlobalFilter(q) },
+  tickPage: (i) => { if (table) table.setPageIndex(i) },
+  refresh: () => { if (refreshRowModel) refreshRowModel() },
+})
+</script>
+
+<template>
+<div class="rozie-data-table-probe" role="table">
+  <!-- header row -->
+  <div class="rdt-thead" role="rowgroup">
+    <div class="rdt-tr" role="row">
+      <div
+        class="rdt-th"
+        role="columnheader"
+        r-for="col in resolvedColumnDefs()"
+        :key="col.id"
+        :data-col="col.id"
+        @click="table && table.getColumn(col.id) && table.getColumn(col.id).toggleSorting()"
+      >{{ col.header }}</div>
+    </div>
+  </div>
+
+  <!-- body: keyed r-for over the pulled row model. Loop var is `cellCtx`, NEVER
+       `cell` (the #cell slot name must not shadow it → Svelte mount throw, D-09). -->
+  <div class="rdt-tbody" role="rowgroup">
+    <div
+      class="rdt-tr"
+      role="row"
+      r-for="row in $data.rows"
+      :key="row.id"
+      :data-row="row.id"
+    >
+      <div
+        class="rdt-td"
+        role="cell"
+        r-for="cellCtx in row.getVisibleCells()"
+        :key="cellCtx.id"
+        :data-cell="cellCtx.id"
+      >
+        <!-- "slot" mode: a plain scoped slot inside the keyed r-for (Open-Q2 fast
+             path; the <td> is framework-owned so no portal relocation needed). -->
+        <span r-if="$props.cellMode !== 'portal'" class="rdt-cell-slot">
+          <slot
+            name="cell"
+            :row="cellCtx.row.original"
+            :value="cellCtx.getValue()"
+            :columnId="cellCtx.column.id"
+          >{{ cellCtx.getValue() }}</slot>
+        </span>
+        <!-- "portal" mode: a per-cell reactive-portal host. The portal slot is
+             declared (not rendered inline by the emitter) and mounted into this
+             <td> ref via $portals.cell — ONE handle per cell. -->
+        <span r-if="$props.cellMode === 'portal'" class="rdt-cell-portal" :ref="'cellHost'"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- the per-cell reactive portal slot (declared; mounted imperatively per cell
+       via $portals.cellPortal in portal mode). Distinct slot name `cellPortal` —
+       no prop/model is named `cellPortal`, so no ROZ127; and it must differ from
+       the inline scoped `cell` slot above (a name shared between an inline slot and
+       a portal slot would collide in the emitter's slot table). The driver fills
+       BOTH `#cell` (slot mode) and `#cellPortal` (portal mode) consumer templates. -->
+  <slot name="cellPortal" portal reactive :params="['row', 'value', 'columnId']" />
+
+  <!-- renderless <ColumnProbe> children mount here so their $onMount fires and
+       registers the column spec; hidden 0×0 container (no visible chrome). -->
+  <div class="rozie-data-table-children" style="display:none"><slot /></div>
+</div>
+</template>
+
+</rozie>
