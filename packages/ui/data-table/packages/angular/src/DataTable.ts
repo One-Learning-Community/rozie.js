@@ -18,11 +18,33 @@ interface SelectAllCtx {
   toggle: any;
 }
 
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
+}
+
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
+}
+
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
   checked: any;
   toggle: any;
+}
+
+interface CellCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -101,8 +123,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
     } @else {
 
+                
                 @if (selectionMode() === 'multiple') {
-    <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" [attr.indeterminate]="rozieAttr(isSomeRowsSelected())" (change)="onToggleAllRows($event)" />
+    <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" (change)="onToggleAllRows($event)" />
     }
     }
             </span>
@@ -112,28 +135,34 @@ function rozieToken(key: string): InjectionToken<unknown> {
               @if (header.column.getCanSort && header.column.getCanSort()) {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
                 
-                @if (columnHasHeaderTemplate(header.column.id)) {
-    <span class="rdt-header-host" [attr.data-header-host]="rozieAttr('h:' + header.column.id)" [attr.data-col]="rozieAttr(header.column.id)"></span>
+                <span class="rdt-header-label">
+                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
-    <span class="rdt-header-label">{{ rozieDisplay(headerLabel(header.column.id)) }}</span>
-    }<span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(header.column.id)) }}</span>
+    {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                </span>
+                <span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(header.column.id)) }}</span>
               </button>
     } @else {
     <span style="display:contents">
-                @if (columnHasHeaderTemplate(header.column.id)) {
-    <span class="rdt-header-host" [attr.data-header-host]="rozieAttr('h:' + header.column.id)" [attr.data-col]="rozieAttr(header.column.id)"></span>
+                <span class="rdt-header-label">
+                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
-    <span class="rdt-header-label">{{ rozieDisplay(headerLabel(header.column.id)) }}</span>
-    }</span>
+    {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                </span>
+              </span>
     }@if (columnIsFilterable(header.column.id)) {
-    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="_guardedUndefined($event)" />
+    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
     }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
-                <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="_guardedHandler1_1($event)">⇤</button>
-                <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="_guardedHandler2_2($event)">⇔</button>
-                <button type="button" class="rdt-pin-btn rdt-pin-right" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="_guardedHandler3_3($event)">⇥</button>
+                <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">⇤</button>
+                <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">⇔</button>
+                <button type="button" class="rdt-pin-btn rdt-pin-right" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">⇥</button>
               </span>
               
-              <button type="button" class="rdt-resize-handle" [attr.aria-label]="rozieAttr('Resize ' + headerLabel(header.column.id))" (pointerdown)="_guardedHandler4_4($event)" (touchstart)="_guardedHandler5_5($event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
+              <button type="button" class="rdt-resize-handle" [attr.aria-label]="rozieAttr('Resize ' + headerLabel(header.column.id))" (pointerdown)="onResizeStart(header.column.id, $event)" (touchstart)="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
             </span>
     }</th>
     }
@@ -144,23 +173,27 @@ function rozieToken(key: string): InjectionToken<unknown> {
       <tbody class="rdt-tbody" role="rowgroup">
         @for (row of rows(); track row.id) {
     <tr class="rdt-tr" role="row">
-          @for (cellCtx of row.getVisibleCells(); track cellCtx.id) {
+          @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" role="cell" [attr.data-col]="rozieAttr(cellCtx.column.id)" [style]="pinStyle(cellCtx.column.id)">
             
             @if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_6(row, cellCtx)" />
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(row, cellCtx)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(row)" (change)="onToggleRow(row, $event)" />
               
     }
             </span>
-    } @else if (columnHasCellTemplate(cellCtx.column.id)) {
-    <span class="rdt-cell-host" [attr.data-cell-host]="rozieAttr('c:' + row.id + ':' + cellCtx.column.id)" [attr.data-col]="rozieAttr(cellCtx.column.id)" [attr.data-row]="rozieAttr(row.id)"></span>
     } @else {
-    <span class="rdt-cell-value">{{ rozieDisplay(cellCtx.getValue()) }}</span>
+    <span class="rdt-cell-value">
+              @if ((cellTpl ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }" />
+    } @else {
+    {{ rozieDisplay(cellCtx.getValue()) }}
+    }
+            </span>
     }</td>
     }
         </tr>
@@ -453,28 +486,24 @@ export class DataTable {
   pinChange = output<unknown>({ alias: 'pin-change' });
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
+  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
+  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
-  private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
-  private __rozieWatchInitial_1 = true;
 
   constructor() {
-    this.cellMounts = new Map();
-    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length, this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => () => {
       if (!this.table) return;
-      this.table.setOptions((prev: any) => ({
-        ...prev,
-        data: this.data(),
-        columns: this.tableColumns(),
-        state: this.currentState(),
-        enableRowSelection: this.selectionMode() !== 'none',
-        enableMultiRowSelection: this.selectionMode() === 'multiple'
-      }));
-      if (this.refreshRowModel) this.refreshRowModel();
-    })(); }); });
-    effect(() => { const __watchVal = (() => this.rowModelVer())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      this.scheduleReconcile();
+      const d = this.data() || [];
+      if (d === this.lastData && d.length === this.lastDataLen) return;
+      this.lastData = d;
+      this.lastDataLen = d.length;
+      this.reFeed();
+    });
+    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length, this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      this.reFeed();
     })(); }); });
   }
 
@@ -483,9 +512,13 @@ export class DataTable {
     const __selectionMode = this.selectionMode();
     // Build the table instance HERE so the closures below capture the live `table`.
     this.table = createTable({
-      get data() {
-        return this.data();
-      },
+      // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
+      // `this` to the options object, and the Angular/Lit emitters resolve $props via
+      // `this.data` — so `get data() { return $props.data }` lowers to `this.data`
+      // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
+      // on every change by the watch's setOptions below, exactly like columns/state, so
+      // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
+      data: this.data(),
       columns: this.tableColumns(),
       state: this.currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -503,62 +536,30 @@ export class DataTable {
       // default, D-06 — NOT overridden).
       enableRowSelection: __selectionMode !== 'none',
       enableMultiRowSelection: __selectionMode === 'multiple',
-      // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
-      // no global onStateChange diff). Each applies the table-core Updater against the
-      // CURRENT slice value, then funnels a FRESH value through the echo-guarded writer.
-      onSortingChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().sorting);
-        this.writeSorting(next);
-      },
-      onGlobalFilterChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().globalFilter);
-        this.writeGlobalFilter(next);
-      },
-      onColumnFiltersChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnFilters);
-        this.writeColumnFilters(next);
-      },
-      onPaginationChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().pagination);
-        this.writePagination(next);
-      },
-      onRowSelectionChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().rowSelection);
-        this.writeRowSelection(next);
-      },
-      // Column-management callbacks (req-8/9/10/11) — each applies the table-core Updater
-      // against the CURRENT slice value, then funnels a FRESH value through its
-      // echo-guarded writer (same A4 STATIC-key discipline as the slices above).
-      onColumnVisibilityChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnVisibility);
-        this.writeColumnVisibility(next);
-      },
-      onColumnSizingChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnSizing);
-        this.writeColumnSizing(next);
-      },
-      onColumnOrderChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnOrder);
-        this.writeColumnOrder(next);
-      },
-      onColumnPinningChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnPinning);
-        this.writeColumnPinning(next);
-      },
-      // Transient resize-gesture state — table-core drives this during a drag (NOT a
-      // two-way model slice). Write a FRESH object to $data so getState() reflects
-      // the live gesture; gate the row-model refresh on the resizing flag so a drag
-      // re-pulls the sized columns. No change event (it is internal gesture state).
-      onColumnSizingInfoChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.columnSizingInfo());
-        this.columnSizingInfo.set(next != null ? next : this.columnSizingInfo());
-      },
+      // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
+      // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
+      // $watch so React reads fresh currentState (the stale-closure fix, F6).
+      onSortingChange: this.onSortingChangeCb,
+      onGlobalFilterChange: this.onGlobalFilterChangeCb,
+      onColumnFiltersChange: this.onColumnFiltersChangeCb,
+      onPaginationChange: this.onPaginationChangeCb,
+      onRowSelectionChange: this.onRowSelectionChangeCb,
+      onColumnVisibilityChange: this.onColumnVisibilityChangeCb,
+      onColumnSizingChange: this.onColumnSizingChangeCb,
+      onColumnOrderChange: this.onColumnOrderChangeCb,
+      onColumnPinningChange: this.onColumnPinningChangeCb,
+      onColumnSizingInfoChange: this.onColumnSizingInfoChangeCb,
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
       columnResizeMode: 'onChange',
       enableColumnResizing: true,
-      renderFallbackValue: null
+      renderFallbackValue: null,
+      // table-core's RESOLVED options type (TableOptionsResolved) requires a global
+      // onStateChange + renderFallbackValue; we drive state via the per-slice on<Slice>Change
+      // callbacks above, so the global hook is a no-op. Present so the createTable() argument
+      // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
+      onStateChange: () => {}
     });
     this.refreshRowModel = () => {
       if (!this.table) return;
@@ -570,38 +571,21 @@ export class DataTable {
       this.rows.set(nextRows);
       this.headerGroups.set(nextGroups);
       this.rowModelVer.set(this.rowModelVer() + 1);
+      // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
+      // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
+      // across selection changes; a microtask defer covers React's post-render DOM patch.
+      this.syncIndeterminate();
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(this.syncIndeterminate);else Promise.resolve().then(this.syncIndeterminate);
     };
 
     // initial pull
     // initial pull
     this.refreshRowModel();
-    // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
-    // hosts exist before we query for them (a synchronous call here finds zero hosts
-    // on first paint).
-    // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
-    // hosts exist before we query for them (a synchronous call here finds zero hosts
-    // on first paint).
-    this.scheduleReconcile();
-    this.__rozieDestroyRef.onDestroy(() => {
-      // dispose every live cell/header projection on unmount.
-      if (this.cellMounts) {
-        for (const h of this.cellMounts.values() as any) {
-          if (h && h.dispose) {
-            try {
-              h.dispose();
-            } catch (e: any) {}
-          }
-        }
-        this.cellMounts.clear();
-      }
-    });
   }
 
   table: any = null;
   programmatic = 0;
-  currentState = () => ({
+  currentState = (): any => ({
     sorting: this.sorting() != null ? this.sorting() : this.sortingDefault(),
     globalFilter: this.globalFilter() != null ? this.globalFilter() : this.globalFilterDefault(),
     columnFilters: this.columnFilters() != null ? this.columnFilters() : this.columnFiltersDefault(),
@@ -643,11 +627,6 @@ export class DataTable {
         // filtered (and renders no per-column filter input in the chrome below).
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
-        // config-array columns carry no template → plain-value fast path.
-        hasCell: false,
-        cellRenderer: null,
-        hasHeader: false,
-        headerRenderer: null,
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : ''
       };
@@ -665,10 +644,6 @@ export class DataTable {
         enableSorting: spec.sortable === true,
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
-        hasCell: spec.hasCell === true,
-        cellRenderer: spec.cellRenderer != null ? spec.cellRenderer : null,
-        hasHeader: spec.hasHeader === true,
-        headerRenderer: spec.headerRenderer != null ? spec.headerRenderer : null,
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : ''
       };
@@ -688,10 +663,6 @@ export class DataTable {
         enableColumnFilter: false,
         filterable: false,
         isSelectColumn: true,
-        hasCell: false,
-        cellRenderer: null,
-        hasHeader: false,
-        headerRenderer: null,
         pinned: '',
         width: ''
       };
@@ -792,75 +763,63 @@ export class DataTable {
     this.writeColumnFilters(next);
   };
   refreshRowModel: any = null;
-  cellMounts: any = null;
-  reconcileProjections = () => {
-    if (!this.__rozieRoot()?.nativeElement || !this.cellMounts) return;
-    const seen = new Set();
-    const defs = this.columnDefs();
-    const defById = Object.create(null);
-    for (const d of defs as any) defById[d.id] = d;
-    // cells
-    const cellHosts = this.__rozieRoot()!.nativeElement.querySelectorAll('[data-cell-host]');
-    for (const host of cellHosts as any) {
-      const key = host.getAttribute('data-cell-host');
-      seen.add(key);
-      if (this.cellMounts.has(key)) continue;
-      const colId = host.getAttribute('data-col');
-      const rowId = host.getAttribute('data-row');
-      const def = defById[colId];
-      if (!def || !def.hasCell || !def.cellRenderer) continue;
-      const row = (this.rows() || []).find((r: any) => String(r.id) === String(rowId));
-      if (!row) continue;
-      const handle = def.cellRenderer(host, {
-        row: row.original,
-        value: row.getValue(def.accessorKey),
-        column: def
-      });
-      if (handle) this.cellMounts.set(key, handle);
-    }
-    // headers
-    const headerHosts = this.__rozieRoot()!.nativeElement.querySelectorAll('[data-header-host]');
-    for (const host of headerHosts as any) {
-      const key = host.getAttribute('data-header-host');
-      seen.add(key);
-      if (this.cellMounts.has(key)) continue;
-      const colId = host.getAttribute('data-col');
-      const def = defById[colId];
-      if (!def || !def.hasHeader || !def.headerRenderer) continue;
-      const handle = def.headerRenderer(host, {
-        column: def
-      });
-      if (handle) this.cellMounts.set(key, handle);
-    }
-    // dispose handles whose host went away
-    for (const key of Array.from(this.cellMounts.keys()) as any) {
-      if (!seen.has(key)) {
-        const h = this.cellMounts.get(key);
-        this.cellMounts.delete(key);
-        if (h && h.dispose) {
-          try {
-            h.dispose();
-          } catch (e: any) {}
-        }
-      }
-    }
+  onSortingChangeCb = (updater: any) => {
+    this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
   };
-  reconcilePending = false;
-  scheduleReconcile = () => {
-    if (this.reconcilePending) return;
-    this.reconcilePending = true;
-    const run = () => {
-      this.reconcilePending = false;
-      this.reconcileProjections();
-    };
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        Promise.resolve().then(run);
-      });
-    } else {
-      Promise.resolve().then(run);
-    }
+  onGlobalFilterChangeCb = (updater: any) => {
+    this.writeGlobalFilter(this.applyUpdater(updater, this.currentState().globalFilter));
   };
+  onColumnFiltersChangeCb = (updater: any) => {
+    this.writeColumnFilters(this.applyUpdater(updater, this.currentState().columnFilters));
+  };
+  onPaginationChangeCb = (updater: any) => {
+    this.writePagination(this.applyUpdater(updater, this.currentState().pagination));
+  };
+  onRowSelectionChangeCb = (updater: any) => {
+    this.writeRowSelection(this.applyUpdater(updater, this.currentState().rowSelection));
+  };
+  onColumnVisibilityChangeCb = (updater: any) => {
+    this.writeColumnVisibility(this.applyUpdater(updater, this.currentState().columnVisibility));
+  };
+  onColumnSizingChangeCb = (updater: any) => {
+    this.writeColumnSizing(this.applyUpdater(updater, this.currentState().columnSizing));
+  };
+  onColumnOrderChangeCb = (updater: any) => {
+    this.writeColumnOrder(this.applyUpdater(updater, this.currentState().columnOrder));
+  };
+  onColumnPinningChangeCb = (updater: any) => {
+    this.writeColumnPinning(this.applyUpdater(updater, this.currentState().columnPinning));
+  };
+  onColumnSizingInfoChangeCb = (updater: any) => {
+    const next = this.applyUpdater(updater, this.columnSizingInfo());
+    this.columnSizingInfo.set(next != null ? next : this.columnSizingInfo());
+  };
+  reFeed = () => {
+    if (!this.table) return;
+    this.table.setOptions((prev: any) => ({
+      ...prev,
+      data: this.data(),
+      columns: this.tableColumns(),
+      state: this.currentState(),
+      enableRowSelection: this.selectionMode() !== 'none',
+      enableMultiRowSelection: this.selectionMode() === 'multiple',
+      // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
+      // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
+      onSortingChange: this.onSortingChangeCb,
+      onGlobalFilterChange: this.onGlobalFilterChangeCb,
+      onColumnFiltersChange: this.onColumnFiltersChangeCb,
+      onPaginationChange: this.onPaginationChangeCb,
+      onRowSelectionChange: this.onRowSelectionChangeCb,
+      onColumnVisibilityChange: this.onColumnVisibilityChangeCb,
+      onColumnSizingChange: this.onColumnSizingChangeCb,
+      onColumnOrderChange: this.onColumnOrderChangeCb,
+      onColumnPinningChange: this.onColumnPinningChangeCb,
+      onColumnSizingInfoChange: this.onColumnSizingInfoChangeCb
+    }));
+    if (this.refreshRowModel) this.refreshRowModel();
+  };
+  lastData: any = null;
+  lastDataLen = -1;
   onHeaderSort = (colId: any, evt: any) => {
     if (!this.table) return;
     const col = this.table.getColumn(colId);
@@ -869,8 +828,9 @@ export class DataTable {
     // toggleSorting(desc?, isMulti?) cycles asc → desc → none; multi accumulates.
     col.toggleSorting(undefined, multi);
   };
+  tick = () => this.rowModelVer();
   ariaSortFor = (colId: any) => {
-    if (!this.table) return 'none';
+    if (this.tick() < 0 || !this.table) return 'none';
     const col = this.table.getColumn(colId);
     if (!col) return 'none';
     const dir = col.getIsSorted();
@@ -879,7 +839,7 @@ export class DataTable {
     return 'none';
   };
   sortIndicator = (colId: any) => {
-    if (!this.table) return '';
+    if (this.tick() < 0 || !this.table) return '';
     const col = this.table.getColumn(colId);
     if (!col) return '';
     const dir = col.getIsSorted();
@@ -892,14 +852,7 @@ export class DataTable {
     for (const d of defs as any) if (d.id === colId) return d;
     return null;
   };
-  columnHasCellTemplate = (colId: any) => {
-    const d = this.defFor(colId);
-    return !!(d && d.hasCell && d.cellRenderer);
-  };
-  columnHasHeaderTemplate = (colId: any) => {
-    const d = this.defFor(colId);
-    return !!(d && d.hasHeader && d.headerRenderer);
-  };
+  visibleCellsFor = (row: any) => this.rowModelVer() >= 0 ? row.getVisibleCells() : [];
   columnIsFilterable = (colId: any) => {
     const d = this.defFor(colId);
     return !!(d && d.filterable);
@@ -909,13 +862,15 @@ export class DataTable {
     return d ? d.header : colId;
   };
   headerWidth = (colId: any) => {
-    if (!this.table) return null;
+    if (this.tick() < 0 || !this.table) return null;
     const col = this.table.getColumn(colId);
     if (!col) return null;
     const w = col.getSize();
     return w != null && w > 0 ? w + 'px' : null;
   };
   onResizeStart = (colId: any, evt: any) => {
+    // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
+    if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!this.table) return;
     const header = this.findHeader(colId);
     if (!header || !header.getResizeHandler) return;
@@ -931,12 +886,12 @@ export class DataTable {
     return null;
   };
   columnIsResizing = (colId: any) => {
-    if (!this.table) return false;
+    if (this.tick() < 0 || !this.table) return false;
     const header = this.findHeader(colId);
     return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing());
   };
   columnIsVisible = (colId: any) => {
-    if (!this.table) return true;
+    if (this.tick() < 0 || !this.table) return true;
     const col = this.table.getColumn(colId);
     return !!(col && (col.getIsVisible ? col.getIsVisible() : true));
   };
@@ -946,7 +901,7 @@ export class DataTable {
     if (col && col.toggleVisibility) col.toggleVisibility();
   };
   allLeafColumns = () => {
-    if (!this.table) return [];
+    if (this.tick() < 0 || !this.table) return [];
     const cols = this.table.getAllLeafColumns ? this.table.getAllLeafColumns() : [];
     const out = [];
     for (const c of cols as any) {
@@ -960,18 +915,19 @@ export class DataTable {
     return out;
   };
   columnPinSide = (colId: any) => {
-    if (!this.table) return false;
+    if (this.tick() < 0 || !this.table) return false;
     const col = this.table.getColumn(colId);
     if (!col || !col.getIsPinned) return false;
     return col.getIsPinned();
   };
-  onPinColumn = (colId: any, side: any) => {
+  onPinColumn = (colId: any, side: any, evt: any) => {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!this.table) return;
     const col = this.table.getColumn(colId);
     if (col && col.pin) col.pin(side);
   };
   pinStyle = (colId: any) => {
-    if (!this.table) return '';
+    if (this.tick() < 0 || !this.table) return '';
     const col = this.table.getColumn(colId);
     if (!col || !col.getIsPinned) return '';
     const side = col.getIsPinned();
@@ -1009,22 +965,22 @@ export class DataTable {
     return v != null ? v : '';
   };
   pageIndex = () => {
-    if (this.table) return this.table.getState().pagination.pageIndex;
+    if (this.tick() >= 0 && this.table) return this.table.getState().pagination.pageIndex;
     const p = this.currentState().pagination;
     return p && p.pageIndex != null ? p.pageIndex : 0;
   };
   pageSize = () => {
-    if (this.table) return this.table.getState().pagination.pageSize;
+    if (this.tick() >= 0 && this.table) return this.table.getState().pagination.pageSize;
     const p = this.currentState().pagination;
     return p && p.pageSize != null ? p.pageSize : 10;
   };
   pageCount = () => {
-    if (!this.table) return 1;
+    if (this.tick() < 0 || !this.table) return 1;
     const c = this.table.getPageCount();
     return c != null && c > 0 ? c : 1;
   };
-  canPrevPage = () => !!(this.table && this.table.getCanPreviousPage());
-  canNextPage = () => !!(this.table && this.table.getCanNextPage());
+  canPrevPage = () => !!(this.tick() >= 0 && this.table && this.table.getCanPreviousPage());
+  canNextPage = () => !!(this.tick() >= 0 && this.table && this.table.getCanNextPage());
   onPrevPage = () => {
     if (this.table) this.table.previousPage();
   };
@@ -1038,16 +994,31 @@ export class DataTable {
     this.table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10);
   };
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
-  isAllRowsSelected = () => !!(this.table && this.table.getIsAllRowsSelected());
-  isSomeRowsSelected = () => !!(this.table && this.table.getIsSomeRowsSelected());
+  stopEvent = (evt: any) => {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
+  };
+  isAllRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsAllRowsSelected());
+  isSomeRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsSomeRowsSelected());
   onToggleAllRows = (evt: any) => {
     if (!this.table) return;
     this.table.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked));
   };
-  rowIsSelected = (row: any) => !!(row && row.getIsSelected && row.getIsSelected());
+  rowIsSelected = (row: any) => {
+    if (!row) return false;
+    const id = row.id;
+    const sel = this.currentState().rowSelection || {};
+    if (id != null && Object.prototype.hasOwnProperty.call(sel, id)) return !!sel[id];
+    return !!(row.getIsSelected && row.getIsSelected());
+  };
   onToggleRow = (row: any, evt: any) => {
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
+  };
+  selectAllBox: any = null;
+  syncIndeterminate = () => {
+    if (!this.__rozieRoot()?.nativeElement || !this.__rozieRoot()!.nativeElement.querySelector) return;
+    this.selectAllBox = this.__rozieRoot()!.nativeElement.querySelector('.rdt-select-all');
+    if (this.selectAllBox) this.selectAllBox.indeterminate = this.isSomeRowsSelected() && !this.isAllRowsSelected();
   };
   sortColumn = (colId: any, desc: any) => {
     if (this.table) this.table.getColumn(colId) && this.table.getColumn(colId).toggleSorting(desc, false);
@@ -1091,41 +1062,11 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | SelectAllCtx | SelectCellCtx {
+  ): _ctx is DefaultCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | CellCtx {
     return true;
   }
 
-  private _guardedUndefined = ($event: any) => {
-    $event.stopPropagation();
-    this.undefined($event);
-  };
-
-  private _guardedHandler1_1 = ($event: any) => {
-    $event.stopPropagation();
-    onPinColumn(header.column.id, 'left');
-  };
-
-  private _guardedHandler2_2 = ($event: any) => {
-    $event.stopPropagation();
-    onPinColumn(header.column.id, false);
-  };
-
-  private _guardedHandler3_3 = ($event: any) => {
-    $event.stopPropagation();
-    onPinColumn(header.column.id, 'right');
-  };
-
-  private _guardedHandler4_4 = ($event: any) => {
-    $event.stopPropagation();
-    onResizeStart(header.column.id, $event);
-  };
-
-  private _guardedHandler5_5 = ($event: any) => {
-    $event.stopPropagation();
-    onResizeStart(header.column.id, $event);
-  };
-
-  private _selectCell_ctx_6 = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
+  private _selectCell_ctx = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

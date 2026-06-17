@@ -110,4 +110,7 @@ The `<Column>` child declares per-column `#cell` / `#header` render templates; t
 | --- | --- |
 | (default) |  |
 | selectAll | checked, indeterminate, toggle |
+| colHeader | columnId, column, label |
+| colHeader | columnId, column, label |
 | selectCell | row, checked, toggle |
+| cell | columnId, column, row, value |

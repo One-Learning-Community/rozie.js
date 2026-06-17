@@ -20,10 +20,23 @@ interface RozieSelectAllSlotCtx {
   toggle: unknown;
 }
 
+interface RozieColHeaderSlotCtx {
+  columnId: unknown;
+  column: unknown;
+  label: unknown;
+}
+
 interface RozieSelectCellSlotCtx {
   row: unknown;
   checked: unknown;
   toggle: unknown;
+}
+
+interface RozieCellSlotCtx {
+  columnId: unknown;
+  column: unknown;
+  row: unknown;
+  value: unknown;
 }
 
 @customElement('rozie-data-table')
@@ -277,7 +290,6 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _rowModelVer = signal(0);
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
-private __rozieWatchInitial_1 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -303,9 +315,15 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotSelectAll = false;
   @queryAssignedElements({ slot: 'selectAll', flatten: true }) private _slotSelectAllElements!: Element[];
   @property({ attribute: false }) selectAll?: (scope: { checked: unknown; indeterminate: unknown; toggle: unknown }) => unknown;
+  @state() private _hasSlotColHeader = false;
+  @queryAssignedElements({ slot: 'colHeader', flatten: true }) private _slotColHeaderElements!: Element[];
+  @property({ attribute: false }) colHeader?: (scope: { columnId: unknown; column: unknown; label: unknown }) => unknown;
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
   @property({ attribute: false }) selectCell?: (scope: { row: unknown; checked: unknown; toggle: unknown }) => unknown;
+  @state() private _hasSlotCell = false;
+  @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
+  @property({ attribute: false }) cell?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -336,9 +354,31 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="colHeader"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotColHeader = this._slotColHeaderElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="selectCell"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotSelectCell = this._slotSelectCellElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="cell"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotCell = this._slotCellElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -351,7 +391,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotSelectAll = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectAll');
+    this._hasSlotColHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'colHeader');
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
+    this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -359,36 +401,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   firstUpdated(): void {
     this._armListeners();
 
-    this.cellMounts = new Map();
-
-    this._disconnectCleanups.push((() => {
-      // dispose every live cell/header projection on unmount.
-      if (this.cellMounts) {
-        for (const h of this.cellMounts.values() as any) {
-          if (h && h.dispose) {
-            try {
-              h.dispose();
-            } catch (e: any) {}
-          }
-        }
-        this.cellMounts.clear();
-      }
-    }));
-
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
-      if (!this.table) return;
-      this.table.setOptions((prev: any) => ({
-        ...prev,
-        data: this.data,
-        columns: this.tableColumns(),
-        state: this.currentState(),
-        enableRowSelection: this.selectionMode !== 'none',
-        enableMultiRowSelection: this.selectionMode === 'multiple'
-      }));
-      if (this.refreshRowModel) this.refreshRowModel();
-    })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rowModelVer.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      this.scheduleReconcile();
+      this.reFeed();
     })(); }); }));
 
     this._disconnectCleanups.push(effect(() => { void this._colReg.value; this.__rozieCtxProvider_data_table_columns.setValue(((__rozieCtxHost) => ({
@@ -413,9 +427,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
     // Build the table instance HERE so the closures below capture the live `table`.
     this.table = createTable({
-      get data() {
-        return this.data;
-      },
+      // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
+      // `this` to the options object, and the Angular/Lit emitters resolve $props via
+      // `this.data` — so `get data() { return $props.data }` lowers to `this.data`
+      // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
+      // on every change by the watch's setOptions below, exactly like columns/state, so
+      // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
+      data: this.data,
       columns: this.tableColumns(),
       state: this.currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -433,62 +451,30 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // default, D-06 — NOT overridden).
       enableRowSelection: this.selectionMode !== 'none',
       enableMultiRowSelection: this.selectionMode === 'multiple',
-      // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
-      // no global onStateChange diff). Each applies the table-core Updater against the
-      // CURRENT slice value, then funnels a FRESH value through the echo-guarded writer.
-      onSortingChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().sorting);
-        this.writeSorting(next);
-      },
-      onGlobalFilterChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().globalFilter);
-        this.writeGlobalFilter(next);
-      },
-      onColumnFiltersChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnFilters);
-        this.writeColumnFilters(next);
-      },
-      onPaginationChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().pagination);
-        this.writePagination(next);
-      },
-      onRowSelectionChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().rowSelection);
-        this.writeRowSelection(next);
-      },
-      // Column-management callbacks (req-8/9/10/11) — each applies the table-core Updater
-      // against the CURRENT slice value, then funnels a FRESH value through its
-      // echo-guarded writer (same A4 STATIC-key discipline as the slices above).
-      onColumnVisibilityChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnVisibility);
-        this.writeColumnVisibility(next);
-      },
-      onColumnSizingChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnSizing);
-        this.writeColumnSizing(next);
-      },
-      onColumnOrderChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnOrder);
-        this.writeColumnOrder(next);
-      },
-      onColumnPinningChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this.currentState().columnPinning);
-        this.writeColumnPinning(next);
-      },
-      // Transient resize-gesture state — table-core drives this during a drag (NOT a
-      // two-way model slice). Write a FRESH object to $data so getState() reflects
-      // the live gesture; gate the row-model refresh on the resizing flag so a drag
-      // re-pulls the sized columns. No change event (it is internal gesture state).
-      onColumnSizingInfoChange: (updater: any) => {
-        const next = this.applyUpdater(updater, this._columnSizingInfo.value);
-        this._columnSizingInfo.value = next != null ? next : this._columnSizingInfo.value;
-      },
+      // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
+      // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
+      // $watch so React reads fresh currentState (the stale-closure fix, F6).
+      onSortingChange: this.onSortingChangeCb,
+      onGlobalFilterChange: this.onGlobalFilterChangeCb,
+      onColumnFiltersChange: this.onColumnFiltersChangeCb,
+      onPaginationChange: this.onPaginationChangeCb,
+      onRowSelectionChange: this.onRowSelectionChangeCb,
+      onColumnVisibilityChange: this.onColumnVisibilityChangeCb,
+      onColumnSizingChange: this.onColumnSizingChangeCb,
+      onColumnOrderChange: this.onColumnOrderChangeCb,
+      onColumnPinningChange: this.onColumnPinningChangeCb,
+      onColumnSizingInfoChange: this.onColumnSizingInfoChangeCb,
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
       columnResizeMode: 'onChange',
       enableColumnResizing: true,
-      renderFallbackValue: null
+      renderFallbackValue: null,
+      // table-core's RESOLVED options type (TableOptionsResolved) requires a global
+      // onStateChange + renderFallbackValue; we drive state via the per-slice on<Slice>Change
+      // callbacks above, so the global hook is a no-op. Present so the createTable() argument
+      // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
+      onStateChange: () => {}
     });
     this.refreshRowModel = () => {
       if (!this.table) return;
@@ -500,20 +486,25 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       this._rows.value = nextRows;
       this._headerGroups.value = nextGroups;
       this._rowModelVer.value = this._rowModelVer.value + 1;
+      // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
+      // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
+      // across selection changes; a microtask defer covers React's post-render DOM patch.
+      this.syncIndeterminate();
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(this.syncIndeterminate);else Promise.resolve().then(this.syncIndeterminate);
     };
 
     // initial pull
     // initial pull
     this.refreshRowModel();
-    // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
-    // hosts exist before we query for them (a synchronous call here finds zero hosts
-    // on first paint).
-    // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
-    // hosts exist before we query for them (a synchronous call here finds zero hosts
-    // on first paint).
-    this.scheduleReconcile();
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (!this.table) return;
+    const d = this.data || [];
+    if (d === this.lastData && d.length === this.lastDataLen) return;
+    this.lastData = d;
+    this.lastDataLen = d.length;
+    this.reFeed();
   }
 
   disconnectedCallback(): void {
@@ -567,33 +558,42 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         
         ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectAll !== undefined ? this.selectAll({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected(), toggle: this.onToggleAllRows}) : html`<slot name="selectAll" data-rozie-params=${(() => { try { return JSON.stringify({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected()}); } catch { return '{}'; } })()} @rozie-select-all-toggle=${($event: CustomEvent) => ((this.onToggleAllRows) as (...args: any[]) => any)($event.detail)}>
-            ${this.selectionMode === 'multiple' ? html`<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} indeterminate=${rozieAttr(this.isSomeRowsSelected())} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />` : nothing}</slot>`}
+            
+            ${this.selectionMode === 'multiple' ? html`<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />` : nothing}</slot>`}
         </span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
           
           ${header.column.getCanSort && header.column.getCanSort() ? html`<button class="rdt-sort-btn" type="button" @click=${($event: Event) => { this.onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>
             
-            ${this.columnHasHeaderTemplate(header.column.id) ? html`<span class="rdt-header-host" data-header-host=${rozieAttr('h:' + header.column.id)} data-col=${rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-header-label" data-rozie-s-d5dcab4c>${rozieDisplay(this.headerLabel(header.column.id))}</span>`}<span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>${rozieDisplay(this.sortIndicator(header.column.id))}</span>
+            <span class="rdt-header-label" data-rozie-s-d5dcab4c>
+              ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
+            </span>
+            <span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>${rozieDisplay(this.sortIndicator(header.column.id))}</span>
           </button>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.columnHasHeaderTemplate(header.column.id) ? html`<span class="rdt-header-host" data-header-host=${rozieAttr('h:' + header.column.id)} data-col=${rozieAttr(header.column.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-header-label" data-rozie-s-d5dcab4c>${rozieDisplay(this.headerLabel(header.column.id))}</span>`}</span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: MouseEvent) => { $event.stopPropagation(); ((undefined) as (...args: any[]) => any)($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
-            <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, 'left'); }} data-rozie-s-d5dcab4c>⇤</button>
-            <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, false); }} data-rozie-s-d5dcab4c>⇔</button>
-            <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: MouseEvent) => { $event.stopPropagation(); this.onPinColumn(header.column.id, 'right'); }} data-rozie-s-d5dcab4c>⇥</button>
+            <span class="rdt-header-label" data-rozie-s-d5dcab4c>
+              ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
+            </span>
+          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
+            <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
+            <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
+            <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button>
           </span>
           
-          <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: PointerEvent) => { $event.stopPropagation(); this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: TouchEvent) => { $event.stopPropagation(); this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
+          <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
         </span>`}</th>`)}
     </tr>`)}
   </thead>
 
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(row.getVisibleCells(), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="cell" key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="cell" key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
         
         ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(row)} @change=${($event: Event) => { this.onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
-        </span>` : this.columnHasCellTemplate(cellCtx.column.id) ? html`<span class="rdt-cell-host" data-cell-host=${rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col=${rozieAttr(cellCtx.column.id)} data-row=${rozieAttr(row.id)} data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>${rozieDisplay(cellCtx.getValue())}</span>`}</td>`)}
+        </span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+          ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
+        </span>`}</td>`)}
     </tr>`)}
   </tbody>
 </table>
@@ -620,7 +620,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   programmatic = 0;
 
-  currentState = () => ({
+  currentState = (): any => ({
   sorting: this.sorting != null ? this.sorting : this._sortingDefault.value,
   globalFilter: this.globalFilter != null ? this.globalFilter : this._globalFilterDefault.value,
   columnFilters: this.columnFilters != null ? this.columnFilters : this._columnFiltersDefault.value,
@@ -664,11 +664,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // filtered (and renders no per-column filter input in the chrome below).
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
-      // config-array columns carry no template → plain-value fast path.
-      hasCell: false,
-      cellRenderer: null,
-      hasHeader: false,
-      headerRenderer: null,
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : ''
     };
@@ -686,10 +681,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       enableSorting: spec.sortable === true,
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
-      hasCell: spec.hasCell === true,
-      cellRenderer: spec.cellRenderer != null ? spec.cellRenderer : null,
-      hasHeader: spec.hasHeader === true,
-      headerRenderer: spec.headerRenderer != null ? spec.headerRenderer : null,
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : ''
     };
@@ -712,10 +703,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       enableColumnFilter: false,
       filterable: false,
       isSelectColumn: true,
-      hasCell: false,
-      cellRenderer: null,
-      hasHeader: false,
-      headerRenderer: null,
       pinned: '',
       width: ''
     };
@@ -866,78 +853,75 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   refreshRowModel: any = null;
 
-  cellMounts: any = null;
-
-  reconcileProjections = () => {
-  if (!this._ref__rozieRoot || !this.cellMounts) return;
-  const seen = new Set();
-  const defs = this.columnDefs();
-  const defById = Object.create(null);
-  for (const d of defs as any) defById[d.id] = d;
-  // cells
-  const cellHosts = this._ref__rozieRoot.querySelectorAll('[data-cell-host]');
-  for (const host of cellHosts as any) {
-    const key = host.getAttribute('data-cell-host');
-    seen.add(key);
-    if (this.cellMounts.has(key)) continue;
-    const colId = host.getAttribute('data-col');
-    const rowId = host.getAttribute('data-row');
-    const def = defById[colId];
-    if (!def || !def.hasCell || !def.cellRenderer) continue;
-    const row = (this._rows.value || []).find((r: any) => String(r.id) === String(rowId));
-    if (!row) continue;
-    const handle = def.cellRenderer(host, {
-      row: row.original,
-      value: row.getValue(def.accessorKey),
-      column: def
-    });
-    if (handle) this.cellMounts.set(key, handle);
-  }
-  // headers
-  const headerHosts = this._ref__rozieRoot.querySelectorAll('[data-header-host]');
-  for (const host of headerHosts as any) {
-    const key = host.getAttribute('data-header-host');
-    seen.add(key);
-    if (this.cellMounts.has(key)) continue;
-    const colId = host.getAttribute('data-col');
-    const def = defById[colId];
-    if (!def || !def.hasHeader || !def.headerRenderer) continue;
-    const handle = def.headerRenderer(host, {
-      column: def
-    });
-    if (handle) this.cellMounts.set(key, handle);
-  }
-  // dispose handles whose host went away
-  for (const key of Array.from(this.cellMounts.keys()) as any) {
-    if (!seen.has(key)) {
-      const h = this.cellMounts.get(key);
-      this.cellMounts.delete(key);
-      if (h && h.dispose) {
-        try {
-          h.dispose();
-        } catch (e: any) {}
-      }
-    }
-  }
+  onSortingChangeCb = (updater: any) => {
+  this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
 };
 
-  reconcilePending = false;
-
-  scheduleReconcile = () => {
-  if (this.reconcilePending) return;
-  this.reconcilePending = true;
-  const run = () => {
-    this.reconcilePending = false;
-    this.reconcileProjections();
-  };
-  if (typeof requestAnimationFrame !== 'undefined') {
-    requestAnimationFrame(() => {
-      Promise.resolve().then(run);
-    });
-  } else {
-    Promise.resolve().then(run);
-  }
+  onGlobalFilterChangeCb = (updater: any) => {
+  this.writeGlobalFilter(this.applyUpdater(updater, this.currentState().globalFilter));
 };
+
+  onColumnFiltersChangeCb = (updater: any) => {
+  this.writeColumnFilters(this.applyUpdater(updater, this.currentState().columnFilters));
+};
+
+  onPaginationChangeCb = (updater: any) => {
+  this.writePagination(this.applyUpdater(updater, this.currentState().pagination));
+};
+
+  onRowSelectionChangeCb = (updater: any) => {
+  this.writeRowSelection(this.applyUpdater(updater, this.currentState().rowSelection));
+};
+
+  onColumnVisibilityChangeCb = (updater: any) => {
+  this.writeColumnVisibility(this.applyUpdater(updater, this.currentState().columnVisibility));
+};
+
+  onColumnSizingChangeCb = (updater: any) => {
+  this.writeColumnSizing(this.applyUpdater(updater, this.currentState().columnSizing));
+};
+
+  onColumnOrderChangeCb = (updater: any) => {
+  this.writeColumnOrder(this.applyUpdater(updater, this.currentState().columnOrder));
+};
+
+  onColumnPinningChangeCb = (updater: any) => {
+  this.writeColumnPinning(this.applyUpdater(updater, this.currentState().columnPinning));
+};
+
+  onColumnSizingInfoChangeCb = (updater: any) => {
+  const next = this.applyUpdater(updater, this._columnSizingInfo.value);
+  this._columnSizingInfo.value = next != null ? next : this._columnSizingInfo.value;
+};
+
+  reFeed = () => {
+  if (!this.table) return;
+  this.table.setOptions((prev: any) => ({
+    ...prev,
+    data: this.data,
+    columns: this.tableColumns(),
+    state: this.currentState(),
+    enableRowSelection: this.selectionMode !== 'none',
+    enableMultiRowSelection: this.selectionMode === 'multiple',
+    // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
+    // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
+    onSortingChange: this.onSortingChangeCb,
+    onGlobalFilterChange: this.onGlobalFilterChangeCb,
+    onColumnFiltersChange: this.onColumnFiltersChangeCb,
+    onPaginationChange: this.onPaginationChangeCb,
+    onRowSelectionChange: this.onRowSelectionChangeCb,
+    onColumnVisibilityChange: this.onColumnVisibilityChangeCb,
+    onColumnSizingChange: this.onColumnSizingChangeCb,
+    onColumnOrderChange: this.onColumnOrderChangeCb,
+    onColumnPinningChange: this.onColumnPinningChangeCb,
+    onColumnSizingInfoChange: this.onColumnSizingInfoChangeCb
+  }));
+  if (this.refreshRowModel) this.refreshRowModel();
+};
+
+  lastData: any = null;
+
+  lastDataLen = -1;
 
   onHeaderSort = (colId: any, evt: any) => {
   if (!this.table) return;
@@ -948,8 +932,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   col.toggleSorting(undefined, multi);
 };
 
+  tick = () => this._rowModelVer.value;
+
   ariaSortFor = (colId: any) => {
-  if (!this.table) return 'none';
+  if (this.tick() < 0 || !this.table) return 'none';
   const col = this.table.getColumn(colId);
   if (!col) return 'none';
   const dir = col.getIsSorted();
@@ -959,7 +945,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   sortIndicator = (colId: any) => {
-  if (!this.table) return '';
+  if (this.tick() < 0 || !this.table) return '';
   const col = this.table.getColumn(colId);
   if (!col) return '';
   const dir = col.getIsSorted();
@@ -974,15 +960,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   return null;
 };
 
-  columnHasCellTemplate = (colId: any) => {
-  const d = this.defFor(colId);
-  return !!(d && d.hasCell && d.cellRenderer);
-};
-
-  columnHasHeaderTemplate = (colId: any) => {
-  const d = this.defFor(colId);
-  return !!(d && d.hasHeader && d.headerRenderer);
-};
+  visibleCellsFor = (row: any) => this._rowModelVer.value >= 0 ? row.getVisibleCells() : [];
 
   columnIsFilterable = (colId: any) => {
   const d = this.defFor(colId);
@@ -995,7 +973,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   headerWidth = (colId: any) => {
-  if (!this.table) return null;
+  if (this.tick() < 0 || !this.table) return null;
   const col = this.table.getColumn(colId);
   if (!col) return null;
   const w = col.getSize();
@@ -1003,6 +981,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   onResizeStart = (colId: any, evt: any) => {
+  // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
+  if (evt && evt.stopPropagation) evt.stopPropagation();
   if (!this.table) return;
   const header = this.findHeader(colId);
   if (!header || !header.getResizeHandler) return;
@@ -1020,13 +1000,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   columnIsResizing = (colId: any) => {
-  if (!this.table) return false;
+  if (this.tick() < 0 || !this.table) return false;
   const header = this.findHeader(colId);
   return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing());
 };
 
   columnIsVisible = (colId: any) => {
-  if (!this.table) return true;
+  if (this.tick() < 0 || !this.table) return true;
   const col = this.table.getColumn(colId);
   return !!(col && (col.getIsVisible ? col.getIsVisible() : true));
 };
@@ -1038,7 +1018,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   allLeafColumns = () => {
-  if (!this.table) return [];
+  if (this.tick() < 0 || !this.table) return [];
   const cols = this.table.getAllLeafColumns ? this.table.getAllLeafColumns() : [];
   const out = [];
   for (const c of cols as any) {
@@ -1053,20 +1033,21 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   columnPinSide = (colId: any) => {
-  if (!this.table) return false;
+  if (this.tick() < 0 || !this.table) return false;
   const col = this.table.getColumn(colId);
   if (!col || !col.getIsPinned) return false;
   return col.getIsPinned();
 };
 
-  onPinColumn = (colId: any, side: any) => {
+  onPinColumn = (colId: any, side: any, evt: any) => {
+  if (evt && evt.stopPropagation) evt.stopPropagation();
   if (!this.table) return;
   const col = this.table.getColumn(colId);
   if (col && col.pin) col.pin(side);
 };
 
   pinStyle = (colId: any) => {
-  if (!this.table) return '';
+  if (this.tick() < 0 || !this.table) return '';
   const col = this.table.getColumn(colId);
   if (!col || !col.getIsPinned) return '';
   const side = col.getIsPinned();
@@ -1109,26 +1090,26 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 };
 
   pageIndex = () => {
-  if (this.table) return this.table.getState().pagination.pageIndex;
+  if (this.tick() >= 0 && this.table) return this.table.getState().pagination.pageIndex;
   const p = this.currentState().pagination;
   return p && p.pageIndex != null ? p.pageIndex : 0;
 };
 
   pageSize = () => {
-  if (this.table) return this.table.getState().pagination.pageSize;
+  if (this.tick() >= 0 && this.table) return this.table.getState().pagination.pageSize;
   const p = this.currentState().pagination;
   return p && p.pageSize != null ? p.pageSize : 10;
 };
 
   pageCount = () => {
-  if (!this.table) return 1;
+  if (this.tick() < 0 || !this.table) return 1;
   const c = this.table.getPageCount();
   return c != null && c > 0 ? c : 1;
 };
 
-  canPrevPage = () => !!(this.table && this.table.getCanPreviousPage());
+  canPrevPage = () => !!(this.tick() >= 0 && this.table && this.table.getCanPreviousPage());
 
-  canNextPage = () => !!(this.table && this.table.getCanNextPage());
+  canNextPage = () => !!(this.tick() >= 0 && this.table && this.table.getCanNextPage());
 
   onPrevPage = () => {
   if (this.table) this.table.previousPage();
@@ -1147,20 +1128,38 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
 
-  isAllRowsSelected = () => !!(this.table && this.table.getIsAllRowsSelected());
+  stopEvent = (evt: any) => {
+  if (evt && evt.stopPropagation) evt.stopPropagation();
+};
 
-  isSomeRowsSelected = () => !!(this.table && this.table.getIsSomeRowsSelected());
+  isAllRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsAllRowsSelected());
+
+  isSomeRowsSelected = () => !!(this.tick() >= 0 && this.table && this.table.getIsSomeRowsSelected());
 
   onToggleAllRows = (evt: any) => {
   if (!this.table) return;
   this.table.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked));
 };
 
-  rowIsSelected = (row: any) => !!(row && row.getIsSelected && row.getIsSelected());
+  rowIsSelected = (row: any) => {
+  if (!row) return false;
+  const id = row.id;
+  const sel = this.currentState().rowSelection || {};
+  if (id != null && Object.prototype.hasOwnProperty.call(sel, id)) return !!sel[id];
+  return !!(row.getIsSelected && row.getIsSelected());
+};
 
   onToggleRow = (row: any, evt: any) => {
   if (!row || !row.toggleSelected) return;
   row.toggleSelected(!!(evt && evt.target && evt.target.checked));
+};
+
+  selectAllBox: any = null;
+
+  syncIndeterminate = () => {
+  if (!this._ref__rozieRoot || !this._ref__rozieRoot.querySelector) return;
+  this.selectAllBox = this._ref__rozieRoot.querySelector('.rdt-select-all');
+  if (this.selectAllBox) this.selectAllBox.indeterminate = this.isSomeRowsSelected() && !this.isAllRowsSelected();
 };
 
   sortColumn = (colId: any, desc: any) => {

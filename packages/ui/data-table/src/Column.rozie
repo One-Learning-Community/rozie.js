@@ -1,33 +1,27 @@
 <!--
   Column.rozie — declarative <Column> column-definition child for
   @rozie-ui/data-table (Phase 48 core wave). A <Column> declares ONE column of the
-  table: its field/header/sortable/filterable/pinned/width metadata PLUS its
-  optional per-column #cell / #header render templates:
+  table: its field/header/sortable/filterable/pinned/width metadata:
 
-    <DataTable :data="rows" r-model:sorting="$data.sorting">
-      <Column field="name" header="Name" sortable />
-      <Column field="status" header="Status" sortable>
-        <template #cell="{ row, value, column }">
-          <StatusBadge :status="value" />
-        </template>
-        <template #header="{ column }">{{ column.header }} ⚑</template>
-      </Column>
-    </DataTable>
+    DataTable :data="rows" r-model:sorting="$data.sorting"
+      Column field="name" header="Name" sortable
+      Column field="status" header="Status" sortable
+      Column field="amount" header="Amount"
+      (per-column rendering is done on the PARENT via its #cell / #header scoped
+       slots, dispatched by columnId — the Wave-0 probe design)
+    /DataTable
 
   A <Column> is a CONSUMER of the parent <DataTable>'s `data-table:columns` registry
-  API ({ registerColumn, unregisterColumn }): it registers its column SPEC (carrying
-  the #cell / #header render callbacks) on mount and unregisters on cleanup. It draws
-  NOTHING of its own — the <td>/<th> hosts are FRAMEWORK-OWNED by the parent's keyed
-  r-for (the Wave-0 probe's `plain-scoped-slot-in-keyed-r-for` decision: the host is a
-  normal child node, NOT engine-created, so no portal relocation is required). The
-  parent hands the Column its framework-owned cell/header host and the Column mounts
-  ITS OWN scoped #cell / #header slot into that host via $portals — ONE INDEPENDENT
-  handle PER rendered cell/header (a per-instance Set; NEVER a shared handle that
-  disposes siblings → the count-only-VR-masking landmine, rete 41-05).
+  API ({ registerColumn, unregisterColumn }): it registers its column SPEC (metadata
+  only) on mount and unregisters on cleanup. It draws NOTHING of its own.
 
-  Columns with NO #cell template register no cellRenderer → the parent renders the
-  plain accessor value (the fast path the probe report calls out: config-array /
-  template-less columns skip slot dispatch entirely).
+  D-A (Wave-0 probe): per-cell / per-header rendering is a PLAIN SCOPED SLOT on the
+  PARENT, rendered DIRECTLY inside the framework-owned keyed <td>/<th> — NO portal, NO
+  projection. Because a slot is statically positioned in its DECLARING component's
+  template, a per-<Column>-child template cannot plain-render into the parent's <td>
+  across the component boundary (that needs $portals — the rete NodeType mechanism this
+  refactor deletes). So <Column> carries METADATA ONLY; the single #cell / #header slot
+  lives on <DataTable> and the consumer switches on the `columnId` scope param.
 
   REQ-30: the injected registry may be undefined on Lit's first paint — all reads are
   guarded (the null-let `any` alias + the $onUpdate late-context re-registration, the
@@ -37,23 +31,23 @@
 
 <props>
 {
-  // The column id. Optional — defaults to `field` when omitted (resolved in spec()).
+  // The column id. Optional — defaults to `field` when omitted (resolved in colId()).
   // Consumer-controlled, so the parent registry guards __proto__/constructor (T-48-PP).
   id:         { type: String,  default: '' },
   // The row field this column reads (table-core accessorKey). PrimeVue-shaped public
   // attr name. NOT a JS reserved word (the rete `in`/`out`→`input`/`output` lesson).
   field:      { type: String,  default: '' },
-  // The header label (rendered when no #header template is supplied).
+  // The header label (rendered when the parent #header slot falls through to the label).
   header:     { type: String,  default: '' },
   // Whether this column participates in click-to-sort. Bare `<Column sortable>` emits
   // sortable="" and only Vue+Lit coerce → bind `:sortable="true"` in consumers, or
   // rely on the Phase-46 ITEM-2 bare-bool-attr coercion. Default false.
   sortable:   { type: Boolean, default: false },
-  // Whether this column participates in column filtering (wired in a later wave).
+  // Whether this column participates in column filtering.
   filterable: { type: Boolean, default: false },
-  // Pin side: '' (unpinned) | 'left' | 'right' (wired in a later wave; reserved now).
+  // Pin side: '' (unpinned) | 'left' | 'right' (reserved metadata).
   pinned:     { type: String,  default: '' },
-  // Optional fixed/initial column width (CSS length or px number; later wave).
+  // Optional fixed/initial column width (CSS length or px number).
   width:      { type: [String, Number], default: '' },
 }
 </props>
@@ -77,32 +71,9 @@ reg = registry
 // REQ-30) and the $onMount registration never double-register the column.
 let registered = false
 
-// PER-CELL FIX: a Set of INDEPENDENT cell/header handles — ONE PER rendered cell /
-// header. The parent's keyed r-for calls cellRenderer once per visible cell of this
-// column; a single shared handle torn down on each call would leave only the LAST
-// cell rendered (3 cells, 1 body — the count-only-VR-masking bug, rete 41-05). Each
-// call mounts an INDEPENDENT handle and disposes NONE of its siblings; the parent
-// owns per-cell disposal (it tears each handle down on row unmount / re-render).
-// Module-scope `any` so the Solid-hoisted teardown can sweep any leftovers.
-let cellHandles = null
-cellHandles = new Set()
-let headerHandles = null
-headerHandles = new Set()
-
-// The per-cell / per-header mount closures, DEFINED INSIDE $onMount (below) so they
-// capture the emitter-synthesized `portals` local — which on React/Angular/Lit is
-// scoped to the mount effect body, NOT visible from a spec callback the parent
-// invokes later (that escaped scope is exactly why a bare `$portals.cell(...)` in the
-// spec callback threw "portals is not defined" on those 3 targets, the NodeType
-// lesson). Stored in module-scope `any` so the spec callbacks — invoked by the
-// parent's keyed r-for from its own render scope — can delegate to them.
-let mountCell = null
-let mountHeader = null
-
 // the column SPEC builder — shared by the $onMount register and the late-context
-// $onUpdate below. Carries the column metadata PLUS the cellRenderer / headerRenderer
-// callbacks (only present when the consumer supplied a #cell / #header template; a
-// template-less column registers null renderers → the parent renders the plain value).
+// $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
+// per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
 const colId = () => ($props.id !== '' ? $props.id : $props.field)
 const buildSpec = () => ({
   id: colId(),
@@ -112,76 +83,18 @@ const buildSpec = () => ({
   filterable: $props.filterable,
   pinned: $props.pinned,
   width: $props.width,
-  // present only when the consumer declared a #cell template (else the parent renders
-  // the plain accessor value — the template-less fast path). Delegates to the
-  // mount-scoped closure; try/catch so a per-target portal hiccup can NEVER abort the
-  // parent's keyed-r-for render loop (a thrown renderer would stop the whole body).
-  hasCell: !!$slots.cell,
-  cellRenderer: (host, scope) => {
-    if (host && mountCell) { try { return mountCell(host, scope) } catch (e) {} }
-    return null
-  },
-  hasHeader: !!$slots.headerTemplate,
-  headerRenderer: (host, scope) => {
-    if (host && mountHeader) { try { return mountHeader(host, scope) } catch (e) {} }
-    return null
-  },
 })
 
 $onMount(() => {
-  // The per-cell mount closure — captures the mount-scoped `portals` local. Mounts an
-  // INDEPENDENT cell root PER rendered cell (the parent calls this once per visible
-  // cell of the column), so every cell keeps its OWN #cell render — it must NOT
-  // dispose any sibling's handle. The returned { dispose } deregisters ITSELF from the
-  // live set; a leftover handle is swept by the component teardown below.
-  mountCell = (host, scope) => {
-    if (!host) return null
-    const s = scope || {}
-    const h = $portals.cell(host, { row: s.row, value: s.value, column: s.column })
-    if (!h) return null
-    cellHandles.add(h)
-    return {
-      update: (next) => { if (h && h.update) { try { return h.update(next) } catch (e) {} } },
-      dispose: () => {
-        cellHandles.delete(h)
-        if (h && h.dispose) { try { h.dispose() } catch (e) {} }
-      },
-    }
-  }
-  mountHeader = (host, scope) => {
-    if (!host) return null
-    const s = scope || {}
-    const h = $portals.header(host, { column: s.column })
-    if (!h) return null
-    headerHandles.add(h)
-    return {
-      update: (next) => { if (h && h.update) { try { return h.update(next) } catch (e) {} } },
-      dispose: () => {
-        headerHandles.delete(h)
-        if (h && h.dispose) { try { h.dispose() } catch (e) {} }
-      },
-    }
-  }
-  // register this column's spec INCLUDING the render callbacks. On Lit the injected
-  // registry may still be undefined here (REQ-30 async context); the $onUpdate below
-  // performs the registration once the value arrives.
+  // register this column's spec. On Lit the injected registry may still be undefined
+  // here (REQ-30 async context); the $onUpdate below performs the registration once
+  // the value arrives.
   if (reg && !registered) {
     registered = true
     reg.registerColumn(colId(), buildSpec())
   }
 
   return () => {
-    // sweep any cell/header projections still live at teardown (the parent normally
-    // disposes each per cell unmount, but a component-level unmount must clean any
-    // stragglers).
-    if (cellHandles) {
-      for (const h of cellHandles) { if (h && h.dispose) { try { h.dispose() } catch (e) {} } }
-      cellHandles.clear()
-    }
-    if (headerHandles) {
-      for (const h of headerHandles) { if (h && h.dispose) { try { h.dispose() } catch (e) {} } }
-      headerHandles.clear()
-    }
     if (reg) reg.unregisterColumn(colId())
   }
 })
@@ -215,28 +128,10 @@ $watch(
 
 <template>
 <!--
-  cell — REACTIVE per-cell scoped portal slot (the column's per-cell render TEMPLATE).
-  Declared but NOT rendered inline (the per-target emitters skip portal slots in the
-  normal render). The parent-invoked cellRenderer mounts it into each framework-owned
-  <td> host via $portals.cell(host, { row, value, column }) — ONE fresh framework render
-  root per cell, NO DOM relocation (the <td> is framework-owned, so this reuses the
-  shipped reactive-portal machinery without the engine-host relocation rete needs).
-  The `row` scope param is the row's original data, `value` the cell's accessor value,
-  `column` the resolved ColumnDef.
--->
-<slot name="cell" portal reactive :params="['row', 'value', 'column']" />
-<!--
-  headerTemplate — REACTIVE per-header scoped portal slot. Mounted into the
-  framework-owned <th> host by the parent's headerRenderer when the consumer supplies a
-  #headerTemplate template (else the parent renders the plain `header` label prop).
-  Scope: { column }. NAMED `headerTemplate` (NOT `header`) because a `header` prop is
-  declared above and a slot may not share a prop name (ROZ127, the Svelte
-  snippets+props unification). The `#cell` slot has no matching prop so it stays public.
--->
-<slot name="headerTemplate" portal reactive :params="['column']" />
-<!--
-  renderless: the Column draws nothing of its own. Hidden 0×0 container so the child
-  mounts (its $onMount registers the column spec) without adding any visible chrome.
+  renderless: the Column draws nothing of its own and declares no slots (per-cell /
+  per-header rendering is the parent's #cell/#header scoped slot, D-A). Hidden 0×0
+  container so the child mounts (its $onMount registers the column spec) without adding
+  any visible chrome.
 -->
 <div class="rozie-data-table-column" style="display:none"></div>
 </template>

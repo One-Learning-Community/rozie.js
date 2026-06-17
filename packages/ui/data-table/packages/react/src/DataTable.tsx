@@ -12,7 +12,11 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
+interface ColHeaderCtx { columnId: any; column: any; label: any; }
+
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
+
+interface CellCtx { columnId: any; column: any; row: any; value: any; }
 
 interface DataTableProps {
   data: any[];
@@ -58,7 +62,9 @@ interface DataTableProps {
   onPinChange?: (...args: any[]) => void;
   children?: ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
+  renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
+  renderCell?: (ctx: CellCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -90,7 +96,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   };
   const table = useRef<any>(null);
   const refreshRowModel = useRef<any>(null);
-  const cellMounts = useRef<any>(null);
+  const lastData = useRef<any>(null);
+  const lastDataLen = useRef(-1);
   const [sorting, setSorting] = useControllableState({
     value: props.sorting,
     defaultValue: props.defaultSorting ?? (() => [])(),
@@ -173,21 +180,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [rows, setRows] = useState<any[]>([]);
   const [headerGroups, setHeaderGroups] = useState<any[]>([]);
   const [rowModelVer, setRowModelVer] = useState(0);
-  const _columnSizingInfoRef = useRef(columnSizingInfo);
-  _columnSizingInfoRef.current = columnSizingInfo;
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
-  const _watch1First = useRef(true);
 
-  const { onFilterChange: _rozieProp_onFilterChange } = props;
   // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
   // the funnel. A counter (not a boolean) so nested writes are safe.
   let programmatic = 0;
 
   // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
   // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
-  // this whole object as `state`.
-  const currentState = useCallback(() => ({
+  // this whole object as `state`. Return type annotated `any`: the inferred object-literal
+  // type does not structurally match table-core's `Partial<TableState>` under the strict
+  // bundled-leaf tsc (the columnSizingInfo/pagination shapes widen to Record) — the
+  // runtime shape is correct; `any` sidesteps the over-strict structural check (the
+  // deferred-items strict-tsc #2 / leaf-output-strict-typecheck close).
+  const currentState = useCallback((): any => ({
     sorting: sorting != null ? sorting : sortingDefault,
     globalFilter: globalFilter != null ? globalFilter : globalFilterDefault,
     columnFilters: columnFilters != null ? columnFilters : columnFiltersDefault,
@@ -231,11 +238,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         // filtered (and renders no per-column filter input in the chrome below).
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
-        // config-array columns carry no template → plain-value fast path.
-        hasCell: false,
-        cellRenderer: null,
-        hasHeader: false,
-        headerRenderer: null,
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : ''
       };
@@ -253,10 +255,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         enableSorting: spec.sortable === true,
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
-        hasCell: spec.hasCell === true,
-        cellRenderer: spec.cellRenderer != null ? spec.cellRenderer : null,
-        hasHeader: spec.hasHeader === true,
-        headerRenderer: spec.headerRenderer != null ? spec.headerRenderer : null,
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : ''
       };
@@ -290,10 +288,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         enableColumnFilter: false,
         filterable: false,
         isSelectColumn: true,
-        hasCell: false,
-        cellRenderer: null,
-        hasHeader: false,
-        headerRenderer: null,
         pinned: '',
         width: ''
       };
@@ -301,90 +295,85 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return cols;
   }, [columnDefs, selectionEnabled]);
-  const { onSortChange: _rozieProp_onSortChange } = props;
-    const writeSorting = useCallback((next: any) => {
+  function writeSorting(next: any) {
     if (programmatic) return;
     programmatic++;
     setSortingDefault(next); // fresh array only (never in-place)
     setSorting(next); // two-way emit if bound (no-op-diff if not)
-    _rozieProp_onSortChange && _rozieProp_onSortChange(next);
+    props.onSortChange && props.onSortChange(next);
     programmatic--;
-  }, [_rozieProp_onSortChange, setSorting]);
-  const applyUpdater = useCallback((updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater, []);
-  const writeGlobalFilter = useCallback((next: any) => {
+  }
+  function applyUpdater(updater: any, current: any) {
+    return typeof updater === 'function' ? updater(current) : updater;
+  }
+  function writeGlobalFilter(next: any) {
     if (programmatic) return;
     programmatic++;
     setGlobalFilterDefault(next);
     setGlobalFilter(next);
-    _rozieProp_onFilterChange && _rozieProp_onFilterChange({
+    props.onFilterChange && props.onFilterChange({
       globalFilter: next
     });
     programmatic--;
-  }, [_rozieProp_onFilterChange, setGlobalFilter]);
-  const writeColumnFilters = useCallback((next: any) => {
+  }
+  function writeColumnFilters(next: any) {
     if (programmatic) return;
     programmatic++;
     setColumnFiltersDefault(next);
     setColumnFilters(next);
-    _rozieProp_onFilterChange && _rozieProp_onFilterChange({
+    props.onFilterChange && props.onFilterChange({
       columnFilters: next
     });
     programmatic--;
-  }, [_rozieProp_onFilterChange, setColumnFilters]);
-  const { onPageChange: _rozieProp_onPageChange } = props;
-    const writePagination = useCallback((next: any) => {
+  }
+  function writePagination(next: any) {
     if (programmatic) return;
     programmatic++;
     setPaginationDefault(next);
     setPagination(next);
-    _rozieProp_onPageChange && _rozieProp_onPageChange(next);
+    props.onPageChange && props.onPageChange(next);
     programmatic--;
-  }, [_rozieProp_onPageChange, setPagination]);
-  const { onSelectionChange: _rozieProp_onSelectionChange } = props;
-    const writeRowSelection = useCallback((next: any) => {
+  }
+  function writeRowSelection(next: any) {
     if (programmatic) return;
     programmatic++;
     setRowSelectionDefault(next);
     setRowSelection(next);
-    _rozieProp_onSelectionChange && _rozieProp_onSelectionChange(next);
+    props.onSelectionChange && props.onSelectionChange(next);
     programmatic--;
-  }, [_rozieProp_onSelectionChange, setRowSelection]);
-  const { onVisibilityChange: _rozieProp_onVisibilityChange } = props;
-    const writeColumnVisibility = useCallback((next: any) => {
+  }
+  function writeColumnVisibility(next: any) {
     if (programmatic) return;
     programmatic++;
     setColumnVisibilityDefault(next);
     setColumnVisibility(next);
-    _rozieProp_onVisibilityChange && _rozieProp_onVisibilityChange(next);
+    props.onVisibilityChange && props.onVisibilityChange(next);
     programmatic--;
-  }, [_rozieProp_onVisibilityChange, setColumnVisibility]);
-  const { onResizeChange: _rozieProp_onResizeChange } = props;
-    const writeColumnSizing = useCallback((next: any) => {
+  }
+  function writeColumnSizing(next: any) {
     if (programmatic) return;
     programmatic++;
     setColumnSizingDefault(next);
     setColumnSizing(next);
-    _rozieProp_onResizeChange && _rozieProp_onResizeChange(next);
+    props.onResizeChange && props.onResizeChange(next);
     programmatic--;
-  }, [_rozieProp_onResizeChange, setColumnSizing]);
-  const { onReorderChange: _rozieProp_onReorderChange } = props;
-    const writeColumnOrder = useCallback((next: any) => {
+  }
+  function writeColumnOrder(next: any) {
     if (programmatic) return;
     programmatic++;
     setColumnOrderDefault(next);
     setColumnOrder(next);
-    _rozieProp_onReorderChange && _rozieProp_onReorderChange(next);
+    props.onReorderChange && props.onReorderChange(next);
     programmatic--;
-  }, [_rozieProp_onReorderChange, setColumnOrder]);
-  const { onPinChange: _rozieProp_onPinChange } = props;
-    const writeColumnPinning = useCallback((next: any) => {
+  }
+  function writeColumnPinning(next: any) {
     if (programmatic) return;
     programmatic++;
     setColumnPinningDefault(next);
     setColumnPinning(next);
-    _rozieProp_onPinChange && _rozieProp_onPinChange(next);
+    props.onPinChange && props.onPinChange(next);
     programmatic--;
-  }, [_rozieProp_onPinChange, setColumnPinning]);
+  }
   function columnFilterValue(colId: any) {
     const cf = currentState().columnFilters || [];
     for (const f of cf as any) if (f && f.id === colId) return f.value != null ? f.value : '';
@@ -400,83 +389,61 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     });
     writeColumnFilters(next);
   }
-  cellMounts.current = new Map();
-  function reconcileProjections() {
-    if (!__rozieRoot.current || !cellMounts.current) return;
-    const seen = new Set();
-    const defs = columnDefs();
-    const defById = Object.create(null);
-    for (const d of defs as any) defById[d.id] = d;
-    // cells
-    const cellHosts = __rozieRoot.current!.querySelectorAll('[data-cell-host]');
-    for (const host of cellHosts as any) {
-      const key = host.getAttribute('data-cell-host');
-      seen.add(key);
-      if (cellMounts.current.has(key)) continue;
-      const colId = host.getAttribute('data-col');
-      const rowId = host.getAttribute('data-row');
-      const def = defById[colId];
-      if (!def || !def.hasCell || !def.cellRenderer) continue;
-      const row = (rows || []).find((r: any) => String(r.id) === String(rowId));
-      if (!row) continue;
-      const handle = def.cellRenderer(host, {
-        row: row.original,
-        value: row.getValue(def.accessorKey),
-        column: def
-      });
-      if (handle) cellMounts.current.set(key, handle);
-    }
-    // headers
-    const headerHosts = __rozieRoot.current!.querySelectorAll('[data-header-host]');
-    for (const host of headerHosts as any) {
-      const key = host.getAttribute('data-header-host');
-      seen.add(key);
-      if (cellMounts.current.has(key)) continue;
-      const colId = host.getAttribute('data-col');
-      const def = defById[colId];
-      if (!def || !def.hasHeader || !def.headerRenderer) continue;
-      const handle = def.headerRenderer(host, {
-        column: def
-      });
-      if (handle) cellMounts.current.set(key, handle);
-    }
-    // dispose handles whose host went away
-    for (const key of Array.from(cellMounts.current.keys()) as any) {
-      if (!seen.has(key)) {
-        const h = cellMounts.current.get(key);
-        cellMounts.current.delete(key);
-        if (h && h.dispose) {
-          try {
-            h.dispose();
-          } catch (e: any) {}
-        }
-      }
-    }
-  }
-  // Defer reconcileProjections to AFTER the framework flushes the keyed r-for DOM:
-  // the [data-cell-host] / [data-header-host] spans for a freshly-pulled row model
-  // do not exist yet when refreshRowModel() returns (the watch/lifecycle fires
-  // before the DOM patch on Vue's default 'pre' flush, and synchronously in $onMount
-  // before the first r-for render). A microtask + rAF double-defer lands the
-  // projection after the hosts are in the DOM on all six targets (the reactive-portal
-  // timing the listbox/rete ports rely on). Coalesced so a burst of state changes
-  // projects once.
-  let reconcilePending = false;
-  const scheduleReconcile = useCallback(() => {
-    if (reconcilePending) return;
-    reconcilePending = true;
-    const run = () => {
-      reconcilePending = false;
-      reconcileProjections();
-    };
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        Promise.resolve().then(run);
-      });
-    } else {
-      Promise.resolve().then(run);
-    }
-  }, [reconcileProjections]);
+  const onSortingChangeCb = useCallback((updater: any) => {
+    writeSorting(applyUpdater(updater, currentState().sorting));
+  }, [applyUpdater, currentState, writeSorting]);
+  const onGlobalFilterChangeCb = useCallback((updater: any) => {
+    writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
+  }, [applyUpdater, currentState, writeGlobalFilter]);
+  const onColumnFiltersChangeCb = useCallback((updater: any) => {
+    writeColumnFilters(applyUpdater(updater, currentState().columnFilters));
+  }, [applyUpdater, currentState, writeColumnFilters]);
+  const onPaginationChangeCb = useCallback((updater: any) => {
+    writePagination(applyUpdater(updater, currentState().pagination));
+  }, [applyUpdater, currentState, writePagination]);
+  const onRowSelectionChangeCb = useCallback((updater: any) => {
+    writeRowSelection(applyUpdater(updater, currentState().rowSelection));
+  }, [applyUpdater, currentState, writeRowSelection]);
+  const onColumnVisibilityChangeCb = useCallback((updater: any) => {
+    writeColumnVisibility(applyUpdater(updater, currentState().columnVisibility));
+  }, [applyUpdater, currentState, writeColumnVisibility]);
+  const onColumnSizingChangeCb = useCallback((updater: any) => {
+    writeColumnSizing(applyUpdater(updater, currentState().columnSizing));
+  }, [applyUpdater, currentState, writeColumnSizing]);
+  const onColumnOrderChangeCb = useCallback((updater: any) => {
+    writeColumnOrder(applyUpdater(updater, currentState().columnOrder));
+  }, [applyUpdater, currentState, writeColumnOrder]);
+  const onColumnPinningChangeCb = useCallback((updater: any) => {
+    writeColumnPinning(applyUpdater(updater, currentState().columnPinning));
+  }, [applyUpdater, currentState, writeColumnPinning]);
+  const onColumnSizingInfoChangeCb = useCallback((updater: any) => {
+    const next = applyUpdater(updater, columnSizingInfo);
+    setColumnSizingInfo(prev => next != null ? next : prev);
+  }, [applyUpdater, columnSizingInfo]);
+  const reFeed = useCallback(() => {
+    if (!table.current) return;
+    table.current.setOptions((prev: any) => ({
+      ...prev,
+      data: props.data,
+      columns: tableColumns(),
+      state: currentState(),
+      enableRowSelection: props.selectionMode !== 'none',
+      enableMultiRowSelection: props.selectionMode === 'multiple',
+      // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
+      // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
+      onSortingChange: onSortingChangeCb,
+      onGlobalFilterChange: onGlobalFilterChangeCb,
+      onColumnFiltersChange: onColumnFiltersChangeCb,
+      onPaginationChange: onPaginationChangeCb,
+      onRowSelectionChange: onRowSelectionChangeCb,
+      onColumnVisibilityChange: onColumnVisibilityChangeCb,
+      onColumnSizingChange: onColumnSizingChangeCb,
+      onColumnOrderChange: onColumnOrderChangeCb,
+      onColumnPinningChange: onColumnPinningChangeCb,
+      onColumnSizingInfoChange: onColumnSizingInfoChangeCb
+    }));
+    if (refreshRowModel.current) refreshRowModel.current();
+  }, [currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onGlobalFilterChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.data, props.selectionMode, tableColumns]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -485,8 +452,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // toggleSorting(desc?, isMulti?) cycles asc → desc → none; multi accumulates.
     col.toggleSorting(undefined, multi);
   }, []);
+  function tick() {
+    return rowModelVer;
+  }
   function ariaSortFor(colId: any) {
-    if (!table.current) return 'none';
+    if (tick() < 0 || !table.current) return 'none';
     const col = table.current.getColumn(colId);
     if (!col) return 'none';
     const dir = col.getIsSorted();
@@ -495,7 +465,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return 'none';
   }
   function sortIndicator(colId: any) {
-    if (!table.current) return '';
+    if (tick() < 0 || !table.current) return '';
     const col = table.current.getColumn(colId);
     if (!col) return '';
     const dir = col.getIsSorted();
@@ -508,13 +478,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     for (const d of defs as any) if (d.id === colId) return d;
     return null;
   }
-  function columnHasCellTemplate(colId: any) {
-    const d = defFor(colId);
-    return !!(d && d.hasCell && d.cellRenderer);
-  }
-  function columnHasHeaderTemplate(colId: any) {
-    const d = defFor(colId);
-    return !!(d && d.hasHeader && d.headerRenderer);
+  function visibleCellsFor(row: any) {
+    return rowModelVer >= 0 ? row.getVisibleCells() : [];
   }
   function columnIsFilterable(colId: any) {
     const d = defFor(colId);
@@ -525,13 +490,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return d ? d.header : colId;
   }
   function headerWidth(colId: any) {
-    if (!table.current) return null;
+    if (tick() < 0 || !table.current) return null;
     const col = table.current.getColumn(colId);
     if (!col) return null;
     const w = col.getSize();
     return w != null && w > 0 ? w + 'px' : null;
   }
   const onResizeStart = useCallback((colId: any, evt: any) => {
+    // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
+    if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!table.current) return;
     const header = findHeader(colId);
     if (!header || !header.getResizeHandler) return;
@@ -547,12 +514,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return null;
   }
   function columnIsResizing(colId: any) {
-    if (!table.current) return false;
+    if (tick() < 0 || !table.current) return false;
     const header = findHeader(colId);
     return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing());
   }
   function columnIsVisible(colId: any) {
-    if (!table.current) return true;
+    if (tick() < 0 || !table.current) return true;
     const col = table.current.getColumn(colId);
     return !!(col && (col.getIsVisible ? col.getIsVisible() : true));
   }
@@ -562,7 +529,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (col && col.toggleVisibility) col.toggleVisibility();
   }, []);
   function allLeafColumns() {
-    if (!table.current) return [];
+    if (tick() < 0 || !table.current) return [];
     const cols = table.current.getAllLeafColumns ? table.current.getAllLeafColumns() : [];
     const out = [];
     for (const c of cols as any) {
@@ -576,18 +543,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return out;
   }
   function columnPinSide(colId: any) {
-    if (!table.current) return false;
+    if (tick() < 0 || !table.current) return false;
     const col = table.current.getColumn(colId);
     if (!col || !col.getIsPinned) return false;
     return col.getIsPinned();
   }
-  const onPinColumn = useCallback((colId: any, side: any) => {
+  const onPinColumn = useCallback((colId: any, side: any, evt: any) => {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!table.current) return;
     const col = table.current.getColumn(colId);
     if (col && col.pin) col.pin(side);
   }, []);
   function pinStyle(colId: any) {
-    if (!table.current) return '';
+    if (tick() < 0 || !table.current) return '';
     const col = table.current.getColumn(colId);
     if (!col || !col.getIsPinned) return '';
     const side = col.getIsPinned();
@@ -625,25 +593,25 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return v != null ? v : '';
   }
   function pageIndex() {
-    if (table.current) return table.current.getState().pagination.pageIndex;
+    if (tick() >= 0 && table.current) return table.current.getState().pagination.pageIndex;
     const p = currentState().pagination;
     return p && p.pageIndex != null ? p.pageIndex : 0;
   }
   function pageSize() {
-    if (table.current) return table.current.getState().pagination.pageSize;
+    if (tick() >= 0 && table.current) return table.current.getState().pagination.pageSize;
     const p = currentState().pagination;
     return p && p.pageSize != null ? p.pageSize : 10;
   }
   function pageCount() {
-    if (!table.current) return 1;
+    if (tick() < 0 || !table.current) return 1;
     const c = table.current.getPageCount();
     return c != null && c > 0 ? c : 1;
   }
   function canPrevPage() {
-    return !!(table.current && table.current.getCanPreviousPage());
+    return !!(tick() >= 0 && table.current && table.current.getCanPreviousPage());
   }
   function canNextPage() {
-    return !!(table.current && table.current.getCanNextPage());
+    return !!(tick() >= 0 && table.current && table.current.getCanNextPage());
   }
   const onPrevPage = useCallback(() => {
     if (table.current) table.current.previousPage();
@@ -660,23 +628,48 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function isSelectColumn(colId: any) {
     return colId === SELECT_COL_ID;
   }
+  const stopEvent = useCallback((evt: any) => {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
+  }, []);
   function isAllRowsSelected() {
-    return !!(table.current && table.current.getIsAllRowsSelected());
+    return !!(tick() >= 0 && table.current && table.current.getIsAllRowsSelected());
   }
   function isSomeRowsSelected() {
-    return !!(table.current && table.current.getIsSomeRowsSelected());
+    return !!(tick() >= 0 && table.current && table.current.getIsSomeRowsSelected());
   }
   const onToggleAllRows = useCallback((evt: any) => {
     if (!table.current) return;
     table.current.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
   function rowIsSelected(row: any) {
-    return !!(row && row.getIsSelected && row.getIsSelected());
+    if (!row) return false;
+    const id = row.id;
+    const sel = currentState().rowSelection || {};
+    if (id != null && Object.prototype.hasOwnProperty.call(sel, id)) return !!sel[id];
+    return !!(row.getIsSelected && row.getIsSelected());
   }
   const onToggleRow = useCallback((row: any, evt: any) => {
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
+  // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
+  // binding only takes effect on Vue (which binds known DOM props); on
+  // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
+  // stays false. So set it IMPERATIVELY: query the select-all checkbox off the component
+  // root ($el — post-mount safe) and assign the property. Called from refreshRowModel
+  // (every selection change re-pulls the row model) so it stays in lockstep with the
+  // table-core selection state. The select-all box is NOT re-created by a selection
+  // change (only its checked attr flips), so the live element persists.
+  // `box` is aliased through a module-scope null-let (typeNeutralize → `any`) so the
+  // strict bundled-leaf tsc accepts `.indeterminate` (querySelector returns `Element`,
+  // which has no `indeterminate` — it is an HTMLInputElement DOM property). Same idiom
+  // as Column's `let reg = null; reg = $inject(...)`.
+  let selectAllBox: any = null;
+  const syncIndeterminate = useCallback(() => {
+    if (!__rozieRoot.current || !__rozieRoot.current!.querySelector) return;
+    selectAllBox = __rozieRoot.current!.querySelector('.rdt-select-all');
+    if (selectAllBox) selectAllBox.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
+  }, [isAllRowsSelected, isSomeRowsSelected]);
   function sortColumn(colId: any, desc: any) {
     if (table.current) table.current.getColumn(colId) && table.current.getColumn(colId).toggleSorting(desc, false);
   }
@@ -723,9 +716,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   useEffect(() => {
     // Build the table instance HERE so the closures below capture the live `table`.
     table.current = createTable({
-      get data() {
-        return _dataRef.current;
-      },
+      // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
+      // `this` to the options object, and the Angular/Lit emitters resolve $props via
+      // `this.data` — so `get data() { return $props.data }` lowers to `this.data`
+      // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
+      // on every change by the watch's setOptions below, exactly like columns/state, so
+      // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
+      data: _dataRef.current,
       columns: tableColumns(),
       state: currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -743,62 +740,30 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // default, D-06 — NOT overridden).
       enableRowSelection: _selectionModeRef.current !== 'none',
       enableMultiRowSelection: _selectionModeRef.current === 'multiple',
-      // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
-      // no global onStateChange diff). Each applies the table-core Updater against the
-      // CURRENT slice value, then funnels a FRESH value through the echo-guarded writer.
-      onSortingChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().sorting);
-        writeSorting(next);
-      },
-      onGlobalFilterChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().globalFilter);
-        writeGlobalFilter(next);
-      },
-      onColumnFiltersChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().columnFilters);
-        writeColumnFilters(next);
-      },
-      onPaginationChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().pagination);
-        writePagination(next);
-      },
-      onRowSelectionChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().rowSelection);
-        writeRowSelection(next);
-      },
-      // Column-management callbacks (req-8/9/10/11) — each applies the table-core Updater
-      // against the CURRENT slice value, then funnels a FRESH value through its
-      // echo-guarded writer (same A4 STATIC-key discipline as the slices above).
-      onColumnVisibilityChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().columnVisibility);
-        writeColumnVisibility(next);
-      },
-      onColumnSizingChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().columnSizing);
-        writeColumnSizing(next);
-      },
-      onColumnOrderChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().columnOrder);
-        writeColumnOrder(next);
-      },
-      onColumnPinningChange: (updater: any) => {
-        const next = applyUpdater(updater, currentState().columnPinning);
-        writeColumnPinning(next);
-      },
-      // Transient resize-gesture state — table-core drives this during a drag (NOT a
-      // two-way model slice). Write a FRESH object to $data so getState() reflects
-      // the live gesture; gate the row-model refresh on the resizing flag so a drag
-      // re-pulls the sized columns. No change event (it is internal gesture state).
-      onColumnSizingInfoChange: (updater: any) => {
-        const next = applyUpdater(updater, _columnSizingInfoRef.current);
-        setColumnSizingInfo(prev => next != null ? next : prev);
-      },
+      // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
+      // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
+      // $watch so React reads fresh currentState (the stale-closure fix, F6).
+      onSortingChange: onSortingChangeCb,
+      onGlobalFilterChange: onGlobalFilterChangeCb,
+      onColumnFiltersChange: onColumnFiltersChangeCb,
+      onPaginationChange: onPaginationChangeCb,
+      onRowSelectionChange: onRowSelectionChangeCb,
+      onColumnVisibilityChange: onColumnVisibilityChangeCb,
+      onColumnSizingChange: onColumnSizingChangeCb,
+      onColumnOrderChange: onColumnOrderChangeCb,
+      onColumnPinningChange: onColumnPinningChangeCb,
+      onColumnSizingInfoChange: onColumnSizingInfoChangeCb,
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
       columnResizeMode: 'onChange',
       enableColumnResizing: true,
-      renderFallbackValue: null
+      renderFallbackValue: null,
+      // table-core's RESOLVED options type (TableOptionsResolved) requires a global
+      // onStateChange + renderFallbackValue; we drive state via the per-slice on<Slice>Change
+      // callbacks above, so the global hook is a no-op. Present so the createTable() argument
+      // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
+      onStateChange: () => {}
     });
     refreshRowModel.current = () => {
       if (!table.current) return;
@@ -810,46 +775,28 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setRows(nextRows);
       setHeaderGroups(nextGroups);
       setRowModelVer(prev => prev + 1);
+      // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
+      // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
+      // across selection changes; a microtask defer covers React's post-render DOM patch.
+      syncIndeterminate();
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(syncIndeterminate);else Promise.resolve().then(syncIndeterminate);
     };
 
     // initial pull
     refreshRowModel.current();
-    // project the per-column #cell / #header templates into the freshly-rendered
-    // framework-owned hosts — DEFERRED (scheduleReconcile) so the keyed r-for DOM
-    // hosts exist before we query for them (a synchronous call here finds zero hosts
-    // on first paint).
-    scheduleReconcile();
-    return () => {
-      // dispose every live cell/header projection on unmount.
-      if (cellMounts.current) {
-        for (const h of cellMounts.current.values() as any) {
-          if (h && h.dispose) {
-            try {
-              h.dispose();
-            } catch (e: any) {}
-          }
-        }
-        cellMounts.current.clear();
-      }
-    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch0First.current) { _watch0First.current = false; return; }
     if (!table.current) return;
-    table.current.setOptions((prev: any) => ({
-      ...prev,
-      data: props.data,
-      columns: tableColumns(),
-      state: currentState(),
-      enableRowSelection: props.selectionMode !== 'none',
-      enableMultiRowSelection: props.selectionMode === 'multiple'
-    }));
-    if (refreshRowModel.current) refreshRowModel.current();
-  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, globalFilter, pagination, props.data, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+    const d = _dataRef.current || [];
+    if (d === lastData.current && d.length === lastDataLen.current) return;
+    lastData.current = d;
+    lastDataLen.current = d.length;
+    reFeed();
+  }, [lastData, lastDataLen, reFeed, table]);
   useEffect(() => {
-    if (_watch1First.current) { _watch1First.current = false; return; }
-    scheduleReconcile();
-  }, [rowModelVer]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    reFeed();
+  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, globalFilter, pagination, props.data, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useImperativeHandle(ref, () => ({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -899,31 +846,39 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
             
             
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : (props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} indeterminate={rozieAttr(isSomeRowsSelected())} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
+              {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : (props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
             </span> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               
               {(header.column.getCanSort && header.column.getCanSort()) ? <button type="button" className={"rdt-sort-btn"} onClick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c="">
                 
-                {(columnHasHeaderTemplate(header.column.id)) ? <span className={"rdt-header-host"} data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">{rozieDisplay(headerLabel(header.column.id))}</span>}<span className={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
+                <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
+                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
+                </span>
+                <span className={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
               </button> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(columnHasHeaderTemplate(header.column.id)) ? <span className={"rdt-header-host"} data-header-host={rozieAttr('h:' + header.column.id)} data-col={rozieAttr(header.column.id)} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">{rozieDisplay(headerLabel(header.column.id))}</span>}</span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { $event.stopPropagation(); ((undefined) as ((...args: any[]) => any))($event); }} data-rozie-s-d5dcab4c="" />}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
-                <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'left'); }} data-rozie-s-d5dcab4c="">⇤</button>
-                <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, false); }} data-rozie-s-d5dcab4c="">⇔</button>
-                <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { $event.stopPropagation(); onPinColumn(header.column.id, 'right'); }} data-rozie-s-d5dcab4c="">⇥</button>
+                <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
+                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
+                </span>
+              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
+                <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
+                <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
+                <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">⇥</button>
               </span>
               
-              <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { $event.stopPropagation(); onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
+              <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}</th>)}
         </tr>)}
       </thead>
 
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {rows.map((row) => <tr key={row.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          {row.getVisibleCells().map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id) })} role="cell" data-col={rozieAttr(cellCtx.column.id)} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
+          {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id) })} role="cell" data-col={rozieAttr(cellCtx.column.id)} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
             
             {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
-            </span> : (columnHasCellTemplate(cellCtx.column.id)) ? <span className={"rdt-cell-host"} data-cell-host={rozieAttr('c:' + row.id + ':' + cellCtx.column.id)} data-col={rozieAttr(cellCtx.column.id)} data-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">{rozieDisplay(cellCtx.getValue())}</span>}</td>)}
+            </span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+              {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
+            </span>}</td>)}
         </tr>)}
       </tbody>
     </table>

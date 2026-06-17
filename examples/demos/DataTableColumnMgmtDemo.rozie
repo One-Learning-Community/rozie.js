@@ -48,18 +48,15 @@
 </data>
 
 <script>
-// A $refs handle to the table so the driver buttons can call the imperative verbs
-// (toggleColumnVisibility / setColumnOrder / pinColumn). Read in $onMount only
-// (ROZ123) — but we delegate through handler fns that read it at call time
-// (post-mount), so the ref is populated.
-let api = null
-
-const hideCity = () => { if (api && api.toggleColumnVisibility) api.toggleColumnVisibility('city') }
-const reorderCols = () => { if (api && api.applyColumnOrder) api.applyColumnOrder(['score', 'name', 'city']) }
-const pinName = () => { if (api && api.pinColumn) api.pinColumn('name', 'left') }
-const resetSizing = () => { if (api && api.resetColumnSizing) api.resetColumnSizing() }
-
-$onMount(() => { api = $refs.dt })
+// The driver buttons call the DataTable imperative verbs via its $expose handle.
+// Read $refs.dt at CALL TIME inside each handler (post-mount, button @click) rather
+// than caching it in $onMount — a cached handle can be captured before the child's
+// $expose is published on the fine-grained targets (Solid), leaving a stale/empty
+// reference; reading the ref live in the handler always resolves the current handle.
+const hideCity = () => { const api = $refs.dt; if (api && api.toggleColumnVisibility) api.toggleColumnVisibility('city') }
+const reorderCols = () => { const api = $refs.dt; if (api && api.applyColumnOrder) api.applyColumnOrder(['score', 'name', 'city']) }
+const pinName = () => { const api = $refs.dt; if (api && api.pinColumn) api.pinColumn('name', 'left') }
+const resetSizing = () => { const api = $refs.dt; if (api && api.resetColumnSizing) api.resetColumnSizing() }
 </script>
 
 <template>

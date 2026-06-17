@@ -17,10 +17,10 @@
   currency cell ($-prefixed), and the plain name; the config table renders the
   same three columns as plain values. NO screenshot stabilization here.
 
-  The per-row cell r-for loop var inside DataTable is `cellCtx` (NEVER `cell`) —
-  a #cell child slot would shadow it on Svelte mount (the embla/rete lesson). The
-  consumer's slot is `#cell` on the <Column>, which is the column's OWN scoped
-  template, not the parent loop var.
+  D-A (Wave-0 probe): per-cell rendering is a SINGLE #cell scoped slot on <DataTable>
+  rendered DIRECTLY in the framework-owned <td> (no portal, no projection). The
+  consumer SWITCHES ON the `columnId` scope param to vary the render per column; the
+  slot FALLBACK is the plain accessor value. <Column> carries metadata only.
 -->
 
 <rozie name="DataTableColumnsDemo">
@@ -63,20 +63,18 @@ const currency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US')
   <section data-testid="declarative-table">
     <h4>&lt;Column&gt; children</h4>
     <DataTable :data="$data.rows">
-      <!-- plain accessor value (no #cell template → the fast path) -->
+      <!-- <Column> = metadata only (id/field/header/sortable/...). -->
       <Column field="name" header="Name" />
-      <!-- distinct template #1 — a styled status BADGE -->
-      <Column field="status" header="Status">
-        <template #cell="{ value }">
-          <span class="dt-badge" :class="'dt-badge-' + value" data-testid="cell-badge">{{ value }}</span>
-        </template>
-      </Column>
-      <!-- distinct template #2 — a CURRENCY-formatted amount -->
-      <Column field="amount" header="Amount">
-        <template #cell="{ value }">
-          <span class="dt-currency" data-testid="cell-currency">{{ currency(value) }}</span>
-        </template>
-      </Column>
+      <Column field="status" header="Status" />
+      <Column field="amount" header="Amount" />
+      <!-- ONE #cell scoped slot, dispatched by columnId (the 3 distinct render paths):
+           #1 a styled status BADGE (status col), #2 a CURRENCY amount (amount col),
+           and the PLAIN accessor value (name col — the r-else fast-path fallback). -->
+      <template #cell="{ columnId, value }">
+        <span r-if="columnId === 'status'" class="dt-badge" :class="'dt-badge-' + value" data-testid="cell-badge">{{ value }}</span>
+        <span r-else-if="columnId === 'amount'" class="dt-currency" data-testid="cell-currency">{{ currency(value) }}</span>
+        <span r-else>{{ value }}</span>
+      </template>
     </DataTable>
   </section>
 
@@ -98,23 +96,20 @@ const currency = (v) => '$' + (Number(v) || 0).toLocaleString('en-US')
 .dt-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 .dt-demo h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #555; }
 
-/* The .dt-badge / .dt-currency rules style content rendered into the <Column>'s
-   #cell portal slot. Portal content teleports into the engine's shadow root on
-   Lit, where a SCOPED rule can't reach it (ROZ088). Use the :root{} engine-DOM
-   escape hatch (the §9 portal-styling pattern) so the badge/currency styling
-   reaches the projected cells on all six targets — Lit included. */
-:root {
-  .dt-badge {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.8em;
-  }
-  .dt-badge-active { background: #d1fae5; color: #065f46; }
-  .dt-badge-pending { background: #fef3c7; color: #92400e; }
-  .dt-badge-inactive { background: #f3f4f6; color: #4b5563; }
-  .dt-currency { font-variant-numeric: tabular-nums; font-weight: 600; }
+/* D-A: the #cell slot content renders DIRECTLY in the framework-owned <td> as a
+   normal child of THIS demo component (no portal, no shadow-root teleport), so plain
+   SCOPED rules reach it on all six targets — Lit included. The ROZ088 :root{} escape
+   hatch the old portal-projection path needed is no longer required. */
+.dt-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8em;
 }
+.dt-badge-active { background: #d1fae5; color: #065f46; }
+.dt-badge-pending { background: #fef3c7; color: #92400e; }
+.dt-badge-inactive { background: #f3f4f6; color: #4b5563; }
+.dt-currency { font-variant-numeric: tabular-nums; font-weight: 600; }
 </style>
 
 </rozie>

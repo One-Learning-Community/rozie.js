@@ -46,7 +46,10 @@ export interface DataTableProps {
   onPinChange?: (...args: unknown[]) => void;
   children?: ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
+  renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
+  renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
+  renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
