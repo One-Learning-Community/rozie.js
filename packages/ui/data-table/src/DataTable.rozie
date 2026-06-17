@@ -65,14 +65,31 @@
   // future `rowSelection` model prop (no ROZ127 / no slot-name clash).
   selectionMode: { type: String, default: 'none' },
 
-  // ── State slice wired in THIS plan ───────────────────────────────────────────
+  // ── State slices wired so far ────────────────────────────────────────────────
   // sorting (SortingState = [{ id, desc }]). model:true → six native two-way
-  // expansions; uncontrolled fallback is $data.sortingDefault. The remaining eight
-  // slices (globalFilter / columnFilters / pagination / rowSelection /
-  // columnVisibility / columnSizing / columnOrder / columnPinning) drop in here in
-  // Plans 04/05 — each with its own model prop, $data.<slice>Default fallback, and a
-  // STATIC-KEY write funnel (A4: never a generic indexed funnel).
+  // expansions; uncontrolled fallback is $data.sortingDefault. Each slice has its own
+  // model prop, $data.<slice>Default fallback, and a STATIC-KEY write funnel (A4:
+  // never a generic indexed funnel — $data[k]=… is ROZ106 on all six).
   sorting: { type: Array, default: () => [], model: true },
+
+  // globalFilter (string) — feeds getFilteredRowModel(); narrows ALL columns.
+  // Uncontrolled fallback $data.globalFilterDefault. onGlobalFilterChange funnels a
+  // fresh value through writeGlobalFilter → filter-change (regardless of binding).
+  globalFilter: { type: String, default: '', model: true },
+
+  // columnFilters (ColumnFiltersState = [{ id, value }]) — per-column narrowing.
+  // Each <Column> may opt in via its `filterable` flag (read from the resolved
+  // ColumnDef). Whole-array-replace on write (never in-place). filter-change fires.
+  columnFilters: { type: Array, default: () => [], model: true },
+
+  // pagination ({ pageIndex, pageSize }) — feeds getPaginationRowModel(); prev/next +
+  // page-size chrome below. onPaginationChange funnels a fresh object → page-change.
+  pagination: { type: Object, default: () => ({ pageIndex: 0, pageSize: 10 }), model: true },
+
+  // Server-side hook (req-6): when true, sets manualPagination/manualFiltering/
+  // manualSorting on the table instance — table-core then trusts the consumer-supplied
+  // rows verbatim and only emits the change events (the consumer fetches the page).
+  manual: { type: Boolean, default: false },
 
   // Pure-CSS sticky header gate (req-12). When true the <thead> sticks to the top of
   // the scroll container.
@@ -91,6 +108,13 @@
   // r-model:sorting). Whole-array-replace on write (never in-place push → silent on
   // React/Solid/Angular/Lit).
   sortingDefault: [],
+
+  // Uncontrolled fallbacks for the filter / pagination / selection slices (used when
+  // the consumer did NOT bind the matching r-model). Each is whole-value-replace on
+  // write (never in-place mutation → silent on React/Solid/Angular/Lit).
+  globalFilterDefault: '',
+  columnFiltersDefault: [],
+  paginationDefault: { pageIndex: 0, pageSize: 10 },
 
   // The id-keyed <Column> registry. WHOLE-OBJECT-REPLACE on every mutation (never
   // in-place $data.colReg[id] = …). T-48-PP: a column id is consumer-controlled, so
@@ -116,6 +140,8 @@ import {
   createTable,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
 } from '@tanstack/table-core'
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to
@@ -134,6 +160,9 @@ let programmatic = 0
 // $data.<slice>Default). table-core reads this whole object as `state`.
 const currentState = () => ({
   sorting: $props.sorting != null ? $props.sorting : $data.sortingDefault,
+  globalFilter: $props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault,
+  columnFilters: $props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault,
+  pagination: $props.pagination != null ? $props.pagination : $data.paginationDefault,
 })
 
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
@@ -159,6 +188,11 @@ const columnDefs = () => {
       accessorKey: c.field != null ? c.field : id,
       header: c.header != null ? c.header : id,
       enableSorting: c.sortable === true,
+      // per-column filter opt-in (req-5). table-core gates the filter input + value
+      // funnel on enableColumnFilter; a column with filterable !== true cannot be
+      // filtered (and renders no per-column filter input in the chrome below).
+      enableColumnFilter: c.filterable === true,
+      filterable: c.filterable === true,
       // config-array columns carry no template → plain-value fast path.
       hasCell: false,
       cellRenderer: null,
@@ -179,6 +213,8 @@ const columnDefs = () => {
       accessorKey: spec.field != null ? spec.field : id,
       header: spec.header != null ? spec.header : id,
       enableSorting: spec.sortable === true,
+      enableColumnFilter: spec.filterable === true,
+      filterable: spec.filterable === true,
       hasCell: spec.hasCell === true,
       cellRenderer: spec.cellRenderer != null ? spec.cellRenderer : null,
       hasHeader: spec.hasHeader === true,
@@ -210,6 +246,62 @@ const writeSorting = (next) => {
 const applyUpdater = (updater, current) =>
   (typeof updater === 'function' ? updater(current) : updater)
 
+// ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
+// A fresh string (primitive) to the uncontrolled default + the two-way model + fires
+// `filter-change` REGARDLESS of binding.
+const writeGlobalFilter = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.globalFilterDefault = next
+  $model.globalFilter = next
+  $emit('filter-change', { globalFilter: next })
+  programmatic--
+}
+
+// ── columnFilters slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ─────
+// table-core hands ColumnFiltersState = [{ id, value }]; write a FRESH array (never
+// in-place push) + fire `filter-change`. globalFilter + columnFilters both surface
+// through `filter-change` (per the plan: filter-change fires regardless of binding).
+const writeColumnFilters = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnFiltersDefault = next
+  $model.columnFilters = next
+  $emit('filter-change', { columnFilters: next })
+  programmatic--
+}
+
+// ── pagination slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ───────
+// table-core hands { pageIndex, pageSize }; write a FRESH object + fire `page-change`.
+const writePagination = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.paginationDefault = next
+  $model.pagination = next
+  $emit('page-change', next)
+  programmatic--
+}
+
+// Read the live columnFilters value for a given column id (string-safe; drives the
+// per-column filter input's bound value). Reads currentState() (NOT a $data re-read
+// of a just-written key → React stale-read safe).
+const columnFilterValue = (colId) => {
+  const cf = currentState().columnFilters || []
+  for (const f of cf) if (f && f.id === colId) return f.value != null ? f.value : ''
+  return ''
+}
+
+// Apply a per-column filter value: build a FRESH ColumnFiltersState array (drop the
+// column's prior entry, append the new one unless empty) and funnel it. Never mutate
+// the existing array in place (silent on React/Solid/Angular/Lit).
+const setColumnFilter = (colId, value) => {
+  const prev = currentState().columnFilters || []
+  const next = []
+  for (const f of prev) if (f && f.id !== colId) next.push(f)
+  if (value != null && value !== '') next.push({ id: colId, value })
+  writeColumnFilters(next)
+}
+
 // Re-read the row model + header groups into $data (fresh arrays → the template
 // re-renders). A plain fn (NOT a $computed — getRowModel() must be pulled AFTER a
 // setOptions re-feed, imperatively). Defined inside $onMount so it captures the live
@@ -231,12 +323,32 @@ $onMount(() => {
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
+    // rows verbatim (no client-side filter/sort/paginate) and only emits the change
+    // events so the consumer can fetch the next page/filtered slice.
+    manualPagination: $props.manual === true,
+    manualFiltering: $props.manual === true,
+    manualSorting: $props.manual === true,
     // PER-SLICE callback (Open-Q1: each maps 1:1 to a slice's r-model + change event,
-    // no global onStateChange diff). The remaining slices add onGlobalFilterChange /
-    // onPaginationChange / … in later waves.
+    // no global onStateChange diff). Each applies the table-core Updater against the
+    // CURRENT slice value, then funnels a FRESH value through the echo-guarded writer.
     onSortingChange: (updater) => {
       const next = applyUpdater(updater, currentState().sorting)
       writeSorting(next)
+    },
+    onGlobalFilterChange: (updater) => {
+      const next = applyUpdater(updater, currentState().globalFilter)
+      writeGlobalFilter(next)
+    },
+    onColumnFiltersChange: (updater) => {
+      const next = applyUpdater(updater, currentState().columnFilters)
+      writeColumnFilters(next)
+    },
+    onPaginationChange: (updater) => {
+      const next = applyUpdater(updater, currentState().pagination)
+      writePagination(next)
     },
     renderFallbackValue: null,
   })
@@ -327,7 +439,14 @@ const reconcileProjections = () => {
 // Lazy by default ($onMount did the first pull). EXTENSION: add the other bound slices
 // to this getter array as they are wired.
 $watch(
-  () => [$props.sorting, ($props.data || []).length, $data.colReg],
+  () => [
+    $props.sorting,
+    $props.globalFilter,
+    $props.columnFilters,
+    $props.pagination,
+    ($props.data || []).length,
+    $data.colReg,
+  ],
   () => {
     if (!table) return
     table.setOptions((prev) => ({
@@ -397,9 +516,62 @@ const columnHasHeaderTemplate = (colId) => {
   const d = defFor(colId)
   return !!(d && d.hasHeader && d.headerRenderer)
 }
+const columnIsFilterable = (colId) => {
+  const d = defFor(colId)
+  return !!(d && d.filterable)
+}
 const headerLabel = (colId) => {
   const d = defFor(colId)
   return d ? d.header : colId
+}
+
+// ── Filter chrome handlers ─────────────────────────────────────────────────────────
+// Global search input → funnel through table-core's setGlobalFilter so the
+// onGlobalFilterChange callback fires the echo-guarded writer. Capture the fresh local
+// value (never re-read a just-written $data key — React stale-read).
+const onGlobalFilterInput = (evt) => {
+  const value = evt && evt.target ? evt.target.value : ''
+  if (table) { table.setGlobalFilter(value); return }
+  writeGlobalFilter(value)
+}
+// Per-column filter input → setColumnFilter (fresh-array funnel).
+const onColumnFilterInput = (colId, evt) => {
+  const value = evt && evt.target ? evt.target.value : ''
+  setColumnFilter(colId, value)
+}
+// The live global filter value (bound to the search <input>, value-driven NOT eval'd).
+const globalFilterValue = () => {
+  const v = currentState().globalFilter
+  return v != null ? v : ''
+}
+
+// ── Pagination chrome ────────────────────────────────────────────────────────────
+// Read the live pagination state off table-core (post-mount) with a currentState()
+// fallback (pre-mount / SSR). All string-safe (no bound booleans).
+const pageIndex = () => {
+  if (table) return table.getState().pagination.pageIndex
+  const p = currentState().pagination
+  return p && p.pageIndex != null ? p.pageIndex : 0
+}
+const pageSize = () => {
+  if (table) return table.getState().pagination.pageSize
+  const p = currentState().pagination
+  return p && p.pageSize != null ? p.pageSize : 10
+}
+const pageCount = () => {
+  if (!table) return 1
+  const c = table.getPageCount()
+  return c != null && c > 0 ? c : 1
+}
+const canPrevPage = () => !!(table && table.getCanPreviousPage())
+const canNextPage = () => !!(table && table.getCanNextPage())
+const onPrevPage = () => { if (table) table.previousPage() }
+const onNextPage = () => { if (table) table.nextPage() }
+const onPageSizeChange = (evt) => {
+  if (!table) return
+  const v = evt && evt.target ? evt.target.value : ''
+  const n = parseInt(v, 10)
+  table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10)
 }
 
 // The registry API handed to <Column> children (whole-object-replace — T-48-PP guard).
@@ -438,6 +610,19 @@ $expose({
   framework-owned [data-cell-host] span (projected by reconcileProjections); a column
   WITHOUT one renders the plain accessor value inline (the fast path).
 -->
+<div class="rozie-data-table-wrap">
+<!-- Global search (req-5) — bound, value-driven (NOT eval'd). Narrows all columns. -->
+<div class="rdt-toolbar">
+  <input
+    class="rdt-global-filter"
+    type="text"
+    role="searchbox"
+    aria-label="Search table"
+    :value="globalFilterValue()"
+    @input="onGlobalFilterInput($event)"
+  />
+</div>
+
 <table
   class="rozie-data-table"
   :class="{ 'rdt-sticky': $props.stickyHeader }"
@@ -485,6 +670,17 @@ $expose({
           ></span>
           <span r-else class="rdt-header-label">{{ headerLabel(header.column.id) }}</span>
         </template>
+        <!-- per-column filter input (req-5) — gated by the column's filterable flag.
+             Bound value, NOT eval'd (T-48-XSS). -->
+        <input
+          r-if="columnIsFilterable(header.column.id)"
+          class="rdt-col-filter"
+          type="text"
+          :aria-label="'Filter ' + headerLabel(header.column.id)"
+          :value="columnFilterValue(header.column.id)"
+          @input="onColumnFilterInput(header.column.id, $event)"
+          @click.stop
+        />
       </th>
     </tr>
   </thead>
@@ -517,6 +713,38 @@ $expose({
     </tr>
   </tbody>
 </table>
+
+<!-- Pagination chrome (req-6) — prev/next + page-size select. Page indicator is
+     1-based for display; pageIndex() is 0-based. -->
+<div class="rdt-pagination" role="group" aria-label="Pagination">
+  <button
+    type="button"
+    class="rdt-page-btn rdt-page-prev"
+    :disabled="!canPrevPage()"
+    @click="onPrevPage()"
+  >Prev</button>
+  <span class="rdt-page-status" aria-live="polite">
+    {{ 'Page ' + (pageIndex() + 1) + ' of ' + pageCount() }}
+  </span>
+  <button
+    type="button"
+    class="rdt-page-btn rdt-page-next"
+    :disabled="!canNextPage()"
+    @click="onNextPage()"
+  >Next</button>
+  <select
+    class="rdt-page-size"
+    aria-label="Rows per page"
+    :value="pageSize()"
+    @change="onPageSizeChange($event)"
+  >
+    <option :value="10">10</option>
+    <option :value="25">25</option>
+    <option :value="50">50</option>
+    <option :value="100">100</option>
+  </select>
+</div>
+</div>
 </template>
 
 <style>
@@ -558,6 +786,60 @@ $expose({
   top: var(--rdt-sticky-top, 0);
   z-index: var(--rdt-sticky-z, 2);
   background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+}
+/* Filter / pagination chrome (req-5, req-6) — token-driven. */
+.rozie-data-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-chrome-gap, 0.5rem);
+}
+.rozie-data-table-wrap .rdt-toolbar {
+  display: flex;
+  gap: var(--rdt-toolbar-gap, 0.5rem);
+}
+.rozie-data-table-wrap .rdt-global-filter,
+.rozie-data-table-wrap .rdt-col-filter {
+  font: inherit;
+  padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
+  border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-filter-radius, 4px);
+  background: var(--rdt-filter-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table-wrap .rdt-col-filter {
+  display: block;
+  margin-top: var(--rdt-col-filter-gap, 0.25rem);
+  width: 100%;
+  font-weight: normal;
+}
+.rozie-data-table-wrap .rdt-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--rdt-pagination-gap, 0.5rem);
+}
+.rozie-data-table-wrap .rdt-page-btn {
+  font: inherit;
+  cursor: pointer;
+  padding: var(--rdt-page-btn-padding, 0.25rem 0.6rem);
+  border: var(--rdt-page-btn-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-page-btn-radius, 4px);
+  background: var(--rdt-page-btn-bg, transparent);
+  color: inherit;
+}
+.rozie-data-table-wrap .rdt-page-btn:disabled {
+  opacity: var(--rdt-page-btn-disabled-opacity, 0.4);
+  cursor: default;
+}
+.rozie-data-table-wrap .rdt-page-status {
+  font-size: var(--rdt-page-status-size, 0.9em);
+}
+.rozie-data-table-wrap .rdt-page-size {
+  font: inherit;
+  padding: var(--rdt-page-size-padding, 0.2rem 0.4rem);
+  border: var(--rdt-page-size-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-page-size-radius, 4px);
+  background: var(--rdt-page-size-bg, transparent);
+  color: inherit;
 }
 </style>
 
