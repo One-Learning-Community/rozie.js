@@ -29,21 +29,21 @@ export default function Layer(_props: LayerProps): JSX.Element {
   const reg = useRef<any>(null);
   const didRegister = useRef(false);
   const appliedSource = useRef<any>(null);
+  const ctx = useRef<any>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
   const _watch3First = useRef(true);
 
   reg.current = layers;
-  let ctx: any = null;
-  ctx = srcCtx;
+  ctx.current = srcCtx;
 
   // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
   // else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
   // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
   // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
   // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
-  const resolveSource = useCallback(() => props.source ?? (ctx && ctx.id), [props.source]);
+  const resolveSource = useCallback(() => props.source ?? (ctx.current && ctx.current.id), [props.source]);
   const buildSpec = useCallback(() => ({
     id: props.id,
     type: props.type,

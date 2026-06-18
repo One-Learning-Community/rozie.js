@@ -2,9 +2,10 @@
  * hoistModuleLet — Plan 04-02 Task 2 (Wave 0 spike resolution).
  *
  * Detects module-scoped `let X = init` declarations referenced from a
- * LifecycleHook setup body (directly or via one-level helper indirection),
- * auto-hoists them to a `useRef(init)` inside the component body, and
- * rewrites every reference (read AND write) to `X.current`.
+ * LifecycleHook setup body (directly, or via ANY depth of top-level helper
+ * call indirection — Plan 04-04 transitive promotion), auto-hoists them to a
+ * `useRef(init)` inside the component body, and rewrites every reference
+ * (read AND write) to `X.current`.
  *
  * Spike outcome (04-02-SPIKE.md): Modal.rozie's `let savedBodyOverflow = ''`
  * referenced by `lockScroll`/`unlockScroll` (top-level arrows passed
@@ -16,12 +17,18 @@
  *   2. Top-level helpers (const X = arrow|fn OR function X) → which
  *      module-lets they reference
  *   3. For each LifecycleHook:
- *      (a) setup is arrow/fn whose body references a module-let → hoist
- *      (b) setup OR cleanup is Identifier matching a top-level helper that
- *          references a module-let → hoist
- *      (c) deeper indirection / unknown — leave UNHOISTED (no diagnostic
- *          in v1; user code remains as `let X = ...` and survives via the
- *          residual top-level Program. Plan 04-04 may add ROZ523 promotion.)
+ *      (a) setup is arrow/fn whose body references a module-let (directly or
+ *          by calling a helper chain that does) → hoist
+ *      (b) setup OR cleanup is Identifier matching a top-level helper whose
+ *          TRANSITIVE call closure references a module-let → hoist
+ *      (c) no reachable reference — leave UNHOISTED. (Plan 04-04 promoted the
+ *          former one-level-only limit to the full transitive closure over the
+ *          top-level helper call graph, so a let reached as
+ *          `$onMount → handler → pushHistory → pushHistorySnapshot → stack`
+ *          now hoists. Before, it stayed a per-render `let` — re-initialised
+ *          to its `init` on every render — which silently broke any closure
+ *          that captured a later render's copy, e.g. the live-read `$expose`
+ *          handle reading an undo stack that was empty again.)
  *
  * For hoisted lets:
  *   - REMOVE the original `let X = init` from cloned Program top level
@@ -201,8 +208,10 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
 
   const moduleLetNames = new Set(moduleLets.keys());
 
-  // 2. Build map: top-level helper name → set of module-let names it references.
-  const topLevelHelpers = new Map<string, Set<string>>();
+  // 2. Catalogue EVERY top-level helper (name → body), independent of whether
+  //    it directly touches a module-let — a helper that only CALLS another
+  //    helper still participates in the transitive reachability graph below.
+  const helperBodies = new Map<string, t.Node>();
   for (const stmt of program.program.body) {
     let helperName: string | null = null;
     let body: t.Node | null = null;
@@ -226,9 +235,51 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
       body = stmt;
     }
     if (!helperName || !body) continue;
+    helperBodies.set(helperName, body);
+  }
+  const helperNames = new Set(helperBodies.keys());
 
-    const refs = collectIdentifierRefs(body, moduleLetNames);
-    if (refs.size > 0) topLevelHelpers.set(helperName, refs);
+  // 2b. For each helper compute (i) the module-lets it references DIRECTLY and
+  //     (ii) the other helpers it CALLS. Then take the fixpoint over the call
+  //     graph so `helperTransitiveLets[H]` holds every module-let reachable
+  //     from H through ANY chain of helper calls. This is the Plan 04-04
+  //     promotion: the original pass only resolved ONE level of helper
+  //     indirection (case (b)), so a let reached as
+  //     `$onMount → handler → pushHistory → pushHistorySnapshot → historyStack`
+  //     fell through to case (c) and was left as a per-render `let` — fresh
+  //     `[]` every render. Any closure that captured a LATER render (e.g. the
+  //     live-read `$expose` handle) then read an empty stack. Transitive
+  //     hoisting lifts the whole chain to `useRef`, restoring shared identity.
+  const helperDirectLets = new Map<string, Set<string>>();
+  const helperCalls = new Map<string, Set<string>>();
+  for (const [name, body] of helperBodies) {
+    helperDirectLets.set(name, collectIdentifierRefs(body, moduleLetNames));
+    const calls = collectIdentifierRefs(body, helperNames);
+    calls.delete(name); // a self-reference adds nothing to the closure
+    helperCalls.set(name, calls);
+  }
+  const helperTransitiveLets = new Map<string, Set<string>>();
+  for (const name of helperNames) {
+    helperTransitiveLets.set(name, new Set(helperDirectLets.get(name)));
+  }
+  // Fixpoint iteration — terminates because the let universe is finite and
+  // each pass only adds. Cycle-safe (a helper cycle just shares one set).
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const name of helperNames) {
+      const acc = helperTransitiveLets.get(name)!;
+      for (const callee of helperCalls.get(name)!) {
+        const calleeLets = helperTransitiveLets.get(callee);
+        if (!calleeLets) continue;
+        for (const l of calleeLets) {
+          if (!acc.has(l)) {
+            acc.add(l);
+            grew = true;
+          }
+        }
+      }
+    }
   }
 
   // 3. Walk lifecycle hooks AND watchers → which lets are referenced via
@@ -247,11 +298,21 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     classifyExpr(wh.callback);
   }
 
+  /** Pull every let a body reaches: its DIRECT refs plus the transitive lets
+   *  of every helper it calls (at any nesting depth inside the body). */
+  function addBodyReachableLets(body: t.Node): void {
+    for (const r of collectIdentifierRefs(body, moduleLetNames)) referencedLets.add(r);
+    for (const h of collectIdentifierRefs(body, helperNames)) {
+      const lets = helperTransitiveLets.get(h);
+      if (lets) for (const l of lets) referencedLets.add(l);
+    }
+  }
+
   function classifyExpr(expr: t.Expression | t.BlockStatement): void {
-    // (a) DIRECT — arrow/fn expression body references a let.
+    // (a) DIRECT — arrow/fn expression body references a let (or calls a
+    //     helper chain that does).
     if (t.isArrowFunctionExpression(expr) || t.isFunctionExpression(expr)) {
-      const refs = collectIdentifierRefs(expr, moduleLetNames);
-      for (const r of refs) referencedLets.add(r);
+      addBodyReachableLets(expr);
       return;
     }
     // (a') DIRECT — BlockStatement body (post-`extractCleanupReturn` lift,
@@ -262,13 +323,13 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     // React render, breaking the let's "module-scoped scratch state"
     // semantics (e.g. FullCalendar's `let suppressViewSync = false`).
     if (t.isBlockStatement(expr)) {
-      const refs = collectIdentifierRefs(expr, moduleLetNames);
-      for (const r of refs) referencedLets.add(r);
+      addBodyReachableLets(expr);
       return;
     }
-    // (b) ONE-LEVEL HELPER — Identifier referring to a top-level helper.
-    if (t.isIdentifier(expr) && topLevelHelpers.has(expr.name)) {
-      const refs = topLevelHelpers.get(expr.name)!;
+    // (b) HELPER — Identifier referring to a top-level helper. Now resolves
+    //     the helper's TRANSITIVE lets, not just its direct ones.
+    if (t.isIdentifier(expr) && helperTransitiveLets.has(expr.name)) {
+      const refs = helperTransitiveLets.get(expr.name)!;
       for (const r of refs) referencedLets.add(r);
       return;
     }

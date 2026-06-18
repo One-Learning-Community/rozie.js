@@ -240,12 +240,14 @@ $onMount(setup);
     expect(out).toMatch(/\{\s*engine:\s*engine\.current\s*\}/);
   });
 
-  it('Test 3 (deeply-nested): when a let is referenced via 2-level helper indirection it is NOT auto-hoisted (conservative)', () => {
+  it('Test 3 (deeply-nested): a let referenced via 2-level helper indirection IS auto-hoisted (Plan 04-04 transitive promotion)', () => {
     // Synthetic: let X referenced inside `helperA`, `helperA` called from
-    // `helperB`, and `helperB` is the lifecycle setup. Per the spike
-    // pseudocode the conservative rule covers (a) and (b) only — deeper
-    // chains fall through with no hoist + no diag (Plan 04-04 may add
-    // ROZ523 promotion for this in a follow-up).
+    // `helperB`, and `helperB` is the lifecycle setup. The pass now takes the
+    // TRANSITIVE closure over the top-level helper call graph, so `nested`
+    // (reached as $onMount → helperB → helperA → nested) hoists to `useRef`.
+    // Before this promotion it stayed a per-render `let nested = 0` — reset to
+    // 0 every render — which silently broke any closure that captured a later
+    // render's copy (the live-read `$expose` undo-stack regression, 2026-06-18).
     const src = `
 let nested = 0;
 const helperA = () => { nested = 1; };
@@ -279,10 +281,14 @@ $onMount(helperB);
       sourceLoc: { start: 0, end: 0 },
     };
     const { hoisted } = hoistModuleLet(program, syntheticIR);
-    // Conservative — helperB references no let directly, helperA does but
-    // helperA isn't a lifecycle setup. So `nested` stays untouched.
-    expect(hoisted).toHaveLength(0);
+    // Transitive: helperB calls helperA, which writes `nested` → the closure
+    // reaches `nested`, so it hoists.
+    expect(hoisted).toHaveLength(1);
+    expect(hoisted[0]!.name).toBe('nested');
     const out = generate(program).code;
-    expect(out).toContain('let nested');
+    // The `let nested = 0` declaration is removed (emitReact synthesises the
+    // `useRef(0)`), and every reference is rewritten to `nested.current`.
+    expect(out).not.toContain('let nested');
+    expect(out).toMatch(/nested\.current\s*=\s*1/);
   });
 });

@@ -186,8 +186,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const onMarqueePointerMove = useRef<any>(null);
   const onMarqueePointerUp = useRef<any>(null);
   const lastWrittenGraph = useRef<any>(null);
+  const historyStack = useRef([]);
+  const redoStack = useRef([]);
   const dragFlushRaf = useRef(0);
   const selfWriteInFlight = useRef(false);
+  const selectedPathEl = useRef<any>(null);
+  const lastSelectionIds = useRef<any>(null);
   const [graph, setGraph] = useControllableState({
     value: props.graph,
     defaultValue: props.defaultGraph ?? (() => ({
@@ -239,25 +243,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const nodeEntries = useMemo(() => new Map(), []);
   const connEntries = useMemo(() => new Map(), []);
   const connMeta = useMemo(() => new Map(), []);
-  // Win 2: the last emitted selection id-set, joined to a stable string, so
-  // @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
-  // set does not spam the consumer). `null` until the first emit (so the initial empty
-  // selection does not emit on mount). COMPONENT-scope so it survives across area events.
-  let lastSelectionIds: any = null;
-
-  // T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
-  // PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
-  // written into $model.graph, so the controlled-graph write-back assertions are
-  // unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
-  // survives across area events + so the Solid-hoisted teardown can clear it. The
-  // `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
-  // source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
-  // element so a background-click clear (and re-select) can drop `.is-selected` without
-  // re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
-  // branch checks so an edge click (which fires its own pointerup on the path AND lets the
-  // area's background pointerup run) does not immediately clear the selection it just made
-  // — reset on the next microtask, after the gesture settles.
-  let selectedPathEl: any = null;
   // T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
   // echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
   // (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
@@ -282,24 +267,6 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
   // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
   // pops redoStack → pushes the current graph back onto historyStack → restores it.
-  // Two-stack model (simpler + correct than a single cursor): `historyStack` holds
-  // PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
-  // snapshots an undo popped off (the states to REDO forward to, newest last). A new
-  // gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
-  // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
-  // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
-  // pops redoStack → pushes the current graph back onto historyStack → restores it.
-  let historyStack = [];
-  let redoStack = [];
-  // One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
-  // pointermove frame, so a push-per-flush would record many entries for ONE gesture. We
-  // snapshot the PRE-drag graph on `nodepicked` (pointer-DOWN, definitively before any
-  // movement — capturing it on the first `nodetranslated` is too late: the engine has
-  // already applied the initial delta + may have flushed a write-back, so $props.graph no
-  // longer holds the start position), stash it in `pendingDragSnapshot`, and COMMIT it to
-  // the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
-  // must not create a history entry). `dragGestureActive` then holds until the drag-ending
-  // `pointerup` resets it. D-03: a drag = ONE undo step.
   const pendingDragPositions = useMemo(() => new Map(), []);
   const currentGraph = useCallback(() => graph || {
     nodes: [],
@@ -321,11 +288,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const pushHistorySnapshot = useCallback((snap: any) => {
     if (props.history === false) return;
     if (!snap) return;
-    historyStack.push(snap);
-    if (historyStack.length > HISTORY_CAP) {
-      historyStack = historyStack.slice(historyStack.length - HISTORY_CAP);
+    historyStack.current.push(snap);
+    if (historyStack.current.length > HISTORY_CAP) {
+      historyStack.current = historyStack.current.slice(historyStack.current.length - HISTORY_CAP);
     }
-    redoStack = [];
+    redoStack.current = [];
   }, [props.history]);
   function pushHistory() {
     if (programmatic.current) return;
@@ -376,24 +343,24 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
   }
   const undo = useCallback(() => {
-    if (historyStack.length === 0) return;
+    if (historyStack.current.length === 0) return;
     const cur = snapshotCurrent();
-    const snap = historyStack.pop();
-    if (cur) redoStack.push(cur);
+    const snap = historyStack.current.pop();
+    if (cur) redoStack.current.push(cur);
     restoreGraph(snap);
   }, [restoreGraph, snapshotCurrent]);
   const redo = useCallback(() => {
-    if (redoStack.length === 0) return;
+    if (redoStack.current.length === 0) return;
     const cur = snapshotCurrent();
-    const snap = redoStack.pop();
-    if (cur) historyStack.push(cur);
+    const snap = redoStack.current.pop();
+    if (cur) historyStack.current.push(cur);
     restoreGraph(snap);
   }, [restoreGraph, snapshotCurrent]);
   function canUndo() {
-    return historyStack.length > 0;
+    return historyStack.current.length > 0;
   }
   function canRedo() {
-    return redoStack.length > 0;
+    return redoStack.current.length > 0;
   }
   function flushDragWriteBack() {
     dragFlushRaf.current = 0;
@@ -460,20 +427,20 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
   }, [baseGraph, commitGraph, pushHistory]);
   const clearEdgeSelection = useCallback(() => {
-    if (selectedPathEl && selectedPathEl.classList) {
+    if (selectedPathEl.current && selectedPathEl.current.classList) {
       try {
-        selectedPathEl.classList.remove('is-selected');
+        selectedPathEl.current.classList.remove('is-selected');
       } catch (e: any) {}
     }
     selectedConnId.current = null;
-    selectedPathEl = null;
+    selectedPathEl.current = null;
   }, []);
   const { onEdgeClick: _rozieProp_onEdgeClick, onEdgeSelected: _rozieProp_onEdgeSelected } = props;
     const selectEdge = useCallback((id: any, pathEl: any) => {
     if (id == null) return;
     clearEdgeSelection();
     selectedConnId.current = id;
-    selectedPathEl = pathEl;
+    selectedPathEl.current = pathEl;
     if (pathEl && pathEl.classList) {
       try {
         pathEl.classList.add('is-selected');
@@ -556,8 +523,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     if (programmatic.current) return;
     const ids = selectedNodeIds();
     const key = [...ids].map((x: any) => String(x)).sort().join(' ');
-    if (key === lastSelectionIds) return;
-    lastSelectionIds = key;
+    if (key === lastSelectionIds.current) return;
+    lastSelectionIds.current = key;
     props.onSelectionChange && props.onSelectionChange({
       ids
     });

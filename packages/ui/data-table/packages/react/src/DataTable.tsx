@@ -101,6 +101,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const table = useRef<any>(null);
   const refreshRowModel = useRef<any>(null);
   const gridRoot = useRef<any>(null);
+  const programmatic = useRef(0);
+  const selectAllBox = useRef<any>(null);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
   const [sorting, setSorting] = useControllableState({
@@ -202,17 +204,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
   // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
   // computed/template binding (ROZ123).
-  // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
-  // the funnel. A counter (not a boolean) so nested writes are safe.
-  let programmatic = 0;
-
-  // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
-  // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
-  // this whole object as `state`. Return type annotated `any`: the inferred object-literal
-  // type does not structurally match table-core's `Partial<TableState>` under the strict
-  // bundled-leaf tsc (the columnSizingInfo/pagination shapes widen to Record) — the
-  // runtime shape is correct; `any` sidesteps the over-strict structural check (the
-  // deferred-items strict-tsc #2 / leaf-output-strict-typecheck close).
   const currentState = useCallback((): any => ({
     sorting: sorting != null ? sorting : sortingDefault,
     globalFilter: globalFilter != null ? globalFilter : globalFilterDefault,
@@ -315,83 +306,83 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return cols;
   }, [columnDefs, selectionEnabled]);
   function writeSorting(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setSortingDefault(next); // fresh array only (never in-place)
     setSorting(next); // two-way emit if bound (no-op-diff if not)
     props.onSortChange && props.onSortChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function applyUpdater(updater: any, current: any) {
     return typeof updater === 'function' ? updater(current) : updater;
   }
   function writeGlobalFilter(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setGlobalFilterDefault(next);
     setGlobalFilter(next);
     props.onFilterChange && props.onFilterChange({
       globalFilter: next
     });
-    programmatic--;
+    programmatic.current--;
   }
   function writeColumnFilters(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setColumnFiltersDefault(next);
     setColumnFilters(next);
     props.onFilterChange && props.onFilterChange({
       columnFilters: next
     });
-    programmatic--;
+    programmatic.current--;
   }
   function writePagination(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setPaginationDefault(next);
     setPagination(next);
     props.onPageChange && props.onPageChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function writeRowSelection(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setRowSelectionDefault(next);
     setRowSelection(next);
     props.onSelectionChange && props.onSelectionChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function writeColumnVisibility(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setColumnVisibilityDefault(next);
     setColumnVisibility(next);
     props.onVisibilityChange && props.onVisibilityChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function writeColumnSizing(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setColumnSizingDefault(next);
     setColumnSizing(next);
     props.onResizeChange && props.onResizeChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function writeColumnOrder(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setColumnOrderDefault(next);
     setColumnOrder(next);
     props.onReorderChange && props.onReorderChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function writeColumnPinning(next: any) {
-    if (programmatic) return;
-    programmatic++;
+    if (programmatic.current) return;
+    programmatic.current++;
     setColumnPinningDefault(next);
     setColumnPinning(next);
     props.onPinChange && props.onPinChange(next);
-    programmatic--;
+    programmatic.current--;
   }
   function columnFilterValue(colId: any) {
     const cf = currentState().columnFilters || [];
@@ -671,23 +662,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
-  // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
-  // binding only takes effect on Vue (which binds known DOM props); on
-  // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
-  // stays false. So set it IMPERATIVELY: query the select-all checkbox off the component
-  // root ($el — post-mount safe) and assign the property. Called from refreshRowModel
-  // (every selection change re-pulls the row model) so it stays in lockstep with the
-  // table-core selection state. The select-all box is NOT re-created by a selection
-  // change (only its checked attr flips), so the live element persists.
-  // `box` is aliased through a module-scope null-let (typeNeutralize → `any`) so the
-  // strict bundled-leaf tsc accepts `.indeterminate` (querySelector returns `Element`,
-  // which has no `indeterminate` — it is an HTMLInputElement DOM property). Same idiom
-  // as Column's `let reg = null; reg = $inject(...)`.
-  let selectAllBox: any = null;
   const syncIndeterminate = useCallback(() => {
     if (!__rozieRoot.current || !__rozieRoot.current!.querySelector) return;
-    selectAllBox = __rozieRoot.current!.querySelector('.rdt-select-all');
-    if (selectAllBox) selectAllBox.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
+    selectAllBox.current = __rozieRoot.current!.querySelector('.rdt-select-all');
+    if (selectAllBox.current) selectAllBox.current.indeterminate = isSomeRowsSelected() && !isAllRowsSelected();
   }, [isAllRowsSelected, isSomeRowsSelected]);
   function sortColumn(colId: any, desc: any) {
     if (table.current) table.current.getColumn(colId) && table.current.getColumn(colId).toggleSorting(desc, false);
