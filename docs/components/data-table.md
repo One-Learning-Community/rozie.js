@@ -119,7 +119,7 @@ The full prop surface. The nine `model: true` slices (the **Two-way** column) ar
 | `columnOrder` | `Array` | `[]` | ✓ | | `ColumnOrderState` — `string[]`. A fresh order array on reorder (never an in-place splice). |
 | `columnPinning` | `Object` | `{…}` | ✓ | | `ColumnPinningState` — `{ left: string[], right: string[] }`. Pinned columns get `position: sticky` + computed offsets. Defaults to `{ left: [], right: [] }`. |
 | `stickyHeader` | `Boolean` | `false` | | | Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container. |
-| `interactionMode` | `String` | `"table"` | | | Forward-compat seam: `'table'` (default, row-oriented) \| `'grid'`. **Reserved** — full APG grid cell-keyboard navigation is a future additive layer, inert in v1. |
+| `interactionMode` | `String` | `"table"` | | | `'table'` (default, row-oriented) \| `'grid'`. `'grid'` lights up the full WAI-ARIA **[grid interaction mode](#grid-interaction-mode)** — `role="grid"`, a roving single tab-stop, and 2-D APG arrow-key cell navigation. `'table'` is byte-behaviorally identical to a plain accessible table. |
 
 ### Models (the nine two-way slices)
 
@@ -151,6 +151,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `resize-change` | Fired live during a column resize drag (`columnResizeMode: 'onChange'`). Payload: the fresh `ColumnSizingState`. |
 | `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
 | `pin-change` | Fired when a column is pinned/unpinned (the per-header pin buttons or a `pinColumn` call). Payload: the fresh `ColumnPinningState`. |
+| `activecell-change` | **Grid mode only.** Fired when the active cell moves (arrow-key navigation, a click-to-activate, or a `focusCell` call) — but **not** on a clamped no-op edge move. Payload: `{ rowIndex, colIndex }` (integer position over the visible model). See [Grid interaction mode](#grid-interaction-mode). |
 
 ### Imperative handle
 
@@ -170,6 +171,9 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`, to avoid colliding with React's auto-generated `columnOrder` model setter — ROZ524.) |
 | `resetColumnSizing` | Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`. |
 | `pinColumn` | Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` \| `'right'` \| `false`. Fires `pin-change`. |
+| `focusCell` | **Grid mode.** Move + DOM-focus the active cell by index — `focusCell(rowIndex, colIndex)` (coerced to integers and clamped to the visible model). Fires `activecell-change`. |
+| `getActiveCell` | **Grid mode.** Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex }` (integers only; never a row object or DOM node). |
+| `clearActiveCell` | **Grid mode.** Reset the roving position to the entry cell (`0,0`) and exit interaction mode — `clearActiveCell()`. Does not emit (a reset, not a navigation). |
 
 ### Slots
 
@@ -206,11 +210,34 @@ import '@rozie-ui/data-table-react/themes/bootstrap.css'; // Bootstrap 5 — rea
 
 The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/data-table/src/themes/base.css). The structural rules (table layout, sticky-header positioning, pinned-column offsets, the resize-handle hit area) are behavior-critical and not consumer-overridable; only the cosmetic values flow through tokens.
 
+## Grid interaction mode
+
+By default `DataTable` is an accessible **table** — Tab steps between the native controls (sort buttons, checkboxes, filters, pagination). Set `interactionMode="grid"` to opt into the full WAI-ARIA **[grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)** pattern, where the whole grid is a single tab-stop and arrow keys move a roving active cell across both axes:
+
+```rozie
+<DataTable :data="$data.rows" interactionMode="grid" @activecell-change="onMove($event)">
+  <Column field="name" header="Name" sortable />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" sortable />
+</DataTable>
+```
+
+What flips on:
+
+- **Roles.** The root becomes `role="grid"` and body cells become `role="gridcell"` (headers stay `role="columnheader"`). `'table'` mode keeps `role="table"` / `role="cell"`, byte-for-byte unchanged.
+- **Roving tab-stop.** Exactly one cell carries `tabindex="0"` at a time; the rest are `tabindex="-1"`. Tab moves focus *into* the grid (landing on the active cell) and a second Tab moves *out* — the grid is one stop in the page tab order, not one-stop-per-cell. There is **no focus-steal on mount**: the entry cell waits for the first Tab/click.
+- **2-D keyboard navigation (APG).** `ArrowLeft/Right/Up/Down` move one cell; `Home`/`End` jump to the row's first/last cell; `Ctrl+Home`/`Ctrl+End` jump to the first/last cell of the grid; `PageUp`/`PageDown` jump by a row page. `ArrowUp` from the first body row crosses into the header row. Every index is clamped to the visible model — a move past an edge is a no-op (and does **not** emit `activecell-change`).
+- **Cell-level interaction.** `Enter` (or `F2`) focuses the active cell's first interactive control; `Tab`/`Shift+Tab` then cycle *within* the cell (focus containment); `Escape` returns focus to the cell and resumes navigation. Keys are only intercepted while a cell is focused — a caret inside an in-cell `<input>` reached without `Enter` keeps its native behavior.
+- **Mouse + roving model stay in sync.** Clicking a cell makes it the active cell (the roving `tabindex="0"` follows), so the next arrow key continues from where you clicked.
+- **Index-addressed, sort/filter-stable.** The active cell is tracked as a `{ rowIndex, colIndex }` pair over the *visible* model — never a stored DOM node — so it survives a re-sort, filter, page change, or column hide/reorder/pin (it clamps to the new bounds rather than getting lost). Hidden columns are simply absent from the navigable order.
+
+Drive and observe it imperatively via the [`focusCell`](#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](#events) event. The exact behavioral contract is locked by a cross-framework VR matrix (`tests/visual-regression/specs/data-table-grid.spec.ts`) proving REQ-1..7 identically on all six targets.
+
 ## Accessibility
 
 - Semantic ARIA table roles throughout: `role="table"` / `role="rowgroup"` / `role="row"` / `role="columnheader"` / `role="cell"`, with `aria-sort` (the string-safe `'ascending'` \| `'descending'` \| `'none'`) on sortable headers.
 - **Every interactive control is a native, focusable element** with an accessible name — the sort buttons, the select-all + per-row checkboxes, the pagination prev/next + page-size `<select>`, the global + per-column filter inputs, the column-visibility `<details>` disclosure, the per-header pin buttons, and the edge resize handles. There is no div-with-click-only control.
-- The keyboard / focus surface is the **table-oriented** default (Tab between the native controls). The reserved `interactionMode="grid"` seam stays inert in v1 — full APG grid arrow-key cell navigation is a future additive layer, not baked into the core.
+- The keyboard / focus surface is the **table-oriented** default (Tab between the native controls). Opt into [`interactionMode="grid"`](#grid-interaction-mode) for the full WAI-ARIA **grid** pattern — `role="grid"`, a roving single tab-stop, and 2-D APG arrow-key cell navigation — on top of the same accessible chrome.
 - Select-all scopes to the filtered rows (the TanStack default) and shows the indeterminate state on a partial selection.
 
 ## See also

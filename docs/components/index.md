@@ -8,19 +8,51 @@ Every family below ships six packages (`-react`, `-vue`, `-svelte`, `-angular`, 
 
 ## The families
 
+Grouped by what they do. Most wrap a vanilla-JS engine; the **headless** group at the end carries no engine at all.
+
+### Data, tables & lists
+
 | Family | Wraps | Showcase |
 | --- | --- | --- |
+| **DataTable** | [@tanstack/table-core](https://tanstack.com/table) — sorting, filtering, pagination, selection, full column management; **table _and_ WAI-ARIA `role="grid"` modes** | [/components/data-table](/components/data-table) |
 | **SortableList** | [SortableJS](https://sortablejs.github.io/Sortable/) drag-and-drop lists | [/components/sortable-list](/components/sortable-list) |
+
+### Editors
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
+| **CodeMirror** | [CodeMirror 6](https://codemirror.net/) code editor | [/components/codemirror](/components/codemirror) |
+| **TipTap** | [TipTap](https://tiptap.dev/) rich-text editor (ProseMirror) | [/components/tiptap](/components/tiptap) |
+
+### Dates & scheduling
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
 | **Flatpickr** | [flatpickr](https://flatpickr.js.org/) date / time picker | [/components/flatpickr](/components/flatpickr) |
 | **FullCalendar** | [FullCalendar](https://fullcalendar.io/) event calendar | [/components/fullcalendar](/components/fullcalendar) |
-| **CodeMirror** | [CodeMirror 6](https://codemirror.net/) code editor | [/components/codemirror](/components/codemirror) |
+
+### Charts, maps & graphs
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
 | **Chart.js** | [Chart.js](https://www.chartjs.org/) canvas charts | [/components/chartjs](/components/chartjs) |
-| **TipTap** | [TipTap](https://tiptap.dev/) rich-text editor (ProseMirror) | [/components/tiptap](/components/tiptap) |
 | **MapLibre** | [MapLibre GL](https://maplibre.org/) interactive maps | [/components/maplibre](/components/maplibre) |
+| **FlowCanvas** | [Rete.js](https://retejs.org/) node-flow editor | [/components/rete](/components/rete) |
+
+### Media
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
 | **Cropper** | [Cropper.js](https://fengyuanchen.github.io/cropperjs/) image cropping | [/components/cropper](/components/cropper) |
 | **PdfViewer** | [pdf.js](https://mozilla.github.io/pdf.js/) PDF rendering | [/components/pdf](/components/pdf) |
-| **FlowCanvas** | [Rete.js](https://retejs.org/) node-flow editor | [/components/rete](/components/rete) |
 | **Carousel** | [Embla Carousel](https://www.embla-carousel.com) carousel engine | [/components/embla](/components/embla) |
+
+### Headless primitives (no engine)
+
+Authored from scratch in a single `.rozie` file — no third-party engine, fully accessible.
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
 | **Listbox** | *(no engine)* headless WAI-ARIA listbox / combobox | [/components/listbox](/components/listbox) |
 | **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 
