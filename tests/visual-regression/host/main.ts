@@ -506,6 +506,22 @@ export const EXAMPLES = [
   // covered by prebuildExtraRoots[examplesRoot] + the examples tsconfig include +
   // the glob-driven build-cells demos sweep) and imports no cross-tree package.
   'DataTableGridProbe',
+  // Phase 49 (data-table grid interaction mode) LOCKED GATE — the grid-mode
+  // behavioral VR cell (loader → examples/demos/DataTableGridNavDemo.rozie, which
+  // imports ../../packages/ui/data-table/src/{DataTable,Column}.rozie). It mounts
+  // the data-table TWICE: a getTestId="grid-table" instance with
+  // interactionMode='grid' (sortable "name" header = control-bearing gridcell, a
+  // #cell <button> on "score" = control-bearing body gridcell, @activecell-change
+  // + getActiveCell()/focusCell(1,1) via the $refs.dt handle) and a sibling
+  // getTestId="default-table" with NO interactionMode (the phase-48
+  // role="table"/role="cell" default — proves the role flip). Covered by
+  // data-table-grid.spec.ts across REQ-1..REQ-7. Behavioral-only; NOT in
+  // matrix.spec.ts EXAMPLES (no pixel baseline). NO new Angular 3-file
+  // registration needed — it lives under examples/demos/ (already covered by
+  // prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the
+  // glob-driven build-cells demos sweep) and imports the SAME data-table source
+  // pkg already registered for Angular cross-tree AOT in phase 48.
+  'DataTableGridNav',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -704,6 +720,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 49 grid-probe — '-demo' appended on Lit → 'rozie-data-table-grid-probe-demo'
   // = kebab of DataTableGridProbeDemo (the component is name="DataTableGridProbeDemo").
   DataTableGridProbe: 'rozie-data-table-grid-probe',
+  // Phase 49 grid-nav — '-demo' appended on Lit → 'rozie-data-table-grid-nav-demo'
+  // = kebab of DataTableGridNavDemo (the component is name="DataTableGridNavDemo").
+  DataTableGridNav: 'rozie-data-table-grid-nav',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -947,6 +966,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 49 grid-probe — self-contained ($data only: interactionMode='grid' +
   // the active-cell index pair). No parent-supplied props.
   DataTableGridProbe: {},
+  // Phase 49 grid-nav — self-contained ($data only: the rows + sorting + the two
+  // readouts). The DataTable instances are mounted inline with their props.
+  DataTableGridNav: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

@@ -1,0 +1,164 @@
+<!--
+  DataTableGridNavDemo.rozie — Phase 49 LOCKED GATE behavioral VR cell (plan 04).
+
+  Proves the WHOLE grid interaction mode INSIDE the real 1498-line DataTable.rozie
+  (the probe in plan 01 proved the focus MECHANISM in isolation; this proves it with
+  full table chrome — table-core columns, the #cell scoped slot, the $expose handle,
+  the activecell-change event). It mounts the data-table TWICE:
+
+    (A) getTestId="grid-table" — interactionMode='grid'. A small fixed 4-row dataset,
+        3 columns. The "name" column is SORTABLE → its header is a control-bearing
+        gridcell (the sort <button> is the inner control for the Enter/Escape test).
+        The "score" column carries a #cell scoped slot rendering a native <button> so a
+        BODY gridcell is ALSO control-bearing. activecell-change is bound to a readout;
+        the exposed getActiveCell()/focusCell(1,1) verbs are reached via the $refs.dt
+        handle (read live in the handler — the ColumnMgmtDemo idiom; a cached handle can
+        be captured before the child publishes $expose on Solid).
+
+    (B) getTestId="default-table" — the SAME data with NO interactionMode prop → the
+        phase-48 default. Proves the role flip: this one is role="table"/role="cell"
+        exactly as phase 48, while (A) is role="grid"/role="gridcell".
+
+  data-table-grid.spec.ts asserts REQ-1..REQ-7 ×6 over this cell. The dataset is static
+  (no clock/random) for VR determinism. No loop var named row/cell/header is introduced
+  (the consumer uses table-core via <Column>; the slot binding name is `value`/`row`).
+-->
+
+<rozie name="DataTableGridNavDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, name: 'Alpha', city: 'Paris',  score: 41 },
+    { id: 2, name: 'Beta',  city: 'Berlin', score: 92 },
+    { id: 3, name: 'Gamma', city: 'Tokyo',  score: 67 },
+    { id: 4, name: 'Delta', city: 'Rome',   score: 50 },
+  ],
+  sorting: [],
+  // Last activecell-change payload, surfaced as a readout (REQ-5 / D-02). Updated
+  // on EVERY active-cell move (arrow keys + programmatic focusCell).
+  lastActiveCell: '',
+  // Result of an explicit getActiveCell() handle call (REQ-5 read verb).
+  getActiveResult: '',
+}
+</data>
+
+<script lang="ts">
+// activecell-change is a one-way notification {rowIndex,colIndex}; stash the latest
+// as a "r,c" string so the spec can poll it against the focused cell's data-* coords.
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+
+// Read $refs.dt LIVE in the handler (post-mount click), never cached in $onMount — a
+// cached handle can be captured before the child publishes $expose on the fine-grained
+// targets (Solid), leaving a stale reference (the ColumnMgmtDemo lesson).
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
+  }
+}
+
+const callFocusCell = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(1, 1)
+}
+</script>
+
+<template>
+<div class="dt-grid-demo">
+  <h3>DataTable — grid interaction mode</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="call-focuscell" @click="callFocusCell">focusCell(1,1)</button>
+    <span class="label">activecell-change:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+  </div>
+
+  <!-- (A) GRID mode — role flips to grid/gridcell; roving single tab-stop; full
+       APG keyboard nav. "name" is sortable (control-bearing header cell); "score"
+       has a #cell slot button (control-bearing body cell). -->
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      :data="$data.rows"
+      interactionMode="grid"
+      r-model:sorting="$data.sorting"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="name" header="Name" :sortable="true" />
+      <Column field="city" header="City" />
+      <Column field="score" header="Score">
+        <template #cell="{ value }">
+          <button type="button" class="dt-cell-btn" data-testid="cell-action">{{ value }}</button>
+        </template>
+      </Column>
+    </DataTable>
+  </div>
+
+  <!-- (B) DEFAULT mode — NO interactionMode prop → phase-48 table semantics
+       (role="table"/role="cell"). Proves the role flip is gated. -->
+  <div data-testid="default-table">
+    <DataTable :data="$data.rows">
+      <Column field="name" header="Name" :sortable="true" />
+      <Column field="city" header="City" />
+      <Column field="score" header="Score" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-grid-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+/* Make the roving active cell visible (token surface; :focus-visible parity). */
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.dt-cell-btn {
+  padding: 0.125rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+</style>
+
+</rozie>
