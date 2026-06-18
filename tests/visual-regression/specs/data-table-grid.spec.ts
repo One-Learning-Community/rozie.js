@@ -44,22 +44,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 type Target = (typeof TARGETS)[number];
 
-// React is BLOCKED on a pre-existing EMITTER gap (NOT this phase's source): the
-// React emitter compiles every $expose block to `useImperativeHandle(ref, () => ({…}), [])`
-// with an EMPTY dep array, so the exposed-verb closures are captured at RENDER 0 — before
-// $onMount creates the table-core instance, when the `rows` state is still []. The
-// data-table's `focusCell` clamps its args against `bodyRowCount()`/`visibleColCount()`
-// (both read the render-0 empty `rows` → max = 0 → every focusCell clamps to (0,0)), and
-// `getActiveCell` reads the render-0 `activeRow`/`activeColIndex` (= 0,0). REQ-1/2/3/4/6/7
-// pass on React (keyboard nav goes through a fresh `onGridKeyDown` useCallback whose deps
-// include the live state — the roving tabindex + emit are correct); ONLY REQ-5's handle
-// verbs are stale. This is the ROZ138 stale-read class applied to $expose verbs — the clean
-// fix is at the React emitter (route reactive reads inside exposed verbs through the
-// `_xRef.current` mirrors the emitter already generates, or rebuild the handle with proper
-// deps) + a dist-parity rebless. Tracked in
-// .planning/phases/49-…/deferred-items.md. Marked KNOWN_FAILING so the other 5 targets
-// gate cleanly and React is re-enabled the moment the emitter fix lands.
-const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>(['react']);
+// React was BLOCKED on a pre-existing EMITTER gap (the ROZ138 stale-read class
+// applied to $expose verbs): the React emitter compiled every $expose block to
+// `useImperativeHandle(ref, () => ({…}), [])` with an EMPTY dep array, so the
+// exposed-verb closures were captured at RENDER 0 — before $onMount creates the
+// table-core instance, when `rows` is still []. `focusCell`/`getActiveCell` then
+// clamped/read against the render-0 empty model and returned (0,0).
+//
+// FIXED by quick task 260618-ao9 — the React emitter now builds the handle once
+// (stable `ref.current`) but routes each verb through a live `_rozieExposeRef`
+// useRef mirror that is re-synced every render, so exposed verbs read LIVE
+// reactive state. React grid REQ-5 (focusCell/getActiveCell) now passes; the
+// KNOWN_FAILING set is empty and React runs as a real (non-fixme) test.
+const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>([]);
 
 function runnerFor(target: Target) {
   const built = existsSync(
