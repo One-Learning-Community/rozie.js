@@ -84,7 +84,7 @@ const COLS = `[
     { field: 'status', header: 'Status', sortable: true },
   ]`;
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useState } from 'react';
@@ -202,7 +202,7 @@ const FRAMEWORK_PEER_LABEL = {
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';

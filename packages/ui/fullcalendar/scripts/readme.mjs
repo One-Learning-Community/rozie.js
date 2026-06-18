@@ -76,7 +76,7 @@ function slotParams(slot) {
 // divergence from flatpickr).
 // ---------------------------------------------------------------------------
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useState } from 'react';
@@ -192,7 +192,7 @@ const FRAMEWORK_PEER_LABEL = {
 // Rozie-level consumer directive for calling a child's method.
 // ---------------------------------------------------------------------------
 
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';

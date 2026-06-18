@@ -72,7 +72,7 @@ const FRUITS = `[
     { label: 'Cherry', value: 'cherry' },
   ]`;
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useState } from 'react';
@@ -209,7 +209,7 @@ export class PickFormComponent {
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';

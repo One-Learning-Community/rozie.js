@@ -73,7 +73,7 @@ function slotParams(slot) {
 // flatpickr's own stylesheet must be imported by the consuming app.
 // ---------------------------------------------------------------------------
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useState } from 'react';
@@ -217,7 +217,7 @@ export class BirthdayFormComponent {
 // Rozie-level consumer directive for calling a child's method.
 // ---------------------------------------------------------------------------
 
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';

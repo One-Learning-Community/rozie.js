@@ -78,7 +78,7 @@ function slotParams(slot) {
 // `:plugins` is the per-instance plugin passthrough.
 // ---------------------------------------------------------------------------
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { Chart } from '@rozie-ui/chartjs-react';
@@ -181,7 +181,7 @@ const FRAMEWORK_PEER_LABEL = {
 // Rozie-level consumer directive for calling a child's method.
 // ---------------------------------------------------------------------------
 
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';

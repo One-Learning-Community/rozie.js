@@ -77,7 +77,7 @@ function slotParams(slot) {
 // <style> cannot reach the engine-rendered .cropper-* DOM. See the Install section.
 // ---------------------------------------------------------------------------
 
-const USAGE = {
+export const USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useState } from 'react';
@@ -209,7 +209,7 @@ const FRAMEWORK_PEER_LABEL = {
 // `$expose`). Each shows the framework's NATIVE ref mechanism.
 // ---------------------------------------------------------------------------
 
-const HANDLE_USAGE = {
+export const HANDLE_USAGE = {
   react: {
     lang: 'tsx',
     code: `import { useRef } from 'react';
