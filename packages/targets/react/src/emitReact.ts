@@ -250,6 +250,7 @@ export function emitReact(
   if (exposeMethods.length > 0) {
     reactImports.add('forwardRef');
     reactImports.add('useImperativeHandle');
+    reactImports.add('useRef');
     exposeNames = exposeMethods.map((e) => e.name);
     // synthesizeHandleType returns the bare `interface <Name>Handle {...}` (or
     // null); prepend `export ` so the named handle type is importable from the
@@ -257,16 +258,37 @@ export function emitReact(
     // export, so this only affects the `.tsx` surface — no double-export.
     const synthesized = synthesizeHandleType(ir, `${ir.name}Handle`);
     handleInterface = synthesized != null ? `export ${synthesized}` : undefined;
-    // `[]` deps: the handle is registered once; the exposed functions are the
-    // same in-scope references for the component's lifetime (those that close
-    // over reactive state are already `useCallback`-stabilized by the emitter,
-    // so `[]` carries no stale-closure risk). The factory references the
-    // exposed names while the dep array is empty, so `react-hooks/exhaustive-deps`
-    // would flag them — emit the same targeted `eslint-disable-line` the emitter
-    // already uses on its mount-once `useEffect`/`useThrottledCallback` lines
-    // (D-62-relaxed: a justified, rule-specific disable). Always used (the
-    // factory always references >=1 exposed name), so no unused-directive risk.
-    imperativeHandleBlock = `useImperativeHandle(ref, () => ({ ${exposeNames.join(', ')} }), []); // eslint-disable-line react-hooks/exhaustive-deps`;
+    // Quick task 260618-ao9 (ROZ138 stale-read class applied to $expose verbs) —
+    // STABLE-IDENTITY, LIVE-READ handle. Previously this emitted
+    // `useImperativeHandle(ref, () => ({ a, b }), [])`: the `[]` dep array froze
+    // the handle's verb references at RENDER 0, so a verb that reads reactive
+    // state ($data / derived / props) returned stale render-0 values when called
+    // later (data-table grid: `focusCell(1,1)`→(0,0), `getActiveCell()`→(0,0)
+    // because they clamp/read against the render-0 empty row model).
+    //
+    // Fix: keep `ref.current` referentially STABLE (the handle object is still
+    // built ONCE with `[]` deps), but route each verb through a `useRef` mirror
+    // (`_rozieExposeRef.current.<verb>`) that is re-synced each render to the
+    // LATEST closure. The exposed verbs are plain per-render `function`
+    // declarations (recreated each render → they already read live state), so a
+    // dispatch wrapper over the live mirror is sufficient — no per-verb body
+    // rewrite or `_<X>Ref` state-mirror generation needed.
+    //
+    // The factory still references the mirror under an empty dep array, so the
+    // same targeted `eslint-disable-line react-hooks/exhaustive-deps` the emitter
+    // uses on its mount-once `useEffect` lines applies. `Parameters<typeof X>` /
+    // `ReturnType<typeof X>` preserve each verb's exact signature so the emitted
+    // handle stays type-clean against `export interface <Name>Handle`.
+    const refInit = `const _rozieExposeRef = useRef({ ${exposeNames.join(', ')} });`;
+    const refSync = `_rozieExposeRef.current = { ${exposeNames.join(', ')} };`;
+    const dispatchers = exposeNames
+      .map(
+        (n) =>
+          `${n}: (...args: Parameters<typeof ${n}>): ReturnType<typeof ${n}> => _rozieExposeRef.current.${n}(...args)`,
+      )
+      .join(', ');
+    const handleLine = `useImperativeHandle(ref, () => ({ ${dispatchers} }), []); // eslint-disable-line react-hooks/exhaustive-deps`;
+    imperativeHandleBlock = `${refInit}\n${refSync}\n${handleLine}`;
   }
 
   const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({

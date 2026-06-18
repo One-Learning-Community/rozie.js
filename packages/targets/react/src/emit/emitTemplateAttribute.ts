@@ -981,7 +981,11 @@ function emitNonClassAttribute(
       // JSX omits the attribute), matching the `rozieAttr` drop semantics for
       // the numeric case without the string widening.
       if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase())) {
-        return { jsx: `${jsxName}={${exprCode} ?? undefined}`, diagnostics };
+        // WR-01 (260618-ao9) — parenthesize the expression. An unparenthesized
+        // top-level `||`/`&&` adjacent to `??` is a JS SyntaxError
+        // (`span || 1 ?? undefined` fails to parse), so wrap `exprCode` so the
+        // `?? undefined` nullish-drop is always well-formed.
+        return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
       }
       ctx.collectors.runtime.add('rozieAttr');
       return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };

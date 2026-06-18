@@ -360,7 +360,13 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // The exposed functions are user `<script>` arrows/functions already emitted
   // into the body above, so they are in scope here.
   if (hasExpose && parts.imperativeHandleBlock && parts.imperativeHandleBlock.length > 0) {
-    moduleParts.push('  ' + parts.imperativeHandleBlock + '\n\n');
+    // 260618-ao9 — the handle block is now multi-line (useRef mirror + sync +
+    // useImperativeHandle), so indent PER LINE, not just the first line.
+    const indented = parts.imperativeHandleBlock
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    moduleParts.push(indented + '\n\n');
   }
 
   // JSX body — wrap in `return ( ... );`.
@@ -516,7 +522,12 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
 
   // Phase 21 ($expose) — useImperativeHandle before `return (` (legacy mirror).
   if (hasExpose && parts.imperativeHandleBlock && parts.imperativeHandleBlock.length > 0) {
-    ms.append('  ' + parts.imperativeHandleBlock + '\n\n');
+    // 260618-ao9 — multi-line handle block, indent per line (legacy mirror).
+    const indented = parts.imperativeHandleBlock
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    ms.append(indented + '\n\n');
   }
 
   const jsxIndented = parts.jsx

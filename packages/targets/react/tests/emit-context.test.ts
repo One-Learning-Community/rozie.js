@@ -158,7 +158,13 @@ describe('React emit — cross-component context ($provide / $inject)', () => {
     expect(diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
     // forwardRef framing present (because $expose).
     expect(code).toContain('forwardRef<ThemeStoreHandle, ThemeStoreProps>');
-    expect(code).toContain('useImperativeHandle(ref, () => ({ reset }), [])');
+    // 260618-ao9 — stable-identity, live-read handle: a useRef mirror + a
+    // dispatch wrapper per verb (was `useImperativeHandle(ref, () => ({ reset }), [])`).
+    expect(code).toContain('const _rozieExposeRef = useRef({ reset });');
+    expect(code).toContain('_rozieExposeRef.current = { reset };');
+    expect(code).toContain('useImperativeHandle(ref, () => ({');
+    expect(code).toContain('reset: (...args');
+    expect(code).toContain('_rozieExposeRef.current.reset(...args)');
     // The Provider wrap is INSIDE the returned JSX.
     expect(code).toContain('<__ctx_theme.Provider value={');
     expect(code).toContain('</__ctx_theme.Provider>');

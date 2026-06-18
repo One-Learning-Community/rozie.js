@@ -107,7 +107,11 @@ $expose({ open, close })
     const code = compileOk(SRC, 'react');
     // The exposed `open` must be the user function (un-suffixed), and the state
     // is `open$local`. The function must NOT be renamed to open$local.
-    expect(code).toMatch(/useImperativeHandle\([^)]*\(\)\s*=>\s*\(\{\s*open\s*,/);
+    // 260618-ao9 — the handle is now a stable-identity dispatch form: each verb
+    // dispatches through `_rozieExposeRef.current.<verb>`. Assert the `open` verb
+    // is present in the handle factory body via its dispatch wrapper.
+    expect(code).toMatch(/useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{/);
+    expect(code).toMatch(/open:\s*\(\.\.\.args[^)]*\)[^=]*=>\s*_rozieExposeRef\.current\.open\(\.\.\.args\)/);
     expect(code).toMatch(/const\s+\[open\$local\s*,\s*setOpen\$local\]\s*=\s*useState/);
     expect(code).not.toMatch(/function open\$local|const open\$local\s*=\s*\(\)/);
   });
