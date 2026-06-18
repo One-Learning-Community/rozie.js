@@ -11,7 +11,7 @@
 }
   </header>
 
-  <form (submit)="_guardedAdd_2($event)">
+  <form (submit)="$event.preventDefault(); add($event)">
     <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" [ngModelOptions]="{standalone: true}" placeholder="What needs doing?" />
     <button type="submit" [disabled]="!draft().trim()">Add</button>
   </form>
@@ -22,7 +22,7 @@
 <li [class]="{ done: item.done }">
       
       @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-<ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_3(item)" />
+<ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
 } @else {
 
         <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>

@@ -162,14 +162,22 @@ const fn = () => undefined;
     expect(template).toMatchSnapshot();
     // The modifier-bearing literal rides the existing emitTemplateEvent.ts
     // modifier-pipeline emit (synthetic Listener splice path), producing the
-    // SAME (click)="_guardedFn($event)" wrapper shape that an authored
-    // @click.stop="fn" would yield — the modifier-pipeline IR survives
-    // uniformly across all 6 targets via the synthetic-splice route.
+    // SAME @click.stop="fn" lowering that an authored binding would yield — the
+    // modifier-pipeline IR survives uniformly across all 6 targets via the
+    // synthetic-splice route.
+    //
+    // angular-stop-handler-in-loop — `.stop` is a side-effect-only guard, so
+    // Angular now emits it INLINE in the `(click)=` template statement
+    // (`$event.stopPropagation(); fn()`) rather than hoisting a `_guardedFn`
+    // class-field wrapper. Inline form runs in template scope, so the bare `fn`
+    // auto-resolves against the component instance — no `this.` prefix and no
+    // wrapper method (which is what lets the same `.stop` work inside an
+    // `@for` loop where a class-field arrow could not capture the loop var).
     expect(template).toContain('(click)=');
+    expect(template).toContain('$event.stopPropagation();');
     expect(code).toContain('stopPropagation');
-    // The wrapper method's body invokes `fn` (collision-renamed bare
-    // identifier prefixed with `this.` by applyThisPrefixing).
-    expect(code).toMatch(/this\.fn/);
+    // Inline template-statement form: bare `fn()` (zero-arg) in template scope.
+    expect(template).toMatch(/\$event\.stopPropagation\(\); fn\(\)/);
   });
 
   it('(4) dynamic no-merge: r-on="someObj" → #rozieListenersTarget_N + effect() + Renderer2.listen()', () => {

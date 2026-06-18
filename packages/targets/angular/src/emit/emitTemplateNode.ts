@@ -380,8 +380,15 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
       // runtime (`f1 is not defined` at class scope). Extended to also
       // capture the 0-arg shape — bare `fn()` (no other chars between the
       // parens) now also gets the `this.` prefix.
+      // angular-stop-handler-in-loop — the negative lookbehind `(?<![\w$.])`
+      // ensures we only prefix BARE call expressions. Without it, an inlined
+      // side-effect guard's MEMBER call (`$event.stopPropagation()` /
+      // `$event.preventDefault()` — now spliced verbatim from a `.stop`/`.prevent`
+      // handler) would match the `\b(\w+)\(\)` shape on `stopPropagation()` and
+      // get mangled into `$event.this.stopPropagation()`. The lookbehind rejects
+      // any identifier preceded by `.` (member access) or `$`/word-char.
       inner = inner.replace(
-        /\b([a-zA-Z_$][\w$]*)\(\$event\)/g,
+        /(?<![\w$.])([a-zA-Z_$][\w$]*)\(\$event\)/g,
         (_match, fn: string) => {
           if (fn === 'this') return _match;
           // The collision-renamed user methods already carry `_` prefix from
@@ -390,7 +397,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         },
       );
       inner = inner.replace(
-        /\b([a-zA-Z_$][\w$]*)\(\)/g,
+        /(?<![\w$.])([a-zA-Z_$][\w$]*)\(\)/g,
         (_match, fn: string) => {
           if (fn === 'this') return _match;
           return `this.${fn}()`;

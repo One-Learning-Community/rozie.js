@@ -489,6 +489,7 @@ export const RozieErrorCode = {
   TARGET_ANGULAR_RFOR_MISSING_KEY: 'ROZ720', // Angular @for REQUIRES track expression (Pitfall 3); upgrade ROZ300 warning to error for Angular target
   TARGET_ANGULAR_RHTML_WITH_CHILDREN: 'ROZ721', // r-html via [innerHTML] cannot coexist with children
   TARGET_ANGULAR_RESERVED: 'ROZ722', // internal-invariant placeholder
+  TARGET_ANGULAR_LOOP_GUARD_HOIST: 'ROZ723', // an early-return event modifier (.self / key-filter) inside an r-for loop references the loop variable — Angular hoists the guard to a class-field arrow that cannot capture loop-scoped bindings
 
   // ---- @rozie/runtime-angular warnings (Phase 5) — ROZ750..ROZ799 (RESERVED for v2 helpers) ----
 

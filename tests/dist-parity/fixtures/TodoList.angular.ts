@@ -55,7 +55,7 @@ function __rozieAttr(v: unknown): string | null {
     }
       </header>
 
-      <form (submit)="_guarded_add_2($event)">
+      <form (submit)="$event.preventDefault(); _add()">
         <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" [ngModelOptions]="{standalone: true}" placeholder="What needs doing?" />
         <button type="submit" [disabled]="!draft().trim()">Add</button>
       </form>
@@ -66,7 +66,7 @@ function __rozieAttr(v: unknown): string | null {
     <li [class]="{ done: item.done }">
           
           @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_3(item)" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>
@@ -299,12 +299,7 @@ export class TodoList {
     }
   });
 
-  private _guarded_add_2 = ($event: any) => {
-    $event.preventDefault();
-    this._add();
-  };
-
-  private _defaultSlot_ctx_3 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
+  private _defaultSlot_ctx_2 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

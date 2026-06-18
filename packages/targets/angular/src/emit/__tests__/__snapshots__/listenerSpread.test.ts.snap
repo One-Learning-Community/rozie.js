@@ -19,7 +19,7 @@ exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (2) R6 same-e
 exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → (click)= with stopPropagation 1`] = `
 "
 
-      <button (click)="_guardedFn($event)">go</button>
+      <button (click)="$event.stopPropagation(); fn()">go</button>
 
   "
 `;

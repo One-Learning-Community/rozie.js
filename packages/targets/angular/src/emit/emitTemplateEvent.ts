@@ -126,6 +126,59 @@ function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): stri
   ].join('\n');
 }
 
+/**
+ * angular-stop-handler-in-loop — classify an inlineGuard `code` fragment.
+ *
+ * Every builtin Angular inlineGuard is exactly one of two shapes:
+ *   - side-effect statement, e.g. `$event.stopPropagation();` / `$event.preventDefault();`
+ *     (`.stop`, `.prevent`) — a plain expression-statement with no control flow.
+ *   - early-return guard, e.g. `if ($event.key !== 'Enter') return;`
+ *     (`.self`, key/button filters) — a conditional `return`.
+ *
+ * Angular event bindings are STATEMENTS that support `;`-separated chains, so a
+ * pipeline of side-effect-only guards can be emitted INLINE in the `(event)=`
+ * template binding (template scope auto-resolves bare component members against
+ * `this` AND sees `@for` loop variables). An early-return guard cannot be
+ * expressed as a template statement (`if`/`return` is not valid Angular
+ * template-statement grammar) — it must stay hoisted into a class-field arrow.
+ */
+function classifyGuard(code: string): 'sideEffect' | 'earlyReturn' {
+  const trimmed = code.trim();
+  // `if (...) return;` — the only early-return shape the builtins emit.
+  if (/^if\s*\(/.test(trimmed) && /\breturn\b/.test(trimmed)) {
+    return 'earlyReturn';
+  }
+  return 'sideEffect';
+}
+
+/**
+ * angular-stop-handler-in-loop — collect the names of TOP-LEVEL `<script>`
+ * bindings (user `const`/`let`/`function`/`class` declarations) that
+ * emitScript.ts lifts into class fields/methods. These ARE class members and so
+ * need a `this.` prefix when referenced inside a hoisted guard wrapper arrow —
+ * but `applyThisPrefixing`'s member set only covers props/state/computed/refs/
+ * emits/collision-renames, so a non-colliding top-level user handler (e.g.
+ * `const onPick = () => {}`) was previously left bare → `ReferenceError`.
+ */
+function collectTopLevelScriptBindings(
+  ir: import('../../../../core/src/ir/types.js').IRComponent,
+): Set<string> {
+  const names = new Set<string>();
+  const program = ir.setupBody?.scriptProgram;
+  const body = program?.program?.body;
+  if (!body) return names;
+  for (const stmt of body) {
+    if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        if (t.isIdentifier(d.id)) names.add(d.id.name);
+      }
+    } else if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      names.add(stmt.id.name);
+    }
+  }
+  return names;
+}
+
 function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
   if (t.isIdentifier(node)) return 'identifier';
   if (
@@ -294,25 +347,86 @@ export function emitTemplateEvent(
   } else if (inlineGuards.length === 0 && handlerKind === 'callable') {
     // Callable but not bare identifier — invoke with $event.
     attrValue = `(${handlerRef})($event)`;
-  } else {
-    // Inline guards present — synthesize a class-body wrapper method that
-    // runs the guards then invokes the handler. The wrapper body uses `e`
-    // as the event arg so that inlineGuard fragments like
-    // `if ($event.target !== $event.currentTarget) return;` resolve naturally.
+  } else if (inlineGuards.every((g) => classifyGuard(g) === 'sideEffect')) {
+    // angular-stop-handler-in-loop — ALL guards are plain side-effect
+    // statements (`.stop` → `$event.stopPropagation();`, `.prevent` →
+    // `$event.preventDefault();`). Angular event bindings are STATEMENTS that
+    // support `;`-separated chains, so emit the guards INLINE in the `(event)=`
+    // template binding rather than hoisting a class-field arrow wrapper. The
+    // inline form runs in TEMPLATE scope:
+    //   - bare component members auto-resolve against `this`
+    //     (no fragile regex `this.`-prefixing — fixes the non-colliding
+    //      top-level user handler `onPick is not defined` bug), and
+    //   - `@for` loop variables (`header`) are visible
+    //     (a class-field arrow cannot capture them — the core of the bug), and
+    //   - no `this.undefined($event)` is ever synthesized (no wrapper at all).
     //
-    // The body's class-member references need `this.` prefix because we're
-    // inside a class arrow field, not a template binding. We post-process
-    // the rewritten template-style handler code by adding `this.` prefix to
+    // Each guard string already ends with `;`. The template-scope handler
+    // invocation is appended as the final statement in the chain.
+    const guardChain = inlineGuards.join(' ');
+    let invocation: string;
+    if (handlerKind === 'identifier') {
+      const originalName = t.isIdentifier(listener.handler)
+        ? listener.handler.name
+        : undefined;
+      const arity =
+        originalName !== undefined
+          ? ctx.handlerArity?.get(originalName)
+          : undefined;
+      invocation = arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`;
+    } else if (handlerKind === 'callable') {
+      invocation = `(${handlerRef})($event)`;
+    } else {
+      // statement — splice the template-scope expression as-is.
+      invocation = handlerRef;
+    }
+    attrValue = `${guardChain} ${invocation}`;
+  } else {
+    // At least one early-return guard (`.self` / a key/button filter →
+    // `if (C) return;`). Angular template-statement grammar has no `if`/`return`
+    // form, so these MUST be hoisted into a class-body wrapper arrow that runs
+    // the guards then invokes the handler. The wrapper body runs in CLASS scope:
+    //   - class-member references need an explicit `this.` prefix, and
+    //   - a `@for` loop variable is NOT in scope — a class-field arrow cannot
+    //     capture it. We emit a diagnostic (ROZ723) for that residual rather
+    //     than silently emitting an undefined reference.
+    //
+    // `applyThisPrefixing` post-processes the template-style `handlerRef` so
     // bare class-member identifiers (signal calls + user methods + collision
-    // renames).
+    // renames + TOP-LEVEL user `<script>` bindings) get a `this.` prefix.
     const wrapperName = makeWrapperMethodName(handlerRef, counter);
     const guardLines = inlineGuards.map((g) => `  ${g}`).join('\n');
 
-    // Re-render the handler with class-member-aware `this.` prefix. Use a
-    // simple post-process: any bare identifier matching a known class member
-    // gets `this.` prefix. The `handlerRef` was produced by
-    // rewriteTemplateExpression in template style.
-    const thisPrefixed = applyThisPrefixing(handlerRef, ctx.ir, ctx.collisionRenames);
+    // angular-stop-handler-in-loop — a hoisted early-return guard whose handler
+    // references a loop-scoped binding cannot work: the class-field arrow runs
+    // outside the `@for` template scope. Flag it (ROZ723) so the failure is a
+    // compile diagnostic, not a silent runtime `ReferenceError`.
+    if (ctx.loopBindings && ctx.loopBindings.size > 0) {
+      const referencedLoopVar = Array.from(ctx.loopBindings).find((name) =>
+        new RegExp(`(?<![\\w$.])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(
+          handlerRef,
+        ),
+      );
+      if (referencedLoopVar !== undefined) {
+        diagnostics.push({
+          code: RozieErrorCode.TARGET_ANGULAR_LOOP_GUARD_HOIST, // ROZ723
+          severity: 'error',
+          message: `Event handler uses an early-return modifier (e.g. '.self' or a key filter) inside an r-for loop and references the loop variable '${referencedLoopVar}'. Angular hoists this guard to a class-field arrow that cannot capture loop-scoped bindings. Move the guard check into the handler body, or use a side-effect-only modifier (.stop / .prevent) which Angular can emit inline.`,
+          loc: listener.sourceLoc,
+        });
+      }
+    }
+
+    // angular-stop-handler-in-loop — include TOP-LEVEL `<script>` bindings in
+    // the member set so a non-colliding user handler (`const onBare = () => {}`,
+    // lifted to a class field) is correctly `this.`-prefixed inside the wrapper.
+    const topLevelBindings = collectTopLevelScriptBindings(ctx.ir);
+    const thisPrefixed = applyThisPrefixing(
+      handlerRef,
+      ctx.ir,
+      ctx.collisionRenames,
+      topLevelBindings,
+    );
 
     let innerInvocation: string;
     if (handlerKind === 'identifier') {
@@ -329,8 +443,11 @@ export function emitTemplateEvent(
         originalName !== undefined
           ? ctx.handlerArity?.get(originalName)
           : undefined;
+      // The bare handlerRef may be a top-level user fn (not in the old member
+      // set) — `thisPrefixed` already routed it through `this.`; use it as the
+      // callee so a non-colliding `onBare` becomes `this.onBare`.
       innerInvocation =
-        arity === 0 ? `this.${handlerRef}()` : `this.${handlerRef}($event)`;
+        arity === 0 ? `${thisPrefixed}()` : `${thisPrefixed}($event)`;
     } else if (handlerKind === 'callable') {
       innerInvocation = `(${thisPrefixed})($event)`;
     } else {
@@ -380,6 +497,7 @@ function applyThisPrefixing(
   code: string,
   ir: import('../../../../core/src/ir/types.js').IRComponent,
   collisionRenames?: ReadonlyMap<string, string> | undefined,
+  extraMembers?: ReadonlySet<string> | undefined,
 ): string {
   const memberNames = new Set<string>();
   for (const p of ir.props) memberNames.add(p.name);
@@ -393,6 +511,11 @@ function applyThisPrefixing(
   // Add collision-renamed targets (e.g., _close).
   if (collisionRenames) {
     for (const renamed of collisionRenames.values()) memberNames.add(renamed);
+  }
+  // angular-stop-handler-in-loop — TOP-LEVEL `<script>` bindings (lifted to
+  // class fields/methods) so a non-colliding user handler is `this.`-prefixed.
+  if (extraMembers) {
+    for (const name of extraMembers) memberNames.add(name);
   }
 
   if (memberNames.size === 0) return code;

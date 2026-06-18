@@ -6,9 +6,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, effect
   template: `
 
     <div class="r-on-probe">
-      <span (click)="_guardedHandler0($event)" (input)="debouncedOnInput_1($event)">literal modifier-bearing</span>
-      <span #rozieListenersTarget_2>dynamic</span>
-      <span (click)="_merged_click_3($event)">R6 source-order merge</span>
+      <span (click)="$event.stopPropagation(); fn()($event)" (input)="debouncedOnInput($event)">literal modifier-bearing</span>
+      <span #rozieListenersTarget_1>dynamic</span>
+      <span (click)="_merged_click_2($event)">R6 source-order merge</span>
     </div>
 
   `,
@@ -36,12 +36,7 @@ export class ROnProbe {
 
   private __rozieDestroyRef = inject(DestroyRef);
 
-  private _guardedHandler0 = ($event: any) => {
-    $event.stopPropagation();
-    this.fn()($event);
-  };
-
-  private debouncedOnInput_1 = (() => {
+  private debouncedOnInput = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -49,37 +44,37 @@ export class ROnProbe {
     };
   })();
 
-  private rozieListenersTarget_2 = viewChild<ElementRef>('rozieListenersTarget_2');
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
 
   private __rozieListenersRenderer = inject(Renderer2);
 
-  private __rozieListenersDisposers_2: Array<() => void> = [];
+  private __rozieListenersDisposers_1: Array<() => void> = [];
 
-  private __rozieListenersDestroyRegistered_2 = false;
+  private __rozieListenersDestroyRegistered_1 = false;
 
-  private __rozieListenersEffect_2 = effect(() => {
-    const el = this.rozieListenersTarget_2()?.nativeElement;
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
     if (!el) return;
-    for (const off of this.__rozieListenersDisposers_2) off();
-    this.__rozieListenersDisposers_2 = [];
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
     const obj = (this.someObj()) ?? {};
     for (const [k, v] of Object.entries(obj)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       if (typeof v !== 'function') continue;
       const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
       const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
-      this.__rozieListenersDisposers_2.push(dispose);
+      this.__rozieListenersDisposers_1.push(dispose);
     }
-    if (!this.__rozieListenersDestroyRegistered_2) {
-      this.__rozieListenersDestroyRegistered_2 = true;
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
       this.__rozieDestroyRef.onDestroy(() => {
-        for (const off of this.__rozieListenersDisposers_2) off();
-        this.__rozieListenersDisposers_2 = [];
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
       });
     }
   });
 
-  private _merged_click_3 = ($event: any) => {
+  private _merged_click_2 = ($event: any) => {
     this.f1()($event);
     this.f2()($event);
   };
