@@ -90,7 +90,7 @@ You author the component **once** as a `.rozie` file (the parent `DataTable.rozi
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same nine two-way slices, same eight change events, same `<Column>` API, same scoped slots, same imperative handle — all from the one source above, built on `@tanstack/table-core` with no per-framework adapter behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same nine two-way slices, same nine change events, same `<Column>` API, same scoped slots, same imperative handle — all from the one source above, built on `@tanstack/table-core` with no per-framework adapter behind it.
 
 ## See also
 
