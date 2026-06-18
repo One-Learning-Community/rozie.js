@@ -217,6 +217,22 @@
 
   // bumps each refreshRowModel() — lets the post-render cell-mount watcher react.
   rowModelVer: 0,
+
+  // ── Grid interaction-mode active-cell state (phase 49, REQ-1/2/6) ──────────────────
+  // The active cell is tracked as an INDEX PAIR over the current visible model — NEVER a
+  // stored DOM node (req-6). On every focus move it is re-resolved to an element through
+  // the single focusActiveCell() seam. These are NOT model:true slices (D-01 — the count
+  // stays 9) and are inert while interactionMode='table'.
+  // activeRow: body-row index over $data.rows (D-04 entry = first body row, 0).
+  activeRow: 0,
+  // activeColIndex: position in the row's visible cell list (uniform header + body).
+  activeColIndex: 0,
+  // activeIsHeader: the active cell is in the header row (reachable via ArrowUp). When
+  // true the rowKey resolves to the literal '__header'.
+  activeIsHeader: false,
+  // activeInControl: navigation (false) vs interaction (true) mode (D-07). Plan 03 drives
+  // the Enter/F2-to-enter / Escape-to-exit transition; this field reserves the state.
+  activeInControl: false,
 }
 </data>
 
@@ -235,6 +251,18 @@ import {
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 let table = null
+
+// ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
+// Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
+// via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
+// later change is a one-line edit.
+const GRID_PAGE_STEP = 10
+// The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
+// $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
+// shadow-safe because the query runs from INSIDE the component's own scope (the listbox
+// querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
+// computed/template binding (ROZ123).
+let gridRoot = null
 
 // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
 // the funnel. A counter (not a boolean) so nested writes are safe.
@@ -590,6 +618,21 @@ $onMount(() => {
 
   // initial pull
   refreshRowModel()
+
+  // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+  // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+  // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+  // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+  // isGrid() so 'table' mode is entirely untouched.
+  gridRoot = $el ? $el.querySelector('.rozie-data-table') : null
+  if (isGrid()) {
+    // D-04: first body data cell (row 0, first navigable column). Re-resolved fresh —
+    // no DOM node is ever stored in $data. Deferred a microtask so the body cells have
+    // mounted before the query (React/Solid commit their first render asynchronously).
+    const focusEntry = () => focusActiveCell($data.activeRow, $data.activeColIndex)
+    if (typeof queueMicrotask !== 'undefined') queueMicrotask(focusEntry)
+    else Promise.resolve().then(focusEntry)
+  }
 })
 
 // Reactive re-feed: when the bound sorting slice OR data length OR the column registry
@@ -1003,6 +1046,73 @@ const resetColumnSizing = () => { if (table) table.resetColumnSizing(true) }
 const pinColumn = (colId, side) => {
   if (table) { const c = table.getColumn(colId); if (c && c.pin) c.pin(side) }
 }
+
+// ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+// This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+// the active-cell index-pair state, the data-* cell markers, and the SINGLE
+// focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+// (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+
+// interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+// identical to phase 48 (roles fall back to the literals, tabindex drops).
+const isGrid = () => $props.interactionMode === 'grid'
+
+// Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+// literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+// 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
+const tableRole = () => (isGrid() ? 'grid' : 'table')
+const cellRole = () => (isGrid() ? 'gridcell' : 'cell')
+
+// ── Cell addressing helpers (plain fns — no $computed alias trap; safe in template) ────
+// rowIndexOf: a body row's index over the visible model ($data.rows). tick() puts the read
+// in the fine-grained reactive scope (Solid/Lit) so the data-row marker re-derives on a
+// re-pull (reorder/filter) — matching visibleCellsFor's discipline.
+const rowIndexOf = (row) => (tick() >= 0 ? ($data.rows || []).indexOf(row) : -1)
+// colIndexOf: a body cell's position in its row's visible cell list.
+const colIndexOf = (row, cellCtx) => (tick() >= 0 ? visibleCellsFor(row).indexOf(cellCtx) : -1)
+// headerColIndexOf: a header cell's position in its header group's leaf headers.
+const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).indexOf(header))
+
+// Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
+// fine-grained-reactive). Returns null in 'table' mode → the bound attribute DROPS
+// entirely (rozieAttr nullish-drop), keeping 'table'-mode DOM clean. rowKey is the literal
+// '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
+// header state (activeIsHeader) is addressable through the same computed.
+const cellTabindex = (rowKey, colIndex) => {
+  if (!isGrid()) return null
+  const activeKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  const isActive = rowKey === activeKey && colIndex === $data.activeColIndex
+  return isActive ? 0 : -1
+}
+
+// ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
+// resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
+// post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
+// component's own scope). rowKey is the literal '__header' or a String(integer index) and
+// colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
+const resolveCellEl = (rowKey, colIndex) => {
+  if (!gridRoot) return null
+  return gridRoot.querySelector(
+    '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]'
+  )
+}
+
+// focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
+// the D-04 entry cell here, and (plan 03) arrow nav / focusCell() / the data-change clamp —
+// routes through this one function, so a verifier can point to it and phase 53 windowing
+// hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
+// pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
+// falls back to $data when none passed. NEVER stores a DOM node (index-only state).
+const focusActiveCell = (nextRow, nextCol) => {
+  if (!isGrid() || !gridRoot) return
+  // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
+  const r = nextRow == null ? $data.activeRow : nextRow
+  const c = nextCol == null ? $data.activeColIndex : nextCol
+  const rowKey = $data.activeIsHeader ? '__header' : String(r)
+  const el = resolveCellEl(rowKey, c)
+  if (el) el.focus()
+}
+
 $expose({
   sortColumn,
   clearSorting,
