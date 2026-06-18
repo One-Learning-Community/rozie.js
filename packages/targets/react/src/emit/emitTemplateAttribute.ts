@@ -972,6 +972,17 @@ function emitNonClassAttribute(
       // `false` still stringifies (preserves aria-/data- a11y). Interpolated
       // SEGMENTS below stay on `rozieDisplay` (a null segment in a composed
       // string is `''`, matching Vue interpolation).
+      //
+      // Phase 49 — known-numeric DOM attributes (`tabIndex`, `colSpan`, …) are
+      // typed `number | undefined` by React, but `rozieAttr` stringifies any
+      // non-string input (→ `string | undefined`) → TS2322. For these, emit the
+      // `?? undefined` form instead: it preserves the `number | undefined` type
+      // AND keeps the nullish-drop (a `null`/`undefined` value → `undefined` →
+      // JSX omits the attribute), matching the `rozieAttr` drop semantics for
+      // the numeric case without the string widening.
+      if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase())) {
+        return { jsx: `${jsxName}={${exprCode} ?? undefined}`, diagnostics };
+      }
       ctx.collectors.runtime.add('rozieAttr');
       return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };
     }
