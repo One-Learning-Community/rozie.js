@@ -20,6 +20,7 @@
     "vr:rebuild": "turbo run build --filter=@rozie/visual-regression --force && pnpm --filter @rozie/visual-regression test:visual",
     "vr-preview": "pnpm --filter @rozie/visual-regression preview",
     "vr-preview:build": "turbo run build --filter=@rozie/visual-regression --force && pnpm --filter @rozie/visual-regression preview",
+    "vr-preview:debug": "pnpm --filter=@rozie/visual-regression run build:debug && pnpm --filter @rozie/visual-regression preview",
     "vr:debug": "pnpm --filter=@rozie/visual-regression run build:debug",
     "prepush": "bash scripts/ci-prepush.sh",
     "install-hooks": "bash scripts/install-hooks.sh"
