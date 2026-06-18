@@ -36,6 +36,12 @@ export const handleManifest = {
   resetColumnSizing: 'Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`.',
   pinColumn:
     "Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` | `'right'` | `false`. Fires `pin-change` with the fresh `ColumnPinningState`.",
+  focusCell:
+    'Move + focus the active cell (grid interaction mode) — `focusCell(rowIndex, colIndex)`, addressed by index over the visible model (D-03; args coerced to integers and clamped to bounds). Fires `activecell-change`. (Named `focusCell`, not `focus`: a bare `focus` verb shadows the inherited `HTMLElement.focus` on Lit — ROZ137.)',
+  getActiveCell:
+    'Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex }` integers (no row data, no DOM node).',
+  clearActiveCell:
+    'Reset the roving active-cell position to the entry cell and exit interaction mode — `clearActiveCell()`. The next Tab-in re-enters at the entry cell (D-01). (Named `clearActiveCell`, not `clear`: distinct from the listbox `clear` selection verb.)',
 };
 
 export default handleManifest;

@@ -109,7 +109,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
       </details>
     }</div>
 
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" (keydown)="onGridKeyDown($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id) {
     <tr class="rdt-tr" role="row">
@@ -488,6 +488,7 @@ export class DataTable {
   resizeChange = output<unknown>({ alias: 'resize-change' });
   reorderChange = output<unknown>({ alias: 'reorder-change' });
   pinChange = output<unknown>({ alias: 'pin-change' });
+  activecellChange = output<unknown>({ alias: 'activecell-change' });
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
@@ -575,6 +576,10 @@ export class DataTable {
       this.rows.set(nextRows);
       this.headerGroups.set(nextGroups);
       this.rowModelVer.set(this.rowModelVer() + 1);
+      // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
+      // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
+      // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
+      this.clampActiveCell();
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.
@@ -1107,6 +1112,220 @@ export class DataTable {
     const rowKey = this.activeIsHeader() ? '__header' : String(r);
     const el = this.resolveCellEl(rowKey, c);
     if (el) el.focus();
+  };
+  visibleColCount = () => {
+    // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
+    // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
+    // self-shadow class as the deconflictPropShadows finding; avoid the $data-key name as a local.
+    const rowList = this.rows() || [];
+    if (rowList.length) return rowList[0].getVisibleCells().length;
+    const hg = this.headerGroups() || [];
+    return hg.length ? (hg[hg.length - 1].headers || []).length : 0;
+  };
+  bodyRowCount = () => (this.rows() || []).length;
+  clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
+  moveCol = (delta: any) => {
+    const max = this.visibleColCount() - 1;
+    const nextCol = this.clamp(this.activeColIndex() + delta, 0, max < 0 ? 0 : max);
+    this.activeColIndex.set(nextCol);
+    return nextCol;
+  };
+  moveRow = (delta: any) => {
+    const lastRow = this.bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    if (this.activeIsHeader()) {
+      // In the header: any downward move lands on body row 0; upward stays in the header.
+      if (delta > 0) {
+        this.activeIsHeader.set(false);
+        this.activeRow.set(0);
+        return {
+          row: 0,
+          isHeader: false
+        };
+      }
+      return {
+        row: this.activeRow(),
+        isHeader: true
+      };
+    }
+    // In the body: an upward move from row 0 crosses into the header.
+    if (delta < 0 && this.activeRow() === 0) {
+      this.activeIsHeader.set(true);
+      return {
+        row: this.activeRow(),
+        isHeader: true
+      };
+    }
+    const nextRow = this.clamp(this.activeRow() + delta, 0, maxRow);
+    this.activeRow.set(nextRow);
+    this.activeIsHeader.set(false);
+    return {
+      row: nextRow,
+      isHeader: false
+    };
+  };
+  gotoColEdge = (toEnd: any) => {
+    const max = this.visibleColCount() - 1;
+    const nextCol = toEnd ? max < 0 ? 0 : max : 0;
+    this.activeColIndex.set(nextCol);
+    return nextCol;
+  };
+  gotoStart = () => {
+    this.activeIsHeader.set(false);
+    this.activeRow.set(0);
+    this.activeColIndex.set(0);
+    return {
+      row: 0,
+      col: 0
+    };
+  };
+  gotoEnd = () => {
+    const lastRow = this.bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    const max = this.visibleColCount() - 1;
+    const maxCol = max < 0 ? 0 : max;
+    this.activeIsHeader.set(false);
+    this.activeRow.set(maxRow);
+    this.activeColIndex.set(maxCol);
+    return {
+      row: maxRow,
+      col: maxCol
+    };
+  };
+  currentCellEl = () => {
+    const rowKey = this.activeIsHeader() ? '__header' : String(this.activeRow());
+    return this.resolveCellEl(rowKey, this.activeColIndex());
+  };
+  focusables = (cellEl: any) => {
+    if (!cellEl || !cellEl.querySelectorAll) return [];
+    const list = Array.prototype.slice.call(cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'));
+    return list.filter((n: any) => !n.disabled);
+  };
+  enterControl = () => {
+    const cellEl = this.currentCellEl();
+    const list = this.focusables(cellEl);
+    if (!list.length) return;
+    this.activeInControl.set(true);
+    list[0].focus();
+  };
+  cycleWithinCell = (cellEl: any, forward: any) => {
+    const list = this.focusables(cellEl);
+    if (!list.length) return;
+    const active = this.gridRoot ? this.gridRoot.getRootNode().activeElement : null;
+    const cur = list.indexOf(active);
+    let i = cur < 0 ? 0 : forward ? cur + 1 : cur - 1;
+    if (i >= list.length) i = 0;
+    if (i < 0) i = list.length - 1;
+    list[i].focus();
+  };
+  onGridKeyDown = (e: any) => {
+    const __activeRow = this.activeRow();
+    const __activeColIndex = this.activeColIndex();
+    if (!this.isGrid() || !e) return;
+    const key = e.key;
+    // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
+    if (this.activeInControl()) {
+      if (key === 'Escape') {
+        e.preventDefault();
+        this.activeInControl.set(false);
+        // Return focus to the OWNING cell (no move happened) — pass the current indices
+        // explicitly (the React-emitted seam types both params as required; a zero-arg call
+        // is TS2554). Reading $data here is safe: no write to activeRow/activeColIndex precedes it.
+        this.focusActiveCell(__activeRow, __activeColIndex);
+      } else if (key === 'Tab') {
+        e.preventDefault();
+        this.cycleWithinCell(this.currentCellEl(), !e.shiftKey);
+      }
+      return;
+    }
+    // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
+    let nextRow = __activeRow;
+    let nextCol = __activeColIndex;
+    if (key === 'ArrowRight') {
+      e.preventDefault();
+      nextCol = this.moveCol(1);
+    } else if (key === 'ArrowLeft') {
+      e.preventDefault();
+      nextCol = this.moveCol(-1);
+    } else if (key === 'ArrowDown') {
+      e.preventDefault();
+      nextRow = this.moveRow(1).row;
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      nextRow = this.moveRow(-1).row;
+    } else if (key === 'PageDown') {
+      e.preventDefault();
+      nextRow = this.moveRow(this.GRID_PAGE_STEP).row;
+    } else if (key === 'PageUp') {
+      e.preventDefault();
+      nextRow = this.moveRow(-this.GRID_PAGE_STEP).row;
+    } else if (key === 'Home') {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const s = this.gotoStart();
+        nextRow = s.row;
+        nextCol = s.col;
+      } else {
+        nextCol = this.gotoColEdge(false);
+      }
+    } else if (key === 'End') {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const en = this.gotoEnd();
+        nextRow = en.row;
+        nextCol = en.col;
+      } else {
+        nextCol = this.gotoColEdge(true);
+      }
+    } else if (key === 'Enter' || key === 'F2') {
+      e.preventDefault();
+      this.enterControl();
+      return;
+    } else return;
+    // THE seam + the D-02 event — BOTH built from the SAME fresh post-write locals (Pitfall 2).
+    this.focusActiveCell(nextRow, nextCol);
+    this.activecellChange.emit({
+      rowIndex: nextRow,
+      colIndex: nextCol
+    });
+  };
+  clampActiveCell = () => {
+    if (!this.isGrid()) return;
+    const maxCol = this.visibleColCount() - 1;
+    const col = this.clamp(this.activeColIndex(), 0, maxCol < 0 ? 0 : maxCol);
+    if (col !== this.activeColIndex()) this.activeColIndex.set(col);
+    if (!this.activeIsHeader()) {
+      const lastRow = this.bodyRowCount() - 1;
+      const maxRow = lastRow < 0 ? 0 : lastRow;
+      const row = this.clamp(this.activeRow(), 0, maxRow);
+      if (row !== this.activeRow()) this.activeRow.set(row);
+    }
+  };
+  focusCell = (rowIndex: any, colIndex: any) => {
+    const lastRow = this.bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    const maxCol = this.visibleColCount() - 1;
+    const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+    const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+    this.activeIsHeader.set(false);
+    this.activeInControl.set(false);
+    this.activeRow.set(r);
+    this.activeColIndex.set(c);
+    this.focusActiveCell(r, c);
+    this.activecellChange.emit({
+      rowIndex: r,
+      colIndex: c
+    });
+  };
+  getActiveCell = () => ({
+    rowIndex: this.activeRow(),
+    colIndex: this.activeColIndex()
+  });
+  clearActiveCell = () => {
+    this.activeIsHeader.set(false);
+    this.activeInControl.set(false);
+    this.activeRow.set(0);
+    this.activeColIndex.set(0);
   };
 
   static ngTemplateContextGuard(

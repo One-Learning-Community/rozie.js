@@ -1129,8 +1129,11 @@ const focusActiveCell = (nextRow, nextCol) => {
 // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
 // header leaf count when there are no body rows.
 const visibleColCount = () => {
-  const rows = $data.rows || []
-  if (rows.length) return rows[0].getVisibleCells().length
+  // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
+  // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
+  // self-shadow class as the deconflictPropShadows finding; avoid the $data-key name as a local.
+  const rowList = $data.rows || []
+  if (rowList.length) return rowList[0].getVisibleCells().length
   const hg = $data.headerGroups || []
   return hg.length ? ((hg[hg.length - 1].headers || []).length) : 0
 }
@@ -1262,7 +1265,10 @@ const onGridKeyDown = (e) => {
     if (key === 'Escape') {
       e.preventDefault()
       $data.activeInControl = false
-      focusActiveCell()
+      // Return focus to the OWNING cell (no move happened) — pass the current indices
+      // explicitly (the React-emitted seam types both params as required; a zero-arg call
+      // is TS2554). Reading $data here is safe: no write to activeRow/activeColIndex precedes it.
+      focusActiveCell($data.activeRow, $data.activeColIndex)
     } else if (key === 'Tab') {
       e.preventDefault()
       cycleWithinCell(currentCellEl(), !e.shiftKey)

@@ -490,6 +490,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       this._rows.value = nextRows;
       this._headerGroups.value = nextGroups;
       this._rowModelVer.value = this._rowModelVer.value + 1;
+      // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
+      // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
+      // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
+      this.clampActiveCell();
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.
@@ -573,7 +577,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     </div>
   </details>` : nothing}</div>
 
-<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} data-rozie-s-d5dcab4c>
+<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
@@ -1271,6 +1275,243 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   const rowKey = this._activeIsHeader.value ? '__header' : String(r);
   const el = this.resolveCellEl(rowKey, c);
   if (el) el.focus();
+};
+
+  visibleColCount = () => {
+  // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
+  // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
+  // self-shadow class as the deconflictPropShadows finding; avoid the $data-key name as a local.
+  const rowList = this._rows.value || [];
+  if (rowList.length) return rowList[0].getVisibleCells().length;
+  const hg = this._headerGroups.value || [];
+  return hg.length ? (hg[hg.length - 1].headers || []).length : 0;
+};
+
+  bodyRowCount = () => (this._rows.value || []).length;
+
+  clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
+
+  moveCol = (delta: any) => {
+  const max = this.visibleColCount() - 1;
+  const nextCol = this.clamp(this._activeColIndex.value + delta, 0, max < 0 ? 0 : max);
+  this._activeColIndex.value = nextCol;
+  return nextCol;
+};
+
+  moveRow = (delta: any) => {
+  const lastRow = this.bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  if (this._activeIsHeader.value) {
+    // In the header: any downward move lands on body row 0; upward stays in the header.
+    if (delta > 0) {
+      this._activeIsHeader.value = false;
+      this._activeRow.value = 0;
+      return {
+        row: 0,
+        isHeader: false
+      };
+    }
+    return {
+      row: this._activeRow.value,
+      isHeader: true
+    };
+  }
+  // In the body: an upward move from row 0 crosses into the header.
+  if (delta < 0 && this._activeRow.value === 0) {
+    this._activeIsHeader.value = true;
+    return {
+      row: this._activeRow.value,
+      isHeader: true
+    };
+  }
+  const nextRow = this.clamp(this._activeRow.value + delta, 0, maxRow);
+  this._activeRow.value = nextRow;
+  this._activeIsHeader.value = false;
+  return {
+    row: nextRow,
+    isHeader: false
+  };
+};
+
+  gotoColEdge = (toEnd: any) => {
+  const max = this.visibleColCount() - 1;
+  const nextCol = toEnd ? max < 0 ? 0 : max : 0;
+  this._activeColIndex.value = nextCol;
+  return nextCol;
+};
+
+  gotoStart = () => {
+  this._activeIsHeader.value = false;
+  this._activeRow.value = 0;
+  this._activeColIndex.value = 0;
+  return {
+    row: 0,
+    col: 0
+  };
+};
+
+  gotoEnd = () => {
+  const lastRow = this.bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  const max = this.visibleColCount() - 1;
+  const maxCol = max < 0 ? 0 : max;
+  this._activeIsHeader.value = false;
+  this._activeRow.value = maxRow;
+  this._activeColIndex.value = maxCol;
+  return {
+    row: maxRow,
+    col: maxCol
+  };
+};
+
+  currentCellEl = () => {
+  const rowKey = this._activeIsHeader.value ? '__header' : String(this._activeRow.value);
+  return this.resolveCellEl(rowKey, this._activeColIndex.value);
+};
+
+  focusables = (cellEl: any) => {
+  if (!cellEl || !cellEl.querySelectorAll) return [];
+  const list = Array.prototype.slice.call(cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'));
+  return list.filter((n: any) => !n.disabled);
+};
+
+  enterControl = () => {
+  const cellEl = this.currentCellEl();
+  const list = this.focusables(cellEl);
+  if (!list.length) return;
+  this._activeInControl.value = true;
+  list[0].focus();
+};
+
+  cycleWithinCell = (cellEl: any, forward: any) => {
+  const list = this.focusables(cellEl);
+  if (!list.length) return;
+  const active = this.gridRoot ? this.gridRoot.getRootNode().activeElement : null;
+  const cur = list.indexOf(active);
+  let i = cur < 0 ? 0 : forward ? cur + 1 : cur - 1;
+  if (i >= list.length) i = 0;
+  if (i < 0) i = list.length - 1;
+  list[i].focus();
+};
+
+  onGridKeyDown = (e: any) => {
+  if (!this.isGrid() || !e) return;
+  const key = e.key;
+  // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
+  if (this._activeInControl.value) {
+    if (key === 'Escape') {
+      e.preventDefault();
+      this._activeInControl.value = false;
+      // Return focus to the OWNING cell (no move happened) — pass the current indices
+      // explicitly (the React-emitted seam types both params as required; a zero-arg call
+      // is TS2554). Reading $data here is safe: no write to activeRow/activeColIndex precedes it.
+      this.focusActiveCell(this._activeRow.value, this._activeColIndex.value);
+    } else if (key === 'Tab') {
+      e.preventDefault();
+      this.cycleWithinCell(this.currentCellEl(), !e.shiftKey);
+    }
+    return;
+  }
+  // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
+  let nextRow = this._activeRow.value;
+  let nextCol = this._activeColIndex.value;
+  if (key === 'ArrowRight') {
+    e.preventDefault();
+    nextCol = this.moveCol(1);
+  } else if (key === 'ArrowLeft') {
+    e.preventDefault();
+    nextCol = this.moveCol(-1);
+  } else if (key === 'ArrowDown') {
+    e.preventDefault();
+    nextRow = this.moveRow(1).row;
+  } else if (key === 'ArrowUp') {
+    e.preventDefault();
+    nextRow = this.moveRow(-1).row;
+  } else if (key === 'PageDown') {
+    e.preventDefault();
+    nextRow = this.moveRow(this.GRID_PAGE_STEP).row;
+  } else if (key === 'PageUp') {
+    e.preventDefault();
+    nextRow = this.moveRow(-this.GRID_PAGE_STEP).row;
+  } else if (key === 'Home') {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      const s = this.gotoStart();
+      nextRow = s.row;
+      nextCol = s.col;
+    } else {
+      nextCol = this.gotoColEdge(false);
+    }
+  } else if (key === 'End') {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      const en = this.gotoEnd();
+      nextRow = en.row;
+      nextCol = en.col;
+    } else {
+      nextCol = this.gotoColEdge(true);
+    }
+  } else if (key === 'Enter' || key === 'F2') {
+    e.preventDefault();
+    this.enterControl();
+    return;
+  } else return;
+  // THE seam + the D-02 event — BOTH built from the SAME fresh post-write locals (Pitfall 2).
+  this.focusActiveCell(nextRow, nextCol);
+  this.dispatchEvent(new CustomEvent("activecell-change", {
+    detail: {
+      rowIndex: nextRow,
+      colIndex: nextCol
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  clampActiveCell = () => {
+  if (!this.isGrid()) return;
+  const maxCol = this.visibleColCount() - 1;
+  const col = this.clamp(this._activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
+  if (col !== this._activeColIndex.value) this._activeColIndex.value = col;
+  if (!this._activeIsHeader.value) {
+    const lastRow = this.bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    const row = this.clamp(this._activeRow.value, 0, maxRow);
+    if (row !== this._activeRow.value) this._activeRow.value = row;
+  }
+};
+
+  focusCell = (rowIndex: any, colIndex: any) => {
+  const lastRow = this.bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  const maxCol = this.visibleColCount() - 1;
+  const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  this._activeIsHeader.value = false;
+  this._activeInControl.value = false;
+  this._activeRow.value = r;
+  this._activeColIndex.value = c;
+  this.focusActiveCell(r, c);
+  this.dispatchEvent(new CustomEvent("activecell-change", {
+    detail: {
+      rowIndex: r,
+      colIndex: c
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  getActiveCell = () => ({
+  rowIndex: this._activeRow.value,
+  colIndex: this._activeColIndex.value
+});
+
+  clearActiveCell = () => {
+  this._activeIsHeader.value = false;
+  this._activeInControl.value = false;
+  this._activeRow.value = 0;
+  this._activeColIndex.value = 0;
 };
 
   get sorting(): any[] { return this._sortingControllable.read(); }

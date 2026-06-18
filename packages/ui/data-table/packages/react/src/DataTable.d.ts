@@ -44,6 +44,7 @@ export interface DataTableProps {
   onResizeChange?: (...args: unknown[]) => void;
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
+  onActivecellChange?: (...args: unknown[]) => void;
   children?: ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
@@ -66,6 +67,9 @@ export interface DataTableHandle {
   applyColumnOrder: (...args: any[]) => any;
   resetColumnSizing: (...args: any[]) => any;
   pinColumn: (...args: any[]) => any;
+  focusCell: (...args: any[]) => any;
+  getActiveCell: (...args: any[]) => any;
+  clearActiveCell: (...args: any[]) => any;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;
