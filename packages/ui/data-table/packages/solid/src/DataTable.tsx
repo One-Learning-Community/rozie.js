@@ -1240,12 +1240,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
   // pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
   // falls back to $data when none passed. NEVER stores a DOM node (index-only state).
-  function focusActiveCell(nextRow: any, nextCol: any) {
+  function focusActiveCell(nextRow: any, nextCol: any, nextIsHeader: any) {
     if (!isGrid() || !gridRoot) return;
     // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
     const r = nextRow == null ? activeRow() : nextRow;
     const c = nextCol == null ? activeColIndex() : nextCol;
-    const rowKey = activeIsHeader() ? '__header' : String(r);
+    // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
+    // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
+    // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
+    // here returns the PRE-write value, resolving focus to the BODY cell instead of the
+    // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
+    const header = nextIsHeader == null ? activeIsHeader() : nextIsHeader;
+    const rowKey = header ? '__header' : String(r);
     const el = resolveCellEl(rowKey, c);
     if (el) el.focus();
   }
@@ -1429,8 +1435,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       return;
     }
     // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
+    // nextIsHeader is threaded alongside nextRow/nextCol so the focus seam never re-reads the
+    // async-stale $data.activeIsHeader after a header crossing (React ROZ138 / Angular signal —
+    // plan-01 Pitfall 2). moveRow returns the fresh { row, isHeader }; every other branch lands
+    // in the body (isHeader = false).
     let nextRow = activeRow();
     let nextCol = activeColIndex();
+    let nextIsHeader = activeIsHeader();
     if (key === 'ArrowRight') {
       e.preventDefault();
       nextCol = moveCol(1);
@@ -1439,22 +1450,31 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       nextCol = moveCol(-1);
     } else if (key === 'ArrowDown') {
       e.preventDefault();
-      nextRow = moveRow(1).row;
+      const m = moveRow(1);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'ArrowUp') {
       e.preventDefault();
-      nextRow = moveRow(-1).row;
+      const m = moveRow(-1);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'PageDown') {
       e.preventDefault();
-      nextRow = moveRow(GRID_PAGE_STEP).row;
+      const m = moveRow(GRID_PAGE_STEP);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'PageUp') {
       e.preventDefault();
-      nextRow = moveRow(-GRID_PAGE_STEP).row;
+      const m = moveRow(-GRID_PAGE_STEP);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'Home') {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const s = gotoStart();
         nextRow = s.row;
         nextCol = s.col;
+        nextIsHeader = false;
       } else {
         nextCol = gotoColEdge(false);
       }
@@ -1464,6 +1484,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         const en = gotoEnd();
         nextRow = en.row;
         nextCol = en.col;
+        nextIsHeader = false;
       } else {
         nextCol = gotoColEdge(true);
       }
@@ -1473,7 +1494,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       return;
     } else return;
     // THE seam + the D-02 event — BOTH built from the SAME fresh post-write locals (Pitfall 2).
-    focusActiveCell(nextRow, nextCol);
+    focusActiveCell(nextRow, nextCol, nextIsHeader);
     _props.onActivecellChange?.({
       rowIndex: nextRow,
       colIndex: nextCol

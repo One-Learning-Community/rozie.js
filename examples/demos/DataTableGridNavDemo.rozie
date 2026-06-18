@@ -35,13 +35,26 @@
 
 <data>
 {
+  // 6 rows + a controlled pageSize of 3 → TWO pages. The grid nav stays within
+  // page 1 (rows 0..2); REQ-7's "ArrowDown at the last visible row does NOT cross
+  // the page" is asserted against this (pagination readout stays on page 1).
   rows: [
-    { id: 1, name: 'Alpha', city: 'Paris',  score: 41 },
-    { id: 2, name: 'Beta',  city: 'Berlin', score: 92 },
-    { id: 3, name: 'Gamma', city: 'Tokyo',  score: 67 },
-    { id: 4, name: 'Delta', city: 'Rome',   score: 50 },
+    { id: 1, name: 'Alpha',   city: 'Paris',  score: 41 },
+    { id: 2, name: 'Beta',    city: 'Berlin', score: 92 },
+    { id: 3, name: 'Gamma',   city: 'Tokyo',  score: 67 },
+    { id: 4, name: 'Delta',   city: 'Rome',   score: 50 },
+    { id: 5, name: 'Epsilon', city: 'Madrid', score: 73 },
+    { id: 6, name: 'Zeta',    city: 'Lisbon', score: 28 },
   ],
   sorting: [],
+  // UNCONTROLLED pagination (a static prop, NOT r-model) — a small pageSize=3 so the
+  // spec can prove ArrowDown at the page-last row does NOT cross the page (REQ-7
+  // no-page-cross). Deliberately NOT two-way bound: a controlled pagination r-model
+  // round-trips an echo on every internal page-change which, combined with the
+  // child's per-keystroke active-cell setState, races the roving-tabindex commit on
+  // React (the activecell state reverts to the entry cell). The component still owns
+  // its page state via the uncontrolled fallback; the page simply never changes here.
+  pageConfig: { pageIndex: 0, pageSize: 3 },
   // Last activecell-change payload, surfaced as a readout (REQ-5 / D-02). Updated
   // on EVERY active-cell move (arrow keys + programmatic focusCell).
   lastActiveCell: '',
@@ -72,6 +85,14 @@ const callFocusCell = (): void => {
   const api = $refs.dt
   if (api && api.focusCell) api.focusCell(1, 1)
 }
+
+// Hide the "city" column (the middle data column) via the DataTable handle so the
+// spec can prove horizontal nav skips a hidden column (REQ-7 visible-model nav).
+const hideCity = (): void => {
+  const api = $refs.dt
+  if (api && api.toggleColumnVisibility) api.toggleColumnVisibility('city')
+}
+
 </script>
 
 <template>
@@ -81,6 +102,7 @@ const callFocusCell = (): void => {
   <div class="controls">
     <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
     <button type="button" data-testid="call-focuscell" @click="callFocusCell">focusCell(1,1)</button>
+    <button type="button" data-testid="hide-city" @click="hideCity">Toggle City</button>
     <span class="label">activecell-change:</span>
     <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
     <span class="label">getActiveCell:</span>
@@ -95,16 +117,21 @@ const callFocusCell = (): void => {
       ref="dt"
       :data="$data.rows"
       interactionMode="grid"
+      :pagination="$data.pageConfig"
       r-model:sorting="$data.sorting"
       @activecell-change="onActiveCellChange($event)"
     >
       <Column field="name" header="Name" :sortable="true" />
       <Column field="city" header="City" />
-      <Column field="score" header="Score">
-        <template #cell="{ value }">
-          <button type="button" class="dt-cell-btn" data-testid="cell-action">{{ value }}</button>
-        </template>
-      </Column>
+      <Column field="score" header="Score" />
+      <!-- ONE #cell scoped slot on <DataTable>, dispatched by columnId (D-A). The
+           "score" column renders a NATIVE <button> → its body gridcell is
+           control-bearing (the Enter/Escape in-cell trap test); every other column
+           falls through to the plain accessor value. -->
+      <template #cell="{ columnId, value }">
+        <button r-if="columnId === 'score'" type="button" class="dt-cell-btn" data-testid="cell-action">{{ value }}</button>
+        <span r-else>{{ value }}</span>
+      </template>
     </DataTable>
   </div>
 

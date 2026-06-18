@@ -1104,12 +1104,18 @@ export class DataTable {
     if (!this.gridRoot) return null;
     return this.gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
   };
-  focusActiveCell = (nextRow: any, nextCol: any) => {
+  focusActiveCell = (nextRow: any, nextCol: any, nextIsHeader: any) => {
     if (!this.isGrid() || !this.gridRoot) return;
     // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
     const r = nextRow == null ? this.activeRow() : nextRow;
     const c = nextCol == null ? this.activeColIndex() : nextCol;
-    const rowKey = this.activeIsHeader() ? '__header' : String(r);
+    // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
+    // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
+    // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
+    // here returns the PRE-write value, resolving focus to the BODY cell instead of the
+    // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
+    const header = nextIsHeader == null ? this.activeIsHeader() : nextIsHeader;
+    const rowKey = header ? '__header' : String(r);
     const el = this.resolveCellEl(rowKey, c);
     if (el) el.focus();
   };
@@ -1239,8 +1245,13 @@ export class DataTable {
       return;
     }
     // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
+    // nextIsHeader is threaded alongside nextRow/nextCol so the focus seam never re-reads the
+    // async-stale $data.activeIsHeader after a header crossing (React ROZ138 / Angular signal —
+    // plan-01 Pitfall 2). moveRow returns the fresh { row, isHeader }; every other branch lands
+    // in the body (isHeader = false).
     let nextRow = __activeRow;
     let nextCol = __activeColIndex;
+    let nextIsHeader = this.activeIsHeader();
     if (key === 'ArrowRight') {
       e.preventDefault();
       nextCol = this.moveCol(1);
@@ -1249,22 +1260,31 @@ export class DataTable {
       nextCol = this.moveCol(-1);
     } else if (key === 'ArrowDown') {
       e.preventDefault();
-      nextRow = this.moveRow(1).row;
+      const m = this.moveRow(1);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'ArrowUp') {
       e.preventDefault();
-      nextRow = this.moveRow(-1).row;
+      const m = this.moveRow(-1);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'PageDown') {
       e.preventDefault();
-      nextRow = this.moveRow(this.GRID_PAGE_STEP).row;
+      const m = this.moveRow(this.GRID_PAGE_STEP);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'PageUp') {
       e.preventDefault();
-      nextRow = this.moveRow(-this.GRID_PAGE_STEP).row;
+      const m = this.moveRow(-this.GRID_PAGE_STEP);
+      nextRow = m.row;
+      nextIsHeader = m.isHeader;
     } else if (key === 'Home') {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const s = this.gotoStart();
         nextRow = s.row;
         nextCol = s.col;
+        nextIsHeader = false;
       } else {
         nextCol = this.gotoColEdge(false);
       }
@@ -1274,6 +1294,7 @@ export class DataTable {
         const en = this.gotoEnd();
         nextRow = en.row;
         nextCol = en.col;
+        nextIsHeader = false;
       } else {
         nextCol = this.gotoColEdge(true);
       }
@@ -1283,7 +1304,7 @@ export class DataTable {
       return;
     } else return;
     // THE seam + the D-02 event — BOTH built from the SAME fresh post-write locals (Pitfall 2).
-    this.focusActiveCell(nextRow, nextCol);
+    this.focusActiveCell(nextRow, nextCol, nextIsHeader);
     this.activecellChange.emit({
       rowIndex: nextRow,
       colIndex: nextCol
