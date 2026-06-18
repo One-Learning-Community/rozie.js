@@ -113,6 +113,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'SortableList — showcase & API', link: '/components/sortable-list' },
+            { text: 'Usage examples', link: '/components/sortable-list-usage' },
             { text: 'Sortable libraries comparison', link: '/components/sortable-comparison' },
             { text: 'SortableList example & output', link: '/examples/sortable-list' },
             { text: 'SortableList — live demo', link: '/components/sortable-list-demo' },
@@ -123,6 +124,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Flatpickr — showcase & API', link: '/components/flatpickr' },
+            { text: 'Usage examples', link: '/components/flatpickr-usage' },
             { text: 'Flatpickr libraries comparison', link: '/components/flatpickr-comparison' },
             { text: 'Flatpickr example & output', link: '/examples/flatpickr' },
             { text: 'Flatpickr — live demo', link: '/components/flatpickr-demo' },
@@ -133,6 +135,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'FullCalendar — showcase & API', link: '/components/fullcalendar' },
+            { text: 'Usage examples', link: '/components/fullcalendar-usage' },
             { text: 'FullCalendar libraries comparison', link: '/components/fullcalendar-comparison' },
             { text: 'FullCalendar — live demo', link: '/components/fullcalendar-demo' },
           ],
@@ -142,6 +145,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'CodeMirror — showcase & API', link: '/components/codemirror' },
+            { text: 'Usage examples', link: '/components/codemirror-usage' },
             { text: 'CodeMirror libraries comparison', link: '/components/codemirror-comparison' },
             { text: 'CodeMirror — live demo', link: '/components/codemirror-demo' },
           ],
@@ -151,6 +155,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Chart.js — showcase & API', link: '/components/chartjs' },
+            { text: 'Usage examples', link: '/components/chartjs-usage' },
             { text: 'Chart.js libraries comparison', link: '/components/chartjs-comparison' },
             { text: 'Chart.js — live demo', link: '/components/chartjs-demo' },
           ],
@@ -160,6 +165,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'TipTap — showcase & API', link: '/components/tiptap' },
+            { text: 'Usage examples', link: '/components/tiptap-usage' },
             { text: 'TipTap libraries comparison', link: '/components/tiptap-comparison' },
             { text: 'TipTap — live demo', link: '/components/tiptap-demo' },
           ],
@@ -169,6 +175,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'MapLibre — showcase & API', link: '/components/maplibre' },
+            { text: 'Usage examples', link: '/components/maplibre-usage' },
             { text: 'MapLibre libraries comparison', link: '/components/maplibre-comparison' },
             { text: 'MapLibre — live demo', link: '/components/maplibre-demo' },
           ],
@@ -178,6 +185,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Cropper — showcase & API', link: '/components/cropper' },
+            { text: 'Usage examples', link: '/components/cropper-usage' },
             { text: 'Cropper libraries comparison', link: '/components/cropper-comparison' },
             { text: 'Cropper — live demo', link: '/components/cropper-demo' },
           ],
@@ -187,6 +195,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'PdfViewer — showcase & API', link: '/components/pdf' },
+            { text: 'Usage examples', link: '/components/pdf-usage' },
             { text: 'PDF libraries comparison', link: '/components/pdf-comparison' },
             { text: 'PdfViewer — live demo', link: '/components/pdf-demo' },
           ],
@@ -196,6 +205,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'FlowCanvas — showcase & API', link: '/components/rete' },
+            { text: 'Usage examples', link: '/components/rete-usage' },
             { text: 'Node-flow editor comparison', link: '/components/rete-comparison' },
             { text: 'FlowCanvas — live demo', link: '/components/rete-demo' },
           ],
@@ -205,6 +215,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Embla — showcase & API', link: '/components/embla' },
+            { text: 'Usage examples', link: '/components/embla-usage' },
             { text: 'Embla libraries comparison', link: '/components/embla-comparison' },
             { text: 'Embla — live demo', link: '/components/embla-demo' },
           ],
@@ -214,6 +225,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Listbox — headless select / combobox', link: '/components/listbox' },
+            { text: 'Usage examples', link: '/components/listbox-usage' },
             { text: 'Headless select / combobox comparison', link: '/components/listbox-comparison' },
             { text: 'Listbox — live demo', link: '/components/listbox-demo' },
           ],
@@ -223,6 +235,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'Slider — headless slider / range', link: '/components/slider' },
+            { text: 'Usage examples', link: '/components/slider-usage' },
             { text: 'Headless slider / range comparison', link: '/components/slider-comparison' },
             { text: 'Slider — live demo', link: '/components/slider-demo' },
           ],
@@ -232,6 +245,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'DataTable — showcase & API', link: '/components/data-table' },
+            { text: 'Usage examples', link: '/components/data-table-usage' },
             { text: 'Data table comparison', link: '/components/data-table-comparison' },
             { text: 'DataTable — live demo', link: '/components/data-table-demo' },
           ],
