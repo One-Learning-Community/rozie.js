@@ -8,7 +8,7 @@ title: FlowCanvas — usage examples
 
 `FlowCanvas` ships as six pre-compiled, per-framework packages from a single `.rozie` source — install only the one for your framework (no Rozie toolchain, no build-time compile step). Each carries its engine + framework peers as **peer dependencies**, so you control their versions. The snippets below are the same idiomatic consumption code shown in each package's README; switch the tab to your framework.
 
-## Consume it
+## Usage
 
 ::: code-group
 
