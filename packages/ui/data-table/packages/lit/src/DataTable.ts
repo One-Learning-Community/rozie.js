@@ -288,6 +288,10 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _rows = signal([]);
   private _headerGroups = signal([]);
   private _rowModelVer = signal(0);
+  private _activeRow = signal(0);
+  private _activeColIndex = signal(0);
+  private _activeIsHeader = signal(false);
+  private _activeInControl = signal(false);
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
@@ -496,6 +500,25 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // initial pull
     // initial pull
     this.refreshRowModel();
+
+    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+    // isGrid() so 'table' mode is entirely untouched.
+    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+    // isGrid() so 'table' mode is entirely untouched.
+    this.gridRoot = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-data-table') : null;
+    if (this.isGrid()) {
+      // D-04: first body data cell (row 0, first navigable column). Re-resolved fresh —
+      // no DOM node is ever stored in $data. Deferred a microtask so the body cells have
+      // mounted before the query (React/Solid commit their first render asynchronously).
+      const focusEntry = () => this.focusActiveCell(this._activeRow.value, this._activeColIndex.value);
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(focusEntry);else Promise.resolve().then(focusEntry);
+    }
   }
 
   updated(changedProperties: Map<string, unknown>): void {
@@ -550,10 +573,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     </div>
   </details>` : nothing}</div>
 
-<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="table" data-rozie-s-d5dcab4c>
+<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
         
         
         ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
@@ -585,7 +608,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="cell" key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
         
         ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
@@ -617,6 +640,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   }
 
   table: any = null;
+
+  GRID_PAGE_STEP = 10;
+
+  gridRoot: any = null;
 
   programmatic = 0;
 
@@ -1210,6 +1237,40 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     const c = this.table.getColumn(colId);
     if (c && c.pin) c.pin(side);
   }
+};
+
+  isGrid = () => this.interactionMode === 'grid';
+
+  tableRole = () => this.isGrid() ? 'grid' : 'table';
+
+  cellRole = () => this.isGrid() ? 'gridcell' : 'cell';
+
+  rowIndexOf = (row: any) => this.tick() >= 0 ? (this._rows.value || []).indexOf(row) : -1;
+
+  colIndexOf = (row: any, cellCtx: any) => this.tick() >= 0 ? this.visibleCellsFor(row).indexOf(cellCtx) : -1;
+
+  headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
+
+  cellTabindex = (rowKey: any, colIndex: any) => {
+  if (!this.isGrid()) return null;
+  const activeKey = this._activeIsHeader.value ? '__header' : String(this._activeRow.value);
+  const isActive = rowKey === activeKey && colIndex === this._activeColIndex.value;
+  return isActive ? 0 : -1;
+};
+
+  resolveCellEl = (rowKey: any, colIndex: any) => {
+  if (!this.gridRoot) return null;
+  return this.gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
+};
+
+  focusActiveCell = (nextRow: any, nextCol: any) => {
+  if (!this.isGrid() || !this.gridRoot) return;
+  // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
+  const r = nextRow == null ? this._activeRow.value : nextRow;
+  const c = nextCol == null ? this._activeColIndex.value : nextCol;
+  const rowKey = this._activeIsHeader.value ? '__header' : String(r);
+  const el = this.resolveCellEl(rowKey, c);
+  if (el) el.focus();
 };
 
   get sorting(): any[] { return this._sortingControllable.read(); }

@@ -1188,7 +1188,7 @@ $expose({
 <table
   class="rozie-data-table"
   :class="{ 'rdt-sticky': $props.stickyHeader }"
-  role="table"
+  :role="tableRole()"
 >
   <thead class="rdt-thead" role="rowgroup">
     <tr
@@ -1203,6 +1203,10 @@ $expose({
         r-for="header in hg.headers"
         :key="header.id"
         :data-col="header.column.id"
+        data-grid-cell
+        data-row="__header"
+        :data-col-index="headerColIndexOf(hg, header)"
+        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header))"
         :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header.column.id)"
@@ -1331,10 +1335,14 @@ $expose({
     >
       <td
         class="rdt-td"
-        role="cell"
+        :role="cellRole()"
         r-for="cellCtx in visibleCellsFor(row)"
         :key="cellCtx.id"
         :data-col="cellCtx.column.id"
+        data-grid-cell
+        :data-row="rowIndexOf(row)"
+        :data-col-index="colIndexOf(row, cellCtx)"
+        :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
         :style="pinStyle(cellCtx.column.id)"
       >

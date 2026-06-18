@@ -109,12 +109,12 @@ function rozieToken(key: string): InjectionToken<unknown> {
       </details>
     }</div>
 
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" role="table">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id) {
     <tr class="rdt-tr" role="row">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             
             
             @if (isSelectColumn(header.column.id)) {
@@ -174,7 +174,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @for (row of rows(); track row.id) {
     <tr class="rdt-tr" role="row">
           @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" role="cell" [attr.data-col]="rozieAttr(cellCtx.column.id)" [style]="pinStyle(cellCtx.column.id)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)">
             
             @if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
@@ -475,6 +475,10 @@ export class DataTable {
   rows = signal<any[]>([]);
   headerGroups = signal<any[]>([]);
   rowModelVer = signal(0);
+  activeRow = signal(0);
+  activeColIndex = signal(0);
+  activeIsHeader = signal(false);
+  activeInControl = signal(false);
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   sortChange = output<unknown>({ alias: 'sort-change' });
   filterChange = output<unknown>({ alias: 'filter-change' });
@@ -581,9 +585,30 @@ export class DataTable {
     // initial pull
     // initial pull
     this.refreshRowModel();
+
+    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+    // isGrid() so 'table' mode is entirely untouched.
+    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+    // isGrid() so 'table' mode is entirely untouched.
+    this.gridRoot = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-data-table') : null;
+    if (this.isGrid()) {
+      // D-04: first body data cell (row 0, first navigable column). Re-resolved fresh —
+      // no DOM node is ever stored in $data. Deferred a microtask so the body cells have
+      // mounted before the query (React/Solid commit their first render asynchronously).
+      const focusEntry = () => this.focusActiveCell(this.activeRow(), this.activeColIndex());
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(focusEntry);else Promise.resolve().then(focusEntry);
+    }
   }
 
   table: any = null;
+  GRID_PAGE_STEP = 10;
+  gridRoot: any = null;
   programmatic = 0;
   currentState = (): any => ({
     sorting: this.sorting() != null ? this.sorting() : this.sortingDefault(),
@@ -1058,6 +1083,31 @@ export class DataTable {
       if (c && c.pin) c.pin(side);
     }
   };
+  isGrid = () => this.interactionMode() === 'grid';
+  tableRole = () => this.isGrid() ? 'grid' : 'table';
+  cellRole = () => this.isGrid() ? 'gridcell' : 'cell';
+  rowIndexOf = (row: any) => this.tick() >= 0 ? (this.rows() || []).indexOf(row) : -1;
+  colIndexOf = (row: any, cellCtx: any) => this.tick() >= 0 ? this.visibleCellsFor(row).indexOf(cellCtx) : -1;
+  headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
+  cellTabindex = (rowKey: any, colIndex: any) => {
+    if (!this.isGrid()) return null;
+    const activeKey = this.activeIsHeader() ? '__header' : String(this.activeRow());
+    const isActive = rowKey === activeKey && colIndex === this.activeColIndex();
+    return isActive ? 0 : -1;
+  };
+  resolveCellEl = (rowKey: any, colIndex: any) => {
+    if (!this.gridRoot) return null;
+    return this.gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
+  };
+  focusActiveCell = (nextRow: any, nextCol: any) => {
+    if (!this.isGrid() || !this.gridRoot) return;
+    // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
+    const r = nextRow == null ? this.activeRow() : nextRow;
+    const c = nextCol == null ? this.activeColIndex() : nextCol;
+    const rowKey = this.activeIsHeader() ? '__header' : String(r);
+    const el = this.resolveCellEl(rowKey, c);
+    if (el) el.focus();
+  };
 
   static ngTemplateContextGuard(
     _dir: DataTable,
@@ -1067,6 +1117,8 @@ export class DataTable {
   }
 
   private _selectCell_ctx = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
+
+  protected readonly String = String;
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

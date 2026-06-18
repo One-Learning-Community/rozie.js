@@ -315,6 +315,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const [rows, setRows] = createSignal([]);
   const [headerGroups, setHeaderGroups] = createSignal([]);
   const [rowModelVer, setRowModelVer] = createSignal(0);
+  const [activeRow, setActiveRow] = createSignal(0);
+  const [activeColIndex, setActiveColIndex] = createSignal(0);
+  const [activeIsHeader, setActiveIsHeader] = createSignal(false);
+  const [activeInControl, setActiveInControl] = createSignal(false);
   onMount(() => {
     // Build the table instance HERE so the closures below capture the live `table`.
     table = createTable({
@@ -386,6 +390,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
     // initial pull
     refreshRowModel();
+
+    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
+    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
+    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
+    // isGrid() so 'table' mode is entirely untouched.
+    gridRoot = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-data-table') : null;
+    if (isGrid()) {
+      // D-04: first body data cell (row 0, first navigable column). Re-resolved fresh —
+      // no DOM node is ever stored in $data. Deferred a microtask so the body cells have
+      // mounted before the query (React/Solid commit their first render asynchronously).
+      const focusEntry = () => focusActiveCell(activeRow(), activeColIndex());
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(focusEntry);else Promise.resolve().then(focusEntry);
+    }
   });
   createEffect(() => {
     if (!table) return;
@@ -406,6 +424,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
   // freezes the table at the empty-initial state on React).
   let table: any = null;
+
+  // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
+  // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
+  // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
+  // later change is a one-line edit.
+  const GRID_PAGE_STEP = 10;
+  // The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
+  // $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
+  // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
+  // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
+  // computed/template binding (ROZ123).
+  let gridRoot: any = null;
 
   // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
   // the funnel. A counter (not a boolean) so nested writes are safe.
@@ -1136,6 +1166,82 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     }
   }
 
+  // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+  // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+  // the active-cell index-pair state, the data-* cell markers, and the SINGLE
+  // focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+  // (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+
+  // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+  // identical to phase 48 (roles fall back to the literals, tabindex drops).
+  function isGrid() {
+    return local.interactionMode === 'grid';
+  }
+
+  // Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+  // literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+  // 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
+  function tableRole() {
+    return isGrid() ? 'grid' : 'table';
+  }
+  function cellRole() {
+    return isGrid() ? 'gridcell' : 'cell';
+  }
+
+  // ── Cell addressing helpers (plain fns — no $computed alias trap; safe in template) ────
+  // rowIndexOf: a body row's index over the visible model ($data.rows). tick() puts the read
+  // in the fine-grained reactive scope (Solid/Lit) so the data-row marker re-derives on a
+  // re-pull (reorder/filter) — matching visibleCellsFor's discipline.
+  function rowIndexOf(row: any) {
+    return tick() >= 0 ? (rows() || []).indexOf(row) : -1;
+  }
+  // colIndexOf: a body cell's position in its row's visible cell list.
+  function colIndexOf(row: any, cellCtx: any) {
+    return tick() >= 0 ? visibleCellsFor(row).indexOf(cellCtx) : -1;
+  }
+  // headerColIndexOf: a header cell's position in its header group's leaf headers.
+  function headerColIndexOf(hg: any, header: any) {
+    return (hg && hg.headers ? hg.headers : []).indexOf(header);
+  }
+
+  // Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
+  // fine-grained-reactive). Returns null in 'table' mode → the bound attribute DROPS
+  // entirely (rozieAttr nullish-drop), keeping 'table'-mode DOM clean. rowKey is the literal
+  // '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
+  // header state (activeIsHeader) is addressable through the same computed.
+  function cellTabindex(rowKey: any, colIndex: any) {
+    if (!isGrid()) return null;
+    const activeKey = activeIsHeader() ? '__header' : String(activeRow());
+    const isActive = rowKey === activeKey && colIndex === activeColIndex();
+    return isActive ? 0 : -1;
+  }
+
+  // ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
+  // resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
+  // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
+  // component's own scope). rowKey is the literal '__header' or a String(integer index) and
+  // colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
+  function resolveCellEl(rowKey: any, colIndex: any) {
+    if (!gridRoot) return null;
+    return gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
+  }
+
+  // focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
+  // the D-04 entry cell here, and (plan 03) arrow nav / focusCell() / the data-change clamp —
+  // routes through this one function, so a verifier can point to it and phase 53 windowing
+  // hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
+  // pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
+  // falls back to $data when none passed. NEVER stores a DOM node (index-only state).
+  function focusActiveCell(nextRow: any, nextCol: any) {
+    if (!isGrid() || !gridRoot) return;
+    // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
+    const r = nextRow == null ? activeRow() : nextRow;
+    const c = nextCol == null ? activeColIndex() : nextCol;
+    const rowKey = activeIsHeader() ? '__header' : String(r);
+    const el = resolveCellEl(rowKey, c);
+    if (el) el.focus();
+  }
+
   return (
     <__ctx_data_table_columns.Provider value={{
   registerColumn: (id: any, spec: any) => {
@@ -1175,10 +1281,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </div>
       </details></Show>}</div>
 
-    <table class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role="table" data-rozie-s-d5dcab4c="">
+    <table class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={headerGroups()}>{(hg) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <For each={hg.headers}>{(header) => <th class={"rdt-th"} classList={{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }} role="columnheader" data-col={rozieAttr(header.column.id)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+          <For each={hg.headers}>{(header) => <th class={"rdt-th"} classList={{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             
             
             {<Show when={isSelectColumn(header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -1208,7 +1314,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={rows()}>{(row) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role="cell" data-col={rozieAttr(cellCtx.column.id)} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
             
             {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
