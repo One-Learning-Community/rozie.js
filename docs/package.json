@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vitepress dev .",
-    "build": "vitepress build . && node scripts/check-anchors.mjs",
+    "build": "NODE_OPTIONS=--max-old-space-size=6144 vitepress build . && node scripts/check-anchors.mjs",
     "preview": "vitepress preview ."
   },
   "devDependencies": {
