@@ -113,23 +113,32 @@ const moveCol = (delta: number): number => {
 // Cross the header boundary. Models the header as a row above body row 0:
 //   ArrowUp from body row 0 → activeIsHeader=true
 //   ArrowDown from header   → activeIsHeader=false, activeRow=0
-// Returns nothing meaningful (the caller re-reads the fresh locals it sets).
-const moveRow = (delta: number): void => {
+// RETURNS the FRESH { row, isHeader } locals so the caller threads them into the
+// focus seam WITHOUT re-reading $data after the write (RESEARCH Pitfall 2 / ROZ138:
+// React's setState — and Angular's signal write — are async within one handler, so
+// a re-read of $data.activeIsHeader here returns the PRE-write value → focus lands
+// on the body cell, not the header). This is the cross-target bug the Wave-0 probe
+// surfaced on React + Angular (assertion 3); the fix is fresh-local threading,
+// identical to moveCol's contract.
+const moveRow = (delta: number): { row: number; isHeader: boolean } => {
   if ($data.activeIsHeader) {
     if (delta > 0) {
       // header → body row 0
       $data.activeIsHeader = false
       $data.activeRow = 0
+      return { row: 0, isHeader: false }
     }
     // ArrowUp from header is a no-op (top edge).
-    return
+    return { row: $data.activeRow, isHeader: true }
   }
   if (delta < 0 && $data.activeRow === 0) {
     // body row 0 → header
     $data.activeIsHeader = true
-    return
+    return { row: $data.activeRow, isHeader: true }
   }
-  $data.activeRow = clamp($data.activeRow + delta, 0, BODY_ROW_COUNT - 1)
+  const next = clamp($data.activeRow + delta, 0, BODY_ROW_COUNT - 1)
+  $data.activeRow = next
+  return { row: next, isHeader: false }
 }
 
 // --- in-cell control entry/exit (RESEARCH Pattern 2) -----------------------
@@ -159,22 +168,27 @@ const onGridKeyDown = ($event: KeyboardEvent): void => {
     }
     return
   }
+  // Capture the col index BEFORE any write so row-nav threads a stable fresh
+  // local into the seam (no $data re-read after a write — Pitfall 2 / ROZ138).
+  const col0 = $data.activeColIndex
+  const rowIsHeader0 = $data.activeIsHeader
+  const row0 = $data.activeRow
   if (key === 'ArrowRight') {
     $event.preventDefault()
     const c = moveCol(1)
-    focusActiveCell($data.activeRow, c, $data.activeIsHeader)
+    focusActiveCell(row0, c, rowIsHeader0)
   } else if (key === 'ArrowLeft') {
     $event.preventDefault()
     const c = moveCol(-1)
-    focusActiveCell($data.activeRow, c, $data.activeIsHeader)
+    focusActiveCell(row0, c, rowIsHeader0)
   } else if (key === 'ArrowDown') {
     $event.preventDefault()
-    moveRow(1)
-    focusActiveCell($data.activeRow, $data.activeColIndex, $data.activeIsHeader)
+    const m = moveRow(1)
+    focusActiveCell(m.row, col0, m.isHeader)
   } else if (key === 'ArrowUp') {
     $event.preventDefault()
-    moveRow(-1)
-    focusActiveCell($data.activeRow, $data.activeColIndex, $data.activeIsHeader)
+    const m = moveRow(-1)
+    focusActiveCell(m.row, col0, m.isHeader)
   } else if (key === 'Enter' || key === 'F2') {
     $event.preventDefault()
     enterControl()
