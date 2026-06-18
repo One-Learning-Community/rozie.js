@@ -301,7 +301,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     () => !!(open$local),
   );
 
-  useImperativeHandle(ref, () => ({ open, close, toggle, clear, focusControl }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ open, close, toggle, clear, focusControl });
+  _rozieExposeRef.current = { open, close, toggle, clear, focusControl };
+  useImperativeHandle(ref, () => ({ open: (...args: Parameters<typeof open>): ReturnType<typeof open> => _rozieExposeRef.current.open(...args), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => _rozieExposeRef.current.close(...args), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), focusControl: (...args: Parameters<typeof focusControl>): ReturnType<typeof focusControl> => _rozieExposeRef.current.focusControl(...args) }), []);
 
   return (
     <>

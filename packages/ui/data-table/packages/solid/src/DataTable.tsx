@@ -1240,7 +1240,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
   // pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
   // falls back to $data when none passed. NEVER stores a DOM node (index-only state).
-  function focusActiveCell(nextRow: any, nextCol: any, nextIsHeader: any) {
+  // 260618-ao9 — params carry explicit `= null` defaults so the cross-target
+  // emitters type them OPTIONAL (untyped params lower to REQUIRED `any`, making the
+  // 2-arg `focusActiveCell(r, c)` call sites a TS2554 on React/Solid/Lit — a
+  // pre-existing regression from the d7166c5e header-crossing `nextIsHeader` add).
+  // The `= null` default reproduces the documented "falls back to $data when
+  // omitted" contract: an omitted arg arrives as `null`, and the body's `== null`
+  // checks already route those to the live `$data` value — behavior-identical.
+  function focusActiveCell(nextRow = null, nextCol = null, nextIsHeader = null) {
     if (!isGrid() || !gridRoot) return;
     // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
     const r = nextRow == null ? activeRow() : nextRow;

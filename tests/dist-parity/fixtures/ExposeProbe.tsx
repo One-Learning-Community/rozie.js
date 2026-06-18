@@ -21,7 +21,9 @@ const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function Exp
     field.current!.focus();
   }
 
-  useImperativeHandle(ref, () => ({ reset, focus }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ reset, focus });
+  _rozieExposeRef.current = { reset, focus };
+  useImperativeHandle(ref, () => ({ reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args) }), []);
 
   return (
     <>

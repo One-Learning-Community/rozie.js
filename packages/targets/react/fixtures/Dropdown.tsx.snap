@@ -98,7 +98,9 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
     return () => window.removeEventListener('resize', _rozieThrottledLReposition);
   }, [_rozieThrottledLReposition, open, reposition]);
 
-  useImperativeHandle(ref, () => ({ toggle, close }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ toggle, close });
+  _rozieExposeRef.current = { toggle, close };
+  useImperativeHandle(ref, () => ({ toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => _rozieExposeRef.current.close(...args) }), []);
 
   return (
     <>

@@ -303,7 +303,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     instance.current?.option('easing', v);
   }, [props.easing]);
 
-  useImperativeHandle(ref, () => ({ getInstance, toArray, sort, option }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ getInstance, toArray, sort, option });
+  _rozieExposeRef.current = { getInstance, toArray, sort, option };
+  useImperativeHandle(ref, () => ({ getInstance: (...args: Parameters<typeof getInstance>): ReturnType<typeof getInstance> => _rozieExposeRef.current.getInstance(...args), toArray: (...args: Parameters<typeof toArray>): ReturnType<typeof toArray> => _rozieExposeRef.current.toArray(...args), sort: (...args: Parameters<typeof sort>): ReturnType<typeof sort> => _rozieExposeRef.current.sort(...args), option: (...args: Parameters<typeof option>): ReturnType<typeof option> => _rozieExposeRef.current.option(...args) }), []);
 
   return (
     <>

@@ -1267,7 +1267,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   return this.gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
 };
 
-  focusActiveCell = (nextRow: any, nextCol: any, nextIsHeader: any) => {
+  focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
   if (!this.isGrid() || !this.gridRoot) return;
   // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
   const r = nextRow == null ? this._activeRow.value : nextRow;

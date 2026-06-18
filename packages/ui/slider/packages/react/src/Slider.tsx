@@ -196,7 +196,9 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     }
   }
 
-  useImperativeHandle(ref, () => ({ focus, increment, decrement }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ focus, increment, decrement });
+  _rozieExposeRef.current = { focus, increment, decrement };
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), increment: (...args: Parameters<typeof increment>): ReturnType<typeof increment> => _rozieExposeRef.current.increment(...args), decrement: (...args: Parameters<typeof decrement>): ReturnType<typeof decrement> => _rozieExposeRef.current.decrement(...args) }), []);
 
   return (
     <>

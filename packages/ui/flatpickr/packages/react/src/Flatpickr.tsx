@@ -383,7 +383,9 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   });
   }, [props.firstDayOfWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const _rozieExposeRef = useRef({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear });
+  _rozieExposeRef.current = { clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear };
+  useImperativeHandle(ref, () => ({ clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), openPicker: (...args: Parameters<typeof openPicker>): ReturnType<typeof openPicker> => _rozieExposeRef.current.openPicker(...args), closePicker: (...args: Parameters<typeof closePicker>): ReturnType<typeof closePicker> => _rozieExposeRef.current.closePicker(...args), selectDate: (...args: Parameters<typeof selectDate>): ReturnType<typeof selectDate> => _rozieExposeRef.current.selectDate(...args), jumpToDate: (...args: Parameters<typeof jumpToDate>): ReturnType<typeof jumpToDate> => _rozieExposeRef.current.jumpToDate(...args), getSelectedDates: (...args: Parameters<typeof getSelectedDates>): ReturnType<typeof getSelectedDates> => _rozieExposeRef.current.getSelectedDates(...args), togglePicker: (...args: Parameters<typeof togglePicker>): ReturnType<typeof togglePicker> => _rozieExposeRef.current.togglePicker(...args), changeMonth: (...args: Parameters<typeof changeMonth>): ReturnType<typeof changeMonth> => _rozieExposeRef.current.changeMonth(...args), changeYear: (...args: Parameters<typeof changeYear>): ReturnType<typeof changeYear> => _rozieExposeRef.current.changeYear(...args) }), []);
 
   return (
     <>

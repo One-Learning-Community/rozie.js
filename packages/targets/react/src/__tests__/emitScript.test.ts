@@ -632,8 +632,14 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     // The plain `export default function` shape is gone for the exposed case.
     expect(code).not.toContain('export default function ExposeProbe(');
 
-    // useImperativeHandle with the exposed names + [] deps.
-    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, focus }), []);');
+    // 260618-ao9 — stable-identity, live-read handle: a useRef mirror + a
+    // dispatch wrapper per verb (was `useImperativeHandle(ref, () => ({ reset, focus }), [])`).
+    expect(code).toContain('const _rozieExposeRef = useRef({ reset, focus });');
+    expect(code).toContain('_rozieExposeRef.current = { reset, focus };');
+    expect(code).toContain('useImperativeHandle(ref, () => ({');
+    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
+    expect(code).toContain('focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args)');
+    expect(code).toContain('}), []);');
 
     // inline interface adjacent to the props interface.
     expect(code).toContain('interface ExposeProbeHandle {');
@@ -660,7 +666,10 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     expect(code).toContain('interface ExposeProbeTsHandle {');
     expect(code).toContain('reset(): void;');
     expect(code).toContain('setText(next: string): void;');
-    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, setText }), []);');
+    // 260618-ao9 — dispatch-wrapper handle (was `({ reset, setText }), []`).
+    expect(code).toContain('const _rozieExposeRef = useRef({ reset, setText });');
+    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
+    expect(code).toContain('setText: (...args: Parameters<typeof setText>): ReturnType<typeof setText> => _rozieExposeRef.current.setText(...args)');
   });
 
   it('byte-identity: a non-$expose source emits the EXACT plain function shape (no forwardRef, no Handle, no useImperativeHandle)', () => {
@@ -691,7 +700,9 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     const { code } = emitReact(ir, {});
     expect(code).toContain('const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function ExposeProbe(props: ExposeProbeProps, ref): JSX.Element {');
     expect(code).toContain('export default ExposeProbe;');
-    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, focus }), []);');
+    // 260618-ao9 — dispatch-wrapper handle on the legacy path too.
+    expect(code).toContain('const _rozieExposeRef = useRef({ reset, focus });');
+    expect(code).toContain('reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)');
   });
 });
 

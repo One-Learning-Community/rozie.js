@@ -274,11 +274,17 @@ export function emitReact(
     // dispatch wrapper over the live mirror is sufficient — no per-verb body
     // rewrite or `_<X>Ref` state-mirror generation needed.
     //
-    // The factory still references the mirror under an empty dep array, so the
-    // same targeted `eslint-disable-line react-hooks/exhaustive-deps` the emitter
-    // uses on its mount-once `useEffect` lines applies. `Parameters<typeof X>` /
-    // `ReturnType<typeof X>` preserve each verb's exact signature so the emitted
-    // handle stays type-clean against `export interface <Name>Handle`.
+    // The factory now references ONLY `_rozieExposeRef` (a `useRef`), which
+    // `react-hooks/exhaustive-deps` treats as a stable dependency it never
+    // requires in the dep array — so the empty `[]` is CORRECT without any
+    // disable. (The previous direct `({ a, b })` form referenced the verb
+    // closures, which the rule WOULD flag; that emitted a targeted
+    // `eslint-disable-line`. With the ref-dispatch form the disable would be an
+    // UNUSED directive — a warning under the strict `--report-unused-disable-
+    // directives` fixture-lint gate — so it is deliberately omitted.)
+    // `Parameters<typeof X>` / `ReturnType<typeof X>` preserve each verb's exact
+    // signature so the emitted handle stays type-clean against
+    // `export interface <Name>Handle`.
     const refInit = `const _rozieExposeRef = useRef({ ${exposeNames.join(', ')} });`;
     const refSync = `_rozieExposeRef.current = { ${exposeNames.join(', ')} };`;
     const dispatchers = exposeNames
@@ -287,7 +293,7 @@ export function emitReact(
           `${n}: (...args: Parameters<typeof ${n}>): ReturnType<typeof ${n}> => _rozieExposeRef.current.${n}(...args)`,
       )
       .join(', ');
-    const handleLine = `useImperativeHandle(ref, () => ({ ${dispatchers} }), []); // eslint-disable-line react-hooks/exhaustive-deps`;
+    const handleLine = `useImperativeHandle(ref, () => ({ ${dispatchers} }), []);`;
     imperativeHandleBlock = `${refInit}\n${refSync}\n${handleLine}`;
   }
 
