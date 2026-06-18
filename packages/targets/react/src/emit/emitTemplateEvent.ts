@@ -93,11 +93,17 @@ const EVENT_NAME_TO_JSX_PROP: Readonly<Record<string, string>> = {
   invalid: 'onInvalid',
   reset: 'onReset',
   submit: 'onSubmit',
-  // Focus
+  // Focus. React has NO `onFocusIn`/`onFocusOut` props — it would warn
+  // "Unknown event handler property onFocusIn. It will be ignored." and drop the
+  // listener entirely. React's `onFocus`/`onBlur` are themselves the BUBBLING focus
+  // events (React 17+ attaches them via the native focusin/focusout phase and they
+  // propagate, unlike native DOM focus/blur), and the SyntheticFocusEvent carries
+  // `relatedTarget`. So a delegated `@focusin`/`@focusout` on a container maps to
+  // React's `onFocus`/`onBlur` — the only props that deliver the bubbling behavior.
   focus: 'onFocus',
   blur: 'onBlur',
-  focusin: 'onFocusIn',
-  focusout: 'onFocusOut',
+  focusin: 'onFocus',
+  focusout: 'onBlur',
   // Composition
   compositionstart: 'onCompositionStart',
   compositionend: 'onCompositionEnd',

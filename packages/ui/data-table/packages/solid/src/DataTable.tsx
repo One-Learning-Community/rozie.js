@@ -399,19 +399,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // initial pull
     refreshRowModel();
 
-    // ── Grid mode: capture the table root + focus the D-04 entry cell ──────────────────
+    // ── Grid mode: capture the table root ──────────────────────────────────────────────
     // $el is the component root; the <table class="rozie-data-table"> is the grid root the
     // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
-    // (post-mount) so it is non-null and ROZ123-clean. The entry-cell focus is gated by
-    // isGrid() so 'table' mode is entirely untouched.
+    // (post-mount) so it is non-null and ROZ123-clean.
     gridRoot = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-data-table') : null;
-    if (isGrid()) {
-      // D-04: first body data cell (row 0, first navigable column). Re-resolved fresh —
-      // no DOM node is ever stored in $data. Deferred a microtask so the body cells have
-      // mounted before the query (React/Solid commit their first render asynchronously).
-      const focusEntry = () => focusActiveCell(activeRow(), activeColIndex());
-      if (typeof queueMicrotask !== 'undefined') queueMicrotask(focusEntry);else Promise.resolve().then(focusEntry);
-    }
+    // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
+    // page load AND was non-deterministic on React/Solid (the entry cell may not be
+    // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
+    // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
+    // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
   });
   createEffect(() => {
     if (!table) return;
@@ -1213,8 +1210,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   }
 
   // Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
-  // fine-grained-reactive). Returns null in 'table' mode → the bound attribute DROPS
-  // entirely (rozieAttr nullish-drop), keeping 'table'-mode DOM clean. rowKey is the literal
+  // fine-grained-reactive). Returns null in 'table' mode → the bound numeric attribute
+  // DROPS entirely (IN-01: on React via the `cellTabindex(...) ?? undefined` numeric-attr
+  // emitter path landed in 4bec3b8e — NOT rozieAttr, which would string-widen tabIndex and
+  // TS2322; the other five targets drop it via their own nullish-attr handling), keeping
+  // 'table'-mode DOM clean. rowKey is the literal
   // '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
   // header state (activeIsHeader) is addressable through the same computed.
   function cellTabindex(rowKey: any, colIndex: any) {
@@ -1441,14 +1441,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       }
       return;
     }
+    // WR-05: in navigation mode, only hijack arrow/Home/End/Page keys when focus is ON a
+    // grid cell. An inner control reached WITHOUT Enter (e.g. a header filter <input> the
+    // user clicked into directly, or a per-cell control tabbed/clicked to) must keep its
+    // NATIVE key behavior — caret movement, option cycling, etc. e.target is the deepest
+    // focused node; if it is not itself a [data-grid-cell], let the event pass through.
+    const tgt = e.target;
+    if (!tgt || !tgt.hasAttribute || !tgt.hasAttribute('data-grid-cell')) return;
     // Navigation mode — compute fresh locals, write $data inside the helper, thread them out.
     // nextIsHeader is threaded alongside nextRow/nextCol so the focus seam never re-reads the
     // async-stale $data.activeIsHeader after a header crossing (React ROZ138 / Angular signal —
     // plan-01 Pitfall 2). moveRow returns the fresh { row, isHeader }; every other branch lands
-    // in the body (isHeader = false).
-    let nextRow = activeRow();
-    let nextCol = activeColIndex();
-    let nextIsHeader = activeIsHeader();
+    // in the body (isHeader = false). WR-06: snapshot the PRE-move indices so the emit below
+    // fires ONLY on a real move (a clamped no-op edge move leaves them identical).
+    const prevRow = activeRow();
+    const prevCol = activeColIndex();
+    const prevIsHeader = activeIsHeader();
+    let nextRow = prevRow;
+    let nextCol = prevCol;
+    let nextIsHeader = prevIsHeader;
     if (key === 'ArrowRight') {
       e.preventDefault();
       nextCol = moveCol(1);
@@ -1500,12 +1511,64 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       enterControl();
       return;
     } else return;
-    // THE seam + the D-02 event — BOTH built from the SAME fresh post-write locals (Pitfall 2).
+    // THE seam — built from the SAME fresh post-write locals (Pitfall 2). Always re-assert
+    // focus on the resolved cell (harmless on a no-op clamp; corrects any drift otherwise).
     focusActiveCell(nextRow, nextCol, nextIsHeader);
-    _props.onActivecellChange?.({
-      rowIndex: nextRow,
-      colIndex: nextCol
-    });
+    // WR-06: the D-02 activecell-change event fires ONLY when the resolved cell actually
+    // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
+    // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
+    if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader) {
+      _props.onActivecellChange?.({
+        rowIndex: nextRow,
+        colIndex: nextCol
+      });
+    }
+  }
+
+  // WR-03: integrate mouse-click + programmatic focus with the roving model. A click on a
+  // tabindex="-1" cell (or focus arriving any way other than the keyboard nav path) moves
+  // DOM focus there but does NOT run onGridKeyDown — so activeRow/activeColIndex would stay
+  // on the OLD cell and the NEXT arrow key would jump from the stale active cell. Wired as
+  // ONE @focusin on the <table> root (focusin bubbles): resolve the focused element's owning
+  // [data-grid-cell], parse its data-row/data-col-index, and write them into the active-cell
+  // state (mirroring the keyboard path). Clears activeInControl ONLY when the cell ITSELF
+  // (not an inner control) received focus — focusing a control via Enter keeps the in-control
+  // flag. NEVER emits activecell-change (a focus sync is not a keyboard navigation event).
+  function syncActiveFromEvent(e: any) {
+    if (!isGrid() || !e) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-grid-cell]');
+    if (!cellEl) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null) return;
+    const col = parseInt(colAttr, 10);
+    if (!Number.isFinite(col)) return;
+    const isHeader = rowAttr === '__header';
+    setActiveIsHeader(isHeader);
+    if (!isHeader) {
+      const row = parseInt(rowAttr, 10);
+      if (Number.isFinite(row)) setActiveRow(row);
+    }
+    setActiveColIndex(col);
+    // The cell box (not an inner control) receiving focus = navigation mode.
+    if (tgt === cellEl) setActiveInControl(false);
+  }
+
+  // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
+  // Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
+  // the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in
+  // the in-cell-trap branch so arrow nav is dead until Escape. Wired as ONE @focusout on
+  // the <table> root (focusout bubbles, unlike blur). relatedTarget is the element RECEIVING
+  // focus (null when focus leaves the document / is retargeted across a shadow boundary). If
+  // focus is NOT moving to a descendant of the active cell, drop the flag. A Tab-cycle WITHIN
+  // the cell (interaction mode) keeps relatedTarget inside cellEl → no reset.
+  function onGridFocusOut(e: any) {
+    if (!isGrid() || !activeInControl()) return;
+    const next = e ? e.relatedTarget : null;
+    const cellEl = currentCellEl();
+    if (!cellEl || !next || !cellEl.contains(next)) setActiveInControl(false);
   }
 
   // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
@@ -1546,7 +1609,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setActiveInControl(false);
     setActiveRow(r);
     setActiveColIndex(c);
-    focusActiveCell(r, c);
+    // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
+    // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
+    // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
+    // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
+    // last clicked, so a stale read would resolve focus to the header instead of body row r.
+    focusActiveCell(r, c, false);
     _props.onActivecellChange?.({
       rowIndex: r,
       colIndex: c
@@ -1611,7 +1679,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </div>
       </details></Show>}</div>
 
-    <table class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} data-rozie-s-d5dcab4c="">
+    <table class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={headerGroups()}>{(hg) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
           <For each={hg.headers}>{(header) => <th class={"rdt-th"} classList={{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">

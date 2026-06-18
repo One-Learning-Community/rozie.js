@@ -58,6 +58,9 @@
   // Last activecell-change payload, surfaced as a readout (REQ-5 / D-02). Updated
   // on EVERY active-cell move (arrow keys + programmatic focusCell).
   lastActiveCell: '',
+  // Count of activecell-change emits, surfaced as a readout. WR-06 asserts a clamped
+  // no-op edge move does NOT increment this (no spurious emit), while a real move does.
+  activeCellChangeCount: 0,
   // Result of an explicit getActiveCell() handle call (REQ-5 read verb).
   getActiveResult: '',
 }
@@ -68,6 +71,9 @@
 // as a "r,c" string so the spec can poll it against the focused cell's data-* coords.
 const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
   $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+  // WR-06: every emit bumps the counter so the spec can prove a clamped no-op move
+  // does NOT fire activecell-change (the count holds steady on a no-op, rises on a move).
+  $data.activeCellChangeCount = $data.activeCellChangeCount + 1
 }
 
 // Read $refs.dt LIVE in the handler (post-mount click), never cached in $onMount — a
@@ -105,6 +111,8 @@ const hideCity = (): void => {
     <button type="button" data-testid="hide-city" @click="hideCity">Toggle City</button>
     <span class="label">activecell-change:</span>
     <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">emit-count:</span>
+    <span class="readout" data-testid="activecell-count">{{ $data.activeCellChangeCount }}</span>
     <span class="label">getActiveCell:</span>
     <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
   </div>

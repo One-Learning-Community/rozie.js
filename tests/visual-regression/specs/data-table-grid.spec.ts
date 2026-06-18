@@ -157,6 +157,17 @@ for (const target of TARGETS) {
     await expect(defaultTable).toBeVisible({ timeout: 15_000 });
 
     // ===================================================================
+    // WR-04 — no focus-steal on mount: nothing inside the grid is focused until the
+    //         user Tabs/clicks in (the roving tabindex="0" is the entry target, NOT an
+    //         on-mount auto-focus). The active element is the document body, whose
+    //         closest [data-grid-cell] is null → cell role null.
+    // ===================================================================
+    {
+      const onMount = await activeCellCoords(page);
+      expect(onMount?.role ?? null).toBeNull();
+    }
+
+    // ===================================================================
     // REQ-1 — role flip (grid/gridcell vs table/cell); headers stay columnheader
     // ===================================================================
     await expect
@@ -459,5 +470,97 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => (await pageStatus.textContent())?.trim() ?? '', { timeout: 10_000 })
       .toBe('Page 1 of 2');
+
+    // ===================================================================
+    // WR-03 — click-to-activate: clicking a tabindex="-1" cell moves the SINGLE roving
+    //         tab-stop AND the active-cell state to the clicked cell (mouse integrates
+    //         with the roving model); the next arrow continues from the clicked cell.
+    // ===================================================================
+    const cell20 = gridContainer.locator(
+      '[data-grid-cell][data-row="2"][data-col-index="0"]',
+    );
+    await cell20.click();
+    await expect.poll(async () => tabStops.count(), { timeout: 10_000 }).toBe(1);
+    await expect
+      .poll(async () => tabStops.first().getAttribute('data-row'), { timeout: 10_000 })
+      .toBe('2');
+    await expect
+      .poll(async () => tabStops.first().getAttribute('data-col-index'), { timeout: 10_000 })
+      .toBe('0');
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 })
+      .toBe('2');
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.col, { timeout: 10_000 })
+      .toBe('0');
+    // A subsequent ArrowRight continues from the CLICKED cell (col 0 → col 1), proving
+    // the roving model picked up the mouse focus (not a stale keyboard-nav index). Settle
+    // the emit so the following async-target (React/Angular) assertions start from rest.
+    await page.keyboard.press('ArrowRight');
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.col, { timeout: 10_000 })
+      .toBe('1');
+    await expect
+      .poll(async () => activeReadout.textContent(), { timeout: 10_000 })
+      .toBe('2,1');
+
+    // ===================================================================
+    // WR-05 — keys are NOT hijacked when focus is on an inner control reached WITHOUT
+    //         Enter. Click the score body cell's <button> directly (focus lands on the
+    //         button, not the cell box); an ArrowDown must NOT move the active cell — the
+    //         button keeps native behavior. Distinct from the in-cell-trap (Enter) path.
+    //         (The row + inner-control checks alone prove it: a hijacked ArrowDown would
+    //         nav to row 1 and move DOM focus onto the (1,2) cell, flipping both.)
+    // ===================================================================
+    const scoreBtn00 = gridContainer.locator(
+      '[data-grid-cell][data-row="0"][data-col-index="2"] [data-testid="cell-action"]',
+    );
+    await scoreBtn00.click();
+    await expect
+      .poll(async () => innerControlFocused(page), { timeout: 10_000 })
+      .toBe(true);
+    // The active cell synced to the clicked control's owning cell (row 0, col 2)…
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 })
+      .toBe('0');
+    // …but ArrowDown while the button holds focus is a no-op (WR-05 early-return): focus
+    // stays on the inner control and the active cell does NOT advance to row 1.
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(async () => innerControlFocused(page), { timeout: 10_000 })
+      .toBe(true);
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 })
+      .toBe('0');
+
+    // ===================================================================
+    // WR-06 — a clamped no-op edge move does NOT emit activecell-change; a real move
+    //         does. Net-count proof (race-free on async targets): from a settled base,
+    //         two REAL moves ((1,0) then (1,1)) bracket one no-op ArrowLeft at col 0;
+    //         the settled emit counter must rise by EXACTLY two (the no-op adds zero —
+    //         a spurious emit would make it three).
+    // ===================================================================
+    const countReadout = page.getByTestId('activecell-count');
+    await page.getByTestId('call-focuscell').click(); // → cell (1,1), emits '1,1'
+    await expect
+      .poll(async () => activeReadout.textContent(), { timeout: 10_000 })
+      .toBe('1,1'); // emit settled
+    const countBase = Number(await countReadout.textContent());
+    await page.keyboard.press('ArrowLeft'); // → (1,0) REAL move (emits)
+    await expect
+      .poll(async () => activeReadout.textContent(), { timeout: 10_000 })
+      .toBe('1,0'); // settled
+    await page.keyboard.press('ArrowLeft'); // no-op at col 0 — WR-06: NO emit
+    await page.keyboard.press('ArrowRight'); // → (1,1) REAL move (emits)
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.col, { timeout: 10_000 })
+      .toBe('1');
+    await expect
+      .poll(async () => activeReadout.textContent(), { timeout: 10_000 })
+      .toBe('1,1'); // settled
+    // Exactly TWO emits since the settled base — the clamped no-op contributed zero.
+    await expect
+      .poll(async () => Number(await countReadout.textContent()), { timeout: 10_000 })
+      .toBe(countBase + 2);
   });
 }
