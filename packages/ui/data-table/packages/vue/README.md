@@ -12,6 +12,35 @@ Peer dependencies: `vue + @tanstack/table-core`. Install them alongside this pac
 
 ## Usage
 
+Columns may be declared as a `:columns` config array **or** as `<Column>` children (or both — an id-keyed last-write-wins union). Per-cell rendering is one parent `#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it works the same with either column form.
+
+### Columns as a config array
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+const columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
+  ];
+const sorting = ref<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<template>
+  <DataTable :data="rows" :columns="columns" v-model:sorting="sorting" selection-mode="multiple" sticky-header />
+</template>
+```
+
+### Declarative `<Column>` children + a custom cell
+
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
@@ -29,9 +58,13 @@ const sorting = ref<{ id: string; desc: boolean }[]>([]);
   <DataTable :data="rows" v-model:sorting="sorting" selection-mode="multiple" sticky-header>
     <Column field="name" header="Name" :sortable="true" :filterable="true" />
     <Column field="email" header="Email" />
-    <Column field="status" header="Status" :sortable="true">
-      <template #cell="{ value }"><span class="badge">{{ value }}</span></template>
-    </Column>
+    <Column field="status" header="Status" :sortable="true" />
+
+    <!-- One #cell slot on <DataTable>, dispatched by columnId (works with :columns too) -->
+    <template #cell="{ columnId, value }">
+      <span v-if="columnId === 'status'" class="badge">{{ value }}</span>
+      <template v-else>{{ value }}</template>
+    </template>
   </DataTable>
 </template>
 ```
@@ -115,7 +148,7 @@ const tbl = ref();          // template ref
 
 ## Slots
 
-The `<Column>` child declares per-column `#cell` / `#header` render templates; the parent `<DataTable>` exposes the selection-chrome slots below. (On React, slots are a render-prop API — the one documented cross-framework divergence.)
+All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
 
 | Slot | Params |
 | --- | --- |

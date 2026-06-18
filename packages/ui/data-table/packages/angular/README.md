@@ -12,6 +12,39 @@ Peer dependencies: `@angular/core + @angular/common + @angular/forms + @tanstack
 
 ## Usage
 
+Columns may be declared as a `:columns` config array **or** as `<Column>` children (or both — an id-keyed last-write-wins union). Per-cell rendering is one parent `#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it works the same with either column form.
+
+### Columns as a config array
+
+```ts
+import { Component } from '@angular/core';
+import { DataTable } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable],
+  template: `
+    <DataTable [data]="rows" [columns]="columns" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true" />
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
+  ];
+  sorting: { id: string; desc: boolean }[] = [];
+}
+```
+
+### Declarative `<Column>` children + a custom cell
+
 ```ts
 import { Component } from '@angular/core';
 import { DataTable, Column } from '@rozie-ui/data-table-angular';
@@ -25,6 +58,15 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
       <Column field="name" header="Name" [sortable]="true" [filterable]="true" />
       <Column field="email" header="Email" />
       <Column field="status" header="Status" [sortable]="true" />
+
+      <!-- One #cell template on <DataTable>, dispatched by columnId -->
+      <ng-template #cell let-columnId="columnId" let-value="value">
+        @if (columnId === 'status') {
+          <span class="badge">{{ value }}</span>
+        } @else {
+          {{ value }}
+        }
+      </ng-template>
     </DataTable>
   `,
 })
@@ -114,7 +156,7 @@ export class DemoComponent {
 
 ## Slots
 
-The `<Column>` child declares per-column `#cell` / `#header` render templates; the parent `<DataTable>` exposes the selection-chrome slots below. (On React, slots are a render-prop API — the one documented cross-framework divergence.)
+All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
 
 | Slot | Params |
 | --- | --- |

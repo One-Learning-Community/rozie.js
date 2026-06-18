@@ -12,6 +12,10 @@ Peer dependencies: `lit + @lit-labs/preact-signals + @preact/signals-core + @tan
 
 ## Usage
 
+Columns may be declared as a `:columns` config array **or** as `<Column>` children (or both — an id-keyed last-write-wins union). Per-cell rendering is one parent `#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it works the same with either column form.
+
+### Columns as a config array
+
 ```ts
 import '@rozie-ui/data-table-lit';
 
@@ -31,6 +35,35 @@ el.columns = [
 el.addEventListener('sort-change', (e) => {
   console.log('sorting', e.detail);
 });
+```
+
+### Declarative `<Column>` children + a custom cell
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+
+// Declare columns as <rozie-column> children and supply ONE cell renderer —
+// a function returning a Lit template, dispatched by columnId.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    selection-mode="multiple"
+    sticky-header
+    .cell=${({ columnId, value }) =>
+      columnId === 'status' ? html`<span class="badge">${value}</span>` : value}
+  >
+    <rozie-column field="name" header="Name" sortable filterable></rozie-column>
+    <rozie-column field="email" header="Email"></rozie-column>
+    <rozie-column field="status" header="Status" sortable></rozie-column>
+  </rozie-data-table>
+`, document.body);
 ```
 
 ## Theming
@@ -108,7 +141,7 @@ const selected = el.getSelectedRows();
 
 ## Slots
 
-The `<Column>` child declares per-column `#cell` / `#header` render templates; the parent `<DataTable>` exposes the selection-chrome slots below. (On React, slots are a render-prop API — the one documented cross-framework divergence.)
+All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
 
 | Slot | Params |
 | --- | --- |

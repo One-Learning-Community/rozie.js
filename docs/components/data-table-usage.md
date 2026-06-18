@@ -8,7 +8,9 @@ title: DataTable — usage examples
 
 `DataTable` ships as six pre-compiled, per-framework packages from a single `.rozie` source — install only the one for your framework (no Rozie toolchain, no build-time compile step). Each carries its engine + framework peers as **peer dependencies**, so you control their versions. The snippets below are the same idiomatic consumption code shown in each package's README; switch the tab to your framework.
 
-## Consume it
+## Usage
+
+### Columns as a config array
 
 ::: code-group
 
@@ -44,60 +46,56 @@ export function Demo() {
 ```vue [Vue]
 <script setup lang="ts">
 import { ref } from 'vue';
-import DataTable, { Column } from '@rozie-ui/data-table-vue';
+import DataTable from '@rozie-ui/data-table-vue';
 
 const rows = [
     { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
     { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
     { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
   ];
+const columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
+  ];
 const sorting = ref<{ id: string; desc: boolean }[]>([]);
 </script>
 
 <template>
-  <DataTable :data="rows" v-model:sorting="sorting" selection-mode="multiple" sticky-header>
-    <Column field="name" header="Name" :sortable="true" :filterable="true" />
-    <Column field="email" header="Email" />
-    <Column field="status" header="Status" :sortable="true">
-      <template #cell="{ value }"><span class="badge">{{ value }}</span></template>
-    </Column>
-  </DataTable>
+  <DataTable :data="rows" :columns="columns" v-model:sorting="sorting" selection-mode="multiple" sticky-header />
 </template>
 ```
 
 ```svelte [Svelte]
 <script lang="ts">
-  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+  import DataTable from '@rozie-ui/data-table-svelte';
 
   const rows = [
     { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
     { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
     { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
   ];
+  const columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
+  ];
   let sorting = $state<{ id: string; desc: boolean }[]>([]);
 </script>
 
-<DataTable data={rows} bind:sorting selectionMode="multiple" stickyHeader>
-  <Column field="name" header="Name" sortable filterable />
-  <Column field="email" header="Email" />
-  <Column field="status" header="Status" sortable />
-</DataTable>
+<DataTable data={rows} {columns} bind:sorting selectionMode="multiple" stickyHeader />
 ```
 
 ```ts [Angular]
 import { Component } from '@angular/core';
-import { DataTable, Column } from '@rozie-ui/data-table-angular';
+import { DataTable } from '@rozie-ui/data-table-angular';
 
 @Component({
   selector: 'app-demo',
   standalone: true,
-  imports: [DataTable, Column],
+  imports: [DataTable],
   template: `
-    <DataTable [data]="rows" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true">
-      <Column field="name" header="Name" [sortable]="true" [filterable]="true" />
-      <Column field="email" header="Email" />
-      <Column field="status" header="Status" [sortable]="true" />
-    </DataTable>
+    <DataTable [data]="rows" [columns]="columns" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true" />
   `,
 })
 export class DemoComponent {
@@ -105,6 +103,11 @@ export class DemoComponent {
     { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
     { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
     { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
   ];
   sorting: { id: string; desc: boolean }[] = [];
 }
@@ -151,6 +154,184 @@ el.columns = [
 el.addEventListener('sort-change', (e) => {
   console.log('sorting', e.detail);
 });
+```
+
+:::
+
+### Declarative `<Column>` children + a custom cell
+
+::: code-group
+
+```tsx [React]
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  // One cell renderer on <DataTable>, dispatched by columnId — it works the same
+  // whether columns are declared as <Column> children or via :columns.
+  return (
+    <DataTable
+      data={rows}
+      selectionMode="multiple"
+      stickyHeader
+      renderCell={({ columnId, value }) =>
+        columnId === 'status' ? <StatusBadge status={value} /> : value
+      }
+    >
+      <Column field="name" header="Name" sortable filterable />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" sortable />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+const sorting = ref<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<template>
+  <DataTable :data="rows" v-model:sorting="sorting" selection-mode="multiple" sticky-header>
+    <Column field="name" header="Name" :sortable="true" :filterable="true" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" :sortable="true" />
+
+    <!-- One #cell slot on <DataTable>, dispatched by columnId (works with :columns too) -->
+    <template #cell="{ columnId, value }">
+      <span v-if="columnId === 'status'" class="badge">{{ value }}</span>
+      <template v-else>{{ value }}</template>
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  let sorting = $state<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<DataTable data={rows} bind:sorting selectionMode="multiple" stickyHeader>
+  <Column field="name" header="Name" sortable filterable />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" sortable />
+
+  <!-- One cell snippet on <DataTable>, dispatched by columnId -->
+  {#snippet cell({ columnId, value })}
+    {#if columnId === 'status'}<span class="badge">{value}</span>{:else}{value}{/if}
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <DataTable [data]="rows" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true">
+      <Column field="name" header="Name" [sortable]="true" [filterable]="true" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" [sortable]="true" />
+
+      <!-- One #cell template on <DataTable>, dispatched by columnId -->
+      <ng-template #cell let-columnId="columnId" let-value="value">
+        @if (columnId === 'status') {
+          <span class="badge">{{ value }}</span>
+        } @else {
+          {{ value }}
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  sorting: { id: string; desc: boolean }[] = [];
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  const [sorting, setSorting] = createSignal<{ id: string; desc: boolean }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      sorting={sorting()}
+      onSortChange={setSorting}
+      selectionMode="multiple"
+      stickyHeader
+      cellSlot={({ columnId, value }) =>
+        columnId === 'status' ? <StatusBadge status={value} /> : value
+      }
+    >
+      <Column field="name" header="Name" sortable filterable />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" sortable />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+
+// Declare columns as <rozie-column> children and supply ONE cell renderer —
+// a function returning a Lit template, dispatched by columnId.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    selection-mode="multiple"
+    sticky-header
+    .cell=${({ columnId, value }) =>
+      columnId === 'status' ? html`<span class="badge">${value}</span>` : value}
+  >
+    <rozie-column field="name" header="Name" sortable filterable></rozie-column>
+    <rozie-column field="email" header="Email"></rozie-column>
+    <rozie-column field="status" header="Status" sortable></rozie-column>
+  </rozie-data-table>
+`, document.body);
 ```
 
 :::

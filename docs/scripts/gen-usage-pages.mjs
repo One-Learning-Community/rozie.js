@@ -46,10 +46,37 @@ function displayNameFor(slug) {
 
 /** A `::: code-group` block from a `{ target: { lang, code } }` map. Only
  * targets present (with non-empty code) are emitted, in TARGETS order. */
-function codeGroup(snippets) {
+/** Normalize a target's entry to a list of `{ title, lang, code }` example sets.
+ * Accepts either the single-snippet shape `{ lang, code }` (most components) or
+ * an aligned list of sets `[{ title, lang, code }, …]` (e.g. data-table). */
+function setsFor(snippets, target) {
+  const v = snippets?.[target];
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  return [{ title: null, lang: v.lang, code: v.code }];
+}
+
+/** The number of aligned example sets across targets. */
+function setCount(snippets) {
+  let n = 0;
+  for (const [target] of TARGETS) n = Math.max(n, setsFor(snippets, target).length);
+  return n;
+}
+
+/** The title for set `i` (first target that declares one), or null. */
+function setTitle(snippets, i) {
+  for (const [target] of TARGETS) {
+    const s = setsFor(snippets, target)[i];
+    if (s?.title) return s.title;
+  }
+  return null;
+}
+
+/** A `::: code-group` for set `i` — one tab per target that has that set. */
+function codeGroup(snippets, i = 0) {
   const tabs = [];
   for (const [target, label] of TARGETS) {
-    const snip = snippets?.[target];
+    const snip = setsFor(snippets, target)[i];
     if (!snip?.code) continue;
     tabs.push(`\`\`\`${snip.lang} [${label}]\n${snip.code}\n\`\`\``);
   }
@@ -71,9 +98,9 @@ function relatedLinks(slug, name) {
 }
 
 function renderPage(slug, name, usage, handle) {
-  const usageGroup = codeGroup(usage);
-  if (!usageGroup) throw new Error(`gen-usage-pages: no USAGE snippets for "${slug}"`);
-  const handleGroup = codeGroup(handle);
+  const nUsage = setCount(usage);
+  if (nUsage === 0) throw new Error(`gen-usage-pages: no USAGE snippets for "${slug}"`);
+  const handleGroup = codeGroup(handle, 0);
 
   const parts = [];
   parts.push('---');
@@ -88,10 +115,19 @@ function renderPage(slug, name, usage, handle) {
     `\`${name}\` ships as six pre-compiled, per-framework packages from a single \`.rozie\` source — install only the one for your framework (no Rozie toolchain, no build-time compile step). Each carries its engine + framework peers as **peer dependencies**, so you control their versions. The snippets below are the same idiomatic consumption code shown in each package's README; switch the tab to your framework.`,
   );
   parts.push('');
-  parts.push('## Consume it');
+  parts.push('## Usage');
   parts.push('');
-  parts.push(usageGroup);
-  parts.push('');
+  for (let i = 0; i < nUsage; i++) {
+    const group = codeGroup(usage, i);
+    if (!group) continue;
+    const title = setTitle(usage, i);
+    if (title) {
+      parts.push(`### ${title}`);
+      parts.push('');
+    }
+    parts.push(group);
+    parts.push('');
+  }
   if (handleGroup) {
     parts.push('## Imperative handle');
     parts.push('');

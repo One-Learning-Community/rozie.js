@@ -51,12 +51,14 @@ This is the **real `@rozie-ui/data-table-vue` package** running on this page (Vi
   >
     <Column field="name" header="Name" :sortable="true" :filterable="true" />
     <Column field="email" header="Email" :sortable="true" />
-    <Column field="status" header="Status" :sortable="true">
-      <template #cell="{ value }">
-        <span class="dt-badge" :class="'dt-badge--' + value">{{ value }}</span>
-      </template>
-    </Column>
+    <Column field="status" header="Status" :sortable="true" />
     <Column field="score" header="Score" :sortable="true" />
+
+    <!-- One #cell slot on <DataTable>, dispatched by columnId -->
+    <template #cell="{ columnId, value }">
+      <span v-if="columnId === 'status'" class="dt-badge" :class="'dt-badge--' + value">{{ value }}</span>
+      <template v-else>{{ value }}</template>
+    </template>
   </DataTable>
 
   <div class="dt-live__state">
@@ -69,7 +71,7 @@ This is the **real `@rozie-ui/data-table-vue` package** running on this page (Vi
 </div>
 </ClientOnly>
 
-Each `v-model:<slice>` is a two-way bind — the readout updates the instant you change the state, and a consumer write flows back in. The four slices bound here (`sorting`, `globalFilter`, `rowSelection`, `pagination`) are four of the [nine independent state slices](/components/data-table#models-the-nine-two-way-slices); bind a slice only when you want to own it. The header buttons drive the imperative handle (`toggleAllRows`, `clearSelection`, `clearSorting`) grabbed through Vue's `ref`. The **Status** column shows a per-column `#cell` template; the others render the plain accessor value (the fast path). See the [full API](/components/data-table) for every prop, slice, event, slot, and handle verb, plus the `<Column>` API, theming, and accessibility reference.
+Each `v-model:<slice>` is a two-way bind — the readout updates the instant you change the state, and a consumer write flows back in. The four slices bound here (`sorting`, `globalFilter`, `rowSelection`, `pagination`) are four of the [nine independent state slices](/components/data-table#models-the-nine-two-way-slices); bind a slice only when you want to own it. The header buttons drive the imperative handle (`toggleAllRows`, `clearSelection`, `clearSorting`) grabbed through Vue's `ref`. A single `#cell` slot on `<DataTable>`, dispatched by `columnId`, renders the **Status** badge; every other column falls through to the plain accessor value (the fast path). See the [full API](/components/data-table) for every prop, slice, event, slot, and handle verb, plus the `<Column>` API, theming, and accessibility reference.
 
 ## One source, six outputs
 

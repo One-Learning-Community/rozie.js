@@ -84,10 +84,17 @@ const COLS = `[
     { field: 'status', header: 'Status', sortable: true },
   ]`;
 
+// Each target carries an ALIGNED list of example sets (same titles, same order)
+// so the README and the docs page can render one set per heading / code-group.
+const SET_A_TITLE = 'Columns as a config array';
+const SET_B_TITLE = 'Declarative `<Column>` children + a custom cell';
+
 export const USAGE = {
-  react: {
-    lang: 'tsx',
-    code: `import { useState } from 'react';
+  react: [
+    {
+      title: SET_A_TITLE,
+      lang: 'tsx',
+      code: `import { useState } from 'react';
 import { DataTable } from '@rozie-ui/data-table-react';
 
 export function Demo() {
@@ -105,10 +112,54 @@ export function Demo() {
     />
   );
 }`,
-  },
-  vue: {
-    lang: 'vue',
-    code: `<script setup lang="ts">
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'tsx',
+      code: `import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  const rows = ${ROWS};
+  // One cell renderer on <DataTable>, dispatched by columnId — it works the same
+  // whether columns are declared as <Column> children or via :columns.
+  return (
+    <DataTable
+      data={rows}
+      selectionMode="multiple"
+      stickyHeader
+      renderCell={({ columnId, value }) =>
+        columnId === 'status' ? <StatusBadge status={value} /> : value
+      }
+    >
+      <Column field="name" header="Name" sortable filterable />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" sortable />
+    </DataTable>
+  );
+}`,
+    },
+  ],
+  vue: [
+    {
+      title: SET_A_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable from '@rozie-ui/data-table-vue';
+
+const rows = ${ROWS};
+const columns = ${COLS};
+const sorting = ref<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<template>
+  <DataTable :data="rows" :columns="columns" v-model:sorting="sorting" selection-mode="multiple" sticky-header />
+</template>`,
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
 import { ref } from 'vue';
 import DataTable, { Column } from '@rozie-ui/data-table-vue';
 
@@ -120,15 +171,35 @@ const sorting = ref<{ id: string; desc: boolean }[]>([]);
   <DataTable :data="rows" v-model:sorting="sorting" selection-mode="multiple" sticky-header>
     <Column field="name" header="Name" :sortable="true" :filterable="true" />
     <Column field="email" header="Email" />
-    <Column field="status" header="Status" :sortable="true">
-      <template #cell="{ value }"><span class="badge">{{ value }}</span></template>
-    </Column>
+    <Column field="status" header="Status" :sortable="true" />
+
+    <!-- One #cell slot on <DataTable>, dispatched by columnId (works with :columns too) -->
+    <template #cell="{ columnId, value }">
+      <span v-if="columnId === 'status'" class="badge">{{ value }}</span>
+      <template v-else>{{ value }}</template>
+    </template>
   </DataTable>
 </template>`,
-  },
-  svelte: {
-    lang: 'svelte',
-    code: `<script lang="ts">
+    },
+  ],
+  svelte: [
+    {
+      title: SET_A_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable from '@rozie-ui/data-table-svelte';
+
+  const rows = ${ROWS};
+  const columns = ${COLS};
+  let sorting = $state<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<DataTable data={rows} {columns} bind:sorting selectionMode="multiple" stickyHeader />`,
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
   import DataTable, { Column } from '@rozie-ui/data-table-svelte';
 
   const rows = ${ROWS};
@@ -139,11 +210,39 @@ const sorting = ref<{ id: string; desc: boolean }[]>([]);
   <Column field="name" header="Name" sortable filterable />
   <Column field="email" header="Email" />
   <Column field="status" header="Status" sortable />
+
+  <!-- One cell snippet on <DataTable>, dispatched by columnId -->
+  {#snippet cell({ columnId, value })}
+    {#if columnId === 'status'}<span class="badge">{value}</span>{:else}{value}{/if}
+  {/snippet}
 </DataTable>`,
-  },
-  angular: {
-    lang: 'ts',
-    code: `import { Component } from '@angular/core';
+    },
+  ],
+  angular: [
+    {
+      title: SET_A_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable],
+  template: \`
+    <DataTable [data]="rows" [columns]="columns" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true" />
+  \`,
+})
+export class DemoComponent {
+  rows = ${ROWS};
+  columns = ${COLS};
+  sorting: { id: string; desc: boolean }[] = [];
+}`,
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
 import { DataTable, Column } from '@rozie-ui/data-table-angular';
 
 @Component({
@@ -155,6 +254,15 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
       <Column field="name" header="Name" [sortable]="true" [filterable]="true" />
       <Column field="email" header="Email" />
       <Column field="status" header="Status" [sortable]="true" />
+
+      <!-- One #cell template on <DataTable>, dispatched by columnId -->
+      <ng-template #cell let-columnId="columnId" let-value="value">
+        @if (columnId === 'status') {
+          <span class="badge">{{ value }}</span>
+        } @else {
+          {{ value }}
+        }
+      </ng-template>
     </DataTable>
   \`,
 })
@@ -162,10 +270,13 @@ export class DemoComponent {
   rows = ${ROWS};
   sorting: { id: string; desc: boolean }[] = [];
 }`,
-  },
-  solid: {
-    lang: 'tsx',
-    code: `import { createSignal } from 'solid-js';
+    },
+  ],
+  solid: [
+    {
+      title: SET_A_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
 import { DataTable } from '@rozie-ui/data-table-solid';
 
 export function Demo() {
@@ -176,10 +287,40 @@ export function Demo() {
     <DataTable data={rows} columns={columns} sorting={sorting()} onSortChange={setSorting} selectionMode="multiple" stickyHeader />
   );
 }`,
-  },
-  lit: {
-    lang: 'ts',
-    code: `import '@rozie-ui/data-table-lit';
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  const rows = ${ROWS};
+  const [sorting, setSorting] = createSignal<{ id: string; desc: boolean }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      sorting={sorting()}
+      onSortChange={setSorting}
+      selectionMode="multiple"
+      stickyHeader
+      cellSlot={({ columnId, value }) =>
+        columnId === 'status' ? <StatusBadge status={value} /> : value
+      }
+    >
+      <Column field="name" header="Name" sortable filterable />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" sortable />
+    </DataTable>
+  );
+}`,
+    },
+  ],
+  lit: [
+    {
+      title: SET_A_TITLE,
+      lang: 'ts',
+      code: `import '@rozie-ui/data-table-lit';
 
 // <rozie-data-table> is a custom element. Set \`data\`/\`columns\` as properties
 // and listen for the change events (\`sort-change\`, \`filter-change\`, …).
@@ -189,7 +330,32 @@ el.columns = ${COLS};
 el.addEventListener('sort-change', (e) => {
   console.log('sorting', e.detail);
 });`,
-  },
+    },
+    {
+      title: SET_B_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = ${ROWS};
+
+// Declare columns as <rozie-column> children and supply ONE cell renderer —
+// a function returning a Lit template, dispatched by columnId.
+render(html\`
+  <rozie-data-table
+    .data=\${rows}
+    selection-mode="multiple"
+    sticky-header
+    .cell=\${({ columnId, value }) =>
+      columnId === 'status' ? html\`<span class="badge">\${value}</span>\` : value}
+  >
+    <rozie-column field="name" header="Name" sortable filterable></rozie-column>
+    <rozie-column field="email" header="Email"></rozie-column>
+    <rozie-column field="status" header="Status" sortable></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
+  ],
 };
 
 const FRAMEWORK_PEER_LABEL = {
@@ -267,8 +433,11 @@ const selected = el.getSelectedRows();`,
 // ---------------------------------------------------------------------------
 
 export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
-  const usage = USAGE[target];
-  if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
+  const usageSets = USAGE[target];
+  if (!usageSets || usageSets.length === 0) {
+    throw new Error(`renderReadme: no usage snippet for target "${target}"`);
+  }
+  const primaryLang = usageSets[0].lang;
 
   const lines = [];
   lines.push(`# ${pkgName}`);
@@ -295,13 +464,24 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
   lines.push('');
 
-  // Usage
+  // Usage — one heading per aligned example set.
   lines.push('## Usage');
   lines.push('');
-  lines.push('```' + usage.lang);
-  lines.push(usage.code);
-  lines.push('```');
+  lines.push(
+    'Columns may be declared as a `:columns` config array **or** as `<Column>` children ' +
+      '(or both — an id-keyed last-write-wins union). Per-cell rendering is one parent ' +
+      '`#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it ' +
+      'works the same with either column form.',
+  );
   lines.push('');
+  for (const set of usageSets) {
+    lines.push(`### ${set.title}`);
+    lines.push('');
+    lines.push('```' + set.lang);
+    lines.push(set.code);
+    lines.push('```');
+    lines.push('');
+  }
 
   // Theming
   lines.push('## Theming');
@@ -312,7 +492,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       '(import `base.css` first, then a bridge):',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (target === 'lit' ? 'ts' : primaryLang === 'vue' ? 'ts' : primaryLang));
   lines.push(`import '${pkgName}/themes/base.css';`);
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css`);
   lines.push('```');
@@ -373,9 +553,12 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('## Slots');
   lines.push('');
   lines.push(
-    'The `<Column>` child declares per-column `#cell` / `#header` render templates; the ' +
-      'parent `<DataTable>` exposes the selection-chrome slots below. (On React, slots are a ' +
-      'render-prop API — the one documented cross-framework divergence.)',
+    'All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata ' +
+      'only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` ' +
+      '— switch on it to vary the render per column; a column the slot does not render shows ' +
+      'the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / ' +
+      '`renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / ' +
+      '`.colHeader` properties — the documented cross-framework divergence.)',
   );
   lines.push('');
   lines.push('| Slot | Params |');

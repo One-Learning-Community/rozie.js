@@ -12,6 +12,32 @@ Peer dependencies: `svelte + @tanstack/table-core`. Install them alongside this 
 
 ## Usage
 
+Columns may be declared as a `:columns` config array **or** as `<Column>` children (or both — an id-keyed last-write-wins union). Per-cell rendering is one parent `#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it works the same with either column form.
+
+### Columns as a config array
+
+```svelte
+<script lang="ts">
+  import DataTable from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, name: 'Ada Lovelace',   email: 'ada@analytical.engine',  status: 'active' },
+    { id: 2, name: 'Alan Turing',    email: 'alan@bletchley.park',    status: 'active' },
+    { id: 3, name: 'Grace Hopper',   email: 'grace@navy.mil',         status: 'away'   },
+  ];
+  const columns = [
+    { field: 'name',   header: 'Name',   sortable: true, filterable: true },
+    { field: 'email',  header: 'Email' },
+    { field: 'status', header: 'Status', sortable: true },
+  ];
+  let sorting = $state<{ id: string; desc: boolean }[]>([]);
+</script>
+
+<DataTable data={rows} {columns} bind:sorting selectionMode="multiple" stickyHeader />
+```
+
+### Declarative `<Column>` children + a custom cell
+
 ```svelte
 <script lang="ts">
   import DataTable, { Column } from '@rozie-ui/data-table-svelte';
@@ -28,6 +54,11 @@ Peer dependencies: `svelte + @tanstack/table-core`. Install them alongside this 
   <Column field="name" header="Name" sortable filterable />
   <Column field="email" header="Email" />
   <Column field="status" header="Status" sortable />
+
+  <!-- One cell snippet on <DataTable>, dispatched by columnId -->
+  {#snippet cell({ columnId, value })}
+    {#if columnId === 'status'}<span class="badge">{value}</span>{:else}{value}{/if}
+  {/snippet}
 </DataTable>
 ```
 
@@ -107,7 +138,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 ## Slots
 
-The `<Column>` child declares per-column `#cell` / `#header` render templates; the parent `<DataTable>` exposes the selection-chrome slots below. (On React, slots are a render-prop API — the one documented cross-framework divergence.)
+All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
 
 | Slot | Params |
 | --- | --- |

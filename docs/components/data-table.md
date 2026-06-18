@@ -48,9 +48,13 @@ Pass a `data` array, declare columns (either as `<Column>` children or via the `
   <DataTable :data="$data.rows" r-model:sorting="$data.sorting" selectionMode="multiple" stickyHeader>
     <Column field="name" header="Name" sortable filterable />
     <Column field="email" header="Email" />
-    <Column field="status" header="Status" sortable>
-      <template #cell="{ value }"><StatusBadge :status="value" /></template>
-    </Column>
+    <Column field="status" header="Status" sortable />
+
+    <!-- One #cell slot on <DataTable>, dispatched by columnId -->
+    <template #cell="{ columnId, value }">
+      <StatusBadge r-if="columnId === 'status'" :status="value" />
+      <template r-else>{{ value }}</template>
+    </template>
   </DataTable>
 </template>
 ```
@@ -84,18 +88,27 @@ Columns may be declared via `<Column>` children **or** via the `:columns` config
 ]" />
 ```
 
-### Per-column `#cell` / `#header` templates
+### Cell & header rendering — the parent `#cell` / `#colHeader` slot
 
-A `<Column>` may carry a `#cell` template (scope `{ row, value, column }`) and/or a `#header` template (scope `{ column }`). A column with **no** `#cell` template renders the plain accessor value inline (the fast path — no portal, no slot dispatch). A column **with** one mounts its scoped template into the framework-owned `<td>` host via Rozie's reactive portal machinery — one independent handle per rendered cell:
+A `<Column>` is **renderless** and carries **metadata only** — it never renders a cell itself. Custom cell and header rendering is a **single scoped slot on the parent `<DataTable>`**, `#cell` (scope `{ columnId, column, row, value }`) and `#colHeader` (scope `{ columnId, column, label }`), **dispatched by `columnId`**: you write one slot and switch on `columnId` to vary the render per column. A column the slot does not render (or any column when no slot is supplied) shows the plain accessor value — the fast path. This holds whether columns are declared as `<Column>` children or via the `:columns` array.
+
+> **Why parent-level, not per-`<Column>`?** The `<td>` / `<th>` hosts are framework-owned by the parent's keyed `r-for`, and a renderless child cannot plain-render into a sibling's host. So the one `#cell` / `#colHeader` scoped slot lives on `<DataTable>` and dispatches by `columnId` (design decision **D-A**). The header slot is named `#colHeader` (not `#header`) because a `#header` slot lowers to a Svelte snippet prop named `header`, which collides with a common local.
 
 ```rozie
-<Column field="status" header="Status" sortable>
-  <template #cell="{ row, value, column }"><StatusBadge :status="value" /></template>
-  <template #header="{ column }">{{ column.header }} ⚑</template>
-</Column>
+<DataTable :data="$data.rows">
+  <Column field="status" header="Status" sortable />
+  <!-- One slot, switched by columnId -->
+  <template #cell="{ columnId, value }">
+    <StatusBadge r-if="columnId === 'status'" :status="value" />
+    <template r-else>{{ value }}</template>
+  </template>
+  <template #colHeader="{ columnId, label }">
+    {{ label }}<span r-if="columnId === 'status'"> ⚑</span>
+  </template>
+</DataTable>
 ```
 
-> **React render-prop caveat (the one documented cross-framework divergence).** On React, scoped slots are a **render-prop** API rather than a `<template>` slot. The per-column `#cell` / `#header` templates surface as render functions receiving the `{ row, value, column }` / `{ column }` scope — `(ctx) => ReactNode` — exactly as for every other Rozie scoped slot. This is the single, deliberately-accepted parity edge; every other target uses its native slot/snippet/`ng-template` mechanism.
+> **React / Solid / Lit render-prop form (the one documented cross-framework divergence).** On the JSX/property targets the slot surfaces as a prop holding a render function rather than a `<template>`: React `renderCell` / `renderColHeader`, Solid `cellSlot` / `colHeaderSlot` — `(ctx) => ReactNode` / `JSX.Element` — and Lit the `.cell` / `.colHeader` properties (a function returning a Lit template). The scope object (`{ columnId, column, row, value }` / `{ columnId, column, label }`) is identical across all six. Vue, Svelte (a `{#snippet cell()}`), and Angular (an `<ng-template #cell>`) use their native slot/snippet/template mechanism. See [usage examples](/components/data-table-usage) for the exact per-target snippet.
 
 ## API
 
@@ -177,10 +190,12 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 ### Slots
 
-The `<Column>` child declares the per-column `#cell` / `#header` render templates (documented above); the parent `<DataTable>` exposes the selection-chrome slots below. On React, slots are a **render-prop** API — the one documented cross-framework divergence.
+All slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers [dispatched by `columnId`](#cell-header-rendering-—-the-parent-cell-colheader-slot). On React/Solid these are render-prop props (`renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`) and on Lit the `.cell` / `.colHeader` properties — the one documented cross-framework divergence.
 
 | Slot | Params | Description |
 | --- | --- | --- |
+| `cell` | `columnId, column, row, value` | Custom cell renderer — switch on `columnId` to vary per column. A column it does not render shows the plain accessor value. |
+| `colHeader` | `columnId, column, label` | Custom header renderer — switch on `columnId`. Falls back to the plain `header` label. |
 | `selectAll` | `checked, indeterminate, toggle` | Override the select-all header (only when `selectionMode="multiple"`). `indeterminate` is true on a partial selection. |
 | `selectCell` | `row, checked, toggle` | Override the per-row select checkbox (only when `selectionMode="multiple"`). |
 

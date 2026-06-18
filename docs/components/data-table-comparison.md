@@ -42,7 +42,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Sticky header | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ✅ `stickyHeader` |
 | APG grid keyboard navigation (`role="grid"`) | ❌ | ⚠️ (PrimeVue) | ❌ | ❌ | ✅ (AG) | ❌ | ✅ `interactionMode="grid"` |
 | Declarative `<Column>` surface | ⚠️ defs array | ✅ (PrimeVue) | ⚠️ | ⚠️ | ⚠️ | — | ✅ `<Column>` + `:columns` |
-| Per-column cell / header templates | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ `#cell` / `#header` (React render-prop) |
+| Custom cell / header rendering | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ parent `#cell` / `#colHeader`, `columnId`-dispatched (React/Solid render-prop, Lit property) |
 | Server-side (manual) mode | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ `manual` |
 | No per-framework adapter | ❌ | ❌ | ❌ | ❌ | ❌ | — | ✅ single `table-core` |
 | Idiomatic two-way state binding | ⚠️ state+onChange | ✅ `v-model` | ⚠️ stores | ⚠️ signal | ⚠️ | — | ✅ nine `r-model` slices |
@@ -55,7 +55,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **The same component surface everywhere.** Where TanStack offers hooks (React), composables (Vue), stores (Svelte), and signals (Solid) — four mental models over the *same* core — `@rozie-ui/data-table` is one `<DataTable>` + `<Column>` with the same props, nine two-way slices, events, slots, and imperative handle on all six.
 - **No per-framework adapter.** Every leaf wires `@tanstack/table-core` directly; the codegen forbids any `@tanstack/<fw>-table` import. You get the exact engine TanStack uses without the adapter-per-framework maintenance surface — and `table-core` is your peer dependency, so you control its version.
 - **Nine independent two-way state slices, controlled *or* uncontrolled.** Sorting, global filter, column filters, pagination, row selection, column visibility / sizing / order / pinning — each is an optional `r-model` you bind only if you want to own it, and each change event fires regardless of binding so you can observe transitions either way.
-- **A declarative `<Column>` API with per-column templates** (the PrimeVue-shaped surface) *and* a `:columns` config-array escape hatch, resolved by an id-keyed last-write-wins union — plus per-column `#cell` / `#header` reactive templates (a render-prop on React, the one documented divergence).
+- **A declarative `<Column>` API** (the PrimeVue-shaped surface) *and* a `:columns` config-array escape hatch, resolved by an id-keyed last-write-wins union — plus custom cell/header rendering via a single parent `#cell` / `#colHeader` scoped slot dispatched by `columnId` (a render-prop on React/Solid and a property on Lit, the one documented divergence).
 - **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-data-table-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5 — no required CSS import.
 - **Opt-in WAI-ARIA grid mode, identical on all six targets.** Set `interactionMode="grid"` for the full [APG grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) — `role="grid"`, a roving single tab-stop, and 2-D arrow-key cell navigation that survives a re-sort / filter / page change / column hide-reorder-pin (the active cell is tracked as a `{ rowIndex, colIndex }` pair over the visible model, never a stored DOM node). It is drivable and observable via the `focusCell` / `getActiveCell` / `clearActiveCell` handle verbs and the `activecell-change` event, and the behavioral contract is locked by a cross-framework VR matrix. The default `interactionMode="table"` stays a plain accessible table, byte-for-byte unchanged.
 
@@ -66,7 +66,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 - **AG Grid's enterprise depth.** [AG Grid](https://www.ag-grid.com/) ships row grouping, tree data, pivoting, range selection, master/detail, integrated charting, and a deep server-side row model. `@rozie-ui/data-table` covers the common surface (sort / filter / paginate / select / column management) and a `manual` server-side hook, not the enterprise feature set.
 - **Row/cell virtualization.** Large datasets render every row today — there is no built-in windowing. Virtualization is a planned phase (the published support boundary is a row-count ceiling until it lands); for now, paginate or pre-window large data yourself.
 - **TanStack's expansion / grouping / faceting helpers.** The shared `table-core` exposes more row-model features (expanding, grouping, faceted filters) than `@rozie-ui/data-table` surfaces in its current prop set. They are reachable via the imperative handle / future additive props.
-- **`@rozie-ui/data-table` is `0.1.0`.** The surface (15 props / 9 two-way slices / 9 events / 15-verb handle / declarative `<Column>` + per-column templates / 2 selection slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
+- **`@rozie-ui/data-table` is `0.1.0`.** The surface (15 props / 9 two-way slices / 9 events / 15-verb handle / declarative `<Column>` + `columnId`-dispatched cell/header slots / 2 selection slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
 
 ## Try it
 
