@@ -492,6 +492,20 @@ export const EXAMPLES = [
   'DataTableSelection',
   'DataTableColumnMgmt',
   'DataTableSticky',
+  // Phase 49 (data-table grid interaction mode) WAVE-0 FOCUS PROBE — the
+  // standalone, chrome-free cross-target focus() de-risk cell (loader →
+  // examples/demos/DataTableGridProbeDemo.rozie, self-contained: NO DataTable /
+  // @tanstack/table-core import). A 3-col grid (1 header row + 3 body rows,
+  // interactionMode='grid') implementing RESEARCH Pattern-1 focus resolution
+  // (data-row/data-col-index querySelector off a stable post-mount root +
+  // .focus()) + a single delegated @keydown + the focusCell $expose verb. Covered
+  // by data-table-grid-probe.spec.ts (single tabindex, ArrowRight focus move,
+  // ArrowUp header crossing, Enter/Escape control entry/exit, focusCell(1,1)).
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). No new
+  // Angular 3-file registration needed — it lives under examples/demos/ (already
+  // covered by prebuildExtraRoots[examplesRoot] + the examples tsconfig include +
+  // the glob-driven build-cells demos sweep) and imports no cross-tree package.
+  'DataTableGridProbe',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -687,6 +701,9 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableSelection: 'rozie-data-table-selection',
   DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
   DataTableSticky: 'rozie-data-table-sticky',
+  // Phase 49 grid-probe — '-demo' appended on Lit → 'rozie-data-table-grid-probe-demo'
+  // = kebab of DataTableGridProbeDemo (the component is name="DataTableGridProbeDemo").
+  DataTableGridProbe: 'rozie-data-table-grid-probe',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -927,6 +944,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableSelection: {},
   DataTableColumnMgmt: {},
   DataTableSticky: {},
+  // Phase 49 grid-probe — self-contained ($data only: interactionMode='grid' +
+  // the active-cell index pair). No parent-supplied props.
+  DataTableGridProbe: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

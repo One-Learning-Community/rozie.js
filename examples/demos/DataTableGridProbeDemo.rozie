@@ -1,0 +1,306 @@
+<!--
+  DataTableGridProbeDemo.rozie — Phase 49 WAVE-0 FOCUS PROBE (rete-FlowCanvas precedent).
+
+  Purpose: de-risk the single hardest, highest-risk surface of phase 49 — the
+  cross-target focus() RESOLUTION mechanism — BEFORE editing the 1498-line
+  DataTable.rozie. This is a STANDALONE, chrome-free grid (NO @tanstack/table-core,
+  NO DataTable import): a hardcoded 3-col grid with a 1-row header + 3 body rows,
+  `interactionMode` hardwired to 'grid', that implements the RESEARCH Pattern-1
+  focus strategy verbatim so a behavioral ×6 spec can prove it works on
+  React/Vue/Svelte/Angular/Solid/Lit (especially Solid's fine-grained renderer and
+  Lit's shadow-DOM activeElement) for ~60 lines of probe code instead of after a
+  1498-line edit.
+
+  Focus mechanism (RESEARCH Pattern 1 / Pattern 3 — the req-6 seam):
+    - active cell = a reactive (activeRow, activeColIndex, activeIsHeader) INDEX
+      pair in $data, NEVER a stored DOM node.
+    - roving :tabindex computed (cellTabindex) reads ONLY reactive $data → ROZ123-safe,
+      fine-grained-reactive (Solid/Lit rove correctly).
+    - ONE stable root ref (gridRoot) captured in $onMount; focusActiveCell() resolves
+      the cell via gridRoot.querySelector('[data-grid-cell][data-row=R][data-col-index=C]')
+      then .focus() — uniform ×6, shadow-safe (same-root query pierces Lit's shadow,
+      the shipped listbox idiom). Accepts OPTIONAL fresh (nextRow,nextCol) locals so
+      React's async setState (ROZ138) never re-reads a stale $data.
+    - SINGLE delegated @keydown on the grid root (NOT per-cell — dodges the Angular
+      .stop-in-@for hoist bug); e.preventDefault() called imperatively inside.
+    - focusCell(rowIndex, colIndex) $expose verb (NOT 'focus' — ROZ137 Lit shadow);
+      args coerced to integers + clamped before building the data-* selector (T-49-01).
+
+  data-table-grid-probe.spec.ts asserts ×6:
+    1. exactly one [tabindex="0"] at mount = the D-04 entry cell (data-row=0, data-col-index=0)
+    2. ArrowRight → [tabindex="0"] moves to data-col-index=1 AND real DOM focus follows
+    3. ArrowUp from body row 0 → active cell is a [role="columnheader"] (header crossing)
+    4. Enter focuses the inner button; Escape returns focus to the owning gridcell
+    5. focusCell(1,1) (via an internal button calling the exposed verb) → focus lands on (1,1)
+-->
+
+<rozie name="DataTableGridProbeDemo">
+
+<data>
+{
+  interactionMode: 'grid',
+  activeRow: 0,
+  activeColIndex: 0,
+  activeIsHeader: false,
+  activeInControl: false,
+}
+</data>
+
+<script lang="ts">
+// --- static grid model (no chrome) -----------------------------------------
+const HEADERS = ['Col A', 'Col B', 'Col C']
+const BODY = [
+  ['a0', 'b0', 'c0'],
+  ['a1', 'b1', 'c1'],
+  ['a2', 'b2', 'c2'],
+]
+const COL_COUNT = 3
+const BODY_ROW_COUNT = 3
+
+// --- mode + role helpers (RESEARCH Pattern 4) ------------------------------
+const isGrid = () => $data.interactionMode === 'grid'
+const tableRole = () => (isGrid() ? 'grid' : 'table')
+const cellRole = () => (isGrid() ? 'gridcell' : 'cell')
+
+// --- roving tabindex (RESEARCH Code Examples — reads ONLY reactive $data) ---
+// rowKey: '__header' for the header row, else the body row index as a string.
+// Returns 0 for the active cell, -1 otherwise — never reads $refs/$el (ROZ123).
+const cellTabindex = (rowKey: string, colIndex: number): number => {
+  if (!isGrid()) return -1
+  const activeKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  const isActive = rowKey === activeKey && colIndex === $data.activeColIndex
+  return isActive ? 0 : -1
+}
+
+// --- stable root + the focus SEAM (RESEARCH Pattern 1 / Pattern 3) ----------
+let gridRoot: Element | null = null
+$onMount(() => {
+  gridRoot = $el ? $el.querySelector('.rozie-grid-probe') : null
+})
+
+// Resolve (rowKey, colIndex) → DOM element via a data-* attribute query off the
+// stable root. Uniform on all six; shadow-safe (same-root query). Post-mount only.
+const resolveCellEl = (rowKey: string, colIndex: number): HTMLElement | null => {
+  if (!gridRoot) return null
+  return gridRoot.querySelector(
+    '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]',
+  ) as HTMLElement | null
+}
+
+// THE seam (req-6). Optional explicit (nextRow,nextCol,nextIsHeader) so callers
+// pass FRESH post-write locals (ROZ138 React-stale-read mitigation); falls back
+// to $data when omitted.
+const focusActiveCell = (nextRow?: number, nextCol?: number, nextIsHeader?: boolean): void => {
+  if (!isGrid() || !gridRoot) return
+  const r = nextRow == null ? $data.activeRow : nextRow
+  const c = nextCol == null ? $data.activeColIndex : nextCol
+  const header = nextIsHeader == null ? $data.activeIsHeader : nextIsHeader
+  const rowKey = header ? '__header' : String(r)
+  const el = resolveCellEl(rowKey, c)
+  if (el) el.focus()
+}
+
+// --- nav math (clamp at edges; header-crossing) ----------------------------
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+
+// Move within the current row's columns (no wrap). Returns the fresh colIndex.
+const moveCol = (delta: number): number => {
+  const next = clamp($data.activeColIndex + delta, 0, COL_COUNT - 1)
+  $data.activeColIndex = next
+  return next
+}
+
+// Cross the header boundary. Models the header as a row above body row 0:
+//   ArrowUp from body row 0 → activeIsHeader=true
+//   ArrowDown from header   → activeIsHeader=false, activeRow=0
+// Returns nothing meaningful (the caller re-reads the fresh locals it sets).
+const moveRow = (delta: number): void => {
+  if ($data.activeIsHeader) {
+    if (delta > 0) {
+      // header → body row 0
+      $data.activeIsHeader = false
+      $data.activeRow = 0
+    }
+    // ArrowUp from header is a no-op (top edge).
+    return
+  }
+  if (delta < 0 && $data.activeRow === 0) {
+    // body row 0 → header
+    $data.activeIsHeader = true
+    return
+  }
+  $data.activeRow = clamp($data.activeRow + delta, 0, BODY_ROW_COUNT - 1)
+}
+
+// --- in-cell control entry/exit (RESEARCH Pattern 2) -----------------------
+const enterControl = (): void => {
+  if (!gridRoot) return
+  const rowKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  const el = resolveCellEl(rowKey, $data.activeColIndex)
+  if (!el) return
+  const ctrl = el.querySelector(
+    'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',
+  ) as HTMLElement | null
+  if (ctrl) {
+    $data.activeInControl = true
+    ctrl.focus()
+  }
+}
+
+// --- single delegated keydown handler (RESEARCH Pattern 4) ------------------
+const onGridKeyDown = ($event: KeyboardEvent): void => {
+  if (!isGrid() || !$event) return
+  const key = $event.key
+  if ($data.activeInControl) {
+    if (key === 'Escape') {
+      $event.preventDefault()
+      $data.activeInControl = false
+      focusActiveCell()
+    }
+    return
+  }
+  if (key === 'ArrowRight') {
+    $event.preventDefault()
+    const c = moveCol(1)
+    focusActiveCell($data.activeRow, c, $data.activeIsHeader)
+  } else if (key === 'ArrowLeft') {
+    $event.preventDefault()
+    const c = moveCol(-1)
+    focusActiveCell($data.activeRow, c, $data.activeIsHeader)
+  } else if (key === 'ArrowDown') {
+    $event.preventDefault()
+    moveRow(1)
+    focusActiveCell($data.activeRow, $data.activeColIndex, $data.activeIsHeader)
+  } else if (key === 'ArrowUp') {
+    $event.preventDefault()
+    moveRow(-1)
+    focusActiveCell($data.activeRow, $data.activeColIndex, $data.activeIsHeader)
+  } else if (key === 'Enter' || key === 'F2') {
+    $event.preventDefault()
+    enterControl()
+  }
+}
+
+// --- $expose: focusCell (NOT 'focus' — ROZ137 Lit shadow) ------------------
+// Args coerced to integers + clamped before building the data-* selector (T-49-01).
+const focusCell = (rowIndex: number, colIndex: number): void => {
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, BODY_ROW_COUNT - 1)
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, COL_COUNT - 1)
+  $data.activeIsHeader = false
+  $data.activeInControl = false
+  $data.activeRow = r
+  $data.activeColIndex = c
+  focusActiveCell(r, c, false)
+}
+
+const getActiveCell = () => ({
+  rowIndex: $data.activeRow,
+  colIndex: $data.activeColIndex,
+  isHeader: $data.activeIsHeader,
+})
+
+$expose({ focusCell, getActiveCell })
+
+// Internal driver: clicking calls the SAME exposed verb the spec wants to prove.
+// (Self-call exercises focusCell ×6 without per-target external-handle plumbing.)
+const driveFocusCell = () => focusCell(1, 1)
+</script>
+
+<template>
+<div class="grid-probe-demo">
+  <h3>DataTable grid-focus probe</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="focus-cell-btn" @click="driveFocusCell">focusCell(1,1)</button>
+  </div>
+
+  <table
+    class="rozie-grid-probe"
+    :role="tableRole()"
+    @keydown="onGridKeyDown($event)"
+  >
+    <thead>
+      <tr role="row">
+        <th
+          r-for="(head, hi) in HEADERS"
+          :key="'h' + hi"
+          role="columnheader"
+          data-grid-cell
+          data-row="__header"
+          :data-col-index="hi"
+          :tabindex="cellTabindex('__header', hi)"
+        >{{ head }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr r-for="(bodyRow, ri) in BODY" :key="'r' + ri" role="row">
+        <td
+          r-for="(val, ci) in bodyRow"
+          :key="'c' + ri + '-' + ci"
+          :role="cellRole()"
+          data-grid-cell
+          :data-row="ri"
+          :data-col-index="ci"
+          :tabindex="cellTabindex(String(ri), ci)"
+        >
+          <button
+            r-if="ri === 1 && ci === 1"
+            type="button"
+            class="cell-control"
+            data-testid="inner-control"
+          >btn</button>
+          <span r-else>{{ val }}</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</template>
+
+<style>
+.grid-probe-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.grid-probe-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.rozie-grid-probe {
+  border-collapse: collapse;
+  width: 100%;
+}
+.rozie-grid-probe th,
+.rozie-grid-probe td {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.rozie-grid-probe th[tabindex="0"],
+.rozie-grid-probe td[tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.cell-control {
+  padding: 0.125rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+}
+</style>
+
+</rozie>
