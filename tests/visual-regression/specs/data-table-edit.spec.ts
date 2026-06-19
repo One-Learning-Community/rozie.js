@@ -524,6 +524,52 @@ async function inRangeCells(page: Page): Promise<string[]> {
   });
 }
 
+/** Scroll the real DataTable's `.rdt-scroll` viewport to `top` (walks open shadow roots). */
+async function scrollGridTo(page: Page, top: number): Promise<void> {
+  await page.evaluate((y) => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('.rdt-scroll');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document) as HTMLElement | null;
+    if (el) {
+      el.scrollTop = y;
+      el.dispatchEvent(new Event('scroll', { bubbles: false }));
+    }
+  }, top);
+}
+
+/** The rendered body rows' [data-index]/[aria-rowindex]/[data-pinned] off the real virtual
+ *  table, in DOM order (shadow-pierced) — for the req-9 pin-row survival assertions. */
+async function virtualRenderedRows(
+  page: Page,
+): Promise<{ index: number; ariaRowIndex: number; pinned: boolean }[]> {
+  return page.evaluate(() => {
+    const out: Element[] = [];
+    const walk = (root: Document | ShadowRoot): void => {
+      out.push(...Array.from(root.querySelectorAll('tbody.rdt-tbody > tr.rdt-tr[data-index]')));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return out.map((tr) => ({
+      index: Number(tr.getAttribute('data-index')),
+      ariaRowIndex: Number(tr.getAttribute('aria-rowindex')),
+      pinned: tr.getAttribute('data-pinned') === 'true',
+    }));
+  });
+}
+
 /** Read the readout testid's trimmed text (shadow-pierced), '' when absent. */
 async function readoutText(page: Page, testid: string): Promise<string> {
   return page.evaluate((id) => {
@@ -1157,10 +1203,116 @@ for (const target of TARGETS) {
       .toEqual([anchorName, anchorName, anchorName]);
   });
 
-  // req-9 — editor + range survive virtualization recycling (Wave-(c), Plan 51-04 Task 3).
-  test.fixme(`data-table-edit [${target}]: open editor + index-based range survive virtualization recycle (Plan 51-04 Task 3)`, async () => {
-    // Pending Plan 51-04 Task 3: the D-02 pin-row mechanism (proven in isolation by the probe
-    // above) wired into the real DataTable windowing so an open editor + the index-based range
-    // survive recycling in DataTableEditVirtualDemo.
+  // req-9 — editor + index-based range survive virtualization recycling (Wave-(c), Plan 51-04
+  // Task 3). The D-02 pin-row mechanism wired into the real DataTable windowing. Drives
+  // DataTableEditVirtualDemo (~2000 rows, virtual, maxHeight 400px).
+  runnerFor(target)(`data-table-edit [${target}]: open editor + index-based range survive virtualization recycle`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEditVirtual&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-virtual-table')).toBeVisible({ timeout: 15_000 });
+
+    // The virtual window renders only a small slice of the 2000-row model.
+    await expect
+      .poll(async () => virtualRenderedRows(page).then((r) => r.length), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    // ── Open an editor on a row initially IN the window (row index 3, name col 0). ──────────
+    await enterEditAt(page, 3, 0);
+    await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('0');
+    // Type a value into the editor (controlled draft) so we can prove it persists across scroll.
+    const editor = mount.locator('[data-editing-cell]');
+    await editor.fill('PinnedEdit');
+    await expect.poll(async () => (await openEditor(page))?.value, { timeout: 10_000 }).toBe('PinnedEdit');
+
+    // ── Scroll the editing row FAR out of the window (row 3 → scroll ~30000px down, well past
+    //    its ~120px offset). The pinned row must stay mounted (D-02). ─────────────────────────
+    await scrollGridTo(page, 30_000);
+
+    // Exactly ONE editor exists throughout (no orphan / duplicate), its value persists, and the
+    // pinned <tr> (data-index=3) is rendered + flagged pinned out-of-window.
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => (await openEditor(page))?.value, { timeout: 10_000 }).toBe('PinnedEdit');
+    {
+      const rows = await virtualRenderedRows(page);
+      const pinned = rows.find((r) => r.index === 3);
+      expect(pinned, 'the editing row 3 must stay mounted out-of-window (D-02)').toBeTruthy();
+      expect(pinned?.pinned).toBe(true);
+      // aria-rowindex stays monotonic with no gap across the rendered rows (== data-index + 1).
+      for (const r of rows) expect(r.ariaRowIndex).toBe(r.index + 1);
+      for (let i = 1; i < rows.length; i++) {
+        expect(rows[i].ariaRowIndex).toBeGreaterThan(rows[i - 1].ariaRowIndex);
+      }
+    }
+
+    // ── Scroll BACK so the editing row re-enters the natural window. The same single editor is
+    //    still open with its value (NOT recycled into another row's data). ────────────────────
+    await scrollGridTo(page, 0);
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => (await openEditor(page))?.value, { timeout: 10_000 }).toBe('PinnedEdit');
+    {
+      // Back in the window, row 3 is no longer a PINNED union entry (it rejoined naturally).
+      const rows = await virtualRenderedRows(page);
+      const r3 = rows.find((r) => r.index === 3);
+      expect(r3, 'row 3 must be present back in the natural window').toBeTruthy();
+      expect(r3?.pinned).toBe(false);
+    }
+
+    // ── Commit closes the editor; the pinned row rejoins normal windowing (no row flagged
+    //    pinned, exactly zero open editors). Re-focus the editor before Enter and retry: after
+    //    the scroll-back re-render the editor is a fresh DOM node on the fine-grained targets,
+    //    so a one-shot .press() can race the remount (focus lands on a detached node). ─────────
+    for (let i = 0; i < 8; i++) {
+      const ed = mount.locator('[data-editing-cell]');
+      if ((await ed.count()) === 0) break;
+      await ed.first().focus();
+      await ed.first().press('Enter');
+      try {
+        await expect.poll(async () => editingCellCount(page), { timeout: 1_500 }).toBe(0);
+        break;
+      } catch {
+        // editor still open (remount race) — re-focus + retry.
+      }
+    }
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(0);
+    expect((await virtualRenderedRows(page)).some((r) => r.pinned)).toBe(false);
+    // The committed value rendered from the single model write (req-4/9).
+    await expect
+      .poll(async () => readoutText(page, 'commit-readout'), { timeout: 10_000 })
+      .toBe('name=PinnedEdit');
+
+    // ── The index-based range reattaches to the CORRECT cells across scroll-out-and-back
+    //    (req-9): select a small rectangle, scroll it out and back, assert the range highlight
+    //    lands on the same index cells. Re-settle focus + retry the Shift+ArrowDown: a stray
+    //    deferred focus-return from the just-committed editor (the commit's rAF focus poll) can
+    //    drift the active cell off (2,0) before the keypress on the fine-grained targets. ──────
+    for (let i = 0; i < 8; i++) {
+      await focusBodyCellStable(page, 2, 0);
+      await page.keyboard.press('Shift+ArrowDown'); // box rows 2-3 × col 0
+      try {
+        await expect.poll(async () => readoutText(page, 'range-readout'), { timeout: 1_500 }).toBe('2,0:3,0');
+        break;
+      } catch {
+        // focus drifted / range not set — clear any partial range and retry from (2,0).
+        await page.keyboard.press('ArrowUp');
+      }
+    }
+    await expect
+      .poll(async () => readoutText(page, 'range-readout'), { timeout: 10_000 })
+      .toBe('2,0:3,0');
+    // Scroll the range far out of view, then back.
+    await scrollGridTo(page, 30_000);
+    await scrollGridTo(page, 0);
+    // getSelectedRange still reports the same index pairs (index-based — survives recycling).
+    await mount.getByTestId('call-getrange').click();
+    await expect
+      .poll(async () => readoutText(page, 'selected-range-readout'), { timeout: 10_000 })
+      .toBe('2,0:3,0');
+    // The highlight reattached to the SAME index cells (rows 2-3, col 0).
+    await expect
+      .poll(async () => inRangeCells(page), { timeout: 10_000 })
+      .toEqual(['2:0', '3:0']);
   });
 }

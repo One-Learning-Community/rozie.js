@@ -245,7 +245,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         </tr>
         
         @for (wr of windowedRows(); track wr.row.id) {
-    <tr class="rdt-tr" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)">
+    <tr class="rdt-tr" [ngClass]="{ 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)">
           @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)">
             @if (isSelectColumn(cellCtx.column.id)) {
@@ -1266,6 +1266,18 @@ export class DataTable {
     }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
   };
+  pinnedEditIndex = () => {
+    const __editingRow = this.editingRow();
+    const __editingRowIndex = this.editingRowIndex();
+    if (__editingRow >= 0) return __editingRow;
+    if (__editingRowIndex != null) return __editingRowIndex;
+    return -1;
+  };
+  pinnedMeasurement = (pin: any) => {
+    if (!this.virtualizer || pin < 0) return null;
+    const ms = this.virtualizer.getMeasurements();
+    return ms && ms[pin] ? ms[pin] : null;
+  };
   windowedRows = () => {
     const __rows = this.rows();
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
@@ -1277,7 +1289,10 @@ export class DataTable {
     // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
     // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
     // first re-run that picks up the now-non-null virtualizer.
+    // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+    // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
     void this.windowVer();
+    void this.editVer();
     if (!this.virtualizer) {
       // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
       // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -1298,27 +1313,88 @@ export class DataTable {
     // shrink window where the virtualizer count is stale relative to $data.rows on the async
     // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
     // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
-    return items.map((vi: any) => ({
+    const out = items.map((vi: any) => ({
       vi,
       row: rowList[vi.index]
     })).filter((wr: any) => wr.row);
+    // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+    // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+    // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+    // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+    // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+    // into the real windowing.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0 && rowList[pin]) {
+      let inWindow = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].index === pin) {
+          inWindow = true;
+          break;
+        }
+      }
+      if (!inWindow) {
+        const pm = this.pinnedMeasurement(pin);
+        const firstStart = items.length ? items[0].start : 0;
+        const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+        const pinnedEntry = {
+          vi: pm != null ? pm : {
+            index: pin
+          },
+          row: rowList[pin],
+          pinned: true
+        };
+        if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+      }
+    }
+    return out;
   };
   padTop = () => {
-    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer at the TOP so the spacer-<td>
-    // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
+    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+    // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+    // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
     void this.windowVer();
+    void this.editVer();
     if (!this.virtual() || !this.virtualizer) return 0;
     const items = this.virtualizer.getVirtualItems();
-    return items.length ? items[0].start : 0;
+    let pad = items.length ? items[0].start : 0;
+    // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+    // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+    // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = this.pinnedMeasurement(pin);
+      const inWindow = this.pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+    }
+    return pad < 0 ? 0 : pad;
   };
   padBottom = () => {
-    // subscribe-first, see windowedRows() (IN-04): touch windowVer before the early return so the
-    // fine-grained spacer :style binding subscribes on its first eval while virtualizer is null.
+    // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+    // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+    // on pin/unpin.
     void this.windowVer();
+    void this.editVer();
     if (!this.virtual() || !this.virtualizer) return 0;
     const items = this.virtualizer.getVirtualItems();
     if (!items.length) return 0;
-    return this.virtualizer.getTotalSize() - items[items.length - 1].end;
+    let pad = this.virtualizer.getTotalSize() - items[items.length - 1].end;
+    // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+    // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = this.pinnedMeasurement(pin);
+      const inWindow = this.pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start >= items[0].start) {
+        // below the window (start at-or-past the first rendered start AND not in window) →
+        // it trailed the slice; subtract its height from the trailing spacer.
+        if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+      }
+    }
+    return pad < 0 ? 0 : pad;
+  };
+  pmIndexInWindow = (items: any, idx: any) => {
+    for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+    return false;
   };
   rowIsOutsideWindow = (r: any) => {
     if (!this.virtual() || !this.virtualizer) return false;

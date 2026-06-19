@@ -557,6 +557,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending.current = false;else setTimeout(rafPass, 0);
   }
+  function pinnedEditIndex() {
+    if (editingRow >= 0) return editingRow;
+    if (editingRowIndex != null) return editingRowIndex;
+    return -1;
+  }
+  function pinnedMeasurement(pin: any) {
+    if (!virtualizer.current || pin < 0) return null;
+    const ms = virtualizer.current.getMeasurements();
+    return ms && ms[pin] ? ms[pin] : null;
+  }
   function windowedRows() {
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
     // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -567,7 +577,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
     // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
     // first re-run that picks up the now-non-null virtualizer.
+    // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+    // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
     void windowVer;
+    void editVer;
     if (!virtualizer.current) {
       // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
       // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -588,27 +601,88 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // shrink window where the virtualizer count is stale relative to $data.rows on the async
     // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
     // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
-    return items.map((vi: any) => ({
+    const out = items.map((vi: any) => ({
       vi,
       row: rowList[vi.index]
     })).filter((wr: any) => wr.row);
+    // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+    // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+    // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+    // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+    // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+    // into the real windowing.
+    const pin = pinnedEditIndex();
+    if (pin >= 0 && rowList[pin]) {
+      let inWindow = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].index === pin) {
+          inWindow = true;
+          break;
+        }
+      }
+      if (!inWindow) {
+        const pm = pinnedMeasurement(pin);
+        const firstStart = items.length ? items[0].start : 0;
+        const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+        const pinnedEntry = {
+          vi: pm != null ? pm : {
+            index: pin
+          },
+          row: rowList[pin],
+          pinned: true
+        };
+        if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+      }
+    }
+    return out;
   }
   function padTop() {
-    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer at the TOP so the spacer-<td>
-    // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
+    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+    // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+    // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
     void windowVer;
+    void editVer;
     if (!props.virtual || !virtualizer.current) return 0;
     const items = virtualizer.current.getVirtualItems();
-    return items.length ? items[0].start : 0;
+    let pad = items.length ? items[0].start : 0;
+    // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+    // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+    // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+    }
+    return pad < 0 ? 0 : pad;
   }
   function padBottom() {
-    // subscribe-first, see windowedRows() (IN-04): touch windowVer before the early return so the
-    // fine-grained spacer :style binding subscribes on its first eval while virtualizer is null.
+    // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+    // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+    // on pin/unpin.
     void windowVer;
+    void editVer;
     if (!props.virtual || !virtualizer.current) return 0;
     const items = virtualizer.current.getVirtualItems();
     if (!items.length) return 0;
-    return virtualizer.current.getTotalSize() - items[items.length - 1].end;
+    let pad = virtualizer.current.getTotalSize() - items[items.length - 1].end;
+    // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+    // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start >= items[0].start) {
+        // below the window (start at-or-past the first rendered start AND not in window) →
+        // it trailed the slice; subtract its height from the trailing spacer.
+        if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+      }
+    }
+    return pad < 0 ? 0 : pad;
+  }
+  function pmIndexInWindow(items: any, idx: any) {
+    for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+    return false;
   }
   function rowIsOutsideWindow(r: any) {
     if (!props.virtual || !virtualizer.current) return false;
@@ -2467,7 +2541,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padTop() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
         </tr>
         
-        {windowedRows().map((wr) => <tr key={wr.row.id} className={"rdt-tr"} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c="">
+        {windowedRows().map((wr) => <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}

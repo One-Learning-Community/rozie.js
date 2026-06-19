@@ -53,7 +53,7 @@
       <td :colspan="visibleColCount()" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
     </tr>
     
-    <tr v-for="wr in windowedRows()" :key="wr.row.id" class="rdt-tr" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index">
+    <tr v-for="wr in windowedRows()" :key="wr.row.id" :class="['rdt-tr', { 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined">
       <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="pinStyle(cellCtx.column.id)" :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined">
         <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="wr.row.original" :checked="rowIsSelected(wr.row)" :toggle="e => onToggleRow(wr.row, e)">
@@ -894,11 +894,41 @@ const scheduleRemeasure = () => {
 // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
 // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
 // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+// pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
+// or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
+// model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
+// ARE the full-model index. The pinned row must never recycle while editing (req-9): it is
+// unioned into the windowed slice when it scrolls off-window and its height is subtracted from
+// the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
 // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
 // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
 // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
 // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
 // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+// pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
+// or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
+// model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
+// ARE the full-model index. The pinned row must never recycle while editing (req-9): it is
+// unioned into the windowed slice when it scrolls off-window and its height is subtracted from
+// the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
+const pinnedEditIndex = () => {
+  if (editingRow.value >= 0) return editingRow.value;
+  if (editingRowIndex.value != null) return editingRowIndex.value;
+  return -1;
+};
+// pinnedMeasurement(pin): the virtual-core measurement { index, start, size, end, key } for the
+// pinned full-model index — its measured (or estimated) height + offset, used to (a) decide
+// whether it sits above/below the rendered window and (b) subtract its height from the right
+// spacer. Null when out of range / not virtual.
+// pinnedMeasurement(pin): the virtual-core measurement { index, start, size, end, key } for the
+// pinned full-model index — its measured (or estimated) height + offset, used to (a) decide
+// whether it sits above/below the rendered window and (b) subtract its height from the right
+// spacer. Null when out of range / not virtual.
+const pinnedMeasurement = (pin: any) => {
+  if (!virtualizer || pin < 0) return null;
+  const ms = virtualizer.getMeasurements();
+  return ms && ms[pin] ? ms[pin] : null;
+};
 const windowedRows = () => {
   // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
   // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -909,7 +939,10 @@ const windowedRows = () => {
   // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
   // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
   // first re-run that picks up the now-non-null virtualizer.
+  // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+  // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
   void windowVer.value;
+  void editVer.value;
   if (!virtualizer) {
     // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -930,10 +963,40 @@ const windowedRows = () => {
   // shrink window where the virtualizer count is stale relative to $data.rows on the async
   // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
   // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
-  return items.map((vi: any) => ({
+  const out = items.map((vi: any) => ({
     vi,
     row: rowList[vi.index]
   })).filter((wr: any) => wr.row);
+  // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+  // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+  // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+  // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+  // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+  // into the real windowing.
+  const pin = pinnedEditIndex();
+  if (pin >= 0 && rowList[pin]) {
+    let inWindow = false;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].index === pin) {
+        inWindow = true;
+        break;
+      }
+    }
+    if (!inWindow) {
+      const pm = pinnedMeasurement(pin);
+      const firstStart = items.length ? items[0].start : 0;
+      const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+      const pinnedEntry = {
+        vi: pm != null ? pm : {
+          index: pin
+        },
+        row: rowList[pin],
+        pinned: true
+      };
+      if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+    }
+  }
+  return out;
 };
 
 // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
@@ -943,21 +1006,54 @@ const windowedRows = () => {
 // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
 // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
 const padTop = () => {
-  // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer at the TOP so the spacer-<td>
-  // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
+  // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+  // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+  // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
   void windowVer.value;
+  void editVer.value;
   if (!props.virtual || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
-  return items.length ? items[0].start : 0;
+  let pad = items.length ? items[0].start : 0;
+  // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+  // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+  // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+  const pin = pinnedEditIndex();
+  if (pin >= 0) {
+    const pm = pinnedMeasurement(pin);
+    const inWindow = pmIndexInWindow(items, pin);
+    if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+  }
+  return pad < 0 ? 0 : pad;
 };
 const padBottom = () => {
-  // subscribe-first, see windowedRows() (IN-04): touch windowVer before the early return so the
-  // fine-grained spacer :style binding subscribes on its first eval while virtualizer is null.
+  // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+  // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+  // on pin/unpin.
   void windowVer.value;
+  void editVer.value;
   if (!props.virtual || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
   if (!items.length) return 0;
-  return virtualizer.getTotalSize() - items[items.length - 1].end;
+  let pad = virtualizer.getTotalSize() - items[items.length - 1].end;
+  // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+  // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+  const pin = pinnedEditIndex();
+  if (pin >= 0) {
+    const pm = pinnedMeasurement(pin);
+    const inWindow = pmIndexInWindow(items, pin);
+    if (pm && !inWindow && pm.start >= items[0].start) {
+      // below the window (start at-or-past the first rendered start AND not in window) →
+      // it trailed the slice; subtract its height from the trailing spacer.
+      if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+    }
+  }
+  return pad < 0 ? 0 : pad;
+};
+// pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
+// pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
+const pmIndexInWindow = (items: any, idx: any) => {
+  for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+  return false;
 };
 // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
 // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
