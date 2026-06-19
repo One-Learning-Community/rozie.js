@@ -47,6 +47,7 @@
     "@rozie/runtime-vue": "workspace:*",
     "@rozie/unplugin": "workspace:*",
     "@tanstack/table-core": "^8.21",
+    "@tanstack/virtual-core": "^3",
     "@tiptap/core": "^3.23.5",
     "@tiptap/extension-bubble-menu": "3.23.5",
     "@tiptap/extension-floating-menu": "3.23.5",

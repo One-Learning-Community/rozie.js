@@ -22,6 +22,9 @@ importers:
       '@tanstack/table-core':
         specifier: ^8.21.3
         version: 8.21.3
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
@@ -151,6 +154,9 @@ importers:
       '@tanstack/table-core':
         specifier: ^8.21
         version: 8.21.3
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       '@tiptap/core':
         specifier: ^3.23.5
         version: 3.23.5(@tiptap/pm@3.23.5)
