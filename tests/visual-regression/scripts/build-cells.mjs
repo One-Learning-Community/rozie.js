@@ -174,6 +174,11 @@ const SLIDER_SRC = resolve(
 // and drops the cross-tree `.rozie.ts` + the `DataTable.ts` / `Column.ts` shim
 // artefacts (a MULTI-component family → TWO shims) that must be swept after the
 // Angular build (see cleanupCrossTreeAngularArtifacts).
+// The Phase 50 round-out demos (examples/demos/DataTable{Expand,Group,Facet}Demo.rozie,
+// data-table-roundout.spec.ts) consume THIS src — they need NO new Angular 3-file
+// registration: they live under examples/demos/ (covered by prebuildExtraRoots[examplesRoot]
+// + the examples tsconfig include + the DEMOS_DIR `.rozie.ts` cleanup sweep below) and
+// import the data-table package src already registered for Angular cross-tree AOT here.
 const DATA_TABLE_SRC = resolve(
   REPO_ROOT,
   'packages',

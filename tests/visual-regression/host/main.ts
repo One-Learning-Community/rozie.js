@@ -597,6 +597,31 @@ export const EXAMPLES = [
   // already registered for Angular cross-tree AOT in phase 48).
   'DataTableEdit',
   'DataTableEditVirtual',
+  // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
+  // faceted filtering) WAVE-0 behavioral fixtures (loaders →
+  // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). DataTableExpand binds
+  // the expand surface (#detail slot + getSubRows nested rows, r-model:expanded,
+  // expanded-change, toggleRowExpanded/expandAll/collapseAll/getExpandedRows handles —
+  // reqs 1-3); DataTableGroup binds grouping/aggregation (r-model:grouping, headless
+  // #groupBar slot with NO drag, aggregationFn='sum' + a custom range fn, grouping-change,
+  // applyGrouping/clearGrouping handles — reqs 4-7); DataTableFacet builds a category
+  // checkbox facet + numeric range slider PURELY from the exposed uniqueValues/minMax via
+  // the #filter slot props + getFacetedUniqueValues/getFacetedMinMaxValues handles, no
+  // built-in facet control (reqs 8-9). They reference the expandable/groupable/faceted/
+  // getSubRows/aggregationFn props, the #detail/#groupBar/#filter slots, the
+  // expanded/grouping model slices, the *-change events, and the new $expose verbs that DO
+  // NOT EXIST until Plans 50-02..04 land — today they pass through inert (a harmless ROZ941
+  // "slot not declared" warning; the fixtures still render the read-only flat table on all
+  // six). Their assertions in data-table-roundout.spec.ts sit behind the runnerFor
+  // build-gate until each wave fills them. Behavioral-only; NOT in matrix.spec.ts EXAMPLES
+  // (no pixel baseline). They live under examples/demos/ so no new Angular 3-file
+  // registration is needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig
+  // include + the glob-driven build-cells demos sweep already cover them, importing the
+  // data-table source pkg already registered for Angular cross-tree AOT in phase 48).
+  'DataTableExpand',
+  'DataTableGroup',
+  'DataTableFacet',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -816,6 +841,13 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTablePinProbe: 'rozie-data-table-pin-probe',
   DataTableEdit: 'rozie-data-table-edit',
   DataTableEditVirtual: 'rozie-data-table-edit-virtual',
+  // Phase 50 round-out — '-demo' appended on Lit → tags
+  // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
+  // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
+  // DataTableFacetDemo.
+  DataTableExpand: 'rozie-data-table-expand',
+  DataTableGroup: 'rozie-data-table-group',
+  DataTableFacet: 'rozie-data-table-facet',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -1074,6 +1106,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableVirtualGrid: {},
   DataTableVirtualStickySelect: {},
   DataTableVirtualWarn: {},
+  // Phase 50 round-out — all three behavioral demos are self-contained: each seeds its
+  // own rows + readouts in <data> and mounts the DataTable inline with its props. No
+  // parent-supplied props.
+  DataTableExpand: {},
+  DataTableGroup: {},
+  DataTableFacet: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
