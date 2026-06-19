@@ -136,6 +136,107 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Expandable rows (`#detail` slot + nested sub-rows)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  // bind:expanded keeps MULTIPLE rows open; getSubRows yields depth-indented child rows.
+  let expanded = $state<Record<string, boolean>>({});
+  const getSubRows = (row: { children?: unknown[] }) => row.children;
+</script>
+
+<DataTable data={rows} expandable bind:expanded {getSubRows}>
+  <Column field="name" header="Name" />
+  <Column field="headcount" header="Headcount" />
+
+  <!-- The #detail scoped slot is a snippet on Svelte; it renders under each open row. -->
+  {#snippet detail({ row })}
+    <aside class="detail">More about {row.name}</aside>
+  {/snippet}
+</DataTable>
+```
+
+### Grouping + aggregation (headless `#groupBar`)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  let grouping = $state<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+</script>
+
+<!-- groupable enables grouping; the model is an ORDERED column-id list; the event is
+     `group-change` → ongroupchange. aggregationFn rolls leaf values into the group header. -->
+<DataTable data={rows} groupable bind:grouping ongroupchange={(g) => console.log('grouping', g)}>
+  <Column field="region" header="Region" />
+  <Column field="category" header="Category" />
+  <Column field="units" header="Units" aggregationFn="sum" />
+  <Column field="score" header="Score" aggregationFn={scoreRange} />
+
+  <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+  {#snippet groupBar({ grouping, groupableColumns, applyGrouping, clearGrouping })}
+    <div class="group-bar">
+      <button type="button" onclick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+      <button type="button" onclick={() => clearGrouping()}>Clear</button>
+      <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+    </div>
+  {/snippet}
+</DataTable>
+```
+
+### Faceted filtering exposure (headless `#filter`)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  let columnFilters = $state<{ id: string; value: unknown }[]>([]);
+</script>
+
+<DataTable data={rows} bind:columnFilters>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  {#snippet filter({ columnId, uniqueValues, minMax })}
+    {#if columnId === 'category'}
+      <fieldset>
+        {#each uniqueValues as v}<label><input type="checkbox" /> {v}</label>{/each}
+      </fieldset>
+    {:else}
+      <input type="range" min={minMax[0]} max={minMax[1]} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -235,11 +336,16 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 <button onclick={() => tbl.clearSelection()}>Clear</button>
 <button onclick={() => tbl.editRow(0)}>Edit row 0</button>
 <button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>
+<button onclick={() => tbl.expandAll()}>Expand all</button>
+<button onclick={() => tbl.applyGrouping(['region'])}>Group by region</button>
+<button onclick={() => console.log(tbl.getFacetedUniqueValues('category'))}>Facet keys</button>
 ```
 
 ## Slots
 
 All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
+
+The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
 | Slot | Params |
 | --- | --- |

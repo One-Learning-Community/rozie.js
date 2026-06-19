@@ -137,6 +137,105 @@ render(html`
 `, document.body);
 ```
 
+### Expandable rows (`#detail` slot + nested sub-rows)
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+
+// expandable opts in; listen for `expand-change`; getSubRows yields depth-indented nested
+// rows; the #detail scoped slot is the `.detail` property (a function returning a template).
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    expandable
+    .getSubRows=${(row: { children?: unknown[] }) => row.children}
+    .detail=${({ row }) => html`<aside class="detail">More about ${row.name}</aside>`}
+    @expand-change=${(e: CustomEvent) => console.log('expanded', e.detail)}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="headcount" header="Headcount"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+### Grouping + aggregation (headless `#groupBar`)
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+  const v = leafRows.map((r) => Number(r.getValue(columnId)));
+  return v.length ? Math.max(...v) - Math.min(...v) : 0;
+};
+
+// groupable enables grouping; listen for `group-change`; #groupBar is the headless
+// `.groupBar` property (NO built-in drag UI) — build the bar from its props.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    groupable
+    @group-change=${(e: CustomEvent) => console.log('grouping', e.detail)}
+    .groupBar=${({ grouping, groupableColumns, applyGrouping, clearGrouping }) => html`
+      <div>
+        <button @click=${() => applyGrouping(['region', 'category'])}>Group region → category</button>
+        <button @click=${() => clearGrouping()}>Clear</button>
+        <span>${grouping.join(' → ') || 'ungrouped'} (${groupableColumns.length} groupable)</span>
+      </div>`}
+  >
+    <rozie-column field="region" header="Region"></rozie-column>
+    <rozie-column field="category" header="Category"></rozie-column>
+    <rozie-column field="units" header="Units" .aggregationFn=${'sum'}></rozie-column>
+    <rozie-column field="score" header="Score" .aggregationFn=${scoreRange}></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+### Faceted filtering exposure (headless `#filter`)
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+
+// Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot is the
+// `.filter` property; it receives `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    .filter=${({ columnId, uniqueValues, minMax }) =>
+      columnId === 'category'
+        ? html`<fieldset>${uniqueValues.map((v) => html`<label><input type="checkbox" /> ${v}</label>`)}</fieldset>`
+        : html`<input type="range" min=${minMax?.[0]} max=${minMax?.[1]} />`}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -235,11 +334,16 @@ el.toggleAllRows(true);
 const selected = el.getSelectedRows();
 el.editRow(0);                       // full-row edit on row 0
 const range = el.getSelectedRange();  // the active cell-range rectangle
+el.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+el.applyGrouping(['region']);        // clearGrouping to reset
+const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too
 ```
 
 ## Slots
 
 All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
+
+The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
 | Slot | Params |
 | --- | --- |

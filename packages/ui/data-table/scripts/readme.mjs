@@ -90,6 +90,9 @@ const SET_A_TITLE = 'Columns as a config array';
 const SET_B_TITLE = 'Declarative `<Column>` children + a custom cell';
 const SET_C_TITLE = 'Virtualized rows (windowing)';
 const SET_D_TITLE = 'Editable cells (inline edit + validation)';
+const SET_E_TITLE = 'Expandable rows (`#detail` slot + nested sub-rows)';
+const SET_F_TITLE = 'Grouping + aggregation (headless `#groupBar`)';
+const SET_G_TITLE = 'Faceted filtering exposure (headless `#filter`)';
 
 // Editing example dataset — one field per built-in editor type (text/number/select/
 // checkbox) + the `score` field routed through the custom `#editor` scoped slot. The
@@ -113,6 +116,36 @@ const MANY_ROWS = `Array.from({ length: 10_000 }, (_, i) => ({
     email: \`user\${i + 1}@example.com\`,
     status: i % 2 ? 'active' : 'away',
   }))`;
+
+// Hierarchical dataset for the expandable-rows example: each top-level row carries a
+// \`children\` array of same-shape sub-rows — \`getSubRows\` turns them into depth-indented
+// nested rows; the \`#detail\` scoped slot renders an arbitrary panel under any open row.
+const TREE_ROWS = `[
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ]`;
+
+// Grouping/aggregation dataset: two groupable string columns (region, category) and two
+// numeric columns (units → built-in \`sum\`; score → a custom range aggregation).
+const GROUP_ROWS = `[
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ]`;
+
+// Faceting dataset: one category column (distinct keys Hardware/Software/Service) + one
+// numeric column (price, range 10..90). The #filter slot exposes the cross-filtered keys
+// + [min,max] so a consumer builds the checkbox list / range slider — NO built-in control.
+const FACET_ROWS = `[
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ]`;
 
 export const USAGE = {
   react: [
@@ -220,6 +253,114 @@ export function Demo() {
       <Column field="status" header="Status" editable editor="select" editorOptions={${STATUS_OPTIONS}} />
       <Column field="active" header="Active" editable editor="checkbox" />
       <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}`,
+    },
+    {
+      title: SET_E_TITLE,
+      lang: 'tsx',
+      code: `import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // \`expandable\` opts the table into getExpandedRowModel + the auto-injected chevron
+  // column. \`getSubRows\` yields depth-indented child rows; the #detail slot renders an
+  // arbitrary panel under any open row. The two-way \`expanded\` set keeps MULTIPLE rows open.
+  const rows = ${TREE_ROWS};
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded}
+      onExpandChange={setExpanded}             // the event is \`expand-change\` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows (pattern b)
+      // The #detail scoped slot is a render prop on React (the documented edge).
+      renderDetail={({ row }) => <aside className="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'tsx',
+      code: `import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // \`groupable\` enables getGroupedRowModel. The \`grouping\` model is an ORDERED column-id
+  // list (multi-column → nested groups). Per-column \`aggregationFn\` rolls leaf values up
+  // into the group-header row (a built-in name OR a custom fn). #groupBar is HEADLESS —
+  // you build the bar from its props; the component ships NO drag UI (D-02 retired).
+  const rows = ${GROUP_ROWS};
+  const [grouping, setGrouping] = useState<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping}
+      onGroupChange={setGrouping}              // the event is \`group-change\` → onGroupChange
+      // The #groupBar scoped slot is a render prop on React (the documented edge).
+      renderGroupBar={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'tsx',
+      code: `import { useRef, useState } from 'react';
+import { DataTable, Column, type DataTableHandle } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only: NO event, NO built-in facet control. The #filter
+  // scoped slot hands you the cross-filtered \`uniqueValues\` (keys only) + numeric \`minMax\`;
+  // you build the checkbox list / range slider and drive \`columnFilters\`. The
+  // getFacetedUniqueValues / getFacetedMinMaxValues handle verbs read the same data back.
+  const rows = ${FACET_ROWS};
+  const [columnFilters, setColumnFilters] = useState<{ id: string; value: unknown }[]>([]);
+  const tbl = useRef<DataTableHandle>(null);
+  return (
+    <DataTable
+      ref={tbl}
+      data={rows}
+      columnFilters={columnFilters}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on React (the documented edge).
+      renderFilter={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => (
+              <label key={String(v)}><input type="checkbox" /> {String(v)}</label>
+            ))}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
     </DataTable>
   );
 }`,
@@ -335,6 +476,96 @@ const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
   </DataTable>
 </template>`,
     },
+    {
+      title: SET_E_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = ${TREE_ROWS};
+const expanded = ref<Record<string, boolean>>({});
+const getSubRows = (row: { children?: unknown[] }) => row.children;
+</script>
+
+<template>
+  <!-- expandable opts in; v-model:expanded keeps MULTIPLE rows open; getSubRows yields
+       depth-indented child rows; the #detail scoped slot renders a panel under each open row. -->
+  <DataTable :data="rows" :expandable="true" v-model:expanded="expanded" :getSubRows="getSubRows">
+    <Column field="name" header="Name" />
+    <Column field="headcount" header="Headcount" />
+
+    <template #detail="{ row }">
+      <aside class="detail">More about {{ row.name }}</aside>
+    </template>
+  </DataTable>
+</template>`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = ${GROUP_ROWS};
+const grouping = ref<string[]>([]);
+// A custom per-column aggregation (range = max − min) over the group's leaf rows.
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+  const v = leafRows.map((r) => Number(r.getValue(columnId)));
+  return v.length ? Math.max(...v) - Math.min(...v) : 0;
+};
+</script>
+
+<template>
+  <!-- groupable enables grouping; the model is an ORDERED column-id list; aggregationFn
+       rolls leaf values into the group header. The event is \`group-change\`. -->
+  <DataTable :data="rows" :groupable="true" v-model:grouping="grouping" @group-change="(g) => console.log('grouping', g)">
+    <Column field="region" header="Region" />
+    <Column field="category" header="Category" />
+    <Column field="units" header="Units" aggregationFn="sum" />
+    <Column field="score" header="Score" :aggregationFn="scoreRange" />
+
+    <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+    <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+      <div class="group-bar">
+        <button type="button" @click="applyGrouping(['region', 'category'])">Group region → category</button>
+        <button type="button" @click="clearGrouping()">Clear</button>
+        <span>{{ grouping.join(' → ') || 'ungrouped' }} ({{ groupableColumns.length }} groupable)</span>
+      </div>
+    </template>
+  </DataTable>
+</template>`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = ${FACET_ROWS};
+const columnFilters = ref<{ id: string; value: unknown }[]>([]);
+</script>
+
+<template>
+  <!-- Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+       hands you \`uniqueValues\` (keys, cross-filtered) + numeric \`minMax\`; build the UI and
+       drive v-model:columnFilters. -->
+  <DataTable :data="rows" v-model:columnFilters="columnFilters">
+    <Column field="name" header="Name" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" :filterable="true" />
+
+    <template #filter="{ columnId, uniqueValues, minMax }">
+      <fieldset v-if="columnId === 'category'">
+        <label v-for="v in uniqueValues" :key="v"><input type="checkbox" /> {{ v }}</label>
+      </fieldset>
+      <input v-else type="range" :min="minMax[0]" :max="minMax[1]" />
+    </template>
+  </DataTable>
+</template>`,
+    },
   ],
   svelte: [
     {
@@ -427,6 +658,88 @@ const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
         <button type="button" onclick={() => commit(Number(value) + 1)}>+</button>
         <button type="button" onclick={() => cancel()}>esc</button>
       </span>
+    {/if}
+  {/snippet}
+</DataTable>`,
+    },
+    {
+      title: SET_E_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = ${TREE_ROWS};
+  // bind:expanded keeps MULTIPLE rows open; getSubRows yields depth-indented child rows.
+  let expanded = $state<Record<string, boolean>>({});
+  const getSubRows = (row: { children?: unknown[] }) => row.children;
+</script>
+
+<DataTable data={rows} expandable bind:expanded {getSubRows}>
+  <Column field="name" header="Name" />
+  <Column field="headcount" header="Headcount" />
+
+  <!-- The #detail scoped slot is a snippet on Svelte; it renders under each open row. -->
+  {#snippet detail({ row })}
+    <aside class="detail">More about {row.name}</aside>
+  {/snippet}
+</DataTable>`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = ${GROUP_ROWS};
+  let grouping = $state<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+</script>
+
+<!-- groupable enables grouping; the model is an ORDERED column-id list; the event is
+     \`group-change\` → ongroupchange. aggregationFn rolls leaf values into the group header. -->
+<DataTable data={rows} groupable bind:grouping ongroupchange={(g) => console.log('grouping', g)}>
+  <Column field="region" header="Region" />
+  <Column field="category" header="Category" />
+  <Column field="units" header="Units" aggregationFn="sum" />
+  <Column field="score" header="Score" aggregationFn={scoreRange} />
+
+  <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+  {#snippet groupBar({ grouping, groupableColumns, applyGrouping, clearGrouping })}
+    <div class="group-bar">
+      <button type="button" onclick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+      <button type="button" onclick={() => clearGrouping()}>Clear</button>
+      <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+    </div>
+  {/snippet}
+</DataTable>`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you \`uniqueValues\` (keys, cross-filtered) + numeric \`minMax\`.
+  const rows = ${FACET_ROWS};
+  let columnFilters = $state<{ id: string; value: unknown }[]>([]);
+</script>
+
+<DataTable data={rows} bind:columnFilters>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  {#snippet filter({ columnId, uniqueValues, minMax })}
+    {#if columnId === 'category'}
+      <fieldset>
+        {#each uniqueValues as v}<label><input type="checkbox" /> {v}</label>{/each}
+      </fieldset>
+    {:else}
+      <input type="range" min={minMax[0]} max={minMax[1]} />
     {/if}
   {/snippet}
 </DataTable>`,
@@ -566,6 +879,110 @@ export class DemoComponent {
   onRowCommit(p: unknown) { console.log('row commit', p); }
 }`,
     },
+    {
+      title: SET_E_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: \`
+    <!-- expandable opts in; [(expanded)] keeps MULTIPLE rows open; getSubRows yields nested rows. -->
+    <DataTable [data]="rows" [expandable]="true" [(expanded)]="expanded" [getSubRows]="getSubRows">
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+
+      <!-- The #detail scoped slot is an ng-template receiving { row }. -->
+      <ng-template #detail let-row="row">
+        <aside class="detail">More about {{ row.name }}</aside>
+      </ng-template>
+    </DataTable>
+  \`,
+})
+export class DemoComponent {
+  rows = ${TREE_ROWS};
+  expanded: Record<string, boolean> = {};
+  getSubRows = (row: { children?: unknown[] }) => row.children;
+}`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: \`
+    <!-- groupable enables grouping; [(grouping)] is an ORDERED column-id list; the event
+         is \`group-change\`. aggregationFn rolls leaf values into the group header. -->
+    <DataTable [data]="rows" [groupable]="true" [(grouping)]="grouping" (group-change)="onGroupChange($event)">
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" [aggregationFn]="scoreRange" />
+
+      <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+      <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
+        <div class="group-bar">
+          <button type="button" (click)="applyGrouping(['region', 'category'])">Group region → category</button>
+          <button type="button" (click)="clearGrouping()">Clear</button>
+          <span>{{ grouping.join(' → ') || 'ungrouped' }} ({{ groupableColumns.length }} groupable)</span>
+        </div>
+      </ng-template>
+    </DataTable>
+  \`,
+})
+export class DemoComponent {
+  rows = ${GROUP_ROWS};
+  grouping: string[] = [];
+  scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  onGroupChange(g: string[]) { console.log('grouping', g); }
+}`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: \`
+    <!-- Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+         hands you \`uniqueValues\` (keys, cross-filtered) + numeric \`minMax\`. -->
+    <DataTable [data]="rows" [(columnFilters)]="columnFilters">
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" [filterable]="true" />
+
+      <ng-template #filter let-columnId="columnId" let-uniqueValues="uniqueValues" let-minMax="minMax">
+        @if (columnId === 'category') {
+          <fieldset>
+            @for (v of uniqueValues; track v) { <label><input type="checkbox" /> {{ v }}</label> }
+          </fieldset>
+        } @else {
+          <input type="range" [min]="minMax[0]" [max]="minMax[1]" />
+        }
+      </ng-template>
+    </DataTable>
+  \`,
+})
+export class DemoComponent {
+  rows = ${FACET_ROWS};
+  columnFilters: { id: string; value: unknown }[] = [];
+}`,
+    },
   ],
   solid: [
     {
@@ -670,6 +1087,105 @@ export function Demo() {
   );
 }`,
     },
+    {
+      title: SET_E_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // expandable opts in; the two-way \`expanded\` set keeps MULTIPLE rows open; getSubRows
+  // yields depth-indented child rows; the #detail slot renders a panel under any open row.
+  const rows = ${TREE_ROWS};
+  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded()}
+      onExpandChange={setExpanded}             // the event is \`expand-change\` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows
+      // The #detail scoped slot is a render prop on Solid (the documented edge).
+      detailSlot={({ row }) => <aside class="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // groupable enables grouping; the \`grouping\` model is an ORDERED column-id list;
+  // aggregationFn rolls leaf values into the group header. #groupBar is HEADLESS (no drag).
+  const rows = ${GROUP_ROWS};
+  const [grouping, setGrouping] = createSignal<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping()}
+      onGroupChange={setGrouping}              // the event is \`group-change\` → onGroupChange
+      // The #groupBar scoped slot is a render prop on Solid (the documented edge).
+      groupBarSlot={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you \`uniqueValues\` (keys, cross-filtered) + numeric \`minMax\`.
+  const rows = ${FACET_ROWS};
+  const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters()}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on Solid (the documented edge).
+      filterSlot={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => <label><input type="checkbox" /> {String(v)}</label>)}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}`,
+    },
   ],
   lit: [
     {
@@ -767,6 +1283,86 @@ render(html\`
   </rozie-data-table>
 \`, document.body);`,
     },
+    {
+      title: SET_E_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = ${TREE_ROWS};
+
+// expandable opts in; listen for \`expand-change\`; getSubRows yields depth-indented nested
+// rows; the #detail scoped slot is the \`.detail\` property (a function returning a template).
+render(html\`
+  <rozie-data-table
+    .data=\${rows}
+    expandable
+    .getSubRows=\${(row: { children?: unknown[] }) => row.children}
+    .detail=\${({ row }) => html\`<aside class="detail">More about \${row.name}</aside>\`}
+    @expand-change=\${(e: CustomEvent) => console.log('expanded', e.detail)}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="headcount" header="Headcount"></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
+    {
+      title: SET_F_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = ${GROUP_ROWS};
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+  const v = leafRows.map((r) => Number(r.getValue(columnId)));
+  return v.length ? Math.max(...v) - Math.min(...v) : 0;
+};
+
+// groupable enables grouping; listen for \`group-change\`; #groupBar is the headless
+// \`.groupBar\` property (NO built-in drag UI) — build the bar from its props.
+render(html\`
+  <rozie-data-table
+    .data=\${rows}
+    groupable
+    @group-change=\${(e: CustomEvent) => console.log('grouping', e.detail)}
+    .groupBar=\${({ grouping, groupableColumns, applyGrouping, clearGrouping }) => html\`
+      <div>
+        <button @click=\${() => applyGrouping(['region', 'category'])}>Group region → category</button>
+        <button @click=\${() => clearGrouping()}>Clear</button>
+        <span>\${grouping.join(' → ') || 'ungrouped'} (\${groupableColumns.length} groupable)</span>
+      </div>\`}
+  >
+    <rozie-column field="region" header="Region"></rozie-column>
+    <rozie-column field="category" header="Category"></rozie-column>
+    <rozie-column field="units" header="Units" .aggregationFn=\${'sum'}></rozie-column>
+    <rozie-column field="score" header="Score" .aggregationFn=\${scoreRange}></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
+    {
+      title: SET_G_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = ${FACET_ROWS};
+
+// Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot is the
+// \`.filter\` property; it receives \`uniqueValues\` (keys, cross-filtered) + numeric \`minMax\`.
+render(html\`
+  <rozie-data-table
+    .data=\${rows}
+    .filter=\${({ columnId, uniqueValues, minMax }) =>
+      columnId === 'category'
+        ? html\`<fieldset>\${uniqueValues.map((v) => html\`<label><input type="checkbox" /> \${v}</label>\`)}</fieldset>\`
+        : html\`<input type="range" min=\${minMax?.[0]} max=\${minMax?.[1]} />\`}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
   ],
 };
 
@@ -791,7 +1387,10 @@ const tbl = useRef<DataTableHandle>(null);
 tbl.current?.toggleAllRows(true);
 const selected = tbl.current?.getSelectedRows();
 tbl.current?.editRow(0);                       // full-row edit on row 0
-const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle`,
+const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle
+tbl.current?.expandAll();                      // open every expandable row (collapseAll / toggleRowExpanded / getExpandedRows)
+tbl.current?.applyGrouping(['region']);        // set grouping (clearGrouping to reset)
+const cats = tbl.current?.getFacetedUniqueValues('category'); // cross-filtered facet keys (getFacetedMinMaxValues too)`,
   },
   vue: {
     lang: 'vue',
@@ -805,6 +1404,9 @@ const tbl = ref();          // template ref
   <button @click="tbl.clearSelection()">Clear</button>
   <button @click="tbl.editRow(0)">Edit row 0</button>
   <button @click="console.log(tbl.getSelectedRange())">Read range</button>
+  <button @click="tbl.expandAll()">Expand all</button>
+  <button @click="tbl.applyGrouping(['region'])">Group by region</button>
+  <button @click="console.log(tbl.getFacetedUniqueValues('category'))">Facet keys</button>
 </template>`,
   },
   svelte: {
@@ -816,7 +1418,10 @@ const tbl = ref();          // template ref
 <DataTable bind:this={tbl} data={rows} />
 <button onclick={() => tbl.clearSelection()}>Clear</button>
 <button onclick={() => tbl.editRow(0)}>Edit row 0</button>
-<button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>`,
+<button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>
+<button onclick={() => tbl.expandAll()}>Expand all</button>
+<button onclick={() => tbl.applyGrouping(['region'])}>Group by region</button>
+<button onclick={() => console.log(tbl.getFacetedUniqueValues('category'))}>Facet keys</button>`,
   },
   angular: {
     lang: 'ts',
@@ -827,6 +1432,9 @@ export class DemoComponent {
   read() { return this.tbl.getSelectedRows(); }
   editFirstRow() { this.tbl.editRow(0); }            // full-row edit on row 0
   readRange() { return this.tbl.getSelectedRange(); } // the active cell-range rectangle
+  expandEverything() { this.tbl.expandAll(); }       // collapseAll / toggleRowExpanded / getExpandedRows
+  groupByRegion() { this.tbl.applyGrouping(['region']); } // clearGrouping to reset
+  facetKeys() { return this.tbl.getFacetedUniqueValues('category'); } // getFacetedMinMaxValues too
 }`,
   },
   solid: {
@@ -838,7 +1446,10 @@ let handle: DataTableHandle | undefined;
 <DataTable ref={(h) => (handle = h)} data={rows} />;
 handle?.toggleAllRows(true);
 handle?.editRow(0);                       // full-row edit on row 0
-const range = handle?.getSelectedRange(); // the active cell-range rectangle`,
+const range = handle?.getSelectedRange(); // the active cell-range rectangle
+handle?.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+handle?.applyGrouping(['region']);        // clearGrouping to reset
+const cats = handle?.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too`,
   },
   lit: {
     lang: 'ts',
@@ -848,7 +1459,10 @@ const el = document.querySelector('rozie-data-table');
 el.toggleAllRows(true);
 const selected = el.getSelectedRows();
 el.editRow(0);                       // full-row edit on row 0
-const range = el.getSelectedRange();  // the active cell-range rectangle`,
+const range = el.getSelectedRange();  // the active cell-range rectangle
+el.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+el.applyGrouping(['region']);        // clearGrouping to reset
+const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too`,
   },
 };
 
@@ -983,6 +1597,17 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / ' +
       '`renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / ' +
       '`.colHeader` properties — the documented cross-framework divergence.)',
+  );
+  lines.push('');
+  lines.push(
+    'The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) ' +
+      'scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / ' +
+      '`renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / ' +
+      '`filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the ' +
+      'documented React render-prop edge (per the cross-framework compatibility bar). On Vue / ' +
+      'Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). ' +
+      'The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / ' +
+      'facet control, so the consumer builds the UI purely from the exposed slot props.',
   );
   lines.push('');
   lines.push('| Slot | Params |');

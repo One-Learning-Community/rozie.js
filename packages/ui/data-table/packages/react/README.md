@@ -150,6 +150,133 @@ export function Demo() {
 }
 ```
 
+### Expandable rows (`#detail` slot + nested sub-rows)
+
+```tsx
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // `expandable` opts the table into getExpandedRowModel + the auto-injected chevron
+  // column. `getSubRows` yields depth-indented child rows; the #detail slot renders an
+  // arbitrary panel under any open row. The two-way `expanded` set keeps MULTIPLE rows open.
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded}
+      onExpandChange={setExpanded}             // the event is `expand-change` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows (pattern b)
+      // The #detail scoped slot is a render prop on React (the documented edge).
+      renderDetail={({ row }) => <aside className="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}
+```
+
+### Grouping + aggregation (headless `#groupBar`)
+
+```tsx
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // `groupable` enables getGroupedRowModel. The `grouping` model is an ORDERED column-id
+  // list (multi-column → nested groups). Per-column `aggregationFn` rolls leaf values up
+  // into the group-header row (a built-in name OR a custom fn). #groupBar is HEADLESS —
+  // you build the bar from its props; the component ships NO drag UI (D-02 retired).
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = useState<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping}
+      onGroupChange={setGrouping}              // the event is `group-change` → onGroupChange
+      // The #groupBar scoped slot is a render prop on React (the documented edge).
+      renderGroupBar={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}
+```
+
+### Faceted filtering exposure (headless `#filter`)
+
+```tsx
+import { useRef, useState } from 'react';
+import { DataTable, Column, type DataTableHandle } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only: NO event, NO built-in facet control. The #filter
+  // scoped slot hands you the cross-filtered `uniqueValues` (keys only) + numeric `minMax`;
+  // you build the checkbox list / range slider and drive `columnFilters`. The
+  // getFacetedUniqueValues / getFacetedMinMaxValues handle verbs read the same data back.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = useState<{ id: string; value: unknown }[]>([]);
+  const tbl = useRef<DataTableHandle>(null);
+  return (
+    <DataTable
+      ref={tbl}
+      data={rows}
+      columnFilters={columnFilters}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on React (the documented edge).
+      renderFilter={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => (
+              <label key={String(v)}><input type="checkbox" /> {String(v)}</label>
+            ))}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -250,11 +377,16 @@ tbl.current?.toggleAllRows(true);
 const selected = tbl.current?.getSelectedRows();
 tbl.current?.editRow(0);                       // full-row edit on row 0
 const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle
+tbl.current?.expandAll();                      // open every expandable row (collapseAll / toggleRowExpanded / getExpandedRows)
+tbl.current?.applyGrouping(['region']);        // set grouping (clearGrouping to reset)
+const cats = tbl.current?.getFacetedUniqueValues('category'); // cross-filtered facet keys (getFacetedMinMaxValues too)
 ```
 
 ## Slots
 
 All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
+
+The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
 | Slot | Params |
 | --- | --- |

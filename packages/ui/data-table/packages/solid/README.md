@@ -144,6 +144,124 @@ export function Demo() {
 }
 ```
 
+### Expandable rows (`#detail` slot + nested sub-rows)
+
+```tsx
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // expandable opts in; the two-way `expanded` set keeps MULTIPLE rows open; getSubRows
+  // yields depth-indented child rows; the #detail slot renders a panel under any open row.
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded()}
+      onExpandChange={setExpanded}             // the event is `expand-change` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows
+      // The #detail scoped slot is a render prop on Solid (the documented edge).
+      detailSlot={({ row }) => <aside class="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}
+```
+
+### Grouping + aggregation (headless `#groupBar`)
+
+```tsx
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // groupable enables grouping; the `grouping` model is an ORDERED column-id list;
+  // aggregationFn rolls leaf values into the group header. #groupBar is HEADLESS (no drag).
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = createSignal<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping()}
+      onGroupChange={setGrouping}              // the event is `group-change` → onGroupChange
+      // The #groupBar scoped slot is a render prop on Solid (the documented edge).
+      groupBarSlot={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}
+```
+
+### Faceted filtering exposure (headless `#filter`)
+
+```tsx
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters()}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on Solid (the documented edge).
+      filterSlot={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => <label><input type="checkbox" /> {String(v)}</label>)}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -243,11 +361,16 @@ let handle: DataTableHandle | undefined;
 handle?.toggleAllRows(true);
 handle?.editRow(0);                       // full-row edit on row 0
 const range = handle?.getSelectedRange(); // the active cell-range rectangle
+handle?.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+handle?.applyGrouping(['region']);        // clearGrouping to reset
+const cats = handle?.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too
 ```
 
 ## Slots
 
 All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metadata only). The `cell` / `colHeader` slots are single renderers dispatched by `columnId` — switch on it to vary the render per column; a column the slot does not render shows the plain accessor value. (On React/Solid these are render-prop props — `renderCell` / `renderColHeader` / `cellSlot` / `colHeaderSlot`; on Lit they are the `.cell` / `.colHeader` properties — the documented cross-framework divergence.)
+
+The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filtering) scoped slots follow the SAME render-prop convention: on React they are `renderDetail` / `renderGroupBar` / `renderFilter`; on Solid they are `detailSlot` / `groupBarSlot` / `filterSlot`; on Lit they are the `.detail` / `.groupBar` / `.filter` properties — the documented React render-prop edge (per the cross-framework compatibility bar). On Vue / Svelte / Angular they are ordinary named scoped slots (`#detail` / `#groupBar` / `#filter`). The `groupBar` and `filter` slots are HEADLESS — the component ships NO built-in group-bar / facet control, so the consumer builds the UI purely from the exposed slot props.
 
 | Slot | Params |
 | --- | --- |
