@@ -4,7 +4,14 @@ import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signa
 import { createLitControllableProperty, rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
+// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -42,6 +49,12 @@ interface RozieColHeaderSlotCtx {
   columnId: unknown;
   column: unknown;
   label: unknown;
+}
+
+interface RozieFilterSlotCtx {
+  columnId: unknown;
+  uniqueValues: unknown;
+  minMax: unknown;
 }
 
 interface RozieSelectCellSlotCtx {
@@ -449,6 +462,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotColHeader = false;
   @queryAssignedElements({ slot: 'colHeader', flatten: true }) private _slotColHeaderElements!: Element[];
   @property({ attribute: false }) colHeader?: (scope: { columnId: unknown; column: unknown; label: unknown }) => unknown;
+  @state() private _hasSlotFilter = false;
+  @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
+  @property({ attribute: false }) filter?: (scope: { columnId: unknown; uniqueValues: unknown; minMax: unknown }) => unknown;
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
   @property({ attribute: false }) selectCell?: (scope: { row: unknown; checked: unknown; toggle: unknown }) => unknown;
@@ -513,6 +529,17 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="filter"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotFilter = this._slotFilterElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="selectCell"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotSelectCell = this._slotSelectCellElements.length > 0; };
@@ -563,6 +590,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotGroupBar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupBar');
     this._hasSlotSelectAll = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectAll');
     this._hasSlotColHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'colHeader');
+    this._hasSlotFilter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'filter');
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
     this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
@@ -645,6 +673,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
       getGroupedRowModel: getGroupedRowModel(),
       onGroupingChange: this.onGroupingChangeCb,
+      // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
+      // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
+      // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
+      // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      getFacetedMinMaxValues: getFacetedMinMaxValues(),
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -882,7 +917,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             <span class="rdt-header-label" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
-          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
+          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
+          </span>` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
             <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
             <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
             <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button>
@@ -941,7 +978,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             <span class="rdt-header-label" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
-          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
+          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
+          </span>` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
             <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
             <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
             <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button>
@@ -1659,6 +1698,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // fresh currentState each cycle, F6).
     getGroupedRowModel: getGroupedRowModel(),
     onGroupingChange: this.onGroupingChangeCb,
+    // Re-pass the 3 faceted models (Pitfall 4 — setOptions REPLACES, so an omitted fn would
+    // drop the model on re-feed; on React the faceted closures must re-capture so exposed
+    // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: this.onSortingChangeCb,
@@ -3454,6 +3499,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   clearGrouping = () => {
   if (this.table) this.table.setGrouping([]);
+};
+
+  facetedUniqueValuesFor = (colId: any) => {
+  if (this.tick() < 0 || !this.table) return [];
+  const col = this.table.getColumn(colId);
+  if (!col || !col.getFacetedUniqueValues) return [];
+  const map = col.getFacetedUniqueValues(); // Map<any, number>
+  return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
+};
+
+  facetedMinMaxFor = (colId: any) => {
+  if (this.tick() < 0 || !this.table) return null;
+  const col = this.table.getColumn(colId);
+  if (!col || !col.getFacetedMinMaxValues) return null;
+  return col.getFacetedMinMaxValues() || null; // [number, number] | null
 };
 
   get data(): any[] { return this._dataControllable.read(); }

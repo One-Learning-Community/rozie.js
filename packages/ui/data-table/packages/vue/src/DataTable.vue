@@ -41,7 +41,9 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
+          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
+            <slot name="filter" :columnId="header.column.id" :uniqueValues="facetedUniqueValuesFor(header.column.id)" :minMax="facetedMinMaxFor(header.column.id)"></slot>
+          </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
             <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">⇔</button>
             <button type="button" class="rdt-pin-btn rdt-pin-right" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">⇥</button>
@@ -100,7 +102,9 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
+          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
+            <slot name="filter" :columnId="header.column.id" :uniqueValues="facetedUniqueValuesFor(header.column.id)" :minMax="facetedMinMaxFor(header.column.id)"></slot>
+          </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
             <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">⇔</button>
             <button type="button" class="rdt-pin-btn rdt-pin-right" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">⇥</button>
@@ -210,12 +214,14 @@ defineSlots<{
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
+  filter(props: { columnId: any; uniqueValues: any; minMax: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
+  filter(props: { columnId: any; uniqueValues: any; minMax: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
@@ -273,7 +279,14 @@ const pasteAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
+// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -1326,6 +1339,12 @@ const reFeed = () => {
     // fresh currentState each cycle, F6).
     getGroupedRowModel: getGroupedRowModel(),
     onGroupingChange: onGroupingChangeCb,
+    // Re-pass the 3 faceted models (Pitfall 4 — setOptions REPLACES, so an omitted fn would
+    // drop the model on re-feed; on React the faceted closures must re-capture so exposed
+    // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
@@ -4161,6 +4180,44 @@ const clearGrouping = () => {
   if (table) table.setGrouping([]);
 };
 
+// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
+// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
+// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
+// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
+// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
+// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
+// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
+//
+// facetedUniqueValuesFor: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; getFacetedUniqueValues() returns Map<any,number>, we return
+// Array.from(map.keys()) — no .entries()/count surface). Empty array on missing column/table.
+// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
+// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
+// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
+// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
+// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
+// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
+// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
+//
+// facetedUniqueValuesFor: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; getFacetedUniqueValues() returns Map<any,number>, we return
+// Array.from(map.keys()) — no .entries()/count surface). Empty array on missing column/table.
+const facetedUniqueValuesFor = (colId: any) => {
+  if (tick() < 0 || !table) return [];
+  const col = table.getColumn(colId);
+  if (!col || !col.getFacetedUniqueValues) return [];
+  const map = col.getFacetedUniqueValues(); // Map<any, number>
+  return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
+};
+// facetedMinMaxFor: the column's [min, max] numeric range, or null when unavailable.
+// facetedMinMaxFor: the column's [min, max] numeric range, or null when unavailable.
+const facetedMinMaxFor = (colId: any) => {
+  if (tick() < 0 || !table) return null;
+  const col = table.getColumn(colId);
+  if (!col || !col.getFacetedMinMaxValues) return null;
+  return col.getFacetedMinMaxValues() || null; // [number, number] | null
+};
+
 provide('data-table:columns', {
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -4223,6 +4280,13 @@ onMounted(() => {
     // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
     getGroupedRowModel: getGroupedRowModel(),
     onGroupingChange: onGroupingChangeCb,
+    // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
+    // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
+    // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
+    // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -4380,7 +4444,7 @@ data.value, dataDefault.value, colReg.value], () => {
   reFeed();
 });
 
-defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
 </script>
 
 <style scoped>

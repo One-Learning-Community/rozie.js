@@ -69,12 +69,14 @@ export interface DataTableProps {
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
+  renderFilter?: (params: { columnId: unknown; uniqueValues: unknown; minMax: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
+  renderFilter?: (params: { columnId: unknown; uniqueValues: unknown; minMax: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
@@ -92,6 +94,8 @@ export interface DataTableHandle {
   getExpandedRows: (...args: any[]) => any;
   applyGrouping: (...args: any[]) => any;
   clearGrouping: (...args: any[]) => any;
+  getFacetedUniqueValues: (...args: any[]) => any;
+  getFacetedMinMaxValues: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;

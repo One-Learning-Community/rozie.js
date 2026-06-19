@@ -1,7 +1,14 @@
 import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
+// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -51,6 +58,13 @@ interface ColHeaderCtx {
   label: any;
 }
 
+interface FilterCtx {
+  $implicit: { columnId: any; uniqueValues: any; minMax: any };
+  columnId: any;
+  uniqueValues: any;
+  minMax: any;
+}
+
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
@@ -95,6 +109,13 @@ interface ColHeaderCtx {
   columnId: any;
   column: any;
   label: any;
+}
+
+interface FilterCtx {
+  $implicit: { columnId: any; uniqueValues: any; minMax: any };
+  columnId: any;
+  uniqueValues: any;
+  minMax: any;
 }
 
 interface SelectCellCtx {
@@ -258,6 +279,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
               </span>
     }@if (columnIsFilterable(header.column.id)) {
     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+    }@if (columnIsFilterable(header.column.id)) {
+    <span style="display:contents">
+                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) }, columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) }" />
+              </span>
     }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
                 <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">⇤</button>
                 <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">⇔</button>
@@ -379,6 +404,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
               </span>
     }@if (columnIsFilterable(header.column.id)) {
     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+    }@if (columnIsFilterable(header.column.id)) {
+    <span style="display:contents">
+                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) }, columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) }" />
+              </span>
     }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
                 <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">⇤</button>
                 <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">⇔</button>
@@ -859,12 +888,14 @@ export class DataTable {
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
@@ -948,6 +979,13 @@ export class DataTable {
       // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
       getGroupedRowModel: getGroupedRowModel(),
       onGroupingChange: this.onGroupingChangeCb,
+      // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
+      // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
+      // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
+      // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      getFacetedMinMaxValues: getFacetedMinMaxValues(),
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -1652,6 +1690,12 @@ export class DataTable {
       // fresh currentState each cycle, F6).
       getGroupedRowModel: getGroupedRowModel(),
       onGroupingChange: this.onGroupingChangeCb,
+      // Re-pass the 3 faceted models (Pitfall 4 — setOptions REPLACES, so an omitted fn would
+      // drop the model on re-feed; on React the faceted closures must re-capture so exposed
+      // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      getFacetedMinMaxValues: getFacetedMinMaxValues(),
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: this.onSortingChangeCb,
@@ -3259,11 +3303,24 @@ export class DataTable {
   clearGrouping = () => {
     if (this.table) this.table.setGrouping([]);
   };
+  facetedUniqueValuesFor = (colId: any) => {
+    if (this.tick() < 0 || !this.table) return [];
+    const col = this.table.getColumn(colId);
+    if (!col || !col.getFacetedUniqueValues) return [];
+    const map = col.getFacetedUniqueValues(); // Map<any, number>
+    return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
+  };
+  facetedMinMaxFor = (colId: any) => {
+    if (this.tick() < 0 || !this.table) return null;
+    const col = this.table.getColumn(colId);
+    if (!col || !col.getFacetedMinMaxValues) return null;
+    return col.getFacetedMinMaxValues() || null; // [number, number] | null
+  };
 
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | EditorCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | CellCtx | EditorCtx | CellCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | EditorCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | CellCtx | DetailCtx {
     return true;
   }
 

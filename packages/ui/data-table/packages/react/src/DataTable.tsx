@@ -2,7 +2,14 @@ import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useR
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
+// Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+// (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+// getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+// getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+// box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+// ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -26,6 +33,8 @@ interface GroupBarCtx { grouping: any; groupableColumns: any; applyGrouping: any
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderCtx { columnId: any; column: any; label: any; }
+
+interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; }
 
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
@@ -101,6 +110,7 @@ interface DataTableProps {
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
+  renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
@@ -117,6 +127,8 @@ export interface DataTableHandle {
   getExpandedRows: (...args: any[]) => any;
   applyGrouping: (...args: any[]) => any;
   clearGrouping: (...args: any[]) => any;
+  getFacetedUniqueValues: (...args: any[]) => any;
+  getFacetedMinMaxValues: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;
@@ -872,6 +884,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // fresh currentState each cycle, F6).
       getGroupedRowModel: getGroupedRowModel(),
       onGroupingChange: onGroupingChangeCb,
+      // Re-pass the 3 faceted models (Pitfall 4 — setOptions REPLACES, so an omitted fn would
+      // drop the model on re-feed; on React the faceted closures must re-capture so exposed
+      // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      getFacetedMinMaxValues: getFacetedMinMaxValues(),
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: onSortingChangeCb,
@@ -2570,6 +2588,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function clearGrouping() {
     if (table.current) table.current.setGrouping([]);
   }
+  function facetedUniqueValuesFor(colId: any) {
+    if (tick() < 0 || !table.current) return [];
+    const col = table.current.getColumn(colId);
+    if (!col || !col.getFacetedUniqueValues) return [];
+    const map = col.getFacetedUniqueValues(); // Map<any, number>
+    return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
+  }
+  function facetedMinMaxFor(colId: any) {
+    if (tick() < 0 || !table.current) return null;
+    const col = table.current.getColumn(colId);
+    if (!col || !col.getFacetedMinMaxValues) return null;
+    return col.getFacetedMinMaxValues() || null; // [number, number] | null
+  }
 
   useEffect(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -2613,6 +2644,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
       getGroupedRowModel: getGroupedRowModel(),
       onGroupingChange: onGroupingChangeCb,
+      // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
+      // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
+      // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
+      // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      getFacetedMinMaxValues: getFacetedMinMaxValues(),
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -2766,9 +2804,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     reFeed();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.expandable, props.groupable, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
-  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange };
-  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => _rozieExposeRef.current.applyGrouping(...args), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => _rozieExposeRef.current.clearGrouping(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
+  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
+  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange };
+  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => _rozieExposeRef.current.applyGrouping(...args), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => _rozieExposeRef.current.clearGrouping(...args), getFacetedUniqueValues: (...args: Parameters<typeof getFacetedUniqueValues>): ReturnType<typeof getFacetedUniqueValues> => _rozieExposeRef.current.getFacetedUniqueValues(...args), getFacetedMinMaxValues: (...args: Parameters<typeof getFacetedMinMaxValues>): ReturnType<typeof getFacetedMinMaxValues> => _rozieExposeRef.current.getFacetedMinMaxValues(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
 
   return (
     <__ctx_data_table_columns.Provider value={{
@@ -2829,7 +2867,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
-              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
+              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) })}
+              </span>}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
                 <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">⇥</button>
@@ -2884,7 +2924,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
-              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
+              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) })}
+              </span>}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
                 <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">⇥</button>
