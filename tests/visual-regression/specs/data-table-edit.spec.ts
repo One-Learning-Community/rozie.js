@@ -304,6 +304,87 @@ async function commitCount(page: Page): Promise<number> {
   });
 }
 
+/** The number of open built-in editors ([data-editing-cell]) in the grid (shadow-pierced). In
+ *  full-row mode every BUILT-IN editable cell of the active row is open at once; the custom
+ *  #editor `score` column renders the stepped slot instead (counted separately). */
+async function editingCellCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const out: Element[] = [];
+    const walk = (root: Document | ShadowRoot): void => {
+      out.push(...Array.from(root.querySelectorAll('[data-editing-cell]')));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return out.length;
+  });
+}
+
+/** The [data-col-index] of every open built-in editor's owning cell, in DOM order
+ *  (shadow-pierced) — to assert editors land on the editable columns and not elsewhere. */
+async function editingColIndices(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: Element[] = [];
+    const walk = (root: Document | ShadowRoot): void => {
+      out.push(...Array.from(root.querySelectorAll('[data-editing-cell]')));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return out
+      .map((el) => {
+        const cell = el.closest('[data-grid-cell]');
+        return cell ? cell.getAttribute('data-col-index') : null;
+      })
+      .filter((c): c is string => c != null);
+  });
+}
+
+/** The row-commit-count readout (number of row-edit-commit emits, req-6). */
+async function rowCommitCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="row-commit-count"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? Number((el.textContent || '0').trim()) : -1;
+  });
+}
+
+/** The row-commit readout ("col=v;col=v" of the changed columns, sorted) for the last
+ *  row-edit-commit (req-6). */
+async function rowCommitReadout(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="row-commit-readout"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? (el.textContent || '').trim() : '';
+  });
+}
+
 /** The commit-readout ("columnId=newValue" of the last commit). */
 async function commitReadout(page: Page): Promise<string> {
   return page.evaluate(() => {
@@ -746,9 +827,103 @@ for (const target of TARGETS) {
   });
 
   // req-6 — full-row edit (Wave-(b), Plan 51-03). Drives DataTableEditDemo.
-  test.fixme(`data-table-edit [${target}]: Shift+F2 full-row edit commits/reverts as a unit (Plan 51-03)`, async () => {
-    // Pending Plan 51-03: Shift+F2 + the editRow verb enter every editable cell in the
-    // active row; one r-model:data write + one row-edit-commit; Escape reverts the row.
+  // Shift+F2 + the editRow verb enter every editable cell in the active row; one r-model:data
+  // write + one row-edit-commit; Escape reverts the row as a unit.
+  runnerFor(target)(`data-table-edit [${target}]: Shift+F2 + editRow verb full-row edit; one row-edit-commit; Escape reverts the row`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEdit&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table')).toBeVisible({ timeout: 15_000 });
+
+    // Columns: name(0,text) qty(1,number) status(2,select) active(3,checkbox) score(4,#editor
+    // custom slot). ALL FIVE are editable → full-row edit opens 4 built-in editors + the
+    // stepped #editor slot on `score`.
+
+    // ── Shift+F2 puts EVERY editable cell in the active row into edit at once. ────────────
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('Shift+F2');
+    // Four built-in editors mount (name/qty/status/active); the score column shows its
+    // stepped #editor slot instead (counted separately).
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(4);
+    expect(await stepEditorPresent(page)).toBe(true);
+    // The built-in editors land on the editable data columns (cols 0-3), not on any other.
+    {
+      const cols = (await editingColIndices(page)).sort();
+      expect(cols).toEqual(['0', '1', '2', '3']);
+    }
+
+    // Edit TWO cells in the row — name (col 0, text) and qty (col 1, number). Each editor
+    // writes its OWN rowDraft key (the shared single-cell draftValue is never used in row mode).
+    const nameEditor = mount.locator('[data-grid-cell][data-col-index="0"] [data-editing-cell]');
+    const qtyEditor = mount.locator('[data-grid-cell][data-col-index="1"] [data-editing-cell]');
+    await nameEditor.fill('AlphaEdited');
+    await qtyEditor.fill('42');
+
+    // Save the WHOLE row with one Enter (from the qty editor) → EXACTLY ONE row-edit-commit
+    // carrying BOTH changed cells; the rendered row updates from the SINGLE model write.
+    const beforeRowCommit = await rowCommitCount(page);
+    expect(beforeRowCommit).toBe(0);
+    await qtyEditor.press('Enter');
+    // The row editors are gone (the whole row committed + closed as a unit).
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(0);
+    await expect.poll(async () => stepEditorPresent(page), { timeout: 10_000 }).toBe(false);
+    // EXACTLY ONE row-edit-commit (NOT one-per-cell) carrying both changed columns (sorted).
+    await expect.poll(async () => rowCommitCount(page), { timeout: 10_000 }).toBe(1);
+    expect(await rowCommitReadout(page)).toBe('name=AlphaEdited;qty=42');
+    // No per-cell cell-edit-commit fired (the row path is its own single event).
+    expect(await commitCount(page)).toBe(0);
+    // The rendered row reflects the single model write (req-6): both cells updated.
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => c[0]), { timeout: 10_000 })
+      .toBe('AlphaEdited');
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => c[1]), { timeout: 10_000 })
+      .toBe('42');
+
+    // ── Escape reverts the WHOLE row as a unit (no model write, no row-edit-commit). ──────
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('Shift+F2');
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(4);
+    // Edit both cells again, then Escape — the drafts are dropped, the row is unchanged.
+    await mount.locator('[data-grid-cell][data-col-index="0"] [data-editing-cell]').fill('SHOULD_REVERT');
+    await mount.locator('[data-grid-cell][data-col-index="1"] [data-editing-cell]').fill('999');
+    await mount.locator('[data-grid-cell][data-col-index="1"] [data-editing-cell]').press('Escape');
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(0);
+    // No NEW row-edit-commit (still 1 from the prior save); the row reverted to its last values.
+    expect(await rowCommitCount(page)).toBe(1);
+    {
+      const cells = await cellDisplayValues(page);
+      expect(cells[0]).toBe('AlphaEdited'); // unchanged by the Escape'd row edit.
+      expect(cells[1]).toBe('42');
+    }
+
+    // ── The editRow $expose verb enters the SAME full-row edit state (row index 1, Beta). ─
+    await mount.getByTestId('call-editrow').click();
+    // Row 1's four built-in editors + the score step slot open.
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(4);
+    expect(await stepEditorPresent(page)).toBe(true);
+    // The open editors sit on row 1 (data-row="1"), proving the verb targeted the right row.
+    {
+      const onRow1 = await page.evaluate(() => {
+        const find = (root: Document | ShadowRoot): Element[] => {
+          const out: Element[] = [];
+          out.push(...Array.from(root.querySelectorAll('[data-editing-cell]')));
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) out.push(...find(sr));
+          }
+          return out;
+        };
+        return find(document).every((el) => el.closest('[data-grid-cell]')?.getAttribute('data-row') === '1');
+      });
+      expect(onRow1).toBe(true);
+    }
+    // Escape closes the verb-opened row edit without a commit (the verb enters the same state).
+    await mount.locator('[data-grid-cell][data-row="1"][data-col-index="0"] [data-editing-cell]').press('Escape');
+    await expect.poll(async () => editingCellCount(page), { timeout: 10_000 }).toBe(0);
+    expect(await rowCommitCount(page)).toBe(1); // verb-entered row was Escaped → no commit.
   });
 
   // req-7/8/9 — range + clipboard + virtualization survival (Wave-(c), Plan 51-04). Drives

@@ -63,6 +63,13 @@
   lastCommit: '',
   // Count of cell-edit-commit emits (proves a rejected/invalid commit does NOT fire it).
   commitCount: 0,
+  // Last row-edit-commit payload (req-6), surfaced as a readout: the changed columns rendered
+  // "col1=v1;col2=v2" (sorted for determinism). The spec asserts EXACTLY ONE row-edit-commit
+  // per row save carrying ALL changed cells.
+  lastRowCommit: '',
+  // Count of row-edit-commit emits (proves Escape / a rejected row does NOT fire it, and that
+  // a row save fires it ONCE — not once-per-cell).
+  rowCommitCount: 0,
 }
 </data>
 
@@ -81,6 +88,27 @@ const validateQty = (value: unknown): true | string => {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? true : 'must be >= 0'
 }
+
+// row-edit-commit payload (req-6 / D-06) → a "col=value;col=value" readout (changed columns
+// only, SORTED for cross-target determinism) + a row-commit counter. The spec asserts EXACTLY
+// ONE row-edit-commit per row save carrying ALL changed cells (not one-per-cell). Payload
+// arrives as arg0 directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onRowEditCommit = (payload: { rowId: unknown; changes: { columnId: string; oldValue: unknown; newValue: unknown }[] }): void => {
+  const changes = payload && payload.changes ? payload.changes : []
+  const parts = changes.map((c) => c.columnId + '=' + String(c.newValue))
+  parts.sort()
+  $data.lastRowCommit = parts.join(';')
+  $data.rowCommitCount = $data.rowCommitCount + 1
+}
+
+// Invoke the editRow $expose verb on row index 1 (Beta) via the DataTable handle (req-6 /
+// D-06) — the API twin of Shift+F2. Resolve the handle at CALL time (never cache: the handle
+// can be captured before the child publishes $expose on the fine-grained targets — the
+// ColumnMgmtDemo / GridNavDemo lesson).
+const callEditRow = (): void => {
+  const api = $refs.dt
+  if (api && api.editRow) api.editRow(1)
+}
 </script>
 
 <template>
@@ -92,6 +120,11 @@ const validateQty = (value: unknown): true | string => {
     <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
     <span class="label">commit-count:</span>
     <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">last row-commit:</span>
+    <span class="readout" data-testid="row-commit-readout">{{ $data.lastRowCommit }}</span>
+    <span class="label">row-commit-count:</span>
+    <span class="readout" data-testid="row-commit-count">{{ $data.rowCommitCount }}</span>
+    <button type="button" data-testid="call-editrow" @click="callEditRow">editRow(1)</button>
   </div>
 
   <div data-testid="edit-table">
@@ -100,6 +133,7 @@ const validateQty = (value: unknown): true | string => {
       interactionMode="grid"
       r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
+      @row-edit-commit="onRowEditCommit($event)"
     >
       <!-- Four built-in editor column types (req-1). -->
       <Column field="name"   header="Name"   :editable="true" editor="text" />
