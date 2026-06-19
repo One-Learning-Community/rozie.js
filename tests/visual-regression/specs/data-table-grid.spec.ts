@@ -576,24 +576,18 @@ for (const target of TARGETS) {
 // off-window row scrolled in AND focus landed on the correct cell (Lit pierced via
 // getRootNode().activeElement in the activeCellCoords helper above).
 //
-// WINDOW_INIT_UNSUPPORTED (Solid, Svelte): the row-windowing engine's windowed <tbody>
-// slice does NOT render on the two fine-grained targets — the windowed `<For>` / `{#each}`
-// over windowedRows() never paints a row even after the virtualizer is re-fed and an
-// explicit scroll forces virtual-core's onChange (the window stays empty, no roving
-// tab-stop). This is a PRE-EXISTING row-windowing-engine bug from Plan 02 (the windowing
-// engine was never per-target VR-exercised there; this Plan-04 grid+virtual case is the
-// first per-target run of the windowed slice). It is OUT OF SCOPE for Plan 04's
-// scroll-then-focus deliverable — the D-12 mechanism is PROVEN on the four targets whose
-// window renders (React/Vue/Angular/Lit). Tracked for the dedicated windowing VR plan
-// (Plan 06) — see phase deferred-items.md. Gated test.fixme (not deleted) so it
-// auto-revives when the fine-grained windowed slice is fixed.
-const WINDOW_INIT_UNSUPPORTED: ReadonlySet<Target> = new Set<Target>(['solid', 'svelte']);
-
+// FINE-GRAINED WINDOW INIT (Solid, Svelte) — RESOLVED (Phase 53 windowing engine fix):
+// the windowed <tbody> slice now renders on the two fine-grained targets. The root cause
+// was that windowedRows()/padTop()/padBottom() read the reactive $data.windowVer BELOW an
+// `if (!virtualizer) return []` early-return; the windowed `<For>`/`{#each}` accessor is
+// first evaluated at initial render while `virtualizer` is still null (it is built in
+// $onMount, after render), so it short-circuited WITHOUT ever reading windowVer and never
+// subscribed — so the later onChange tick could not re-run it. The fix reads windowVer at
+// the TOP of those accessors (subscribe-first) and bumps it once after the virtualizer is
+// constructed in $onMount so the now-subscribed accessor re-runs against the live
+// virtualizer. All six targets render the window; the gate below runs as a real assertion.
 for (const target of TARGETS) {
-  const offWindowRunner = WINDOW_INIT_UNSUPPORTED.has(target)
-    ? test.fixme
-    : runnerFor(target);
-  offWindowRunner(`data-table-grid+virtual [${target}]: off-window focusCell scrolls-then-focuses across the window boundary`, async ({
+  runnerFor(target)(`data-table-grid+virtual [${target}]: off-window focusCell scrolls-then-focuses across the window boundary`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableVirtualGrid&target=${target}`);

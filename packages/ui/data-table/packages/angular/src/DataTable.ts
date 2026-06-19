@@ -796,6 +796,16 @@ export class DataTable {
       this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rdt-scroll') : null;
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
+      // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte): the windowed <For>/{#each} accessor was first
+      // evaluated at initial render — while `virtualizer` was still null — and (because windowedRows()
+      // reads $data.windowVer up top) subscribed to windowVer then returned []. `virtualizer` is a
+      // non-reactive `let`, so its assignment above does NOT notify the accessor; we must bump the
+      // SIGNAL it subscribed to. _didMount() computes the first window synchronously but its onChange
+      // only fires on SUBSEQUENT scroll/resize, so without this explicit bump the first window would
+      // never paint on the fine-grained targets. Idempotent + harmless on the coarse targets (they
+      // re-render wholesale anyway). One bump = one re-run that now sees the non-null virtualizer and
+      // pulls getVirtualItems().
+      this.windowVer.set(this.windowVer() + 1);
       // After the first window commits (next frame), refine heights + fire the dev-mode warns
       // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
       // code and these warns can never fire there (req-1 byte-identical-off preserved).
@@ -1067,6 +1077,16 @@ export class DataTable {
   });
   windowedRows = () => {
     const __rows = this.rows();
+    // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
+    // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
+    // which happens at initial render while `virtualizer` is still null (it is built in $onMount,
+    // after the first render). `virtualizer` is a non-reactive `let`, so if the windowVer read sat
+    // BELOW the `!virtualizer` guard the accessor would early-return [] without ever reading the
+    // signal → it would NEVER re-run when onChange later bumps windowVer, and the window would stay
+    // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
+    // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
+    // first re-run that picks up the now-non-null virtualizer.
+    const ver = this.windowVer();
     if (!this.virtualizer) {
       // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
       // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -1081,7 +1101,7 @@ export class DataTable {
       }
       return [];
     }
-    if (this.windowVer() < 0) return [];
+    if (ver < 0) return [];
     const items = this.virtualizer.getVirtualItems();
     const rowList = __rows || [];
     return items.map((vi: any) => ({
@@ -1090,12 +1110,16 @@ export class DataTable {
     }));
   };
   padTop = () => {
-    if (!this.virtual() || !this.virtualizer || this.windowVer() < 0) return 0;
+    // SUBSCRIBE FIRST (the windowedRows() discipline): read windowVer at the TOP so the spacer-<td>
+    // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
+    const ver = this.windowVer();
+    if (!this.virtual() || !this.virtualizer || ver < 0) return 0;
     const items = this.virtualizer.getVirtualItems();
     return items.length ? items[0].start : 0;
   };
   padBottom = () => {
-    if (!this.virtual() || !this.virtualizer || this.windowVer() < 0) return 0;
+    const ver = this.windowVer();
+    if (!this.virtual() || !this.virtualizer || ver < 0) return 0;
     const items = this.virtualizer.getVirtualItems();
     if (!items.length) return 0;
     return this.virtualizer.getTotalSize() - items[items.length - 1].end;
