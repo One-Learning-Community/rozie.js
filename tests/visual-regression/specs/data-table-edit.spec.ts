@@ -477,15 +477,30 @@ async function srLiveText(page: Page): Promise<string> {
  *  — the deterministic root-cause fix for the editor-open-after-Escape race (51-02/04
  *  focus-settle / `rangeTransition` precedent), NOT a retry-budget bump. */
 async function focusBodyCellStable(page: Page, row: number, col: number): Promise<void> {
-  for (let i = 0; i < 24; i++) {
-    await focusBodyCell(page, row, col);
-    await page.waitForTimeout(40); // let any pending deferred focus-return fire + steal.
-    const a = await activeCellCoords(page);
-    if (a?.col !== String(col) || a?.row !== String(row)) continue;
-    await page.waitForTimeout(40); // confirm it HOLDS (no further pending steal).
-    const b = await activeCellCoords(page);
-    if (b?.col === String(col) && b?.row === String(row)) return;
-  }
+  // WR-06: drive stabilization off the ACTUAL active-cell coords, not fixed 40ms sleeps. We
+  // re-assert focus on the target each poll iteration (so a pending deferred focus-return that
+  // steals focus is re-corrected, not just slept-through) and require the target to HOLD across
+  // two consecutive reads before resolving. expect.poll's escalating intervals give a
+  // deterministic condition (active cell == target, twice running) with a real timeout budget —
+  // equivalent-or-stronger than the old retry-and-sleep loop, no flake-masking fixed sleep.
+  await focusBodyCell(page, row, col);
+  let stableHits = 0;
+  await expect
+    .poll(
+      async () => {
+        const a = await activeCellCoords(page);
+        if (a?.row === String(row) && a?.col === String(col)) {
+          stableHits += 1;
+        } else {
+          stableHits = 0;
+          // A pending deferred focus-return stole focus (or it never landed) — re-assert it.
+          await focusBodyCell(page, row, col);
+        }
+        return stableHits;
+      },
+      { timeout: 5_000, intervals: [40, 40, 40, 60, 100] },
+    )
+    .toBeGreaterThanOrEqual(2);
 }
 
 /** Settle the grid to an idle state, focus (row, col), and press F2 to open its editor. The
