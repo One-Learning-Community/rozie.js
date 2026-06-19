@@ -564,6 +564,20 @@ export const EXAMPLES = [
   // fire). Behavioral-only (DOM/console assert, NOT in matrix.spec.ts — no pixel baseline);
   // lives under examples/demos/ so no Angular 3-file registration is needed.
   'DataTableVirtualWarn',
+  // Phase 51 (data-table editable cells) WAVE-0 D-02 PIN-ROW PROBE — the standalone,
+  // chrome-free cross-target pin-row de-risk cell (loader →
+  // examples/demos/DataTablePinProbeDemo.rozie, self-contained: NO DataTable /
+  // @tanstack/virtual-core / @tanstack/table-core import). A ~100-row table rendered
+  // through a minimal LOCAL copy of the Phase-53 windowedRows/padTop/padBottom math
+  // that PINS an editing <tr> (keyed on row.id) in-flow when it scrolls outside the
+  // natural window, subtracting its height from the appropriate spacer. Covered by
+  // data-table-edit.spec.ts (D-02 pin-row block): proves the editing <tr> stays mounted
+  // out-of-window, aria-rowindex stays monotonic, and total scroll height is invariant
+  // ×6. Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). No new
+  // Angular 3-file registration needed — it lives under examples/demos/ (already covered
+  // by prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the
+  // glob-driven build-cells demos sweep) and imports no cross-tree package.
+  'DataTablePinProbe',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -776,6 +790,9 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableVirtualStickySelect: 'rozie-data-table-virtual-sticky-select',
   // = kebab of DataTableVirtualWarnDemo (name="DataTableVirtualWarnDemo").
   DataTableVirtualWarn: 'rozie-data-table-virtual-warn',
+  // Phase 51 editable cells — '-demo' appended on Lit → tag
+  // 'rozie-data-table-pin-probe-demo' = kebab of DataTablePinProbeDemo.
+  DataTablePinProbe: 'rozie-data-table-pin-probe',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").

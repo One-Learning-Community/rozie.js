@@ -1,0 +1,329 @@
+<!--
+  DataTablePinProbeDemo.rozie — Phase 51 WAVE-0 D-02 PIN-ROW PROBE (rete-FlowCanvas /
+  Phase-49 focus-probe / Phase-48 portal-probe precedent).
+
+  Purpose: de-risk the single genuinely UNPROVEN cross-target surface of phase 51 —
+  D-02 (pin the editing row so it never recycles while an editor is open) under row
+  virtualization — BEFORE any wave touches the real 2487-line DataTable.rozie windowing
+  math (RESEARCH A4 HIGH-risk, Pitfall 3, Open-Q2). This is a STANDALONE, chrome-free
+  windowed table (NO @tanstack/virtual-core, NO @tanstack/table-core, NO DataTable
+  import): a hardcoded ~100-row dataset rendered through a MINIMAL LOCAL copy of the
+  Phase-53 windowing math (windowedRows / padTop / padBottom), so a behavioral ×6 spec
+  can prove the pin mechanism works on React / Vue / Svelte / Angular / Solid / Lit
+  (especially Solid's fine-grained <For> + Svelte's {#each} accessor subscription and
+  Lit's repeat recycling) for ~120 lines of probe code instead of after a 2487-line edit.
+
+  THE PROBE QUESTION (RESEARCH Open-Q2): in-flow vs out-of-flow rendering for the pinned
+  editing row. This probe takes the LOWER-RISK in-flow + spacer-subtraction default:
+    - The pinned editing <tr> stays an ordinary in-<tbody> keyed <tr> (preserves
+      <table>/sticky/colspan semantics — no absolute positioning that would escape the
+      table layout box on some target).
+    - windowedRows() UNIONS the pinned row into the rendered slice when its index falls
+      OUTSIDE the natural window (so the editor never unmounts).
+    - padTop()/padBottom() SUBTRACT the pinned row's (uniform) height from whichever
+      spacer it logically sits inside (above the window → subtract from padTop; below →
+      subtract from padBottom), so total scroll height (padTop + Σ rows + padBottom)
+      stays exactly getTotalSize() and aria-rowindex stays monotonic with no gap.
+
+  SUBSCRIBE-FIRST DISCIPLINE (load-bearing, the Phase-53 windowedRows lesson, commit
+  85fdc0ed): every windowing-derived getter touches `void $data.windowVer` at the TOP —
+  BEFORE any early return — so Solid's <For> / Svelte's {#each} accessor subscribes to
+  the reactive version on its FIRST eval and re-runs on every scroll/pin change. Here
+  windowVer is bumped on scroll and on pin/unpin.
+
+  This probe deliberately uses a UNIFORM fixed ROW_H so the spacer math is exact and
+  deterministic across the six targets + the Linux VR baselines (variable-height
+  measurement is NOT in scope — the real DataTable already owns measureElement; D-02 is
+  about the SLICE/SPACER contiguity, not measurement).
+
+  data-table-edit.spec.ts (D-02 pin-row block) asserts ×6: after scrolling the pinned
+  editing row OUT of the natural window, the keyed editing <tr> is still in the DOM
+  (queried off the stable root), aria-rowindex over the rendered rows is monotonic with
+  no gap, and the scroll-container total height (padTop + Σ + padBottom) does NOT change
+  between editor-closed and editor-open-scrolled-away.
+-->
+
+<rozie name="DataTablePinProbeDemo">
+
+<data>
+{
+  // ── full model: 100 rows, plain deterministic content (no clock / no random) so the
+  //    window + spacer total are stable across the six targets and the Linux baselines.
+  rows: [],
+  // ── windowing state ────────────────────────────────────────────────────────────
+  // scrollTop of the bounded viewport (driven by the @scroll handler). Drives which
+  // contiguous slice is "naturally" visible.
+  scrollTop: 0,
+  // The reactive version counter the fine-grained accessors SUBSCRIBE to (the Phase-53
+  // windowVer discipline). Bumped on scroll + on pin/unpin so windowedRows/padTop/
+  // padBottom re-run on those transitions on Solid/Svelte.
+  windowVer: 0,
+  // ── pin state (D-02) ───────────────────────────────────────────────────────────
+  // The full-model index of the row currently being edited, or -1 when no editor is
+  // open. While >= 0 that row is PINNED: kept mounted + excluded from the natural-window
+  // cull, with its height subtracted from the appropriate spacer.
+  pinnedRowIndex: -1,
+  // The draft value of the open editor (proves the editor element actually holds state
+  // while pinned out of window — not just an empty <tr>).
+  draftValue: '',
+}
+</data>
+
+<script lang="ts">
+// ── static windowing constants (no chrome) ──────────────────────────────────────
+const ROW_COUNT = 100
+// Uniform row height (px). The probe asserts exact spacer math, so heights are fixed
+// (the real DataTable measures; D-02 is about contiguity, not measurement).
+const ROW_H = 32
+// Bounded viewport height (px) → ~6 rows visible.
+const VIEWPORT_H = 192
+// Overscan rows above/below the visible band (mirrors virtual-core's default overscan).
+const OVERSCAN = 2
+
+// ── seed the model in $onMount (deterministic content) ──────────────────────────
+$onMount(() => {
+  const out: { id: number; name: string; value: number }[] = []
+  for (let i = 0; i < ROW_COUNT; i++) {
+    out.push({ id: i + 1, name: 'Row ' + (i + 1), value: (i + 1) * 10 })
+  }
+  $data.rows = out
+})
+
+// ── total content size = getTotalSize() analog. Pure: ROW_COUNT * ROW_H. ─────────
+const totalSize = (): number => ROW_COUNT * ROW_H
+
+// ── the NATURAL window [first, last] (inclusive) from scrollTop, clamped + overscan.
+//    Pure index math — the local analog of virtualizer.getVirtualItems(). ─────────
+const naturalFirst = (): number => {
+  const raw = Math.floor($data.scrollTop / ROW_H) - OVERSCAN
+  return raw < 0 ? 0 : raw
+}
+const naturalLast = (): number => {
+  const visible = Math.ceil(VIEWPORT_H / ROW_H)
+  const raw = Math.floor($data.scrollTop / ROW_H) + visible + OVERSCAN
+  return raw > ROW_COUNT - 1 ? ROW_COUNT - 1 : raw
+}
+
+// Is full-model index `idx` inside the natural (un-pinned) window?
+const inNaturalWindow = (idx: number): boolean => idx >= naturalFirst() && idx <= naturalLast()
+
+// ── windowedRows(): the rendered slice = the natural window, UNION the pinned editing
+//    row when it has scrolled OUTSIDE that window (D-02 — never unmount the editor).
+//    Each entry is { idx, row, pinned } and is KEYED on row.id in the template so Lit's
+//    repeat / Solid's For never recycle the pinned node into another full-model row.
+//    SUBSCRIBE FIRST: touch windowVer at the TOP before any early return so the
+//    fine-grained <For>/{#each} accessor subscribes on its first eval. ──────────────
+const windowedRows = (): { idx: number; row: { id: number; name: string; value: number }; pinned: boolean }[] => {
+  void $data.windowVer
+  const rowList = $data.rows || []
+  if (!rowList.length) return []
+  const first = naturalFirst()
+  const last = naturalLast()
+  const pin = $data.pinnedRowIndex
+  const out: { idx: number; row: { id: number; name: string; value: number }; pinned: boolean }[] = []
+  // If the pinned row sits ABOVE the natural window, it leads the slice (so the rendered
+  // <tr> order matches the visual/aria order top-to-bottom).
+  if (pin >= 0 && pin < first && rowList[pin]) {
+    out.push({ idx: pin, row: rowList[pin], pinned: true })
+  }
+  for (let i = first; i <= last; i++) {
+    if (rowList[i]) out.push({ idx: i, row: rowList[i], pinned: pin === i })
+  }
+  // If the pinned row sits BELOW the natural window, it trails the slice.
+  if (pin > last && rowList[pin]) {
+    out.push({ idx: pin, row: rowList[pin], pinned: true })
+  }
+  return out
+}
+
+// ── spacer math (D-03 analog) with the D-02 pinned-row SUBTRACTION ────────────────
+// padTop = height of the rows scrolled past the top, MINUS the pinned row's height if
+// that pinned row sits above the window (it is rendered in-flow as the slice's leading
+// <tr>, so its ROW_H is already accounted for by the real <tr> — subtract it from the
+// spacer so the total stays exactly totalSize()).
+const padTop = (): number => {
+  void $data.windowVer
+  const first = naturalFirst()
+  let pad = first * ROW_H
+  const pin = $data.pinnedRowIndex
+  if (pin >= 0 && pin < first) pad = pad - ROW_H
+  return pad < 0 ? 0 : pad
+}
+// padBottom = height of the rows below the window, MINUS the pinned row's height if the
+// pinned row sits below the window (rendered in-flow as the slice's trailing <tr>).
+const padBottom = (): number => {
+  void $data.windowVer
+  const last = naturalLast()
+  let pad = (ROW_COUNT - 1 - last) * ROW_H
+  const pin = $data.pinnedRowIndex
+  if (pin > last) pad = pad - ROW_H
+  return pad < 0 ? 0 : pad
+}
+
+// ── scroll handler: update scrollTop + bump windowVer so the accessors re-run ─────
+const onScroll = ($event: Event): void => {
+  const el = $event && $event.target ? ($event.target as HTMLElement) : null
+  if (!el) return
+  $data.scrollTop = el.scrollTop
+  $data.windowVer = $data.windowVer + 1
+}
+
+// ── pin / unpin the editing row (D-02) ───────────────────────────────────────────
+// beginEdit pins full-model index `idx` and seeds the draft; the editor <input> renders
+// inside that row's keyed <tr>. The row is now excluded from the natural-window cull.
+const beginEdit = (idx: number): void => {
+  $data.pinnedRowIndex = idx
+  const rowList = $data.rows || []
+  $data.draftValue = rowList[idx] ? rowList[idx].name : ''
+  // bump so windowedRows/padTop/padBottom re-derive with the new pin on the fine-grained
+  // targets even without a scroll.
+  $data.windowVer = $data.windowVer + 1
+}
+const endEdit = (): void => {
+  $data.pinnedRowIndex = -1
+  $data.draftValue = ''
+  $data.windowVer = $data.windowVer + 1
+}
+
+// Is full-model index `idx` the pinned editing row?
+const isEditing = (idx: number): boolean => $data.pinnedRowIndex === idx
+
+// ── stable root ref for the spec's off-root queries (the listbox/probe idiom) ─────
+let probeRoot: Element | null = null
+$onMount(() => {
+  probeRoot = $el ? $el.querySelector('.pin-probe-scroll') : null
+})
+
+// Internal driver: open an editor on row index 3 (a row that is initially IN the
+// natural window at scrollTop=0) so the spec can scroll it OUT and assert it stays
+// mounted. Self-call exercises the pin path ×6 without external-handle plumbing.
+const driveBeginEdit = (): void => beginEdit(3)
+const driveEndEdit = (): void => endEdit()
+</script>
+
+<template>
+<div class="pin-probe-demo">
+  <h3>DataTable D-02 pin-row probe</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="begin-edit-btn" @click="driveBeginEdit">Edit row 4</button>
+    <button type="button" data-testid="end-edit-btn" @click="driveEndEdit">Commit / cancel</button>
+    <span class="label">pinned:</span>
+    <span class="readout" data-testid="pinned-readout">{{ $data.pinnedRowIndex }}</span>
+    <span class="label">draft:</span>
+    <span class="readout" data-testid="draft-readout">{{ $data.draftValue }}</span>
+  </div>
+
+  <!-- Bounded windowed viewport. scrollHeight = padTop + Σ(rendered tr heights) +
+       padBottom = totalSize() (the spec reads scrollHeight as the getTotalSize() proxy,
+       the Phase-53 data-table-virtual.spec.ts precedent). -->
+  <div
+    class="pin-probe-scroll"
+    data-testid="pin-probe-scroll"
+    @scroll="onScroll($event)"
+    :style="'height:' + VIEWPORT_H + 'px;overflow:auto'"
+  >
+    <table class="pin-probe-table" role="grid" :aria-rowcount="ROW_COUNT">
+      <tbody>
+        <!-- Leading spacer (D-03): occupies the rows scrolled past the top, minus the
+             pinned row's height when it leads the slice (D-02 subtraction). -->
+        <tr class="pin-probe-spacer" aria-hidden="true">
+          <td colspan="2" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
+        </tr>
+        <!-- The windowed slice. Loop var `wr` = { idx, row, pinned }; keyed on the
+             FULL-model row.id so Lit's repeat / Solid's For never recycle a node from
+             one full-model row into another. The pinned editing row stays in THIS slice
+             even when its idx is outside the natural window (D-02). -->
+        <tr
+          class="pin-probe-tr"
+          role="row"
+          r-for="wr in windowedRows()"
+          :key="wr.row.id"
+          :data-row="wr.idx"
+          :data-index="wr.idx"
+          :aria-rowindex="wr.idx + 1"
+          :data-pinned="wr.pinned ? 'true' : 'false'"
+          :class="{ 'pin-probe-editing': wr.pinned }"
+        >
+          <td class="pin-probe-td" role="gridcell" :data-col-index="0" :style="'height:' + ROW_H + 'px'">
+            <!-- display ↔ editor branch (the display:contents span pattern, NOT a
+                 <template> wrapper — inert on svelte/solid/lit/angular). When this row
+                 is the pinned editing row, render an <input> editor; else the value. -->
+            <span style="display:contents" r-if="isEditing(wr.idx)">
+              <input
+                class="pin-probe-editor"
+                type="text"
+                data-editing-cell
+                data-testid="pin-probe-editor"
+                :value="$data.draftValue"
+                @input="$data.draftValue = $event.target.value"
+              />
+            </span>
+            <span r-else>{{ wr.row.name }}</span>
+          </td>
+          <td class="pin-probe-td" role="gridcell" :data-col-index="1" :style="'height:' + ROW_H + 'px'">{{ wr.row.value }}</td>
+        </tr>
+        <!-- Trailing spacer (D-03): occupies the rows below the window, minus the pinned
+             row's height when it trails the slice (D-02 subtraction). -->
+        <tr class="pin-probe-spacer" aria-hidden="true">
+          <td colspan="2" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</template>
+
+<style>
+.pin-probe-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.pin-probe-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.pin-probe-scroll {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.pin-probe-table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.pin-probe-td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0 0.625rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+}
+.pin-probe-editing { outline: 2px solid #2563eb; outline-offset: -2px; }
+.pin-probe-editor {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+</style>
+
+</rozie>
