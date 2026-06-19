@@ -142,4 +142,30 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
   font-size: 0.82rem;
   color: var(--vp-c-text-2);
 }
+
+/*
+ * FullCalendar renders its grid out of real <table>/<tr>/<td> elements, so
+ * VitePress's `.vp-doc table|tr|td|th` rules bleed straight into it: the table
+ * gets `display: block` + `overflow-x: auto` (which collapses the grid layout),
+ * rows pick up the zebra striping + top borders, and cells get 8px/16px padding.
+ * Neutralize just those declarations inside the calendar — FC's own injected CSS
+ * then styles the grid as intended. `:deep()` is required because the calendar
+ * DOM is rendered by the component, not authored in this (scoped) page; pairing
+ * it with FC's `.fc` root class raises specificity above `.vp-doc tr:nth-child()`
+ * so we win the cascade without `!important`. Cell borders are deliberately left
+ * untouched so FullCalendar's own grid lines remain.
+ */
+.fc-live__stage :deep(.fc table) {
+  display: table;
+  margin: 0;
+  overflow: visible;
+}
+.fc-live__stage :deep(.fc tr) {
+  border-top: 0;
+  background-color: transparent;
+}
+.fc-live__stage :deep(.fc td),
+.fc-live__stage :deep(.fc th) {
+  padding: 0;
+}
 </style>
