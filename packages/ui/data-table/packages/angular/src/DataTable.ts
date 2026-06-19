@@ -1091,11 +1091,19 @@ export class DataTable {
   scheduleRemeasure = () => {
     if (this.remeasurePending) return;
     this.remeasurePending = true;
-    const run = () => {
+    let ranMicro = false;
+    const microPass = () => {
+      this.remeasureWindow();
+    };
+    const rafPass = () => {
       this.remeasurePending = false;
       this.remeasureWindow();
     };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else if (typeof queueMicrotask !== 'undefined') queueMicrotask(run);else setTimeout(run, 0);
+    if (typeof queueMicrotask !== 'undefined') {
+      ranMicro = true;
+      queueMicrotask(microPass);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
   };
   windowedRows = () => {
     const __rows = this.rows();
@@ -1470,11 +1478,26 @@ export class DataTable {
       this.virtualizer.scrollToIndex(r, {
         align: 'center'
       });
-      const focusNow = () => {
+      // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
+      // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
+      // reconcile) and for a far scroll (e.g. row 4000) spans several frames — a one-shot double-rAF
+      // fires BEFORE resolveCellEl can find the cell, so focus is silently lost (the deterministic
+      // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
+      // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
+      // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
+      // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+      let focusAttempts = 0;
+      const focusWhenReady = () => {
         const el = this.resolveCellEl(String(r), c);
-        if (el) el.focus();
+        if (el) {
+          el.focus();
+          return;
+        }
+        focusAttempts = focusAttempts + 1;
+        if (focusAttempts >= 30) return;
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady);else setTimeout(focusWhenReady, 16);
       };
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady);else setTimeout(focusWhenReady, 0);
       return;
     }
     const rowKey = header ? '__header' : String(r);

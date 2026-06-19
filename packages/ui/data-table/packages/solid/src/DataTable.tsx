@@ -914,19 +914,40 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     };
   }
 
-  // Defer remeasureWindow() one frame (the recycled <tr> nodes must exist in the DOM first —
-  // onChange fires BEFORE React/Solid commit the new window), falling back to a microtask/timeout
-  // where rAF is unavailable (SSR / test envs). DEDUPED via remeasurePending so a scroll burst
-  // queues at most one sweep per frame (piled-up rAF sweeps broke the Solid scroll-then-focus
-  // seam). The sweep clears the flag first, then measures.
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
+  // BEFORE React/Solid commit), falling back to a microtask/timeout where rAF is unavailable (SSR /
+  // test envs). DEDUPED via remeasurePending so a scroll burst queues at most one in-flight sweep
+  // (piled-up rAF sweeps broke the Solid scroll-then-focus seam — and the focus seam itself now
+  // polls for its target cell, so it no longer depends on remeasure timing).
+  //
+  // TWO deferred passes (microtask THEN rAF), both behind the single in-flight flag:
+  //   - Solid's <For> / Svelte's {#each} commit the recycled <tr> set SYNCHRONOUSLY in the reactive
+  //     tick that the windowVer bump triggers, so the recycled nodes already exist by the next
+  //     microtask — measuring there observes them while they are still connected, BEFORE the next
+  //     fast-scroll step recycles them away. A single rAF (a full frame later) was too late on the
+  //     fine-grained targets under a 40ms-per-step scroll: many rows mounted-and-recycled within one
+  //     frame, so the once-per-frame rAF sweep observed only a fraction of them and the measured
+  //     total under-converged (the Solid ~23.5k-vs-≥24k residual). The microtask catches them.
+  //   - React's setState→reconcile→commit is async (a microtask is too early — the new window is not
+  //     committed yet), so the rAF pass is what observes React's recycled rows.
+  // Each pass only OBSERVES + measures the live window; measureElement is idempotent on an
+  // already-observed node, so running both is cheap and loop-free.
   function scheduleRemeasure() {
     if (remeasurePending) return;
     remeasurePending = true;
-    const run = () => {
+    let ranMicro = false;
+    const microPass = () => {
+      remeasureWindow();
+    };
+    const rafPass = () => {
       remeasurePending = false;
       remeasureWindow();
     };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else if (typeof queueMicrotask !== 'undefined') queueMicrotask(run);else setTimeout(run, 0);
+    if (typeof queueMicrotask !== 'undefined') {
+      ranMicro = true;
+      queueMicrotask(microPass);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending = false;else setTimeout(rafPass, 0);
   }
 
   // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
@@ -1534,11 +1555,26 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       virtualizer.scrollToIndex(r, {
         align: 'center'
       });
-      const focusNow = () => {
+      // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
+      // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
+      // reconcile) and for a far scroll (e.g. row 4000) spans several frames — a one-shot double-rAF
+      // fires BEFORE resolveCellEl can find the cell, so focus is silently lost (the deterministic
+      // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
+      // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
+      // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
+      // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+      let focusAttempts = 0;
+      const focusWhenReady = () => {
         const el = resolveCellEl(String(r), c);
-        if (el) el.focus();
+        if (el) {
+          el.focus();
+          return;
+        }
+        focusAttempts = focusAttempts + 1;
+        if (focusAttempts >= 30) return;
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady);else setTimeout(focusWhenReady, 16);
       };
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady);else setTimeout(focusWhenReady, 0);
       return;
     }
     const rowKey = header ? '__header' : String(r);
