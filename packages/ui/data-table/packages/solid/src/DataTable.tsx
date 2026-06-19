@@ -558,6 +558,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   });
   onCleanup(() => {
     if (virtualizerCleanup) virtualizerCleanup();
+    // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
+    teardownFillDrag();
   });
   createEffect(() => {
     if (!table) return;
@@ -1202,9 +1204,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (pin >= 0) {
       const pm = pinnedMeasurement(pin);
       const inWindow = pmIndexInWindow(items, pin);
-      if (pm && !inWindow && pm.start >= items[0].start) {
-        // below the window (start at-or-past the first rendered start AND not in window) →
-        // it trailed the slice; subtract its height from the trailing spacer.
+      // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+      // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+      // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+      // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+      // the offset comparison only if the measurement lacks an index (defensive).
+      const lastItemIdx = items[items.length - 1].index;
+      const below = pm && pm.index != null ? pm.index > lastItemIdx : pm && pm.start >= items[0].start;
+      if (pm && !inWindow && below) {
+        // below the window → it trailed the slice; subtract its height from the trailing spacer.
         if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
       }
     }
@@ -1825,6 +1833,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // are ALREADY ABSENT, reorder/pinning is ALREADY REFLECTED (REQ-7). There is NO separate
   // "compute visible order" step. Every index is clamped to [0,max] so an out-of-range key
   // never throws or builds an injection-shaped selector (Security V5 / T-49-03).
+
+  // IN-01: aria-rowcount for the NON-VIRTUAL table. The virtual table binds $data.rows.length
+  // (the full pre-pagination model). For the non-virtual path $data.rows is the PAGINATED slice,
+  // so report the FILTERED (pre-pagination) total instead — the count AT users need to know "row N
+  // of TOTAL". Falls back to $data.rows.length pre-mount (table is null until $onMount).
+  // NB the helper is named `totalRowCount`, NOT `ariaRowCount`: `ariaRowCount` is an inherited
+  // HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
+  // becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
+  // (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
+  function totalRowCount() {
+    if (!table) return (rows() || []).length;
+    const fm = table.getFilteredRowModel();
+    return fm && fm.rows ? fm.rows.length : (rows() || []).length;
+  }
 
   // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
   // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
@@ -2454,7 +2476,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
   function parseTsv(text: any) {
     const str = text != null ? String(text) : '';
-    if (str === '') return [];
+    // CR-03: length guard BEFORE the normalize/split allocations — an empty string is a no-op,
+    // and a pathologically large clipboard payload (>2M chars) is rejected outright rather than
+    // forcing two full-string regex passes + a split into millions of cells (DoS-shaped input).
+    if (str === '' || str.length > 2000000) return [];
     const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const rawLines = norm.split('\n');
     // Drop a single trailing empty line (a TSV that ends with a newline).
@@ -2526,7 +2551,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
       for (let i = 0; i < committed.length; i++) _props.onCellEditCommit?.(committed[i]);
     }
-    announce(wrote + ' of ' + total + ' cells pasted');
+    // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
+    // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
+    // distinct validation-failed message instead of a misleading "0 of M cells pasted".
+    if (wrote > 0) announce(wrote + ' of ' + total + ' cells pasted');else if (total > 0) announce('No cells pasted — ' + total + ' cells were invalid or read-only');
     return {
       wrote,
       total
@@ -2550,6 +2578,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // failed/empty read is a silent no-op.
   function pasteRange() {
     if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
+    // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
+    // On React these are useState-backed; re-reading $data inside the async .then() returns the
+    // mount-render stale value, so a cell move between Ctrl+V and the read resolving would anchor
+    // the paste at the wrong cell. Capture the locals now and pass them into applyGridToRange.
+    const anchorRow = activeRow();
+    const anchorCol = activeColIndex();
     let p: any = null;
     try {
       p = navigator.clipboard.readText();
@@ -2560,7 +2594,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     p.then((text: any) => {
       const grid = parseTsv(text);
       if (!grid.length) return;
-      applyGridToRange(grid, activeRow(), activeColIndex());
+      applyGridToRange(grid, anchorRow, anchorCol);
     }).catch(() => {});
   }
 
@@ -2590,6 +2624,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
   // pointermove extends the range to the cell under the pointer; pointerup commits the fill.
   let fillDragging = false;
+  // CR-04: track the live fill-drag document listeners in module-lets so $onUnmount can remove
+  // them if the component unmounts MID-DRAG (the `up` handler clears them on a normal release,
+  // but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
+  let fillDragMove: any = null;
+  let fillDragUp: any = null;
+  function teardownFillDrag() {
+    if (typeof document !== 'undefined') {
+      if (fillDragMove) document.removeEventListener('pointermove', fillDragMove);
+      if (fillDragUp) document.removeEventListener('pointerup', fillDragUp);
+    }
+    fillDragMove = null;
+    fillDragUp = null;
+    fillDragging = false;
+  }
   function cellIndexFromPoint(clientX: any, clientY: any) {
     if (typeof document === 'undefined' || !document.elementFromPoint) return null;
     const el = document.elementFromPoint(clientX, clientY);
@@ -2618,13 +2666,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       if (cell) setRangeFocus$local(cell.r, cell.c);
     };
     const up = () => {
-      fillDragging = false;
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('pointermove', move);
-        document.removeEventListener('pointerup', up);
-      }
+      // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
+      teardownFillDrag();
       fillRange();
     };
+    // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+    fillDragMove = move;
+    fillDragUp = up;
     if (typeof document !== 'undefined') {
       document.addEventListener('pointermove', move);
       document.addEventListener('pointerup', up);
@@ -2722,11 +2770,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const out = [];
     for (let i = 0; i < src.length; i++) {
       if (i === rowIndex) {
-        const merged = {};
-        const orig = src[i] || {};
-        for (const k in orig) merged[k] = orig[k];
-        merged[field] = value;
-        out.push(merged);
+        // WR-03: own-property spread, NOT `for (const k in orig)` which walks the prototype chain
+        // and would copy inherited enumerable props of typed/class-instance row objects.
+        out.push({
+          ...(src[i] || {}),
+          [field]: value
+        });
       } else {
         out.push(src[i]);
       }
@@ -2956,8 +3005,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // return focus to the owning cell.
   function cancelEdit() {
     if (editingRow() < 0) return;
-    const focusRow = activeRow();
-    const focusCol = activeColIndex();
+    // CR-01: capture from the EDITING pair (authoritative), NOT the active-cell indices — a
+    // Tab-advance writes activeRow/activeColIndex to the NEXT cell BEFORE opening its editor, so
+    // an Escape on the just-opened editor would otherwise return focus to the Tab-target cell
+    // instead of the cell being cancelled. commitEdit already snapshots editingRow/editingCol.
+    const focusRow = editingRow();
+    const focusCol = editingCol();
     editTransition = true;
     endEdit();
     editTransition = false;
@@ -3107,11 +3160,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const out = [];
     for (let i = 0; i < src.length; i++) {
       if (i === rowIndex) {
-        const merged = {};
-        const orig = src[i] || {};
-        for (const k in orig) merged[k] = orig[k];
-        for (const k in fv) merged[k] = fv[k];
-        out.push(merged);
+        // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
+        // prototype-walking copy. Spread copies own enumerable props only.
+        out.push({
+          ...(src[i] || {}),
+          ...fv
+        });
       } else {
         out.push(src[i]);
       }
@@ -3291,6 +3345,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
     //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
     //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
+    // WR-04 (BACKED OUT): committing on a null relatedTarget here to catch a touch focus-away
+    // also double-commits on the Tab-advance path — the OLD editor's blur fires with a TRANSIENT
+    // null relatedTarget while it unmounts and BEFORE the next editor is focusable, and at that
+    // instant editTransition is already cleared + the new editor's editingRow>=0, so a commit here
+    // fires a SECOND cell-edit-commit (data-table-edit VR: commitCount 4 vs 3, vue/svelte/angular/
+    // lit). Distinguishing a genuine touch focus-drop from a transient remount focus-drop needs a
+    // deferred "is focus still outside gridRoot after a tick" heuristic (the review's harder
+    // alternative), out of scope here — keep the conservative null=skip behavior.
     if (next == null) return;
     if (gridRoot && gridRoot.contains && gridRoot.contains(next)) return;
     commitEdit(undefined);
@@ -3427,7 +3489,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       </details></Show>}</div>
 
 
-    {<Show when={local.virtual} fallback={<table class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
+    {<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={headerGroups()}>{(hg) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
           <For each={hg.headers}>{(header) => <th class={"rdt-th"} classList={{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">

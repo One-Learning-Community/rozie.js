@@ -720,6 +720,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       this._rozieTornDown = true;
       () => {
         if (this.virtualizerCleanup) this.virtualizerCleanup();
+        // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
+        this.teardownFillDrag();
       };
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
@@ -816,7 +818,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     </tr>
   </tbody>
 </table>
-</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} @mousedown=${($event: Event) => { this.onGridMouseDown($event); }} data-rozie-s-d5dcab4c>
+</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.totalRowCount())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} @mousedown=${($event: Event) => { this.onGridMouseDown($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
@@ -1373,9 +1375,15 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   if (pin >= 0) {
     const pm = this.pinnedMeasurement(pin);
     const inWindow = this.pmIndexInWindow(items, pin);
-    if (pm && !inWindow && pm.start >= items[0].start) {
-      // below the window (start at-or-past the first rendered start AND not in window) →
-      // it trailed the slice; subtract its height from the trailing spacer.
+    // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+    // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+    // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+    // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+    // the offset comparison only if the measurement lacks an index (defensive).
+    const lastItemIdx = items[items.length - 1].index;
+    const below = pm && pm.index != null ? pm.index > lastItemIdx : pm && pm.start >= items[0].start;
+    if (pm && !inWindow && below) {
+      // below the window → it trailed the slice; subtract its height from the trailing spacer.
       if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
     }
   }
@@ -1817,6 +1825,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   const rowKey = header ? '__header' : String(r);
   const el = this.resolveCellEl(rowKey, c);
   if (el) el.focus();
+};
+
+  totalRowCount = () => {
+  if (!this.table) return (this._rows.value || []).length;
+  const fm = this.table.getFilteredRowModel();
+  return fm && fm.rows ? fm.rows.length : (this._rows.value || []).length;
 };
 
   visibleColCount = () => {
@@ -2329,7 +2343,10 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   parseTsv = (text: any) => {
   const str = text != null ? String(text) : '';
-  if (str === '') return [];
+  // CR-03: length guard BEFORE the normalize/split allocations — an empty string is a no-op,
+  // and a pathologically large clipboard payload (>2M chars) is rejected outright rather than
+  // forcing two full-string regex passes + a split into millions of cells (DoS-shaped input).
+  if (str === '' || str.length > 2000000) return [];
   const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const rawLines = norm.split('\n');
   // Drop a single trailing empty line (a TSV that ends with a newline).
@@ -2395,7 +2412,10 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       composed: true
     }));
   }
-  this.announce(wrote + ' of ' + total + ' cells pasted');
+  // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
+  // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
+  // distinct validation-failed message instead of a misleading "0 of M cells pasted".
+  if (wrote > 0) this.announce(wrote + ' of ' + total + ' cells pasted');else if (total > 0) this.announce('No cells pasted — ' + total + ' cells were invalid or read-only');
   return {
     wrote,
     total
@@ -2416,6 +2436,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   pasteRange = () => {
   if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
+  // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
+  // On React these are useState-backed; re-reading $data inside the async .then() returns the
+  // mount-render stale value, so a cell move between Ctrl+V and the read resolving would anchor
+  // the paste at the wrong cell. Capture the locals now and pass them into applyGridToRange.
+  const anchorRow = this._activeRow.value;
+  const anchorCol = this._activeColIndex.value;
   let p: any = null;
   try {
     p = navigator.clipboard.readText();
@@ -2426,7 +2452,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   p.then((text: any) => {
     const grid = this.parseTsv(text);
     if (!grid.length) return;
-    this.applyGridToRange(grid, this._activeRow.value, this._activeColIndex.value);
+    this.applyGridToRange(grid, anchorRow, anchorCol);
   }).catch(() => {});
 };
 
@@ -2447,6 +2473,20 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 };
 
   fillDragging = false;
+
+  fillDragMove: any = null;
+
+  fillDragUp: any = null;
+
+  teardownFillDrag = () => {
+  if (typeof document !== 'undefined') {
+    if (this.fillDragMove) document.removeEventListener('pointermove', this.fillDragMove);
+    if (this.fillDragUp) document.removeEventListener('pointerup', this.fillDragUp);
+  }
+  this.fillDragMove = null;
+  this.fillDragUp = null;
+  this.fillDragging = false;
+};
 
   cellIndexFromPoint = (clientX: any, clientY: any) => {
   if (typeof document === 'undefined' || !document.elementFromPoint) return null;
@@ -2477,13 +2517,13 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     if (cell) this.setRangeFocus(cell.r, cell.c);
   };
   const up = () => {
-    this.fillDragging = false;
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-    }
+    // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
+    this.teardownFillDrag();
     this.fillRange();
   };
+  // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+  this.fillDragMove = move;
+  this.fillDragUp = up;
   if (typeof document !== 'undefined') {
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
@@ -2540,11 +2580,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   const out = [];
   for (let i = 0; i < src.length; i++) {
     if (i === rowIndex) {
-      const merged = {};
-      const orig = src[i] || {};
-      for (const k in orig) merged[k] = orig[k];
-      merged[field] = value;
-      out.push(merged);
+      // WR-03: own-property spread, NOT `for (const k in orig)` which walks the prototype chain
+      // and would copy inherited enumerable props of typed/class-instance row objects.
+      out.push({
+        ...(src[i] || {}),
+        [field]: value
+      });
     } else {
       out.push(src[i]);
     }
@@ -2739,8 +2780,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   cancelEdit = () => {
   if (this._editingRow.value < 0) return;
-  const focusRow = this._activeRow.value;
-  const focusCol = this._activeColIndex.value;
+  // CR-01: capture from the EDITING pair (authoritative), NOT the active-cell indices — a
+  // Tab-advance writes activeRow/activeColIndex to the NEXT cell BEFORE opening its editor, so
+  // an Escape on the just-opened editor would otherwise return focus to the Tab-target cell
+  // instead of the cell being cancelled. commitEdit already snapshots editingRow/editingCol.
+  const focusRow = this._editingRow.value;
+  const focusCol = this._editingCol.value;
   this.editTransition = true;
   this.endEdit();
   this.editTransition = false;
@@ -2870,11 +2915,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   const out = [];
   for (let i = 0; i < src.length; i++) {
     if (i === rowIndex) {
-      const merged = {};
-      const orig = src[i] || {};
-      for (const k in orig) merged[k] = orig[k];
-      for (const k in fv) merged[k] = fv[k];
-      out.push(merged);
+      // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
+      // prototype-walking copy. Spread copies own enumerable props only.
+      out.push({
+        ...(src[i] || {}),
+        ...fv
+      });
     } else {
       out.push(src[i]);
     }
@@ -3012,6 +3058,14 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
   //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
   //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
+  // WR-04 (BACKED OUT): committing on a null relatedTarget here to catch a touch focus-away
+  // also double-commits on the Tab-advance path — the OLD editor's blur fires with a TRANSIENT
+  // null relatedTarget while it unmounts and BEFORE the next editor is focusable, and at that
+  // instant editTransition is already cleared + the new editor's editingRow>=0, so a commit here
+  // fires a SECOND cell-edit-commit (data-table-edit VR: commitCount 4 vs 3, vue/svelte/angular/
+  // lit). Distinguishing a genuine touch focus-drop from a transient remount focus-drop needs a
+  // deferred "is focus still outside gridRoot after a tick" heuristic (the review's harder
+  // alternative), out of scope here — keep the conservative null=skip behavior.
   if (next == null) return;
   if (this.gridRoot && this.gridRoot.contains && this.gridRoot.contains(next)) return;
   this.commitEdit(undefined);
