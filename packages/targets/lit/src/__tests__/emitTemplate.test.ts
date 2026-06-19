@@ -445,3 +445,38 @@ describe('part= passthrough (SPEC-R3/R4b)', () => {
     expect(code).not.toMatch(/part="[^"]*data-rozie-s[^"]*"/);
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  function compileInline(source: string, name = 'ForLit'): string {
+    const { ast } = parse(source, { filename: `${name}.rozie` });
+    if (!ast) throw new Error('parse() returned null');
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+    if (!ir) throw new Error('lowerToIR() returned null');
+    return emitLit(ir, { filename: `${name}.rozie`, source, modifierRegistry: registry })
+      .code;
+  }
+
+  // A `<template r-for>` lifts its children into a TemplateLoop body. Lit's
+  // wrapper-free multi-root idiom is a single `repeat(items, keyFn, (item, idx)
+  // => html`…siblings…`)` whose template literal holds MULTIPLE adjacent nodes
+  // — no host element is created.
+  const MULTI = `<rozie name="ForLit">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody><template r-for="row in $data.rows" :key="row.id"><tr class="data"><td>{{ row.label }}</td></tr><tr class="detail" r-if="$data.openId === row.id"><td>detail</td></tr></template></tbody></table>
+</template>
+</rozie>
+`;
+
+  it('emits a single multi-node repeat() html template (no wrapper element) for a 2-root body', () => {
+    const code = compileInline(MULTI);
+    expect(code).toContain('repeat<any>(');
+    expect(code).toContain("from 'lit/directives/repeat.js'");
+    // The repeat callback returns ONE html`` literal containing both sibling
+    // roots — no per-iteration wrapper element.
+    expect(code).toContain('class="data"');
+    expect(code).toContain('class="detail"');
+    expect(code).not.toContain('<template');
+  });
+});

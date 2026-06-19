@@ -673,3 +673,35 @@ describe('part= passthrough (SPEC-R3/R4b)', () => {
     expect(template).toContain('part="body"');
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  function lowerInline(source: string, name = 'ForVue'): IRComponent {
+    const result = parse(source, { filename: `${name}.rozie` });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  // A `<template r-for>` lifts its children into a TemplateLoop body. Vue's
+  // wrapper-free multi-root idiom is `<template v-for=… :key=…>…siblings…</template>`
+  // — the `<template>` tag is a Vue compile-time host that renders NO DOM node.
+  const MULTI = `<rozie name="ForVue">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody><template r-for="row in $data.rows" :key="row.id"><tr class="data"><td>{{ row.label }}</td></tr><tr class="detail" r-if="$data.openId === row.id"><td>detail</td></tr></template></tbody></table>
+</template>
+</rozie>
+`;
+
+  it('emits <template v-for … :key …> wrapping the per-iteration siblings (no DOM wrapper)', () => {
+    const { template } = emitTemplate(lowerInline(MULTI), createDefaultRegistry());
+    // The Vue multi-root loop host is a non-rendering <template v-for>.
+    expect(template).toMatch(/<template v-for="row in [^"]*rows"/);
+    expect(template).toContain(':key="row.id"');
+    expect(template).toContain('class="data"');
+    expect(template).toContain('class="detail"');
+  });
+});

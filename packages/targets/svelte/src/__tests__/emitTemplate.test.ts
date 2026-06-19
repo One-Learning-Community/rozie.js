@@ -251,3 +251,37 @@ function onClick() {}
     expect(template).toContain('onclick={onClick}');
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  function lowerInline(source: string, name = 'ForSvelte'): IRComponent {
+    const result = parse(source, { filename: `${name}.rozie` });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  // A `<template r-for>` lifts its children into a TemplateLoop body. Svelte
+  // renders the per-iteration siblings as BARE adjacent nodes inside
+  // `{#each …}…{/each}` (anchor-comment based — NO DOM wrapper element).
+  const MULTI = `<rozie name="ForSvelte">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody><template r-for="row in $data.rows" :key="row.id"><tr class="data"><td>{{ row.label }}</td></tr><tr class="detail" r-if="$data.openId === row.id"><td>detail</td></tr></template></tbody></table>
+</template>
+</rozie>
+`;
+
+  it('renders bare siblings inside {#each}…{/each} (no DOM wrapper) for a 2-root body', () => {
+    const { template } = emitTemplate(lowerInline(MULTI), REGISTRY);
+    expect(template).toContain('{#each ');
+    expect(template).toContain('(row.id)');
+    expect(template).toContain('{/each}');
+    // Both sibling roots present as bare elements, no wrapping <template>.
+    expect(template).toContain('class="data"');
+    expect(template).toContain('class="detail"');
+    expect(template).not.toContain('<template');
+  });
+});

@@ -130,3 +130,55 @@ describe('emitTemplateNode — Plan 04-03 Task 1', () => {
     expect(jsx).toContain('{props.label}');
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  // A `<template r-for>` with 2+ children lowers to a TemplateLoop with
+  // body.length > 1. The React emitter must wrap the per-iteration siblings in
+  // a KEYED `<React.Fragment key={...}>` — a logical fragment, NO DOM wrapper —
+  // so `.map()` returns a single keyed element per iteration. This keyed-
+  // fragment path was the weakest-tested branch (it is otherwise unreachable
+  // without a multi-root loop body); this covers it explicitly.
+  it('emits a keyed React.Fragment (no DOM wrapper) for a 2-root loop body', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody>
+  <template r-for="row in $data.rows" :key="row.id">
+    <tr className="data"><td>{{ row.label }}</td></tr>
+    <tr className="detail" r-if="$data.openId === row.id"><td>detail</td></tr>
+  </template>
+</tbody></table>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    // .map over the iterable.
+    expect(jsx).toMatch(/rows\.map/);
+    // Per-iteration KEYED React.Fragment (logical — no DOM node).
+    expect(jsx).toContain('<React.Fragment key={row.id}>');
+    expect(jsx).toContain('</React.Fragment>');
+    // Both sibling roots live inside the single fragment.
+    expect(jsx).toContain('data');
+    expect(jsx).toContain('detail');
+    // The transparent host is NOT rendered as a literal <template> element.
+    expect(jsx).not.toContain('<template');
+  });
+
+  it('emits a keyed map for a single-child <template r-for> (no literal <template>)', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<data>{ rows: [] }</data>
+<template>
+<ul><template r-for="row in $data.rows" :key="row.id"><li>{{ row.label }}</li></template></ul>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    expect(jsx).toMatch(/rows\.map/);
+    expect(jsx).toContain('key={row.id}');
+    // The transparent host is NOT rendered as a literal <template> element.
+    expect(jsx).not.toContain('<template');
+    expect(jsx).toContain('{rozieDisplay(row.label)}');
+  });
+});

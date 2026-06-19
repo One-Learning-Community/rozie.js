@@ -239,3 +239,42 @@ describe('emitTemplate — part= passthrough (SPEC-R3/R4b)', () => {
     expect(template).toContain('part="body"');
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  function lowerInline(source: string, name = 'ForNg'): IRComponent {
+    const result = parse(source, { filename: `${name}.rozie` });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  // A `<template r-for>` lifts its children into a TemplateLoop body. Angular's
+  // wrapper-free multi-root idiom is a control-flow `@for (… ; track …) { … }`
+  // block — a compile-time construct that renders the inner siblings directly,
+  // with NO host DOM element.
+  const MULTI = `<rozie name="ForNg">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody><template r-for="row in $data.rows" :key="row.id"><tr class="data"><td>{{ row.label }}</td></tr><tr class="detail" r-if="$data.openId === row.id"><td>detail</td></tr></template></tbody></table>
+</template>
+</rozie>
+`;
+
+  it('emits @for (… ; track …) { siblings } with no host DOM wrapper for a 2-root body', () => {
+    const { template, diagnostics } = emitTemplate(
+      lowerInline(MULTI),
+      createDefaultRegistry(),
+    );
+    // No ROZ720 — the :key supplies the track expression.
+    expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(template).toMatch(/@for \(row of [^;]*; track row\.id\)/);
+    expect(template).toContain('class="data"');
+    expect(template).toContain('class="detail"');
+    // Control-flow block, not a structural directive, and no literal <template>.
+    expect(template).not.toContain('*ngFor');
+    expect(template).not.toContain('<template');
+  });
+});

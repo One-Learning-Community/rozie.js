@@ -48,3 +48,30 @@ describe('emitTemplate — part= passthrough (SPEC-R3/R4b)', () => {
     expect(code).not.toMatch(/part="[^"]*data-rozie-s[^"]*"/);
   });
 });
+
+describe('<template r-for> multi-root loop body — Phase 50', () => {
+  // A `<template r-for>` lifts its children into a TemplateLoop body. With 2+
+  // roots Solid must wrap the per-iteration siblings in a JSX fragment
+  // `<>…</>` (an array of nodes — NO DOM wrapper) inside `<For>`.
+  const MULTI = `<rozie name="ForSolid">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody><template r-for="row in $data.rows" :key="row.id"><tr class="data"><td>{{ row.label }}</td></tr><tr class="detail" r-if="$data.openId === row.id"><td>detail</td></tr></template></tbody></table>
+</template>
+</rozie>
+`;
+
+  it('wraps a 2-root loop body in a JSX fragment <>…</> inside <For> (no DOM wrapper)', () => {
+    const ir = lowerInline(MULTI, 'ForSolid');
+    const { code } = emitSolid(ir, { filename: 'ForSolid.rozie', source: MULTI });
+    expect(code).toContain('<For each={');
+    // Per-iteration wrapper-free fragment wrapping both sibling roots.
+    expect(code).toMatch(/\{\(row\) => <>/);
+    expect(code).toContain('</>}</For>');
+    // Solid emits class bindings in JSX-expression form `class={"data"}`.
+    expect(code).toContain('class={"data"}');
+    expect(code).toContain('class={"detail"}');
+    // Transparent host — never a literal <template> element.
+    expect(code).not.toContain('<template');
+  });
+});
