@@ -70,6 +70,14 @@
   // Count of row-edit-commit emits (proves Escape / a rejected row does NOT fire it, and that
   // a row save fires it ONCE — not once-per-cell).
   rowCommitCount: 0,
+  // ── Cell-range readouts (req-7 / D-07) ──────────────────────────────────────────────
+  // Last range-change payload rendered "r0,c0:r1,c1" (anchor:focus), '' when no range. The
+  // spec asserts Shift+Arrow / Shift+Click extend the rectangle + range-change fires.
+  lastRange: '',
+  // Count of range-change emits (proves it fires from exactly one call site per extend).
+  rangeChangeCount: 0,
+  // The getSelectedRange() verb readout, surfaced on demand (proves the $expose handle).
+  selectedRangeReadout: '',
 }
 </data>
 
@@ -109,6 +117,31 @@ const callEditRow = (): void => {
   const api = $refs.dt
   if (api && api.editRow) api.editRow(1)
 }
+
+// range-change payload (req-7 / D-07) → "r0,c0:r1,c1" readout + a counter. Payload is
+// { anchor, focus } each a { rowIndex, colIndex } (or null). Arrives as arg0 directly.
+const fmtCorner = (p: { rowIndex: number; colIndex: number } | null): string =>
+  p ? p.rowIndex + ',' + p.colIndex : 'null'
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  $data.lastRange = payload ? fmtCorner(payload.anchor) + ':' + fmtCorner(payload.focus) : ''
+  $data.rangeChangeCount = $data.rangeChangeCount + 1
+}
+
+// Surface getSelectedRange() via the $expose handle (req-7) — the read-verb twin of the
+// range-change event. Resolve the handle at CALL time (never cache — the GridNavDemo lesson).
+const callGetSelectedRange = (): void => {
+  const api = $refs.dt
+  if (!api || !api.getSelectedRange) { $data.selectedRangeReadout = ''; return }
+  const r = api.getSelectedRange()
+  $data.selectedRangeReadout = fmtCorner(r ? r.anchor : null) + ':' + fmtCorner(r ? r.focus : null)
+}
+
+// Toggle ALL row selection via the handle (req-7 coexistence check) — proves the
+// row-selection slice and the cell-range layer do not corrupt each other.
+const callToggleAllRows = (): void => {
+  const api = $refs.dt
+  if (api && api.toggleAllRows) api.toggleAllRows(true)
+}
 </script>
 
 <template>
@@ -125,6 +158,14 @@ const callEditRow = (): void => {
     <span class="label">row-commit-count:</span>
     <span class="readout" data-testid="row-commit-count">{{ $data.rowCommitCount }}</span>
     <button type="button" data-testid="call-editrow" @click="callEditRow">editRow(1)</button>
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.lastRange }}</span>
+    <span class="label">range-count:</span>
+    <span class="readout" data-testid="range-count">{{ $data.rangeChangeCount }}</span>
+    <span class="label">getRange:</span>
+    <span class="readout" data-testid="selected-range-readout">{{ $data.selectedRangeReadout }}</span>
+    <button type="button" data-testid="call-getrange" @click="callGetSelectedRange">getSelectedRange()</button>
+    <button type="button" data-testid="call-toggleall" @click="callToggleAllRows">toggleAllRows</button>
   </div>
 
   <div data-testid="edit-table">
@@ -134,6 +175,7 @@ const callEditRow = (): void => {
       r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
       @row-edit-commit="onRowEditCommit($event)"
+      @range-change="onRangeChange($event)"
     >
       <!-- Four built-in editor column types (req-1). -->
       <Column field="name"   header="Name"   :editable="true" editor="text" />

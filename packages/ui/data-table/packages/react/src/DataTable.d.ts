@@ -50,6 +50,7 @@ export interface DataTableProps {
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
+  onRangeChange?: (...args: unknown[]) => void;
   onCellEditCommit?: (...args: unknown[]) => void;
   onRowEditCommit?: (...args: unknown[]) => void;
   children?: ReactNode;
@@ -87,6 +88,7 @@ export interface DataTableHandle {
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
   editRow: (...args: any[]) => any;
+  getSelectedRange: (...args: any[]) => any;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;

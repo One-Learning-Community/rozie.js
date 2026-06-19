@@ -24,6 +24,9 @@
   outline: var(--rdt-invalid-outline, 2px solid #d33);
   outline-offset: -2px;
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);

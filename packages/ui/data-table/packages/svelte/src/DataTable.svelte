@@ -39,6 +39,7 @@ interface Props {
   onreorderchange?: (...args: unknown[]) => void;
   onpinchange?: (...args: unknown[]) => void;
   onactivecellchange?: (...args: unknown[]) => void;
+  onrangechange?: (...args: unknown[]) => void;
   oncelleditcommit?: (...args: unknown[]) => void;
   onroweditcommit?: (...args: unknown[]) => void;
 }
@@ -86,6 +87,7 @@ let {
   onreorderchange,
   onpinchange,
   onactivecellchange,
+  onrangechange,
   oncelleditcommit,
   onroweditcommit
 }: Props = $props();
@@ -137,6 +139,8 @@ let invalidMsg = $state('');
 let editVer = $state(0);
 let editingRowIndex: any = $state(null);
 let rowDraft = $state({});
+let rangeAnchor: any = $state(null);
+let rangeFocus: any = $state(null);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -1845,19 +1849,43 @@ const onGridKeyDown = (e: any) => {
   let nextRow = prevRow;
   let nextCol = prevCol;
   let nextIsHeader = prevIsHeader;
-  if (key === 'ArrowRight') {
+  // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
+  // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
+  // fall through to a plain navigation move). Body cells only (no range from a header). The
+  // extendRange call owns focus + the range-change emit, so return immediately. ──────────
+  if (key === 'ArrowRight' && e.shiftKey && !activeIsHeader) {
     e.preventDefault();
+    extendRange(0, 1);
+    return;
+  } else if (key === 'ArrowLeft' && e.shiftKey && !activeIsHeader) {
+    e.preventDefault();
+    extendRange(0, -1);
+    return;
+  } else if (key === 'ArrowDown' && e.shiftKey && !activeIsHeader) {
+    e.preventDefault();
+    extendRange(1, 0);
+    return;
+  } else if (key === 'ArrowUp' && e.shiftKey && !activeIsHeader) {
+    e.preventDefault();
+    extendRange(-1, 0);
+    return;
+  } else if (key === 'ArrowRight') {
+    e.preventDefault();
+    clearRange();
     nextCol = moveCol(1);
   } else if (key === 'ArrowLeft') {
     e.preventDefault();
+    clearRange();
     nextCol = moveCol(-1);
   } else if (key === 'ArrowDown') {
     e.preventDefault();
+    clearRange();
     const m = moveRow(1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
   } else if (key === 'ArrowUp') {
     e.preventDefault();
+    clearRange();
     const m = moveRow(-1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
@@ -1969,8 +1997,54 @@ const syncActiveFromEvent = (e: any) => {
     if (Number.isFinite(row)) activeRow = row;
   }
   activeColIndex = col;
+  // A plain focus collapses any range back to the single active cell — EXCEPT (a) the
+  // programmatic settle of an in-flight extendRange (rangeTransition): that focus move lands
+  // ON the new range-focus corner and must NOT wipe the range we just set; and (b) the
+  // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
+  // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
+  // path owns the shift case and flags it here so the collapse is skipped.
+  if (rangeTransition) {
+    rangeTransition = false;
+  } else if (rangeClickPending) {
+    rangeClickPending = false;
+  } else {
+    clearRange();
+  }
   // The cell box (not an inner control) receiving focus = navigation mode.
   if (tgt === cellEl) activeInControl = false;
+};
+
+// onGridMouseDown: the Shift+Click range-extend seam (phase 51 req-7 / D-07). A focusin
+// event carries no reliable `shiftKey`, so the modifier MUST be read off the pointer event
+// — @mousedown fires BEFORE the cell's focusin and DOES carry shiftKey. A shift-held
+// mousedown on a BODY cell sets the range's moving corner to that cell (keeping the anchor),
+// riding the same data-row/data-col-index parse seam, then flags rangeClickPending so the
+// follow-up focusin does not collapse the range. A plain (non-shift) mousedown is ignored
+// here (the focusin owns the active-cell sync + the range collapse).
+// onGridMouseDown: the Shift+Click range-extend seam (phase 51 req-7 / D-07). A focusin
+// event carries no reliable `shiftKey`, so the modifier MUST be read off the pointer event
+// — @mousedown fires BEFORE the cell's focusin and DOES carry shiftKey. A shift-held
+// mousedown on a BODY cell sets the range's moving corner to that cell (keeping the anchor),
+// riding the same data-row/data-col-index parse seam, then flags rangeClickPending so the
+// follow-up focusin does not collapse the range. A plain (non-shift) mousedown is ignored
+// here (the focusin owns the active-cell sync + the range collapse).
+const onGridMouseDown = (e: any) => {
+  if (!isGrid() || !e || !e.shiftKey) return;
+  const tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  const cellEl = tgt.closest('[data-grid-cell]');
+  if (!cellEl) return;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+  const row = parseInt(rowAttr, 10);
+  const col = parseInt(colAttr, 10);
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+  setRangeFocus(row, col);
+  activeIsHeader = false;
+  activeRow = row;
+  activeColIndex = col;
+  rangeClickPending = true;
 };
 
 // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
@@ -2015,6 +2089,172 @@ const clampActiveCell = () => {
     const row = clamp(activeRow, 0, maxRow);
     if (row !== activeRow) activeRow = row;
   }
+};
+
+// ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
+// A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
+// (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
+// highlight reattaches to the correct cells across virtualization recycling (the
+// activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
+// range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
+// the row-selection slice (the two never touch each other's state).
+
+// inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
+// rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
+// the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
+// rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
+// range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
+// (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
+// range we just set. The flag suppresses that collapse for the in-flight focus settle (the
+// editTransition blur-guard precedent). A top-level let → React hoists to useRef.
+// ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
+// A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
+// (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
+// highlight reattaches to the correct cells across virtualization recycling (the
+// activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
+// range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
+// the row-selection slice (the two never touch each other's state).
+
+// inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
+// rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
+// the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
+// rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
+// range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
+// (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
+// range we just set. The flag suppresses that collapse for the in-flight focus settle (the
+// editTransition blur-guard precedent). A top-level let → React hoists to useRef.
+let rangeTransition = false;
+// rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
+// pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
+// to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
+// rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
+// pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
+// to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
+let rangeClickPending = false;
+const inRange = (rIdx: any, cIdx: any) => {
+  const a = rangeAnchor;
+  const f = rangeFocus;
+  if (!a || !f) return false;
+  const r0 = a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex;
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex;
+  const c0 = a.colIndex < f.colIndex ? a.colIndex : f.colIndex;
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex;
+  return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1;
+};
+
+// getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+// { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+// data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+// (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
+// getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+// { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+// data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+// (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
+export const getSelectedRange = () => ({
+  anchor: rangeAnchor,
+  focus: rangeFocus
+});
+
+// emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+// the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+// (useState on React), so re-reading right after the same-tick setState returns the STALE
+// pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+// here so the emitted payload matches the write. The single call site keeps the count
+// predictable (React multi-emit dedup, D-07). One-way notification.
+// emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+// the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+// (useState on React), so re-reading right after the same-tick setState returns the STALE
+// pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+// here so the emitted payload matches the write. The single call site keeps the count
+// predictable (React multi-emit dedup, D-07). One-way notification.
+const emitRangeChange = (anchor: any, focus: any) => {
+  onrangechange?.({
+    anchor,
+    focus
+  });
+};
+
+// extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+// bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+// from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+// only (header rows are not range-selectable). Emits range-change from this single site.
+// extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+// bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+// from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+// only (header rows are not range-selectable). Emits range-change from this single site.
+const extendRange = (dRow: any, dCol: any) => {
+  if (activeIsHeader) return;
+  const maxRow = bodyRowCount() - 1;
+  const maxCol = visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return;
+  // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
+  let anchor = rangeAnchor;
+  let focus = rangeFocus;
+  if (!anchor || !focus) {
+    anchor = {
+      rowIndex: activeRow,
+      colIndex: activeColIndex
+    };
+    focus = {
+      rowIndex: activeRow,
+      colIndex: activeColIndex
+    };
+  }
+  const nextRow = clamp(focus.rowIndex + dRow, 0, maxRow);
+  const nextCol = clamp(focus.colIndex + dCol, 0, maxCol);
+  const nextFocus = {
+    rowIndex: nextRow,
+    colIndex: nextCol
+  };
+  rangeAnchor = anchor;
+  rangeFocus = nextFocus;
+  // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
+  // from the range's leading edge, the spreadsheet convention).
+  activeRow = nextRow;
+  activeColIndex = nextCol;
+  // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
+  // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
+  rangeTransition = true;
+  focusActiveCell(nextRow, nextCol, false);
+  emitRangeChange(anchor, nextFocus);
+};
+
+// setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
+// seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
+// Emits range-change from this single site.
+// setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
+// seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
+// Emits range-change from this single site.
+const setRangeFocus = (rIdx: any, cIdx: any) => {
+  const maxRow = bodyRowCount() - 1;
+  const maxCol = visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return;
+  let anchor = rangeAnchor;
+  if (!anchor) anchor = {
+    rowIndex: activeRow,
+    colIndex: activeColIndex
+  };
+  const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow);
+  const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol);
+  const nextFocus = {
+    rowIndex: r,
+    colIndex: c
+  };
+  rangeAnchor = anchor;
+  rangeFocus = nextFocus;
+  emitRangeChange(anchor, nextFocus);
+};
+
+// clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+// range back to a single active cell). No emit on a clear (a collapse is not a selection
+// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+// clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+// range back to a single active cell). No emit on a clear (a collapse is not a selection
+// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+const clearRange = () => {
+  if (rangeAnchor == null && rangeFocus == null) return;
+  rangeAnchor = null;
+  rangeFocus = null;
 };
 
 // ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
@@ -3129,7 +3369,7 @@ data, dataDefault, colReg])(); untrack(() => { if (__rozieWatchInitial_0) { __ro
 })(); }); });
 </script>
 
-<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class="rdt-tr" role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
+<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class="rdt-tr" role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
 
 <style>
 :global {
@@ -3158,6 +3398,9 @@ data, dataDefault, colReg])(); untrack(() => { if (__rozieWatchInitial_0) { __ro
   .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[aria-invalid="true"][data-rozie-s-d5dcab4c] {
     outline: var(--rdt-invalid-outline, 2px solid #d33);
     outline-offset: -2px;
+  }
+  .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
+    background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
   }
   .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
   .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {

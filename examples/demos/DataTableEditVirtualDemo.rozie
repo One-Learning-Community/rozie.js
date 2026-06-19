@@ -52,6 +52,10 @@
   // Last cell-edit-commit payload readout (same contract as the non-virtual fixture).
   lastCommit: '',
   commitCount: 0,
+  // ── Cell-range readouts (req-7/9 — the index-based range must reattach across recycling) ──
+  lastRange: '',
+  rangeChangeCount: 0,
+  selectedRangeReadout: '',
 }
 </data>
 
@@ -86,6 +90,21 @@ const validateQty = (value: unknown): true | string => {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? true : 'must be >= 0'
 }
+
+// range-change → "r0,c0:r1,c1" readout + counter (req-7/9 — proves the index-based range
+// reattaches to the right cells across virtualization recycling).
+const fmtCorner = (p: { rowIndex: number; colIndex: number } | null): string =>
+  p ? p.rowIndex + ',' + p.colIndex : 'null'
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  $data.lastRange = payload ? fmtCorner(payload.anchor) + ':' + fmtCorner(payload.focus) : ''
+  $data.rangeChangeCount = $data.rangeChangeCount + 1
+}
+const callGetSelectedRange = (): void => {
+  const api = $refs.dt
+  if (!api || !api.getSelectedRange) { $data.selectedRangeReadout = ''; return }
+  const r = api.getSelectedRange()
+  $data.selectedRangeReadout = fmtCorner(r ? r.anchor : null) + ':' + fmtCorner(r ? r.focus : null)
+}
 </script>
 
 <template>
@@ -99,6 +118,11 @@ const validateQty = (value: unknown): true | string => {
     <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
     <span class="label">commit-count:</span>
     <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.lastRange }}</span>
+    <span class="label">getRange:</span>
+    <span class="readout" data-testid="selected-range-readout">{{ $data.selectedRangeReadout }}</span>
+    <button type="button" data-testid="call-getrange" @click="callGetSelectedRange">getSelectedRange()</button>
   </div>
 
   <div data-testid="edit-virtual-table">
@@ -109,6 +133,7 @@ const validateQty = (value: unknown): true | string => {
       :virtual="true"
       maxHeight="400px"
       @cell-edit-commit="onCellEditCommit($event)"
+      @range-change="onRangeChange($event)"
     >
       <Column field="name"   header="Name"   :editable="true" editor="text" />
       <Column field="qty"    header="Qty"    :editable="true" editor="number" :validate="validateQty" />

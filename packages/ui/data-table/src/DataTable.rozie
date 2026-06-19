@@ -310,6 +310,21 @@
   // single-cell draftValue, which only one editor can own). commitRow applies every key to the
   // row object in ONE fresh-array replace; cancelRow drops it (revert — never written). {} = none.
   rowDraft: {},
+
+  // ── Cell-range selection state (phase 51 req-7 / D-07) ──────────────────────────────
+  // The rectangular cell range is tracked as TWO index pairs over the FULL visible model —
+  // NEVER a stored DOM node (the activeRow/activeColIndex invariant, T-49: survives
+  // recycling; the highlight re-resolves to cells every render via the pure inRange() math).
+  // rangeAnchor = the fixed corner (seeded from the active cell when a range begins);
+  // rangeFocus = the moving corner (extended by Shift+Arrow / Shift+Click). The selected
+  // rectangle is the min/max box of the two. BOTH null = no range (the byte-identical-off
+  // baseline: inRange() always false → no range markup). This is ONE-WAY (D-07): exposed via
+  // the getSelectedRange verb + the range-change event, NEVER a model:true slice — the
+  // model:true count stays at 10, leaving the Angular multi-model-CVA condition untouched.
+  // It is a SEPARATE visual layer from the rowSelection slice (the two never corrupt each
+  // other — toggling a row checkbox leaves the range intact and vice versa).
+  rangeAnchor: null,
+  rangeFocus: null,
 }
 </data>
 
@@ -1779,10 +1794,18 @@ const onGridKeyDown = (e) => {
   let nextRow = prevRow
   let nextCol = prevCol
   let nextIsHeader = prevIsHeader
-  if (key === 'ArrowRight') { e.preventDefault(); nextCol = moveCol(1) }
-  else if (key === 'ArrowLeft') { e.preventDefault(); nextCol = moveCol(-1) }
-  else if (key === 'ArrowDown') { e.preventDefault(); const m = moveRow(1); nextRow = m.row; nextIsHeader = m.isHeader }
-  else if (key === 'ArrowUp') { e.preventDefault(); const m = moveRow(-1); nextRow = m.row; nextIsHeader = m.isHeader }
+  // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
+  // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
+  // fall through to a plain navigation move). Body cells only (no range from a header). The
+  // extendRange call owns focus + the range-change emit, so return immediately. ──────────
+  if (key === 'ArrowRight' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(0, 1); return }
+  else if (key === 'ArrowLeft' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(0, -1); return }
+  else if (key === 'ArrowDown' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(1, 0); return }
+  else if (key === 'ArrowUp' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(-1, 0); return }
+  else if (key === 'ArrowRight') { e.preventDefault(); clearRange(); nextCol = moveCol(1) }
+  else if (key === 'ArrowLeft') { e.preventDefault(); clearRange(); nextCol = moveCol(-1) }
+  else if (key === 'ArrowDown') { e.preventDefault(); clearRange(); const m = moveRow(1); nextRow = m.row; nextIsHeader = m.isHeader }
+  else if (key === 'ArrowUp') { e.preventDefault(); clearRange(); const m = moveRow(-1); nextRow = m.row; nextIsHeader = m.isHeader }
   else if (key === 'PageDown') { e.preventDefault(); const m = moveRow(GRID_PAGE_STEP); nextRow = m.row; nextIsHeader = m.isHeader }
   else if (key === 'PageUp') { e.preventDefault(); const m = moveRow(-GRID_PAGE_STEP); nextRow = m.row; nextIsHeader = m.isHeader }
   else if (key === 'Home') {
@@ -1853,8 +1876,47 @@ const syncActiveFromEvent = (e) => {
     if (Number.isFinite(row)) $data.activeRow = row
   }
   $data.activeColIndex = col
+  // A plain focus collapses any range back to the single active cell — EXCEPT (a) the
+  // programmatic settle of an in-flight extendRange (rangeTransition): that focus move lands
+  // ON the new range-focus corner and must NOT wipe the range we just set; and (b) the
+  // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
+  // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
+  // path owns the shift case and flags it here so the collapse is skipped.
+  if (rangeTransition) {
+    rangeTransition = false
+  } else if (rangeClickPending) {
+    rangeClickPending = false
+  } else {
+    clearRange()
+  }
   // The cell box (not an inner control) receiving focus = navigation mode.
   if (tgt === cellEl) $data.activeInControl = false
+}
+
+// onGridMouseDown: the Shift+Click range-extend seam (phase 51 req-7 / D-07). A focusin
+// event carries no reliable `shiftKey`, so the modifier MUST be read off the pointer event
+// — @mousedown fires BEFORE the cell's focusin and DOES carry shiftKey. A shift-held
+// mousedown on a BODY cell sets the range's moving corner to that cell (keeping the anchor),
+// riding the same data-row/data-col-index parse seam, then flags rangeClickPending so the
+// follow-up focusin does not collapse the range. A plain (non-shift) mousedown is ignored
+// here (the focusin owns the active-cell sync + the range collapse).
+const onGridMouseDown = (e) => {
+  if (!isGrid() || !e || !e.shiftKey) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  setRangeFocus(row, col)
+  $data.activeIsHeader = false
+  $data.activeRow = row
+  $data.activeColIndex = col
+  rangeClickPending = true
 }
 
 // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
@@ -1887,6 +1949,111 @@ const clampActiveCell = () => {
     const row = clamp($data.activeRow, 0, maxRow)
     if (row !== $data.activeRow) $data.activeRow = row
   }
+}
+
+// ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
+// A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
+// (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
+// highlight reattaches to the correct cells across virtualization recycling (the
+// activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
+// range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
+// the row-selection slice (the two never touch each other's state).
+
+// inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
+// rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
+// the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
+// rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
+// range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
+// (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
+// range we just set. The flag suppresses that collapse for the in-flight focus settle (the
+// editTransition blur-guard precedent). A top-level let → React hoists to useRef.
+let rangeTransition = false
+// rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
+// pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
+// to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
+let rangeClickPending = false
+
+const inRange = (rIdx, cIdx) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return false
+  const r0 = a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex
+  const c0 = a.colIndex < f.colIndex ? a.colIndex : f.colIndex
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1
+}
+
+// getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+// { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+// data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+// (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
+const getSelectedRange = () => ({ anchor: $data.rangeAnchor, focus: $data.rangeFocus })
+
+// emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+// the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+// (useState on React), so re-reading right after the same-tick setState returns the STALE
+// pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+// here so the emitted payload matches the write. The single call site keeps the count
+// predictable (React multi-emit dedup, D-07). One-way notification.
+const emitRangeChange = (anchor, focus) => { $emit('range-change', { anchor, focus }) }
+
+// extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+// bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+// from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+// only (header rows are not range-selectable). Emits range-change from this single site.
+const extendRange = (dRow, dCol) => {
+  if ($data.activeIsHeader) return
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
+  let anchor = $data.rangeAnchor
+  let focus = $data.rangeFocus
+  if (!anchor || !focus) {
+    anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+    focus = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  }
+  const nextRow = clamp(focus.rowIndex + dRow, 0, maxRow)
+  const nextCol = clamp(focus.colIndex + dCol, 0, maxCol)
+  const nextFocus = { rowIndex: nextRow, colIndex: nextCol }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
+  // from the range's leading edge, the spreadsheet convention).
+  $data.activeRow = nextRow
+  $data.activeColIndex = nextCol
+  // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
+  // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
+  rangeTransition = true
+  focusActiveCell(nextRow, nextCol, false)
+  emitRangeChange(anchor, nextFocus)
+}
+
+// setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
+// seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
+// Emits range-change from this single site.
+const setRangeFocus = (rIdx, cIdx) => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  let anchor = $data.rangeAnchor
+  if (!anchor) anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow)
+  const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol)
+  const nextFocus = { rowIndex: r, colIndex: c }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  emitRangeChange(anchor, nextFocus)
+}
+
+// clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+// range back to a single active cell). No emit on a clear (a collapse is not a selection
+// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+const clearRange = () => {
+  if ($data.rangeAnchor == null && $data.rangeFocus == null) return
+  $data.rangeAnchor = null
+  $data.rangeFocus = null
 }
 
 // ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
@@ -2592,6 +2759,7 @@ $expose({
   editCell,
   commitEditing,
   editRow,
+  getSelectedRange,
 })
 </script>
 
@@ -2677,6 +2845,7 @@ $expose({
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
+  @mousedown="onGridMouseDown($event)"
 >
   <thead class="rdt-thead" role="rowgroup">
     <tr
@@ -2816,9 +2985,10 @@ $expose({
         :data-row="wr.vi.index"
         :data-col-index="colIndexOf(wr.row, cellCtx)"
         :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }"
         :style="pinStyle(cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))"
+        :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null"
       >
         <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
           <slot
@@ -2922,6 +3092,7 @@ $expose({
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
+  @mousedown="onGridMouseDown($event)"
 >
   <thead class="rdt-thead" role="rowgroup">
     <tr
@@ -3076,9 +3247,10 @@ $expose({
         :data-row="rowIndexOf(row)"
         :data-col-index="colIndexOf(row, cellCtx)"
         :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }"
         :style="pinStyle(cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
+        :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null"
       >
         <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
              #selectCell; checkbox-only toggle (row body does NOT select). The
@@ -3247,6 +3419,12 @@ $expose({
 .rozie-data-table .rdt-td[aria-invalid="true"] {
   outline: var(--rdt-invalid-outline, 2px solid #d33);
   outline-offset: -2px;
+}
+/* Cell-range selection highlight (req-7 / D-07): a SEPARATE visual layer from the
+   row-selection slice — a background tint marking the rectangular range. Index-driven
+   (inRange()), so it reattaches to the correct cells across virtualization recycling. */
+.rozie-data-table .rdt-td.rdt-in-range {
+  background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
 }
 .rozie-data-table .rdt-th,
 .rozie-data-table .rdt-td {

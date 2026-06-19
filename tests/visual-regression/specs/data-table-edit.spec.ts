@@ -505,6 +505,45 @@ async function focusEntryCell(page: Page): Promise<void> {
   await focusBodyCell(page, 0, 0);
 }
 
+/** The set of `[data-row]:[data-col-index]` for every cell carrying data-in-range="true",
+ *  sorted (shadow-pierced) — to assert the selected rectangle's exact boundaries (req-7). */
+async function inRangeCells(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: Element[] = [];
+    const walk = (root: Document | ShadowRoot): void => {
+      out.push(...Array.from(root.querySelectorAll('[data-grid-cell][data-in-range="true"]')));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return out
+      .map((el) => `${el.getAttribute('data-row')}:${el.getAttribute('data-col-index')}`)
+      .sort();
+  });
+}
+
+/** Read the readout testid's trimmed text (shadow-pierced), '' when absent. */
+async function readoutText(page: Page, testid: string): Promise<string> {
+  return page.evaluate((id) => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector(`[data-testid="${id}"]`);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? (el.textContent || '').trim() : '';
+  }, testid);
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════
 // D-02 PIN-ROW PROBE (51-01) — the editing <tr> stays mounted in-flow out-of-window with
 //   monotonic aria-rowindex + invariant total scroll height. The hard cross-target
@@ -926,12 +965,93 @@ for (const target of TARGETS) {
     expect(await rowCommitCount(page)).toBe(1); // verb-entered row was Escaped → no commit.
   });
 
-  // req-7/8/9 — range + clipboard + virtualization survival (Wave-(c), Plan 51-04). Drives
-  // DataTableEditVirtualDemo + the clipboard harness proven above.
-  test.fixme(`data-table-edit [${target}]: Shift+Arrow range; TSV copy/paste skip-invalid; editor survives virtualization recycle (Plan 51-04)`, async () => {
-    // Pending Plan 51-04: Shift+Arrow/Shift+Click range distinct from row-selection;
-    // getSelectedRange + range-change; Ctrl/Cmd+C/V TSV with the D-03 skip rule; and the
-    // D-02 pin-row mechanism (proven in isolation by the probe above) wired into the real
-    // DataTable windowing so an open editor survives recycling in DataTableEditVirtualDemo.
+  // req-7 — cell-range selection (Wave-(c), Plan 51-04). Index-based, one-way, distinct from
+  // the row-selection slice. Drives DataTableEditDemo.
+  runnerFor(target)(`data-table-edit [${target}]: Shift+Arrow/Shift+Click rectangular range; getSelectedRange + range-change; distinct from row-selection`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEdit&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table')).toBeVisible({ timeout: 15_000 });
+
+    // Columns: name(0) qty(1) status(2) active(3) score(4). Settle the active cell at (1,1).
+    await focusBodyCellStable(page, 1, 1);
+
+    // ── Shift+ArrowDown then Shift+ArrowRight marks the rectangle anchored at (1,1) →
+    //    focus (2,2): the box is rows 1-2 × cols 1-2 (4 cells), each data-in-range="true". ──
+    await page.keyboard.press('Shift+ArrowDown');
+    await page.keyboard.press('Shift+ArrowRight');
+    await expect
+      .poll(async () => inRangeCells(page), { timeout: 10_000 })
+      .toEqual(['1:1', '1:2', '2:1', '2:2']);
+    // range-change fired (one emit per extend → 2) with the anchor:focus readout.
+    await expect.poll(async () => readoutText(page, 'range-count'), { timeout: 10_000 }).toBe('2');
+    expect(await readoutText(page, 'range-readout')).toBe('1,1:2,2');
+
+    // getSelectedRange() returns the integer index pairs (no DOM node, no row data).
+    await mount.getByTestId('call-getrange').click();
+    await expect
+      .poll(async () => readoutText(page, 'selected-range-readout'), { timeout: 10_000 })
+      .toBe('1,1:2,2');
+
+    // ── Shift+Click extends the range's moving corner to the clicked cell (0,0): the box is
+    //    now rows 0-1 × cols 0-1 anchored at (1,1). ────────────────────────────────────────
+    await page.evaluate(() => {
+      const findGridTable = (root: Document | ShadowRoot): Element | null => {
+        const direct = root.querySelector('table[role="grid"]');
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) {
+            const inner = findGridTable(sr);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      };
+      const grid = findGridTable(document);
+      const cell = grid?.querySelector('[data-grid-cell][data-row="0"][data-col-index="0"]') as HTMLElement | null;
+      if (cell) {
+        // Shift+Click: a shift-held mousedown carries shiftKey (a focusin does NOT), riding
+        // the @mousedown range-extend seam, then the cell focuses (the follow-up focusin syncs
+        // the active cell without collapsing the range).
+        cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, shiftKey: true }));
+        cell.focus();
+      }
+    });
+    await expect
+      .poll(async () => inRangeCells(page), { timeout: 10_000 })
+      .toEqual(['0:0', '0:1', '1:0', '1:1']);
+    expect(await readoutText(page, 'range-readout')).toBe('1,1:0,0');
+
+    // ── Range vs row-selection do NOT corrupt each other: toggling all rows leaves the
+    //    range intact; and a plain (non-shift) arrow collapses the range without touching
+    //    row selection. ────────────────────────────────────────────────────────────────────
+    await mount.getByTestId('call-toggleall').click();
+    // The range is unchanged after a row-selection toggle.
+    await mount.getByTestId('call-getrange').click();
+    await expect
+      .poll(async () => readoutText(page, 'selected-range-readout'), { timeout: 10_000 })
+      .toBe('1,1:0,0');
+    expect(await inRangeCells(page)).toEqual(['0:0', '0:1', '1:0', '1:1']);
+
+    // A plain ArrowDown (no shift) collapses the range (no data-in-range cells remain).
+    await focusBodyCellStable(page, 1, 1);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => inRangeCells(page), { timeout: 10_000 }).toEqual([]);
+  });
+
+  // req-8 — clipboard TSV copy/paste + drag-fill (Wave-(c), Plan 51-04 Task 2). Filled below.
+  test.fixme(`data-table-edit [${target}]: Ctrl/Cmd+C/V TSV skip-invalid + N-of-M announce; drag-fill value-copy; paste-as-text (Plan 51-04 Task 2)`, async () => {
+    // Pending Plan 51-04 Task 2: copyRange→TSV, pasteRange (D-03 skip rule + N-of-M aria-live),
+    // fillRange (D-04 value-copy only), and the T-51-01 paste-as-text security assertion.
+  });
+
+  // req-9 — editor + range survive virtualization recycling (Wave-(c), Plan 51-04 Task 3).
+  test.fixme(`data-table-edit [${target}]: open editor + index-based range survive virtualization recycle (Plan 51-04 Task 3)`, async () => {
+    // Pending Plan 51-04 Task 3: the D-02 pin-row mechanism (proven in isolation by the probe
+    // above) wired into the real DataTable windowing so an open editor + the index-based range
+    // survive recycling in DataTableEditVirtualDemo.
   });
 }

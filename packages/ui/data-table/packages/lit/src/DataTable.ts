@@ -88,6 +88,9 @@ export default class DataTable extends SignalWatcher(LitElement) {
   outline: var(--rdt-invalid-outline, 2px solid #d33);
   outline-offset: -2px;
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
@@ -349,6 +352,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _editVer = signal(0);
   private _editingRowIndex = signal(null);
   private _rowDraft = signal({});
+  private _rangeAnchor = signal(null);
+  private _rangeFocus = signal(null);
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
@@ -741,7 +746,7 @@ ${!!this._invalidMsg.value ? html`<div class="rdt-sr-live" role="status" aria-li
 
 
 ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c>
-<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${this._rows.value.length} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} data-rozie-s-d5dcab4c>
+<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${this._rows.value.length} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} @mousedown=${($event: Event) => { this.onGridMouseDown($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
@@ -775,7 +780,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     </tr>
     
     ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(wr.row.id)} data-row=${rozieAttr(wr.vi.index)} aria-rowindex=${rozieAttr(wr.vi.index + 1)} data-index=${rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(this.visibleCellsFor(wr.row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(wr.vi.index)} data-col-index=${rozieAttr(this.colIndexOf(wr.row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(wr.vi.index), this.colIndexOf(wr.row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(wr.vi.index, this.colIndexOf(wr.row, cellCtx)))} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(wr.row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(wr.vi.index)} data-col-index=${rozieAttr(this.colIndexOf(wr.row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(wr.vi.index), this.colIndexOf(wr.row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(wr.vi.index, this.colIndexOf(wr.row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>
         ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: wr.row.original, checked: this.rowIsSelected(wr.row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(wr.row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(wr.row)} @change=${($event: Event) => { this.onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />
@@ -795,7 +800,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     </tr>
   </tbody>
 </table>
-</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} data-rozie-s-d5dcab4c>
+</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} @mousedown=${($event: Event) => { this.onGridMouseDown($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
@@ -830,7 +835,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)))} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>
         
         ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
@@ -1884,19 +1889,43 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   let nextRow = prevRow;
   let nextCol = prevCol;
   let nextIsHeader = prevIsHeader;
-  if (key === 'ArrowRight') {
+  // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
+  // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
+  // fall through to a plain navigation move). Body cells only (no range from a header). The
+  // extendRange call owns focus + the range-change emit, so return immediately. ──────────
+  if (key === 'ArrowRight' && e.shiftKey && !this._activeIsHeader.value) {
     e.preventDefault();
+    this.extendRange(0, 1);
+    return;
+  } else if (key === 'ArrowLeft' && e.shiftKey && !this._activeIsHeader.value) {
+    e.preventDefault();
+    this.extendRange(0, -1);
+    return;
+  } else if (key === 'ArrowDown' && e.shiftKey && !this._activeIsHeader.value) {
+    e.preventDefault();
+    this.extendRange(1, 0);
+    return;
+  } else if (key === 'ArrowUp' && e.shiftKey && !this._activeIsHeader.value) {
+    e.preventDefault();
+    this.extendRange(-1, 0);
+    return;
+  } else if (key === 'ArrowRight') {
+    e.preventDefault();
+    this.clearRange();
     nextCol = this.moveCol(1);
   } else if (key === 'ArrowLeft') {
     e.preventDefault();
+    this.clearRange();
     nextCol = this.moveCol(-1);
   } else if (key === 'ArrowDown') {
     e.preventDefault();
+    this.clearRange();
     const m = this.moveRow(1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
   } else if (key === 'ArrowUp') {
     e.preventDefault();
+    this.clearRange();
     const m = this.moveRow(-1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
@@ -1994,8 +2023,40 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     if (Number.isFinite(row)) this._activeRow.value = row;
   }
   this._activeColIndex.value = col;
+  // A plain focus collapses any range back to the single active cell — EXCEPT (a) the
+  // programmatic settle of an in-flight extendRange (rangeTransition): that focus move lands
+  // ON the new range-focus corner and must NOT wipe the range we just set; and (b) the
+  // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
+  // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
+  // path owns the shift case and flags it here so the collapse is skipped.
+  if (this.rangeTransition) {
+    this.rangeTransition = false;
+  } else if (this.rangeClickPending) {
+    this.rangeClickPending = false;
+  } else {
+    this.clearRange();
+  }
   // The cell box (not an inner control) receiving focus = navigation mode.
   if (tgt === cellEl) this._activeInControl.value = false;
+};
+
+  onGridMouseDown = (e: any) => {
+  if (!this.isGrid() || !e || !e.shiftKey) return;
+  const tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  const cellEl = tgt.closest('[data-grid-cell]');
+  if (!cellEl) return;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+  const row = parseInt(rowAttr, 10);
+  const col = parseInt(colAttr, 10);
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+  this.setRangeFocus(row, col);
+  this._activeIsHeader.value = false;
+  this._activeRow.value = row;
+  this._activeColIndex.value = col;
+  this.rangeClickPending = true;
 };
 
   onGridFocusOut = (e: any) => {
@@ -2016,6 +2077,100 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     const row = this.clamp(this._activeRow.value, 0, maxRow);
     if (row !== this._activeRow.value) this._activeRow.value = row;
   }
+};
+
+  rangeTransition = false;
+
+  rangeClickPending = false;
+
+  inRange = (rIdx: any, cIdx: any) => {
+  const a = this._rangeAnchor.value;
+  const f = this._rangeFocus.value;
+  if (!a || !f) return false;
+  const r0 = a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex;
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex;
+  const c0 = a.colIndex < f.colIndex ? a.colIndex : f.colIndex;
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex;
+  return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1;
+};
+
+  getSelectedRange = () => ({
+  anchor: this._rangeAnchor.value,
+  focus: this._rangeFocus.value
+});
+
+  emitRangeChange = (anchor: any, focus: any) => {
+  this.dispatchEvent(new CustomEvent("range-change", {
+    detail: {
+      anchor,
+      focus
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  extendRange = (dRow: any, dCol: any) => {
+  if (this._activeIsHeader.value) return;
+  const maxRow = this.bodyRowCount() - 1;
+  const maxCol = this.visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return;
+  // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
+  let anchor = this._rangeAnchor.value;
+  let focus = this._rangeFocus.value;
+  if (!anchor || !focus) {
+    anchor = {
+      rowIndex: this._activeRow.value,
+      colIndex: this._activeColIndex.value
+    };
+    focus = {
+      rowIndex: this._activeRow.value,
+      colIndex: this._activeColIndex.value
+    };
+  }
+  const nextRow = this.clamp(focus.rowIndex + dRow, 0, maxRow);
+  const nextCol = this.clamp(focus.colIndex + dCol, 0, maxCol);
+  const nextFocus = {
+    rowIndex: nextRow,
+    colIndex: nextCol
+  };
+  this._rangeAnchor.value = anchor;
+  this._rangeFocus.value = nextFocus;
+  // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
+  // from the range's leading edge, the spreadsheet convention).
+  this._activeRow.value = nextRow;
+  this._activeColIndex.value = nextCol;
+  // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
+  // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
+  this.rangeTransition = true;
+  this.focusActiveCell(nextRow, nextCol, false);
+  this.emitRangeChange(anchor, nextFocus);
+};
+
+  setRangeFocus = (rIdx: any, cIdx: any) => {
+  const maxRow = this.bodyRowCount() - 1;
+  const maxCol = this.visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return;
+  let anchor = this._rangeAnchor.value;
+  if (!anchor) anchor = {
+    rowIndex: this._activeRow.value,
+    colIndex: this._activeColIndex.value
+  };
+  const r = this.clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow);
+  const c = this.clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol);
+  const nextFocus = {
+    rowIndex: r,
+    colIndex: c
+  };
+  this._rangeAnchor.value = anchor;
+  this._rangeFocus.value = nextFocus;
+  this.emitRangeChange(anchor, nextFocus);
+};
+
+  clearRange = () => {
+  if (this._rangeAnchor.value == null && this._rangeFocus.value == null) return;
+  this._rangeAnchor.value = null;
+  this._rangeFocus.value = null;
 };
 
   activeCellColumnId = () => {
