@@ -1,7 +1,7 @@
 import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -112,6 +112,11 @@ interface CellCtx {
   column: any;
   row: any;
   value: any;
+}
+
+interface DetailCtx {
+  $implicit: { row: any };
+  row: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -361,12 +366,19 @@ function rozieToken(key: string): InjectionToken<unknown> {
       </thead>
 
       <tbody class="rdt-tbody" role="rowgroup">
+        
         @for (row of rows(); track row.id) {
-    <tr class="rdt-tr" role="row">
+
+        <tr class="rdt-tr" role="row" [attr.data-depth]="rozieAttr(row.depth)">
           @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="bodyCellStyle(row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)">
             
-            @if (isSelectColumn(cellCtx.column.id)) {
+            @if (isExpanderColumn(cellCtx.column.id)) {
+    <span style="display:contents">
+              @if (rowCanExpand(row)) {
+    <button type="button" class="rdt-expander" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
+    }</span>
+    } @else if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
     <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cellCtx)" />
@@ -408,6 +420,14 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }</td>
     }
         </tr>
+        
+        @if (rowShowsDetail(row)) {
+    <tr class="rdt-detail-row" role="row" [attr.data-detail-row]="rozieAttr(row.id)">
+          <td class="rdt-detail-cell" [attr.colspan]="rozieAttr(visibleColCount())">
+            <ng-container *ngTemplateOutlet="(detailTpl ?? templates()?.['detail']); context: { $implicit: { row: row.original }, row: row.original }" />
+          </td>
+        </tr>
+    }
     }
       </tbody>
     </table>
@@ -690,6 +710,9 @@ export class DataTable {
     pageSize: 10
   }))());
   manual = input<boolean>(false);
+  expandable = input<boolean>(false);
+  expanded = model<Record<string, any> | boolean>((() => ({}))());
+  getSubRows = input<((...args: unknown[]) => unknown) | null>(null);
   rowSelection = model<Record<string, any>>((() => ({}))());
   columnVisibility = model<Record<string, any>>((() => ({}))());
   columnSizing = model<Record<string, any>>((() => ({}))());
@@ -712,6 +735,7 @@ export class DataTable {
     pageSize: 10
   });
   rowSelectionDefault = signal({});
+  expandedDefault = signal({});
   columnVisibilityDefault = signal({});
   columnSizingDefault = signal({});
   columnOrderDefault = signal<any[]>([]);
@@ -748,6 +772,7 @@ export class DataTable {
   pasteAnnounce = signal('');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   sortChange = output<unknown>({ alias: 'sort-change' });
+  expandedChange = output<unknown>({ alias: 'expanded-change' });
   filterChange = output<unknown>({ alias: 'filter-change' });
   pageChange = output<unknown>({ alias: 'page-change' });
   selectionChange = output<unknown>({ alias: 'selection-change' });
@@ -772,6 +797,7 @@ export class DataTable {
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
+  @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
 
@@ -793,7 +819,7 @@ export class DataTable {
       this.lastDataLen = d.length;
       this.reFeed();
     });
-    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length,
+    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.expanded(), this.expandable(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length,
     // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
     // even when the fresh array is the SAME length (a single-cell edit replaces one row
     // object → new array ref, identical length → the .length key alone would miss it). The
@@ -805,6 +831,7 @@ export class DataTable {
   }
 
   ngAfterViewInit() {
+    const __getSubRows = this.getSubRows();
     const __manual = this.manual();
     const __selectionMode = this.selectionMode();
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -830,6 +857,16 @@ export class DataTable {
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
+      // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
+      // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
+      // (byte-identical-off, req-10). getSubRows is the TABLE-level child accessor (NOT a
+      // ColumnDef field). getRowCanExpand makes EVERY row expandable for the #detail seam
+      // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
+      // default `!!subRows.length` rule applies (only parents with children expand).
+      getExpandedRowModel: getExpandedRowModel(),
+      getSubRows: __getSubRows || undefined,
+      getRowCanExpand: this.expandable() === true && __getSubRows == null ? () => true : undefined,
+      onExpandedChange: this.onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -990,6 +1027,10 @@ export class DataTable {
     columnFilters: this.columnFilters() != null ? this.columnFilters() : this.columnFiltersDefault(),
     pagination: this.pagination() != null ? this.pagination() : this.paginationDefault(),
     rowSelection: this.rowSelection() != null ? this.rowSelection() : this.rowSelectionDefault(),
+    // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+    // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+    // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+    expanded: this.expanded() != null ? this.expanded() : this.expandedDefault(),
     columnVisibility: this.columnVisibility() != null ? this.columnVisibility() : this.columnVisibilityDefault(),
     columnSizing: this.columnSizing() != null ? this.columnSizing() : this.columnSizingDefault(),
     columnOrder: this.columnOrder() != null ? this.columnOrder() : this.columnOrderDefault(),
@@ -1027,6 +1068,8 @@ export class DataTable {
         // filtered (and renders no per-column filter input in the chrome below).
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
+        // Expandable-rows reserved per-column metadata (phase 50, D-04).
+        expandable: c.expandable === true,
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -1052,6 +1095,8 @@ export class DataTable {
         enableSorting: spec.sortable === true,
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
+        // Expandable-rows reserved per-column metadata (phase 50, D-04).
+        expandable: spec.expandable === true,
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -1068,9 +1113,27 @@ export class DataTable {
     return out;
   };
   SELECT_COL_ID = '__rdt_select';
+  EXPANDER_COL_ID = '__rdt_expander';
   selectionEnabled = () => this.selectionMode() === 'single' || this.selectionMode() === 'multiple';
   tableColumns = () => {
     const cols = this.columnDefs();
+    // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+    // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+    // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+    // → byte-identical-off (req-10).
+    let withExpander = cols;
+    if (this.expandable() === true) {
+      const expanderCol = {
+        id: this.EXPANDER_COL_ID,
+        enableSorting: false,
+        enableColumnFilter: false,
+        filterable: false,
+        isExpanderColumn: true,
+        pinned: '',
+        width: ''
+      };
+      withExpander = [expanderCol].concat(cols);
+    }
     if (this.selectionEnabled()) {
       const selectCol = {
         id: this.SELECT_COL_ID,
@@ -1081,9 +1144,9 @@ export class DataTable {
         pinned: '',
         width: ''
       };
-      return [selectCol].concat(cols);
+      return [selectCol].concat(withExpander);
     }
-    return cols;
+    return withExpander;
   };
   writeSorting = (next: any) => {
     if (this.programmatic) return;
@@ -1094,6 +1157,14 @@ export class DataTable {
     this.programmatic--;
   };
   applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
+  writeExpanded = (next: any) => {
+    if (this.programmatic) return;
+    this.programmatic++;
+    this.expandedDefault.set(next); // fresh value only (never in-place)
+    this.expanded.set(next); // two-way emit if bound (no-op-diff if not)
+    this.expandedChange.emit(next);
+    this.programmatic--;
+  };
   writeGlobalFilter = (next: any) => {
     if (this.programmatic) return;
     this.programmatic++;
@@ -1187,6 +1258,9 @@ export class DataTable {
   refreshRowModel: any = null;
   onSortingChangeCb = (updater: any) => {
     this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
+  };
+  onExpandedChangeCb = (updater: any) => {
+    this.writeExpanded(this.applyUpdater(updater, this.currentState().expanded));
   };
   onGlobalFilterChangeCb = (updater: any) => {
     this.writeGlobalFilter(this.applyUpdater(updater, this.currentState().globalFilter));
@@ -1432,6 +1506,13 @@ export class DataTable {
       state: this.currentState(),
       enableRowSelection: this.selectionMode() !== 'none',
       enableMultiRowSelection: this.selectionMode() === 'multiple',
+      // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
+      // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
+      // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
+      getExpandedRowModel: getExpandedRowModel(),
+      getSubRows: this.getSubRows() || undefined,
+      getRowCanExpand: this.expandable() === true && this.getSubRows() == null ? () => true : undefined,
+      onExpandedChange: this.onExpandedChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: this.onSortingChangeCb,
@@ -1640,6 +1721,22 @@ export class DataTable {
     this.table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10);
   };
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
+  isExpanderColumn = (colId: any) => colId === this.EXPANDER_COL_ID;
+  rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+  rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
+  rowShowsDetail = (row: any) => this.getSubRows() == null && this.rowIsExpanded(row);
+  onToggleExpand = (row: any, evt: any) => {
+    if (!row || !row.toggleExpanded) return;
+    row.toggleExpanded();
+  };
+  bodyCellStyle = (row: any, colId: any) => {
+    const base = this.pinStyle(colId);
+    if (this.isExpanderColumn(colId) && row && row.depth) {
+      const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem';
+      return base ? base + ';' + pad : pad;
+    }
+    return base;
+  };
   stopEvent = (evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
   };
@@ -2973,11 +3070,37 @@ export class DataTable {
     this.activeRow.set(0);
     this.activeColIndex.set(0);
   };
+  toggleRowExpanded = (rowId: any) => {
+    if (!this.table) return;
+    const target = String(rowId);
+    const flat = this.table.getCoreRowModel().flatRows;
+    for (const r of flat as any) {
+      if (r.id === target || r.original && String(r.original.id) === target) {
+        r.toggleExpanded();
+        return;
+      }
+    }
+  };
+  expandAll = () => {
+    if (!this.table) return;
+    this.table.toggleAllRowsExpanded(true);
+  };
+  collapseAll = () => {
+    if (!this.table) return;
+    this.table.resetExpanded(true);
+  };
+  getExpandedRows = () => {
+    if (!this.table) return [];
+    const out = [];
+    const flat = this.table.getCoreRowModel().flatRows;
+    for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
+    return out;
+  };
 
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | EditorCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | EditorCtx | CellCtx {
+  ): _ctx is DefaultCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | EditorCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | EditorCtx | CellCtx | DetailCtx {
     return true;
   }
 

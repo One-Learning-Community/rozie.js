@@ -1581,6 +1581,40 @@ const onPageSizeChange = (evt) => {
 // Detect the auto-injected leading checkbox column by its constant id (template uses
 // this to render checkbox chrome instead of an accessor value).
 const isSelectColumn = (colId) => colId === SELECT_COL_ID
+// ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+// isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+// isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+// reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+// re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+// visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+// listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
+const isExpanderColumn = (colId) => colId === EXPANDER_COL_ID
+const rowCanExpand = (row) => !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand())
+const rowIsExpanded = (row) => !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded())
+// rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+// row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
+// $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+const rowShowsDetail = (row) => ($props.getSubRows == null && rowIsExpanded(row))
+// Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+// fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+// Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+// a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
+const onToggleExpand = (row, evt) => {
+  if (!row || !row.toggleExpanded) return
+  row.toggleExpanded()
+}
+// bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+// left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+// Only the expander column indents (the tree affordance lives in its dedicated column);
+// data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
+const bodyCellStyle = (row, colId) => {
+  const base = pinStyle(colId)
+  if (isExpanderColumn(colId) && row && row.depth) {
+    const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem'
+    return base ? (base + ';' + pad) : pad
+  }
+  return base
+}
 // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
 // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
 // on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
@@ -3217,9 +3251,60 @@ const clearActiveCell = () => {
   $data.activeColIndex = 0
 }
 
+// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+// one expanded-change. ──────────────────────────────────────────────────────────────────
+
+// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+// rows regardless of current expansion) so a collapsed parent is still resolvable.
+const toggleRowExpanded = (rowId) => {
+  if (!table) return
+  const target = String(rowId)
+  const flat = table.getCoreRowModel().flatRows
+  for (const r of flat) {
+    if (r.id === target || (r.original && String(r.original.id) === target)) {
+      r.toggleExpanded()
+      return
+    }
+  }
+}
+
+// expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+// literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
+const expandAll = () => {
+  if (!table) return
+  table.toggleAllRowsExpanded(true)
+}
+
+// collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+// blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
+const collapseAll = () => {
+  if (!table) return
+  table.resetExpanded(true)
+}
+
+// getExpandedRows() — return the original row data for every currently-expanded row
+// (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+// filters by getIsExpanded(). Empty when nothing is expanded.
+const getExpandedRows = () => {
+  if (!table) return []
+  const out = []
+  const flat = table.getCoreRowModel().flatRows
+  for (const r of flat) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original)
+  return out
+}
+
 $expose({
   sortColumn,
   clearSorting,
+  toggleRowExpanded,
+  expandAll,
+  collapseAll,
+  getExpandedRows,
   getColumnDefs,
   toggleAllRows,
   clearSelection,
@@ -3728,11 +3813,15 @@ $expose({
   </thead>
 
   <tbody class="rdt-tbody" role="rowgroup">
+    <!-- D-04 expand seam (the canonical shape Wave 3 grouping reuses): each keyed iteration
+         is a <template r-for> (wrapper-free multi-root, core e6ac185d) holding the data <tr>
+         followed by a conditional #detail <tr>. getSubRows children arrive as ordinary
+         depth-indented rows in $data.rows (NO nested r-for — Pitfall 1). -->
+    <template r-for="row in $data.rows" :key="row.id">
     <tr
       class="rdt-tr"
       role="row"
-      r-for="row in $data.rows"
-      :key="row.id"
+      :data-depth="row.depth"
     >
       <td
         class="rdt-td"
@@ -3745,10 +3834,25 @@ $expose({
         :data-col-index="colIndexOf(row, cellCtx)"
         :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }"
-        :style="pinStyle(cellCtx.column.id)"
+        :style="bodyCellStyle(row, cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
         :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null"
       >
+        <!-- auto-injected chevron expander cell (phase 50, D-04) — a native <button>
+             (handles Enter/Space → click natively; NO explicit @keydown.enter/.space which
+             would double-toggle). aria-expanded reflects row.getIsExpanded(); the chevron
+             renders only when row.getCanExpand(). -->
+        <span style="display:contents" r-if="isExpanderColumn(cellCtx.column.id)">
+          <button
+            r-if="rowCanExpand(row)"
+            type="button"
+            class="rdt-expander"
+            data-expander
+            :aria-expanded="!!rowIsExpanded(row)"
+            :aria-label="rowIsExpanded(row) ? 'Collapse row' : 'Expand row'"
+            @click="onToggleExpand(row, $event)"
+          >{{ rowIsExpanded(row) ? '▾' : '▸' }}</button>
+        </span>
         <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
              #selectCell; checkbox-only toggle (row body does NOT select). The
              conditional branches use `display:contents` <span> wrappers (NOT
@@ -3758,7 +3862,7 @@ $expose({
              DocumentFragment → never displayed → empty cells). A real element with
              r-if/r-else lowers cleanly on all six; `display:contents` keeps it
              layout-transparent so the <td> box is unaffected. -->
-        <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
+        <span style="display:contents" r-else-if="isSelectColumn(cellCtx.column.id)">
           <slot
             name="selectCell"
             :row="row.original"
@@ -3858,6 +3962,21 @@ $expose({
         ></span>
       </td>
     </tr>
+    <!-- #detail row (phase 50 req-2, D-04): the ONLY genuinely additive DOM row — renders
+         the #detail scoped slot ({ row }) under an expanded row, ONLY in #detail mode (no
+         getSubRows; rowShowsDetail gates it). The React render-prop edge (documented
+         divergence). Sibling of the data <tr> inside the same <template r-for> iteration. -->
+    <tr
+      r-if="rowShowsDetail(row)"
+      class="rdt-detail-row"
+      role="row"
+      :data-detail-row="row.id"
+    >
+      <td class="rdt-detail-cell" :colspan="visibleColCount()">
+        <slot name="detail" :row="row.original" />
+      </td>
+    </tr>
+    </template>
   </tbody>
 </table>
 

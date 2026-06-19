@@ -171,6 +171,9 @@ import '@rozie-ui/data-table-react/themes/shadcn.css';    // or material.css, bo
 | `columnFilters` | `Array` | `[]` | ✓ |  |
 | `pagination` | `Object` | `{…}` | ✓ |  |
 | `manual` | `Boolean` | `false` |  |  |
+| `expandable` | `Boolean` | `false` |  |  |
+| `expanded` | `any` | `{}` | ✓ |  |
+| `getSubRows` | `Function` | `null` |  |  |
 | `rowSelection` | `Object` | `{}` | ✓ |  |
 | `columnVisibility` | `Object` | `{}` | ✓ |  |
 | `columnSizing` | `Object` | `{}` | ✓ |  |
@@ -187,6 +190,7 @@ import '@rozie-ui/data-table-react/themes/shadcn.css';    // or material.css, bo
 | Event | Description |
 | --- | --- |
 | `sort-change` | Fired when the sort state changes (header click / shift-click multi-sort / a `sortColumn`/`clearSorting` call). Payload is the fresh `SortingState` array `[{ id, desc }]`. |
+| `expanded-change` | Fired (phase 50) when the expanded-row set changes (an expander chevron toggle — click / Enter / Space — or a `toggleRowExpanded`/`expandAll`/`collapseAll` call). Fires exactly once per change (the echo-guarded write funnel dedups the React multi-render re-entry, D-07) and REGARDLESS of whether `r-model:expanded` is bound. Payload is the fresh `ExpandedState` — a `{ [rowId]: true }` object, or the `true` literal after `expandAll` (Pitfall 2: it is passed through verbatim — never `Object.keys` it without a `=== true` guard). |
 | `filter-change` | Fired when a filter changes. Payload is `{ globalFilter }` for the global search box or `{ columnFilters }` (the fresh `ColumnFiltersState` `[{ id, value }]`) for a per-column filter — both surface through this one event. |
 | `page-change` | Fired when pagination changes (prev/next, a page-size change, or a `setPage`/`setRowsPerPage` call). Payload is the fresh `{ pageIndex, pageSize }` object. |
 | `selection-change` | Fired when the row selection changes (a row/select-all checkbox toggle or a `toggleAllRows`/`clearSelection` call). Payload is the fresh `RowSelectionState` `{ [rowId]: true }` object. |
@@ -207,6 +211,10 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | --- | --- |
 | `sortColumn` | Toggle (or set) the sort for a column — `sortColumn(colId, desc?)`. Drives table-core so `sort-change` fires with the fresh `SortingState`. |
 | `clearSorting` | Clear all sorting — `clearSorting()`. Resets to the unsorted core row model and fires `sort-change`. |
+| `toggleRowExpanded` | Toggle ONE row's expanded state (phase 50 req-3) — `toggleRowExpanded(rowId)` where `rowId` is the consumer's row `id` (the data field) OR the table-core row id (both resolve). Scans the core flat-row set so a collapsed parent is still resolvable. Drives table-core so `expanded-change` fires with the fresh `ExpandedState`. Multi-expand: it does not collapse other open rows. |
+| `expandAll` | Open every expandable row (phase 50 req-3) — `expandAll()`. Drives table-core (`toggleAllRowsExpanded(true)`) so `expanded-change` fires; the payload may be the `true` expand-all literal (Pitfall 2). |
+| `collapseAll` | Collapse every row (phase 50 req-3) — `collapseAll()`. Resets the expanded set to a blank state (`resetExpanded(true)` → `{}`) and fires `expanded-change` with `{}`. |
+| `getExpandedRows` | Return the original row data for the currently-expanded rows (phase 50 req-3) — `getExpandedRows()` → `unknown[]` (empty when nothing is expanded). The read-verb twin of the `expanded-change` event. |
 | `getColumnDefs` | Return the resolved `ColumnDef[]` (the id-keyed LWW union of the `:columns` config array and the `<Column>` children) — `getColumnDefs()`. |
 | `toggleAllRows` | Select or clear all (filtered) rows — `toggleAllRows(value)`. Drives table-core so `selection-change` fires with the fresh `RowSelectionState`. |
 | `clearSelection` | Clear the row selection — `clearSelection()`. Fires `selection-change` with `{}`. |
@@ -249,3 +257,4 @@ All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metad
 | selectCell | row, checked, toggle |
 | editor | columnId, column, row, value, commit, cancel |
 | cell | columnId, column, row, value |
+| detail | row |

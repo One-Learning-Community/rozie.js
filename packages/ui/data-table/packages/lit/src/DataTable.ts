@@ -4,7 +4,7 @@ import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signa
 import { createLitControllableProperty, rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -57,6 +57,10 @@ interface RozieCellSlotCtx {
   column: unknown;
   row: unknown;
   value: unknown;
+}
+
+interface RozieDetailSlotCtx {
+  row: unknown;
 }
 
 @customElement('rozie-data-table')
@@ -306,6 +310,10 @@ export default class DataTable extends SignalWatcher(LitElement) {
   pageSize: 10
 }, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) manual: boolean = false;
+  @property({ type: Boolean, reflect: true }) expandable: boolean = false;
+  @property({ type: Object, attribute: 'expanded' }) _expanded_attr: any | boolean = {};
+  private _expandedControllable = createLitControllableProperty<any | boolean>({ host: this, eventName: 'expanded-change', defaultValue: {}, initialControlledValue: undefined });
+  @property({ type: Function }) getSubRows: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Object, attribute: 'row-selection' }) _rowSelection_attr: any = {};
   private _rowSelectionControllable = createLitControllableProperty<any>({ host: this, eventName: 'row-selection-change', defaultValue: {}, initialControlledValue: undefined });
   @property({ type: Object, attribute: 'column-visibility' }) _columnVisibility_attr: any = {};
@@ -336,6 +344,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   pageSize: 10
 });
   private _rowSelectionDefault = signal({});
+  private _expandedDefault = signal({});
   private _columnVisibilityDefault = signal({});
   private _columnSizingDefault = signal({});
   private _columnOrderDefault = signal([]);
@@ -409,6 +418,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
   @property({ attribute: false }) cell?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => unknown;
+  @state() private _hasSlotDetail = false;
+  @queryAssignedElements({ slot: 'detail', flatten: true }) private _slotDetailElements!: Element[];
+  @property({ attribute: false }) detail?: (scope: { row: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -481,6 +493,17 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="detail"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDetail = this._slotDetailElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
@@ -491,6 +514,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
     this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
+    this._hasSlotDetail = Array.from(this.children).some((el) => el.getAttribute('slot') === 'detail');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -498,7 +522,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.expanded, this.expandable, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
     // even when the fresh array is the SAME length (a single-cell edit replaces one row
     // object → new array ref, identical length → the .length key alone would miss it). The
     // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
@@ -550,6 +574,16 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
+      // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
+      // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
+      // (byte-identical-off, req-10). getSubRows is the TABLE-level child accessor (NOT a
+      // ColumnDef field). getRowCanExpand makes EVERY row expandable for the #detail seam
+      // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
+      // default `!!subRows.length` rule applies (only parents with children expand).
+      getExpandedRowModel: getExpandedRowModel(),
+      getSubRows: this.getSubRows || undefined,
+      getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
+      onExpandedChange: this.onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -735,6 +769,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     if (name === 'global-filter') this._globalFilterControllable.notifyAttributeChange(value as unknown as string);
     if (name === 'column-filters') this._columnFiltersControllable.notifyAttributeChange(value as unknown as any[]);
     if (name === 'pagination') this._paginationControllable.notifyAttributeChange(value as unknown as any);
+    if (name === 'expanded') this._expandedControllable.notifyAttributeChange(value as unknown as any | boolean);
     if (name === 'row-selection') this._rowSelectionControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'column-visibility') this._columnVisibilityControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'column-sizing') this._columnSizingControllable.notifyAttributeChange(value as unknown as any);
@@ -852,10 +887,13 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   </thead>
 
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
-    ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
-      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>
+    
+    ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`
+    <tr class="rdt-tr" role="row" data-depth=${rozieAttr(row.depth)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${this.bodyCellStyle(row, cellCtx.column.id)} aria-invalid=${rozieAttr(this.cellAriaInvalid(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>
         
-        ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+        ${this.isExpanderColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.rowCanExpand(row) ? html`<button class="rdt-expander" type="button" data-expander="" aria-expanded=${!!this.rowIsExpanded(row)} aria-label=${rozieAttr(this.rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} @click=${($event: Event) => { this.onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c>${rozieDisplay(this.rowIsExpanded(row) ? '▾' : '▸')}</button>` : nothing}</span>` : this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(row)} @change=${($event: Event) => { this.onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
@@ -867,7 +905,13 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
           </select>` : this.editorTypeOf(cellCtx.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cellCtx.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cellCtx.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
         </span>`}${this.isFillHandleCell(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? html`<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown=${($event: Event) => { this.onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>` : nothing}</td>`)}
-    </tr>`)}
+    </tr>
+    
+    ${this.rowShowsDetail(row) ? html`<tr class="rdt-detail-row" role="row" data-detail-row=${rozieAttr(row.id)} data-rozie-s-d5dcab4c>
+      <td class="rdt-detail-cell" colspan=${rozieAttr(this.visibleColCount())} data-rozie-s-d5dcab4c>
+        ${this.detail !== undefined ? this.detail({row: row.original}) : html`<slot name="detail" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original}); } catch { return '{}'; } })()}></slot>`}
+      </td>
+    </tr>` : nothing}`)}
   </tbody>
 </table>`}${!this.virtual ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
   <button class="rdt-page-btn rdt-page-prev" type="button" ?disabled=${!this.canPrevPage()} @click=${($event: Event) => { this.onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button>
@@ -907,6 +951,10 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   columnFilters: this.columnFilters != null ? this.columnFilters : this._columnFiltersDefault.value,
   pagination: this.pagination != null ? this.pagination : this._paginationDefault.value,
   rowSelection: this.rowSelection != null ? this.rowSelection : this._rowSelectionDefault.value,
+  // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+  // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+  // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+  expanded: this.expanded != null ? this.expanded : this._expandedDefault.value,
   columnVisibility: this.columnVisibility != null ? this.columnVisibility : this._columnVisibilityDefault.value,
   columnSizing: this.columnSizing != null ? this.columnSizing : this._columnSizingDefault.value,
   columnOrder: this.columnOrder != null ? this.columnOrder : this._columnOrderDefault.value,
@@ -947,6 +995,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       // filtered (and renders no per-column filter input in the chrome below).
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -972,6 +1022,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       enableSorting: spec.sortable === true,
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: spec.expandable === true,
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -990,10 +1042,29 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   SELECT_COL_ID = '__rdt_select';
 
+  EXPANDER_COL_ID = '__rdt_expander';
+
   selectionEnabled = () => this.selectionMode === 'single' || this.selectionMode === 'multiple';
 
   tableColumns = () => {
   const cols = this.columnDefs();
+  // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+  // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+  // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+  // → byte-identical-off (req-10).
+  let withExpander = cols;
+  if (this.expandable === true) {
+    const expanderCol = {
+      id: this.EXPANDER_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isExpanderColumn: true,
+      pinned: '',
+      width: ''
+    };
+    withExpander = [expanderCol].concat(cols);
+  }
   if (this.selectionEnabled()) {
     const selectCol = {
       id: this.SELECT_COL_ID,
@@ -1004,9 +1075,9 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       pinned: '',
       width: ''
     };
-    return [selectCol].concat(cols);
+    return [selectCol].concat(withExpander);
   }
-  return cols;
+  return withExpander;
 };
 
   writeSorting = (next: any) => {
@@ -1023,6 +1094,19 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 };
 
   applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
+
+  writeExpanded = (next: any) => {
+  if (this.programmatic) return;
+  this.programmatic++;
+  this._expandedDefault.value = next; // fresh value only (never in-place)
+  this._expandedControllable.write(next); // two-way emit if bound (no-op-diff if not)
+  this.dispatchEvent(new CustomEvent("expanded-change", {
+    detail: next,
+    bubbles: true,
+    composed: true
+  }));
+  this.programmatic--;
+};
 
   writeGlobalFilter = (next: any) => {
   if (this.programmatic) return;
@@ -1161,6 +1245,10 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   onSortingChangeCb = (updater: any) => {
   this.writeSorting(this.applyUpdater(updater, this.currentState().sorting));
+};
+
+  onExpandedChangeCb = (updater: any) => {
+  this.writeExpanded(this.applyUpdater(updater, this.currentState().expanded));
 };
 
   onGlobalFilterChangeCb = (updater: any) => {
@@ -1425,6 +1513,13 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     state: this.currentState(),
     enableRowSelection: this.selectionMode !== 'none',
     enableMultiRowSelection: this.selectionMode === 'multiple',
+    // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
+    // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
+    // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: this.getSubRows || undefined,
+    getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
+    onExpandedChange: this.onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: this.onSortingChangeCb,
@@ -1671,6 +1766,28 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 };
 
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
+
+  isExpanderColumn = (colId: any) => colId === this.EXPANDER_COL_ID;
+
+  rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+
+  rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
+
+  rowShowsDetail = (row: any) => this.getSubRows == null && this.rowIsExpanded(row);
+
+  onToggleExpand = (row: any, evt: any) => {
+  if (!row || !row.toggleExpanded) return;
+  row.toggleExpanded();
+};
+
+  bodyCellStyle = (row: any, colId: any) => {
+  const base = this.pinStyle(colId);
+  if (this.isExpanderColumn(colId) && row && row.depth) {
+    const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem';
+    return base ? base + ';' + pad : pad;
+  }
+  return base;
+};
 
   stopEvent = (evt: any) => {
   if (evt && evt.stopPropagation) evt.stopPropagation();
@@ -3137,6 +3254,36 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   this._activeColIndex.value = 0;
 };
 
+  toggleRowExpanded = (rowId: any) => {
+  if (!this.table) return;
+  const target = String(rowId);
+  const flat = this.table.getCoreRowModel().flatRows;
+  for (const r of flat as any) {
+    if (r.id === target || r.original && String(r.original.id) === target) {
+      r.toggleExpanded();
+      return;
+    }
+  }
+};
+
+  expandAll = () => {
+  if (!this.table) return;
+  this.table.toggleAllRowsExpanded(true);
+};
+
+  collapseAll = () => {
+  if (!this.table) return;
+  this.table.resetExpanded(true);
+};
+
+  getExpandedRows = () => {
+  if (!this.table) return [];
+  const out = [];
+  const flat = this.table.getCoreRowModel().flatRows;
+  for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
+  return out;
+};
+
   get data(): any[] { return this._dataControllable.read(); }
   set data(v: any[]) { this._dataControllable.notifyPropertyWrite(v); }
   get sorting(): any[] { return this._sortingControllable.read(); }
@@ -3147,6 +3294,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   set columnFilters(v: any[]) { this._columnFiltersControllable.notifyPropertyWrite(v); }
   get pagination(): any { return this._paginationControllable.read(); }
   set pagination(v: any) { this._paginationControllable.notifyPropertyWrite(v); }
+  get expanded(): any | boolean { return this._expandedControllable.read(); }
+  set expanded(v: any | boolean) { this._expandedControllable.notifyPropertyWrite(v); }
   get rowSelection(): any { return this._rowSelectionControllable.read(); }
   set rowSelection(v: any) { this._rowSelectionControllable.notifyPropertyWrite(v); }
   get columnVisibility(): any { return this._columnVisibilityControllable.read(); }

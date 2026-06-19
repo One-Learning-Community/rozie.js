@@ -108,10 +108,13 @@
   </thead>
 
   <tbody class="rdt-tbody" role="rowgroup">
-    <tr v-for="row in rows" :key="row.id" class="rdt-tr" role="row">
-      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))" :style="pinStyle(cellCtx.column.id)" :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined">
+    
+    <template v-for="row in rows" :key="row.id">
+    <tr class="rdt-tr" role="row" :data-depth="row.depth">
+      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))" :style="bodyCellStyle(row, cellCtx.column.id)" :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined">
         
-        <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
+        <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
+          <button v-if="rowCanExpand(row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(row)" :aria-label="rowIsExpanded(row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(row, $event)">{{ rowIsExpanded(row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="row.original" :checked="rowIsSelected(row)" :toggle="e => onToggleRow(row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(row)" @change="onToggleRow(row, $event)" />
           </slot>
@@ -124,6 +127,12 @@
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
         </span><span v-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
+    
+    <tr v-if="rowShowsDetail(row)" class="rdt-detail-row" role="row" :data-detail-row="row.id">
+      <td class="rdt-detail-cell" :colspan="visibleColCount()">
+        <slot name="detail" :row="row.original"></slot>
+      </td>
+    </tr></template>
   </tbody>
 </table><div v-if="!props.virtual" class="rdt-pagination" role="group" aria-label="Pagination">
   <button type="button" class="rdt-page-btn rdt-page-prev" :disabled="!canPrevPage()" @click="onPrevPage()">Prev</button>
@@ -145,8 +154,8 @@
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, useSlots, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ columns?: any[]; selectionMode?: string; manual?: boolean; stickyHeader?: boolean; interactionMode?: string; virtual?: boolean; estimateRowHeight?: number; maxHeight?: string }>(),
-  { columns: () => [], selectionMode: 'none', manual: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }
+  defineProps<{ columns?: any[]; selectionMode?: string; manual?: boolean; expandable?: boolean; getSubRows?: ((...args: any[]) => any) | null; stickyHeader?: boolean; interactionMode?: string; virtual?: boolean; estimateRowHeight?: number; maxHeight?: string }>(),
+  { columns: () => [], selectionMode: 'none', manual: false, expandable: false, getSubRows: null, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }
 );
 
 const data = defineModel<any[]>('data', { required: true });
@@ -157,6 +166,7 @@ const pagination = defineModel<Record<string, any>>('pagination', { default: () 
   pageIndex: 0,
   pageSize: 10
 }) });
+const expanded = defineModel<Record<string, any> | boolean>('expanded', { default: () => ({}) });
 const rowSelection = defineModel<Record<string, any>>('rowSelection', { default: () => ({}) });
 const columnVisibility = defineModel<Record<string, any>>('columnVisibility', { default: () => ({}) });
 const columnSizing = defineModel<Record<string, any>>('columnSizing', { default: () => ({}) });
@@ -168,6 +178,7 @@ const columnPinning = defineModel<Record<string, any>>('columnPinning', { defaul
 
 const emit = defineEmits<{
   'sort-change': [...args: any[]];
+  'expanded-change': [...args: any[]];
   'filter-change': [...args: any[]];
   'page-change': [...args: any[]];
   'selection-change': [...args: any[]];
@@ -195,6 +206,7 @@ defineSlots<{
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
+  detail(props: { row: any }): any;
 }>();
 
 const slots = useSlots();
@@ -208,6 +220,7 @@ const paginationDefault = ref({
   pageSize: 10
 });
 const rowSelectionDefault = ref({});
+const expandedDefault = ref({});
 const columnVisibilityDefault = ref({});
 const columnSizingDefault = ref({});
 const columnOrderDefault = ref<any[]>([]);
@@ -245,7 +258,7 @@ const pasteAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -350,6 +363,10 @@ const currentState = (): any => ({
   columnFilters: columnFilters.value != null ? columnFilters.value : columnFiltersDefault.value,
   pagination: pagination.value != null ? pagination.value : paginationDefault.value,
   rowSelection: rowSelection.value != null ? rowSelection.value : rowSelectionDefault.value,
+  // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+  // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+  // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+  expanded: expanded.value != null ? expanded.value : expandedDefault.value,
   columnVisibility: columnVisibility.value != null ? columnVisibility.value : columnVisibilityDefault.value,
   columnSizing: columnSizing.value != null ? columnSizing.value : columnSizingDefault.value,
   columnOrder: columnOrder.value != null ? columnOrder.value : columnOrderDefault.value,
@@ -409,6 +426,8 @@ const columnDefs = () => {
       // filtered (and renders no per-column filter input in the chrome below).
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -434,6 +453,8 @@ const columnDefs = () => {
       enableSorting: spec.sortable === true,
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: spec.expandable === true,
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -456,6 +477,14 @@ const columnDefs = () => {
 // any consumer column id (the registry/config guard never produces a leading "__").
 const SELECT_COL_ID = '__rdt_select';
 
+// The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+// Distinct from any consumer column id (the registry/config guard never produces a leading
+// "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
+// The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+// Distinct from any consumer column id (the registry/config guard never produces a leading
+// "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
+const EXPANDER_COL_ID = '__rdt_expander';
+
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
 // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
 // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
@@ -477,6 +506,23 @@ const SELECT_COL_ID = '__rdt_select';
 const selectionEnabled = () => props.selectionMode === 'single' || props.selectionMode === 'multiple';
 const tableColumns = () => {
   const cols = columnDefs();
+  // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+  // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+  // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+  // → byte-identical-off (req-10).
+  let withExpander = cols;
+  if (props.expandable === true) {
+    const expanderCol = {
+      id: EXPANDER_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isExpanderColumn: true,
+      pinned: '',
+      width: ''
+    };
+    withExpander = [expanderCol].concat(cols);
+  }
   if (selectionEnabled()) {
     const selectCol = {
       id: SELECT_COL_ID,
@@ -487,9 +533,9 @@ const tableColumns = () => {
       pinned: '',
       width: ''
     };
-    return [selectCol].concat(cols);
+    return [selectCol].concat(withExpander);
   }
-  return cols;
+  return withExpander;
 };
 
 // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
@@ -515,6 +561,29 @@ const writeSorting = (next: any) => {
   programmatic--;
 };
 const applyUpdater = (updater: any, current: any) => typeof updater === 'function' ? updater(current) : updater;
+
+// ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+// applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+// uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+// `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+// verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+// React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
+// ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+// applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+// uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+// `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+// verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+// React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
+const writeExpanded = (next: any) => {
+  if (programmatic) return;
+  programmatic++;
+  expandedDefault.value = next; // fresh value only (never in-place)
+  expanded.value = next; // two-way emit if bound (no-op-diff if not)
+  emit('expanded-change', next);
+  programmatic--;
+};
 
 // ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
 // A fresh string (primitive) to the uncontrolled default + the two-way model + fires
@@ -727,6 +796,9 @@ let refreshRowModel: any = null;
 // keeps the Updater base value current. No-op cost on the other five.
 const onSortingChangeCb = (updater: any) => {
   writeSorting(applyUpdater(updater, currentState().sorting));
+};
+const onExpandedChangeCb = (updater: any) => {
+  writeExpanded(applyUpdater(updater, currentState().expanded));
 };
 const onGlobalFilterChangeCb = (updater: any) => {
   writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
@@ -1113,6 +1185,13 @@ const reFeed = () => {
     state: currentState(),
     enableRowSelection: props.selectionMode !== 'none',
     enableMultiRowSelection: props.selectionMode === 'multiple',
+    // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
+    // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
+    // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: props.getSubRows || undefined,
+    getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
+    onExpandedChange: onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
@@ -1505,6 +1584,58 @@ const onPageSizeChange = (evt: any) => {
 // Detect the auto-injected leading checkbox column by its constant id (template uses
 // this to render checkbox chrome instead of an accessor value).
 const isSelectColumn = (colId: any) => colId === SELECT_COL_ID;
+// ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+// isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+// isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+// reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+// re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+// visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+// listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
+// ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+// isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+// isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+// reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+// re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+// visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+// listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
+const isExpanderColumn = (colId: any) => colId === EXPANDER_COL_ID;
+const rowCanExpand = (row: any) => !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+const rowIsExpanded = (row: any) => !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
+// rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+// row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
+// $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+// rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+// row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
+// $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+const rowShowsDetail = (row: any) => props.getSubRows == null && rowIsExpanded(row);
+// Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+// fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+// Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+// a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
+// Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+// fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+// Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+// a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
+const onToggleExpand = (row: any, evt: any) => {
+  if (!row || !row.toggleExpanded) return;
+  row.toggleExpanded();
+};
+// bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+// left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+// Only the expander column indents (the tree affordance lives in its dedicated column);
+// data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
+// bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+// left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+// Only the expander column indents (the tree affordance lives in its dedicated column);
+// data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
+const bodyCellStyle = (row: any, colId: any) => {
+  const base = pinStyle(colId);
+  if (isExpanderColumn(colId) && row && row.depth) {
+    const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem';
+    return base ? base + ';' + pad : pad;
+  }
+  return base;
+};
 // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
 // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
 // on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
@@ -3749,6 +3880,70 @@ const clearActiveCell = () => {
   activeColIndex.value = 0;
 };
 
+// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+// one expanded-change. ──────────────────────────────────────────────────────────────────
+
+// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+// rows regardless of current expansion) so a collapsed parent is still resolvable.
+// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+// one expanded-change. ──────────────────────────────────────────────────────────────────
+
+// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+// rows regardless of current expansion) so a collapsed parent is still resolvable.
+const toggleRowExpanded = (rowId: any) => {
+  if (!table) return;
+  const target = String(rowId);
+  const flat = table.getCoreRowModel().flatRows;
+  for (const r of flat as any) {
+    if (r.id === target || r.original && String(r.original.id) === target) {
+      r.toggleExpanded();
+      return;
+    }
+  }
+};
+
+// expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+// literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
+// expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+// literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
+const expandAll = () => {
+  if (!table) return;
+  table.toggleAllRowsExpanded(true);
+};
+
+// collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+// blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
+// collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+// blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
+const collapseAll = () => {
+  if (!table) return;
+  table.resetExpanded(true);
+};
+
+// getExpandedRows() — return the original row data for every currently-expanded row
+// (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+// filters by getIsExpanded(). Empty when nothing is expanded.
+// getExpandedRows() — return the original row data for every currently-expanded row
+// (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+// filters by getIsExpanded(). Empty when nothing is expanded.
+const getExpandedRows = () => {
+  if (!table) return [];
+  const out = [];
+  const flat = table.getCoreRowModel().flatRows;
+  for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
+  return out;
+};
+
 provide('data-table:columns', {
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -3792,6 +3987,16 @@ onMounted(() => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
+    // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
+    // (byte-identical-off, req-10). getSubRows is the TABLE-level child accessor (NOT a
+    // ColumnDef field). getRowCanExpand makes EVERY row expandable for the #detail seam
+    // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
+    // default `!!subRows.length` rule applies (only parents with children expand).
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: props.getSubRows || undefined,
+    getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
+    onExpandedChange: onExpandedChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -3939,7 +4144,7 @@ onUpdated(() => {
   reFeed();
 });
 
-watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value, rowSelection.value, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
+watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value, rowSelection.value, expanded.value, props.expandable, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
 // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
 // even when the fresh array is the SAME length (a single-cell edit replaces one row
 // object → new array ref, identical length → the .length key alone would miss it). The
@@ -3949,7 +4154,7 @@ data.value, dataDefault.value, colReg.value], () => {
   reFeed();
 });
 
-defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
 </script>
 
 <style scoped>

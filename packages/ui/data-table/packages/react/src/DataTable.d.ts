@@ -21,6 +21,11 @@ export interface DataTableProps {
   defaultPagination?: Record<string, unknown>;
   onPaginationChange?: (next: Record<string, unknown>) => void;
   manual?: boolean;
+  expandable?: boolean;
+  expanded?: Record<string, unknown> | boolean;
+  defaultExpanded?: Record<string, unknown> | boolean;
+  onExpandedChange?: (next: Record<string, unknown> | boolean) => void;
+  getSubRows?: ((...args: unknown[]) => unknown) | null;
   rowSelection?: Record<string, unknown>;
   defaultRowSelection?: Record<string, unknown>;
   onRowSelectionChange?: (next: Record<string, unknown>) => void;
@@ -66,12 +71,17 @@ export interface DataTableProps {
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
+  renderDetail?: (params: { row: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
 export interface DataTableHandle {
   sortColumn: (...args: any[]) => any;
   clearSorting: (...args: any[]) => any;
+  toggleRowExpanded: (...args: any[]) => any;
+  expandAll: (...args: any[]) => any;
+  collapseAll: (...args: any[]) => any;
+  getExpandedRows: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;

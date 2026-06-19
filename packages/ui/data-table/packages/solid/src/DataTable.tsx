@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -254,6 +254,8 @@ interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; comm
 
 interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
 
+interface DetailSlotCtx { row: any; }
+
 interface DataTableProps {
   data: any[];
   defaultData?: any[];
@@ -273,6 +275,11 @@ interface DataTableProps {
   defaultPagination?: Record<string, any>;
   onPaginationChange?: (pagination: Record<string, any>) => void;
   manual?: boolean;
+  expandable?: boolean;
+  expanded?: Record<string, any> | boolean;
+  defaultExpanded?: Record<string, any> | boolean;
+  onExpandedChange?: (expanded: Record<string, any> | boolean) => void;
+  getSubRows?: ((...args: unknown[]) => unknown) | null;
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
@@ -294,6 +301,7 @@ interface DataTableProps {
   estimateRowHeight?: number;
   maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
+  onExpandedChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -312,6 +320,7 @@ interface DataTableProps {
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
   editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
+  detailSlot?: (ctx: DetailSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: DataTableHandle) => void;
 }
@@ -319,6 +328,10 @@ interface DataTableProps {
 export interface DataTableHandle {
   sortColumn: (...args: any[]) => any;
   clearSorting: (...args: any[]) => any;
+  toggleRowExpanded: (...args: any[]) => any;
+  expandAll: (...args: any[]) => any;
+  collapseAll: (...args: any[]) => any;
+  getExpandedRows: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;
@@ -339,10 +352,10 @@ export interface DataTableHandle {
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
-  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
+  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -353,6 +366,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     pageIndex: 0,
     pageSize: 10
   }))());
+  const [expanded, setExpanded] = createControllableSignal<Record<string, any> | boolean>(_props as unknown as Record<string, unknown>, 'expanded', (() => ({}))());
   const [rowSelection, setRowSelection] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'rowSelection', (() => ({}))());
   const [columnVisibility, setColumnVisibility] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnVisibility', (() => ({}))());
   const [columnSizing, setColumnSizing] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnSizing', (() => ({}))());
@@ -370,6 +384,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     pageSize: 10
   });
   const [rowSelectionDefault, setRowSelectionDefault] = createSignal({});
+  const [expandedDefault, setExpandedDefault] = createSignal({});
   const [columnVisibilityDefault, setColumnVisibilityDefault] = createSignal({});
   const [columnSizingDefault, setColumnSizingDefault] = createSignal({});
   const [columnOrderDefault, setColumnOrderDefault] = createSignal([]);
@@ -427,6 +442,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
+      // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
+      // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
+      // (byte-identical-off, req-10). getSubRows is the TABLE-level child accessor (NOT a
+      // ColumnDef field). getRowCanExpand makes EVERY row expandable for the #detail seam
+      // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
+      // default `!!subRows.length` rule applies (only parents with children expand).
+      getExpandedRowModel: getExpandedRowModel(),
+      getSubRows: local.getSubRows || undefined,
+      getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
+      onExpandedChange: onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -573,7 +598,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     lastDataLen = d.length;
     reFeed();
   });
-  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), expanded(), local.expandable, columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
   // even when the fresh array is the SAME length (a single-cell edit replaces one row
   // object → new array ref, identical length → the .length key alone would miss it). The
   // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
@@ -639,6 +664,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       columnFilters: columnFilters() != null ? columnFilters() : columnFiltersDefault(),
       pagination: pagination() != null ? pagination() : paginationDefault(),
       rowSelection: rowSelection() != null ? rowSelection() : rowSelectionDefault(),
+      // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+      // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+      // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+      expanded: expanded() != null ? expanded() : expandedDefault(),
       columnVisibility: columnVisibility() != null ? columnVisibility() : columnVisibilityDefault(),
       columnSizing: columnSizing() != null ? columnSizing() : columnSizingDefault(),
       columnOrder: columnOrder() != null ? columnOrder() : columnOrderDefault(),
@@ -693,6 +722,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         // filtered (and renders no per-column filter input in the chrome below).
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
+        // Expandable-rows reserved per-column metadata (phase 50, D-04).
+        expandable: c.expandable === true,
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -718,6 +749,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         enableSorting: spec.sortable === true,
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
+        // Expandable-rows reserved per-column metadata (phase 50, D-04).
+        expandable: spec.expandable === true,
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -738,6 +771,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // any consumer column id (the registry/config guard never produces a leading "__").
   const SELECT_COL_ID = '__rdt_select';
 
+  // The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+  // Distinct from any consumer column id (the registry/config guard never produces a leading
+  // "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
+  const EXPANDER_COL_ID = '__rdt_expander';
+
   // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
   // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
   // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
@@ -752,6 +790,23 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   }
   function tableColumns() {
     const cols = columnDefs();
+    // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+    // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+    // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+    // → byte-identical-off (req-10).
+    let withExpander = cols;
+    if (local.expandable === true) {
+      const expanderCol = {
+        id: EXPANDER_COL_ID,
+        enableSorting: false,
+        enableColumnFilter: false,
+        filterable: false,
+        isExpanderColumn: true,
+        pinned: '',
+        width: ''
+      };
+      withExpander = [expanderCol].concat(cols);
+    }
     if (selectionEnabled()) {
       const selectCol = {
         id: SELECT_COL_ID,
@@ -762,9 +817,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         pinned: '',
         width: ''
       };
-      return [selectCol].concat(cols);
+      return [selectCol].concat(withExpander);
     }
-    return cols;
+    return withExpander;
   }
 
   // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
@@ -784,6 +839,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   }
   function applyUpdater(updater: any, current: any) {
     return typeof updater === 'function' ? updater(current) : updater;
+  }
+
+  // ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+  // table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+  // applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+  // uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+  // `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+  // verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+  // React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
+  function writeExpanded(next: any) {
+    if (programmatic) return;
+    programmatic++;
+    setExpandedDefault(next); // fresh value only (never in-place)
+    setExpanded(next); // two-way emit if bound (no-op-diff if not)
+    _props.onExpandedChange?.(next);
+    programmatic--;
   }
 
   // ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
@@ -944,6 +1015,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // keeps the Updater base value current. No-op cost on the other five.
   function onSortingChangeCb(updater: any) {
     writeSorting(applyUpdater(updater, currentState().sorting));
+  }
+  function onExpandedChangeCb(updater: any) {
+    writeExpanded(applyUpdater(updater, currentState().expanded));
   }
   function onGlobalFilterChangeCb(updater: any) {
     writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
@@ -1264,6 +1338,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       state: currentState(),
       enableRowSelection: local.selectionMode !== 'none',
       enableMultiRowSelection: local.selectionMode === 'multiple',
+      // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
+      // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
+      // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
+      getExpandedRowModel: getExpandedRowModel(),
+      getSubRows: local.getSubRows || undefined,
+      getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
+      onExpandedChange: onExpandedChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: onSortingChangeCb,
@@ -1582,6 +1663,48 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // this to render checkbox chrome instead of an accessor value).
   function isSelectColumn(colId: any) {
     return colId === SELECT_COL_ID;
+  }
+  // ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+  // isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+  // isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+  // reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+  // re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+  // visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+  // listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
+  function isExpanderColumn(colId: any) {
+    return colId === EXPANDER_COL_ID;
+  }
+  function rowCanExpand(row: any) {
+    return !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+  }
+  function rowIsExpanded(row: any) {
+    return !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
+  }
+  // rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+  // row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
+  // $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+  function rowShowsDetail(row: any) {
+    return local.getSubRows == null && rowIsExpanded(row);
+  }
+  // Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+  // fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+  // Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+  // a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
+  function onToggleExpand(row: any, evt: any) {
+    if (!row || !row.toggleExpanded) return;
+    row.toggleExpanded();
+  }
+  // bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+  // left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+  // Only the expander column indents (the tree affordance lives in its dedicated column);
+  // data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
+  function bodyCellStyle(row: any, colId: any) {
+    const base = pinStyle(colId);
+    if (isExpanderColumn(colId) && row && row.depth) {
+      const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem';
+      return base ? base + ';' + pad : pad;
+    }
+    return base;
   }
   // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
   // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
@@ -3449,6 +3572,53 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setActiveColIndex(0);
   }
 
+  // ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+  // Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+  // not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+  // or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+  // Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+  // one expanded-change. ──────────────────────────────────────────────────────────────────
+
+  // toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+  // row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+  // rows regardless of current expansion) so a collapsed parent is still resolvable.
+  function toggleRowExpanded(rowId: any) {
+    if (!table) return;
+    const target = String(rowId);
+    const flat = table.getCoreRowModel().flatRows;
+    for (const r of flat as any) {
+      if (r.id === target || r.original && String(r.original.id) === target) {
+        r.toggleExpanded();
+        return;
+      }
+    }
+  }
+
+  // expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+  // literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
+  function expandAll() {
+    if (!table) return;
+    table.toggleAllRowsExpanded(true);
+  }
+
+  // collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+  // blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
+  function collapseAll() {
+    if (!table) return;
+    table.resetExpanded(true);
+  }
+
+  // getExpandedRows() — return the original row data for every currently-expanded row
+  // (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+  // filters by getIsExpanded(). Empty when nothing is expanded.
+  function getExpandedRows() {
+    if (!table) return [];
+    const out = [];
+    const flat = table.getCoreRowModel().flatRows;
+    for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
+    return out;
+  }
+
   return (
     <__ctx_data_table_columns.Provider value={{
   registerColumn: (id: any, spec: any) => {
@@ -3521,10 +3691,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       </thead>
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        <For each={rows()}>{(row) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c="">
+        
+        <For each={rows()}>{(row) => <>
+        <tr class={"rdt-tr"} role="row" data-depth={rozieAttr(row.depth)} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c="">
             
-            {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+            {<Show when={isExpanderColumn(cellCtx.column.id)} fallback={<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onChange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
@@ -3533,8 +3705,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
                 {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
-            </span></Show>}{<Show when={isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</For>
-        </tr>}</For>
+            </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={rowCanExpand(row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</For>
+        </tr>
+        
+        {<Show when={rowShowsDetail(row)}><tr class={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c="">
+          <td class={"rdt-detail-cell"} colSpan={rozieAttr(visibleColCount())} data-rozie-s-d5dcab4c="">
+            {(_props.detailSlot ?? _props.slots?.['detail'])?.({ row: row.original })}
+          </td>
+        </tr></Show>}</>}</For>
       </tbody>
     </table>}><div class={"rdt-scroll"} style={parseInlineStyle(local.maxHeight ? 'max-height:' + local.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + local.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
     <table aria-rowcount={rows().length} class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">

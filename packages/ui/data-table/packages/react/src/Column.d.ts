@@ -8,6 +8,7 @@ export interface ColumnProps {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  expandable?: boolean;
   editable?: boolean;
   editor?: string;
   editorOptions?: unknown[];

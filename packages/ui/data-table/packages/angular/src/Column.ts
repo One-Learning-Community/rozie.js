@@ -32,6 +32,7 @@ export class Column {
   filterable = input<boolean>(false);
   pinned = input<string>('');
   width = input<string | number>('');
+  expandable = input<boolean>(false);
   editable = input<boolean>(false);
   editor = input<string>('text');
   editorOptions = input<any[]>((() => [])());
@@ -53,7 +54,7 @@ export class Column {
       this.registered = true;
       this.reg.registerColumn(this.colId(), this.buildSpec());
     });
-    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.expandable(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }); });
   }
@@ -82,6 +83,8 @@ export class Column {
     filterable: this.filterable(),
     pinned: this.pinned(),
     width: this.width(),
+    // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
+    expandable: this.expandable(),
     // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
     // registry (the existing per-column metadata path; NO parallel registry).
     editable: this.editable(),

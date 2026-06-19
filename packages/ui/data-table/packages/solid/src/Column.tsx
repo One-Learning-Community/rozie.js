@@ -10,6 +10,7 @@ interface ColumnProps {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  expandable?: boolean;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -17,8 +18,8 @@ interface ColumnProps {
 }
 
 export default function Column(_props: ColumnProps): JSX.Element {
-  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'editable', 'editor', 'editorOptions', 'validate']);
+  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));
   onMount(() => {
@@ -44,7 +45,7 @@ export default function Column(_props: ColumnProps): JSX.Element {
     registered = true;
     reg.registerColumn(colId(), buildSpec());
   });
-  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
     if (reg) reg.registerColumn(colId(), buildSpec());
   })()), { defer: true }));
 
@@ -77,6 +78,8 @@ export default function Column(_props: ColumnProps): JSX.Element {
       filterable: local.filterable,
       pinned: local.pinned,
       width: local.width,
+      // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
+      expandable: local.expandable,
       // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
       // registry (the existing per-column metadata path; NO parallel registry).
       editable: local.editable,

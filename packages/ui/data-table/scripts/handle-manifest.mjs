@@ -20,6 +20,14 @@ export const handleManifest = {
   sortColumn:
     'Toggle (or set) the sort for a column — `sortColumn(colId, desc?)`. Drives table-core so `sort-change` fires with the fresh `SortingState`.',
   clearSorting: 'Clear all sorting — `clearSorting()`. Resets to the unsorted core row model and fires `sort-change`.',
+  toggleRowExpanded:
+    "Toggle ONE row's expanded state (phase 50 req-3) — `toggleRowExpanded(rowId)` where `rowId` is the consumer's row `id` (the data field) OR the table-core row id (both resolve). Scans the core flat-row set so a collapsed parent is still resolvable. Drives table-core so `expanded-change` fires with the fresh `ExpandedState`. Multi-expand: it does not collapse other open rows.",
+  expandAll:
+    'Open every expandable row (phase 50 req-3) — `expandAll()`. Drives table-core (`toggleAllRowsExpanded(true)`) so `expanded-change` fires; the payload may be the `true` expand-all literal (Pitfall 2).',
+  collapseAll:
+    'Collapse every row (phase 50 req-3) — `collapseAll()`. Resets the expanded set to a blank state (`resetExpanded(true)` → `{}`) and fires `expanded-change` with `{}`.',
+  getExpandedRows:
+    'Return the original row data for the currently-expanded rows (phase 50 req-3) — `getExpandedRows()` → `unknown[]` (empty when nothing is expanded). The read-verb twin of the `expanded-change` event.',
   getColumnDefs:
     'Return the resolved `ColumnDef[]` (the id-keyed LWW union of the `:columns` config array and the `<Column>` children) — `getColumnDefs()`.',
   toggleAllRows:

@@ -9,6 +9,7 @@ interface Props {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  expandable?: boolean;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -25,6 +26,7 @@ let {
   filterable = false,
   pinned = '',
   width = '',
+  expandable = false,
   editable = false,
   editor = 'text',
   editorOptions = __defaultEditorOptions,
@@ -64,6 +66,8 @@ const buildSpec = () => ({
   filterable: filterable,
   pinned: pinned,
   width: width,
+  // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
+  expandable: expandable,
   // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
   // registry (the existing per-column metadata path; NO parallel registry).
   editable: editable,
@@ -94,7 +98,7 @@ $effect(() => (() => {
 })());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (reg) reg.registerColumn(colId(), buildSpec());
 })(); }); });
 </script>
