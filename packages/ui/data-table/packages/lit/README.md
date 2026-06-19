@@ -66,6 +66,34 @@ render(html`
 `, document.body);
 ```
 
+### Virtualized rows (windowing)
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+
+// PROP form — the `max-height` attribute sizes the scroll container.
+render(html`
+  <rozie-data-table .data=${rows} virtual max-height="400px">
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="email" header="Email"></rozie-column>
+    <rozie-column field="status" header="Status"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+
+// TOKEN form — the same height via the CSS custom property (the prop wins when
+// both are set; the token is the fallback). `estimate-row-height` tunes the seed:
+//   <rozie-data-table .data=${rows} virtual estimate-row-height="48"
+//     style="--rozie-data-table-max-height: 400px"> … </rozie-data-table>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

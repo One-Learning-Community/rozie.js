@@ -62,6 +62,36 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Virtualized rows (windowing)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+</script>
+
+<!-- PROP form — bound maxHeight sizes the scroll container. -->
+<DataTable data={rows} virtual maxHeight="400px">
+  <Column field="name" header="Name" />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" />
+</DataTable>
+
+<!-- TOKEN form — the same height via the CSS custom property (prop wins when both
+     are set; the token is the fallback). estimateRowHeight tunes the seed. -->
+<DataTable data={rows} virtual estimateRowHeight={48} style="--rozie-data-table-max-height: 400px">
+  <Column field="name" header="Name" />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" />
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

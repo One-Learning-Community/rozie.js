@@ -75,6 +75,34 @@ export function Demo() {
 }
 ```
 
+### Virtualized rows (windowing)
+
+```tsx
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+// PROP form — bound `maxHeight` sizes the scroll container.
+export function Demo() {
+  const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+  return (
+    <DataTable data={rows} virtual maxHeight="400px">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  );
+}
+
+// TOKEN form — the same bound height via the CSS custom property (the prop wins
+// when both are set; the token is the fallback). Tune the row estimate too:
+// <DataTable data={rows} virtual estimateRowHeight={48}
+//   style={{ '--rozie-data-table-max-height': '400px' } as React.CSSProperties} />
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
