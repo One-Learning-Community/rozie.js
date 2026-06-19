@@ -148,8 +148,13 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // otherwise concatenate.
     const parts = node.body.map((c) => emitNode(c, childCtx)).join('');
     if (keyCode !== null) {
-      bodyJsx = `<React.Fragment key={${keyCode}}>${parts}</React.Fragment>`;
-      // We'd need React.Fragment — skip the import dance for v1; assume rare.
+      // A keyed multi-root loop body needs a keyed Fragment (the `<>` shorthand
+      // cannot carry a key). Use the NAMED `Fragment` import (registered on the
+      // react import collector) rather than `React.Fragment` — leaves import named
+      // hooks only, never the `React` namespace (D-68 automatic JSX runtime), so
+      // `React.Fragment` would be an undefined UMD global (TS2686) under strict tsc.
+      ctx.collectors.react.add('Fragment');
+      bodyJsx = `<Fragment key={${keyCode}}>${parts}</Fragment>`;
     } else {
       bodyJsx = parts;
     }

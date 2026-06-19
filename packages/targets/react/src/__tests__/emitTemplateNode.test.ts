@@ -134,11 +134,13 @@ describe('emitTemplateNode — Plan 04-03 Task 1', () => {
 describe('<template r-for> multi-root loop body — Phase 50', () => {
   // A `<template r-for>` with 2+ children lowers to a TemplateLoop with
   // body.length > 1. The React emitter must wrap the per-iteration siblings in
-  // a KEYED `<React.Fragment key={...}>` — a logical fragment, NO DOM wrapper —
-  // so `.map()` returns a single keyed element per iteration. This keyed-
-  // fragment path was the weakest-tested branch (it is otherwise unreachable
-  // without a multi-root loop body); this covers it explicitly.
-  it('emits a keyed React.Fragment (no DOM wrapper) for a 2-root loop body', () => {
+  // a KEYED `<Fragment key={...}>` (the named `Fragment` import — `<>` cannot
+  // carry a key, and `React.Fragment` would be an undefined UMD global under the
+  // automatic JSX runtime where the leaf imports named hooks only) — a logical
+  // fragment, NO DOM wrapper — so `.map()` returns a single keyed element per
+  // iteration. This keyed-fragment path was the weakest-tested branch (it is
+  // otherwise unreachable without a multi-root loop body); this covers it explicitly.
+  it('emits a keyed Fragment (no DOM wrapper) for a 2-root loop body', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <data>{ rows: [], openId: null }</data>
@@ -155,9 +157,12 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
     const { jsx } = emit(ir);
     // .map over the iterable.
     expect(jsx).toMatch(/rows\.map/);
-    // Per-iteration KEYED React.Fragment (logical — no DOM node).
-    expect(jsx).toContain('<React.Fragment key={row.id}>');
-    expect(jsx).toContain('</React.Fragment>');
+    // Per-iteration KEYED Fragment (logical — no DOM node; named import, not the
+    // `React.` namespace which is absent under the automatic JSX runtime).
+    expect(jsx).toContain('<Fragment key={row.id}>');
+    expect(jsx).toContain('</Fragment>');
+    // NEVER the `React.` namespace form (TS2686 UMD-global under strict tsc).
+    expect(jsx).not.toContain('React.Fragment');
     // Both sibling roots live inside the single fragment.
     expect(jsx).toContain('data');
     expect(jsx).toContain('detail');

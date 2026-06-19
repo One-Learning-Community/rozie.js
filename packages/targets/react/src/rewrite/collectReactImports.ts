@@ -27,7 +27,12 @@ export type ReactImport =
   | 'useImperativeHandle'
   // Phase 36 ($inject) — emitted only when ir.injects is non-empty so a
   // non-context component's `react` import line stays byte-identical (R12/D-5).
-  | 'useContext';
+  | 'useContext'
+  // Phase 50 (<template r-for> multi-root) — emitted only when a keyed multi-root
+  // loop body lowers to `<Fragment key={…}>` (the `<>` shorthand cannot carry a
+  // key, and `React.Fragment` is an undefined UMD global under the automatic JSX
+  // runtime where leaves import named hooks only). Byte-identical otherwise.
+  | 'Fragment';
 
 export class ReactImportCollector {
   private symbols = new Set<ReactImport>();
