@@ -2,7 +2,7 @@ import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useR
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -20,6 +20,8 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 // getRowModel-reading closures capture the LIVE instance, NOT an empty initial
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
+
+interface GroupBarCtx { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any; }
 
 interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
@@ -57,6 +59,10 @@ interface DataTableProps {
   defaultExpanded?: Record<string, any> | boolean;
   onExpandedChange?: (expanded: Record<string, any> | boolean) => void;
   getSubRows?: ((...args: any[]) => any) | null;
+  groupable?: boolean;
+  grouping?: any[];
+  defaultGrouping?: any[];
+  onGroupingChange?: (grouping: any[]) => void;
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
@@ -79,6 +85,7 @@ interface DataTableProps {
   maxHeight?: string;
   onSortChange?: (...args: any[]) => void;
   onExpandChange?: (...args: any[]) => void;
+  onGroupChange?: (...args: any[]) => void;
   onFilterChange?: (...args: any[]) => void;
   onPageChange?: (...args: any[]) => void;
   onSelectionChange?: (...args: any[]) => void;
@@ -91,6 +98,7 @@ interface DataTableProps {
   onCellEditCommit?: (...args: any[]) => void;
   onRowEditCommit?: (...args: any[]) => void;
   children?: ReactNode;
+  renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
@@ -107,6 +115,8 @@ export interface DataTableHandle {
   expandAll: (...args: any[]) => any;
   collapseAll: (...args: any[]) => any;
   getExpandedRows: (...args: any[]) => any;
+  applyGrouping: (...args: any[]) => any;
+  clearGrouping: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;
@@ -129,13 +139,14 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'expandable' | 'getSubRows' | 'stickyHeader' | 'interactionMode' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; stickyHeader: boolean; interactionMode: string; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
     manual: _props.manual ?? false,
     expandable: _props.expandable ?? false,
     getSubRows: _props.getSubRows ?? null,
+    groupable: _props.groupable ?? false,
     stickyHeader: _props.stickyHeader ?? false,
     interactionMode: _props.interactionMode ?? 'table',
     virtual: _props.virtual ?? false,
@@ -148,6 +159,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const gridRoot = useRef<any>(null);
   const gridScrollEl = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
+  const expandedTouched = useRef(false);
   const programmatic = useRef(0);
   const remeasurePending = useRef(false);
   const selectAllBox = useRef<any>(null);
@@ -188,6 +200,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     value: props.expanded,
     defaultValue: props.defaultExpanded ?? (() => ({}))(),
     onValueChange: props.onExpandedChange,
+  });
+  const [grouping, setGrouping] = useControllableState({
+    value: props.grouping,
+    defaultValue: props.defaultGrouping ?? (() => [])(),
+    onValueChange: props.onGroupingChange,
   });
   const [rowSelection, setRowSelection] = useControllableState({
     value: props.rowSelection,
@@ -235,6 +252,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   });
   const [rowSelectionDefault, setRowSelectionDefault] = useState({});
   const [expandedDefault, setExpandedDefault] = useState({});
+  const [groupingDefault, setGroupingDefault] = useState<any[]>([]);
   const [columnVisibilityDefault, setColumnVisibilityDefault] = useState({});
   const [columnSizingDefault, setColumnSizingDefault] = useState({});
   const [columnOrderDefault, setColumnOrderDefault] = useState<any[]>([]);
@@ -282,6 +300,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
   // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
   // computed/template binding (ROZ123).
+  function groupingActiveDefault() {
+    return ((grouping != null ? grouping : groupingDefault) || []).length > 0;
+  }
   const currentState = useCallback((): any => ({
     sorting: sorting != null ? sorting : sortingDefault,
     globalFilter: globalFilter != null ? globalFilter : globalFilterDefault,
@@ -291,7 +312,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
     // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
     // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
-    expanded: expanded != null ? expanded : expandedDefault,
+    // GROUPING AUTO-EXPAND (req-4): when grouping is active and the consumer has neither bound
+    // `expanded` nor toggled a group yet (!expandedTouched), default to the `true` expand-all
+    // literal so the grouped subtree is visible by default; the first toggle latches
+    // expandedTouched and the user's expanded state wins thereafter. Non-grouping path is
+    // unchanged → byte-identical-off (the table + the expandable-rows feature both keep
+    // $data.expandedDefault).
+    expanded: expanded != null ? expanded : groupingActiveDefault() && !expandedTouched.current ? true : expandedDefault,
+    // grouping (phase 50 reqs 4-7): GroupingState = ordered string[] of column ids. Falls back
+    // to $data.groupingDefault when r-model:grouping is unbound. table-core's getGroupedRowModel
+    // is inert when this is empty (byte-identical-off, req-10).
+    grouping: grouping != null ? grouping : groupingDefault,
     columnVisibility: columnVisibility != null ? columnVisibility : columnVisibilityDefault,
     columnSizing: columnSizing != null ? columnSizing : columnSizingDefault,
     columnOrder: columnOrder != null ? columnOrder : columnOrderDefault,
@@ -305,10 +336,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // every render. Not a two-way model slice (transient gesture state, not consumer
     // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
     columnSizingInfo: columnSizingInfo
-  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, expanded, expandedDefault, globalFilter, globalFilterDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
+  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, expanded, expandedDefault, globalFilter, globalFilterDefault, grouping, groupingActiveDefault, groupingDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
   const currentData = useCallback((): any => data != null ? data : dataDefault, [data, dataDefault]);
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
+  }
+  function wrapAggregationFn(fn: any) {
+    if (typeof fn === 'string') return fn;
+    if (typeof fn !== 'function') return undefined;
+    return (columnId: any, leafRows: any, childRows: any) => {
+      try {
+        return fn(columnId, leafRows, childRows);
+      } catch (err: any) {
+        return undefined;
+      }
+    };
   }
   function columnDefs() {
     const byId = Object.create(null);
@@ -333,6 +375,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         filterable: c.filterable === true,
         // Expandable-rows reserved per-column metadata (phase 50, D-04).
         expandable: c.expandable === true,
+        // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+        // so every data column is offered to the headless #groupBar by default; the per-column
+        // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+        // a custom fn defensively wrapped (T-50-04).
+        groupable: c.groupable !== false,
+        aggregationFn: wrapAggregationFn(c.aggregationFn),
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -360,6 +408,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         filterable: spec.filterable === true,
         // Expandable-rows reserved per-column metadata (phase 50, D-04).
         expandable: spec.expandable === true,
+        // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
+        groupable: spec.groupable !== false,
+        aggregationFn: wrapAggregationFn(spec.aggregationFn),
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -446,6 +497,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function writeExpanded(next: any) {
     if (programmatic.current) return;
     programmatic.current++;
+    // Latch the grouping auto-expand default (req-4): the FIRST expand/collapse toggle means
+    // the user now owns the expanded state, so currentState() stops defaulting grouped rows to
+    // the `true` expand-all literal and honors $data.expandedDefault from here on.
+    expandedTouched.current = true;
     setExpandedDefault(next); // fresh value only (never in-place)
     setExpanded(next); // two-way emit if bound (no-op-diff if not)
     // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
@@ -455,6 +510,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
     // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
     props.onExpandChange && props.onExpandChange(next);
+    programmatic.current--;
+  }
+  function writeGrouping(next: any) {
+    if (programmatic.current) return;
+    programmatic.current++;
+    setGroupingDefault(next); // fresh ordered array only (never in-place push)
+    setGrouping(next); // two-way emit if bound (no-op-diff if not)
+    props.onGroupChange && props.onGroupChange(next);
     programmatic.current--;
   }
   function writeGlobalFilter(next: any) {
@@ -553,6 +616,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const onExpandedChangeCb = useCallback((updater: any) => {
     writeExpanded(applyUpdater(updater, currentState().expanded));
   }, [applyUpdater, currentState, writeExpanded]);
+  const onGroupingChangeCb = useCallback((updater: any) => {
+    writeGrouping(applyUpdater(updater, currentState().grouping));
+  }, [applyUpdater, currentState, writeGrouping]);
   const onGlobalFilterChangeCb = useCallback((updater: any) => {
     writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
   }, [applyUpdater, currentState, writeGlobalFilter]);
@@ -801,6 +867,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
+      // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
+      // fresh currentState each cycle, F6).
+      getGroupedRowModel: getGroupedRowModel(),
+      onGroupingChange: onGroupingChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: onSortingChangeCb,
@@ -815,7 +886,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.selectionMode, tableColumns]);
+  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.selectionMode, tableColumns]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -1042,6 +1113,36 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       return base ? base + ';' + pad : pad;
     }
     return base;
+  }
+  function rowIsGrouped(row: any) {
+    return !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped());
+  }
+  function groupingActive() {
+    return tick() >= 0 && (currentState().grouping || []).length > 0;
+  }
+  function cellIsGrouped(cellCtx: any) {
+    return !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
+  }
+  function cellIsAggregated(cellCtx: any) {
+    return !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+  }
+  function groupSubRowCount(row: any) {
+    return row && row.subRows ? row.subRows.length : 0;
+  }
+  function groupingKeys() {
+    return currentState().grouping || [];
+  }
+  function groupableColumns() {
+    const out = [];
+    const defs = columnDefs();
+    for (const d of defs as any) {
+      if (!d || d.groupable === false) continue;
+      out.push({
+        id: d.id,
+        label: d.header != null ? d.header : d.id
+      });
+    }
+    return out;
   }
   const stopEvent = useCallback((evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
@@ -2463,6 +2564,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
     return out;
   }
+  function applyGrouping(cols: any) {
+    if (table.current) table.current.setGrouping(cols);
+  }
+  function clearGrouping() {
+    if (table.current) table.current.setGrouping([]);
+  }
 
   useEffect(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -2497,6 +2604,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: _expandableRef.current === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
+      // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
+      // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
+      // table-core FLATTENS group-header rows (carrying getIsGrouped()/subRows) and their
+      // members into getRowModel().rows, so they ride the SAME D-04 <template r-for> seam (no
+      // nested r-for — Pitfall 1). Group rows are expandable via the EXISTING expanded model
+      // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
+      getGroupedRowModel: getGroupedRowModel(),
+      onGroupingChange: onGroupingChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -2648,11 +2764,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     reFeed();
-  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, pagination, props.expandable, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.expandable, props.groupable, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
-  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange };
-  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
+  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
+  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange };
+  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => _rozieExposeRef.current.applyGrouping(...args), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => _rozieExposeRef.current.clearGrouping(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
 
   return (
     <__ctx_data_table_columns.Provider value={{
@@ -2694,7 +2810,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       </details>}</div>
 
 
-    {(props.virtual) ? <div className={"rdt-scroll"} style={parseInlineStyle(props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
+    {(props.groupable) && <div className={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
+      {(props.renderGroupBar ?? props.slots?.['groupBar']) ? ((props.renderGroupBar ?? props.slots?.['groupBar']) as Function)({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) : groupingKeys().map((gk) => <span key={gk} className={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk)}</span>)}
+    </div>}{(props.virtual) ? <div className={"rdt-scroll"} style={parseInlineStyle(props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
     <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {headerGroups.map((hg) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
@@ -2780,12 +2898,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         {rows.map((row) => <Fragment key={row.id}>
-        <tr key={row.id} className={"rdt-tr"} role="row" data-depth={rozieAttr(row.depth)} data-rozie-s-d5dcab4c="">
-          {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
+        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
+          {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(rowCanExpand(row)) && <button type="button" className={"rdt-expander"} data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} onClick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button>}</span> : (isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
+            </span> : (cellIsGrouped(cellCtx)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              <button type="button" className={"rdt-expander rdt-group-toggle"} data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')} onClick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button>
+              <span className={"rdt-group-value"} data-rozie-s-d5dcab4c="">
+                {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
+              </span>
+              <span className={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(row) + ')')}</span>
             </span> : (isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(hasEditorSlot(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}

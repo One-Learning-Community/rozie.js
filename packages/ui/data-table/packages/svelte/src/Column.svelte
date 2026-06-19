@@ -10,6 +10,8 @@ interface Props {
   pinned?: string;
   width?: string | number;
   expandable?: boolean;
+  groupable?: boolean;
+  aggregationFn?: (string | (...args: any[]) => any) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -27,6 +29,8 @@ let {
   pinned = '',
   width = '',
   expandable = false,
+  groupable = true,
+  aggregationFn = null,
   editable = false,
   editor = 'text',
   editorOptions = __defaultEditorOptions,
@@ -68,6 +72,11 @@ const buildSpec = () => ({
   width: width,
   // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
   expandable: expandable,
+  // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+  // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+  // custom fn) and filters groupableColumns by `groupable`.
+  groupable: groupable,
+  aggregationFn: aggregationFn,
   // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
   // registry (the existing per-column metadata path; NO parallel registry).
   editable: editable,
@@ -98,7 +107,7 @@ $effect(() => (() => {
 })());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, groupable, aggregationFn, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (reg) reg.registerColumn(colId(), buildSpec());
 })(); }); });
 </script>

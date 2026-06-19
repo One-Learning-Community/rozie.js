@@ -10,6 +10,8 @@ interface ColumnProps {
   pinned?: string;
   width?: string | number;
   expandable?: boolean;
+  groupable?: boolean;
+  aggregationFn?: (string | (...args: any[]) => any) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -19,7 +21,7 @@ interface ColumnProps {
 export default function Column(_props: ColumnProps): JSX.Element {
   const registry = useContext(rozieContext("data-table:columns"));
   const __defaultEditorOptions = useState(() => (() => [])())[0];
-  const props: Omit<ColumnProps, 'id' | 'field' | 'header' | 'sortable' | 'filterable' | 'pinned' | 'width' | 'expandable' | 'editable' | 'editor' | 'editorOptions' | 'validate'> & { id: string; field: string; header: string; sortable: boolean; filterable: boolean; pinned: string; width: string | number; expandable: boolean; editable: boolean; editor: string; editorOptions: any[]; validate: ((...args: any[]) => any) | null } = {
+  const props: Omit<ColumnProps, 'id' | 'field' | 'header' | 'sortable' | 'filterable' | 'pinned' | 'width' | 'expandable' | 'groupable' | 'aggregationFn' | 'editable' | 'editor' | 'editorOptions' | 'validate'> & { id: string; field: string; header: string; sortable: boolean; filterable: boolean; pinned: string; width: string | number; expandable: boolean; groupable: boolean; aggregationFn: (string | (...args: any[]) => any) | null; editable: boolean; editor: string; editorOptions: any[]; validate: ((...args: any[]) => any) | null } = {
     ..._props,
     id: _props.id ?? '',
     field: _props.field ?? '',
@@ -29,6 +31,8 @@ export default function Column(_props: ColumnProps): JSX.Element {
     pinned: _props.pinned ?? '',
     width: _props.width ?? '',
     expandable: _props.expandable ?? false,
+    groupable: _props.groupable ?? true,
+    aggregationFn: _props.aggregationFn ?? null,
     editable: _props.editable ?? false,
     editor: _props.editor ?? 'text',
     editorOptions: _props.editorOptions ?? __defaultEditorOptions,
@@ -53,13 +57,18 @@ export default function Column(_props: ColumnProps): JSX.Element {
     width: props.width,
     // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
     expandable: props.expandable,
+    // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+    // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+    // custom fn) and filters groupableColumns by `groupable`.
+    groupable: props.groupable,
+    aggregationFn: props.aggregationFn,
     // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
     // registry (the existing per-column metadata path; NO parallel registry).
     editable: props.editable,
     editor: props.editor,
     editorOptions: props.editorOptions,
     validate: props.validate
-  }), [colId, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterable, props.header, props.pinned, props.sortable, props.validate, props.width]);
+  }), [colId, props.aggregationFn, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterable, props.groupable, props.header, props.pinned, props.sortable, props.validate, props.width]);
 
   useEffect(() => {
     // register this column's spec. On Lit the injected registry may still be undefined
@@ -84,7 +93,7 @@ export default function Column(_props: ColumnProps): JSX.Element {
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     if (reg.current) reg.current.registerColumn(colId(), buildSpec());
-  }, [props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterable, props.header, props.id, props.pinned, props.sortable, props.validate, props.width]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.aggregationFn, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterable, props.groupable, props.header, props.id, props.pinned, props.sortable, props.validate, props.width]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

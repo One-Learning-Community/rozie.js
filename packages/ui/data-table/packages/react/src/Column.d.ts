@@ -9,6 +9,8 @@ export interface ColumnProps {
   pinned?: string;
   width?: string | number;
   expandable?: boolean;
+  groupable?: boolean;
+  aggregationFn?: (string | (...args: unknown[]) => unknown) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: unknown[];

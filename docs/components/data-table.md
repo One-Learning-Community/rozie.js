@@ -74,6 +74,8 @@ A `<Column>` declares one column of the table. It is **renderless** — it draws
 | `filterable` | `Boolean` | `false` | Whether this column shows a per-column filter input. |
 | `pinned` | `String` | `''` | Initial pin side: `''` (unpinned) \| `'left'` \| `'right'`. |
 | `width` | `String \| Number` | `''` | Optional fixed/initial column width (CSS length or px number). |
+| `groupable` | `Boolean` | `true` | Whether this column is offered to the headless `#groupBar` as a grouping target (opt-out via `:groupable="false"`). Grouping is engaged via the parent's `grouping` model, not this flag. |
+| `aggregationFn` | `String \| Function` | `null` | The aggregation for this column's group-header value: a built-in name (`'sum'` \| `'min'` \| `'max'` \| `'extent'` \| `'mean'` \| `'median'` \| `'unique'` \| `'uniqueCount'` \| `'count'`) or a custom `(columnId, leafRows, childRows) => any`. A custom fn is defensively wrapped (a throw cannot crash the table). Null → no aggregation (placeholder cell). |
 
 Because a bare boolean attribute on a child component (`<Column sortable />`) only coerces to `true` on Vue + Lit, **bind it** in the other targets — `:sortable="true"` (React/Solid/Angular/Svelte) — or rely on each consumer framework's own boolean-attribute convention.
 
@@ -129,6 +131,8 @@ The full prop surface. The nine `model: true` slices (the **Two-way** column) ar
 | `expandable` | `Boolean` | `false` | | | Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). |
 | `expanded` | `any` | `{}` | ✓ | | `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback when unbound. |
 | `getSubRows` | `Function` | `null` | | | Table-level child-row accessor `(originalRow, index) => TData[] \| undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode. |
+| `groupable` | `Boolean` | `false` | | | Opt-in gate for the **headless `#groupBar`** host region. Default `false` is byte-identical-off. `getGroupedRowModel` is wired unconditionally (inert when `grouping` is empty), so grouping is driven by the `grouping` model; this flag only gates the consumer-facing group-bar surface (the component ships **no** built-in drag UI). |
+| `grouping` | `Array` | `[]` | ✓ | | `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). `[]` is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback when unbound. |
 | `rowSelection` | `Object` | `{}` | ✓ | | `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). |
 | `columnVisibility` | `Object` | `{}` | ✓ | | `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. |
 | `columnSizing` | `Object` | `{}` | ✓ | | `ColumnSizingState` — `{ [colId]: number }`. Driven live by the pointer-drag resize handle (`columnResizeMode: 'onChange'`). |
@@ -152,6 +156,7 @@ Each slice is an independent, optional two-way `r-model` with its own uncontroll
 | `pagination` | `{ pageIndex, pageSize }` | `page-change` | The current page index + size. |
 | `rowSelection` | `{ [rowId]: true }` | `selection-change` | The selected-row set (checkbox-only). |
 | `expanded` | `{ [rowId]: true } \| true` | `expand-change` | The expanded-row set (multi-expand; the `true` literal = all rows expanded). |
+| `grouping` | `string[]` | `group-change` | The ordered grouping key list (multi-column → nested groups). `[]` is ungrouped. |
 | `columnVisibility` | `{ [colId]: boolean }` | `visibility-change` | Per-column shown/hidden state. |
 | `columnSizing` | `{ [colId]: number }` | `resize-change` | Per-column widths (live during a resize drag). |
 | `columnOrder` | `string[]` | `reorder-change` | The full column order. |
@@ -168,6 +173,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `page-change` | Fired when pagination changes (prev/next, a page-size change, or a `setPage`/`setRowsPerPage` call). Payload: the fresh `{ pageIndex, pageSize }`. |
 | `selection-change` | Fired when the row selection changes (a row/select-all checkbox toggle or a `toggleAllRows`/`clearSelection` call). Payload: the fresh `RowSelectionState`. |
 | `expand-change` | Fired when the expanded-row set changes (an expander chevron toggle — click / Enter / Space — or a `toggleRowExpanded`/`expandAll`/`collapseAll` call). Fires exactly once per change. Payload: the fresh `ExpandedState` (`{ [rowId]: true }`, or the `true` literal after `expandAll` — pass through verbatim, never `Object.keys` without a `=== true` guard). Named `expand-change` (not `expanded-change`) so it does not collide with the `expanded` model's `onExpandedChange` callback on the React/Solid Props interface. |
+| `group-change` | Fired when the grouping changes (a `#groupBar` apply/clear, mutating the `grouping` model, or an `applyGrouping`/`clearGrouping` call). Fires exactly once per change. Payload: the fresh `GroupingState` — an ordered `string[]` of column ids, or `[]` when cleared. Named `group-change` (not `grouping-change`) so it does not collide with the `grouping` model's `onGroupingChange` callback on the React/Solid Props interface. |
 | `visibility-change` | Fired when a column is shown/hidden (the column-toggle menu or a `toggleColumnVisibility` call). Payload: the fresh `VisibilityState`. |
 | `resize-change` | Fired live during a column resize drag (`columnResizeMode: 'onChange'`). Payload: the fresh `ColumnSizingState`. |
 | `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
@@ -190,6 +196,8 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `expandAll` | Open every expandable row — `expandAll()`. Fires `expand-change` (payload may be the `true` literal). |
 | `collapseAll` | Collapse every row — `collapseAll()`. Resets the expanded set to `{}`. Fires `expand-change`. |
 | `getExpandedRows` | Return the original row data for the currently-expanded rows — `getExpandedRows()` → `unknown[]` (empty when nothing is expanded). |
+| `applyGrouping` | Set the full grouping — `applyGrouping(cols)` where `cols` is an ordered `string[]` of column ids (multi-column → nested groups). Fires `group-change`. (Named `applyGrouping`, not `setGrouping`, to avoid colliding with React's auto-generated `grouping` model setter — ROZ524.) |
+| `clearGrouping` | Clear all grouping — `clearGrouping()`. Resets to the ungrouped (flat) row model. Fires `group-change` with `[]`. |
 | `setPage` | Go to a 0-based page index — `setPage(idx)`. Fires `page-change`. |
 | `setRowsPerPage` | Set the page size — `setRowsPerPage(size)`. Fires `page-change`. |
 | `toggleColumnVisibility` | Show/hide a column — `toggleColumnVisibility(colId)`. Fires `visibility-change`. |
@@ -211,6 +219,7 @@ All slots live on the parent `<DataTable>` (a `<Column>` carries metadata only).
 | `selectAll` | `checked, indeterminate, toggle` | Override the select-all header (only when `selectionMode="multiple"`). `indeterminate` is true on a partial selection. |
 | `selectCell` | `row, checked, toggle` | Override the per-row select checkbox (only when `selectionMode="multiple"`). |
 | `detail` | `row` | Custom expanded-row content rendered under an expanded row (only when `expandable` and no `getSubRows`). The React render-prop edge (documented divergence). |
+| `groupBar` | `grouping, groupableColumns, applyGrouping, clearGrouping` | **Headless** group-bar (only when `groupable`). Receives the ordered `grouping` array, the `groupableColumns` (`[{ id, label }]`), and the `applyGrouping`/`clearGrouping` helpers so a consumer builds any bar/drag UI. The default render is a non-interactive styled-token reflection (empty when ungrouped); the component ships **no** drag affordance. The React render-prop edge (documented divergence). |
 
 ## Theming
 

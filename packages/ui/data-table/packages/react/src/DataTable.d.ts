@@ -26,6 +26,10 @@ export interface DataTableProps {
   defaultExpanded?: Record<string, unknown> | boolean;
   onExpandedChange?: (next: Record<string, unknown> | boolean) => void;
   getSubRows?: ((...args: unknown[]) => unknown) | null;
+  groupable?: boolean;
+  grouping?: unknown[];
+  defaultGrouping?: unknown[];
+  onGroupingChange?: (next: unknown[]) => void;
   rowSelection?: Record<string, unknown>;
   defaultRowSelection?: Record<string, unknown>;
   onRowSelectionChange?: (next: Record<string, unknown>) => void;
@@ -48,6 +52,7 @@ export interface DataTableProps {
   maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
   onExpandChange?: (...args: unknown[]) => void;
+  onGroupChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -60,6 +65,7 @@ export interface DataTableProps {
   onCellEditCommit?: (...args: unknown[]) => void;
   onRowEditCommit?: (...args: unknown[]) => void;
   children?: ReactNode;
+  renderGroupBar?: (params: { grouping: unknown; groupableColumns: unknown; applyGrouping: () => void; clearGrouping: () => void }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
@@ -70,6 +76,7 @@ export interface DataTableProps {
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
+  renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
@@ -83,6 +90,8 @@ export interface DataTableHandle {
   expandAll: (...args: any[]) => any;
   collapseAll: (...args: any[]) => any;
   getExpandedRows: (...args: any[]) => any;
+  applyGrouping: (...args: any[]) => any;
+  clearGrouping: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;

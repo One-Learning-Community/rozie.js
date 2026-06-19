@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -99,6 +99,32 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
   max-height: var(--rozie-data-table-max-height);
   overflow: auto;
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-bar-host[data-rozie-s-d5dcab4c] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-token[data-rozie-s-d5dcab4c] {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+  border-radius: var(--rdt-group-token-radius, 999px);
+  background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+  font-size: var(--rdt-group-token-size, 0.8125em);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] {
+  background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
+  font-weight: var(--rdt-group-header-weight, 600);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-toggle[data-rozie-s-d5dcab4c] {
+  margin-right: var(--rdt-group-toggle-gap, 0.375rem);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-count[data-rozie-s-d5dcab4c] {
+  margin-left: var(--rdt-group-count-gap, 0.375rem);
+  opacity: var(--rdt-group-count-opacity, 0.65);
+  font-weight: 400;
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] {
   display: flex;
@@ -244,6 +270,8 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
   accent-color: var(--rdt-select-accent, currentColor);
 }`);
 
+interface GroupBarSlotCtx { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any; }
+
 interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
@@ -280,6 +308,10 @@ interface DataTableProps {
   defaultExpanded?: Record<string, any> | boolean;
   onExpandedChange?: (expanded: Record<string, any> | boolean) => void;
   getSubRows?: ((...args: unknown[]) => unknown) | null;
+  groupable?: boolean;
+  grouping?: any[];
+  defaultGrouping?: any[];
+  onGroupingChange?: (grouping: any[]) => void;
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
@@ -302,6 +334,7 @@ interface DataTableProps {
   maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
   onExpandChange?: (...args: unknown[]) => void;
+  onGroupChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -315,6 +348,7 @@ interface DataTableProps {
   onRowEditCommit?: (...args: unknown[]) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
   colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
@@ -332,6 +366,8 @@ export interface DataTableHandle {
   expandAll: (...args: any[]) => any;
   collapseAll: (...args: any[]) => any;
   getExpandedRows: (...args: any[]) => any;
+  applyGrouping: (...args: any[]) => any;
+  clearGrouping: (...args: any[]) => any;
   getColumnDefs: (...args: any[]) => any;
   toggleAllRows: (...args: any[]) => any;
   clearSelection: (...args: any[]) => any;
@@ -352,10 +388,10 @@ export interface DataTableHandle {
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
-  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
+  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -367,6 +403,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     pageSize: 10
   }))());
   const [expanded, setExpanded] = createControllableSignal<Record<string, any> | boolean>(_props as unknown as Record<string, unknown>, 'expanded', (() => ({}))());
+  const [grouping, setGrouping] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'grouping', (() => [])());
   const [rowSelection, setRowSelection] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'rowSelection', (() => ({}))());
   const [columnVisibility, setColumnVisibility] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnVisibility', (() => ({}))());
   const [columnSizing, setColumnSizing] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnSizing', (() => ({}))());
@@ -385,6 +422,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   });
   const [rowSelectionDefault, setRowSelectionDefault] = createSignal({});
   const [expandedDefault, setExpandedDefault] = createSignal({});
+  const [groupingDefault, setGroupingDefault] = createSignal([]);
   const [columnVisibilityDefault, setColumnVisibilityDefault] = createSignal({});
   const [columnSizingDefault, setColumnSizingDefault] = createSignal({});
   const [columnOrderDefault, setColumnOrderDefault] = createSignal([]);
@@ -452,6 +490,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       getSubRows: (local.getSubRows || undefined) as any,
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
+      // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
+      // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
+      // table-core FLATTENS group-header rows (carrying getIsGrouped()/subRows) and their
+      // members into getRowModel().rows, so they ride the SAME D-04 <template r-for> seam (no
+      // nested r-for — Pitfall 1). Group rows are expandable via the EXISTING expanded model
+      // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
+      getGroupedRowModel: getGroupedRowModel(),
+      onGroupingChange: onGroupingChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -598,7 +645,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     lastDataLen = d.length;
     reFeed();
   });
-  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), expanded(), local.expandable, columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), expanded(), local.expandable, grouping(), local.groupable, columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
   // even when the fresh array is the SAME length (a single-cell edit replaces one row
   // object → new array ref, identical length → the .length key alone would miss it). The
   // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
@@ -650,6 +697,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // the funnel. A counter (not a boolean) so nested writes are safe.
   let programmatic = 0;
 
+  // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+  // has not bound `expanded` and has not yet toggled any group, group-header rows default to
+  // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+  // roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+  // writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+  // non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+  // exactly as before, both for the plain table AND the expandable-rows feature).
+  let expandedTouched = false;
+
+  // groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+  // the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+  // the expanded auto-default below tracks the live grouping state on every target.
+  function groupingActiveDefault() {
+    return ((grouping() != null ? grouping() : groupingDefault()) || []).length > 0;
+  }
+
   // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
   // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
   // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -667,7 +730,17 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
       // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
       // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
-      expanded: expanded() != null ? expanded() : expandedDefault(),
+      // GROUPING AUTO-EXPAND (req-4): when grouping is active and the consumer has neither bound
+      // `expanded` nor toggled a group yet (!expandedTouched), default to the `true` expand-all
+      // literal so the grouped subtree is visible by default; the first toggle latches
+      // expandedTouched and the user's expanded state wins thereafter. Non-grouping path is
+      // unchanged → byte-identical-off (the table + the expandable-rows feature both keep
+      // $data.expandedDefault).
+      expanded: expanded() != null ? expanded() : groupingActiveDefault() && !expandedTouched ? true : expandedDefault(),
+      // grouping (phase 50 reqs 4-7): GroupingState = ordered string[] of column ids. Falls back
+      // to $data.groupingDefault when r-model:grouping is unbound. table-core's getGroupedRowModel
+      // is inert when this is empty (byte-identical-off, req-10).
+      grouping: grouping() != null ? grouping() : groupingDefault(),
       columnVisibility: columnVisibility() != null ? columnVisibility() : columnVisibilityDefault(),
       columnSizing: columnSizing() != null ? columnSizing() : columnSizingDefault(),
       columnOrder: columnOrder() != null ? columnOrder() : columnOrderDefault(),
@@ -701,6 +774,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
   }
+  // wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+  // aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+  // anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+  // 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+  // built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+  // is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+  // throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+  // Anything else → undefined (no aggregation; the cell renders as a placeholder).
+  function wrapAggregationFn(fn: any) {
+    if (typeof fn === 'string') return fn;
+    if (typeof fn !== 'function') return undefined;
+    return (columnId: any, leafRows: any, childRows: any) => {
+      try {
+        return fn(columnId, leafRows, childRows);
+      } catch (err: any) {
+        return undefined;
+      }
+    };
+  }
   function columnDefs() {
     const byId = Object.create(null);
     const order = [];
@@ -724,6 +816,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         filterable: c.filterable === true,
         // Expandable-rows reserved per-column metadata (phase 50, D-04).
         expandable: c.expandable === true,
+        // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+        // so every data column is offered to the headless #groupBar by default; the per-column
+        // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+        // a custom fn defensively wrapped (T-50-04).
+        groupable: c.groupable !== false,
+        aggregationFn: wrapAggregationFn(c.aggregationFn),
         pinned: c.pinned != null ? c.pinned : '',
         width: c.width != null ? c.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -751,6 +849,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         filterable: spec.filterable === true,
         // Expandable-rows reserved per-column metadata (phase 50, D-04).
         expandable: spec.expandable === true,
+        // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
+        groupable: spec.groupable !== false,
+        aggregationFn: wrapAggregationFn(spec.aggregationFn),
         pinned: spec.pinned != null ? spec.pinned : '',
         width: spec.width != null ? spec.width : '',
         // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -851,6 +952,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function writeExpanded(next: any) {
     if (programmatic) return;
     programmatic++;
+    // Latch the grouping auto-expand default (req-4): the FIRST expand/collapse toggle means
+    // the user now owns the expanded state, so currentState() stops defaulting grouped rows to
+    // the `true` expand-all literal and honors $data.expandedDefault from here on.
+    expandedTouched = true;
     setExpandedDefault(next); // fresh value only (never in-place)
     setExpanded(next); // two-way emit if bound (no-op-diff if not)
     // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
@@ -860,6 +965,26 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
     // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
     _props.onExpandChange?.(next);
+    programmatic--;
+  }
+
+  // ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+  // table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+  // against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+  // uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+  // emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+  // STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+  // `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+  // on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+  // SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+  // hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+  // name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
+  function writeGrouping(next: any) {
+    if (programmatic) return;
+    programmatic++;
+    setGroupingDefault(next); // fresh ordered array only (never in-place push)
+    setGrouping(next); // two-way emit if bound (no-op-diff if not)
+    _props.onGroupChange?.(next);
     programmatic--;
   }
 
@@ -1024,6 +1149,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   }
   function onExpandedChangeCb(updater: any) {
     writeExpanded(applyUpdater(updater, currentState().expanded));
+  }
+  function onGroupingChangeCb(updater: any) {
+    writeGrouping(applyUpdater(updater, currentState().grouping));
   }
   function onGlobalFilterChangeCb(updater: any) {
     writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
@@ -1351,6 +1479,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       getSubRows: (local.getSubRows || undefined) as any,
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
+      // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
+      // fresh currentState each cycle, F6).
+      getGroupedRowModel: getGroupedRowModel(),
+      onGroupingChange: onGroupingChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: onSortingChangeCb,
@@ -1711,6 +1844,58 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       return base ? base + ';' + pad : pad;
     }
     return base;
+  }
+  // ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+  // Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+  // $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+  // (no parallel render path, no nested r-for). These predicates read through the reactive tick
+  // (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+  // targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+  // listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+  // rowIsGrouped: this flattened row is a group-header row.
+  function rowIsGrouped(row: any) {
+    return !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped());
+  }
+  // groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+  // data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
+  function groupingActive() {
+    return tick() >= 0 && (currentState().grouping || []).length > 0;
+  }
+  // cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+  // the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+  // EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+  // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
+  function cellIsGrouped(cellCtx: any) {
+    return !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
+  }
+  function cellIsAggregated(cellCtx: any) {
+    return !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+  }
+  // groupSubRowCount: the number of immediate members under a group-header row (the count shown in
+  // the header, e.g. "North (3)").
+  function groupSubRowCount(row: any) {
+    return row && row.subRows ? row.subRows.length : 0;
+  }
+  // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+  // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+  // both reactive sources, so the bar re-renders on a grouping change across all six targets.
+  function groupingKeys() {
+    return currentState().grouping || [];
+  }
+  // groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+  // `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+  // not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+  function groupableColumns() {
+    const out = [];
+    const defs = columnDefs();
+    for (const d of defs as any) {
+      if (!d || d.groupable === false) continue;
+      out.push({
+        id: d.id,
+        label: d.header != null ? d.header : d.id
+      });
+    }
+    return out;
   }
   // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
   // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
@@ -3625,6 +3810,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return out;
   }
 
+  // ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+  // applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+  // React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+  // $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+  // setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+  // table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+  // the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
+  function applyGrouping(cols: any) {
+    if (table) table.setGrouping(cols);
+  }
+  function clearGrouping() {
+    if (table) table.setGrouping([]);
+  }
+
   return (
     <__ctx_data_table_columns.Provider value={{
   registerColumn: (id: any, spec: any) => {
@@ -3665,7 +3864,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       </details></Show>}</div>
 
 
-    {<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
+    {<Show when={local.groupable}><div class={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
+      {(_props.groupBarSlot ?? _props.slots?.['groupBar'])?.({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) ?? <For each={groupingKeys()}>{(gk) => <span class={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk)}</span>}</For>}
+    </div></Show>}{<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table"} classList={{ 'rdt-sticky': local.stickyHeader }} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocusIn={($event) => { syncActiveFromEvent($event); }} onFocusOut={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={headerGroups()}>{(hg) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
           <For each={hg.headers}>{(header) => <th class={"rdt-th"} classList={{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
@@ -3699,10 +3900,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         <For each={rows()}>{(row) => <>
-        <tr class={"rdt-tr"} role="row" data-depth={rozieAttr(row.depth)} data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c="">
+        <tr class={"rdt-tr"} classList={{ 'rdt-group-header': rowIsGrouped(row) }} role="row" data-depth={rozieAttr(row.depth)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c="">
             
-            {<Show when={isExpanderColumn(cellCtx.column.id)} fallback={<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+            {<Show when={isExpanderColumn(cellCtx.column.id)} fallback={<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={cellIsGrouped(cellCtx)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onChange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
@@ -3710,6 +3911,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button>
+              <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
+                {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
+              </span>
+              <span class={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(row) + ')')}</span>
+            </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={rowCanExpand(row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</For>

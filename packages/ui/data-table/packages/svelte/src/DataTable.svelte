@@ -16,6 +16,8 @@ interface Props {
   expandable?: boolean;
   expanded?: any | boolean;
   getSubRows?: ((...args: any[]) => any) | null;
+  groupable?: boolean;
+  grouping?: any[];
   rowSelection?: any;
   columnVisibility?: any;
   columnSizing?: any;
@@ -27,6 +29,7 @@ interface Props {
   estimateRowHeight?: number;
   maxHeight?: string;
   children?: Snippet;
+  groupBar?: Snippet<[{ grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }]>;
   selectAll?: Snippet<[{ checked: any; indeterminate: any; toggle: any }]>;
   colHeader?: Snippet<[{ columnId: any; column: any; label: any }]>;
   selectCell?: Snippet<[{ row: any; checked: any; toggle: any }]>;
@@ -36,6 +39,7 @@ interface Props {
   snippets?: Record<string, any>;
   onsortchange?: (...args: unknown[]) => void;
   onexpandchange?: (...args: unknown[]) => void;
+  ongroupchange?: (...args: unknown[]) => void;
   onfilterchange?: (...args: unknown[]) => void;
   onpagechange?: (...args: unknown[]) => void;
   onselectionchange?: (...args: unknown[]) => void;
@@ -66,6 +70,8 @@ let {
   expandable = false,
   expanded = $bindable((() => ({}))()),
   getSubRows = null,
+  groupable = false,
+  grouping = $bindable((() => [])()),
   rowSelection = $bindable((() => ({}))()),
   columnVisibility = $bindable((() => ({}))()),
   columnSizing = $bindable((() => ({}))()),
@@ -80,6 +86,7 @@ let {
   estimateRowHeight = 40,
   maxHeight = '',
   children: __childrenProp,
+  groupBar: __groupBarProp,
   selectAll: __selectAllProp,
   colHeader: __colHeaderProp,
   selectCell: __selectCellProp,
@@ -89,6 +96,7 @@ let {
   snippets,
   onsortchange,
   onexpandchange,
+  ongroupchange,
   onfilterchange,
   onpagechange,
   onselectionchange,
@@ -103,6 +111,7 @@ let {
 }: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
+const groupBar = $derived(__groupBarProp ?? snippets?.groupBar);
 const selectAll = $derived(__selectAllProp ?? snippets?.selectAll);
 const colHeader = $derived(__colHeaderProp ?? snippets?.colHeader);
 const selectCell = $derived(__selectCellProp ?? snippets?.selectCell);
@@ -120,6 +129,7 @@ let paginationDefault = $state({
 });
 let rowSelectionDefault = $state({});
 let expandedDefault = $state({});
+let groupingDefault: any[] = $state([]);
 let columnVisibilityDefault = $state({});
 let columnSizingDefault = $state({});
 let columnOrderDefault: any[] = $state([]);
@@ -157,7 +167,7 @@ let pasteAnnounce = $state('');
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
-import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel } from '@tanstack/table-core';
+import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -242,6 +252,30 @@ let gridRoot: any = null;
 // the funnel. A counter (not a boolean) so nested writes are safe.
 let programmatic = 0;
 
+// Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+// has not bound `expanded` and has not yet toggled any group, group-header rows default to
+// EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+// roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+// writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+// non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+// exactly as before, both for the plain table AND the expandable-rows feature).
+// Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+// has not bound `expanded` and has not yet toggled any group, group-header rows default to
+// EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+// roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+// writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+// non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+// exactly as before, both for the plain table AND the expandable-rows feature).
+let expandedTouched = false;
+
+// groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+// the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+// the expanded auto-default below tracks the live grouping state on every target.
+// groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+// the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+// the expanded auto-default below tracks the live grouping state on every target.
+const groupingActiveDefault = () => ((grouping != null ? grouping : groupingDefault) || []).length > 0;
+
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
 // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
 // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -265,7 +299,17 @@ const currentState = (): any => ({
   // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
   // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
   // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
-  expanded: expanded != null ? expanded : expandedDefault,
+  // GROUPING AUTO-EXPAND (req-4): when grouping is active and the consumer has neither bound
+  // `expanded` nor toggled a group yet (!expandedTouched), default to the `true` expand-all
+  // literal so the grouped subtree is visible by default; the first toggle latches
+  // expandedTouched and the user's expanded state wins thereafter. Non-grouping path is
+  // unchanged → byte-identical-off (the table + the expandable-rows feature both keep
+  // $data.expandedDefault).
+  expanded: expanded != null ? expanded : groupingActiveDefault() && !expandedTouched ? true : expandedDefault,
+  // grouping (phase 50 reqs 4-7): GroupingState = ordered string[] of column ids. Falls back
+  // to $data.groupingDefault when r-model:grouping is unbound. table-core's getGroupedRowModel
+  // is inert when this is empty (byte-identical-off, req-10).
+  grouping: grouping != null ? grouping : groupingDefault,
   columnVisibility: columnVisibility != null ? columnVisibility : columnVisibilityDefault,
   columnSizing: columnSizing != null ? columnSizing : columnSizingDefault,
   columnOrder: columnOrder != null ? columnOrder : columnOrderDefault,
@@ -304,6 +348,33 @@ const currentData = (): any => data != null ? data : dataDefault;
 // render callbacks — cells render via the single #cell/#header scoped slot on this
 // component, dispatched by columnId; <Column> carries metadata only.)
 const isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
+// wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+// aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+// anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+// 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+// built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+// is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+// throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+// Anything else → undefined (no aggregation; the cell renders as a placeholder).
+// wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+// aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+// anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+// 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+// built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+// is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+// throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+// Anything else → undefined (no aggregation; the cell renders as a placeholder).
+const wrapAggregationFn = (fn: any) => {
+  if (typeof fn === 'string') return fn;
+  if (typeof fn !== 'function') return undefined;
+  return (columnId: any, leafRows: any, childRows: any) => {
+    try {
+      return fn(columnId, leafRows, childRows);
+    } catch (err: any) {
+      return undefined;
+    }
+  };
+};
 const columnDefs = () => {
   const byId = Object.create(null);
   const order = [];
@@ -327,6 +398,12 @@ const columnDefs = () => {
       filterable: c.filterable === true,
       // Expandable-rows reserved per-column metadata (phase 50, D-04).
       expandable: c.expandable === true,
+      // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+      // so every data column is offered to the headless #groupBar by default; the per-column
+      // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+      // a custom fn defensively wrapped (T-50-04).
+      groupable: c.groupable !== false,
+      aggregationFn: wrapAggregationFn(c.aggregationFn),
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -354,6 +431,9 @@ const columnDefs = () => {
       filterable: spec.filterable === true,
       // Expandable-rows reserved per-column metadata (phase 50, D-04).
       expandable: spec.expandable === true,
+      // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
+      groupable: spec.groupable !== false,
+      aggregationFn: wrapAggregationFn(spec.aggregationFn),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -478,6 +558,10 @@ const applyUpdater = (updater: any, current: any) => typeof updater === 'functio
 const writeExpanded = (next: any) => {
   if (programmatic) return;
   programmatic++;
+  // Latch the grouping auto-expand default (req-4): the FIRST expand/collapse toggle means
+  // the user now owns the expanded state, so currentState() stops defaulting grouped rows to
+  // the `true` expand-all literal and honors $data.expandedDefault from here on.
+  expandedTouched = true;
   expandedDefault = next; // fresh value only (never in-place)
   expanded = next; // two-way emit if bound (no-op-diff if not)
   // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
@@ -487,6 +571,37 @@ const writeExpanded = (next: any) => {
   // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
   // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
   onexpandchange?.(next);
+  programmatic--;
+};
+
+// ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+// table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+// against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+// uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+// emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+// STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+// `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+// on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+// SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+// hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+// name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
+// ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+// table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+// against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+// uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+// emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+// STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+// `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+// on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+// SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+// hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+// name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
+const writeGrouping = (next: any) => {
+  if (programmatic) return;
+  programmatic++;
+  groupingDefault = next; // fresh ordered array only (never in-place push)
+  grouping = next; // two-way emit if bound (no-op-diff if not)
+  ongroupchange?.(next);
   programmatic--;
 };
 
@@ -704,6 +819,9 @@ const onSortingChangeCb = (updater: any) => {
 };
 const onExpandedChangeCb = (updater: any) => {
   writeExpanded(applyUpdater(updater, currentState().expanded));
+};
+const onGroupingChangeCb = (updater: any) => {
+  writeGrouping(applyUpdater(updater, currentState().grouping));
 };
 const onGlobalFilterChangeCb = (updater: any) => {
   writeGlobalFilter(applyUpdater(updater, currentState().globalFilter));
@@ -1097,6 +1215,11 @@ const reFeed = () => {
     getSubRows: (getSubRows || undefined) as any,
     getRowCanExpand: expandable === true && getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
+    // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
+    // fresh currentState each cycle, F6).
+    getGroupedRowModel: getGroupedRowModel(),
+    onGroupingChange: onGroupingChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
@@ -1540,6 +1663,68 @@ const bodyCellStyle = (row: any, colId: any) => {
     return base ? base + ';' + pad : pad;
   }
   return base;
+};
+// ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+// Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+// $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+// (no parallel render path, no nested r-for). These predicates read through the reactive tick
+// (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+// targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+// listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+// rowIsGrouped: this flattened row is a group-header row.
+// ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+// Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+// $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+// (no parallel render path, no nested r-for). These predicates read through the reactive tick
+// (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+// targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+// listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+// rowIsGrouped: this flattened row is a group-header row.
+const rowIsGrouped = (row: any) => !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped());
+// groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+// data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
+// groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+// data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
+const groupingActive = () => tick() >= 0 && (currentState().grouping || []).length > 0;
+// cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+// the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+// EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+// Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
+// cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+// the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+// EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+// Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
+const cellIsGrouped = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
+const cellIsAggregated = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
+// the header, e.g. "North (3)").
+// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
+// the header, e.g. "North (3)").
+const groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
+// groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+// default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+// both reactive sources, so the bar re-renders on a grouping change across all six targets.
+// groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+// default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+// both reactive sources, so the bar re-renders on a grouping change across all six targets.
+const groupingKeys = () => currentState().grouping || [];
+// groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+// `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+// not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+// groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+// `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+// not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+const groupableColumns = () => {
+  const out = [];
+  const defs = columnDefs();
+  for (const d of defs as any) {
+    if (!d || d.groupable === false) continue;
+    out.push({
+      id: d.id,
+      label: d.header != null ? d.header : d.id
+    });
+  }
+  return out;
 };
 // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
 // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
@@ -3847,6 +4032,27 @@ export const getExpandedRows = () => {
   return out;
 };
 
+// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
+// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
+export const applyGrouping = (cols: any) => {
+  if (table) table.setGrouping(cols);
+};
+export const clearGrouping = () => {
+  if (table) table.setGrouping([]);
+};
+
 setContext('data-table:columns', {
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -3900,6 +4106,15 @@ onMount(() => {
     getSubRows: (getSubRows || undefined) as any,
     getRowCanExpand: expandable === true && getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
+    // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
+    // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
+    // table-core FLATTENS group-header rows (carrying getIsGrouped()/subRows) and their
+    // members into getRowModel().rows, so they ride the SAME D-04 <template r-for> seam (no
+    // nested r-for — Pitfall 1). Group rows are expandable via the EXISTING expanded model
+    // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
+    getGroupedRowModel: getGroupedRowModel(),
+    onGroupingChange: onGroupingChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -4048,7 +4263,7 @@ $effect(() => (() => {
 })());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [sorting, globalFilter, columnFilters, pagination, rowSelection, expanded, expandable, columnVisibility, columnSizing, columnOrder, columnPinning, selectionMode, (data || []).length,
+$effect(() => { (() => [sorting, globalFilter, columnFilters, pagination, rowSelection, expanded, expandable, grouping, groupable, columnVisibility, columnSizing, columnOrder, columnPinning, selectionMode, (data || []).length,
 // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
 // even when the fresh array is the SAME length (a single-cell edit replaces one row
 // object → new array ref, identical length → the .length key alone would miss it). The
@@ -4059,7 +4274,7 @@ data, dataDefault, colReg])(); untrack(() => { if (__rozieWatchInitial_0) { __ro
 })(); }); });
 </script>
 
-<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}{#if !!pasteAnnounce}<div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{pasteAnnounce}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class={["rdt-tr", { 'rdt-row-pinned': wr.pinned }]} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : null)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}{#if isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onpointerdown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rozieAttr(totalRowCount())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-depth={rozieAttr(row.depth)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={bodyCellStyle(row, cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>{#if isExpanderColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if rowCanExpand(row)}<button type="button" class="rdt-expander" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} onclick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c>{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button>{/if}</span>{:else if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}{#if isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))}<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onpointerdown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>{/if}</td>{/each}</tr>{#if rowShowsDetail(row)}<tr class="rdt-detail-row" role="row" data-detail-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c><td class="rdt-detail-cell" colspan={rozieAttr(visibleColCount())} data-rozie-s-d5dcab4c>{@render detail?.({ row: row.original })}</td></tr>{/if}{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
+<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}{#if !!pasteAnnounce}<div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{pasteAnnounce}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if groupable}<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>{#if groupBar}{@render groupBar({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping })}{:else}{#each groupingKeys() as gk (gk)}<span class="rdt-group-token" data-group-token="" data-rozie-s-d5dcab4c>{rozieDisplay(gk)}</span>{/each}{/if}</div>{/if}{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class={["rdt-tr", { 'rdt-row-pinned': wr.pinned }]} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : null)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}{#if isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onpointerdown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rozieAttr(totalRowCount())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} onmousedown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class={["rdt-tr", { 'rdt-group-header': rowIsGrouped(row) }]} role="row" data-depth={rozieAttr(row.depth)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={bodyCellStyle(row, cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c>{#if isExpanderColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if rowCanExpand(row)}<button type="button" class="rdt-expander" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')} onclick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c>{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button>{/if}</span>{:else if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if cellIsGrouped(cellCtx)}<span style="display:contents" data-rozie-s-d5dcab4c><button type="button" class="rdt-expander rdt-group-toggle" data-expander="" aria-expanded={!!rowIsExpanded(row)} aria-label={rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')} onclick={($event) => { onToggleExpand(row, $event); }} data-rozie-s-d5dcab4c>{rozieDisplay(rowIsExpanded(row) ? '▾' : '▸')}</button><span class="rdt-group-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span><span class="rdt-group-count" data-rozie-s-d5dcab4c>{rozieDisplay('(' + groupSubRowCount(row) + ')')}</span></span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}{#if isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))}<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onpointerdown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>{/if}</td>{/each}</tr>{#if rowShowsDetail(row)}<tr class="rdt-detail-row" role="row" data-detail-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c><td class="rdt-detail-cell" colspan={rozieAttr(visibleColCount())} data-rozie-s-d5dcab4c>{@render detail?.({ row: row.original })}</td></tr>{/if}{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
 
 <style>
 :global {
@@ -4142,6 +4357,32 @@ data, dataDefault, colReg])(); untrack(() => { if (__rozieWatchInitial_0) { __ro
   .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
     max-height: var(--rozie-data-table-max-height);
     overflow: auto;
+  }
+  .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-bar-host[data-rozie-s-d5dcab4c] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rdt-group-bar-gap, 0.375rem);
+  }
+  .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-token[data-rozie-s-d5dcab4c] {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+    border-radius: var(--rdt-group-token-radius, 999px);
+    background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+    font-size: var(--rdt-group-token-size, 0.8125em);
+  }
+  .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] {
+    background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
+    font-weight: var(--rdt-group-header-weight, 600);
+  }
+  .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-toggle[data-rozie-s-d5dcab4c] {
+    margin-right: var(--rdt-group-toggle-gap, 0.375rem);
+  }
+  .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-count[data-rozie-s-d5dcab4c] {
+    margin-left: var(--rdt-group-count-gap, 0.375rem);
+    opacity: var(--rdt-group-count-opacity, 0.65);
+    font-weight: 400;
   }
   .rozie-data-table-wrap[data-rozie-s-d5dcab4c] {
     display: flex;

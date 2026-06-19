@@ -33,6 +33,8 @@ export class Column {
   pinned = input<string>('');
   width = input<string | number>('');
   expandable = input<boolean>(false);
+  groupable = input<boolean>(true);
+  aggregationFn = input<(string | (...args: unknown[]) => unknown) | null>(null);
   editable = input<boolean>(false);
   editor = input<string>('text');
   editorOptions = input<any[]>((() => [])());
@@ -54,7 +56,7 @@ export class Column {
       this.registered = true;
       this.reg.registerColumn(this.colId(), this.buildSpec());
     });
-    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.expandable(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.expandable(), this.groupable(), this.aggregationFn(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }); });
   }
@@ -85,6 +87,11 @@ export class Column {
     width: this.width(),
     // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
     expandable: this.expandable(),
+    // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+    // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+    // custom fn) and filters groupableColumns by `groupable`.
+    groupable: this.groupable(),
+    aggregationFn: this.aggregationFn(),
     // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
     // registry (the existing per-column metadata path; NO parallel registry).
     editable: this.editable(),

@@ -15,6 +15,8 @@ export default class Column extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) pinned: string = '';
   @property({ type: String }) width: string | number = '';
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
+  @property({ type: Boolean, reflect: true }) groupable: boolean = true;
+  @property({ type: String }) aggregationFn: string | ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Boolean, reflect: true }) editable: boolean = false;
   @property({ type: String, reflect: true }) editor: string = 'text';
   @property({ type: Array }) editorOptions: any[] = [];
@@ -48,7 +50,7 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('id') || changedProperties.has('field') || changedProperties.has('header') || changedProperties.has('sortable') || changedProperties.has('filterable') || changedProperties.has('pinned') || changedProperties.has('width') || changedProperties.has('expandable') || changedProperties.has('editable') || changedProperties.has('editor') || changedProperties.has('editorOptions') || changedProperties.has('validate'))) { const __watchVal = (() => [this.id, this.field, this.header, this.sortable, this.filterable, this.pinned, this.width, this.expandable, this.editable, this.editor, this.editorOptions, this.validate])(); (() => {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('id') || changedProperties.has('field') || changedProperties.has('header') || changedProperties.has('sortable') || changedProperties.has('filterable') || changedProperties.has('pinned') || changedProperties.has('width') || changedProperties.has('expandable') || changedProperties.has('groupable') || changedProperties.has('aggregationFn') || changedProperties.has('editable') || changedProperties.has('editor') || changedProperties.has('editorOptions') || changedProperties.has('validate'))) { const __watchVal = (() => [this.id, this.field, this.header, this.sortable, this.filterable, this.pinned, this.width, this.expandable, this.groupable, this.aggregationFn, this.editable, this.editor, this.editorOptions, this.validate])(); (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }
     this.__rozieFirstUpdateDone = true;
@@ -94,6 +96,11 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
   width: this.width,
   // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
   expandable: this.expandable,
+  // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+  // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+  // custom fn) and filters groupableColumns by `groupable`.
+  groupable: this.groupable,
+  aggregationFn: this.aggregationFn,
   // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
   // registry (the existing per-column metadata path; NO parallel registry).
   editable: this.editable,

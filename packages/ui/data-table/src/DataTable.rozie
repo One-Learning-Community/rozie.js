@@ -1746,6 +1746,43 @@ const bodyCellStyle = (row, colId) => {
   }
   return base
 }
+// ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+// Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+// $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+// (no parallel render path, no nested r-for). These predicates read through the reactive tick
+// (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+// targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+// listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+// rowIsGrouped: this flattened row is a group-header row.
+const rowIsGrouped = (row) => !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped())
+// groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+// data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
+const groupingActive = () => (tick() >= 0 && ((currentState().grouping || []).length > 0))
+// cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+// the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+// EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+// Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
+const cellIsGrouped = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped())
+const cellIsAggregated = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated())
+// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
+// the header, e.g. "North (3)").
+const groupSubRowCount = (row) => (row && row.subRows ? row.subRows.length : 0)
+// groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+// default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+// both reactive sources, so the bar re-renders on a grouping change across all six targets.
+const groupingKeys = () => (currentState().grouping || [])
+// groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+// `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+// not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+const groupableColumns = () => {
+  const out = []
+  const defs = columnDefs()
+  for (const d of defs) {
+    if (!d || d.groupable === false) continue
+    out.push({ id: d.id, label: d.header != null ? d.header : d.id })
+  }
+  return out
+}
 // Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
 // a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
 // on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
@@ -3429,6 +3466,16 @@ const getExpandedRows = () => {
   return out
 }
 
+// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
+const applyGrouping = (cols) => { if (table) table.setGrouping(cols) }
+const clearGrouping = () => { if (table) table.setGrouping([]) }
+
 $expose({
   sortColumn,
   clearSorting,
@@ -3436,6 +3483,8 @@ $expose({
   expandAll,
   collapseAll,
   getExpandedRows,
+  applyGrouping,
+  clearGrouping,
   getColumnDefs,
   toggleAllRows,
   clearSelection,
@@ -3520,6 +3569,31 @@ $expose({
       </label>
     </div>
   </details>
+</div>
+
+<!-- HEADLESS group bar (phase 50 req-6, D-02 REVISED) — the #groupBar scoped slot, mirroring
+     the #cell plain-scoped-slot lowering (no portal/projection; React render-prop edge is the
+     documented divergence). Gated on $props.groupable so the host <div> is ABSENT for any
+     non-grouping consumer (byte-identical-off, req-10). Slot props: the live ordered `grouping`
+     array, the `groupableColumns` (`[{ id, label }]`), and the `applyGrouping`/`clearGrouping`
+     helpers (the same $expose verbs) so a consumer builds ANY bar/drag UI themselves. The DEFAULT
+     render is a NON-INTERACTIVE styled-token reflection of the grouping state (or empty when
+     ungrouped) — the component renders NO draggable / drag handle (D-02 retired). -->
+<div class="rdt-group-bar-host" r-if="$props.groupable">
+  <slot
+    name="groupBar"
+    :grouping="groupingKeys()"
+    :groupableColumns="groupableColumns()"
+    :applyGrouping="applyGrouping"
+    :clearGrouping="clearGrouping"
+  >
+    <span
+      class="rdt-group-token"
+      data-group-token
+      r-for="gk in groupingKeys()"
+      :key="gk"
+    >{{ gk }}</span>
+  </slot>
 </div>
 
 <!-- ══ VIRTUAL (phase 53): scroll-bounded WINDOWED table — emitted ONLY when $props.virtual ══
@@ -3951,8 +4025,11 @@ $expose({
     <template r-for="row in $data.rows" :key="row.id">
     <tr
       class="rdt-tr"
+      :class="{ 'rdt-group-header': rowIsGrouped(row) }"
       role="row"
       :data-depth="row.depth"
+      :data-group-header="rowIsGrouped(row) ? row.id : null"
+      :data-group-leaf="(groupingActive() && !rowIsGrouped(row)) ? row.id : null"
     >
       <td
         class="rdt-td"
@@ -3968,6 +4045,7 @@ $expose({
         :style="bodyCellStyle(row, cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
         :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null"
+        :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : null"
       >
         <!-- auto-injected chevron expander cell (phase 50, D-04) — a native <button>
              (handles Enter/Space → click natively; NO explicit @keydown.enter/.space which
@@ -4008,6 +4086,33 @@ $expose({
               @change="onToggleRow(row, $event)"
             />
           </slot>
+        </span>
+        <!-- ── Group-header cell (phase 50 req-4/5, D-04) — the grouped cell on a flattened
+             group-header row (cell.getIsGrouped()). Renders a native <button data-expander>
+             (REUSING the D-04 onToggleExpand path — group rows are expandable rows, no new
+             collapse branch) + the group key through the EXISTING #cell slot (cell.getValue())
+             + the member count. Aggregated cells (cell.getIsAggregated()) are NOT branched here
+             — they flow through the #cell r-else below via cell.getValue() (NO aggregatedCell
+             template); placeholder cells fall through to the same r-else and render empty. -->
+        <span style="display:contents" r-else-if="cellIsGrouped(cellCtx)">
+          <button
+            type="button"
+            class="rdt-expander rdt-group-toggle"
+            data-expander
+            :aria-expanded="!!rowIsExpanded(row)"
+            :aria-label="rowIsExpanded(row) ? 'Collapse group' : 'Expand group'"
+            @click="onToggleExpand(row, $event)"
+          >{{ rowIsExpanded(row) ? '▾' : '▸' }}</button>
+          <span class="rdt-group-value">
+            <slot
+              name="cell"
+              :columnId="cellCtx.column.id"
+              :column="cellCtx.column"
+              :row="row.original"
+              :value="cellCtx.getValue()"
+            >{{ cellCtx.getValue() }}</slot>
+          </span>
+          <span class="rdt-group-count">{{ '(' + groupSubRowCount(row) + ')' }}</span>
         </span>
         <!-- ── Editor branch (phase 51 req-1/2): display↔editor r-if INSIDE the keyed <td>.
              A `display:contents` <span> (NEVER a <template> — inert on 4 targets). The
@@ -4240,6 +4345,36 @@ $expose({
 .rozie-data-table-wrap .rdt-scroll {
   max-height: var(--rozie-data-table-max-height);
   overflow: auto;
+}
+/* Headless group-bar host (phase 50 req-6, D-02 REVISED) — token-driven, NON-interactive.
+   The default render is a styled-token reflection of the grouping state; the component ships
+   NO drag affordance (consumers build any bar/drag UI from the #groupBar slot props). */
+.rozie-data-table-wrap .rdt-group-bar-host {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rozie-data-table-wrap .rdt-group-token {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+  border-radius: var(--rdt-group-token-radius, 999px);
+  background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+  font-size: var(--rdt-group-token-size, 0.8125em);
+}
+/* Group-header rows + grouped-cell chrome (phase 50 req-4/5) — group rows ride the D-04 seam. */
+.rozie-data-table .rdt-group-header {
+  background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
+  font-weight: var(--rdt-group-header-weight, 600);
+}
+.rozie-data-table .rdt-group-toggle {
+  margin-right: var(--rdt-group-toggle-gap, 0.375rem);
+}
+.rozie-data-table .rdt-group-count {
+  margin-left: var(--rdt-group-count-gap, 0.375rem);
+  opacity: var(--rdt-group-count-opacity, 0.65);
+  font-weight: 400;
 }
 /* Filter / pagination chrome (req-5, req-6) — token-driven. */
 .rozie-data-table-wrap {

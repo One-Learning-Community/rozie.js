@@ -11,6 +11,8 @@ interface ColumnProps {
   pinned?: string;
   width?: string | number;
   expandable?: boolean;
+  groupable?: boolean;
+  aggregationFn?: (string | (...args: unknown[]) => unknown) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -18,8 +20,8 @@ interface ColumnProps {
 }
 
 export default function Column(_props: ColumnProps): JSX.Element {
-  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'editable', 'editor', 'editorOptions', 'validate']);
+  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, groupable: true, aggregationFn: null, editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'groupable', 'aggregationFn', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));
   onMount(() => {
@@ -45,7 +47,7 @@ export default function Column(_props: ColumnProps): JSX.Element {
     registered = true;
     reg.registerColumn(colId(), buildSpec());
   });
-  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.groupable, local.aggregationFn, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
     if (reg) reg.registerColumn(colId(), buildSpec());
   })()), { defer: true }));
 
@@ -80,6 +82,11 @@ export default function Column(_props: ColumnProps): JSX.Element {
       width: local.width,
       // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
       expandable: local.expandable,
+      // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+      // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+      // custom fn) and filters groupableColumns by `groupable`.
+      groupable: local.groupable,
+      aggregationFn: local.aggregationFn,
       // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
       // registry (the existing per-column metadata path; NO parallel registry).
       editable: local.editable,

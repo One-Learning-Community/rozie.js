@@ -124,7 +124,7 @@ const callClearGrouping = (): void => {
       :groupable="true"
       :data="$data.rows"
       r-model:grouping="$data.grouping"
-      @grouping-change="onGroupingChange($event)"
+      @group-change="onGroupingChange($event)"
     >
       <Column field="region"   header="Region" />
       <Column field="category" header="Category" />
