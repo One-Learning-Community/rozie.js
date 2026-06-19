@@ -400,3 +400,285 @@ for (const target of TARGETS) {
       .toBe('2000');
   });
 }
+
+// ── req-2 / req-9 / req-10 helpers ──────────────────────────────────────────────────
+
+/** The trailing spacer <tr.rdt-spacer> td height (padBottom). 0 at scroll-end (no drift). */
+async function trailingSpacerHeight(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('.rdt-scroll tbody.rdt-tbody');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const tbody = find(document);
+    if (!tbody) return null;
+    const spacers = tbody.querySelectorAll('tr.rdt-spacer > td');
+    if (!spacers.length) return null;
+    // The LAST spacer td is the trailing one; its height is padBottom.
+    const last = spacers[spacers.length - 1] as HTMLElement;
+    return Math.round(last.getBoundingClientRect().height);
+  });
+}
+
+/** Σ of the rendered windowed tr heights (req-2 height-alignment numerator). */
+async function sumRenderedRowHeights(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('.rdt-scroll tbody.rdt-tbody');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const tbody = find(document);
+    if (!tbody) return null;
+    const rows = tbody.querySelectorAll('tr[data-index]');
+    let sum = 0;
+    for (const r of Array.from(rows)) sum += (r as HTMLElement).getBoundingClientRect().height;
+    return Math.round(sum);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// req-2 — variable-height alignment: Σ rendered tr heights + spacers track the windowing
+//         total (getTotalSize, == the rdt-scroll scrollHeight), and the trailing spacer
+//         (padBottom) reaches 0 at scroll-end → NO cumulative offset drift. DOM, not pixels.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-virtual [${target}]: variable-height rows abut getTotalSize with no drift; padBottom reaches 0 at end`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableVirtualVarHeight&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 20_000 })
+      .toBe('500');
+    const scroll = mount.locator('.rdt-scroll');
+    await expect(scroll).toBeVisible({ timeout: 15_000 });
+    await scrollWindowTo(page, 0);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+
+    // The windowing total = virtual-core's getTotalSize() (== the rdt-scroll scrollHeight).
+    // For 500 non-uniform rows this is well above the ~400px viewport (windowing engaged).
+    const total = await getTotalSize(page);
+    expect(total).not.toBeNull();
+    expect(total as number).toBeGreaterThan(400);
+
+    // req-2 — the rendered slice is self-consistent with getTotalSize: padTop + Σ(rendered
+    // tr heights) + padBottom == getTotalSize. We read Σ rendered heights + the trailing
+    // spacer (padBottom); since padTop = getTotalSize - Σheights - padBottom by construction,
+    // Σheights + padBottom must be ≤ getTotalSize (no overlap) and within one window of it.
+    const sumH = await sumRenderedRowHeights(page);
+    const padBottom0 = await trailingSpacerHeight(page);
+    expect(sumH).not.toBeNull();
+    expect(padBottom0).not.toBeNull();
+    // No overlap/gap: the rendered rows + the trailing spacer never exceed the total.
+    expect((sumH as number) + (padBottom0 as number)).toBeLessThanOrEqual((total as number) + 2);
+
+    // req-2 — scroll to the END: the trailing spacer (padBottom) converges to ~0 (the last
+    // row's end == getTotalSize). A non-zero residual at the bottom would be cumulative drift.
+    await scrollWindowToBottom(page);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect
+      .poll(async () => trailingSpacerHeight(page), { timeout: 15_000 })
+      .toBeLessThanOrEqual(1);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// req-10 — #cell slot correctness under recycling: as rows recycle on scroll, each visible
+//          cell's TEXT matches the row at its data-index (no stale/duplicated content). The
+//          Lit repeat() / Solid For recycling footgun makes this Lit-critical. Assert TEXT.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-virtual [${target}]: #cell slot content tracks data-index as rows recycle (no stale/dup cells, incl Lit)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableVirtualVarHeight&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 20_000 })
+      .toBe('500');
+    const scroll = mount.locator('.rdt-scroll');
+    await expect(scroll).toBeVisible({ timeout: 15_000 });
+
+    // Helper: every visible windowed row's "name" cell text must equal `Row <dataIndex+1>`
+    // (the demo seeds name = 'Row ' + (i+1), data-index = i). A stale/recycled cell would
+    // show a DIFFERENT row's text than its data-index claims.
+    const assertCellsMatchIndex = async () => {
+      await expect
+        .poll(
+          async () =>
+            page.evaluate(() => {
+              const find = (root: Document | ShadowRoot): Element | null => {
+                const direct = root.querySelector('.rdt-scroll tbody.rdt-tbody');
+                if (direct) return direct;
+                for (const el of Array.from(root.querySelectorAll('*'))) {
+                  const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                  if (sr) {
+                    const inner = find(sr);
+                    if (inner) return inner;
+                  }
+                }
+                return null;
+              };
+              const tbody = find(document);
+              if (!tbody) return 'no-tbody';
+              const rows = tbody.querySelectorAll('tr[data-index]');
+              if (!rows.length) return 'no-rows';
+              for (const r of Array.from(rows)) {
+                const idx = Number(r.getAttribute('data-index'));
+                // The "name" column cell (data-col="name"); its text is the plain accessor.
+                const nameCell = r.querySelector('td[data-col="name"]');
+                const txt = (nameCell?.textContent || '').trim();
+                if (txt !== 'Row ' + (idx + 1)) return `MISMATCH@${idx}:"${txt}"`;
+              }
+              return 'OK';
+            }),
+          { timeout: 15_000 },
+        )
+        .toBe('OK');
+    };
+
+    await scrollWindowTo(page, 0);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await assertCellsMatchIndex();
+
+    // Recycle the window: scroll down, mid, and to the end — at every settled position the
+    // visible cells must still match their data-index (no node carried stale content over).
+    await scrollWindowTo(page, 1200);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await assertCellsMatchIndex();
+
+    await scrollWindowTo(page, 600);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await assertCellsMatchIndex();
+
+    await scrollWindowToBottom(page);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await assertCellsMatchIndex();
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// req-9 — pagination⇄virtual: chrome ABSENT under virtual; all rows reachable (last
+//         aria-rowindex == full count at scroll-end); manual+virtual still emits a change
+//         event. Plus the D-07 dev-warn 3-case console capture (a/b/c).
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-virtual [${target}]: pagination absent + last row reachable; manual+virtual emits change; D-07 warn a/b/c`, async ({
+    page,
+  }) => {
+    // ── req-9 reachability on the 100k fixture: scroll to the end, the LAST rendered
+    //    aria-rowindex equals the full model count (every row reachable by scrolling).
+    await page.goto(`/?example=DataTableVirtual&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 20_000 })
+      .toBe('100000');
+    await expect(mount.locator('.rdt-scroll')).toBeVisible({ timeout: 15_000 });
+
+    // req-9 — pagination chrome ABSENT under virtual.
+    await expect(mount.locator('.rdt-pagination')).toHaveCount(0);
+
+    // req-9 — scroll to the END; the largest rendered aria-rowindex == 100000 (1-based map
+    // over the full model → the final row is reachable).
+    await scrollWindowToBottom(page);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const find = (root: Document | ShadowRoot): Element | null => {
+              const direct = root.querySelector('.rdt-scroll tbody.rdt-tbody');
+              if (direct) return direct;
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) {
+                  const inner = find(sr);
+                  if (inner) return inner;
+                }
+              }
+              return null;
+            };
+            const tbody = find(document);
+            if (!tbody) return -1;
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            let max = -1;
+            for (const r of Array.from(rows)) {
+              const ri = Number(r.getAttribute('aria-rowindex'));
+              if (ri > max) max = ri;
+            }
+            return max;
+          }),
+        { timeout: 20_000 },
+      )
+      .toBe(100000);
+
+    // ── req-9 manual+virtual emits a change event (selection-change → bound round-trip).
+    await page.goto(`/?example=DataTableVirtualWarn&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const warnMount = page.getByTestId('rozie-mount');
+    await expect.poll(async () => warnMount.getByTestId('manual-table').locator('.rdt-scroll tbody.rdt-tbody > tr[data-index]').count(), {
+      timeout: 20_000,
+    }).toBeGreaterThan(0);
+    // Check a row in the manual+virtual table → selection-change fires → the bound count
+    // readout rises (proves change events still emit with manual+virtual on).
+    const manualFirstCheckbox = warnMount
+      .getByTestId('manual-table')
+      .locator('.rdt-scroll tbody.rdt-tbody > tr[data-index] input.rdt-select-row')
+      .first();
+    await manualFirstCheckbox.check();
+    await expect
+      .poll(async () => warnMount.getByTestId('manual-sel-count').textContent(), { timeout: 15_000 })
+      .toBe('1');
+
+    // ── req-9 / D-07 dev-warn 3-case console capture. Capture console.warn during a fresh
+    //    mount for each case and count the `virtual+pagination` warns.
+    const countVirtualPaginationWarns = async (url: string): Promise<number> => {
+      const warns: string[] = [];
+      const onConsole = (msg: import('@playwright/test').ConsoleMessage) => {
+        if (msg.type() === 'warning' || msg.type() === 'error' || msg.type() === 'log') {
+          warns.push(msg.text());
+        }
+      };
+      page.on('console', onConsole);
+      await page.goto(url);
+      await expect(page.getByTestId('rozie-mount')).toBeVisible();
+      // Let the post-mount double-rAF warn path run (the warn fires inside the virtual guard
+      // after the virtualizer is constructed). Wait for the windowed slice to settle.
+      await expect
+        .poll(async () => page.getByTestId('rozie-mount').locator('.rdt-scroll tbody.rdt-tbody > tr[data-index], table.rozie-data-table tbody tr').count(), { timeout: 20_000 })
+        .toBeGreaterThan(0);
+      // Give the deferred warn a beat to flush.
+      await page.waitForTimeout(500);
+      page.off('console', onConsole);
+      return warns.filter((w) => w.includes('virtual+pagination')).length;
+    };
+
+    // (a) virtual=true + configured pagination → EXACTLY ONE virtual+pagination warn.
+    expect(await countVirtualPaginationWarns(`/?example=DataTableVirtualWarn&target=${target}`)).toBe(1);
+    // (b) virtual=true + NO pagination → ZERO warns (the warn-free virtual path).
+    expect(await countVirtualPaginationWarns(`/?example=DataTableVirtual&target=${target}`)).toBe(0);
+    // (c) virtual=false + pagination → ZERO warns (the warn lives inside the $props.virtual
+    //     guard → byte-identical-off is preserved; the non-virtual path never warns).
+    expect(await countVirtualPaginationWarns(`/?example=DataTableFilterPaginate&target=${target}`)).toBe(0);
+  });
+}

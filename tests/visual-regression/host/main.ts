@@ -557,6 +557,13 @@ export const EXAMPLES = [
   // matrix.spec.ts — no pixel baseline); lives under examples/demos/ so no Angular
   // 3-file registration is needed.
   'DataTableVirtualStickySelect',
+  // Phase 53 plan 06 (req-9 / D-07) — the virtual+pagination dev-warn + manual+virtual
+  // change-event fixture (loader → examples/demos/DataTableVirtualWarnDemo.rozie). Mounts
+  // a virtual table WITH a configured pagination (the only co-presence that trips the D-07
+  // console.warn) + a manual+virtual table with bound selection (proving change events still
+  // fire). Behavioral-only (DOM/console assert, NOT in matrix.spec.ts — no pixel baseline);
+  // lives under examples/demos/ so no Angular 3-file registration is needed.
+  'DataTableVirtualWarn',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -767,6 +774,8 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableVirtualGrid: 'rozie-data-table-virtual-grid',
   // = kebab of DataTableVirtualStickySelectDemo (name="DataTableVirtualStickySelectDemo").
   DataTableVirtualStickySelect: 'rozie-data-table-virtual-sticky-select',
+  // = kebab of DataTableVirtualWarnDemo (name="DataTableVirtualWarnDemo").
+  DataTableVirtualWarn: 'rozie-data-table-virtual-warn',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -1024,6 +1033,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-supplied props.
   DataTableVirtualGrid: {},
   DataTableVirtualStickySelect: {},
+  DataTableVirtualWarn: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

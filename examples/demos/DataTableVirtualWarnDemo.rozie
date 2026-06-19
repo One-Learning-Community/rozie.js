@@ -1,0 +1,116 @@
+<!--
+  DataTableVirtualWarnDemo.rozie — D-07 virtual+pagination dev-warn + manual+virtual
+  change-event fixture (phase 53, req-9).
+
+  Two virtual tables drive the req-9 / D-07 cases that the OTHER fixtures cannot:
+
+    (A) getTestId="warn-table" — :virtual="true" WITH a configured client pagination
+        (pageSize=5 ≠ the {pageIndex:0,pageSize:10} default). This is the ONLY co-presence
+        that trips the D-07 dev-mode console.warn ("virtual+pagination: client pagination is
+        configured but virtual windowing replaces it…"). The spec captures console.warn during
+        mount and asserts EXACTLY ONE such warn here. (Case (b) zero-warn = DataTableVirtual,
+        virtual + NO pagination; case (c) zero-warn = DataTableFilterPaginate, virtual=false +
+        pagination — both already exist, so this fixture only supplies case (a).)
+
+    (B) getTestId="manual-table" — :manual="true" + :virtual="true" (the valid D-09 combo:
+        the consumer owns the data window; windowing renders it). selectionMode="multiple" with
+        r-model:rowSelection bound to a live `manual-sel-count` readout proves a change event
+        (selection-change → the bound state round-trip) STILL fires with manual+virtual on. No
+        pagination prop here, so it does NOT add a second D-07 warn (keeps case (a) at exactly one).
+
+  ~600 rows each (enough to window; deterministic, no clock/random) for stable VR baselines.
+-->
+
+<rozie name="DataTableVirtualWarnDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  // Configured client pagination (pageSize 5 ≠ the {0,10} default) → trips the D-07 warn
+  // on the virtual warn-table.
+  pagination: { pageIndex: 0, pageSize: 5 },
+  // Bound selection on the manual+virtual table → a selection-change round-trips OUT,
+  // proving change events still fire with manual+virtual on.
+  manualSel: {},
+}
+</data>
+
+<script>
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 600; i++) {
+    out.push({ id: i, name: 'Row ' + i, value: i * 10 })
+  }
+  $data.rows = out
+})
+
+const manualSelCount = $computed(() => Object.keys($data.manualSel || {}).length)
+</script>
+
+<template>
+<div class="dt-warn-demo">
+  <h3>DataTable — virtual+pagination warn / manual+virtual</h3>
+
+  <div class="controls">
+    <span class="label">manual selected:</span>
+    <span class="readout" data-testid="manual-sel-count">{{ manualSelCount }}</span>
+  </div>
+
+  <!-- (A) virtual + CONFIGURED pagination → D-07 warn fires exactly once on mount. -->
+  <div data-testid="warn-table">
+    <DataTable
+      :data="$data.rows"
+      :virtual="true"
+      maxHeight="300px"
+      :pagination="$data.pagination"
+    >
+      <Column field="name" header="Name" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+
+  <!-- (B) manual + virtual (valid D-09 combo) + bound selection → selection-change fires. -->
+  <div data-testid="manual-table">
+    <DataTable
+      :data="$data.rows"
+      :virtual="true"
+      :manual="true"
+      maxHeight="300px"
+      selectionMode="multiple"
+      r-model:rowSelection="$data.manualSel"
+    >
+      <Column field="name" header="Name" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-warn-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 400px;
+}
+.dt-warn-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 2ch; }
+</style>
+
+</rozie>
