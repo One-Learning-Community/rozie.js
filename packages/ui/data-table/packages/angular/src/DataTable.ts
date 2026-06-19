@@ -1395,11 +1395,19 @@ export class DataTable {
     if (!this.isGrid() || !this.gridRoot) return;
     const r = nextRow == null ? this.activeRow() : nextRow;
     const c = nextCol == null ? this.activeColIndex() : nextCol;
+    // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
+    // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
+    // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
+    // here returns the PRE-write value, resolving focus to the BODY cell instead of the
+    // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
+    const header = nextIsHeader == null ? this.activeIsHeader() : nextIsHeader;
     // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
     // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
     // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
     // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
-    if (this.virtual() && this.virtualizer && !nextIsHeader && this.rowIsOutsideWindow(r)) {
+    // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
+    // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
+    if (this.virtual() && this.virtualizer && !header && this.rowIsOutsideWindow(r)) {
       this.virtualizer.scrollToIndex(r, {
         align: 'center'
       });
@@ -1410,12 +1418,6 @@ export class DataTable {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
       return;
     }
-    // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
-    // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
-    // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
-    // here returns the PRE-write value, resolving focus to the BODY cell instead of the
-    // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
-    const header = nextIsHeader == null ? this.activeIsHeader() : nextIsHeader;
     const rowKey = header ? '__header' : String(r);
     const el = this.resolveCellEl(rowKey, c);
     if (el) el.focus();
