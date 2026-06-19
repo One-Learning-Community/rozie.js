@@ -26,6 +26,26 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
 }
+.rdt-sr-live[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-cell-editor[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[aria-invalid="true"][data-rozie-s-d5dcab4c] {
+  outline: var(--rdt-invalid-outline, 2px solid #d33);
+  outline-offset: -2px;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
@@ -2064,6 +2084,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return editVer() >= 0 && editingRow() === rowIndex && editingCol() === colIndex;
   }
 
+  // cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
+  // an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
+  // attribute DROPS (the rozieAttr nullish-attr path), keeping non-editing cells byte-clean.
+  // Returns the literal 'true' (NOT boolean true) so rozieAttr's string-literal-union preserve
+  // keeps React's aria-invalid (Booleanish incl. 'true') happy instead of widening to string.
+  function cellAriaInvalid(rowIndex: any, colIndex: any): 'true' | null {
+    return isEditing(rowIndex, colIndex) && !!invalidMsg() ? 'true' : null;
+  }
+
   // runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
   // function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
   // return coerces to a generic message so a misbehaving validator can never wedge the
@@ -2521,7 +2550,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
     <div class={"rdt-column-defs"} style={{ display: "none" }} aria-hidden="true" data-rozie-s-d5dcab4c="">{resolved()}</div>
 
-    <div class={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
+    {<Show when={!!invalidMsg()}><div class={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg()}</div></Show>}<div class={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
       <input type="text" role="searchbox" aria-label="Search table" class={"rdt-global-filter"} value={globalFilterValue()} onInput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
       
       {<Show when={allLeafColumns().length}><details class={"rdt-colvis"} data-rozie-s-d5dcab4c="">
@@ -2568,7 +2597,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <For each={rows()}>{(row) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-rozie-s-d5dcab4c="">
             
             {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
@@ -2616,7 +2645,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </tr>
         
         <For each={windowedRows()}>{(wr) => <tr class={"rdt-tr"} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(wr.row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(wr.row)}>{(cellCtx) => <td class={"rdt-td"} classList={{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

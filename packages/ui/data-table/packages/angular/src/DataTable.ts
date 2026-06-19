@@ -159,7 +159,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
     <div class="rdt-column-defs" style="display:none" aria-hidden="true"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
 
-    <div class="rdt-toolbar">
+    @if (!!invalidMsg()) {
+    <div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg() }}</div>
+    }<div class="rdt-toolbar">
       <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" [value]="globalFilterValue()" (input)="onGlobalFilterInput($event)" />
       
       @if (allLeafColumns().length) {
@@ -243,7 +245,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @for (wr of windowedRows(); track wr.row.id) {
     <tr class="rdt-tr" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)">
           @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))">
             @if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
@@ -358,7 +360,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @for (row of rows(); track row.id) {
     <tr class="rdt-tr" role="row">
           @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))">
             
             @if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
@@ -426,6 +428,26 @@ function rozieToken(key: string): InjectionToken<unknown> {
       width: 100%;
       font: var(--rdt-font, 14px system-ui, sans-serif);
       color: var(--rdt-color, inherit);
+    }
+    .rdt-sr-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .rozie-data-table .rdt-cell-editor {
+      font: inherit;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .rozie-data-table .rdt-td[aria-invalid="true"] {
+      outline: var(--rdt-invalid-outline, 2px solid #d33);
+      outline-offset: -2px;
     }
     .rozie-data-table .rdt-th,
     .rozie-data-table .rdt-td {
@@ -1908,6 +1930,7 @@ export class DataTable {
     return colId != null && this.columnEditable(colId);
   };
   isEditing = (rowIndex: any, colIndex: any) => this.editVer() >= 0 && this.editingRow() === rowIndex && this.editingCol() === colIndex;
+  cellAriaInvalid = (rowIndex: any, colIndex: any): 'true' | null => this.isEditing(rowIndex, colIndex) && !!this.invalidMsg() ? 'true' : null;
   runValidator = (colId: any, value: any, row: any) => {
     const m = this.editMetaOf(colId);
     const v = m ? m.validate : null;

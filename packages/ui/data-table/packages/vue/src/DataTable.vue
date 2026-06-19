@@ -5,7 +5,7 @@
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot></slot></div>
 
-<div class="rdt-toolbar">
+<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div class="rdt-toolbar">
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" :value="globalFilterValue()" @input="onGlobalFilterInput($event)" />
   
   <details v-if="allLeafColumns().length" class="rdt-colvis">
@@ -54,7 +54,7 @@
     </tr>
     
     <tr v-for="wr in windowedRows()" :key="wr.row.id" class="rdt-tr" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index">
-      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="pinStyle(cellCtx.column.id)">
+      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="pinStyle(cellCtx.column.id)" :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))">
         <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="wr.row.original" :checked="rowIsSelected(wr.row)" :toggle="e => onToggleRow(wr.row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(wr.row)" @change="onToggleRow(wr.row, $event)" />
@@ -109,7 +109,7 @@
 
   <tbody class="rdt-tbody" role="rowgroup">
     <tr v-for="row in rows" :key="row.id" class="rdt-tr" role="row">
-      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))" :style="pinStyle(cellCtx.column.id)">
+      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))" :style="pinStyle(cellCtx.column.id)" :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))">
         
         <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="row.original" :checked="rowIsSelected(row)" :toggle="e => onToggleRow(row, e)">
@@ -2150,6 +2150,18 @@ const isActiveCellEditable = () => {
 // body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
 const isEditing = (rowIndex: any, colIndex: any) => editVer.value >= 0 && editingRow.value === rowIndex && editingCol.value === colIndex;
 
+// cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
+// an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
+// attribute DROPS (the rozieAttr nullish-attr path), keeping non-editing cells byte-clean.
+// Returns the literal 'true' (NOT boolean true) so rozieAttr's string-literal-union preserve
+// keeps React's aria-invalid (Booleanish incl. 'true') happy instead of widening to string.
+// cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
+// an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
+// attribute DROPS (the rozieAttr nullish-attr path), keeping non-editing cells byte-clean.
+// Returns the literal 'true' (NOT boolean true) so rozieAttr's string-literal-union preserve
+// keeps React's aria-invalid (Booleanish incl. 'true') happy instead of widening to string.
+const cellAriaInvalid = (rowIndex: any, colIndex: any): 'true' | null => isEditing(rowIndex, colIndex) && !!invalidMsg.value ? 'true' : null;
+
 // runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
 // function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
 // return coerces to a generic message so a misbehaving validator can never wedge the
@@ -2880,6 +2892,26 @@ defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSele
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
+}
+.rdt-sr-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rozie-data-table .rdt-cell-editor {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rozie-data-table .rdt-td[aria-invalid="true"] {
+  outline: var(--rdt-invalid-outline, 2px solid #d33);
+  outline-offset: -2px;
 }
 .rozie-data-table .rdt-th,
 .rozie-data-table .rdt-td {

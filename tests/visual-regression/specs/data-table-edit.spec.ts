@@ -348,6 +348,47 @@ async function focusBodyCell(page: Page, row: number, col: number): Promise<void
   }, { r: row, c: col });
 }
 
+/** The [data-col-index] of the cell currently flagged aria-invalid="true" (req-5), or null.
+ *  Walks open shadow roots (Lit). */
+async function ariaInvalidColIndex(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-grid-cell][aria-invalid="true"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? el.getAttribute('data-col-index') : null;
+  });
+}
+
+/** The text in the polite aria-live status region (req-5/D-01), '' when absent/empty. */
+async function srLiveText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[role="status"][aria-live="polite"].rdt-sr-live');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? (el.textContent || '').trim() : '';
+  });
+}
+
 /** Focus (row, col) and KEEP it focused until the active cell settles there — re-focuses if
  *  a stray deferred focus-return (the commit/cancel rAF poll from a prior block) steals focus
  *  away. Returns once activeCellCoords reports the target col, or after the retry budget. */
@@ -357,6 +398,24 @@ async function focusBodyCellStable(page: Page, row: number, col: number): Promis
     const coords = await activeCellCoords(page);
     if (coords?.col === String(col) && coords?.row === String(row)) return;
     await page.waitForTimeout(50);
+  }
+}
+
+/** Settle focus on (row, col) and press F2 to open its editor, retrying if a stray deferred
+ *  focus-return (a prior block's commit/cancel rAF) steals focus before the editor mounts.
+ *  Returns once a built-in editor is open at `col` (or after the retry budget). */
+async function enterEditAt(page: Page, row: number, col: number): Promise<void> {
+  for (let i = 0; i < 8; i++) {
+    await focusBodyCellStable(page, row, col);
+    const open = await openEditor(page);
+    if (open) return; // already editing this cell (rare; from a prior retry)
+    await page.keyboard.press('F2');
+    try {
+      await expect.poll(async () => (await openEditor(page))?.col, { timeout: 2_000 }).toBe(String(col));
+      return;
+    } catch {
+      // editor didn't open (focus stolen / F2 swallowed) — re-settle and retry.
+    }
   }
 }
 
@@ -550,11 +609,9 @@ for (const target of TARGETS) {
 
     // The columns are name(0,text) qty(1,number) status(2,select) active(3,checkbox)
     // score(4,#editor slot). Begin keyboard nav at the entry cell (row 0, col 0).
-    await focusBodyCellStable(page, 0, 0);
-
     // ── req-1: F2 on the editable text cell mounts an <input> with data-editing-cell,
     //    focused, holding the existing value ('Alpha'). ────────────────────────────────
-    await page.keyboard.press('F2');
+    await enterEditAt(page, 0, 0);
     await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
     {
       const ed = await openEditor(page);
@@ -575,8 +632,7 @@ for (const target of TARGETS) {
 
     // ── req-1 + req-3 + req-4: F2 → type → Enter commits ONE cell-edit-commit + returns
     //    focus to the cell; the rendered cell updates FROM the model write. ─────────────
-    await focusBodyCellStable(page, 0, 0);
-    await page.keyboard.press('F2');
+    await enterEditAt(page, 0, 0);
     await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
     // Wait for the component's rAF focus poll to land focus in the editor, then fill the
     // value (Playwright locators pierce open shadow DOM → Lit-safe). fill() focuses +
@@ -593,8 +649,7 @@ for (const target of TARGETS) {
     await expect.poll(async () => (await activeCellCoords(page))?.col, { timeout: 10_000 }).toBe('0');
 
     // ── req-1: the select editor enters a native <select> seeded with the cell value. ──
-    await focusBodyCellStable(page, 0, 2); // col 2 (status, select)
-    await page.keyboard.press('F2');
+    await enterEditAt(page, 0, 2); // col 2 (status, select)
     await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('select');
     expect((await openEditor(page))?.value).toBe('active'); // row 0 status seed.
     // Press Escape ON the editor locator (focuses it first → the editor keymap receives it).
@@ -602,8 +657,7 @@ for (const target of TARGETS) {
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
 
     // ── req-1: the checkbox editor enters a checkbox seeded from the boolean value. ────
-    await focusBodyCellStable(page, 0, 3); // col 3 (active, checkbox)
-    await page.keyboard.press('F2');
+    await enterEditAt(page, 0, 3); // col 3 (active, checkbox)
     await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('checkbox');
     expect((await openEditor(page))?.checked).toBe(true); // row 0 active=true seed.
     await mount.locator('[data-editing-cell]').press('Escape');
@@ -624,8 +678,7 @@ for (const target of TARGETS) {
 
     // ── req-3 (Tab advances to the next editable cell): F2 on col 0, edit, Tab commits +
     //    moves the editor to the next editable cell (col 1). ───────────────────────────
-    await focusBodyCellStable(page, 0, 0);
-    await page.keyboard.press('F2');
+    await enterEditAt(page, 0, 0);
     await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('0');
     const editor2 = mount.locator('[data-editing-cell]');
     await editor2.fill('Omega');
@@ -639,11 +692,57 @@ for (const target of TARGETS) {
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
   });
 
-  // req-5 — synchronous validation D-01 keep-open + aria-live (Plan 51-02 Task 3).
-  test.fixme(`data-table-edit [${target}]: invalid commit keeps editor open, aria-live announces, no model write (Plan 51-02 Task 3)`, async () => {
-    // Pending Plan 51-02 Task 3: a value failing the qty validator (negative) keeps the
-    // editor OPEN (D-01) with aria-invalid on the <td>, announces in [role="status"], does
-    // NOT write the model + fires zero cell-edit-commit; a subsequent valid value commits.
+  // req-5 — synchronous validation D-01 keep-open + aria-live + aria-invalid (Plan 51-02 Task 3).
+  runnerFor(target)(`data-table-edit [${target}]: invalid commit keeps editor open, aria-live announces, no model write`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEdit&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table')).toBeVisible({ timeout: 15_000 });
+
+    // The qty column (col 1) carries the validator `value >= 0 || 'must be >= 0'`.
+    await enterEditAt(page, 0, 1);
+    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('number');
+
+    // Enter an INVALID value (negative) and commit → D-01: the editor STAYS OPEN, the model
+    // is NOT written, zero cell-edit-commit, aria-invalid="true" on the <td>, aria-live announces.
+    const editor = mount.locator('[data-editing-cell]');
+    await editor.fill('-5');
+    await editor.press('Enter');
+    // The editor is still open (D-01 keep-open).
+    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('number');
+    // No commit fired → no model write (the qty cell display is replaced by the open editor,
+    // so the unchanged-model proof is the zero commit count + unchanged commit readout).
+    expect(await commitCount(page)).toBe(0);
+    expect(await commitReadout(page)).toBe('');
+    // aria-invalid="true" on the editing cell (col 1).
+    await expect
+      .poll(async () => ariaInvalidColIndex(page), { timeout: 10_000 })
+      .toBe('1');
+    // The aria-live polite region announces the validator's message.
+    await expect.poll(async () => srLiveText(page), { timeout: 10_000 }).toBe('must be >= 0');
+
+    // Fix the value to a valid one → commits normally, clears aria-invalid + aria-live.
+    await editor.fill('9');
+    await editor.press('Enter');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(1);
+    expect(await commitReadout(page)).toBe('qty=9');
+    await expect.poll(async () => cellDisplayValues(page).then((c) => c[1]), { timeout: 10_000 }).toBe('9');
+    // aria-invalid cleared (no cell flagged) and the aria-live region cleared/removed.
+    expect(await ariaInvalidColIndex(page)).toBeNull();
+    expect(await srLiveText(page)).toBe('');
+
+    // Escape reverts: open again, enter invalid, Escape → editor closes, value reverts, no commit.
+    await enterEditAt(page, 0, 1);
+    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('number');
+    const editor2 = mount.locator('[data-editing-cell]');
+    await editor2.fill('-3');
+    await editor2.press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    expect(await commitCount(page)).toBe(1); // still 1 (Escape wrote nothing).
+    expect((await cellDisplayValues(page))[1]).toBe('9'); // reverted to the last committed value.
   });
 
   // req-6 — full-row edit (Wave-(b), Plan 51-03). Drives DataTableEditDemo.

@@ -1895,6 +1895,13 @@ const isActiveCellEditable = () => {
 // body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
 const isEditing = (rowIndex, colIndex) => ($data.editVer >= 0 && $data.editingRow === rowIndex && $data.editingCol === colIndex)
 
+// cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
+// an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
+// attribute DROPS (the rozieAttr nullish-attr path), keeping non-editing cells byte-clean.
+// Returns the literal 'true' (NOT boolean true) so rozieAttr's string-literal-union preserve
+// keeps React's aria-invalid (Booleanish incl. 'true') happy instead of widening to string.
+const cellAriaInvalid = (rowIndex, colIndex): 'true' | null => (isEditing(rowIndex, colIndex) && !!$data.invalidMsg ? 'true' : null)
+
 // runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
 // function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
 // return coerces to a generic message so a misbehaving validator can never wedge the
@@ -2340,6 +2347,11 @@ $expose({
      FlowCanvas declarative-children precedent: config children stay in the normal
      child tree so $inject resolves tree-scoped). -->
 <div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot /></div>
+<!-- Validation aria-live region (phase 51 req-5/D-01): a visually-hidden polite status
+     region announcing the current editor validation error. Gated `r-if="!!$data.invalidMsg"`
+     so it renders ONLY while an editor holds an invalid value — a table with no editable
+     columns (invalidMsg always '') never emits this node (byte-identical-off, req-10). -->
+<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" r-if="!!$data.invalidMsg">{{ $data.invalidMsg }}</div>
 <!-- Global search (req-5) — bound, value-driven (NOT eval'd). Narrows all columns. -->
 <div class="rdt-toolbar">
   <input
@@ -2535,6 +2547,7 @@ $expose({
         :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
         :style="pinStyle(cellCtx.column.id)"
+        :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))"
       >
         <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
           <slot
@@ -2794,6 +2807,7 @@ $expose({
         :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
         :style="pinStyle(cellCtx.column.id)"
+        :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
       >
         <!-- auto-injected per-row select checkbox (D-04/D-05) — slot-overridable via
              #selectCell; checkbox-only toggle (row body does NOT select). The
@@ -2939,6 +2953,29 @@ $expose({
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
+}
+/* Validation aria-live region (req-5/D-01): visually hidden, announced to AT. */
+.rdt-sr-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Built-in cell editor (req-1): inline, full-cell-width input/select. */
+.rozie-data-table .rdt-cell-editor {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Invalid-state cell highlight (req-5/D-01). */
+.rozie-data-table .rdt-td[aria-invalid="true"] {
+  outline: var(--rdt-invalid-outline, 2px solid #d33);
+  outline-offset: -2px;
 }
 .rozie-data-table .rdt-th,
 .rozie-data-table .rdt-td {

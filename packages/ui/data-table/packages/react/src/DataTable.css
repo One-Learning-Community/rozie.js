@@ -4,6 +4,26 @@
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
 }
+.rdt-sr-live[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-cell-editor[data-rozie-s-d5dcab4c] {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[aria-invalid="true"][data-rozie-s-d5dcab4c] {
+  outline: var(--rdt-invalid-outline, 2px solid #d33);
+  outline-offset: -2px;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
