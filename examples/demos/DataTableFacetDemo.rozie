@@ -6,8 +6,9 @@
   + <Column> children + a $refs.dt handle + readouts), binding the FACETED-FILTERING
   feature surface this phase builds — entirely HEADLESS (no built-in facet control):
 
-    - Faceted row models wired + values exposed (req-8): `:faceted` opts the table into
-      getFacetedRowModel / getFacetedUniqueValues / getFacetedMinMaxValues; per-column
+    - Faceted row models wired + values exposed (req-8): getFacetedRowModel /
+      getFacetedUniqueValues / getFacetedMinMaxValues are supplied UNCONDITIONALLY (Plan
+      50-04 — off-by-default = inert until a facet is READ; no opt-in prop). Per-column
       unique-value lists (category facet) and min/max ranges (numeric facet) are exposed.
     - Faceted exposure surface — $expose verbs + #filter slot props (req-9): the fixture
       builds a category-facet CHECKBOX LIST and a numeric RANGE SLIDER purely from the
@@ -15,14 +16,14 @@
       props + the getFacetedUniqueValues / getFacetedMinMaxValues $expose verbs), filtering
       the table via the columnFilters model. NO built-in facet dropdown/range ships.
 
-  IMPORTANT (Wave-0 status, Plan 50-01): the `faceted` table prop, the `#filter` slot's
-  faceted props (`uniqueValues`/`minMax`), and the getFacetedUniqueValues /
-  getFacetedMinMaxValues $expose verbs DO NOT EXIST in DataTable.rozie until Plan 50-04
-  (Wave-(c)) lands — they pass through as inert undeclared props/slots today (the `#filter`
-  slot emits a harmless ROZ941 "slot not declared" WARNING; the fixture still compiles +
-  renders the read-only flat table on all six). The facet assertions in
-  data-table-roundout.spec.ts sit behind the runnerFor build-gate until Plan 50-04 declares
-  the surface. (The columnFilters model already exists from Phase 48.)
+  STATUS (Plan 50-04 / Wave-(c) LANDED): the `#filter` slot's faceted props
+  (`uniqueValues`/`minMax`) + the getFacetedUniqueValues / getFacetedMinMaxValues $expose
+  verbs now EXIST in DataTable.rozie. There is NO `faceted` opt-in prop — the 3 faceted
+  models are supplied unconditionally (off-by-default = inert until a facet is read), so
+  faceting is available without an opt-in. The verbs return KEYS-ONLY arrays (counts
+  excluded, D-03). The consumer-built facets drive the columnFilters model (Phase 48);
+  per-column filtering uses table-core's default `auto` filterFn (no filterFn prop exists —
+  category single-select resolves to includesString, price to inNumberRange).
 
   Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot
   named `cell` — the #cell display slot binds `value`/`row`/`columnId`; the filter slot is
@@ -96,12 +97,13 @@ const setPriceMax = (value: number, min: number): void => {
 
 // Surface getFacetedUniqueValues('category') via the $expose handle (req-9) — the count
 // of distinct category values. Resolve the handle at CALL time (never cache — the
-// GridNavDemo lesson). The verb returns a Map<value, count> in table-core; we read .size.
+// GridNavDemo lesson). Plan 50-04 D-03: the verb returns the KEYS-ONLY distinct-value
+// ARRAY (occurrence counts deliberately excluded) — we read .length (NOT a Map .size).
 const callGetUniqueValues = (): void => {
   const api = $refs.dt
   if (!api || !api.getFacetedUniqueValues) { $data.uniqueCountReadout = ''; return }
-  const m = api.getFacetedUniqueValues('category')
-  $data.uniqueCountReadout = String(m && typeof m.size === 'number' ? m.size : 0)
+  const arr = api.getFacetedUniqueValues('category')
+  $data.uniqueCountReadout = String(Array.isArray(arr) ? arr.length : 0)
 }
 
 // Surface getFacetedMinMaxValues('price') via the $expose handle (req-9) — "min,max".
@@ -129,7 +131,6 @@ const callGetMinMax = (): void => {
   <div data-testid="facet-table">
     <DataTable
       ref="dt"
-      :faceted="true"
       :data="$data.rows"
       r-model:columnFilters="$data.columnFilters"
     >
