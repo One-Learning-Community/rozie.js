@@ -197,6 +197,174 @@ async function probeEditorPresent(page: Page): Promise<boolean> {
   });
 }
 
+// ── Editable-cell helpers (Plan 51-02, Wave-(a)) — read the open editor + commit readout
+//    off the DataTableEditDemo fixture, shadow-piercing for Lit. ─────────────────────────
+
+/**
+ * The open editor element ([data-editing-cell]) descriptor — its tag, type, value, and the
+ * owning cell's [data-col-index]. Null when no editor is open. Walks open shadow roots (Lit).
+ */
+async function openEditor(
+  page: Page,
+): Promise<{ tag: string; type: string | null; value: string; checked: boolean; col: string | null } | null> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-editing-cell]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document) as (HTMLInputElement & HTMLSelectElement) | null;
+    if (!el) return null;
+    const cell = el.closest('[data-grid-cell]');
+    return {
+      tag: el.tagName.toLowerCase(),
+      type: el.getAttribute('type'),
+      value: el.value != null ? String(el.value) : '',
+      checked: !!el.checked,
+      col: cell ? cell.getAttribute('data-col-index') : null,
+    };
+  });
+}
+
+/** True when the custom #editor stepped-slot control is mounted (req-2). */
+async function stepEditorPresent(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="step-editor"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    return !!find(document);
+  });
+}
+
+/** The focused element's tagName (shadow-pierced), to assert the editor is focused. */
+async function focusedTag(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    let root: Document | ShadowRoot = document;
+    let active: Element | null = document.activeElement;
+    // Pierce shadow roots to the deepest active element (Lit).
+    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
+      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
+      if (!sr.activeElement) break;
+      root = sr;
+      active = sr.activeElement;
+    }
+    return active ? active.tagName.toLowerCase() : null;
+  });
+}
+
+/** The first cell-display cell's text for a given visible column (the model-driven value). */
+async function cellDisplayValues(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element[] => {
+      const out: Element[] = [];
+      out.push(...Array.from(root.querySelectorAll('[data-testid="cell-display"]')));
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) out.push(...find(sr));
+      }
+      return out;
+    };
+    return find(document).map((el) => (el.textContent || '').trim());
+  });
+}
+
+/** The commit-count readout (number of cell-edit-commit emits). */
+async function commitCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="commit-count"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? Number((el.textContent || '0').trim()) : -1;
+  });
+}
+
+/** The commit-readout ("columnId=newValue" of the last commit). */
+async function commitReadout(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="commit-readout"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document);
+    return el ? (el.textContent || '').trim() : '';
+  });
+}
+
+/** Focus a body cell directly by (row, col) — drives @focusin → activeRow/activeColIndex
+ *  sync without relying on per-arrow timing (the editor-block sequencing is deterministic
+ *  this way). Walks open shadow roots (Lit). */
+async function focusBodyCell(page: Page, row: number, col: number): Promise<void> {
+  await page.evaluate(({ r, c }) => {
+    const findGridTable = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('table[role="grid"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findGridTable(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const grid = findGridTable(document);
+    if (!grid) return;
+    const cell = grid.querySelector(`[data-grid-cell][data-row="${r}"][data-col-index="${c}"]`) as HTMLElement | null;
+    if (cell) cell.focus();
+  }, { r: row, c: col });
+}
+
+/** Focus (row, col) and KEEP it focused until the active cell settles there — re-focuses if
+ *  a stray deferred focus-return (the commit/cancel rAF poll from a prior block) steals focus
+ *  away. Returns once activeCellCoords reports the target col, or after the retry budget. */
+async function focusBodyCellStable(page: Page, row: number, col: number): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    await focusBodyCell(page, row, col);
+    const coords = await activeCellCoords(page);
+    if (coords?.col === String(col) && coords?.row === String(row)) return;
+    await page.waitForTimeout(50);
+  }
+}
+
+/** Focus the grid's roving entry cell (data-row=0, data-col-index=0) to begin keyboard nav. */
+async function focusEntryCell(page: Page): Promise<void> {
+  await focusBodyCell(page, 0, 0);
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════
 // D-02 PIN-ROW PROBE (51-01) — the editing <tr> stays mounted in-flow out-of-window with
 //   monotonic aria-rowindex + invariant total scroll height. The hard cross-target
@@ -369,12 +537,113 @@ for (const target of TARGETS) {
 //   fixme by phase end). Listed here so the spec's coverage shape is visible from Wave-0.
 // ════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  // req-1/2/3/4/5 — built-in editors + #editor slot + lifecycle + write-back + validation
-  // (Wave-(a), Plan 51-02). Drives DataTableEditDemo.
-  test.fixme(`data-table-edit [${target}]: built-in editors commit one cell-edit-commit; #editor slot; invalid keeps editor open (Plan 51-02)`, async () => {
-    // Pending Plan 51-02: F2/Enter/printable enter; commit on Enter/Tab/blur; Escape
-    // revert; the four built-in editor types; the #editor stepped slot; the qty validator
-    // keeps the editor open (D-01) on a negative value with no model write.
+  // req-1/2/3/4 — built-in editors + #editor slot + lifecycle + write-back (Wave-(a),
+  // Plan 51-02). Drives DataTableEditDemo. (req-5 validation is a separate assertion below,
+  // promoted in Plan 51-02 Task 3.)
+  runnerFor(target)(`data-table-edit [${target}]: built-in editors enter/commit/cancel; #editor slot; one cell-edit-commit per commit`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableEdit&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table')).toBeVisible({ timeout: 15_000 });
+
+    // The columns are name(0,text) qty(1,number) status(2,select) active(3,checkbox)
+    // score(4,#editor slot). Begin keyboard nav at the entry cell (row 0, col 0).
+    await focusBodyCellStable(page, 0, 0);
+
+    // ── req-1: F2 on the editable text cell mounts an <input> with data-editing-cell,
+    //    focused, holding the existing value ('Alpha'). ────────────────────────────────
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
+    {
+      const ed = await openEditor(page);
+      expect(ed?.type).toBe('text');
+      expect(ed?.value).toBe('Alpha'); // F2 seeds the existing value (D-05).
+      expect(ed?.col).toBe('0');
+    }
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+
+    // ── req-3 (Escape revert): Escape closes the editor + reverts; no model write. ─────
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    expect(await commitCount(page)).toBe(0);
+    {
+      const cells = await cellDisplayValues(page);
+      expect(cells[0]).toBe('Alpha'); // unchanged (cancel writes nothing).
+    }
+
+    // ── req-1 + req-3 + req-4: F2 → type → Enter commits ONE cell-edit-commit + returns
+    //    focus to the cell; the rendered cell updates FROM the model write. ─────────────
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
+    // Wait for the component's rAF focus poll to land focus in the editor, then fill the
+    // value (Playwright locators pierce open shadow DOM → Lit-safe). fill() focuses +
+    // replaces the value + fires the input event the controlled draftValue binds.
+    const editor1 = mount.locator('[data-editing-cell]');
+    await editor1.fill('Zeta');
+    await editor1.press('Enter');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    // Exactly one commit; the rendered cell reflects the MODEL write (req-4).
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(1);
+    expect(await commitReadout(page)).toBe('name=Zeta');
+    await expect.poll(async () => cellDisplayValues(page).then((c) => c[0]), { timeout: 10_000 }).toBe('Zeta');
+    // Focus returned to the cell (data-grid-cell), not stuck in an input.
+    await expect.poll(async () => (await activeCellCoords(page))?.col, { timeout: 10_000 }).toBe('0');
+
+    // ── req-1: the select editor enters a native <select> seeded with the cell value. ──
+    await focusBodyCellStable(page, 0, 2); // col 2 (status, select)
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('select');
+    expect((await openEditor(page))?.value).toBe('active'); // row 0 status seed.
+    // Press Escape ON the editor locator (focuses it first → the editor keymap receives it).
+    await mount.locator('[data-editing-cell]').press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+
+    // ── req-1: the checkbox editor enters a checkbox seeded from the boolean value. ────
+    await focusBodyCellStable(page, 0, 3); // col 3 (active, checkbox)
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('checkbox');
+    expect((await openEditor(page))?.checked).toBe(true); // row 0 active=true seed.
+    await mount.locator('[data-editing-cell]').press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+
+    // ── req-2: the custom #editor stepped slot replaces the built-in editor on `score`,
+    //    receives commit (the React render-prop edge), and a step commits one edit. ─────
+    await focusBodyCellStable(page, 0, 4); // col 4 (score, custom #editor slot)
+    await page.keyboard.press('F2');
+    await expect.poll(async () => stepEditorPresent(page), { timeout: 10_000 }).toBe(true);
+    // No built-in input is mounted for the custom column.
+    expect((await openEditor(page))).toBeNull();
+    const beforeStep = await commitCount(page);
+    // The stepped control's "+" calls commit(value+1) → one cell-edit-commit; row 0 score 41 → 42.
+    await page.getByTestId('step-up').click();
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforeStep + 1);
+    expect(await commitReadout(page)).toBe('score=42');
+
+    // ── req-3 (Tab advances to the next editable cell): F2 on col 0, edit, Tab commits +
+    //    moves the editor to the next editable cell (col 1). ───────────────────────────
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('0');
+    const editor2 = mount.locator('[data-editing-cell]');
+    await editor2.fill('Omega');
+    const beforeTab = await commitCount(page);
+    await editor2.press('Tab');
+    // Commit fired once and the editor advanced to col 1 (qty, number).
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforeTab + 1);
+    await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('1');
+    expect((await openEditor(page))?.type).toBe('number');
+    await mount.locator('[data-editing-cell]').press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+  });
+
+  // req-5 — synchronous validation D-01 keep-open + aria-live (Plan 51-02 Task 3).
+  test.fixme(`data-table-edit [${target}]: invalid commit keeps editor open, aria-live announces, no model write (Plan 51-02 Task 3)`, async () => {
+    // Pending Plan 51-02 Task 3: a value failing the qty validator (negative) keeps the
+    // editor OPEN (D-01) with aria-invalid on the <td>, announces in [role="status"], does
+    // NOT write the model + fires zero cell-edit-commit; a subsequent valid value commits.
   });
 
   // req-6 — full-row edit (Wave-(b), Plan 51-03). Drives DataTableEditDemo.

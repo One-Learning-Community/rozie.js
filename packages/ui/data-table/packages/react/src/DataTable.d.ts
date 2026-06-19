@@ -50,16 +50,19 @@ export interface DataTableProps {
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
+  onCellEditCommit?: (...args: unknown[]) => void;
   children?: ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
+  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: () => void; cancel: () => void }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderColHeader?: (params: { columnId: unknown; column: unknown; label: unknown }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
+  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: () => void; cancel: () => void }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
@@ -80,6 +83,8 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  editCell: (...args: any[]) => any;
+  commitEditing: (...args: any[]) => any;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;

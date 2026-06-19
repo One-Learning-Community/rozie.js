@@ -43,6 +43,15 @@ interface RozieSelectCellSlotCtx {
   toggle: unknown;
 }
 
+interface RozieEditorSlotCtx {
+  columnId: unknown;
+  column: unknown;
+  row: unknown;
+  value: unknown;
+  commit: unknown;
+  cancel: unknown;
+}
+
 interface RozieCellSlotCtx {
   columnId: unknown;
   column: unknown;
@@ -313,6 +322,11 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _activeColIndex = signal(0);
   private _activeIsHeader = signal(false);
   private _activeInControl = signal(false);
+  private _editingRow = signal(-1);
+  private _editingCol = signal(-1);
+  private _draftValue = signal(null);
+  private _invalidMsg = signal('');
+  private _editVer = signal(0);
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
@@ -346,6 +360,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
   @property({ attribute: false }) selectCell?: (scope: { row: unknown; checked: unknown; toggle: unknown }) => unknown;
+  @state() private _hasSlotEditor = false;
+  @queryAssignedElements({ slot: 'editor', flatten: true }) private _slotEditorElements!: Element[];
+  @property({ attribute: false }) editor?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => unknown;
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
   @property({ attribute: false }) cell?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => unknown;
@@ -401,6 +418,17 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="editor"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotEditor = this._slotEditorElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="cell"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotCell = this._slotCellElements.length > 0; };
@@ -418,6 +446,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotSelectAll = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectAll');
     this._hasSlotColHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'colHeader');
     this._hasSlotSelectCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selectCell');
+    this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -729,7 +758,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
           ${this.selectCell !== undefined ? this.selectCell({row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: wr.row.original, checked: this.rowIsSelected(wr.row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(wr.row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(wr.row)} @change=${($event: Event) => { this.onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
-        </span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+        </span>` : this.isEditing(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.hasEditorSlot(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.editor !== undefined ? this.editor({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: this._draftValue.value, commit: this.commitEdit, cancel: this.cancelEdit}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: this._draftValue.value}); } catch { return '{}'; } })()} @rozie-editor-commit=${($event: CustomEvent) => ((this.commitEdit) as (...args: any[]) => any)($event.detail)} @rozie-editor-cancel=${($event: CustomEvent) => ((this.cancelEdit) as (...args: any[]) => any)($event.detail)}></slot>`}
+          </span>` : this.editorTypeOf(cellCtx.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this._draftValue.value} @input=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cellCtx.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this._draftValue.value} @change=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
+            ${repeat<any>(this.editorOptionsOf(cellCtx.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
+          </select>` : this.editorTypeOf(cellCtx.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${!!this._draftValue.value} @change=${($event: Event) => { this.onEditorCheckboxChange($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this._draftValue.value} @input=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
         </span>`}</td>`)}
     </tr>`)}
@@ -780,7 +814,12 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
           ${this.selectCell !== undefined ? this.selectCell({row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: row.original, checked: this.rowIsSelected(row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(row, e)) as (...args: any[]) => any)($event.detail)}>
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(row)} @change=${($event: Event) => { this.onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />
           </slot>`}
-        </span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+        </span>` : this.isEditing(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.hasEditorSlot(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.editor !== undefined ? this.editor({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: this._draftValue.value, commit: this.commitEdit, cancel: this.cancelEdit}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: this._draftValue.value}); } catch { return '{}'; } })()} @rozie-editor-commit=${($event: CustomEvent) => ((this.commitEdit) as (...args: any[]) => any)($event.detail)} @rozie-editor-cancel=${($event: CustomEvent) => ((this.cancelEdit) as (...args: any[]) => any)($event.detail)}></slot>`}
+          </span>` : this.editorTypeOf(cellCtx.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this._draftValue.value} @input=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cellCtx.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this._draftValue.value} @change=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
+            ${repeat<any>(this.editorOptionsOf(cellCtx.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
+          </select>` : this.editorTypeOf(cellCtx.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${!!this._draftValue.value} @change=${($event: Event) => { this.onEditorCheckboxChange($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this._draftValue.value} @input=${($event: Event) => { this.onEditorInput($event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
         </span>`}</td>`)}
     </tr>`)}
@@ -1317,6 +1356,28 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   visibleCellsFor = (row: any) => this._rowModelVer.value >= 0 ? row.getVisibleCells() : [];
 
+  editMetaOf = (colId: any) => {
+  const d = this.defFor(colId);
+  return d && d.meta ? d.meta : null;
+};
+
+  columnEditable = (colId: any) => {
+  const m = this.editMetaOf(colId);
+  return !!(m && m.editable === true);
+};
+
+  editorTypeOf = (colId: any) => {
+  const m = this.editMetaOf(colId);
+  return m && m.editor != null ? m.editor : 'text';
+};
+
+  editorOptionsOf = (colId: any) => {
+  const m = this.editMetaOf(colId);
+  return m && m.editorOptions != null ? m.editorOptions : [];
+};
+
+  hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this._hasSlotEditor || this.editor !== undefined);
+
   columnIsFilterable = (colId: any) => {
   const d = this.defFor(colId);
   return !!(d && d.filterable);
@@ -1758,6 +1819,11 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   onGridKeyDown = (e: any) => {
   if (!this.isGrid() || !e) return;
   const key = e.key;
+  // Editing mode (phase 51, Pitfall 5): an OPEN editor owns Tab/Enter/Escape (+ caret keys)
+  // via its local onEditorKeyDown handler. This top check (BEFORE activeInControl) returns
+  // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
+  // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
+  if (this._editingRow.value >= 0) return;
   // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
   if (this._activeInControl.value) {
     if (key === 'Escape') {
@@ -1838,6 +1904,19 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     } else {
       nextCol = this.gotoColEdge(true);
     }
+  }
+  // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
+  // Gated by isActiveCellEditable(): a non-editable active cell falls through to
+  // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
+  // (in-place edit); a single printable char (no Ctrl/Meta/Alt) REPLACES the value.
+  else if ((key === 'Enter' || key === 'F2') && this.isActiveCellEditable()) {
+    e.preventDefault();
+    this.beginEdit(this._activeRow.value, this._activeColIndex.value, null);
+    return;
+  } else if (this.isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    this.beginEdit(this._activeRow.value, this._activeColIndex.value, key);
+    return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();
     this.enterControl();
@@ -1901,6 +1980,334 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     const row = this.clamp(this._activeRow.value, 0, maxRow);
     if (row !== this._activeRow.value) this._activeRow.value = row;
   }
+};
+
+  activeCellColumnId = () => {
+  if (this._activeIsHeader.value) return null;
+  const rowList = this._rows.value || [];
+  const row = rowList[this._activeRow.value];
+  if (!row) return null;
+  const cells = this.visibleCellsFor(row);
+  const cell = cells[this._activeColIndex.value];
+  return cell && cell.column ? cell.column.id : null;
+};
+
+  isActiveCellEditable = () => {
+  const colId = this.activeCellColumnId();
+  return colId != null && this.columnEditable(colId);
+};
+
+  isEditing = (rowIndex: any, colIndex: any) => this._editVer.value >= 0 && this._editingRow.value === rowIndex && this._editingCol.value === colIndex;
+
+  runValidator = (colId: any, value: any, row: any) => {
+  const m = this.editMetaOf(colId);
+  const v = m ? m.validate : null;
+  if (typeof v !== 'function') return true;
+  let r: any = null;
+  try {
+    r = v(value, row);
+  } catch (err: any) {
+    return 'Invalid value';
+  }
+  if (r === true) return true;
+  if (typeof r === 'string') return r;
+  return 'Invalid value';
+};
+
+  setInvalid = (msg: any) => {
+  this._invalidMsg.value = msg != null ? msg : '';
+};
+
+  replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
+  const src = rows || [];
+  const out = [];
+  for (let i = 0; i < src.length; i++) {
+    if (i === rowIndex) {
+      const merged = {};
+      const orig = src[i] || {};
+      for (const k in orig) merged[k] = orig[k];
+      merged[field] = value;
+      out.push(merged);
+    } else {
+      out.push(src[i]);
+    }
+  }
+  return out;
+};
+
+  sourceIndexOfRow = (visibleRowIndex: any) => {
+  const rowList = this._rows.value || [];
+  const row = rowList[visibleRowIndex];
+  if (!row) return visibleRowIndex;
+  const orig = row.original;
+  const data = this.currentData() || [];
+  const idx = data.indexOf(orig);
+  return idx >= 0 ? idx : visibleRowIndex;
+};
+
+  editingColumnId = () => {
+  const rowList = this._rows.value || [];
+  const row = rowList[this._editingRow.value];
+  if (!row) return null;
+  const cells = this.visibleCellsFor(row);
+  const cell = cells[this._editingCol.value];
+  return cell && cell.column ? cell.column.id : null;
+};
+
+  editingColumnField = () => {
+  const colId = this.editingColumnId();
+  if (colId == null) return null;
+  const d = this.defFor(colId);
+  return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+};
+
+  editingCellValue = () => {
+  const rowList = this._rows.value || [];
+  const row = rowList[this._editingRow.value];
+  if (!row) return null;
+  const cells = this.visibleCellsFor(row);
+  const cell = cells[this._editingCol.value];
+  return cell ? cell.getValue() : null;
+};
+
+  editingRowOriginal = () => {
+  const rowList = this._rows.value || [];
+  const row = rowList[this._editingRow.value];
+  return row ? row.original : null;
+};
+
+  editingRowId = () => {
+  const rowList = this._rows.value || [];
+  const row = rowList[this._editingRow.value];
+  return row ? row.id : null;
+};
+
+  focusEditorWhenReady = () => {
+  if (!this.gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
+    if (el) {
+      el.focus();
+      if (el.select) {
+        try {
+          el.select();
+        } catch (e: any) {}
+      }
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
+  columnIdAt = (rowIndex: any, colIndex: any) => {
+  const rowList = this._rows.value || [];
+  const row = rowList[rowIndex];
+  if (!row) return null;
+  const cells = this.visibleCellsFor(row);
+  const cell = cells[colIndex];
+  return cell && cell.column ? cell.column.id : null;
+};
+
+  cellValueAt = (rowIndex: any, colIndex: any) => {
+  const rowList = this._rows.value || [];
+  const row = rowList[rowIndex];
+  if (!row) return null;
+  const cells = this.visibleCellsFor(row);
+  const cell = cells[colIndex];
+  return cell ? cell.getValue() : null;
+};
+
+  beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
+  const colId = this.columnIdAt(rowIndex, colIndex);
+  if (colId == null || !this.columnEditable(colId)) return;
+  this.setInvalid('');
+  this._editingRow.value = rowIndex;
+  this._editingCol.value = colIndex;
+  this._draftValue.value = seed != null ? seed : this.cellValueAt(rowIndex, colIndex);
+  this._activeInControl.value = true;
+  this._editVer.value = this._editVer.value + 1;
+  this.focusEditorWhenReady();
+};
+
+  focusCellWhenReady = (row: any, col: any) => {
+  if (!this.gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = this.resolveCellEl(String(row), col);
+    if (el) {
+      el.focus();
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
+  endEdit = () => {
+  this._editingRow.value = -1;
+  this._editingCol.value = -1;
+  this._draftValue.value = null;
+  this._invalidMsg.value = '';
+  this._activeInControl.value = false;
+  this._editVer.value = this._editVer.value + 1;
+};
+
+  commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
+  if (this._editingRow.value < 0) return false;
+  const colId = this.editingColumnId();
+  if (colId == null) {
+    this.endEdit();
+    return false;
+  }
+  const field = this.editingColumnField();
+  const oldValue = this.editingCellValue();
+  const rowOriginal = this.editingRowOriginal();
+  const rowId = this.editingRowId();
+  const newValue = overrideValue !== undefined ? overrideValue : this._draftValue.value;
+  const err = this.runValidator(colId, newValue, rowOriginal);
+  if (err !== true) {
+    // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+    this.setInvalid(err);
+    this.focusEditorWhenReady();
+    return false;
+  }
+  this.setInvalid('');
+  const srcIndex = this.sourceIndexOfRow(this._editingRow.value);
+  const next = this.replaceRowValue(this.currentData(), srcIndex, field, newValue);
+  // Snapshot the EDITING cell to return focus to BEFORE endEdit clears editing state.
+  const focusRow = this._editingRow.value;
+  const focusCol = this._editingCol.value;
+  // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
+  // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
+  this.editTransition = true;
+  this.writeData(next);
+  // Exactly one emit per commit, from this single call site (writeData does NOT emit).
+  this.dispatchEvent(new CustomEvent("cell-edit-commit", {
+    detail: {
+      rowId,
+      columnId: colId,
+      oldValue,
+      newValue
+    },
+    bubbles: true,
+    composed: true
+  }));
+  this.endEdit();
+  this.editTransition = false;
+  // Defer the focus return so the display↔editor re-render commits first (async on
+  // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
+  // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
+  // Tab-advance (the caller immediately opens the next editor and focuses THAT).
+  if (skipFocusReturn !== true) this.focusCellWhenReady(focusRow, focusCol);
+  return true;
+};
+
+  cancelEdit = () => {
+  if (this._editingRow.value < 0) return;
+  const focusRow = this._activeRow.value;
+  const focusCol = this._activeColIndex.value;
+  this.editTransition = true;
+  this.endEdit();
+  this.editTransition = false;
+  this.focusCellWhenReady(focusRow, focusCol);
+};
+
+  nextEditableCell = (fromRow: any, fromCol: any) => {
+  const rowList = this._rows.value || [];
+  const rowCount = rowList.length;
+  if (rowCount === 0) return null;
+  let r = fromRow;
+  let c = fromCol + 1;
+  while (r < rowCount) {
+    const row = rowList[r];
+    const cells = row ? this.visibleCellsFor(row) : [];
+    while (c < cells.length) {
+      const cell = cells[c];
+      const cid = cell && cell.column ? cell.column.id : null;
+      if (cid != null && this.columnEditable(cid)) return {
+        row: r,
+        col: c
+      };
+      c = c + 1;
+    }
+    r = r + 1;
+    c = 0;
+  }
+  return null;
+};
+
+  editTransition = false;
+
+  onEditorInput = (evt: any) => {
+  this._draftValue.value = evt && evt.target ? evt.target.value : '';
+};
+
+  onEditorCheckboxChange = (evt: any) => {
+  this._draftValue.value = !!(evt && evt.target && evt.target.checked);
+};
+
+  onEditorKeyDown = (e: any) => {
+  if (!e) return;
+  const key = e.key;
+  if (key === 'Enter') {
+    e.preventDefault();
+    this.commitEdit(undefined);
+  } else if (key === 'Tab') {
+    e.preventDefault();
+    // Resolve the advance target from the EDITING pair (the cell that is open), not the
+    // active cell (they match here, but the editing pair is authoritative).
+    const target = this.nextEditableCell(this._editingRow.value, this._editingCol.value);
+    // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
+    // straight into the next editable cell's editor below. Use the RETURN value (not a
+    // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
+    // failure returns false and keeps the editor open (the user must fix the value first).
+    const committed = this.commitEdit(undefined, true);
+    if (committed && target) {
+      this._activeRow.value = target.row;
+      this._activeColIndex.value = target.col;
+      this.beginEdit(target.row, target.col, null);
+    }
+  } else if (key === 'Escape') {
+    e.preventDefault();
+    this.cancelEdit();
+  }
+};
+
+  onEditorBlur = (e: any) => {
+  if (this._editingRow.value < 0 || this.editTransition) return;
+  const next = e ? e.relatedTarget : null;
+  // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
+  // another widget). Skip when:
+  //  - relatedTarget is inside gridRoot — a controlled move (Tab-advance to the next editor,
+  //    Enter/Escape focus-return to the cell); the keyboard handler already acted, AND
+  //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
+  //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
+  //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
+  if (next == null) return;
+  if (this.gridRoot && this.gridRoot.contains && this.gridRoot.contains(next)) return;
+  this.commitEdit(undefined);
+};
+
+  editCell = (rowIndex: any, colIndex: any) => {
+  const lastRow = this.bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  const maxCol = this.visibleColCount() - 1;
+  const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  this._activeIsHeader.value = false;
+  this._activeRow.value = r;
+  this._activeColIndex.value = c;
+  this.beginEdit(r, c, null);
+};
+
+  commitEditing = () => {
+  if (this._editingRow.value >= 0) this.commitEdit(undefined);
 };
 
   focusCell = (rowIndex: any, colIndex: any) => {

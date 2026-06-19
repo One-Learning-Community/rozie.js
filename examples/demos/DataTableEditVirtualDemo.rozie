@@ -105,7 +105,7 @@ const validateQty = (value: unknown): true | string => {
     <DataTable
       ref="dt"
       interactionMode="grid"
-      :data="$data.rows"
+      r-model:data="$data.rows"
       :virtual="true"
       maxHeight="400px"
       @cell-edit-commit="onCellEditCommit($event)"
@@ -120,7 +120,7 @@ const validateQty = (value: unknown): true | string => {
         :editorOptions="$data.statusOptions"
       />
       <Column field="active" header="Active" :editable="true" editor="checkbox" />
-      <Column field="score"  header="Score"  :editable="true" />
+      <Column field="score"  header="Score"  :editable="true" editor="custom" />
 
       <template #cell="{ columnId, value }">
         <span data-testid="cell-display">{{ value }}</span>

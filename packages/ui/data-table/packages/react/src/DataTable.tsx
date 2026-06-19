@@ -27,6 +27,8 @@ interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
+interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
+
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
 
 interface DataTableProps {
@@ -77,10 +79,12 @@ interface DataTableProps {
   onReorderChange?: (...args: any[]) => void;
   onPinChange?: (...args: any[]) => void;
   onActivecellChange?: (...args: any[]) => void;
+  onCellEditCommit?: (...args: any[]) => void;
   children?: ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
+  renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -101,6 +105,8 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  editCell: (...args: any[]) => any;
+  commitEditing: (...args: any[]) => any;
 }
 
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
@@ -223,6 +229,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [activeColIndex, setActiveColIndex] = useState(0);
   const [activeIsHeader, setActiveIsHeader] = useState(false);
   const [activeInControl, setActiveInControl] = useState(false);
+  const [editingRow, setEditingRow] = useState(-1);
+  const [editingCol, setEditingCol] = useState(-1);
+  const [draftValue, setDraftValue] = useState<any>(null);
+  const [invalidMsg, setInvalidMsg] = useState('');
+  const [editVer, setEditVer] = useState(0);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
 
@@ -670,6 +681,25 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function visibleCellsFor(row: any) {
     return rowModelVer >= 0 ? row.getVisibleCells() : [];
   }
+  function editMetaOf(colId: any) {
+    const d = defFor(colId);
+    return d && d.meta ? d.meta : null;
+  }
+  function columnEditable(colId: any) {
+    const m = editMetaOf(colId);
+    return !!(m && m.editable === true);
+  }
+  function editorTypeOf(colId: any) {
+    const m = editMetaOf(colId);
+    return m && m.editor != null ? m.editor : 'text';
+  }
+  function editorOptionsOf(colId: any) {
+    const m = editMetaOf(colId);
+    return m && m.editorOptions != null ? m.editorOptions : [];
+  }
+  function hasEditorSlot(colId: any) {
+    return editorTypeOf(colId) === 'custom' && !!(props.renderEditor ?? props.slots?.["editor"]);
+  }
   function columnIsFilterable(colId: any) {
     const d = defFor(colId);
     return !!(d && d.filterable);
@@ -1075,6 +1105,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const onGridKeyDown = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const key = e.key;
+    // Editing mode (phase 51, Pitfall 5): an OPEN editor owns Tab/Enter/Escape (+ caret keys)
+    // via its local onEditorKeyDown handler. This top check (BEFORE activeInControl) returns
+    // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
+    // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
+    if (editingRow >= 0) return;
     // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
     if (activeInControl) {
       if (key === 'Escape') {
@@ -1155,6 +1190,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       } else {
         nextCol = gotoColEdge(true);
       }
+    }
+    // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
+    // Gated by isActiveCellEditable(): a non-editable active cell falls through to
+    // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
+    // (in-place edit); a single printable char (no Ctrl/Meta/Alt) REPLACES the value.
+    else if ((key === 'Enter' || key === 'F2') && isActiveCellEditable()) {
+      e.preventDefault();
+      beginEdit(activeRow, activeColIndex, null);
+      return;
+    } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      beginEdit(activeRow, activeColIndex, key);
+      return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
       enterControl();
@@ -1172,7 +1220,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeColIndex, activeInControl, activeIsHeader, activeRow, currentCellEl, cycleWithinCell, enterControl, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isGrid, moveCol, moveRow]);
+  }, [_rozieProp_onActivecellChange, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, currentCellEl, cycleWithinCell, editingRow, enterControl, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -1212,6 +1260,312 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (row !== activeRow) setActiveRow(row);
     }
   }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, isGrid, visibleColCount]);
+  function activeCellColumnId() {
+    if (activeIsHeader) return null;
+    const rowList = rows || [];
+    const row = rowList[activeRow];
+    if (!row) return null;
+    const cells = visibleCellsFor(row);
+    const cell = cells[activeColIndex];
+    return cell && cell.column ? cell.column.id : null;
+  }
+  function isActiveCellEditable() {
+    const colId = activeCellColumnId();
+    return colId != null && columnEditable(colId);
+  }
+  function isEditing(rowIndex: any, colIndex: any) {
+    return editVer >= 0 && editingRow === rowIndex && editingCol === colIndex;
+  }
+  function runValidator(colId: any, value: any, row: any) {
+    const m = editMetaOf(colId);
+    const v = m ? m.validate : null;
+    if (typeof v !== 'function') return true;
+    let r: any = null;
+    try {
+      r = v(value, row);
+    } catch (err: any) {
+      return 'Invalid value';
+    }
+    if (r === true) return true;
+    if (typeof r === 'string') return r;
+    return 'Invalid value';
+  }
+  function setInvalid(msg: any) {
+    setInvalidMsg(msg != null ? msg : '');
+  }
+  function replaceRowValue(rows: any, rowIndex: any, field: any, value: any) {
+    const src = rows || [];
+    const out = [];
+    for (let i = 0; i < src.length; i++) {
+      if (i === rowIndex) {
+        const merged = {};
+        const orig = src[i] || {};
+        for (const k in orig) merged[k] = orig[k];
+        merged[field] = value;
+        out.push(merged);
+      } else {
+        out.push(src[i]);
+      }
+    }
+    return out;
+  }
+  function sourceIndexOfRow(visibleRowIndex: any) {
+    const rowList = rows || [];
+    const row = rowList[visibleRowIndex];
+    if (!row) return visibleRowIndex;
+    const orig = row.original;
+    const data = currentData() || [];
+    const idx = data.indexOf(orig);
+    return idx >= 0 ? idx : visibleRowIndex;
+  }
+  function editingColumnId() {
+    const rowList = rows || [];
+    const row = rowList[editingRow];
+    if (!row) return null;
+    const cells = visibleCellsFor(row);
+    const cell = cells[editingCol];
+    return cell && cell.column ? cell.column.id : null;
+  }
+  function editingColumnField() {
+    const colId = editingColumnId();
+    if (colId == null) return null;
+    const d = defFor(colId);
+    return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+  }
+  function editingCellValue() {
+    const rowList = rows || [];
+    const row = rowList[editingRow];
+    if (!row) return null;
+    const cells = visibleCellsFor(row);
+    const cell = cells[editingCol];
+    return cell ? cell.getValue() : null;
+  }
+  function editingRowOriginal() {
+    const rowList = rows || [];
+    const row = rowList[editingRow];
+    return row ? row.original : null;
+  }
+  function editingRowId() {
+    const rowList = rows || [];
+    const row = rowList[editingRow];
+    return row ? row.id : null;
+  }
+  function focusEditorWhenReady() {
+    if (!gridRoot.current) return;
+    let attempts = 0;
+    const tryFocus = () => {
+      const el = gridRoot.current ? gridRoot.current.querySelector('[data-editing-cell]') : null;
+      if (el) {
+        el.focus();
+        if (el.select) {
+          try {
+            el.select();
+          } catch (e: any) {}
+        }
+        return;
+      }
+      attempts = attempts + 1;
+      if (attempts >= 30) return;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+  }
+  function columnIdAt(rowIndex: any, colIndex: any) {
+    const rowList = rows || [];
+    const row = rowList[rowIndex];
+    if (!row) return null;
+    const cells = visibleCellsFor(row);
+    const cell = cells[colIndex];
+    return cell && cell.column ? cell.column.id : null;
+  }
+  function cellValueAt(rowIndex: any, colIndex: any) {
+    const rowList = rows || [];
+    const row = rowList[rowIndex];
+    if (!row) return null;
+    const cells = visibleCellsFor(row);
+    const cell = cells[colIndex];
+    return cell ? cell.getValue() : null;
+  }
+  function beginEdit(rowIndex: any, colIndex: any, seed: any) {
+    const colId = columnIdAt(rowIndex, colIndex);
+    if (colId == null || !columnEditable(colId)) return;
+    setInvalid('');
+    setEditingRow(rowIndex);
+    setEditingCol(colIndex);
+    setDraftValue(seed != null ? seed : cellValueAt(rowIndex, colIndex));
+    setActiveInControl(true);
+    setEditVer(prev => prev + 1);
+    focusEditorWhenReady();
+  }
+  function focusCellWhenReady(row: any, col: any) {
+    if (!gridRoot.current) return;
+    let attempts = 0;
+    const tryFocus = () => {
+      const el = resolveCellEl(String(row), col);
+      if (el) {
+        el.focus();
+        return;
+      }
+      attempts = attempts + 1;
+      if (attempts >= 30) return;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+  }
+  function endEdit() {
+    setEditingRow(-1);
+    setEditingCol(-1);
+    setDraftValue(null);
+    setInvalidMsg('');
+    setActiveInControl(false);
+    setEditVer(prev => prev + 1);
+  }
+  function commitEdit(overrideValue = undefined, skipFocusReturn = false) {
+    if (editingRow < 0) return false;
+    const colId = editingColumnId();
+    if (colId == null) {
+      endEdit();
+      return false;
+    }
+    const field = editingColumnField();
+    const oldValue = editingCellValue();
+    const rowOriginal = editingRowOriginal();
+    const rowId = editingRowId();
+    const newValue = overrideValue !== undefined ? overrideValue : draftValue;
+    const err = runValidator(colId, newValue, rowOriginal);
+    if (err !== true) {
+      // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+      setInvalid(err);
+      focusEditorWhenReady();
+      return false;
+    }
+    setInvalid('');
+    const srcIndex = sourceIndexOfRow(editingRow);
+    const next = replaceRowValue(currentData(), srcIndex, field, newValue);
+    // Snapshot the EDITING cell to return focus to BEFORE endEdit clears editing state.
+    const focusRow = editingRow;
+    const focusCol = editingCol;
+    // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
+    // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
+    editTransition = true;
+    writeData(next);
+    // Exactly one emit per commit, from this single call site (writeData does NOT emit).
+    props.onCellEditCommit && props.onCellEditCommit({
+      rowId,
+      columnId: colId,
+      oldValue,
+      newValue
+    });
+    endEdit();
+    editTransition = false;
+    // Defer the focus return so the display↔editor re-render commits first (async on
+    // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
+    // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
+    // Tab-advance (the caller immediately opens the next editor and focuses THAT).
+    if (skipFocusReturn !== true) focusCellWhenReady(focusRow, focusCol);
+    return true;
+  }
+  function cancelEdit() {
+    if (editingRow < 0) return;
+    const focusRow = activeRow;
+    const focusCol = activeColIndex;
+    editTransition = true;
+    endEdit();
+    editTransition = false;
+    focusCellWhenReady(focusRow, focusCol);
+  }
+  function nextEditableCell(fromRow: any, fromCol: any) {
+    const rowList = rows || [];
+    const rowCount = rowList.length;
+    if (rowCount === 0) return null;
+    let r = fromRow;
+    let c = fromCol + 1;
+    while (r < rowCount) {
+      const row = rowList[r];
+      const cells = row ? visibleCellsFor(row) : [];
+      while (c < cells.length) {
+        const cell = cells[c];
+        const cid = cell && cell.column ? cell.column.id : null;
+        if (cid != null && columnEditable(cid)) return {
+          row: r,
+          col: c
+        };
+        c = c + 1;
+      }
+      r = r + 1;
+      c = 0;
+    }
+    return null;
+  }
+  // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
+  // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
+  // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
+  // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
+  let editTransition = false;
+
+  // Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+  // neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+  // `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+  const onEditorInput = useCallback((evt: any) => {
+    setDraftValue(evt && evt.target ? evt.target.value : '');
+  }, []);
+  const onEditorCheckboxChange = useCallback((evt: any) => {
+    setDraftValue(!!(evt && evt.target && evt.target.checked));
+  }, []);
+  const onEditorKeyDown = useCallback((e: any) => {
+    if (!e) return;
+    const key = e.key;
+    if (key === 'Enter') {
+      e.preventDefault();
+      commitEdit(undefined);
+    } else if (key === 'Tab') {
+      e.preventDefault();
+      // Resolve the advance target from the EDITING pair (the cell that is open), not the
+      // active cell (they match here, but the editing pair is authoritative).
+      const target = nextEditableCell(editingRow, editingCol);
+      // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
+      // straight into the next editable cell's editor below. Use the RETURN value (not a
+      // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
+      // failure returns false and keeps the editor open (the user must fix the value first).
+      const committed = commitEdit(undefined, true);
+      if (committed && target) {
+        setActiveRow(target.row);
+        setActiveColIndex(target.col);
+        beginEdit(target.row, target.col, null);
+      }
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  }, [beginEdit, cancelEdit, commitEdit, editingCol, editingRow, nextEditableCell]);
+  const onEditorBlur = useCallback((e: any) => {
+    if (editingRow < 0 || editTransition) return;
+    const next = e ? e.relatedTarget : null;
+    // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
+    // another widget). Skip when:
+    //  - relatedTarget is inside gridRoot — a controlled move (Tab-advance to the next editor,
+    //    Enter/Escape focus-return to the cell); the keyboard handler already acted, AND
+    //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
+    //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
+    //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
+    if (next == null) return;
+    if (gridRoot.current && gridRoot.current.contains && gridRoot.current.contains(next)) return;
+    commitEdit(undefined);
+  }, [commitEdit, editingRow]);
+  function editCell(rowIndex: any, colIndex: any) {
+    const lastRow = bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    const maxCol = visibleColCount() - 1;
+    const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+    const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+    setActiveIsHeader(false);
+    setActiveRow(r);
+    setActiveColIndex(c);
+    beginEdit(r, c, null);
+  }
+  function commitEditing() {
+    if (editingRow >= 0) commitEdit(undefined);
+  }
   function focusCell(rowIndex: any, colIndex: any) {
     const lastRow = bodyRowCount() - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -1420,9 +1774,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     reFeed();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, globalFilter, pagination, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell });
-  _rozieExposeRef.current = { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell };
-  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args) }), []);
+  const _rozieExposeRef = useRef({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing });
+  _rozieExposeRef.current = { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing };
+  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args) }), []);
 
   return (
     <__ctx_data_table_columns.Provider value={{
@@ -1501,7 +1855,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
-            </span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+            </span> : (isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(hasEditorSlot(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: draftValue, commit: commitEdit, cancel: cancelEdit })}
+              </span> : (editorTypeOf(cellCtx.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={draftValue} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cellCtx.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={draftValue} onChange={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+                {editorOptionsOf(cellCtx.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
+              </select> : (editorTypeOf(cellCtx.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={!!draftValue} onChange={($event) => { onEditorCheckboxChange($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={draftValue} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
             </span>}</td>)}
         </tr>)}
@@ -1548,7 +1907,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
             
             {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
-            </span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+            </span> : (isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(hasEditorSlot(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: draftValue, commit: commitEdit, cancel: cancelEdit })}
+              </span> : (editorTypeOf(cellCtx.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={draftValue} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cellCtx.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={draftValue} onChange={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+                {editorOptionsOf(cellCtx.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
+              </select> : (editorTypeOf(cellCtx.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={!!draftValue} onChange={($event) => { onEditorCheckboxChange($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={draftValue} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
             </span>}</td>)}
         </tr>)}

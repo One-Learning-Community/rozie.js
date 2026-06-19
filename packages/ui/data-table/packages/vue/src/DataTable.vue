@@ -59,7 +59,12 @@
           <slot name="selectCell" :row="wr.row.original" :checked="rowIsSelected(wr.row)" :toggle="e => onToggleRow(wr.row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(wr.row)" @change="onToggleRow(wr.row, $event)" />
           </slot>
-        </span><span v-else class="rdt-cell-value">
+        </span><span v-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))" style="display:contents">
+          <span v-if="hasEditorSlot(cellCtx.column.id)" style="display:contents">
+            <slot name="editor" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="draftValue" :commit="commitEdit" :cancel="cancelEdit"></slot>
+          </span><input v-else-if="editorTypeOf(cellCtx.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="draftValue" @input="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cellCtx.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="draftValue" @change="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
+            <option v-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select><input v-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="!!draftValue" @change="onEditorCheckboxChange($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="draftValue" @input="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
         </span></td>
     </tr>
@@ -110,7 +115,12 @@
           <slot name="selectCell" :row="row.original" :checked="rowIsSelected(row)" :toggle="e => onToggleRow(row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(row)" @change="onToggleRow(row, $event)" />
           </slot>
-        </span><span v-else class="rdt-cell-value">
+        </span><span v-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))" style="display:contents">
+          <span v-if="hasEditorSlot(cellCtx.column.id)" style="display:contents">
+            <slot name="editor" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="row.original" :value="draftValue" :commit="commitEdit" :cancel="cancelEdit"></slot>
+          </span><input v-else-if="editorTypeOf(cellCtx.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="draftValue" @input="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cellCtx.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="draftValue" @change="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
+            <option v-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select><input v-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="!!draftValue" @change="onEditorCheckboxChange($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="draftValue" @input="onEditorInput($event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
         </span></td>
     </tr>
@@ -132,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, onUpdated, provide, ref, useSlots, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{ columns?: any[]; selectionMode?: string; manual?: boolean; stickyHeader?: boolean; interactionMode?: string; virtual?: boolean; estimateRowHeight?: number; maxHeight?: string }>(),
@@ -166,6 +176,7 @@ const emit = defineEmits<{
   'reorder-change': [...args: any[]];
   'pin-change': [...args: any[]];
   'activecell-change': [...args: any[]];
+  'cell-edit-commit': [...args: any[]];
 }>();
 
 defineSlots<{
@@ -174,13 +185,17 @@ defineSlots<{
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
+  editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
+  editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
 }>();
+
+const slots = useSlots();
 
 const dataDefault = ref<any[]>([]);
 const sortingDefault = ref<any[]>([]);
@@ -215,6 +230,11 @@ const activeRow = ref(0);
 const activeColIndex = ref(0);
 const activeIsHeader = ref(false);
 const activeInControl = ref(false);
+const editingRow = ref(-1);
+const editingCol = ref(-1);
+const draftValue = ref<any>(null);
+const invalidMsg = ref('');
+const editVer = ref(0);
 
 const __rozieRootRef = ref<HTMLElement>();
 
@@ -1106,6 +1126,50 @@ const defFor = (colId: any) => {
 // refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
 // re-derives the cells on every row-model change. No-op on the coarse-render targets.
 const visibleCellsFor = (row: any) => rowModelVer.value >= 0 ? row.getVisibleCells() : [];
+
+// ── Editable-cell column-meta accessors (phase 51 req-1/2/5) ───────────────────────
+// editMetaOf: the resolved ColumnDef.meta for a column id (the editable config carried
+// from <Column>/`:columns` via columnDefs). Null-safe — an unknown/non-editable column
+// returns null and every predicate below short-circuits to the read-only path.
+// ── Editable-cell column-meta accessors (phase 51 req-1/2/5) ───────────────────────
+// editMetaOf: the resolved ColumnDef.meta for a column id (the editable config carried
+// from <Column>/`:columns` via columnDefs). Null-safe — an unknown/non-editable column
+// returns null and every predicate below short-circuits to the read-only path.
+const editMetaOf = (colId: any) => {
+  const d = defFor(colId);
+  return d && d.meta ? d.meta : null;
+};
+// columnEditable: whether this column opted into editing (req-1). Drives every editor
+// gate; false → the cell stays the read-only #cell display (byte-identical-off).
+// columnEditable: whether this column opted into editing (req-1). Drives every editor
+// gate; false → the cell stays the read-only #cell display (byte-identical-off).
+const columnEditable = (colId: any) => {
+  const m = editMetaOf(colId);
+  return !!(m && m.editable === true);
+};
+// editorTypeOf: the built-in editor kind ('text'|'number'|'select'|'checkbox') OR
+// 'custom' (the #editor scoped-slot escape hatch, req-2). Defaults to 'text'.
+// editorTypeOf: the built-in editor kind ('text'|'number'|'select'|'checkbox') OR
+// 'custom' (the #editor scoped-slot escape hatch, req-2). Defaults to 'text'.
+const editorTypeOf = (colId: any) => {
+  const m = editMetaOf(colId);
+  return m && m.editor != null ? m.editor : 'text';
+};
+// editorOptionsOf: the select-editor options ([{ value, label }]) for editor='select'.
+// editorOptionsOf: the select-editor options ([{ value, label }]) for editor='select'.
+const editorOptionsOf = (colId: any) => {
+  const m = editMetaOf(colId);
+  return m && m.editorOptions != null ? m.editorOptions : [];
+};
+// hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
+// — true only when the column declared editor='custom' AND the consumer actually
+// provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
+// column marked 'custom' with no slot supplied degrades to the text editor, never blank).
+// hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
+// — true only when the column declared editor='custom' AND the consumer actually
+// provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
+// column marked 'custom' with no slot supplied degrades to the text editor, never blank).
+const hasEditorSlot = (colId: any) => editorTypeOf(colId) === 'custom' && !!slots.editor;
 const columnIsFilterable = (colId: any) => {
   const d = defFor(colId);
   return !!(d && d.filterable);
@@ -1836,6 +1900,11 @@ const cycleWithinCell = (cellEl: any, forward: any) => {
 const onGridKeyDown = (e: any) => {
   if (!isGrid() || !e) return;
   const key = e.key;
+  // Editing mode (phase 51, Pitfall 5): an OPEN editor owns Tab/Enter/Escape (+ caret keys)
+  // via its local onEditorKeyDown handler. This top check (BEFORE activeInControl) returns
+  // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
+  // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
+  if (editingRow.value >= 0) return;
   // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
   if (activeInControl.value) {
     if (key === 'Escape') {
@@ -1916,6 +1985,19 @@ const onGridKeyDown = (e: any) => {
     } else {
       nextCol = gotoColEdge(true);
     }
+  }
+  // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
+  // Gated by isActiveCellEditable(): a non-editable active cell falls through to
+  // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
+  // (in-place edit); a single printable char (no Ctrl/Meta/Alt) REPLACES the value.
+  else if ((key === 'Enter' || key === 'F2') && isActiveCellEditable()) {
+    e.preventDefault();
+    beginEdit(activeRow.value, activeColIndex.value, null);
+    return;
+  } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    beginEdit(activeRow.value, activeColIndex.value, key);
+    return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();
     enterControl();
@@ -2017,6 +2099,512 @@ const clampActiveCell = () => {
     const row = clamp(activeRow.value, 0, maxRow);
     if (row !== activeRow.value) activeRow.value = row;
   }
+};
+
+// ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
+// Single-cell, non-virtual. Index-based state (editingRow/editingCol over the visible model),
+// the display↔editor branch in the keyed <td>, F2/Enter/printable entry off the reserved
+// onGridKeyDown seam, commit on Enter/Tab/blur, cancel+revert on Escape, sync validation with
+// D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
+// editable columns lowers byte-identical (the editor branch r-if is always false).
+
+// The column id at the active cell (the active row's visible cell list @ activeColIndex).
+// Null when out of range (no body rows, or active cell is a header / select column).
+// ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
+// Single-cell, non-virtual. Index-based state (editingRow/editingCol over the visible model),
+// the display↔editor branch in the keyed <td>, F2/Enter/printable entry off the reserved
+// onGridKeyDown seam, commit on Enter/Tab/blur, cancel+revert on Escape, sync validation with
+// D-01 keep-open. All gated by columnEditable() / the editing index pair so a table with no
+// editable columns lowers byte-identical (the editor branch r-if is always false).
+
+// The column id at the active cell (the active row's visible cell list @ activeColIndex).
+// Null when out of range (no body rows, or active cell is a header / select column).
+const activeCellColumnId = () => {
+  if (activeIsHeader.value) return null;
+  const rowList = rows.value || [];
+  const row = rowList[activeRow.value];
+  if (!row) return null;
+  const cells = visibleCellsFor(row);
+  const cell = cells[activeColIndex.value];
+  return cell && cell.column ? cell.column.id : null;
+};
+
+// isActiveCellEditable: the active cell sits in an editable column AND is a body cell
+// (req-1). Gates the F2/Enter/printable edit-entry branches in onGridKeyDown; a
+// non-editable active cell falls through to the reserved enterControl path.
+// isActiveCellEditable: the active cell sits in an editable column AND is a body cell
+// (req-1). Gates the F2/Enter/printable edit-entry branches in onGridKeyDown; a
+// non-editable active cell falls through to the reserved enterControl path.
+const isActiveCellEditable = () => {
+  const colId = activeCellColumnId();
+  return colId != null && columnEditable(colId);
+};
+
+// isEditing: is the cell at (rowIndex, colIndex) over the visible model the one in edit?
+// Pure index compare against the editing pair (-1/-1 = none) → the byte-identical-off
+// guard for the editor template branch. Called per-cell in both <td> bodies with the
+// body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
+// isEditing: is the cell at (rowIndex, colIndex) over the visible model the one in edit?
+// Pure index compare against the editing pair (-1/-1 = none) → the byte-identical-off
+// guard for the editor template branch. Called per-cell in both <td> bodies with the
+// body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
+const isEditing = (rowIndex: any, colIndex: any) => editVer.value >= 0 && editingRow.value === rowIndex && editingCol.value === colIndex;
+
+// runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
+// function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
+// return coerces to a generic message so a misbehaving validator can never wedge the
+// keymap, Security V5 DoS). A string return is the error message (commit rejected, D-01).
+// runValidator: the sync per-column validator (req-5). Reads col.meta.validate; not a
+// function → valid (true). Calls it (defensively wrapped — a thrown/non-true/non-string
+// return coerces to a generic message so a misbehaving validator can never wedge the
+// keymap, Security V5 DoS). A string return is the error message (commit rejected, D-01).
+const runValidator = (colId: any, value: any, row: any) => {
+  const m = editMetaOf(colId);
+  const v = m ? m.validate : null;
+  if (typeof v !== 'function') return true;
+  let r: any = null;
+  try {
+    r = v(value, row);
+  } catch (err: any) {
+    return 'Invalid value';
+  }
+  if (r === true) return true;
+  if (typeof r === 'string') return r;
+  return 'Invalid value';
+};
+
+// setInvalid: record the current validation error (drives the aria-live region +
+// :aria-invalid wired in Task 3). Empty string clears it.
+// setInvalid: record the current validation error (drives the aria-live region +
+// :aria-invalid wired in Task 3). Empty string clears it.
+const setInvalid = (msg: any) => {
+  invalidMsg.value = msg != null ? msg : '';
+};
+
+// replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
+// set to the new value); the rest share by reference (the family immutable whole-array
+// replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
+// is over currentData() (== the visible model order for the non-virtual, unsorted/
+// unfiltered single-cell case; the row id is carried for the commit payload).
+// replaceRowValue: build a FRESH array with ONE row object replaced (the column's field
+// set to the new value); the rest share by reference (the family immutable whole-array
+// replace — in-place mutation is silently dropped on React/Solid/Angular/Lit). rowIndex
+// is over currentData() (== the visible model order for the non-virtual, unsorted/
+// unfiltered single-cell case; the row id is carried for the commit payload).
+const replaceRowValue = (rows: any, rowIndex: any, field: any, value: any) => {
+  const src = rows || [];
+  const out = [];
+  for (let i = 0; i < src.length; i++) {
+    if (i === rowIndex) {
+      const merged = {};
+      const orig = src[i] || {};
+      for (const k in orig) merged[k] = orig[k];
+      merged[field] = value;
+      out.push(merged);
+    } else {
+      out.push(src[i]);
+    }
+  }
+  return out;
+};
+
+// Map a visible-model body-row index ($data.rows index) to its underlying currentData()
+// index via the row's original object identity (sorting/filtering/pagination may reorder
+// the visible model away from the source array order). Falls back to the same index.
+// Map a visible-model body-row index ($data.rows index) to its underlying currentData()
+// index via the row's original object identity (sorting/filtering/pagination may reorder
+// the visible model away from the source array order). Falls back to the same index.
+const sourceIndexOfRow = (visibleRowIndex: any) => {
+  const rowList = rows.value || [];
+  const row = rowList[visibleRowIndex];
+  if (!row) return visibleRowIndex;
+  const orig = row.original;
+  const data = currentData() || [];
+  const idx = data.indexOf(orig);
+  return idx >= 0 ? idx : visibleRowIndex;
+};
+
+// The column id / field (accessorKey) / current value / row object / row id for the cell
+// in EDIT — keyed off the authoritative editing pair ($data.editingRow/editingCol), NOT
+// the active-cell indices (which can drift from the editing cell on a Tab-advance, and are
+// async-stale right after a setState on React — ROZ138). Called only from commitEdit.
+// The column id / field (accessorKey) / current value / row object / row id for the cell
+// in EDIT — keyed off the authoritative editing pair ($data.editingRow/editingCol), NOT
+// the active-cell indices (which can drift from the editing cell on a Tab-advance, and are
+// async-stale right after a setState on React — ROZ138). Called only from commitEdit.
+const editingColumnId = () => {
+  const rowList = rows.value || [];
+  const row = rowList[editingRow.value];
+  if (!row) return null;
+  const cells = visibleCellsFor(row);
+  const cell = cells[editingCol.value];
+  return cell && cell.column ? cell.column.id : null;
+};
+const editingColumnField = () => {
+  const colId = editingColumnId();
+  if (colId == null) return null;
+  const d = defFor(colId);
+  return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+};
+const editingCellValue = () => {
+  const rowList = rows.value || [];
+  const row = rowList[editingRow.value];
+  if (!row) return null;
+  const cells = visibleCellsFor(row);
+  const cell = cells[editingCol.value];
+  return cell ? cell.getValue() : null;
+};
+const editingRowOriginal = () => {
+  const rowList = rows.value || [];
+  const row = rowList[editingRow.value];
+  return row ? row.original : null;
+};
+const editingRowId = () => {
+  const rowList = rows.value || [];
+  const row = rowList[editingRow.value];
+  return row ? row.id : null;
+};
+
+// Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
+// state, the editor <input> does not exist until the framework commits the r-if branch
+// (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
+// [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
+// on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+// Focus the freshly-mounted editor (Pitfall 1, ROZ123): after beginEdit flips the editing
+// state, the editor <input> does not exist until the framework commits the r-if branch
+// (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
+// [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
+// on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
+const focusEditorWhenReady = () => {
+  if (!gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null;
+    if (el) {
+      el.focus();
+      if (el.select) {
+        try {
+          el.select();
+        } catch (e: any) {}
+      }
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
+// Column id + current value at an EXPLICIT (rowIndex, colIndex) over the visible model —
+// used by beginEdit so it never re-reads $data.activeRow/activeColIndex (which are async-
+// stale right after a Tab-advance sets them on React — ROZ138).
+// Column id + current value at an EXPLICIT (rowIndex, colIndex) over the visible model —
+// used by beginEdit so it never re-reads $data.activeRow/activeColIndex (which are async-
+// stale right after a Tab-advance sets them on React — ROZ138).
+const columnIdAt = (rowIndex: any, colIndex: any) => {
+  const rowList = rows.value || [];
+  const row = rowList[rowIndex];
+  if (!row) return null;
+  const cells = visibleCellsFor(row);
+  const cell = cells[colIndex];
+  return cell && cell.column ? cell.column.id : null;
+};
+const cellValueAt = (rowIndex: any, colIndex: any) => {
+  const rowList = rows.value || [];
+  const row = rowList[rowIndex];
+  if (!row) return null;
+  const cells = visibleCellsFor(row);
+  const cell = cells[colIndex];
+  return cell ? cell.getValue() : null;
+};
+
+// beginEdit: open the editor on the (rowIndex, colIndex) cell (req-1/3, D-05). seed===null
+// → seed the EXISTING value (F2/Enter in-place edit); a printable char → REPLACE (the
+// editor opens holding just that char). Resolves the column from the PASSED indices (not
+// $data) so a Tab-advance that just setState'd activeRow/Col works on React. Clears any
+// prior invalid state. Focus moves into the editor.
+// beginEdit: open the editor on the (rowIndex, colIndex) cell (req-1/3, D-05). seed===null
+// → seed the EXISTING value (F2/Enter in-place edit); a printable char → REPLACE (the
+// editor opens holding just that char). Resolves the column from the PASSED indices (not
+// $data) so a Tab-advance that just setState'd activeRow/Col works on React. Clears any
+// prior invalid state. Focus moves into the editor.
+const beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
+  const colId = columnIdAt(rowIndex, colIndex);
+  if (colId == null || !columnEditable(colId)) return;
+  setInvalid('');
+  editingRow.value = rowIndex;
+  editingCol.value = colIndex;
+  draftValue.value = seed != null ? seed : cellValueAt(rowIndex, colIndex);
+  activeInControl.value = true;
+  editVer.value = editVer.value + 1;
+  focusEditorWhenReady();
+};
+
+// Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
+// editor re-render must commit before the <td> is focusable with its roving tabindex —
+// on React/Solid/Lit that commit is async, so a synchronous focusActiveCell can run while
+// the cell is still the editor (or mid-swap) and focus is lost. Bounded rAF-poll resolves
+// the [data-row][data-col-index] cell off gridRoot for ~30 frames (the fast targets land
+// on attempt 1; React/Solid retry across the async commit). Mirrors focusEditorWhenReady.
+// Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
+// editor re-render must commit before the <td> is focusable with its roving tabindex —
+// on React/Solid/Lit that commit is async, so a synchronous focusActiveCell can run while
+// the cell is still the editor (or mid-swap) and focus is lost. Bounded rAF-poll resolves
+// the [data-row][data-col-index] cell off gridRoot for ~30 frames (the fast targets land
+// on attempt 1; React/Solid retry across the async commit). Mirrors focusEditorWhenReady.
+const focusCellWhenReady = (row: any, col: any) => {
+  if (!gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = resolveCellEl(String(row), col);
+    if (el) {
+      el.focus();
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
+// endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
+// draft + invalid state and returns to navigation mode. Does NOT move focus (callers
+// decide where focus lands — commit/cancel return it to the owning cell).
+// endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
+// draft + invalid state and returns to navigation mode. Does NOT move focus (callers
+// decide where focus lands — commit/cancel return it to the owning cell).
+const endEdit = () => {
+  editingRow.value = -1;
+  editingCol.value = -1;
+  draftValue.value = null;
+  invalidMsg.value = '';
+  activeInControl.value = false;
+  editVer.value = editVer.value + 1;
+};
+
+// commitEdit: validate the draft (req-5); on success replace one row in a fresh array,
+// funnel it through writeData (the controlled r-model:data write, req-4), emit EXACTLY
+// ONE cell-edit-commit from THIS single call site (React multi-emit dedup, D-07), then
+// return focus to the cell. On a validation FAILURE keep the editor OPEN (D-01) — set
+// invalid, re-trap focus, never write the model. Captures the optional override value
+// (the #editor slot's commit(v) call) else the live draft.
+// Returns true when the commit succeeded (model written, editor closed); false when a
+// validation failure kept the editor OPEN (D-01). Callers MUST use this return value, not
+// a synchronous re-read of $data.editingRow — React's endEdit setState is async, so an
+// immediate re-read of editingRow still shows the OLD value (the ROZ138 stale-read class).
+// commitEdit: validate the draft (req-5); on success replace one row in a fresh array,
+// funnel it through writeData (the controlled r-model:data write, req-4), emit EXACTLY
+// ONE cell-edit-commit from THIS single call site (React multi-emit dedup, D-07), then
+// return focus to the cell. On a validation FAILURE keep the editor OPEN (D-01) — set
+// invalid, re-trap focus, never write the model. Captures the optional override value
+// (the #editor slot's commit(v) call) else the live draft.
+// Returns true when the commit succeeded (model written, editor closed); false when a
+// validation failure kept the editor OPEN (D-01). Callers MUST use this return value, not
+// a synchronous re-read of $data.editingRow — React's endEdit setState is async, so an
+// immediate re-read of editingRow still shows the OLD value (the ROZ138 stale-read class).
+const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
+  if (editingRow.value < 0) return false;
+  const colId = editingColumnId();
+  if (colId == null) {
+    endEdit();
+    return false;
+  }
+  const field = editingColumnField();
+  const oldValue = editingCellValue();
+  const rowOriginal = editingRowOriginal();
+  const rowId = editingRowId();
+  const newValue = overrideValue !== undefined ? overrideValue : draftValue.value;
+  const err = runValidator(colId, newValue, rowOriginal);
+  if (err !== true) {
+    // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
+    setInvalid(err);
+    focusEditorWhenReady();
+    return false;
+  }
+  setInvalid('');
+  const srcIndex = sourceIndexOfRow(editingRow.value);
+  const next = replaceRowValue(currentData(), srcIndex, field, newValue);
+  // Snapshot the EDITING cell to return focus to BEFORE endEdit clears editing state.
+  const focusRow = editingRow.value;
+  const focusCol = editingCol.value;
+  // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
+  // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
+  editTransition = true;
+  writeData(next);
+  // Exactly one emit per commit, from this single call site (writeData does NOT emit).
+  emit('cell-edit-commit', {
+    rowId,
+    columnId: colId,
+    oldValue,
+    newValue
+  });
+  endEdit();
+  editTransition = false;
+  // Defer the focus return so the display↔editor re-render commits first (async on
+  // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
+  // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
+  // Tab-advance (the caller immediately opens the next editor and focuses THAT).
+  if (skipFocusReturn !== true) focusCellWhenReady(focusRow, focusCol);
+  return true;
+};
+
+// cancelEdit: discard the draft (D-05 — revert to the pre-edit value, no model write) and
+// return focus to the owning cell.
+// cancelEdit: discard the draft (D-05 — revert to the pre-edit value, no model write) and
+// return focus to the owning cell.
+const cancelEdit = () => {
+  if (editingRow.value < 0) return;
+  const focusRow = activeRow.value;
+  const focusCol = activeColIndex.value;
+  editTransition = true;
+  endEdit();
+  editTransition = false;
+  focusCellWhenReady(focusRow, focusCol);
+};
+
+// Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
+// rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
+// cell at the row's end; stop (return null) at grid end. Pure index math over the visible
+// model. Returns { row, col } or null.
+// Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
+// rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
+// cell at the row's end; stop (return null) at grid end. Pure index math over the visible
+// model. Returns { row, col } or null.
+const nextEditableCell = (fromRow: any, fromCol: any) => {
+  const rowList = rows.value || [];
+  const rowCount = rowList.length;
+  if (rowCount === 0) return null;
+  let r = fromRow;
+  let c = fromCol + 1;
+  while (r < rowCount) {
+    const row = rowList[r];
+    const cells = row ? visibleCellsFor(row) : [];
+    while (c < cells.length) {
+      const cell = cells[c];
+      const cid = cell && cell.column ? cell.column.id : null;
+      if (cid != null && columnEditable(cid)) return {
+        row: r,
+        col: c
+      };
+      c = c + 1;
+    }
+    r = r + 1;
+    c = 0;
+  }
+  return null;
+};
+
+// Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
+// editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
+// guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
+// cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
+// Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
+// editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
+// guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
+// cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
+let editTransition = false;
+
+// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+const onEditorInput = (evt: any) => {
+  draftValue.value = evt && evt.target ? evt.target.value : '';
+};
+const onEditorCheckboxChange = (evt: any) => {
+  draftValue.value = !!(evt && evt.target && evt.target.checked);
+};
+
+// onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
+// to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
+// revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
+// onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
+// to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
+// revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
+const onEditorKeyDown = (e: any) => {
+  if (!e) return;
+  const key = e.key;
+  if (key === 'Enter') {
+    e.preventDefault();
+    commitEdit(undefined);
+  } else if (key === 'Tab') {
+    e.preventDefault();
+    // Resolve the advance target from the EDITING pair (the cell that is open), not the
+    // active cell (they match here, but the editing pair is authoritative).
+    const target = nextEditableCell(editingRow.value, editingCol.value);
+    // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
+    // straight into the next editable cell's editor below. Use the RETURN value (not a
+    // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
+    // failure returns false and keeps the editor open (the user must fix the value first).
+    const committed = commitEdit(undefined, true);
+    if (committed && target) {
+      activeRow.value = target.row;
+      activeColIndex.value = target.col;
+      beginEdit(target.row, target.col, null);
+    }
+  } else if (key === 'Escape') {
+    e.preventDefault();
+    cancelEdit();
+  }
+};
+
+// onEditorBlur: commit on a genuine click/focus-away (D-01 — an invalid value keeps the
+// editor open via commitEdit's reject path). SKIP when:
+//  - editTransition is set (a synchronous commit/cancel teardown is unmounting the editor), or
+//  - the blur is part of a controlled keyboard transition: focus is moving to a grid cell
+//    or another editor inside our gridRoot (Tab-advance, Enter/Escape focus-return). On the
+//    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
+//    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
+// onEditorBlur: commit on a genuine click/focus-away (D-01 — an invalid value keeps the
+// editor open via commitEdit's reject path). SKIP when:
+//  - editTransition is set (a synchronous commit/cancel teardown is unmounting the editor), or
+//  - the blur is part of a controlled keyboard transition: focus is moving to a grid cell
+//    or another editor inside our gridRoot (Tab-advance, Enter/Escape focus-return). On the
+//    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
+//    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
+const onEditorBlur = (e: any) => {
+  if (editingRow.value < 0 || editTransition) return;
+  const next = e ? e.relatedTarget : null;
+  // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
+  // another widget). Skip when:
+  //  - relatedTarget is inside gridRoot — a controlled move (Tab-advance to the next editor,
+  //    Enter/Escape focus-return to the cell); the keyboard handler already acted, AND
+  //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
+  //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
+  //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
+  if (next == null) return;
+  if (gridRoot && gridRoot.contains && gridRoot.contains(next)) return;
+  commitEdit(undefined);
+};
+
+// editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
+// clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
+// cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
+// editCell(rowIndex, colIndex) — programmatic edit-entry ($expose, req-3). Coerces +
+// clamps indices, moves the active cell, and opens the editor (no-op on a non-editable
+// cell). Collision-clean (RESEARCH name-check): not a verb/event/prop/ROZ137 member.
+const editCell = (rowIndex: any, colIndex: any) => {
+  const lastRow = bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  const maxCol = visibleColCount() - 1;
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  activeIsHeader.value = false;
+  activeRow.value = r;
+  activeColIndex.value = c;
+  beginEdit(r, c, null);
+};
+
+// commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
+// no cell is editing. Collision-clean (not `commit`).
+// commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
+// no cell is editing. Collision-clean (not `commit`).
+const commitEditing = () => {
+  if (editingRow.value >= 0) commitEdit(undefined);
 };
 
 // ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
@@ -2283,7 +2871,7 @@ data.value, dataDefault.value, colReg.value], () => {
   reFeed();
 });
 
-defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell });
+defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing });
 </script>
 
 <style scoped>

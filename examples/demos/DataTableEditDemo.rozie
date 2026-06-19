@@ -98,7 +98,7 @@ const validateQty = (value: unknown): true | string => {
     <DataTable
       ref="dt"
       interactionMode="grid"
-      :data="$data.rows"
+      r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
     >
       <!-- Four built-in editor column types (req-1). -->
@@ -112,8 +112,10 @@ const validateQty = (value: unknown): true | string => {
         :editorOptions="$data.statusOptions"
       />
       <Column field="active" header="Active" :editable="true" editor="checkbox" />
-      <!-- The #editor-slot column (req-2): a custom stepped numeric editor. -->
-      <Column field="score"  header="Score"  :editable="true" />
+      <!-- The #editor-slot column (req-2): a custom stepped numeric editor. editor='custom'
+           routes this column through the #editor scoped slot (every other editable column
+           uses its built-in editor). -->
+      <Column field="score"  header="Score"  :editable="true" editor="custom" />
 
       <!-- The default #cell display slot (read-only display path). -->
       <template #cell="{ columnId, value }">
