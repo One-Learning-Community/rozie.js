@@ -1042,10 +1042,119 @@ for (const target of TARGETS) {
     await expect.poll(async () => inRangeCells(page), { timeout: 10_000 }).toEqual([]);
   });
 
-  // req-8 — clipboard TSV copy/paste + drag-fill (Wave-(c), Plan 51-04 Task 2). Filled below.
-  test.fixme(`data-table-edit [${target}]: Ctrl/Cmd+C/V TSV skip-invalid + N-of-M announce; drag-fill value-copy; paste-as-text (Plan 51-04 Task 2)`, async () => {
-    // Pending Plan 51-04 Task 2: copyRange→TSV, pasteRange (D-03 skip rule + N-of-M aria-live),
-    // fillRange (D-04 value-copy only), and the T-51-01 paste-as-text security assertion.
+  // req-8 — clipboard TSV copy/paste + drag-fill (Wave-(c), Plan 51-04 Task 2). Drives
+  // DataTableEditDemo; clipboard permissions granted per the Plan-01-proven approach.
+  runnerFor(target)(`data-table-edit [${target}]: Ctrl/Cmd+C/V TSV skip-invalid + N-of-M announce; drag-fill value-copy; paste-as-text`, async ({
+    page,
+    context,
+  }) => {
+    // Grant clipboard permissions (the Plan-01-proven grantPermissions path — works in the
+    // pinned container under single-worker). Use Control for the keyboard shortcut on Linux.
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto(`/?example=DataTableEdit&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount.getByTestId('edit-table')).toBeVisible({ timeout: 15_000 });
+
+    // Columns: name(0,text) qty(1,number,validate>=0) status(2,select) active(3,checkbox)
+    // score(4,#editor). Rows: Alpha/Beta/Gamma/Delta.
+
+    // ── Ctrl/Cmd+C copies a 2×2 range (rows 0-1 × cols 0-1: name+qty of Alpha,Beta) as TSV. ─
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('Shift+ArrowDown'); // → (1,0)
+    await page.keyboard.press('Shift+ArrowRight'); // → (1,1): box rows 0-1 × cols 0-1
+    await expect
+      .poll(async () => inRangeCells(page), { timeout: 10_000 })
+      .toEqual(['0:0', '0:1', '1:0', '1:1']);
+    await page.keyboard.press('ControlOrMeta+c');
+    // The clipboard now holds the 2×2 TSV (Alpha\t3 / Beta\t7).
+    await expect
+      .poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+      .toBe('Alpha\t3\nBeta\t7');
+
+    // ── Ctrl/Cmd+V pastes a TSV grid anchored at the active cell under the D-03 skip rule.
+    //    Seed a 1×2 TSV "Echo\t-5": col 0 (name, editable) writes; col 1 (qty) fails the
+    //    >=0 validator → SKIPPED. Result: 1 of 2 cells pasted, one cell-edit-commit. ────────
+    await page.evaluate(() => navigator.clipboard.writeText('Echo\t-5'));
+    await focusBodyCellStable(page, 2, 0); // anchor at Gamma's name cell (row 2, col 0)
+    const beforePaste = await commitCount(page);
+    await page.keyboard.press('ControlOrMeta+v');
+    // The name cell committed (Gamma → Echo); the qty cell was skipped (validator).
+    // 5 columns per row → row r, col c is cell-display index (r*5 + c). Row 2 col 0 = index 10.
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => c[10]), { timeout: 10_000 })
+      .toBe('Echo');
+    // Exactly ONE cell-edit-commit fired (the skipped invalid cell emitted nothing).
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforePaste + 1);
+    // The N-of-M aria-live announce (D-03): 1 of 2 cells pasted.
+    await expect
+      .poll(async () => readoutText(page, 'paste-announce'), { timeout: 10_000 })
+      .toBe('1 of 2 cells pasted');
+
+    // ── T-51-01 (BLOCKING-high): pasted TSV is plain string DATA — markup is rendered as
+    //    LITERAL TEXT, never parsed into elements / executed. Paste an <img onerror> payload
+    //    into the editable name cell and assert the cell's textContent is the literal string
+    //    and NO <img> element was created. ──────────────────────────────────────────────────
+    const xss = '<img src=x onerror=alert(1)>';
+    await page.evaluate((payload) => navigator.clipboard.writeText(payload), xss);
+    await focusBodyCellStable(page, 3, 0); // Delta's name cell (row 3, col 0)
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => c[15]), { timeout: 10_000 })
+      .toBe(xss); // row 3, col 0 = cell-display index 15: literal text, not markup.
+    // No <img> element exists anywhere in the grid (shadow-pierced) — the payload was DATA.
+    const imgCount = await page.evaluate(() => {
+      let count = 0;
+      const walk = (root: Document | ShadowRoot): void => {
+        count += root.querySelectorAll('img').length;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) walk(sr);
+        }
+      };
+      walk(document);
+      return count;
+    });
+    expect(imgCount, 'pasted markup must render as text — no <img> element created (T-51-01)').toBe(0);
+
+    // ── Drag-fill (D-04 — VALUE-COPY ONLY, no series detection): select a 1×3 vertical range
+    //    in the name column anchored at row 0 (Alpha), then fillRange propagates the anchor's
+    //    value down the column. A "Alpha" source does NOT become a series. ────────────────────
+    // Reset: select name cells rows 0-2 (col 0). The anchor (top-left) value is row 0's name.
+    await focusBodyCellStable(page, 0, 0);
+    await page.keyboard.press('Shift+ArrowDown'); // (1,0)
+    await page.keyboard.press('Shift+ArrowDown'); // (2,0): box rows 0-2 × col 0
+    await expect
+      .poll(async () => inRangeCells(page), { timeout: 10_000 })
+      .toEqual(['0:0', '1:0', '2:0']);
+    const anchorName = (await cellDisplayValues(page))[0]; // row 0 name (the fill source).
+    // Drag the fill handle: pointerdown on the handle, pointermove over the bottom cell,
+    // pointerup. The handle sits on the range's bottom-right corner (2,0).
+    await page.evaluate(() => {
+      const find = (root: Document | ShadowRoot): Element | null => {
+        const direct = root.querySelector('[data-fill-handle]');
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) {
+            const inner = find(sr);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      };
+      const handle = find(document) as HTMLElement | null;
+      if (handle) {
+        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        // No move needed — the existing range IS the fill target; release commits the fill.
+        document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      }
+    });
+    // Every name cell in rows 0-2 now equals the anchor name (value-copy, NOT a series).
+    // Name cells are at indices 0, 5, 10 (col 0 of rows 0,1,2 with 5 columns per row).
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => [c[0], c[5], c[10]]), { timeout: 10_000 })
+      .toEqual([anchorName, anchorName, anchorName]);
   });
 
   // req-9 — editor + range survive virtualization recycling (Wave-(c), Plan 51-04 Task 3).

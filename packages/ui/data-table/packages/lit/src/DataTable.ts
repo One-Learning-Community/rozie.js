@@ -91,6 +91,21 @@ export default class DataTable extends SignalWatcher(LitElement) {
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
   background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  position: relative;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-fill-handle[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--rdt-fill-handle-bg, #2563eb);
+  border: 1px solid #fff;
+  cursor: crosshair;
+  z-index: 1;
+  touch-action: none;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
@@ -354,6 +369,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _rowDraft = signal({});
   private _rangeAnchor = signal(null);
   private _rangeFocus = signal(null);
+  private _pasteAnnounce = signal('');
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
@@ -731,7 +747,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c><slot></slot></div>
 
-${!!this._invalidMsg.value ? html`<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._invalidMsg.value}</div>` : nothing}<div class="rdt-toolbar" data-rozie-s-d5dcab4c>
+${!!this._invalidMsg.value ? html`<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._invalidMsg.value}</div>` : nothing}${!!this._pasteAnnounce.value ? html`<div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._pasteAnnounce.value}</div>` : nothing}<div class="rdt-toolbar" data-rozie-s-d5dcab4c>
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" .value=${this.globalFilterValue()} @input=${($event: Event) => { this.onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />
   
   ${this.allLeafColumns().length ? html`<details class="rdt-colvis" data-rozie-s-d5dcab4c>
@@ -792,7 +808,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
             ${repeat<any>(this.editorOptionsOf(cellCtx.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cellCtx.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cellCtx.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cellCtx.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
-        </span>`}</td>`)}
+        </span>`}${this.isFillHandleCell(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) ? html`<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown=${($event: Event) => { this.onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>` : nothing}</td>`)}
     </tr>`)}
     
     <tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c>
@@ -848,7 +864,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
             ${repeat<any>(this.editorOptionsOf(cellCtx.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cellCtx.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cellCtx.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cellCtx.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cellCtx.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
-        </span>`}</td>`)}
+        </span>`}${this.isFillHandleCell(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? html`<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown=${($event: Event) => { this.onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>` : nothing}</td>`)}
     </tr>`)}
   </tbody>
 </table>`}${!this.virtual ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
@@ -1960,6 +1976,19 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       nextCol = this.gotoColEdge(true);
     }
   }
+  // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
+  // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
+  // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
+  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    this.copyRange();
+    return;
+  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    this.pasteRange();
+    return;
+  }
   // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
   // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
   // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
@@ -2099,6 +2128,15 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   focus: this._rangeFocus.value
 });
 
+  isFillHandleCell = (rIdx: any, cIdx: any) => {
+  const a = this._rangeAnchor.value;
+  const f = this._rangeFocus.value;
+  if (!a || !f) return false;
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex;
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex;
+  return rIdx === r1 && cIdx === c1;
+};
+
   emitRangeChange = (anchor: any, focus: any) => {
   this.dispatchEvent(new CustomEvent("range-change", {
     detail: {
@@ -2171,6 +2209,208 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   if (this._rangeAnchor.value == null && this._rangeFocus.value == null) return;
   this._rangeAnchor.value = null;
   this._rangeFocus.value = null;
+};
+
+  announce = (msg: any) => {
+  this._pasteAnnounce.value = msg != null ? msg : '';
+};
+
+  fieldOfColId = (colId: any) => {
+  const d = this.defFor(colId);
+  return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+};
+
+  normalizedRange = () => {
+  const a = this._rangeAnchor.value;
+  const f = this._rangeFocus.value;
+  if (!a || !f) return null;
+  return {
+    r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
+    r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
+    c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
+    c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  };
+};
+
+  rangeToTsv = () => {
+  const box = this.normalizedRange();
+  const r0 = box ? box.r0 : this._activeRow.value;
+  const r1 = box ? box.r1 : this._activeRow.value;
+  const c0 = box ? box.c0 : this._activeColIndex.value;
+  const c1 = box ? box.c1 : this._activeColIndex.value;
+  const lines = [];
+  for (let r = r0; r <= r1; r++) {
+    const cells = [];
+    for (let c = c0; c <= c1; c++) {
+      const v = this.cellValueAt(r, c);
+      cells.push(v == null ? '' : String(v));
+    }
+    lines.push(cells.join('\t'));
+  }
+  return lines.join('\n');
+};
+
+  parseTsv = (text: any) => {
+  const str = text != null ? String(text) : '';
+  if (str === '') return [];
+  const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rawLines = norm.split('\n');
+  // Drop a single trailing empty line (a TSV that ends with a newline).
+  if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
+  return rawLines.map((line: any) => line.split('\t'));
+};
+
+  copyRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return;
+  try {
+    const p = navigator.clipboard.writeText(this.rangeToTsv());
+    if (p && p.catch) p.catch(() => {});
+  } catch (err: any) {/* best-effort copy */}
+};
+
+  applyGridToRange = (grid: any, originRow: any, originCol: any) => {
+  const maxRow = this.bodyRowCount() - 1;
+  const maxCol = this.visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return {
+    wrote: 0,
+    total: 0
+  };
+  let total = 0;
+  let wrote = 0;
+  const committed = [];
+  // Build the fresh data array incrementally so the whole paste is ONE writeData.
+  let next = this.currentData();
+  for (let gr = 0; gr < grid.length; gr++) {
+    const r = originRow + gr;
+    if (r > maxRow) break;
+    const cols = grid[gr] || [];
+    for (let gc = 0; gc < cols.length; gc++) {
+      const c = originCol + gc;
+      if (c > maxCol) break;
+      total = total + 1;
+      const colId = this.columnIdAt(r, c);
+      if (colId == null || !this.columnEditable(colId)) continue;
+      const rowObj = this.rowOriginalAt(r);
+      const value = cols[gc];
+      // T-51-01: validate the pasted value as plain string DATA before any write.
+      if (this.runValidator(colId, value, rowObj) !== true) continue;
+      const field = this.fieldOfColId(colId);
+      const srcIndex = this.sourceIndexOfRow(r);
+      const oldValue = rowObj ? rowObj[field] : null;
+      next = this.replaceRowValue(next, srcIndex, field, value);
+      committed.push({
+        rowId: this.rowIdAt(r),
+        columnId: colId,
+        oldValue,
+        newValue: value
+      });
+      wrote = wrote + 1;
+    }
+  }
+  if (wrote > 0) {
+    this.editTransition = true;
+    this.writeData(next);
+    this.editTransition = false;
+    // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
+    for (let i = 0; i < committed.length; i++) this.dispatchEvent(new CustomEvent("cell-edit-commit", {
+      detail: committed[i],
+      bubbles: true,
+      composed: true
+    }));
+  }
+  this.announce(wrote + ' of ' + total + ' cells pasted');
+  return {
+    wrote,
+    total
+  };
+};
+
+  rowOriginalAt = (rowIndex: any) => {
+  const rowList = this._rows.value || [];
+  const row = rowList[rowIndex];
+  return row ? row.original : null;
+};
+
+  rowIdAt = (rowIndex: any) => {
+  const rowList = this._rows.value || [];
+  const row = rowList[rowIndex];
+  return row ? row.id : null;
+};
+
+  pasteRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
+  let p: any = null;
+  try {
+    p = navigator.clipboard.readText();
+  } catch (err: any) {
+    return;
+  }
+  if (!p || !p.then) return;
+  p.then((text: any) => {
+    const grid = this.parseTsv(text);
+    if (!grid.length) return;
+    this.applyGridToRange(grid, this._activeRow.value, this._activeColIndex.value);
+  }).catch(() => {});
+};
+
+  fillRange = () => {
+  const box = this.normalizedRange();
+  if (!box) return;
+  const anchorVal = this.cellValueAt(box.r0, box.c0);
+  const fillStr = anchorVal == null ? '' : String(anchorVal);
+  // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
+  // numeric/date series, D-04), anchored at (r0,c0).
+  const grid = [];
+  for (let r = box.r0; r <= box.r1; r++) {
+    const cols = [];
+    for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr);
+    grid.push(cols);
+  }
+  this.applyGridToRange(grid, box.r0, box.c0);
+};
+
+  fillDragging = false;
+
+  cellIndexFromPoint = (clientX: any, clientY: any) => {
+  if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el || !el.closest) return null;
+  const cellEl = el.closest('[data-grid-cell]');
+  if (!cellEl) return null;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return null;
+  const r = parseInt(rowAttr, 10);
+  const c = parseInt(colAttr, 10);
+  if (!Number.isFinite(r) || !Number.isFinite(c)) return null;
+  return {
+    r,
+    c
+  };
+};
+
+  onFillHandlePointerDown = (e: any) => {
+  if (!e) return;
+  if (e.preventDefault) e.preventDefault();
+  if (e.stopPropagation) e.stopPropagation();
+  this.fillDragging = true;
+  const move = (ev: any) => {
+    if (!this.fillDragging) return;
+    const cell = this.cellIndexFromPoint(ev.clientX, ev.clientY);
+    if (cell) this.setRangeFocus(cell.r, cell.c);
+  };
+  const up = () => {
+    this.fillDragging = false;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+    }
+    this.fillRange();
+  };
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  }
 };
 
   activeCellColumnId = () => {

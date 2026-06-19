@@ -242,6 +242,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [rowDraft, setRowDraft] = useState({});
   const [rangeAnchor, setRangeAnchor] = useState<any>(null);
   const [rangeFocus, setRangeFocus] = useState<any>(null);
+  const [pasteAnnounce, setPasteAnnounce] = useState('');
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
 
@@ -1227,6 +1228,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         nextCol = gotoColEdge(true);
       }
     }
+    // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
+    // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
+    // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
+    // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
+    else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      copyRange();
+      return;
+    } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      pasteRange();
+      return;
+    }
     // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
     // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
     // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
@@ -1266,7 +1280,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, rows]);
+  }, [_rozieProp_onActivecellChange, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -1377,6 +1391,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       focus: rangeFocus
     };
   }
+  function isFillHandleCell(rIdx: any, cIdx: any) {
+    const a = rangeAnchor;
+    const f = rangeFocus;
+    if (!a || !f) return false;
+    const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex;
+    const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex;
+    return rIdx === r1 && cIdx === c1;
+  }
   function emitRangeChange(anchor: any, focus: any) {
     props.onRangeChange && props.onRangeChange({
       anchor,
@@ -1443,6 +1465,194 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setRangeAnchor(null);
     setRangeFocus(null);
   }
+  function announce(msg: any) {
+    setPasteAnnounce(msg != null ? msg : '');
+  }
+  function fieldOfColId(colId: any) {
+    const d = defFor(colId);
+    return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+  }
+  function normalizedRange() {
+    const a = rangeAnchor;
+    const f = rangeFocus;
+    if (!a || !f) return null;
+    return {
+      r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
+      r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
+      c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
+      c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+    };
+  }
+  function rangeToTsv() {
+    const box = normalizedRange();
+    const r0 = box ? box.r0 : activeRow;
+    const r1 = box ? box.r1 : activeRow;
+    const c0 = box ? box.c0 : activeColIndex;
+    const c1 = box ? box.c1 : activeColIndex;
+    const lines = [];
+    for (let r = r0; r <= r1; r++) {
+      const cells = [];
+      for (let c = c0; c <= c1; c++) {
+        const v = cellValueAt(r, c);
+        cells.push(v == null ? '' : String(v));
+      }
+      lines.push(cells.join('\t'));
+    }
+    return lines.join('\n');
+  }
+  function parseTsv(text: any) {
+    const str = text != null ? String(text) : '';
+    if (str === '') return [];
+    const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const rawLines = norm.split('\n');
+    // Drop a single trailing empty line (a TSV that ends with a newline).
+    if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
+    return rawLines.map((line: any) => line.split('\t'));
+  }
+  function copyRange() {
+    if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return;
+    try {
+      const p = navigator.clipboard.writeText(rangeToTsv());
+      if (p && p.catch) p.catch(() => {});
+    } catch (err: any) {/* best-effort copy */}
+  }
+  function applyGridToRange(grid: any, originRow: any, originCol: any) {
+    const maxRow = bodyRowCount() - 1;
+    const maxCol = visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return {
+      wrote: 0,
+      total: 0
+    };
+    let total = 0;
+    let wrote = 0;
+    const committed = [];
+    // Build the fresh data array incrementally so the whole paste is ONE writeData.
+    let next = currentData();
+    for (let gr = 0; gr < grid.length; gr++) {
+      const r = originRow + gr;
+      if (r > maxRow) break;
+      const cols = grid[gr] || [];
+      for (let gc = 0; gc < cols.length; gc++) {
+        const c = originCol + gc;
+        if (c > maxCol) break;
+        total = total + 1;
+        const colId = columnIdAt(r, c);
+        if (colId == null || !columnEditable(colId)) continue;
+        const rowObj = rowOriginalAt(r);
+        const value = cols[gc];
+        // T-51-01: validate the pasted value as plain string DATA before any write.
+        if (runValidator(colId, value, rowObj) !== true) continue;
+        const field = fieldOfColId(colId);
+        const srcIndex = sourceIndexOfRow(r);
+        const oldValue = rowObj ? rowObj[field] : null;
+        next = replaceRowValue(next, srcIndex, field, value);
+        committed.push({
+          rowId: rowIdAt(r),
+          columnId: colId,
+          oldValue,
+          newValue: value
+        });
+        wrote = wrote + 1;
+      }
+    }
+    if (wrote > 0) {
+      editTransition = true;
+      writeData(next);
+      editTransition = false;
+      // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
+      for (let i = 0; i < committed.length; i++) props.onCellEditCommit && props.onCellEditCommit(committed[i]);
+    }
+    announce(wrote + ' of ' + total + ' cells pasted');
+    return {
+      wrote,
+      total
+    };
+  }
+  function rowOriginalAt(rowIndex: any) {
+    const rowList = rows || [];
+    const row = rowList[rowIndex];
+    return row ? row.original : null;
+  }
+  function rowIdAt(rowIndex: any) {
+    const rowList = rows || [];
+    const row = rowList[rowIndex];
+    return row ? row.id : null;
+  }
+  function pasteRange() {
+    if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
+    let p: any = null;
+    try {
+      p = navigator.clipboard.readText();
+    } catch (err: any) {
+      return;
+    }
+    if (!p || !p.then) return;
+    p.then((text: any) => {
+      const grid = parseTsv(text);
+      if (!grid.length) return;
+      applyGridToRange(grid, activeRow, activeColIndex);
+    }).catch(() => {});
+  }
+  function fillRange() {
+    const box = normalizedRange();
+    if (!box) return;
+    const anchorVal = cellValueAt(box.r0, box.c0);
+    const fillStr = anchorVal == null ? '' : String(anchorVal);
+    // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
+    // numeric/date series, D-04), anchored at (r0,c0).
+    const grid = [];
+    for (let r = box.r0; r <= box.r1; r++) {
+      const cols = [];
+      for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr);
+      grid.push(cols);
+    }
+    applyGridToRange(grid, box.r0, box.c0);
+  }
+  // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
+  // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
+  // cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
+  // pointermove extends the range to the cell under the pointer; pointerup commits the fill.
+  let fillDragging = false;
+  function cellIndexFromPoint(clientX: any, clientY: any) {
+    if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el || !el.closest) return null;
+    const cellEl = el.closest('[data-grid-cell]');
+    if (!cellEl) return null;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null || rowAttr === '__header') return null;
+    const r = parseInt(rowAttr, 10);
+    const c = parseInt(colAttr, 10);
+    if (!Number.isFinite(r) || !Number.isFinite(c)) return null;
+    return {
+      r,
+      c
+    };
+  }
+  const onFillHandlePointerDown = useCallback((e: any) => {
+    if (!e) return;
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    fillDragging = true;
+    const move = (ev: any) => {
+      if (!fillDragging) return;
+      const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
+      if (cell) setRangeFocus$local(cell.r, cell.c);
+    };
+    const up = () => {
+      fillDragging = false;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+      }
+      fillRange();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }
+  }, [cellIndexFromPoint, fillRange, setRangeFocus$local]);
   function activeCellColumnId() {
     if (activeIsHeader) return null;
     const rowList = rows || [];
@@ -2210,7 +2420,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
 
     <div className={"rdt-column-defs"} style={{ display: "none" }} aria-hidden="true" data-rozie-s-d5dcab4c="">{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</div>
 
-    {(!!invalidMsg) && <div className={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg}</div>}<div className={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
+    {(!!invalidMsg) && <div className={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg}</div>}{(!!pasteAnnounce) && <div className={"rdt-sr-live rdt-sr-paste"} data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{pasteAnnounce}</div>}<div className={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
       <input className={"rdt-global-filter"} type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} onInput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
       
       {(allLeafColumns().length) && <details className={"rdt-colvis"} data-rozie-s-d5dcab4c="">
@@ -2268,7 +2478,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 {editorOptionsOf(cellCtx.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cellCtx.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
-            </span>}</td>)}
+            </span>}{(isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
         </tr>)}
         
         <tr className={"rdt-spacer"} aria-hidden="true" data-rozie-s-d5dcab4c="">
@@ -2320,7 +2530,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 {editorOptionsOf(cellCtx.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cellCtx.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
-            </span>}</td>)}
+            </span>}{(isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
         </tr>)}
       </tbody>
     </table>}{(!props.virtual) && <div className={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">

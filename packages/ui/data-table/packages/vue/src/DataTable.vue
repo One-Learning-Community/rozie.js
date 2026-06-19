@@ -5,7 +5,7 @@
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot></slot></div>
 
-<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div class="rdt-toolbar">
+<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div v-if="!!pasteAnnounce" class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce }}</div><div class="rdt-toolbar">
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" :value="globalFilterValue()" @input="onGlobalFilterInput($event)" />
   
   <details v-if="allLeafColumns().length" class="rdt-colvis">
@@ -66,7 +66,7 @@
             <option v-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cellCtx.column.id)" @change="onCellEditorCheckbox(cellCtx.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cellCtx.column.id)" @input="onCellEditorInput(cellCtx.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
-        </span></td>
+        </span><span v-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
     
     <tr class="rdt-spacer" aria-hidden="true">
@@ -122,7 +122,7 @@
             <option v-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select><input v-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cellCtx.column.id)" @change="onCellEditorCheckbox(cellCtx.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cellCtx.column.id)" @input="onCellEditorInput(cellCtx.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
-        </span></td>
+        </span><span v-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
   </tbody>
 </table><div v-if="!props.virtual" class="rdt-pagination" role="group" aria-label="Pagination">
@@ -241,6 +241,7 @@ const editingRowIndex = ref<any>(null);
 const rowDraft = ref({});
 const rangeAnchor = ref<any>(null);
 const rangeFocus = ref<any>(null);
+const pasteAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
@@ -2020,6 +2021,19 @@ const onGridKeyDown = (e: any) => {
       nextCol = gotoColEdge(true);
     }
   }
+  // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
+  // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
+  // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
+  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    copyRange();
+    return;
+  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    pasteRange();
+    return;
+  }
   // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
   // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
   // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
@@ -2255,6 +2269,21 @@ const getSelectedRange = () => ({
   focus: rangeFocus.value
 });
 
+// isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
+// That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
+// byte-identical-off guard for the handle markup (no range → no handle).
+// isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
+// That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
+// byte-identical-off guard for the handle markup (no range → no handle).
+const isFillHandleCell = (rIdx: any, cIdx: any) => {
+  const a = rangeAnchor.value;
+  const f = rangeFocus.value;
+  if (!a || !f) return false;
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex;
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex;
+  return rIdx === r1 && cIdx === c1;
+};
+
 // emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
 // the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
 // (useState on React), so re-reading right after the same-tick setState returns the STALE
@@ -2355,6 +2384,289 @@ const clearRange = () => {
   if (rangeAnchor.value == null && rangeFocus.value == null) return;
   rangeAnchor.value = null;
   rangeFocus.value = null;
+};
+
+// ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
+// The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
+// TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
+// N-of-M aria-live announce + one cell-edit-commit per committed cell; drag-fill = value-copy
+// ONLY (D-04, NO series detection). T-51-01 (BLOCKING-high): pasted TSV is UNTRUSTED — every
+// cell is written as plain string DATA through the per-column validator and rendered via the
+// SAME {{ }}/rozieDisplay text path as #cell (never innerHTML / a template / a selector); the
+// cell-resolution query interpolates integer indices only (resolveCellEl, T-49-01).
+
+// announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
+// pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
+// ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
+// The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
+// TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
+// N-of-M aria-live announce + one cell-edit-commit per committed cell; drag-fill = value-copy
+// ONLY (D-04, NO series detection). T-51-01 (BLOCKING-high): pasted TSV is UNTRUSTED — every
+// cell is written as plain string DATA through the per-column validator and rendered via the
+// SAME {{ }}/rozieDisplay text path as #cell (never innerHTML / a template / a selector); the
+// cell-resolution query interpolates integer indices only (resolveCellEl, T-49-01).
+
+// announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
+// pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
+const announce = (msg: any) => {
+  pasteAnnounce.value = msg != null ? msg : '';
+};
+
+// fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
+// accessorKey-or-id rule the edit funnels use. Used by paste/fill to apply values by field.
+// fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
+// accessorKey-or-id rule the edit funnels use. Used by paste/fill to apply values by field.
+const fieldOfColId = (colId: any) => {
+  const d = defFor(colId);
+  return d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+};
+
+// normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
+// or null when no range. The shared rectangle source for copy/paste/fill.
+// normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
+// or null when no range. The shared rectangle source for copy/paste/fill.
+const normalizedRange = () => {
+  const a = rangeAnchor.value;
+  const f = rangeFocus.value;
+  if (!a || !f) return null;
+  return {
+    r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
+    r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
+    c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
+    c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  };
+};
+
+// rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
+// reading each cell's value off the visible model by index (cellValueAt). A single active
+// cell (no range) serializes that one cell. Pure read — never writes.
+// rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
+// reading each cell's value off the visible model by index (cellValueAt). A single active
+// cell (no range) serializes that one cell. Pure read — never writes.
+const rangeToTsv = () => {
+  const box = normalizedRange();
+  const r0 = box ? box.r0 : activeRow.value;
+  const r1 = box ? box.r1 : activeRow.value;
+  const c0 = box ? box.c0 : activeColIndex.value;
+  const c1 = box ? box.c1 : activeColIndex.value;
+  const lines = [];
+  for (let r = r0; r <= r1; r++) {
+    const cells = [];
+    for (let c = c0; c <= c1; c++) {
+      const v = cellValueAt(r, c);
+      cells.push(v == null ? '' : String(v));
+    }
+    lines.push(cells.join('\t'));
+  }
+  return lines.join('\n');
+};
+
+// parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
+// newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
+// the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
+// parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
+// newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
+// the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
+const parseTsv = (text: any) => {
+  const str = text != null ? String(text) : '';
+  if (str === '') return [];
+  const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rawLines = norm.split('\n');
+  // Drop a single trailing empty line (a TSV that ends with a newline).
+  if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
+  return rawLines.map((line: any) => line.split('\t'));
+};
+
+// copyRange(): write the current range as TSV to the clipboard (async). No-op when the
+// async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
+// copyRange(): write the current range as TSV to the clipboard (async). No-op when the
+// async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
+const copyRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return;
+  try {
+    const p = navigator.clipboard.writeText(rangeToTsv());
+    if (p && p.catch) p.catch(() => {});
+  } catch (err: any) {/* best-effort copy */}
+};
+
+// applyGridToRange(grid, originRow, originCol): the SHARED write path for paste + fill. Walks
+// the grid (string[][]) anchored at (originRow, originCol), CLAMPED to the grid bounds (no
+// unbounded loop — T-51-02). For each target cell: count it (total); SKIP if the column is
+// non-editable (D-03) or the per-column validator rejects the value (D-03, T-51-01 — the
+// value passes runValidator as plain string DATA before any write); else stage it into ONE
+// running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
+// writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
+// N-of-M aria-live announce. Returns { wrote, total }.
+// applyGridToRange(grid, originRow, originCol): the SHARED write path for paste + fill. Walks
+// the grid (string[][]) anchored at (originRow, originCol), CLAMPED to the grid bounds (no
+// unbounded loop — T-51-02). For each target cell: count it (total); SKIP if the column is
+// non-editable (D-03) or the per-column validator rejects the value (D-03, T-51-01 — the
+// value passes runValidator as plain string DATA before any write); else stage it into ONE
+// running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
+// writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
+// N-of-M aria-live announce. Returns { wrote, total }.
+const applyGridToRange = (grid: any, originRow: any, originCol: any) => {
+  const maxRow = bodyRowCount() - 1;
+  const maxCol = visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return {
+    wrote: 0,
+    total: 0
+  };
+  let total = 0;
+  let wrote = 0;
+  const committed = [];
+  // Build the fresh data array incrementally so the whole paste is ONE writeData.
+  let next = currentData();
+  for (let gr = 0; gr < grid.length; gr++) {
+    const r = originRow + gr;
+    if (r > maxRow) break;
+    const cols = grid[gr] || [];
+    for (let gc = 0; gc < cols.length; gc++) {
+      const c = originCol + gc;
+      if (c > maxCol) break;
+      total = total + 1;
+      const colId = columnIdAt(r, c);
+      if (colId == null || !columnEditable(colId)) continue;
+      const rowObj = rowOriginalAt(r);
+      const value = cols[gc];
+      // T-51-01: validate the pasted value as plain string DATA before any write.
+      if (runValidator(colId, value, rowObj) !== true) continue;
+      const field = fieldOfColId(colId);
+      const srcIndex = sourceIndexOfRow(r);
+      const oldValue = rowObj ? rowObj[field] : null;
+      next = replaceRowValue(next, srcIndex, field, value);
+      committed.push({
+        rowId: rowIdAt(r),
+        columnId: colId,
+        oldValue,
+        newValue: value
+      });
+      wrote = wrote + 1;
+    }
+  }
+  if (wrote > 0) {
+    editTransition = true;
+    writeData(next);
+    editTransition = false;
+    // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
+    for (let i = 0; i < committed.length; i++) emit('cell-edit-commit', committed[i]);
+  }
+  announce(wrote + ' of ' + total + ' cells pasted');
+  return {
+    wrote,
+    total
+  };
+};
+
+// rowOriginalAt / rowIdAt: the underlying row object / id at a visible-model body index.
+// rowOriginalAt / rowIdAt: the underlying row object / id at a visible-model body index.
+const rowOriginalAt = (rowIndex: any) => {
+  const rowList = rows.value || [];
+  const row = rowList[rowIndex];
+  return row ? row.original : null;
+};
+const rowIdAt = (rowIndex: any) => {
+  const rowList = rows.value || [];
+  const row = rowList[rowIndex];
+  return row ? row.id : null;
+};
+
+// pasteRange(): read TSV from the clipboard (async), parse it, and apply it anchored at the
+// active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
+// failed/empty read is a silent no-op.
+// pasteRange(): read TSV from the clipboard (async), parse it, and apply it anchored at the
+// active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
+// failed/empty read is a silent no-op.
+const pasteRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
+  let p: any = null;
+  try {
+    p = navigator.clipboard.readText();
+  } catch (err: any) {
+    return;
+  }
+  if (!p || !p.then) return;
+  p.then((text: any) => {
+    const grid = parseTsv(text);
+    if (!grid.length) return;
+    applyGridToRange(grid, activeRow.value, activeColIndex.value);
+  }).catch(() => {});
+};
+
+// fillRange(): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). Propagate the anchor
+// cell's value across the whole current rectangle, honoring the SAME editable + validation
+// skip rule as paste (D-03). The anchor cell is the rectangle's top-left (r0,c0); its value
+// fills every cell of the box. One writeData + one cell-edit-commit per committed cell + the
+// N-of-M announce (via the shared applyGridToRange path). No-op without a range.
+// fillRange(): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). Propagate the anchor
+// cell's value across the whole current rectangle, honoring the SAME editable + validation
+// skip rule as paste (D-03). The anchor cell is the rectangle's top-left (r0,c0); its value
+// fills every cell of the box. One writeData + one cell-edit-commit per committed cell + the
+// N-of-M announce (via the shared applyGridToRange path). No-op without a range.
+const fillRange = () => {
+  const box = normalizedRange();
+  if (!box) return;
+  const anchorVal = cellValueAt(box.r0, box.c0);
+  const fillStr = anchorVal == null ? '' : String(anchorVal);
+  // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
+  // numeric/date series, D-04), anchored at (r0,c0).
+  const grid = [];
+  for (let r = box.r0; r <= box.r1; r++) {
+    const cols = [];
+    for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr);
+    grid.push(cols);
+  }
+  applyGridToRange(grid, box.r0, box.c0);
+};
+
+// onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
+// range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
+// cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
+// pointermove extends the range to the cell under the pointer; pointerup commits the fill.
+// onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
+// range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
+// cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
+// pointermove extends the range to the cell under the pointer; pointerup commits the fill.
+let fillDragging = false;
+const cellIndexFromPoint = (clientX: any, clientY: any) => {
+  if (typeof document === 'undefined' || !document.elementFromPoint) return null;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el || !el.closest) return null;
+  const cellEl = el.closest('[data-grid-cell]');
+  if (!cellEl) return null;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return null;
+  const r = parseInt(rowAttr, 10);
+  const c = parseInt(colAttr, 10);
+  if (!Number.isFinite(r) || !Number.isFinite(c)) return null;
+  return {
+    r,
+    c
+  };
+};
+const onFillHandlePointerDown = (e: any) => {
+  if (!e) return;
+  if (e.preventDefault) e.preventDefault();
+  if (e.stopPropagation) e.stopPropagation();
+  fillDragging = true;
+  const move = (ev: any) => {
+    if (!fillDragging) return;
+    const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
+    if (cell) setRangeFocus(cell.r, cell.c);
+  };
+  const up = () => {
+    fillDragging = false;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+    }
+    fillRange();
+  };
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  }
 };
 
 // ══ Editable-cell lifecycle (phase 51 plan 02 — RESEARCH Pattern 1/3/4/5) ════════════════
@@ -3500,6 +3812,21 @@ defineExpose({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSele
 }
 .rozie-data-table .rdt-td.rdt-in-range {
   background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
+}
+.rozie-data-table .rdt-td {
+  position: relative;
+}
+.rozie-data-table .rdt-fill-handle {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--rdt-fill-handle-bg, #2563eb);
+  border: 1px solid #fff;
+  cursor: crosshair;
+  z-index: 1;
+  touch-action: none;
 }
 .rozie-data-table .rdt-th,
 .rozie-data-table .rdt-td {

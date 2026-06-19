@@ -27,6 +27,21 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
   background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
+  position: relative;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-fill-handle[data-rozie-s-d5dcab4c] {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--rdt-fill-handle-bg, #2563eb);
+  border: 1px solid #fff;
+  cursor: crosshair;
+  z-index: 1;
+  touch-action: none;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
