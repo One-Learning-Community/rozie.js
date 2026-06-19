@@ -36,6 +36,10 @@
   z-index: var(--rdt-sticky-z, 2);
   background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
 }
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
+  max-height: var(--rozie-data-table-max-height);
+  overflow: auto;
+}
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] {
   display: flex;
   flex-direction: column;

@@ -180,6 +180,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _dataRef.current = props.data;
   const _selectionModeRef = useRef(props.selectionMode);
   _selectionModeRef.current = props.selectionMode;
+  const _paginationRef = useRef(pagination);
+  _paginationRef.current = pagination;
   const [sortingDefault, setSortingDefault] = useState<any[]>([]);
   const [globalFilterDefault, setGlobalFilterDefault] = useState('');
   const [columnFiltersDefault, setColumnFiltersDefault] = useState<any[]>([]);
@@ -475,12 +477,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
   }), [props.estimateRowHeight, virtualItemKey, windowingSource]);
   function windowedRows() {
-    if (!props.virtual || !virtualizer.current) {
-      const rowList = rows || [];
-      return rowList.map((r: any) => ({
-        vi: null,
-        row: r
-      }));
+    if (!virtualizer.current) {
+      // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+      // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+      // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+      // rows appear on the first onChange after _didMount.
+      if (!props.virtual) {
+        const rowList = rows || [];
+        return rowList.map((r: any) => ({
+          vi: null,
+          row: r
+        }));
+      }
+      return [];
     }
     if (windowVer < 0) return [];
     const items = virtualizer.current.getVirtualItems();
@@ -490,6 +499,28 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       row: rowList[vi.index]
     }));
   }
+  function padTop() {
+    if (!props.virtual || !virtualizer.current || windowVer < 0) return 0;
+    const items = virtualizer.current.getVirtualItems();
+    return items.length ? items[0].start : 0;
+  }
+  function padBottom() {
+    if (!props.virtual || !virtualizer.current || windowVer < 0) return 0;
+    const items = virtualizer.current.getVirtualItems();
+    if (!items.length) return 0;
+    return virtualizer.current.getTotalSize() - items[items.length - 1].end;
+  }
+  function rowIsOutsideWindow(r: any) {
+    if (!props.virtual || !virtualizer.current) return false;
+    const items = virtualizer.current.getVirtualItems();
+    for (const it of items as any) if (it.index === r) return false;
+    return true;
+  }
+  const remeasureWindow = useCallback(() => {
+    if (!virtualizer.current || !gridRoot.current) return;
+    const trs = gridRoot.current.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
+    for (const tr of trs as any) virtualizer.current.measureElement(tr);
+  }, []);
   const reFeed = useCallback(() => {
     if (!table.current) return;
     table.current.setOptions((prev: any) => ({
@@ -799,9 +830,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function focusActiveCell(nextRow = null, nextCol = null, nextIsHeader = null) {
     if (!isGrid() || !gridRoot.current) return;
-    // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
     const r = nextRow == null ? activeRow : nextRow;
     const c = nextCol == null ? activeColIndex : nextCol;
+    // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
+    // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
+    // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
+    // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
+    if (props.virtual && virtualizer.current && !nextIsHeader && rowIsOutsideWindow(r)) {
+      virtualizer.current.scrollToIndex(r, {
+        align: 'center'
+      });
+      const focusNow = () => {
+        const el = resolveCellEl(String(r), c);
+        if (el) el.focus();
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
+      return;
+    }
     // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
     // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
     // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -1202,6 +1247,33 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rdt-scroll') : null;
       virtualizer.current = new Virtualizer(virtualizerOptions());
       virtualizerCleanup.current = virtualizer.current._didMount();
+      // After the first window commits (next frame), refine heights + fire the dev-mode warns
+      // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
+      // code and these warns can never fire there (req-1 byte-identical-off preserved).
+      const afterFirstFrame = () => {
+        // D-10: measure the rendered rows.
+        remeasureWindow();
+        // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
+        // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
+        // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
+        const h = gridScrollEl.current ? gridScrollEl.current.clientHeight : 0;
+        if (!h) {
+          console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height');
+        }
+        // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
+        // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
+        // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
+        // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
+        // detected as a pagination that DIFFERS from that default (a consumer who set a real page
+        // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
+        // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
+        const pg = _paginationRef.current;
+        const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
+        if (props.manual !== true && pgConfigured) {
+          console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
+        }
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -1265,7 +1337,55 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </div>
       </details>}</div>
 
-    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c="">
+
+    {(props.virtual) ? <div className={"rdt-scroll"} style={parseInlineStyle(props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
+    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c="">
+      <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
+        {headerGroups.map((hg) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+          {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header))) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+            {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : (props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
+            </span> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(header.column.getCanSort && header.column.getCanSort()) ? <button type="button" className={"rdt-sort-btn"} onClick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c="">
+                <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
+                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
+                </span>
+                <span className={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
+              </button> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
+                  {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
+                </span>
+              </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
+                <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
+                <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
+                <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">⇥</button>
+              </span>
+              <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
+            </span>}</th>)}
+        </tr>)}
+      </thead>
+
+      <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
+        
+        <tr className={"rdt-spacer"} aria-hidden="true" data-rozie-s-d5dcab4c="">
+          <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padTop() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
+        </tr>
+        
+        {windowedRows().map((wr) => <tr key={wr.row.id} className={"rdt-tr"} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c="">
+          {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(pinStyle(cellCtx.column.id))} data-rozie-s-d5dcab4c="">
+            {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
+            </span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+              {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
+            </span>}</td>)}
+        </tr>)}
+        
+        <tr className={"rdt-spacer"} aria-hidden="true" data-rozie-s-d5dcab4c="">
+          <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padBottom() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
+        </tr>
+      </tbody>
+    </table>
+    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {headerGroups.map((hg) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header))) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
@@ -1307,10 +1427,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
             </span>}</td>)}
         </tr>)}
       </tbody>
-    </table>
-
-
-    <div className={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">
+    </table>}{(!props.virtual) && <div className={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">
       <button type="button" className={"rdt-page-btn rdt-page-prev"} disabled={!canPrevPage()} onClick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c="">Prev</button>
       <span className={"rdt-page-status"} aria-live="polite" data-rozie-s-d5dcab4c="">
         {rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}
@@ -1322,8 +1439,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         <option value={50} data-rozie-s-d5dcab4c="">50</option>
         <option value={100} data-rozie-s-d5dcab4c="">100</option>
       </select>
-    </div>
-    </div>
+    </div>}</div>
     </>
     </__ctx_data_table_columns.Provider>
   );

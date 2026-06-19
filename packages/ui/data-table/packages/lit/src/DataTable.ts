@@ -91,6 +91,10 @@ export default class DataTable extends SignalWatcher(LitElement) {
   z-index: var(--rdt-sticky-z, 2);
   background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
 }
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
+  max-height: var(--rozie-data-table-max-height);
+  overflow: auto;
+}
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] {
   display: flex;
   flex-direction: column;
@@ -565,6 +569,33 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rdt-scroll') : null;
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
+      // After the first window commits (next frame), refine heights + fire the dev-mode warns
+      // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
+      // code and these warns can never fire there (req-1 byte-identical-off preserved).
+      const afterFirstFrame = () => {
+        // D-10: measure the rendered rows.
+        this.remeasureWindow();
+        // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
+        // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
+        // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
+        const h = this.gridScrollEl ? this.gridScrollEl.clientHeight : 0;
+        if (!h) {
+          console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height');
+        }
+        // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
+        // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
+        // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
+        // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
+        // detected as a pagination that DIFFERS from that default (a consumer who set a real page
+        // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
+        // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
+        const pg = this.pagination;
+        const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
+        if (this.manual !== true && pgConfigured) {
+          console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
+        }
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
   }
 
@@ -623,7 +654,58 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     </div>
   </details>` : nothing}</div>
 
-<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} data-rozie-s-d5dcab4c>
+
+${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c>
+<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${this._rows.value.length} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} data-rozie-s-d5dcab4c>
+  <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
+    ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
+        ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.selectAll !== undefined ? this.selectAll({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected(), toggle: this.onToggleAllRows}) : html`<slot name="selectAll" data-rozie-params=${(() => { try { return JSON.stringify({checked: this.isAllRowsSelected(), indeterminate: this.isSomeRowsSelected()}); } catch { return '{}'; } })()} @rozie-select-all-toggle=${($event: CustomEvent) => ((this.onToggleAllRows) as (...args: any[]) => any)($event.detail)}>
+            ${this.selectionMode === 'multiple' ? html`<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" ?checked=${this.isAllRowsSelected()} @change=${($event: Event) => { this.onToggleAllRows($event); }} data-rozie-s-d5dcab4c />` : nothing}</slot>`}
+        </span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${header.column.getCanSort && header.column.getCanSort() ? html`<button class="rdt-sort-btn" type="button" @click=${($event: Event) => { this.onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c>
+            <span class="rdt-header-label" data-rozie-s-d5dcab4c>
+              ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
+            </span>
+            <span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>${rozieDisplay(this.sortIndicator(header.column.id))}</span>
+          </button>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            <span class="rdt-header-label" data-rozie-s-d5dcab4c>
+              ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
+            </span>
+          </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
+            <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
+            <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
+            <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button>
+          </span>
+          <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
+        </span>`}</th>`)}
+    </tr>`)}
+  </thead>
+
+  <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
+    
+    <tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c>
+      <td colspan=${rozieAttr(this.visibleColCount())} style=${'height:' + this.padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td>
+    </tr>
+    
+    ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(wr.row.id)} data-row=${rozieAttr(wr.vi.index)} aria-rowindex=${rozieAttr(wr.vi.index + 1)} data-index=${rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>
+      ${repeat<any>(this.visibleCellsFor(wr.row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(wr.vi.index)} data-col-index=${rozieAttr(this.colIndexOf(wr.row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(wr.vi.index), this.colIndexOf(wr.row, cellCtx)))} style=${this.pinStyle(cellCtx.column.id)} data-rozie-s-d5dcab4c>
+        ${this.isSelectColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.selectCell !== undefined ? this.selectCell({row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e)}) : html`<slot name="selectCell" data-rozie-params=${(() => { try { return JSON.stringify({row: wr.row.original, checked: this.rowIsSelected(wr.row)}); } catch { return '{}'; } })()} @rozie-select-cell-toggle=${($event: CustomEvent) => ((e => this.onToggleRow(wr.row, e)) as (...args: any[]) => any)($event.detail)}>
+            <input class="rdt-select-row" type="checkbox" aria-label="Select row" ?checked=${this.rowIsSelected(wr.row)} @change=${($event: Event) => { this.onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />
+          </slot>`}
+        </span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+          ${this.cell !== undefined ? this.cell({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cellCtx.getValue())}</slot>`}
+        </span>`}</td>`)}
+    </tr>`)}
+    
+    <tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c>
+      <td colspan=${rozieAttr(this.visibleColCount())} style=${'height:' + this.padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td>
+    </tr>
+  </tbody>
+</table>
+</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} @keydown=${($event: Event) => { this.onGridKeyDown($event); }} @focusin=${($event: Event) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event) => { this.onGridFocusOut($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, _idx) => hg.id, (hg, _idx) => html`<tr class="rdt-tr" role="row" key=${rozieAttr(hg.id)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-th-resizing': this.columnIsResizing(header.column.id) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" key=${rozieAttr(header.id)} data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header)))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${this.thStyle(header.column.id)} data-rozie-s-d5dcab4c>
@@ -669,10 +751,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         </span>`}</td>`)}
     </tr>`)}
   </tbody>
-</table>
-
-
-<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
+</table>`}${!this.virtual ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
   <button class="rdt-page-btn rdt-page-prev" type="button" ?disabled=${!this.canPrevPage()} @click=${($event: Event) => { this.onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button>
   <span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>
     ${rozieDisplay('Page ' + (this.pageIndex() + 1) + ' of ' + this.pageCount())}
@@ -684,8 +763,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     <option value=${50} data-rozie-s-d5dcab4c>50</option>
     <option value=${100} data-rozie-s-d5dcab4c>100</option>
   </select>
-</div>
-</div>
+</div>` : nothing}</div>
 `;
   }
 
@@ -1004,12 +1082,19 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 });
 
   windowedRows = () => {
-  if (!this.virtual || !this.virtualizer) {
-    const rowList = this._rows.value || [];
-    return rowList.map((r: any) => ({
-      vi: null,
-      row: r
-    }));
+  if (!this.virtualizer) {
+    // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+    // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+    // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+    // rows appear on the first onChange after _didMount.
+    if (!this.virtual) {
+      const rowList = this._rows.value || [];
+      return rowList.map((r: any) => ({
+        vi: null,
+        row: r
+      }));
+    }
+    return [];
   }
   if (this._windowVer.value < 0) return [];
   const items = this.virtualizer.getVirtualItems();
@@ -1018,6 +1103,32 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     vi,
     row: rowList[vi.index]
   }));
+};
+
+  padTop = () => {
+  if (!this.virtual || !this.virtualizer || this._windowVer.value < 0) return 0;
+  const items = this.virtualizer.getVirtualItems();
+  return items.length ? items[0].start : 0;
+};
+
+  padBottom = () => {
+  if (!this.virtual || !this.virtualizer || this._windowVer.value < 0) return 0;
+  const items = this.virtualizer.getVirtualItems();
+  if (!items.length) return 0;
+  return this.virtualizer.getTotalSize() - items[items.length - 1].end;
+};
+
+  rowIsOutsideWindow = (r: any) => {
+  if (!this.virtual || !this.virtualizer) return false;
+  const items = this.virtualizer.getVirtualItems();
+  for (const it of items as any) if (it.index === r) return false;
+  return true;
+};
+
+  remeasureWindow = () => {
+  if (!this.virtualizer || !this.gridRoot) return;
+  const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
+  for (const tr of trs as any) this.virtualizer.measureElement(tr);
 };
 
   reFeed = () => {
@@ -1364,9 +1475,23 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
   if (!this.isGrid() || !this.gridRoot) return;
-  // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
   const r = nextRow == null ? this._activeRow.value : nextRow;
   const c = nextCol == null ? this._activeColIndex.value : nextCol;
+  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
+  // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
+  // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
+  // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
+  if (this.virtual && this.virtualizer && !nextIsHeader && this.rowIsOutsideWindow(r)) {
+    this.virtualizer.scrollToIndex(r, {
+      align: 'center'
+    });
+    const focusNow = () => {
+      const el = this.resolveCellEl(String(r), c);
+      if (el) el.focus();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
+    return;
+  }
   // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
   // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
   // Angular's signal write are async within one handler — re-reading $data.activeIsHeader

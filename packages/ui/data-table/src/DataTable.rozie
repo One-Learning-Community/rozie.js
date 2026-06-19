@@ -642,14 +642,53 @@ const virtualizerOptions = (): any => ({
 // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
 // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
 const windowedRows = () => {
-  if (!$props.virtual || !virtualizer) {
-    const rowList = $data.rows || []
-    return rowList.map((r) => ({ vi: null, row: r }))
+  if (!virtualizer) {
+    // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+    // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+    // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+    // rows appear on the first onChange after _didMount.
+    if (!$props.virtual) {
+      const rowList = $data.rows || []
+      return rowList.map((r) => ({ vi: null, row: r }))
+    }
+    return []
   }
   if ($data.windowVer < 0) return []
   const items = virtualizer.getVirtualItems()
   const rowList = $data.rows || []
   return items.map((vi) => ({ vi, row: rowList[vi.index] }))
+}
+
+// Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+// the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+// (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
+const padTop = () => {
+  if (!$props.virtual || !virtualizer || $data.windowVer < 0) return 0
+  const items = virtualizer.getVirtualItems()
+  return items.length ? items[0].start : 0
+}
+const padBottom = () => {
+  if (!$props.virtual || !virtualizer || $data.windowVer < 0) return 0
+  const items = virtualizer.getVirtualItems()
+  if (!items.length) return 0
+  return virtualizer.getTotalSize() - items[items.length - 1].end
+}
+// rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+// window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
+const rowIsOutsideWindow = (r) => {
+  if (!$props.virtual || !virtualizer) return false
+  const items = virtualizer.getVirtualItems()
+  for (const it of items) if (it.index === r) return false
+  return true
+}
+// measureElement sweep (D-10): refine estimated heights to MEASURED ones. The off-root
+// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref); virtual-core
+// registers each <tr> with its internal ResizeObserver keyed by data-index, so later content
+// height changes re-fire onChange. Idempotent on already-observed rows. Deferred (double-rAF).
+const remeasureWindow = () => {
+  if (!virtualizer || !gridRoot) return
+  const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]')
+  for (const tr of trs) virtualizer.measureElement(tr)
 }
 
 $onMount(() => {
@@ -760,6 +799,34 @@ $onMount(() => {
     gridScrollEl = $el ? $el.querySelector('.rdt-scroll') : null
     virtualizer = new Virtualizer(virtualizerOptions())
     virtualizerCleanup = virtualizer._didMount()
+    // After the first window commits (next frame), refine heights + fire the dev-mode warns
+    // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
+    // code and these warns can never fire there (req-1 byte-identical-off preserved).
+    const afterFirstFrame = () => {
+      // D-10: measure the rendered rows.
+      remeasureWindow()
+      // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
+      // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
+      // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
+      const h = gridScrollEl ? gridScrollEl.clientHeight : 0
+      if (!h) {
+        console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height')
+      }
+      // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
+      // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
+      // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
+      // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
+      // detected as a pagination that DIFFERS from that default (a consumer who set a real page
+      // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
+      // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
+      const pg = $props.pagination
+      const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10)
+      if ($props.manual !== true && pgConfigured) {
+        console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.')
+      }
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame))
+    else setTimeout(afterFirstFrame, 0)
   }
 })
 
@@ -1249,9 +1316,19 @@ const resolveCellEl = (rowKey, colIndex) => {
 // checks already route those to the live `$data` value — behavior-identical.
 const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
   if (!isGrid() || !gridRoot) return
-  // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
   const r = nextRow == null ? $data.activeRow : nextRow
   const c = nextCol == null ? $data.activeColIndex : nextCol
+  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
+  // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
+  // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
+  // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
+  if ($props.virtual && virtualizer && !nextIsHeader && rowIsOutsideWindow(r)) {
+    virtualizer.scrollToIndex(r, { align: 'center' })
+    const focusNow = () => { const el = resolveCellEl(String(r), c); if (el) el.focus() }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow))
+    else setTimeout(focusNow, 0)
+    return
+  }
   // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
   // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
   // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -1651,7 +1728,207 @@ $expose({
   </details>
 </div>
 
+<!-- ══ VIRTUAL (phase 53): scroll-bounded WINDOWED table — emitted ONLY when $props.virtual ══
+     (D-05). The rdt-scroll wrapper bounds the scroll viewport (max-height from the maxHeight
+     prop inline AND mirrored to --rozie-data-table-max-height; the CSS rule supplies the
+     token-only fallback — D-06, prop wins). aria-rowcount = the FULL model count (req-6). The
+     <tbody> renders a leading spacer <tr>, the windowed { vi, row } slice keyed on the FULL-model
+     row.id (Pitfall 3 / req-10 — NOT vi.index), and a trailing spacer <tr>. Because this whole
+     branch is r-if and the r-else table below is the verbatim pre-phase markup, the non-virtual
+     emitted render is byte-identical (req-1). -->
+<div
+  class="rdt-scroll"
+  r-if="$props.virtual"
+  :style="$props.maxHeight ? ('max-height:' + $props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + $props.maxHeight) : 'overflow:auto'"
+>
 <table
+  class="rozie-data-table"
+  :class="{ 'rdt-sticky': $props.stickyHeader }"
+  :role="tableRole()"
+  :aria-rowcount="$data.rows.length"
+  @keydown="onGridKeyDown($event)"
+  @focusin="syncActiveFromEvent($event)"
+  @focusout="onGridFocusOut($event)"
+>
+  <thead class="rdt-thead" role="rowgroup">
+    <tr
+      class="rdt-tr"
+      role="row"
+      r-for="hg in $data.headerGroups"
+      :key="hg.id"
+    >
+      <th
+        class="rdt-th"
+        role="columnheader"
+        r-for="header in hg.headers"
+        :key="header.id"
+        :data-col="header.column.id"
+        data-grid-cell
+        data-row="__header"
+        :data-col-index="headerColIndexOf(hg, header)"
+        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header))"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
+        :aria-sort="ariaSortFor(header.column.id)"
+        :style="thStyle(header.column.id)"
+      >
+        <span style="display:contents" r-if="isSelectColumn(header.column.id)">
+          <slot
+            name="selectAll"
+            :checked="isAllRowsSelected()"
+            :indeterminate="isSomeRowsSelected()"
+            :toggle="onToggleAllRows"
+          >
+            <input
+              r-if="$props.selectionMode === 'multiple'"
+              class="rdt-select-all"
+              type="checkbox"
+              aria-label="Select all rows"
+              :checked="isAllRowsSelected()"
+              @change="onToggleAllRows($event)"
+            />
+          </slot>
+        </span>
+        <span style="display:contents" r-else>
+          <button
+            r-if="header.column.getCanSort && header.column.getCanSort()"
+            type="button"
+            class="rdt-sort-btn"
+            @click="onHeaderSort(header.column.id, $event)"
+          >
+            <span class="rdt-header-label">
+              <slot
+                name="colHeader"
+                :columnId="header.column.id"
+                :column="header.column"
+                :label="headerLabel(header.column.id)"
+              >{{ headerLabel(header.column.id) }}</slot>
+            </span>
+            <span class="rdt-sort-ind" aria-hidden="true">{{ sortIndicator(header.column.id) }}</span>
+          </button>
+          <span style="display:contents" r-else>
+            <span class="rdt-header-label">
+              <slot
+                name="colHeader"
+                :columnId="header.column.id"
+                :column="header.column"
+                :label="headerLabel(header.column.id)"
+              >{{ headerLabel(header.column.id) }}</slot>
+            </span>
+          </span>
+          <input
+            r-if="columnIsFilterable(header.column.id)"
+            class="rdt-col-filter"
+            type="text"
+            :aria-label="'Filter ' + headerLabel(header.column.id)"
+            :value="columnFilterValue(header.column.id)"
+            @input="onColumnFilterInput(header.column.id, $event)"
+            @click="stopEvent($event)"
+          />
+          <span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-left"
+              :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'"
+              :aria-pressed="columnPinSide(header.column.id) === 'left'"
+              @click="onPinColumn(header.column.id, 'left', $event)"
+            >⇤</button>
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-none"
+              :aria-label="'Unpin ' + headerLabel(header.column.id)"
+              :aria-pressed="!columnPinSide(header.column.id)"
+              @click="onPinColumn(header.column.id, false, $event)"
+            >⇔</button>
+            <button
+              type="button"
+              class="rdt-pin-btn rdt-pin-right"
+              :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'"
+              :aria-pressed="columnPinSide(header.column.id) === 'right'"
+              @click="onPinColumn(header.column.id, 'right', $event)"
+            >⇥</button>
+          </span>
+          <button
+            type="button"
+            class="rdt-resize-handle"
+            :aria-label="'Resize ' + headerLabel(header.column.id)"
+            @pointerdown="onResizeStart(header.column.id, $event)"
+            @touchstart="onResizeStart(header.column.id, $event)"
+          ><span class="rdt-resize-grip" aria-hidden="true"></span></button>
+        </span>
+      </th>
+    </tr>
+  </thead>
+
+  <tbody class="rdt-tbody" role="rowgroup">
+    <!-- Leading spacer (D-03): occupies the height of the rows scrolled past the top of the
+         window. No data-grid-cell/data-index/role — not a navigable, measurable cell (Pitfall 5). -->
+    <tr class="rdt-spacer" aria-hidden="true">
+      <td :colspan="visibleColCount()" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
+    </tr>
+    <!-- The windowed slice. Loop var `wr` = { vi, row }; keyed on the FULL-model row.id so Lit's
+         repeat / Solid's For never recycle a node from one full-model row into another (req-10).
+         data-row/data-index use vi.index (O(1), authoritative full-model index — NOT the O(n)
+         rowIndexOf scan over the full model). The <td> cell loop mirrors the non-virtual body. -->
+    <tr
+      class="rdt-tr"
+      role="row"
+      r-for="wr in windowedRows()"
+      :key="wr.row.id"
+      :data-row="wr.vi.index"
+      :aria-rowindex="wr.vi.index + 1"
+      :data-index="wr.vi.index"
+    >
+      <td
+        class="rdt-td"
+        :role="cellRole()"
+        r-for="cellCtx in visibleCellsFor(wr.row)"
+        :key="cellCtx.id"
+        :data-col="cellCtx.column.id"
+        data-grid-cell
+        :data-row="wr.vi.index"
+        :data-col-index="colIndexOf(wr.row, cellCtx)"
+        :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }"
+        :style="pinStyle(cellCtx.column.id)"
+      >
+        <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
+          <slot
+            name="selectCell"
+            :row="wr.row.original"
+            :checked="rowIsSelected(wr.row)"
+            :toggle="(e) => onToggleRow(wr.row, e)"
+          >
+            <input
+              class="rdt-select-row"
+              type="checkbox"
+              aria-label="Select row"
+              :checked="rowIsSelected(wr.row)"
+              @change="onToggleRow(wr.row, $event)"
+            />
+          </slot>
+        </span>
+        <span r-else class="rdt-cell-value">
+          <slot
+            name="cell"
+            :columnId="cellCtx.column.id"
+            :column="cellCtx.column"
+            :row="wr.row.original"
+            :value="cellCtx.getValue()"
+          >{{ cellCtx.getValue() }}</slot>
+        </span>
+      </td>
+    </tr>
+    <!-- Trailing spacer (D-03): occupies the height of the rows below the window. -->
+    <tr class="rdt-spacer" aria-hidden="true">
+      <td :colspan="visibleColCount()" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+<!-- ══ NON-VIRTUAL (byte-identical to the pre-phase output): the bare table, NO scroll wrapper.
+     This r-else branch lowers character-for-character to today's markup (req-1). ══ -->
+<table
+  r-else
   class="rozie-data-table"
   :class="{ 'rdt-sticky': $props.stickyHeader }"
   :role="tableRole()"
@@ -1858,8 +2135,11 @@ $expose({
 </table>
 
 <!-- Pagination chrome (req-6) — prev/next + page-size select. Page indicator is
-     1-based for display; pageIndex() is 0-based. -->
-<div class="rdt-pagination" role="group" aria-label="Pagination">
+     1-based for display; pageIndex() is 0-based. SUPPRESSED when virtual (req-9): windowing
+     renders the full pre-pagination model, so the pagination chrome is meaningless — gated by
+     `!$props.virtual`. The D-07 dev-mode warn (in $onMount) fires alongside this suppression
+     when the consumer ALSO configured client pagination. -->
+<div class="rdt-pagination" role="group" aria-label="Pagination" r-if="!$props.virtual">
   <button
     type="button"
     class="rdt-page-btn rdt-page-prev"
@@ -1929,6 +2209,14 @@ $expose({
   top: var(--rdt-sticky-top, 0);
   z-index: var(--rdt-sticky-z, 2);
   background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+}
+/* Vertical row windowing (phase 53, req-3/D-06) — the bounded scroll viewport, emitted ONLY
+   when virtual. The maxHeight prop sets max-height inline (and mirrors the custom property);
+   this rule supplies the TOKEN-ONLY fallback so a consumer can bound the container purely via
+   --rozie-data-table-max-height without passing the prop. overflow:auto enables row windowing. */
+.rozie-data-table-wrap .rdt-scroll {
+  max-height: var(--rozie-data-table-max-height);
+  overflow: auto;
 }
 /* Filter / pagination chrome (req-5, req-6) — token-driven. */
 .rozie-data-table-wrap {

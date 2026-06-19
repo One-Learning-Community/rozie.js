@@ -563,7 +563,14 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push('| Slot | Params |');
   lines.push('| --- | --- |');
+  // De-duplicate by name: the same logical slot can be DECLARED more than once in the source
+  // when a template branch is duplicated for an r-if/r-else structural guard (phase 53 windowing
+  // duplicates the <table> — and thus its #cell/#colHeader/#selectAll/#selectCell slots — across
+  // the virtual and non-virtual branches). The README should list each slot once.
+  const seenSlots = new Set();
   for (const s of ir.slots) {
+    if (seenSlots.has(s.name)) continue;
+    seenSlots.add(s.name);
     lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
   }
   lines.push('');

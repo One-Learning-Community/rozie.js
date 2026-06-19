@@ -151,6 +151,5 @@ All rendering slots live on the parent `<DataTable>` (a `<Column>` carries metad
 | (default) |  |
 | selectAll | checked, indeterminate, toggle |
 | colHeader | columnId, column, label |
-| colHeader | columnId, column, label |
 | selectCell | row, checked, toggle |
 | cell | columnId, column, row, value |

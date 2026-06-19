@@ -58,6 +58,42 @@ interface CellCtx {
   value: any;
 }
 
+interface SelectAllCtx {
+  $implicit: { checked: any; indeterminate: any; toggle: any };
+  checked: any;
+  indeterminate: any;
+  toggle: any;
+}
+
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
+}
+
+interface ColHeaderCtx {
+  $implicit: { columnId: any; column: any; label: any };
+  columnId: any;
+  column: any;
+  label: any;
+}
+
+interface SelectCellCtx {
+  $implicit: { row: any; checked: any; toggle: any };
+  row: any;
+  checked: any;
+  toggle: any;
+}
+
+interface CellCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+}
+
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v;
@@ -120,6 +156,104 @@ function rozieToken(key: string): InjectionToken<unknown> {
       </details>
     }</div>
 
+
+    @if (virtual()) {
+    <div class="rdt-scroll" [style]="__style">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rows().length" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)">
+      <thead class="rdt-thead" role="rowgroup">
+        @for (hg of headerGroups(); track hg.id) {
+    <tr class="rdt-tr" role="row">
+          @for (header of hg.headers; track header.id) {
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+            @if (isSelectColumn(header.column.id)) {
+    <span style="display:contents">
+              @if ((selectAllTpl ?? templates()?.['selectAll'])) {
+    <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
+    } @else {
+
+                @if (selectionMode() === 'multiple') {
+    <input class="rdt-select-all" type="checkbox" aria-label="Select all rows" [checked]="isAllRowsSelected()" (change)="onToggleAllRows($event)" />
+    }
+    }
+            </span>
+    } @else {
+    <span style="display:contents">
+              @if (header.column.getCanSort && header.column.getCanSort()) {
+    <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
+                <span class="rdt-header-label">
+                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+    } @else {
+    {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                </span>
+                <span class="rdt-sort-ind" aria-hidden="true">{{ rozieDisplay(sortIndicator(header.column.id)) }}</span>
+              </button>
+    } @else {
+    <span style="display:contents">
+                <span class="rdt-header-label">
+                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+    } @else {
+    {{ rozieDisplay(headerLabel(header.column.id)) }}
+    }
+                </span>
+              </span>
+    }@if (columnIsFilterable(header.column.id)) {
+    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+    }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
+                <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">⇤</button>
+                <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">⇔</button>
+                <button type="button" class="rdt-pin-btn rdt-pin-right" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">⇥</button>
+              </span>
+              <button type="button" class="rdt-resize-handle" [attr.aria-label]="rozieAttr('Resize ' + headerLabel(header.column.id))" (pointerdown)="onResizeStart(header.column.id, $event)" (touchstart)="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
+            </span>
+    }</th>
+    }
+        </tr>
+    }
+      </thead>
+
+      <tbody class="rdt-tbody" role="rowgroup">
+        
+        <tr class="rdt-spacer" aria-hidden="true">
+          <td [attr.colspan]="rozieAttr(visibleColCount())" [style]="'height:' + padTop() + 'px;padding:0;border:0'"></td>
+        </tr>
+        
+        @for (wr of windowedRows(); track wr.row.id) {
+    <tr class="rdt-tr" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)">
+          @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)">
+            @if (isSelectColumn(cellCtx.column.id)) {
+    <span style="display:contents">
+              @if ((selectCellTpl ?? templates()?.['selectCell'])) {
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cellCtx)" />
+    } @else {
+
+                <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(wr.row)" (change)="onToggleRow(wr.row, $event)" />
+              
+    }
+            </span>
+    } @else {
+    <span class="rdt-cell-value">
+              @if ((cellTpl ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }" />
+    } @else {
+    {{ rozieDisplay(cellCtx.getValue()) }}
+    }
+            </span>
+    }</td>
+    }
+        </tr>
+    }
+        
+        <tr class="rdt-spacer" aria-hidden="true">
+          <td [attr.colspan]="rozieAttr(visibleColCount())" [style]="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    } @else {
     <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id) {
@@ -190,7 +324,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
             @if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(row, cellCtx)" />
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cellCtx)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(row)" (change)="onToggleRow(row, $event)" />
@@ -211,8 +345,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
       </tbody>
     </table>
-
-
+    }@if (!virtual()) {
     <div class="rdt-pagination" role="group" aria-label="Pagination">
       <button type="button" class="rdt-page-btn rdt-page-prev" [disabled]="!canPrevPage()" (click)="onPrevPage()">Prev</button>
       <span class="rdt-page-status" aria-live="polite">
@@ -226,7 +359,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         <option [value]="100">100</option>
       </select>
     </div>
-    </div>
+    }</div>
 
   `,
   styles: [`
@@ -267,6 +400,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
       top: var(--rdt-sticky-top, 0);
       z-index: var(--rdt-sticky-z, 2);
       background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+    }
+    .rozie-data-table-wrap .rdt-scroll {
+      max-height: var(--rozie-data-table-max-height);
+      overflow: auto;
     }
     .rozie-data-table-wrap {
       display: flex;
@@ -510,6 +647,11 @@ export class DataTable {
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
+  @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
+  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
+  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
 
@@ -654,6 +796,33 @@ export class DataTable {
       this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rdt-scroll') : null;
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
+      // After the first window commits (next frame), refine heights + fire the dev-mode warns
+      // ONCE. Entirely inside the $props.virtual guard so the virtual=false emitted path adds NO
+      // code and these warns can never fire there (req-1 byte-identical-off preserved).
+      const afterFirstFrame = () => {
+        // D-10: measure the rendered rows.
+        this.remeasureWindow();
+        // D-08/A1: a dev-mode runtime warn when the scroll container has no bounded height (the
+        // bound may come from consumer CSS the compiler can't see — no compile diagnostic). No
+        // process.env guard (not bundler-portable); always-warn-on-misconfig is acceptable.
+        const h = this.gridScrollEl ? this.gridScrollEl.clientHeight : 0;
+        if (!h) {
+          console.warn('[rozie-data-table] virtual is on but the scroll container has no bounded height; set maxHeight or --rozie-data-table-max-height');
+        }
+        // D-07 (RESOLVED — runtime warn, not a compile diagnostic): warn ONCE when the consumer
+        // CONFIGURED client pagination alongside virtual, in the non-manual case (the valid
+        // virtual+manual combo per D-09 is silent). The pagination prop carries a non-null default
+        // ({ pageIndex: 0, pageSize: 10 }) so it is never strictly null — "configured" is therefore
+        // detected as a pagination that DIFFERS from that default (a consumer who set a real page
+        // size / index). The uncontrolled default ({0,10}) does NOT trip the warn. Behavior + the
+        // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
+        const pg = this.pagination();
+        const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
+        if (__manual !== true && pgConfigured) {
+          console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
+        }
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
   }
 
@@ -898,12 +1067,19 @@ export class DataTable {
   });
   windowedRows = () => {
     const __rows = this.rows();
-    if (!this.virtual() || !this.virtualizer) {
-      const rowList = __rows || [];
-      return rowList.map((r: any) => ({
-        vi: null,
-        row: r
-      }));
+    if (!this.virtualizer) {
+      // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+      // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+      // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+      // rows appear on the first onChange after _didMount.
+      if (!this.virtual()) {
+        const rowList = __rows || [];
+        return rowList.map((r: any) => ({
+          vi: null,
+          row: r
+        }));
+      }
+      return [];
     }
     if (this.windowVer() < 0) return [];
     const items = this.virtualizer.getVirtualItems();
@@ -912,6 +1088,28 @@ export class DataTable {
       vi,
       row: rowList[vi.index]
     }));
+  };
+  padTop = () => {
+    if (!this.virtual() || !this.virtualizer || this.windowVer() < 0) return 0;
+    const items = this.virtualizer.getVirtualItems();
+    return items.length ? items[0].start : 0;
+  };
+  padBottom = () => {
+    if (!this.virtual() || !this.virtualizer || this.windowVer() < 0) return 0;
+    const items = this.virtualizer.getVirtualItems();
+    if (!items.length) return 0;
+    return this.virtualizer.getTotalSize() - items[items.length - 1].end;
+  };
+  rowIsOutsideWindow = (r: any) => {
+    if (!this.virtual() || !this.virtualizer) return false;
+    const items = this.virtualizer.getVirtualItems();
+    for (const it of items as any) if (it.index === r) return false;
+    return true;
+  };
+  remeasureWindow = () => {
+    if (!this.virtualizer || !this.gridRoot) return;
+    const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
+    for (const tr of trs as any) this.virtualizer.measureElement(tr);
   };
   reFeed = () => {
     if (!this.table) return;
@@ -1195,9 +1393,23 @@ export class DataTable {
   };
   focusActiveCell = (nextRow: any = null, nextCol: any = null, nextIsHeader: any = null) => {
     if (!this.isGrid() || !this.gridRoot) return;
-    // ── phase 53 hooks HERE: scrollRowIntoWindow(nextRow ?? $data.activeRow) before resolve ──
     const r = nextRow == null ? this.activeRow() : nextRow;
     const c = nextCol == null ? this.activeColIndex() : nextCol;
+    // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
+    // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
+    // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
+    // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
+    if (this.virtual() && this.virtualizer && !nextIsHeader && this.rowIsOutsideWindow(r)) {
+      this.virtualizer.scrollToIndex(r, {
+        align: 'center'
+      });
+      const focusNow = () => {
+        const el = this.resolveCellEl(String(r), c);
+        if (el) el.focus();
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(focusNow));else setTimeout(focusNow, 0);
+      return;
+    }
     // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
     // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
     // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -1490,11 +1702,18 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | CellCtx {
+  ): _ctx is DefaultCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | SelectCellCtx | CellCtx {
     return true;
   }
 
-  private _selectCell_ctx = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
+  protected get __style() {
+      const __maxHeight = this.maxHeight();
+      return __maxHeight ? 'max-height:' + __maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + __maxHeight : 'overflow:auto';
+    }
+
+  private _selectCell_ctx = (wr: any, cellCtx: any) => ({ $implicit: { row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) }, row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) });
+
+  private _selectCell_ctx_1 = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
 
   protected readonly String = String;
 
