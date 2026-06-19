@@ -3743,6 +3743,24 @@ $expose({
             @input="onColumnFilterInput(header.column.id, $event)"
             @click="stopEvent($event)"
           />
+          <!-- HEADLESS facet slot (phase 50 reqs 8-9, D-03) — the #filter scoped slot, mirroring
+               the #cell/#colHeader plain-scoped-slot lowering (no portal/projection). Gated on
+               the column's filterable flag (faceted filtering requires the column be filterable in
+               table-core), wrapped in a display:contents host so an UNFACETED column emits nothing
+               extra. NO fallback content → the component renders NO built-in facet control (the
+               headless line, #groupBar precedent); a consumer builds a category-checkbox list +
+               a numeric range slider purely from the slot props. Slot props: the column id, the
+               CROSS-FILTERED unique-value list (keys only — counts deferred, D-03) + the [min,max]
+               range. ⚠️ #filter → a Svelte $props() snippet named `filter` (the #header→`const
+               header` collision class) — re-grepped: no `filter` local in the script. -->
+          <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
+            <slot
+              name="filter"
+              :columnId="header.column.id"
+              :uniqueValues="facetedUniqueValuesFor(header.column.id)"
+              :minMax="facetedMinMaxFor(header.column.id)"
+            />
+          </span>
           <span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button
               type="button"
@@ -4024,6 +4042,19 @@ $expose({
             @input="onColumnFilterInput(header.column.id, $event)"
             @click="stopEvent($event)"
           />
+          <!-- HEADLESS facet slot (phase 50 reqs 8-9, D-03) — the #filter scoped slot (see the
+               virtual-branch twin above for the full rationale). Gated on the column's filterable
+               flag, display:contents host (unfaceted column emits nothing extra), NO fallback →
+               NO built-in facet control. Slot props: column id + cross-filtered unique-value list
+               (keys only, D-03) + [min,max] range so a consumer builds the facet UI themselves. -->
+          <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
+            <slot
+              name="filter"
+              :columnId="header.column.id"
+              :uniqueValues="facetedUniqueValuesFor(header.column.id)"
+              :minMax="facetedMinMaxFor(header.column.id)"
+            />
+          </span>
           <!-- Pin control (req-11) — three native buttons (left / unpin / right), each
                keyboard-reachable with an accessible name. Drives column.pin(side|false)
                → pin-change. The active side is reflected with aria-pressed. -->
