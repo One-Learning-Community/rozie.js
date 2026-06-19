@@ -1,0 +1,174 @@
+<!--
+  DataTableEditVirtualDemo.rozie — Phase 51 VIRTUAL editable fixture (req-9, D-02).
+
+  The virtual sibling of DataTableEditDemo.rozie: the SAME editable column surface
+  (built-in text/number/select/checkbox editors + a validate column + a #editor scoped
+  slot) but mounted with `:virtual="true"` + a bounded `maxHeight`, over a larger dataset
+  so an editing row can be scrolled OUT of the virtual window. This is the fixture the
+  req-9 "editing survives virtualization" assertions drive: Plan 51-04 wires the D-02
+  pin-row mechanism (proven in isolation by DataTablePinProbeDemo.rozie / the
+  data-table-edit.spec.ts D-02 block) into the real DataTable windowing, and the spec
+  asserts here that an open editor + a selected range survive recycling.
+
+  IMPORTANT (Wave-0 status, Plan 51-01): like the non-virtual sibling, the
+  `editable`/`editor`/`editorOptions`/`validate` Column props, the `#editor` slot on
+  DataTable, and the `cell-edit-commit` event DO NOT EXIST until Plan 51-02 (Wave-(a))
+  declares them — they pass through inert today (the `#editor` slot emits a harmless
+  ROZ941 WARNING; the fixture still compiles + renders the windowed read-only table on
+  all six). The req-9 editing assertions in data-table-edit.spec.ts sit behind
+  `test.fixme` until Plan 51-04 wires the proven pin-row mechanism. At that point this
+  fixture's `:data="$data.rows"` flips to `r-model:data="$data.rows"` (controlled
+  write-back).
+
+  Windowing posture mirrors DataTableVirtualDemo.rozie: `:virtual="true"` opts into row
+  windowing (pagination chrome auto-suppressed), `maxHeight="400px"` bounds the scroll
+  container (PROP form), uniform ~40px rows so getVirtualItems() is deterministic (no
+  measureElement drift — the pin-row math is about SLICE/SPACER contiguity, not
+  measurement). Static dataset (no clock/random) for VR determinism. NO loop var or slot
+  named `cell` (Svelte mount-throw); the editor slot is `editor`.
+-->
+
+<rozie name="DataTableEditVirtualDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // ~2,000 rows: enough that an editing row scrolls far out of the ~10-row window so the
+  // req-9 pin-row survival assertion is meaningful, while staying CI-fast/deterministic.
+  rows: [],
+  rowCount: 0,
+  // Select-editor options for the `status` column (editor='select').
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ],
+  // Last cell-edit-commit payload readout (same contract as the non-virtual fixture).
+  lastCommit: '',
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// Seed the dataset in $onMount. Plain deterministic content (no clock / no random) so
+// the window + measured total are stable across the six targets + the Linux baselines.
+$onMount(() => {
+  const out: { id: number; name: string; qty: number; status: string; active: boolean; score: number }[] = []
+  const statuses = ['active', 'archived', 'pending']
+  for (let i = 1; i <= 2000; i++) {
+    out.push({
+      id: i,
+      name: 'Row ' + i,
+      qty: i % 9,
+      status: statuses[i % 3],
+      active: i % 2 === 0,
+      score: i * 7,
+    })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+
+// cell-edit-commit → "columnId=newValue" readout + a commit counter (req-4 / req-9).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// Sync validator for `qty` (req-5 / D-01): reject negatives. Pure + synchronous.
+const validateQty = (value: unknown): true | string => {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? true : 'must be >= 0'
+}
+</script>
+
+<template>
+<div class="dt-edit-virtual-demo">
+  <h3>DataTable — editable cells (virtual)</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+    <span class="label">last commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <div data-testid="edit-virtual-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      :data="$data.rows"
+      :virtual="true"
+      maxHeight="400px"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <Column field="name"   header="Name"   :editable="true" editor="text" />
+      <Column field="qty"    header="Qty"    :editable="true" editor="number" :validate="validateQty" />
+      <Column
+        field="status"
+        header="Status"
+        :editable="true"
+        editor="select"
+        :editorOptions="$data.statusOptions"
+      />
+      <Column field="active" header="Active" :editable="true" editor="checkbox" />
+      <Column field="score"  header="Score"  :editable="true" />
+
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <template #editor="{ columnId, value, commit, cancel }">
+        <span r-if="columnId === 'score'" class="dt-step-editor" data-testid="step-editor" style="display:contents">
+          <button type="button" data-testid="step-down" @click="commit(Number(value) - 1)">−</button>
+          <span class="dt-step-value" data-testid="step-value">{{ value }}</span>
+          <button type="button" data-testid="step-up" @click="commit(Number(value) + 1)">+</button>
+          <button type="button" data-testid="step-cancel" @click="cancel()">esc</button>
+        </span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-edit-virtual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-edit-virtual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.dt-step-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.dt-step-editor button {
+  padding: 0 0.375rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.dt-step-value { font-family: ui-monospace, monospace; min-width: 1.5rem; text-align: center; }
+</style>
+
+</rozie>

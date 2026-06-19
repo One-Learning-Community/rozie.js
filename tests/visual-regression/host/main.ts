@@ -578,6 +578,25 @@ export const EXAMPLES = [
   // by prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the
   // glob-driven build-cells demos sweep) and imports no cross-tree package.
   'DataTablePinProbe',
+  // Phase 51 (data-table editable cells) — the editor fixtures the spec's editing-wave
+  // assertions grow into (loaders → examples/demos/DataTableEdit{,Virtual}Demo.rozie,
+  // each importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie).
+  // DataTableEdit is the NON-VIRTUAL editable fixture (text/number/select/checkbox
+  // built-in editor columns + a `validate` column + a custom #editor scoped-slot column
+  // exercising the React render-prop edge); DataTableEditVirtual is the VIRTUAL editable
+  // fixture (~2000 rows, :virtual + maxHeight) for the req-9 pin-row survival assertions.
+  // They reference the editable/editor/validate Column props + the #editor slot +
+  // @cell-edit-commit that DO NOT EXIST until Plan 51-02 (Wave-(a)) declares them — today
+  // they pass through inert (the #editor slot emits a harmless ROZ941 "slot not declared"
+  // warning; the fixtures still compile + render the read-only table on all six). Their
+  // editing assertions in data-table-edit.spec.ts sit behind test.fixme until Plans
+  // 51-02..04 land. Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  // They live under examples/demos/ so no new Angular 3-file registration is needed
+  // (prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the glob-driven
+  // build-cells demos sweep already cover them, importing the data-table source pkg
+  // already registered for Angular cross-tree AOT in phase 48).
+  'DataTableEdit',
+  'DataTableEditVirtual',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -790,9 +809,13 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableVirtualStickySelect: 'rozie-data-table-virtual-sticky-select',
   // = kebab of DataTableVirtualWarnDemo (name="DataTableVirtualWarnDemo").
   DataTableVirtualWarn: 'rozie-data-table-virtual-warn',
-  // Phase 51 editable cells — '-demo' appended on Lit → tag
-  // 'rozie-data-table-pin-probe-demo' = kebab of DataTablePinProbeDemo.
+  // Phase 51 editable cells — '-demo' appended on Lit → tags
+  // 'rozie-data-table-pin-probe-demo' / 'rozie-data-table-edit-demo' /
+  // 'rozie-data-table-edit-virtual-demo' = kebab of DataTablePinProbeDemo /
+  // DataTableEditDemo / DataTableEditVirtualDemo.
   DataTablePinProbe: 'rozie-data-table-pin-probe',
+  DataTableEdit: 'rozie-data-table-edit',
+  DataTableEditVirtual: 'rozie-data-table-edit-virtual',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").

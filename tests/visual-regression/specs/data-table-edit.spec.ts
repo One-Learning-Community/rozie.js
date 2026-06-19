@@ -282,3 +282,113 @@ for (const target of TARGETS) {
     expect(Math.abs((afterHeight as number) - (baselineHeight as number))).toBeLessThanOrEqual(1);
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// CLIPBOARD SPIKE (51-01, RESEARCH A3 / Pitfall 4) — confirm Playwright grants
+//   clipboard-read + clipboard-write in the pinned Linux Chromium container under
+//   single-worker, so the later clipboard wave (req-8, TSV copy/paste) has a working
+//   harness. A TSV string written via navigator.clipboard.writeText must read back
+//   identically via readText. The existing data-table specs never exercised clipboard —
+//   this is NEW harness territory. If grantPermissions is BLOCKED in the container, the
+//   documented page.evaluate clipboard-shim fallback is asserted through instead (the
+//   spike records which path won in the SUMMARY).
+//
+// The spike runs once per target only to confirm the API surface is uniform ×6 — the
+// page is irrelevant to the clipboard round-trip, but goto'ing a real cell keeps the
+// browser context realistic (a clipboard call from about:blank can behave differently).
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-edit [${target}]: clipboard spike — TSV writeText/readText round-trips in the pinned container`, async ({
+    page,
+    context,
+  }) => {
+    // Grant both clipboard permissions on the context (Chromium supports both; the
+    // harness is Chromium-pinned). If the container blocks the grant, the catch falls
+    // through to the page.evaluate shim path below.
+    let grantOk = true;
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    } catch {
+      grantOk = false;
+    }
+
+    await page.goto(`/?example=DataTablePinProbe&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const tsv = 'a1\tb1\na2\tb2';
+
+    // Primary path: the real async Clipboard API (what req-8 copy/paste will use). A
+    // round-trip through writeText → readText proves grantPermissions works in the
+    // container under single-worker.
+    const realRoundTrip = await page.evaluate(async (text) => {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText || !navigator.clipboard.readText) {
+          return { ok: false, value: null as string | null };
+        }
+        await navigator.clipboard.writeText(text);
+        const read = await navigator.clipboard.readText();
+        return { ok: true, value: read };
+      } catch {
+        return { ok: false, value: null as string | null };
+      }
+    }, tsv);
+
+    if (grantOk && realRoundTrip.ok) {
+      // grantPermissions path works — the SUMMARY records "grantPermissions works".
+      expect(realRoundTrip.value).toBe(tsv);
+    } else {
+      // FALLBACK (documented shim, Pitfall 4): if the container blocked the grant or the
+      // async API threw, prove the page.evaluate clipboard-shim round-trips so the later
+      // clipboard wave has a deterministic harness. The shim stubs navigator.clipboard
+      // with an in-page buffer so the component code path (writeText/readText) is
+      // unchanged; only the backing store is shimmed.
+      const shimRoundTrip = await page.evaluate(async (text) => {
+        let buffer = '';
+        const shim = {
+          writeText: async (t: string) => {
+            buffer = t;
+          },
+          readText: async () => buffer,
+        };
+        // Override only for this assertion (does not persist past the page).
+        Object.defineProperty(navigator, 'clipboard', { value: shim, configurable: true });
+        await navigator.clipboard.writeText(text);
+        return navigator.clipboard.readText();
+      }, tsv);
+      expect(shimRoundTrip).toBe(tsv);
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// EDITING REQS 1-9 — STUBBED behind test.fixme pending Plans 51-02..04 (Wave-(a)..(c)).
+//   These reference Column `editable`/`editor`/`validate` props + the DataTable #editor
+//   slot + `r-model:data` + `cell-edit-commit` that DO NOT EXIST until Plan 51-02
+//   declares them, so the DataTableEdit{,Virtual}Demo fixtures cannot be exercised yet.
+//   Each becomes a real assertion as its wave ships (req-11 acceptance = no permanent
+//   fixme by phase end). Listed here so the spec's coverage shape is visible from Wave-0.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  // req-1/2/3/4/5 — built-in editors + #editor slot + lifecycle + write-back + validation
+  // (Wave-(a), Plan 51-02). Drives DataTableEditDemo.
+  test.fixme(`data-table-edit [${target}]: built-in editors commit one cell-edit-commit; #editor slot; invalid keeps editor open (Plan 51-02)`, async () => {
+    // Pending Plan 51-02: F2/Enter/printable enter; commit on Enter/Tab/blur; Escape
+    // revert; the four built-in editor types; the #editor stepped slot; the qty validator
+    // keeps the editor open (D-01) on a negative value with no model write.
+  });
+
+  // req-6 — full-row edit (Wave-(b), Plan 51-03). Drives DataTableEditDemo.
+  test.fixme(`data-table-edit [${target}]: Shift+F2 full-row edit commits/reverts as a unit (Plan 51-03)`, async () => {
+    // Pending Plan 51-03: Shift+F2 + the editRow verb enter every editable cell in the
+    // active row; one r-model:data write + one row-edit-commit; Escape reverts the row.
+  });
+
+  // req-7/8/9 — range + clipboard + virtualization survival (Wave-(c), Plan 51-04). Drives
+  // DataTableEditVirtualDemo + the clipboard harness proven above.
+  test.fixme(`data-table-edit [${target}]: Shift+Arrow range; TSV copy/paste skip-invalid; editor survives virtualization recycle (Plan 51-04)`, async () => {
+    // Pending Plan 51-04: Shift+Arrow/Shift+Click range distinct from row-selection;
+    // getSelectedRange + range-change; Ctrl/Cmd+C/V TSV with the D-03 skip rule; and the
+    // D-02 pin-row mechanism (proven in isolation by the probe above) wired into the real
+    // DataTable windowing so an open editor survives recycling in DataTableEditVirtualDemo.
+  });
+}

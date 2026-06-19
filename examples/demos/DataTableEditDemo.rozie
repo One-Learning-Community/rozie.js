@@ -1,0 +1,172 @@
+<!--
+  DataTableEditDemo.rozie — Phase 51 NON-VIRTUAL editable fixture (req-1/2/4/5).
+
+  The fixture the editing-wave assertions in data-table-edit.spec.ts grow into. Mirrors
+  DataTableGridNavDemo.rozie's structure (DataTable + <Column> children + a $refs.dt
+  handle + a commit readout), adding the editing surface this phase builds:
+
+    - FOUR built-in editor column types (req-1): `editable editor='text'` (name),
+      `editor='number'` (qty), `editor='select'` with options (status), and
+      `editor='checkbox'` (active).
+    - A `validate` column (req-5): the qty column carries a sync validator
+      (value >= 0 || 'must be >= 0') so the spec can prove the D-01 keep-editor-open
+      invalid path.
+    - A custom `#editor` scoped slot column (req-2): the `score` column uses the
+      `{ value, row, column, commit, cancel }` slot to render a STEPPED numeric control
+      (− / value / +) — exercising the React render-prop edge (the documented acceptable
+      divergence per SPEC req-2 / CONTEXT discretion).
+    - A `$refs.dt` handle + a `cell-edit-commit` readout (the payload `{rowId, columnId,
+      oldValue, newValue}`), so the spec can assert exactly one commit per edit.
+
+  IMPORTANT (Wave-0 status, Plan 51-01): the `editable`/`editor`/`editorOptions`/
+  `validate` Column props, the `#editor` slot on DataTable, and the `cell-edit-commit`
+  event DO NOT EXIST in DataTable.rozie/Column.rozie until Plan 51-02 (Wave-(a)) lands —
+  they pass through as inert undeclared props/events today (the `#editor` slot emits a
+  harmless ROZ941 "slot not declared" WARNING; the fixture still compiles + renders the
+  read-only table on all six). The editing assertions in data-table-edit.spec.ts sit
+  behind `test.fixme` until Plan 51-02 declares the slot + makes `data` model:true. At
+  that point this fixture's `:data="$data.rows"` flips to `r-model:data="$data.rows"`
+  (the controlled write-back, req-4) and the fixmes become real assertions.
+
+  Loop-var / slot discipline (DataTable.rozie:1794, Svelte mount-throw): NO loop var or
+  slot named `cell` — the editor slot is `editor`; the #cell display slot binds `value`/
+  `row`/`columnId`. Static dataset (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableEditDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // A small static dataset with one field per built-in editor type + the #editor-slot
+  // field (`score`). No clock/random → VR-deterministic.
+  rows: [
+    { id: 1, name: 'Alpha',   qty: 3,  status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',    qty: 7,  status: 'archived', active: false, score: 92 },
+    { id: 3, name: 'Gamma',   qty: 1,  status: 'active',   active: true,  score: 67 },
+    { id: 4, name: 'Delta',   qty: 5,  status: 'pending',  active: false, score: 50 },
+  ],
+  // Select-editor options for the `status` column (editor='select').
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ],
+  // Last cell-edit-commit payload, surfaced as a readout: "columnId=newValue". The spec
+  // asserts EXACTLY ONE commit per edit (React multi-emit dedup, D-07).
+  lastCommit: '',
+  // Count of cell-edit-commit emits (proves a rejected/invalid commit does NOT fire it).
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// cell-edit-commit payload → "columnId=newValue" readout + a commit counter (req-4).
+// The payload object arrives as arg0 directly (the @emit consumer contract — NOT a
+// wrapped CustomEvent).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// Sync validator for the `qty` column (req-5 / D-01): reject negatives. Returns
+// true | string (the error message). Pure + synchronous.
+const validateQty = (value: unknown): true | string => {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? true : 'must be >= 0'
+}
+</script>
+
+<template>
+<div class="dt-edit-demo">
+  <h3>DataTable — editable cells</h3>
+
+  <div class="controls">
+    <span class="label">last commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <div data-testid="edit-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      :data="$data.rows"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <!-- Four built-in editor column types (req-1). -->
+      <Column field="name"   header="Name"   :editable="true" editor="text" />
+      <Column field="qty"    header="Qty"    :editable="true" editor="number" :validate="validateQty" />
+      <Column
+        field="status"
+        header="Status"
+        :editable="true"
+        editor="select"
+        :editorOptions="$data.statusOptions"
+      />
+      <Column field="active" header="Active" :editable="true" editor="checkbox" />
+      <!-- The #editor-slot column (req-2): a custom stepped numeric editor. -->
+      <Column field="score"  header="Score"  :editable="true" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- Custom #editor scoped slot (req-2), dispatched by columnId. The `score`
+           column renders a STEPPED numeric control (the React render-prop edge); every
+           other editable column falls through to its built-in editor. The slot receives
+           { value, row, column, commit, cancel }. -->
+      <template #editor="{ columnId, value, commit, cancel }">
+        <span r-if="columnId === 'score'" class="dt-step-editor" data-testid="step-editor" style="display:contents">
+          <button type="button" data-testid="step-down" @click="commit(Number(value) - 1)">−</button>
+          <span class="dt-step-value" data-testid="step-value">{{ value }}</span>
+          <button type="button" data-testid="step-up" @click="commit(Number(value) + 1)">+</button>
+          <button type="button" data-testid="step-cancel" @click="cancel()">esc</button>
+        </span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-edit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-edit-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.dt-step-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.dt-step-editor button {
+  padding: 0 0.375rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.dt-step-value { font-family: ui-monospace, monospace; min-width: 1.5rem; text-align: center; }
+</style>
+
+</rozie>
