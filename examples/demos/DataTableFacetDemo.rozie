@@ -1,0 +1,215 @@
+<!--
+  DataTableFacetDemo.rozie — Phase 50 WAVE-0 FACETED-FILTERING fixture (reqs 8-9).
+
+  The behavioral fixture the facet-wave assertions in data-table-roundout.spec.ts grow
+  into. Mirrors DataTableGridNavDemo.rozie / DataTableEditDemo.rozie structure (DataTable
+  + <Column> children + a $refs.dt handle + readouts), binding the FACETED-FILTERING
+  feature surface this phase builds — entirely HEADLESS (no built-in facet control):
+
+    - Faceted row models wired + values exposed (req-8): `:faceted` opts the table into
+      getFacetedRowModel / getFacetedUniqueValues / getFacetedMinMaxValues; per-column
+      unique-value lists (category facet) and min/max ranges (numeric facet) are exposed.
+    - Faceted exposure surface — $expose verbs + #filter slot props (req-9): the fixture
+      builds a category-facet CHECKBOX LIST and a numeric RANGE SLIDER purely from the
+      exposed values/slot props (the `#filter` scoped slot's `uniqueValues` / `minMax`
+      props + the getFacetedUniqueValues / getFacetedMinMaxValues $expose verbs), filtering
+      the table via the columnFilters model. NO built-in facet dropdown/range ships.
+
+  IMPORTANT (Wave-0 status, Plan 50-01): the `faceted` table prop, the `#filter` slot's
+  faceted props (`uniqueValues`/`minMax`), and the getFacetedUniqueValues /
+  getFacetedMinMaxValues $expose verbs DO NOT EXIST in DataTable.rozie until Plan 50-04
+  (Wave-(c)) lands — they pass through as inert undeclared props/slots today (the `#filter`
+  slot emits a harmless ROZ941 "slot not declared" WARNING; the fixture still compiles +
+  renders the read-only flat table on all six). The facet assertions in
+  data-table-roundout.spec.ts sit behind the runnerFor build-gate until Plan 50-04 declares
+  the surface. (The columnFilters model already exists from Phase 48.)
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot
+  named `cell` — the #cell display slot binds `value`/`row`/`columnId`; the filter slot is
+  `filter`; the facet checkbox loop var is `opt`. Static dataset (no clock/random) for VR
+  determinism.
+-->
+
+<rozie name="DataTableFacetDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // A static dataset with one category column (distinct values: Hardware, Software,
+  // Service) and one numeric column (price, range 10..90). No clock/random →
+  // VR-deterministic. Distinct categories = 3; price min=10, max=90.
+  rows: [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+    { id: 5, name: 'Epsilon', category: 'Software', price: 70 },
+  ],
+  // The columnFilters model (Phase 48) the consumer-built facet UI drives — an array of
+  // { id, value }. model:true two-way. The category facet appends an { id:'category',
+  // value: string[] } entry; the price facet appends an { id:'price', value:[min,max] }.
+  columnFilters: [],
+  // The consumer-built category-facet selection set (a list of checked category values).
+  // Built ENTIRELY from the exposed uniqueValues — no built-in facet control.
+  checkedCategories: [],
+  // The consumer-built numeric range-slider upper bound (req-9). Driven from the exposed
+  // minMax; the lower bound stays at min. Initialized in $onMount once minMax is exposed.
+  priceMax: 90,
+  // getFacetedUniqueValues('category') verb readout (proves the $expose handle), surfaced
+  // on demand: the count of distinct category values.
+  uniqueCountReadout: '',
+  // getFacetedMinMaxValues('price') verb readout, surfaced on demand: "min,max".
+  minMaxReadout: '',
+}
+</data>
+
+<script lang="ts">
+// Toggle a category in the consumer-built checkbox facet (req-9) → rewrite the
+// columnFilters model as a FRESH array (the controlled write-back contract). Empty
+// selection removes the category filter entirely.
+const toggleCategory = (value: string): void => {
+  const checked = $data.checkedCategories.slice()
+  const idx = checked.indexOf(value)
+  if (idx === -1) checked.push(value)
+  else checked.splice(idx, 1)
+  $data.checkedCategories = checked
+  // Rebuild columnFilters as a fresh array (drop any prior category entry first).
+  const next = $data.columnFilters.filter((f: { id: string }) => f.id !== 'category')
+  if (checked.length > 0) next.push({ id: 'category', value: checked })
+  $data.columnFilters = next
+}
+
+// Drive the numeric range-slider upper bound (req-9) → rewrite columnFilters with a
+// [min, max] price filter as a FRESH array. The lower bound is the exposed minimum (10).
+const setPriceMax = (value: number, min: number): void => {
+  $data.priceMax = value
+  const next = $data.columnFilters.filter((f: { id: string }) => f.id !== 'price')
+  next.push({ id: 'price', value: [min, value] })
+  $data.columnFilters = next
+}
+
+// Surface getFacetedUniqueValues('category') via the $expose handle (req-9) — the count
+// of distinct category values. Resolve the handle at CALL time (never cache — the
+// GridNavDemo lesson). The verb returns a Map<value, count> in table-core; we read .size.
+const callGetUniqueValues = (): void => {
+  const api = $refs.dt
+  if (!api || !api.getFacetedUniqueValues) { $data.uniqueCountReadout = ''; return }
+  const m = api.getFacetedUniqueValues('category')
+  $data.uniqueCountReadout = String(m && typeof m.size === 'number' ? m.size : 0)
+}
+
+// Surface getFacetedMinMaxValues('price') via the $expose handle (req-9) — "min,max".
+const callGetMinMax = (): void => {
+  const api = $refs.dt
+  if (!api || !api.getFacetedMinMaxValues) { $data.minMaxReadout = ''; return }
+  const mm = api.getFacetedMinMaxValues('price')
+  $data.minMaxReadout = mm ? mm[0] + ',' + mm[1] : ''
+}
+</script>
+
+<template>
+<div class="dt-facet-demo">
+  <h3>DataTable — faceted filtering (headless)</h3>
+
+  <div class="controls">
+    <span class="label">getUnique:</span>
+    <span class="readout" data-testid="unique-count-readout">{{ $data.uniqueCountReadout }}</span>
+    <span class="label">getMinMax:</span>
+    <span class="readout" data-testid="minmax-readout">{{ $data.minMaxReadout }}</span>
+    <button type="button" data-testid="call-get-unique" @click="callGetUniqueValues">getFacetedUniqueValues(category)</button>
+    <button type="button" data-testid="call-get-minmax" @click="callGetMinMax">getFacetedMinMaxValues(price)</button>
+  </div>
+
+  <div data-testid="facet-table">
+    <DataTable
+      ref="dt"
+      :faceted="true"
+      :data="$data.rows"
+      r-model:columnFilters="$data.columnFilters"
+    >
+      <Column field="name"     header="Name" />
+      <Column field="category" header="Category" :filterable="true" />
+      <Column field="price"    header="Price" :filterable="true" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The headless #filter scoped slot (req-9), dispatched by columnId. Receives the
+           exposed faceted props: `uniqueValues` (the distinct-value list for category
+           facets) + `minMax` ([min, max] for numeric facets). The consumer builds a
+           CHECKBOX LIST for `category` and a RANGE SLIDER for `price` — no built-in
+           facet control ships. -->
+      <template #filter="{ columnId, uniqueValues, minMax }">
+        <!-- Category facet: a checkbox list built purely from uniqueValues. -->
+        <div r-if="columnId === 'category'" class="dt-facet" data-testid="category-facet">
+          <label r-for="opt in uniqueValues" :key="opt" class="dt-facet-opt">
+            <input
+              type="checkbox"
+              :data-testid="'facet-cat-' + opt"
+              :checked="$data.checkedCategories.includes(opt)"
+              @change="toggleCategory(opt)"
+            />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
+        <!-- Numeric facet: a range slider built purely from minMax. -->
+        <div r-else-if="columnId === 'price'" class="dt-facet" data-testid="price-facet">
+          <span class="label">min {{ minMax[0] }}</span>
+          <input
+            type="range"
+            data-testid="facet-price-range"
+            :min="minMax[0]"
+            :max="minMax[1]"
+            :value="$data.priceMax"
+            @input="setPriceMax(Number($event.target.value), minMax[0])"
+          />
+          <span class="label">max {{ minMax[1] }}</span>
+          <span class="readout" data-testid="facet-price-value">{{ $data.priceMax }}</span>
+        </div>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-facet-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-facet-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.dt-facet {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.dt-facet-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+</style>
+
+</rozie>

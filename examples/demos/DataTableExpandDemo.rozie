@@ -1,0 +1,231 @@
+<!--
+  DataTableExpandDemo.rozie — Phase 50 WAVE-0 EXPANDABLE-ROWS fixture (reqs 1-3).
+
+  The behavioral fixture the expand-wave assertions in data-table-roundout.spec.ts
+  grow into. Mirrors DataTableGridNavDemo.rozie / DataTableEditDemo.rozie structure
+  (DataTable + <Column> children + a $refs.dt handle + readouts), binding the EXPAND
+  feature surface this phase builds:
+
+    - Multi-expand expander column (req-1): `:expandable="true"` opts the table into
+      getExpandedRowModel; the auto-injected chevron expander column toggles a row on
+      click / Enter / Space; r-model:expanded makes the expanded-row set controllable
+      and observable so two rows can be open at once.
+    - BOTH expanded-content patterns (req-2):
+        (a) a `#detail` scoped slot ({ row }) rendering an arbitrary panel under the
+            expanded row (the React render-prop edge);
+        (b) true nested sub-rows via `:getSubRows` (child rows rendered with the same
+            columns, indented by depth) — a SECOND table region (data-testid=subrow-table)
+            seeded with hierarchical data so depth-indentation is exercised.
+    - Expand API + event (req-3): @expanded-change wired to a visible readout +
+      counter, and $expose-handle buttons for toggleRowExpanded / expandAll /
+      collapseAll / getExpandedRows.
+
+  IMPORTANT (Wave-0 status, Plan 50-01): the `expandable` table prop, the `getSubRows`
+  prop, the `#detail` slot, the `expanded` model:true slice, the `expanded-change`
+  event, and the toggleRowExpanded/expandAll/collapseAll/getExpandedRows $expose verbs
+  DO NOT EXIST in DataTable.rozie until Plan 50-02 (Wave-(a)) lands — they pass through
+  as inert undeclared props/events/slots today (the `#detail` slot emits a harmless
+  ROZ941 "slot not declared" WARNING; the fixture still compiles + renders the
+  read-only flat table on all six). The expand assertions in data-table-roundout.spec.ts
+  sit behind the runnerFor build-gate until Plan 50-02 declares the surface.
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or
+  slot named `cell` — the #cell display slot binds `value`/`row`/`columnId`; the
+  detail slot is `detail`. Static dataset (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableExpandDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Flat dataset for the #detail-slot region (req-2 pattern a). No clock/random →
+  // VR-deterministic.
+  rows: [
+    { id: 1, name: 'Alpha',   region: 'North', score: 41 },
+    { id: 2, name: 'Beta',    region: 'South', score: 92 },
+    { id: 3, name: 'Gamma',   region: 'North', score: 67 },
+    { id: 4, name: 'Delta',   region: 'West',  score: 50 },
+  ],
+  // Hierarchical dataset for the getSubRows region (req-2 pattern b): each top-level
+  // row carries a `children` array of same-shape sub-rows → indented child rows.
+  treeRows: [
+    {
+      id: 't1', name: 'Engineering', region: 'North', score: 80,
+      children: [
+        { id: 't1a', name: 'Frontend', region: 'North', score: 70 },
+        { id: 't1b', name: 'Backend',  region: 'North', score: 90 },
+      ],
+    },
+    {
+      id: 't2', name: 'Sales', region: 'South', score: 60,
+      children: [
+        { id: 't2a', name: 'Inbound',  region: 'South', score: 55 },
+        { id: 't2b', name: 'Outbound', region: 'South', score: 65 },
+      ],
+    },
+  ],
+  // Controlled expanded-row set (req-1/3) — ExpandedState ({ [rowId]: true } | true).
+  // model:true two-way write-back from the component; empty = nothing expanded.
+  expanded: {},
+  // Controlled expanded set for the sub-row tree region.
+  treeExpanded: {},
+  // Last expanded-change payload rendered as a sorted, comma-joined key list (req-3),
+  // surfaced as a readout. The spec asserts it fires once per change with the right keys.
+  lastExpanded: '',
+  // Count of expanded-change emits (proves a no-op does NOT fire it; React multi-emit dedup).
+  expandedChangeCount: 0,
+  // getExpandedRows() verb readout (proves the $expose handle), surfaced on demand.
+  expandedRowsReadout: '',
+}
+</data>
+
+<script lang="ts">
+// expanded-change payload → a sorted comma-joined key readout + a counter (req-3).
+// The payload (the new ExpandedState object) arrives as arg0 directly (the @emit
+// consumer contract — NOT a wrapped CustomEvent).
+const onExpandedChange = (payload: Record<string, boolean> | boolean): void => {
+  if (payload === true) {
+    $data.lastExpanded = 'ALL'
+  } else if (payload && typeof payload === 'object') {
+    const keys = Object.keys(payload).filter((k) => payload[k])
+    keys.sort()
+    $data.lastExpanded = keys.join(',')
+  } else {
+    $data.lastExpanded = ''
+  }
+  $data.expandedChangeCount = $data.expandedChangeCount + 1
+}
+
+// Invoke the toggleRowExpanded $expose verb on row id 2 (Beta) via the DataTable handle
+// (req-3). Resolve the handle at CALL time (never cache: the handle can be captured before
+// the child publishes $expose on the fine-grained targets — the GridNavDemo lesson).
+const callToggleRow = (): void => {
+  const api = $refs.dt
+  if (api && api.toggleRowExpanded) api.toggleRowExpanded(2)
+}
+
+const callExpandAll = (): void => {
+  const api = $refs.dt
+  if (api && api.expandAll) api.expandAll()
+}
+
+const callCollapseAll = (): void => {
+  const api = $refs.dt
+  if (api && api.collapseAll) api.collapseAll()
+}
+
+// Surface getExpandedRows() via the $expose handle (req-3) — the read-verb twin of the
+// expanded-change event. Renders the count of currently-expanded rows. Resolve the handle
+// at CALL time (never cache — the GridNavDemo lesson).
+const callGetExpandedRows = (): void => {
+  const api = $refs.dt
+  if (!api || !api.getExpandedRows) { $data.expandedRowsReadout = ''; return }
+  const rows = api.getExpandedRows()
+  $data.expandedRowsReadout = String(rows ? rows.length : 0)
+}
+
+// getSubRows accessor (req-2 pattern b): the component pulls child rows from each row's
+// `children` field, building the nested sub-row tree (indented by depth).
+const getSubRows = (row: { children?: unknown[] }): unknown[] | undefined => row.children
+</script>
+
+<template>
+<div class="dt-expand-demo">
+  <h3>DataTable — expandable rows</h3>
+
+  <div class="controls">
+    <span class="label">expanded:</span>
+    <span class="readout" data-testid="expanded-readout">{{ $data.lastExpanded }}</span>
+    <span class="label">change-count:</span>
+    <span class="readout" data-testid="expanded-change-count">{{ $data.expandedChangeCount }}</span>
+    <span class="label">getExpanded:</span>
+    <span class="readout" data-testid="expanded-rows-readout">{{ $data.expandedRowsReadout }}</span>
+    <button type="button" data-testid="call-toggle-row" @click="callToggleRow">toggleRowExpanded(2)</button>
+    <button type="button" data-testid="call-expand-all" @click="callExpandAll">expandAll</button>
+    <button type="button" data-testid="call-collapse-all" @click="callCollapseAll">collapseAll</button>
+    <button type="button" data-testid="call-get-expanded" @click="callGetExpandedRows">getExpandedRows()</button>
+  </div>
+
+  <!-- (a) #detail-slot region (req-2 pattern a): the expander reveals custom panel content. -->
+  <div data-testid="detail-table">
+    <DataTable
+      ref="dt"
+      :expandable="true"
+      :data="$data.rows"
+      r-model:expanded="$data.expanded"
+      @expanded-change="onExpandedChange($event)"
+    >
+      <Column field="name"   header="Name" />
+      <Column field="region" header="Region" />
+      <Column field="score"  header="Score" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The #detail scoped slot (req-2 pattern a): custom expanded-row content
+           receiving { row } — the React render-prop edge (documented divergence). -->
+      <template #detail="{ row }">
+        <div class="dt-detail-panel" data-testid="detail-panel">
+          Detail for {{ row.name }} — region {{ row.region }}, score {{ row.score }}
+        </div>
+      </template>
+    </DataTable>
+  </div>
+
+  <!-- (b) getSubRows region (req-2 pattern b): the expander reveals indented child rows. -->
+  <div data-testid="subrow-table">
+    <DataTable
+      :expandable="true"
+      :data="$data.treeRows"
+      :getSubRows="getSubRows"
+      r-model:expanded="$data.treeExpanded"
+    >
+      <Column field="name"   header="Name" />
+      <Column field="region" header="Region" />
+      <Column field="score"  header="Score" />
+
+      <template #cell="{ value }">
+        <span data-testid="subrow-cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-expand-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-expand-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.dt-detail-panel {
+  padding: 0.5rem 0.75rem;
+  background: #f5f7fa;
+  border-left: 3px solid #6b9bd1;
+  font-size: 0.8125rem;
+}
+[data-testid="subrow-table"] { margin-top: 1.25rem; }
+</style>
+
+</rozie>

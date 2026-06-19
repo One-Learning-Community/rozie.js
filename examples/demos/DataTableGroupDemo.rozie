@@ -1,0 +1,198 @@
+<!--
+  DataTableGroupDemo.rozie — Phase 50 WAVE-0 GROUPING + AGGREGATION fixture (reqs 4-7).
+
+  The behavioral fixture the grouping-wave assertions in data-table-roundout.spec.ts
+  grow into. Mirrors DataTableGridNavDemo.rozie / DataTableEditDemo.rozie structure
+  (DataTable + <Column> children + a $refs.dt handle + readouts), binding the GROUPING
+  feature surface this phase builds:
+
+    - Multi-column nested grouping + collapsible group-header rows (req-4): `:groupable`
+      opts the table into getGroupedRowModel; r-model:grouping is an ordered array of
+      column keys (multi-column → nested groups, e.g. Region → Category); each group
+      renders a collapsible group-header row (group key + row count) reusing the expand
+      model.
+    - Aggregation — full set + per-column custom (req-5): the numeric `units` column uses
+      the built-in `aggregationFn='sum'`; the numeric `score` column uses a per-column
+      CUSTOM aggregationFn (range = max - min). Both render their rolled-up value in the
+      group-header cell.
+    - Grouping binding — model/prop + headless #groupBar slot, NO built-in drag (req-6):
+      the `#groupBar` scoped slot receives the current grouping + the groupable columns +
+      apply/clear helpers; a CONSUMER-built bar (apply/clear buttons — NO drag) drives the
+      grouping model. The component renders NO built-in drag affordance.
+    - Grouping state API + event (req-7): @grouping-change wired to a readout + counter,
+      and $expose-handle buttons for applyGrouping / clearGrouping.
+
+  IMPORTANT (Wave-0 status, Plan 50-01): the `groupable` table prop, the per-Column
+  `aggregationFn` prop, the `#groupBar` slot, the `grouping` model:true slice, the
+  `grouping-change` event, and the applyGrouping/clearGrouping $expose verbs DO NOT EXIST
+  in DataTable.rozie/Column.rozie until Plan 50-03 (Wave-(b)) lands — they pass through as
+  inert undeclared props/events/slots today (the `#groupBar` slot emits a harmless ROZ941
+  "slot not declared" WARNING; the fixture still compiles + renders the read-only flat
+  table on all six). The grouping assertions in data-table-roundout.spec.ts sit behind the
+  runnerFor build-gate until Plan 50-03 declares the surface.
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot
+  named `cell` — the #cell display slot binds `value`/`row`/`columnId`; the group bar slot
+  is `groupBar`. Static dataset (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableGroupDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // A static dataset with two groupable string columns (region, category) and two
+  // numeric columns (units, score) for the aggregation checks. No clock/random →
+  // VR-deterministic. Hand-computed group rollups (Region → Category):
+  //   North/Hardware: units 3+5=8, score range 41..67 = 26
+  //   North/Software: units 2     , score range 90..90 = 0
+  //   South/Hardware: units 7     , score range 60..60 = 0
+  //   South/Software: units 1+4=5 , score range 50..92 = 42
+  rows: [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+    { id: 5, region: 'South', category: 'Software', units: 1, score: 50 },
+    { id: 6, region: 'South', category: 'Software', units: 4, score: 92 },
+  ],
+  // Controlled grouping state (req-4/6/7) — ordered array of column keys. model:true
+  // two-way write-back from the component; [] = ungrouped (flat table).
+  grouping: [],
+  // Last grouping-change payload rendered as a comma-joined ordered key list (req-7),
+  // surfaced as a readout. The spec asserts it fires once per change with the ordered keys.
+  lastGrouping: '',
+  // Count of grouping-change emits (proves a no-op does NOT fire it; React multi-emit dedup).
+  groupingChangeCount: 0,
+}
+</data>
+
+<script lang="ts">
+// grouping-change payload → an ordered comma-joined key readout + a counter (req-7).
+// The payload (the new ordered grouping array) arrives as arg0 directly (the @emit
+// consumer contract — NOT a wrapped CustomEvent).
+const onGroupingChange = (payload: string[]): void => {
+  $data.lastGrouping = Array.isArray(payload) ? payload.join(',') : ''
+  $data.groupingChangeCount = $data.groupingChangeCount + 1
+}
+
+// Per-column CUSTOM aggregationFn for the `score` column (req-5): the value range
+// (max - min) across the group's leaf rows. Signature mirrors table-core's
+// (columnId, leafRows) shape; we read each leaf's score via getValue. Pure + synchronous.
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => unknown }[]): number => {
+  const vals = leafRows.map((r) => Number(r.getValue(columnId)))
+  if (vals.length === 0) return 0
+  return Math.max(...vals) - Math.min(...vals)
+}
+
+// Apply Region → Category two-column grouping via the applyGrouping $expose verb (req-7) —
+// the API twin of the consumer group bar. Resolve the handle at CALL time (never cache —
+// the GridNavDemo lesson).
+const callApplyGrouping = (): void => {
+  const api = $refs.dt
+  if (api && api.applyGrouping) api.applyGrouping(['region', 'category'])
+}
+
+const callClearGrouping = (): void => {
+  const api = $refs.dt
+  if (api && api.clearGrouping) api.clearGrouping()
+}
+</script>
+
+<template>
+<div class="dt-group-demo">
+  <h3>DataTable — grouping + aggregation</h3>
+
+  <div class="controls">
+    <span class="label">grouping:</span>
+    <span class="readout" data-testid="grouping-readout">{{ $data.lastGrouping }}</span>
+    <span class="label">change-count:</span>
+    <span class="readout" data-testid="grouping-change-count">{{ $data.groupingChangeCount }}</span>
+    <button type="button" data-testid="call-apply-grouping" @click="callApplyGrouping">applyGrouping(region,category)</button>
+    <button type="button" data-testid="call-clear-grouping" @click="callClearGrouping">clearGrouping</button>
+  </div>
+
+  <div data-testid="group-table">
+    <DataTable
+      ref="dt"
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.grouping"
+      @grouping-change="onGroupingChange($event)"
+    >
+      <Column field="region"   header="Region" />
+      <Column field="category" header="Category" />
+      <!-- Built-in named aggregationFn (req-5). -->
+      <Column field="units"    header="Units" aggregationFn="sum" />
+      <!-- Per-column custom aggregationFn (req-5). -->
+      <Column field="score"    header="Score" :aggregationFn="scoreRange" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The headless #groupBar scoped slot (req-6): receives the current grouping,
+           the groupable columns, and apply/clear helpers. A CONSUMER-built bar (buttons
+           only — NO drag) drives the grouping model; the component ships NO drag UI. -->
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <div class="dt-group-bar" data-testid="group-bar">
+          <span class="label">groupBar grouping:</span>
+          <span class="readout" data-testid="group-bar-state">{{ grouping.join(',') }}</span>
+          <span class="label">groupable:</span>
+          <span class="readout" data-testid="group-bar-columns">{{ groupableColumns.length }}</span>
+          <button
+            type="button"
+            data-testid="group-bar-apply"
+            @click="applyGrouping(['region','category'])"
+          >apply region,category</button>
+          <button
+            type="button"
+            data-testid="group-bar-clear"
+            @click="clearGrouping()"
+          >clear</button>
+        </div>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-group-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-group-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.dt-group-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.375rem 0.5rem;
+  margin-bottom: 0.5rem;
+  background: #eef2f6;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+</style>
+
+</rozie>
