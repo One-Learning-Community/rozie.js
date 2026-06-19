@@ -401,6 +401,15 @@ import {
   getPaginationRowModel,
   getExpandedRowModel,
   getGroupedRowModel,
+  // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
+  // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
+  // getFaceted* $expose verbs or the #filter slot props, so byte-identical-off (req-10) holds.
+  // getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
+  // box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
+  // ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFacetedMinMaxValues,
 } from '@tanstack/table-core'
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
@@ -1204,6 +1213,13 @@ $onMount(() => {
     // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
     getGroupedRowModel: getGroupedRowModel(),
     onGroupingChange: onGroupingChangeCb,
+    // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
+    // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
+    // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
+    // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -1402,6 +1418,12 @@ const reFeed = () => {
     // fresh currentState each cycle, F6).
     getGroupedRowModel: getGroupedRowModel(),
     onGroupingChange: onGroupingChangeCb,
+    // Re-pass the 3 faceted models (Pitfall 4 — setOptions REPLACES, so an omitted fn would
+    // drop the model on re-feed; on React the faceted closures must re-capture so exposed
+    // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
@@ -3476,6 +3498,32 @@ const getExpandedRows = () => {
 const applyGrouping = (cols) => { if (table) table.setGrouping(cols) }
 const clearGrouping = () => { if (table) table.setGrouping([]) }
 
+// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
+// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
+// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
+// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
+// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
+// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
+// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
+//
+// facetedUniqueValuesFor: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; getFacetedUniqueValues() returns Map<any,number>, we return
+// Array.from(map.keys()) — no .entries()/count surface). Empty array on missing column/table.
+const facetedUniqueValuesFor = (colId) => {
+  if (tick() < 0 || !table) return []
+  const col = table.getColumn(colId)
+  if (!col || !col.getFacetedUniqueValues) return []
+  const map = col.getFacetedUniqueValues()   // Map<any, number>
+  return map ? Array.from(map.keys()) : []     // KEYS only — counts deferred (D-03)
+}
+// facetedMinMaxFor: the column's [min, max] numeric range, or null when unavailable.
+const facetedMinMaxFor = (colId) => {
+  if (tick() < 0 || !table) return null
+  const col = table.getColumn(colId)
+  if (!col || !col.getFacetedMinMaxValues) return null
+  return col.getFacetedMinMaxValues() || null  // [number, number] | null
+}
+
 $expose({
   sortColumn,
   clearSorting,
@@ -3485,6 +3533,8 @@ $expose({
   getExpandedRows,
   applyGrouping,
   clearGrouping,
+  getFacetedUniqueValues: facetedUniqueValuesFor,
+  getFacetedMinMaxValues: facetedMinMaxFor,
   getColumnDefs,
   toggleAllRows,
   clearSelection,
