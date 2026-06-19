@@ -160,7 +160,7 @@ const getSubRows = (row: { children?: unknown[] }): unknown[] | undefined => row
       :expandable="true"
       :data="$data.rows"
       r-model:expanded="$data.expanded"
-      @expanded-change="onExpandedChange($event)"
+      @expand-change="onExpandedChange($event)"
     >
       <Column field="name"   header="Name" />
       <Column field="region" header="Region" />

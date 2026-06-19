@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
@@ -78,7 +78,7 @@ interface DataTableProps {
   estimateRowHeight?: number;
   maxHeight?: string;
   onSortChange?: (...args: any[]) => void;
-  onExpandedChange?: (...args: any[]) => void;
+  onExpandChange?: (...args: any[]) => void;
   onFilterChange?: (...args: any[]) => void;
   onPageChange?: (...args: any[]) => void;
   onSelectionChange?: (...args: any[]) => void;
@@ -448,7 +448,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     programmatic.current++;
     setExpandedDefault(next); // fresh value only (never in-place)
     setExpanded(next); // two-way emit if bound (no-op-diff if not)
-    props.onExpandedChange && props.onExpandedChange(next);
+    // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+    // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+    // interface, and an `expanded-change` event would camelCase to the SAME identifier
+    // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+    // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+    // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+    props.onExpandChange && props.onExpandChange(next);
     programmatic.current--;
   }
   function writeGlobalFilter(next: any) {
@@ -792,7 +798,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: props.getSubRows || undefined,
+      getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
@@ -2488,7 +2494,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: props.getSubRows || undefined,
+      getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: _expandableRef.current === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
@@ -2773,7 +2779,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
 
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
-        {rows.map((row) => <React.Fragment key={row.id}>
+        {rows.map((row) => <Fragment key={row.id}>
         <tr key={row.id} className={"rdt-tr"} role="row" data-depth={rozieAttr(row.depth)} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
             
@@ -2794,7 +2800,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           <td className={"rdt-detail-cell"} colSpan={(visibleColCount()) ?? undefined} data-rozie-s-d5dcab4c="">
             {(props.renderDetail ?? props.slots?.['detail'])?.({ row: row.original })}
           </td>
-        </tr>}</React.Fragment>)}
+        </tr>}</Fragment>)}
       </tbody>
     </table>}{(!props.virtual) && <div className={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">
       <button type="button" className={"rdt-page-btn rdt-page-prev"} disabled={!canPrevPage()} onClick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c="">Prev</button>

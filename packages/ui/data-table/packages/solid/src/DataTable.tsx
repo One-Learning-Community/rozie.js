@@ -301,7 +301,7 @@ interface DataTableProps {
   estimateRowHeight?: number;
   maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
-  onExpandedChange?: (...args: unknown[]) => void;
+  onExpandChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;
@@ -449,7 +449,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: local.getSubRows || undefined,
+      getSubRows: (local.getSubRows || undefined) as any,
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
@@ -853,7 +853,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     programmatic++;
     setExpandedDefault(next); // fresh value only (never in-place)
     setExpanded(next); // two-way emit if bound (no-op-diff if not)
-    _props.onExpandedChange?.(next);
+    // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+    // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+    // interface, and an `expanded-change` event would camelCase to the SAME identifier
+    // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+    // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+    // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+    _props.onExpandChange?.(next);
     programmatic--;
   }
 
@@ -1342,7 +1348,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: local.getSubRows || undefined,
+      getSubRows: (local.getSubRows || undefined) as any,
       getRowCanExpand: local.expandable === true && local.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle

@@ -127,7 +127,7 @@ The full prop surface. The nine `model: true` slices (the **Two-way** column) ar
 | `pagination` | `Object` | `{…}` | ✓ | | `{ pageIndex, pageSize }`. Defaults to `{ pageIndex: 0, pageSize: 10 }`; feeds the prev/next + page-size chrome. |
 | `manual` | `Boolean` | `false` | | | Server-side hook: sets `manualPagination` / `manualFiltering` / `manualSorting` so table-core trusts the consumer-supplied rows and only emits the change events. |
 | `expandable` | `Boolean` | `false` | | | Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). |
-| `expanded` | `any` | `{}` | ✓ | | `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expanded-change`; uncontrolled fallback when unbound. |
+| `expanded` | `any` | `{}` | ✓ | | `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback when unbound. |
 | `getSubRows` | `Function` | `null` | | | Table-level child-row accessor `(originalRow, index) => TData[] \| undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode. |
 | `rowSelection` | `Object` | `{}` | ✓ | | `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). |
 | `columnVisibility` | `Object` | `{}` | ✓ | | `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. |
@@ -151,7 +151,7 @@ Each slice is an independent, optional two-way `r-model` with its own uncontroll
 | `columnFilters` | `[{ id, value }]` | `filter-change` | Per-column filter values (gated by each column's `filterable`). |
 | `pagination` | `{ pageIndex, pageSize }` | `page-change` | The current page index + size. |
 | `rowSelection` | `{ [rowId]: true }` | `selection-change` | The selected-row set (checkbox-only). |
-| `expanded` | `{ [rowId]: true } \| true` | `expanded-change` | The expanded-row set (multi-expand; the `true` literal = all rows expanded). |
+| `expanded` | `{ [rowId]: true } \| true` | `expand-change` | The expanded-row set (multi-expand; the `true` literal = all rows expanded). |
 | `columnVisibility` | `{ [colId]: boolean }` | `visibility-change` | Per-column shown/hidden state. |
 | `columnSizing` | `{ [colId]: number }` | `resize-change` | Per-column widths (live during a resize drag). |
 | `columnOrder` | `string[]` | `reorder-change` | The full column order. |
@@ -167,7 +167,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `filter-change` | Fired when a filter changes. Payload `{ globalFilter }` for the global search box or `{ columnFilters }` for a per-column filter — both surface through this one event. |
 | `page-change` | Fired when pagination changes (prev/next, a page-size change, or a `setPage`/`setRowsPerPage` call). Payload: the fresh `{ pageIndex, pageSize }`. |
 | `selection-change` | Fired when the row selection changes (a row/select-all checkbox toggle or a `toggleAllRows`/`clearSelection` call). Payload: the fresh `RowSelectionState`. |
-| `expanded-change` | Fired when the expanded-row set changes (an expander chevron toggle — click / Enter / Space — or a `toggleRowExpanded`/`expandAll`/`collapseAll` call). Fires exactly once per change. Payload: the fresh `ExpandedState` (`{ [rowId]: true }`, or the `true` literal after `expandAll` — pass through verbatim, never `Object.keys` without a `=== true` guard). |
+| `expand-change` | Fired when the expanded-row set changes (an expander chevron toggle — click / Enter / Space — or a `toggleRowExpanded`/`expandAll`/`collapseAll` call). Fires exactly once per change. Payload: the fresh `ExpandedState` (`{ [rowId]: true }`, or the `true` literal after `expandAll` — pass through verbatim, never `Object.keys` without a `=== true` guard). Named `expand-change` (not `expanded-change`) so it does not collide with the `expanded` model's `onExpandedChange` callback on the React/Solid Props interface. |
 | `visibility-change` | Fired when a column is shown/hidden (the column-toggle menu or a `toggleColumnVisibility` call). Payload: the fresh `VisibilityState`. |
 | `resize-change` | Fired live during a column resize drag (`columnResizeMode: 'onChange'`). Payload: the fresh `ColumnSizingState`. |
 | `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
@@ -186,9 +186,9 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `toggleAllRows` | Select or clear all (filtered) rows — `toggleAllRows(value)`. Fires `selection-change`. |
 | `clearSelection` | Clear the row selection — `clearSelection()`. Fires `selection-change` with `{}`. |
 | `getSelectedRows` | Return the original row data for the selected rows — `getSelectedRows()` → `unknown[]`. |
-| `toggleRowExpanded` | Toggle one row's expanded state — `toggleRowExpanded(rowId)` (the data `id` field or the table-core row id; both resolve). Multi-expand (does not collapse other rows). Fires `expanded-change`. |
-| `expandAll` | Open every expandable row — `expandAll()`. Fires `expanded-change` (payload may be the `true` literal). |
-| `collapseAll` | Collapse every row — `collapseAll()`. Resets the expanded set to `{}`. Fires `expanded-change`. |
+| `toggleRowExpanded` | Toggle one row's expanded state — `toggleRowExpanded(rowId)` (the data `id` field or the table-core row id; both resolve). Multi-expand (does not collapse other rows). Fires `expand-change`. |
+| `expandAll` | Open every expandable row — `expandAll()`. Fires `expand-change` (payload may be the `true` literal). |
+| `collapseAll` | Collapse every row — `collapseAll()`. Resets the expanded set to `{}`. Fires `expand-change`. |
 | `getExpandedRows` | Return the original row data for the currently-expanded rows — `getExpandedRows()` → `unknown[]` (empty when nothing is expanded). |
 | `setPage` | Go to a 0-based page index — `setPage(idx)`. Fires `page-change`. |
 | `setRowsPerPage` | Set the page size — `setRowsPerPage(size)`. Fires `page-change`. |

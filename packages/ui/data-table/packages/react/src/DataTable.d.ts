@@ -47,6 +47,7 @@ export interface DataTableProps {
   estimateRowHeight?: number;
   maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
+  onExpandChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;
   onSelectionChange?: (...args: unknown[]) => void;

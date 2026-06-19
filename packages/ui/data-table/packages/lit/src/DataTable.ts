@@ -581,7 +581,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: this.getSubRows || undefined,
+      getSubRows: (this.getSubRows || undefined) as any,
       getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
@@ -1100,7 +1100,13 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   this.programmatic++;
   this._expandedDefault.value = next; // fresh value only (never in-place)
   this._expandedControllable.write(next); // two-way emit if bound (no-op-diff if not)
-  this.dispatchEvent(new CustomEvent("expanded-change", {
+  // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+  // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+  // interface, and an `expanded-change` event would camelCase to the SAME identifier
+  // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+  // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+  // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+  this.dispatchEvent(new CustomEvent("expand-change", {
     detail: next,
     bubbles: true,
     composed: true
@@ -1517,7 +1523,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: this.getSubRows || undefined,
+    getSubRows: (this.getSubRows || undefined) as any,
     getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
     onExpandedChange: this.onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle

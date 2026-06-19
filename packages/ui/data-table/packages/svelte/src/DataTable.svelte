@@ -35,7 +35,7 @@ interface Props {
   detail?: Snippet<[{ row: any }]>;
   snippets?: Record<string, any>;
   onsortchange?: (...args: unknown[]) => void;
-  onexpandedchange?: (...args: unknown[]) => void;
+  onexpandchange?: (...args: unknown[]) => void;
   onfilterchange?: (...args: unknown[]) => void;
   onpagechange?: (...args: unknown[]) => void;
   onselectionchange?: (...args: unknown[]) => void;
@@ -88,7 +88,7 @@ let {
   detail: __detailProp,
   snippets,
   onsortchange,
-  onexpandedchange,
+  onexpandchange,
   onfilterchange,
   onpagechange,
   onselectionchange,
@@ -480,7 +480,13 @@ const writeExpanded = (next: any) => {
   programmatic++;
   expandedDefault = next; // fresh value only (never in-place)
   expanded = next; // two-way emit if bound (no-op-diff if not)
-  onexpandedchange?.(next);
+  // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+  // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+  // interface, and an `expanded-change` event would camelCase to the SAME identifier
+  // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+  // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+  // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+  onexpandchange?.(next);
   programmatic--;
 };
 
@@ -1088,7 +1094,7 @@ const reFeed = () => {
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: getSubRows || undefined,
+    getSubRows: (getSubRows || undefined) as any,
     getRowCanExpand: expandable === true && getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
@@ -3891,7 +3897,7 @@ onMount(() => {
     // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
     // default `!!subRows.length` rule applies (only parents with children expand).
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: getSubRows || undefined,
+    getSubRows: (getSubRows || undefined) as any,
     getRowCanExpand: expandable === true && getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's

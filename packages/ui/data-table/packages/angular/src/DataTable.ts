@@ -772,7 +772,7 @@ export class DataTable {
   pasteAnnounce = signal('');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   sortChange = output<unknown>({ alias: 'sort-change' });
-  expandedChange = output<unknown>({ alias: 'expanded-change' });
+  expandChange = output<unknown>({ alias: 'expand-change' });
   filterChange = output<unknown>({ alias: 'filter-change' });
   pageChange = output<unknown>({ alias: 'page-change' });
   selectionChange = output<unknown>({ alias: 'selection-change' });
@@ -864,7 +864,7 @@ export class DataTable {
       // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: __getSubRows || undefined,
+      getSubRows: (__getSubRows || undefined) as any,
       getRowCanExpand: this.expandable() === true && __getSubRows == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
@@ -1162,7 +1162,13 @@ export class DataTable {
     this.programmatic++;
     this.expandedDefault.set(next); // fresh value only (never in-place)
     this.expanded.set(next); // two-way emit if bound (no-op-diff if not)
-    this.expandedChange.emit(next);
+    // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+    // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+    // interface, and an `expanded-change` event would camelCase to the SAME identifier
+    // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+    // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+    // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+    this.expandChange.emit(next);
     this.programmatic--;
   };
   writeGlobalFilter = (next: any) => {
@@ -1510,7 +1516,7 @@ export class DataTable {
       // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: this.getSubRows() || undefined,
+      getSubRows: (this.getSubRows() || undefined) as any,
       getRowCanExpand: this.expandable() === true && this.getSubRows() == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle

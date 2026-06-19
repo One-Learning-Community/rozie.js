@@ -178,7 +178,7 @@ const columnPinning = defineModel<Record<string, any>>('columnPinning', { defaul
 
 const emit = defineEmits<{
   'sort-change': [...args: any[]];
-  'expanded-change': [...args: any[]];
+  'expand-change': [...args: any[]];
   'filter-change': [...args: any[]];
   'page-change': [...args: any[]];
   'selection-change': [...args: any[]];
@@ -581,7 +581,13 @@ const writeExpanded = (next: any) => {
   programmatic++;
   expandedDefault.value = next; // fresh value only (never in-place)
   expanded.value = next; // two-way emit if bound (no-op-diff if not)
-  emit('expanded-change', next);
+  // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+  // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+  // interface, and an `expanded-change` event would camelCase to the SAME identifier
+  // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+  // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+  // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+  emit('expand-change', next);
   programmatic--;
 };
 
@@ -1189,7 +1195,7 @@ const reFeed = () => {
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: props.getSubRows || undefined,
+    getSubRows: (props.getSubRows || undefined) as any,
     getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
@@ -3994,7 +4000,7 @@ onMounted(() => {
     // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
     // default `!!subRows.length` rule applies (only parents with children expand).
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: props.getSubRows || undefined,
+    getSubRows: (props.getSubRows || undefined) as any,
     getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
