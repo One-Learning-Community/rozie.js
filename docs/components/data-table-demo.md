@@ -24,6 +24,15 @@ const rowSelection = ref({});
 const pagination = ref({ pageIndex: 0, pageSize: 5 });
 
 const tbl = ref();
+
+// A large dataset for the row-windowing demo — 50,000 synthetic rows. With
+// `virtual`, only the visible slice renders inside the bounded scroll container.
+const BIG_ROWS = Array.from({ length: 50_000 }, (_, i) => ({
+  id: i + 1,
+  name: `Row ${i + 1}`,
+  email: `user${i + 1}@example.com`,
+  status: i % 2 ? 'active' : 'away',
+}));
 </script>
 
 # DataTable — live demo
@@ -72,6 +81,24 @@ This is the **real `@rozie-ui/data-table-vue` package** running on this page (Vi
 </ClientOnly>
 
 Each `v-model:<slice>` is a two-way bind — the readout updates the instant you change the state, and a consumer write flows back in. The four slices bound here (`sorting`, `globalFilter`, `rowSelection`, `pagination`) are four of the [nine independent state slices](/components/data-table#models-the-nine-two-way-slices); bind a slice only when you want to own it. The header buttons drive the imperative handle (`toggleAllRows`, `clearSelection`, `clearSorting`) grabbed through Vue's `ref`. A single `#cell` slot on `<DataTable>`, dispatched by `columnId`, renders the **Status** badge; every other column falls through to the plain accessor value (the fast path). See the [full API](/components/data-table) for every prop, slice, event, slot, and handle verb, plus the `<Column>` API, theming, and accessibility reference.
+
+## Row windowing (virtualization)
+
+The same real `@rozie-ui/data-table-vue` package, now over **50,000 rows** with `virtual` + `maxHeight="400px"`. Only the visible slice renders inside the bounded scroll container — scroll the table below and watch the row count stay tiny while the scrollbar spans the full 50,000-row height. Row windowing is GA on all six targets and [**tested to 100,000 rows**](/components/data-table-comparison#feature-matrix) by a DOM/behavioral VR matrix; the default `virtual="false"` is byte-identical to a non-virtual table.
+
+<ClientOnly>
+<div class="dt-live">
+
+  <DataTable :data="BIG_ROWS" virtual max-height="400px">
+    <Column field="name" header="Name" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" />
+  </DataTable>
+
+</div>
+</ClientOnly>
+
+Set `virtual` to opt in; bound `maxHeight` (or the `--rozie-data-table-max-height` CSS custom property — the prop wins, the token is the fallback) sizes the scroll container, and `estimateRowHeight` seeds the row estimate before `measureElement` refines actual heights. Windowing runs over the full filtered + sorted (pre-pagination) model and suppresses the client pagination chrome. See the [comparison page](/components/data-table-comparison#what-rozie-defers) for the published support boundary (and the orthogonal pieces — column virtualization + dynamic auto-measure — that remain deferred).
 
 ## One source, six outputs
 

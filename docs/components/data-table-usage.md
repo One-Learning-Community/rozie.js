@@ -336,6 +336,193 @@ render(html`
 
 :::
 
+### Virtualized rows (windowing)
+
+::: code-group
+
+```tsx [React]
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+// PROP form — bound `maxHeight` sizes the scroll container.
+export function Demo() {
+  const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+  return (
+    <DataTable data={rows} virtual maxHeight="400px">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  );
+}
+
+// TOKEN form — the same bound height via the CSS custom property (the prop wins
+// when both are set; the token is the fallback). Tune the row estimate too:
+// <DataTable data={rows} virtual estimateRowHeight={48}
+//   style={{ '--rozie-data-table-max-height': '400px' } as React.CSSProperties} />
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+</script>
+
+<template>
+  <!-- PROP form — bound :maxHeight sizes the scroll container. -->
+  <DataTable :data="rows" :virtual="true" maxHeight="400px">
+    <Column field="name" header="Name" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" />
+  </DataTable>
+
+  <!-- TOKEN form — the same height via the CSS custom property (prop wins when
+       both are set; the token is the fallback). :estimateRowHeight tunes the seed. -->
+  <DataTable
+    :data="rows"
+    :virtual="true"
+    :estimateRowHeight="48"
+    style="--rozie-data-table-max-height: 400px"
+  >
+    <Column field="name" header="Name" />
+    <Column field="email" header="Email" />
+    <Column field="status" header="Status" />
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+</script>
+
+<!-- PROP form — bound maxHeight sizes the scroll container. -->
+<DataTable data={rows} virtual maxHeight="400px">
+  <Column field="name" header="Name" />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" />
+</DataTable>
+
+<!-- TOKEN form — the same height via the CSS custom property (prop wins when both
+     are set; the token is the fallback). estimateRowHeight tunes the seed. -->
+<DataTable data={rows} virtual estimateRowHeight={48} style="--rozie-data-table-max-height: 400px">
+  <Column field="name" header="Name" />
+  <Column field="email" header="Email" />
+  <Column field="status" header="Status" />
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- PROP form — bound [maxHeight] sizes the scroll container. -->
+    <DataTable [data]="rows" [virtual]="true" maxHeight="400px">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+
+    <!-- TOKEN form — the same height via the CSS custom property (prop wins when
+         both are set; the token is the fallback). [estimateRowHeight] tunes the seed. -->
+    <DataTable
+      [data]="rows"
+      [virtual]="true"
+      [estimateRowHeight]="48"
+      style="--rozie-data-table-max-height: 400px"
+    >
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+}
+```
+
+```tsx [Solid]
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+// PROP form — bound maxHeight sizes the scroll container.
+export function Demo() {
+  const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+  return (
+    <DataTable data={rows} virtual maxHeight="400px">
+      <Column field="name" header="Name" />
+      <Column field="email" header="Email" />
+      <Column field="status" header="Status" />
+    </DataTable>
+  );
+}
+
+// TOKEN form — the same height via the CSS custom property (the prop wins when
+// both are set; the token is the fallback). estimateRowHeight tunes the seed:
+// <DataTable data={rows} virtual estimateRowHeight={48}
+//   style={{ '--rozie-data-table-max-height': '400px' }} />
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = Array.from({ length: 10_000 }, (_, i) => ({
+    id: i + 1,
+    name: `Row ${i + 1}`,
+    email: `user${i + 1}@example.com`,
+    status: i % 2 ? 'active' : 'away',
+  }));
+
+// PROP form — the `max-height` attribute sizes the scroll container.
+render(html`
+  <rozie-data-table .data=${rows} virtual max-height="400px">
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="email" header="Email"></rozie-column>
+    <rozie-column field="status" header="Status"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+
+// TOKEN form — the same height via the CSS custom property (the prop wins when
+// both are set; the token is the fallback). `estimate-row-height` tunes the seed:
+//   <rozie-data-table .data=${rows} virtual estimate-row-height="48"
+//     style="--rozie-data-table-max-height: 400px"> … </rozie-data-table>
+```
+
+:::
+
 ## Imperative handle
 
 Beyond props and events, `DataTable` exposes imperative methods (declared once in the `.rozie` source via `$expose`). Grab a handle through your framework's native ref mechanism and call them directly:
