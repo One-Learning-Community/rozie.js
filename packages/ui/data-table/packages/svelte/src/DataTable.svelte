@@ -40,6 +40,7 @@ interface Props {
   onpinchange?: (...args: unknown[]) => void;
   onactivecellchange?: (...args: unknown[]) => void;
   oncelleditcommit?: (...args: unknown[]) => void;
+  onroweditcommit?: (...args: unknown[]) => void;
 }
 
 let __defaultColumns = (() => [])();
@@ -85,7 +86,8 @@ let {
   onreorderchange,
   onpinchange,
   onactivecellchange,
-  oncelleditcommit
+  oncelleditcommit,
+  onroweditcommit
 }: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
@@ -133,6 +135,8 @@ let editingCol = $state(-1);
 let draftValue: any = $state(null);
 let invalidMsg = $state('');
 let editVer = $state(0);
+let editingRowIndex: any = $state(null);
+let rowDraft = $state({});
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -1803,6 +1807,10 @@ const onGridKeyDown = (e: any) => {
   // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
   // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
   if (editingRow >= 0) return;
+  // Full-row edit (phase 51 req-6): an OPEN row editor owns Enter/Escape/Tab via the cell
+  // editors' local onEditorKeyDown. Return early (before activeInControl) so the grid nav
+  // keymap never hijacks while a row is in edit — the three modes stay mutually exclusive.
+  if (editingRowIndex != null) return;
   // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
   if (activeInControl) {
     if (key === 'Escape') {
@@ -1883,6 +1891,16 @@ const onGridKeyDown = (e: any) => {
     } else {
       nextCol = gotoColEdge(true);
     }
+  }
+  // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
+  // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
+  // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
+  // collision risk against the Phase-49 keymap. Gated by isActiveCellEditable() (the row has
+  // at least the active editable column); a non-editable active cell falls through unchanged.
+  else if (key === 'F2' && e.shiftKey && isActiveCellEditable()) {
+    e.preventDefault();
+    beginRowEdit((rows || [])[activeRow]);
+    return;
   }
   // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
   // Gated by isActiveCellEditable(): a non-editable active cell falls through to
@@ -2038,15 +2056,36 @@ const isActiveCellEditable = () => {
   return colId != null && columnEditable(colId);
 };
 
-// isEditing: is the cell at (rowIndex, colIndex) over the visible model the one in edit?
-// Pure index compare against the editing pair (-1/-1 = none) → the byte-identical-off
-// guard for the editor template branch. Called per-cell in both <td> bodies with the
-// body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
-// isEditing: is the cell at (rowIndex, colIndex) over the visible model the one in edit?
-// Pure index compare against the editing pair (-1/-1 = none) → the byte-identical-off
-// guard for the editor template branch. Called per-cell in both <td> bodies with the
-// body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
-const isEditing = (rowIndex: any, colIndex: any) => editVer >= 0 && editingRow === rowIndex && editingCol === colIndex;
+// isEditing: is the cell at (rowIndex, colIndex) over the visible model in edit? ONE
+// predicate covers BOTH modes (RESEARCH Pattern 6):
+//  - row mode (req-6): editingRowIndex === rowIndex AND the column at colIndex is editable —
+//    so EVERY editable cell in the row enters edit simultaneously (the editor template branch
+//    re-uses this gate verbatim, no template fork);
+//  - single-cell mode (req-1/3): the editingRow/editingCol pair matches exactly.
+// Pure index compare (editingRowIndex null + editingRow -1 = none) → the byte-identical-off
+// guard for the editor template branch. $data.editVer is read first so the per-cell branch
+// re-derives on Svelte/Solid when editing state mutates from a foreign slot-callback scope.
+// Called per-cell in both <td> bodies with the body-specific row index (rowIndexOf(row)
+// non-virtual, wr.vi.index virtual).
+// isEditing: is the cell at (rowIndex, colIndex) over the visible model in edit? ONE
+// predicate covers BOTH modes (RESEARCH Pattern 6):
+//  - row mode (req-6): editingRowIndex === rowIndex AND the column at colIndex is editable —
+//    so EVERY editable cell in the row enters edit simultaneously (the editor template branch
+//    re-uses this gate verbatim, no template fork);
+//  - single-cell mode (req-1/3): the editingRow/editingCol pair matches exactly.
+// Pure index compare (editingRowIndex null + editingRow -1 = none) → the byte-identical-off
+// guard for the editor template branch. $data.editVer is read first so the per-cell branch
+// re-derives on Svelte/Solid when editing state mutates from a foreign slot-callback scope.
+// Called per-cell in both <td> bodies with the body-specific row index (rowIndexOf(row)
+// non-virtual, wr.vi.index virtual).
+const isEditing = (rowIndex: any, colIndex: any) => {
+  if (editVer < 0) return false;
+  if (editingRowIndex != null && editingRowIndex === rowIndex) {
+    const colId = columnIdAt(rowIndex, colIndex);
+    return colId != null && columnEditable(colId);
+  }
+  return editingRow === rowIndex && editingCol === colIndex;
+};
 
 // cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
 // an invalid value — drives :aria-invalid on the <td>. Returns null otherwise so the bound
@@ -2243,6 +2282,10 @@ const beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   const colId = columnIdAt(rowIndex, colIndex);
   if (colId == null || !columnEditable(colId)) return;
   setInvalid('');
+  // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
+  // editor clears any row-edit state so isEditing never resolves both modes for one cell.
+  editingRowIndex = null;
+  rowDraft = {};
   editingRow = rowIndex;
   editingCol = colIndex;
   draftValue = seed != null ? seed : cellValueAt(rowIndex, colIndex);
@@ -2289,6 +2332,20 @@ const endEdit = () => {
   editingRow = -1;
   editingCol = -1;
   draftValue = null;
+  invalidMsg = '';
+  activeInControl = false;
+  editVer = editVer + 1;
+};
+
+// endRowEdit: tear down full-row edit (shared by commitRow/cancelRow). Clears the row
+// index + the per-cell drafts + invalid state and returns to navigation mode. Does NOT
+// move focus (callers return it to the active cell). Mirrors endEdit for the row mode.
+// endRowEdit: tear down full-row edit (shared by commitRow/cancelRow). Clears the row
+// index + the per-cell drafts + invalid state and returns to navigation mode. Does NOT
+// move focus (callers return it to the active cell). Mirrors endEdit for the row mode.
+const endRowEdit = () => {
+  editingRowIndex = null;
+  rowDraft = {};
   invalidMsg = '';
   activeInControl = false;
   editVer = editVer + 1;
@@ -2374,6 +2431,185 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol);
 };
 
+// ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+// Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+// edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+// replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+// validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+// editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+
+// The editable [columnId, field] pairs for a body row at the given visible-model index,
+// in visible-cell order. field is the column's accessorKey (the row-object key to write).
+// ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+// Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+// edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+// replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+// validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+// editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+
+// The editable [columnId, field] pairs for a body row at the given visible-model index,
+// in visible-cell order. field is the column's accessorKey (the row-object key to write).
+const editableColumnsForRow = (rowIndex: any) => {
+  const rowList = rows || [];
+  const row = rowList[rowIndex];
+  if (!row) return [];
+  const cells = visibleCellsFor(row);
+  const out = [];
+  for (let c = 0; c < cells.length; c++) {
+    const cell = cells[c];
+    const colId = cell && cell.column ? cell.column.id : null;
+    if (colId == null || !columnEditable(colId)) continue;
+    const d = defFor(colId);
+    const field = d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+    out.push({
+      colId,
+      field
+    });
+  }
+  return out;
+};
+
+// beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+// editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+// edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+// rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+// focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+// internally via rowIndexOf so it stays in the editingRow/activeRow index space.
+// beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+// editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+// edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+// rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+// focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+// internally via rowIndexOf so it stays in the editingRow/activeRow index space.
+const beginRowEdit = (row: any) => {
+  const rowIndex = rowIndexOf(row);
+  if (rowIndex < 0) return;
+  const editable = editableColumnsForRow(rowIndex);
+  if (editable.length === 0) return;
+  // Clear any single-cell editor first (mutual exclusivity).
+  editingRow = -1;
+  editingCol = -1;
+  draftValue = null;
+  setInvalid('');
+  // Seed each editable cell's draft from its current value.
+  const draft = {};
+  const rowList = rows || [];
+  const r = rowList[rowIndex];
+  const orig = r ? r.original : null;
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i];
+    draft[ec.colId] = orig ? orig[ec.field] : null;
+  }
+  rowDraft = draft;
+  editingRowIndex = rowIndex;
+  activeInControl = true;
+  editVer = editVer + 1;
+  focusEditorWhenReady();
+};
+
+// commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+// invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+// the single row object with all rowDraft values applied at once, call writeData ONCE, then
+// emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+// Returns true on a written commit, false when a validation failure kept the row open.
+// commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+// invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+// the single row object with all rowDraft values applied at once, call writeData ONCE, then
+// emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+// Returns true on a written commit, false when a validation failure kept the row open.
+const commitRow = () => {
+  if (editingRowIndex == null) return false;
+  const rowIndex = editingRowIndex;
+  const editable = editableColumnsForRow(rowIndex);
+  if (editable.length === 0) {
+    endRowEdit();
+    return false;
+  }
+  const rowList = rows || [];
+  const r = rowList[rowIndex];
+  const rowOriginal = r ? r.original : null;
+  const rowId = r ? r.id : null;
+  const draft = rowDraft || {};
+  // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i];
+    const err = runValidator(ec.colId, draft[ec.colId], rowOriginal);
+    if (err !== true) {
+      setInvalid(err);
+      focusEditorWhenReady();
+      return false;
+    }
+  }
+  setInvalid('');
+  // Build the changes payload (only the columns whose value actually changed) + the field→
+  // value map for the single row-object replace.
+  const changes = [];
+  const fieldValues = {};
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i];
+    const newValue = draft[ec.colId];
+    const oldValue = rowOriginal ? rowOriginal[ec.field] : null;
+    fieldValues[ec.field] = newValue;
+    if (oldValue !== newValue) changes.push({
+      columnId: ec.colId,
+      oldValue,
+      newValue
+    });
+  }
+  // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
+  const srcIndex = sourceIndexOfRow(rowIndex);
+  const next = replaceRowValues(currentData(), srcIndex, fieldValues);
+  const focusRow = rowIndex;
+  const focusCol = activeColIndex;
+  editTransition = true;
+  writeData(next);
+  // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
+  onroweditcommit?.({
+    rowId,
+    changes
+  });
+  endRowEdit();
+  editTransition = false;
+  focusCellWhenReady(focusRow, focusCol);
+  return true;
+};
+
+// cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+// return focus to the active cell.
+// cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+// return focus to the active cell.
+const cancelRow = () => {
+  if (editingRowIndex == null) return;
+  const focusRow = activeRow;
+  const focusCol = activeColIndex;
+  editTransition = true;
+  endRowEdit();
+  editTransition = false;
+  focusCellWhenReady(focusRow, focusCol);
+};
+
+// replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
+// in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
+// replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
+// in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
+const replaceRowValues = (rows: any, rowIndex: any, fieldValues: any) => {
+  const src = rows || [];
+  const fv = fieldValues || {};
+  const out = [];
+  for (let i = 0; i < src.length; i++) {
+    if (i === rowIndex) {
+      const merged = {};
+      const orig = src[i] || {};
+      for (const k in orig) merged[k] = orig[k];
+      for (const k in fv) merged[k] = fv[k];
+      out.push(merged);
+    } else {
+      out.push(src[i]);
+    }
+  }
+  return out;
+};
+
 // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
 // rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
 // cell at the row's end; stop (return null) at grid end. Pure index math over the visible
@@ -2416,17 +2652,85 @@ const nextEditableCell = (fromRow: any, fromCol: any) => {
 // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
 let editTransition = false;
 
-// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
-// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
-// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
-// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
-// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
-// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
-const onEditorInput = (evt: any) => {
-  draftValue = evt && evt.target ? evt.target.value : '';
+// ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
+// In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
+// (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
+// rowDraft — so the four editors open simultaneously never clobber one shared value. These
+// helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
+// the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
+// onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
+// ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
+// In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
+// (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
+// rowDraft — so the four editors open simultaneously never clobber one shared value. These
+// helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
+// the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
+// onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
+const inRowEdit = () => editingRowIndex != null;
+const editorValueFor = (colId: any) => inRowEdit() ? rowDraft ? rowDraft[colId] : null : draftValue;
+const editorCheckedFor = (colId: any) => !!(inRowEdit() ? rowDraft ? rowDraft[colId] : null : draftValue);
+
+// #editor custom-slot callbacks (req-2/6): the consumer's slot calls commit(value)/cancel().
+// In SINGLE-CELL mode commit(v) commits that cell (commitEdit override); in ROW mode commit(v)
+// only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
+// reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
+// row-mode commit targets the right draft key.
+// #editor custom-slot callbacks (req-2/6): the consumer's slot calls commit(value)/cancel().
+// In SINGLE-CELL mode commit(v) commits that cell (commitEdit override); in ROW mode commit(v)
+// only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
+// reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
+// row-mode commit targets the right draft key.
+const editorCommitFor = (colId: any) => (value: any) => {
+  if (inRowEdit()) {
+    setRowDraft(colId, value);
+    return;
+  }
+  commitEdit(value);
 };
-const onEditorCheckboxChange = (evt: any) => {
-  draftValue = !!(evt && evt.target && evt.target.checked);
+const editorCancelFor = () => () => {
+  if (inRowEdit()) {
+    cancelRow();
+    return;
+  }
+  cancelEdit();
+};
+
+// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+// Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+// re-derive); single-cell they write the shared draftValue.
+// Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
+// neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
+// `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
+// Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+// re-derive); single-cell they write the shared draftValue.
+const onCellEditorInput = (colId: any, evt: any) => {
+  const v = evt && evt.target ? evt.target.value : '';
+  if (inRowEdit()) {
+    setRowDraft(colId, v);
+    return;
+  }
+  draftValue = v;
+};
+const onCellEditorCheckbox = (colId: any, evt: any) => {
+  const v = !!(evt && evt.target && evt.target.checked);
+  if (inRowEdit()) {
+    setRowDraft(colId, v);
+    return;
+  }
+  draftValue = v;
+};
+// setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+// in-place mutation is silently dropped on React/Solid; the family immutable rule).
+// setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+// in-place mutation is silently dropped on React/Solid; the family immutable rule).
+const setRowDraft = (colId: any, value: any) => {
+  const src = rowDraft || {};
+  const next = {};
+  for (const k in src) next[k] = src[k];
+  next[colId] = value;
+  rowDraft = next;
 };
 
 // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
@@ -2438,6 +2742,20 @@ const onEditorCheckboxChange = (evt: any) => {
 const onEditorKeyDown = (e: any) => {
   if (!e) return;
   const key = e.key;
+  // Full-row mode (req-6): Enter from ANY cell editor commits the WHOLE row at once (ONE
+  // model write + ONE row-edit-commit); Escape reverts the whole row. Tab moves between the
+  // row's editors NATIVELY (no commit-per-cell) — let the browser advance focus, so we don't
+  // preventDefault it here.
+  if (inRowEdit()) {
+    if (key === 'Enter') {
+      e.preventDefault();
+      commitRow();
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      cancelRow();
+    }
+    return;
+  }
   if (key === 'Enter') {
     e.preventDefault();
     commitEdit(undefined);
@@ -2477,6 +2795,11 @@ const onEditorKeyDown = (e: any) => {
 //    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
 //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
 const onEditorBlur = (e: any) => {
+  // Full-row mode (req-6): blur NEVER commits — the row commits as a UNIT only on an
+  // explicit Enter / save / editRow-driven flow (a per-cell blur-commit would split the row
+  // into N writes + N events, violating the one-write/one-event contract). Tabbing between
+  // the row's own editors is a normal focus move, not a commit.
+  if (inRowEdit()) return;
   if (editingRow < 0 || editTransition) return;
   const next = e ? e.relatedTarget : null;
   // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
@@ -2515,6 +2838,30 @@ export const editCell = (rowIndex: any, colIndex: any) => {
 // no cell is editing. Collision-clean (not `commit`).
 export const commitEditing = () => {
   if (editingRow >= 0) commitEdit(undefined);
+};
+
+// editRow(rowIndex) — programmatically enter full-row edit on a body row ($expose, req-6 /
+// D-06), the API twin of the Shift+F2 shortcut. Addressed BY INDEX over the visible model
+// (coerced + clamped); no-op on a row with no editable columns. Collision-clean (RESEARCH
+// name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
+// event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
+// commit/cancel focus-return lands in the right row.
+// editRow(rowIndex) — programmatically enter full-row edit on a body row ($expose, req-6 /
+// D-06), the API twin of the Shift+F2 shortcut. Addressed BY INDEX over the visible model
+// (coerced + clamped); no-op on a row with no editable columns. Collision-clean (RESEARCH
+// name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
+// event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
+// commit/cancel focus-return lands in the right row.
+export const editRow = (rowIndex: any) => {
+  const lastRow = bodyRowCount() - 1;
+  const maxRow = lastRow < 0 ? 0 : lastRow;
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+  const rowList = rows || [];
+  const row = rowList[r];
+  if (!row) return;
+  activeIsHeader = false;
+  activeRow = r;
+  beginRowEdit(row);
 };
 
 // ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
@@ -2782,7 +3129,7 @@ data, dataDefault, colReg])(); untrack(() => { if (__rozieWatchInitial_0) { __ro
 })(); }); });
 </script>
 
-<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class="rdt-tr" role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: draftValue, commit: commitEdit, cancel: cancelEdit })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={draftValue} oninput={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(draftValue)} onchange={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={!!draftValue} onchange={($event) => { onEditorCheckboxChange($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={draftValue} oninput={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: draftValue, commit: commitEdit, cancel: cancelEdit })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={draftValue} oninput={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(draftValue)} onchange={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={!!draftValue} onchange={($event) => { onEditorCheckboxChange($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={draftValue} oninput={($event) => { onEditorInput($event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
+<div class="rozie-data-table-wrap" bind:this={__rozieRoot} data-rozie-s-d5dcab4c><div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c>{@render children?.()}</div>{#if !!invalidMsg}<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>{invalidMsg}</div>{/if}<div class="rdt-toolbar" data-rozie-s-d5dcab4c><input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} oninput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />{#if allLeafColumns().length}<details class="rdt-colvis" data-rozie-s-d5dcab4c><summary class="rdt-colvis-summary" data-rozie-s-d5dcab4c>Columns</summary><div class="rdt-colvis-menu" role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c>{#each allLeafColumns() as lc (lc.id)}<label class="rdt-colvis-item" data-rozie-s-d5dcab4c><input type="checkbox" class="rdt-colvis-checkbox" checked={lc.visible} onchange={($event) => { onToggleVisibility(lc.id); }} data-rozie-s-d5dcab4c /><span class="rdt-colvis-label" data-rozie-s-d5dcab4c>{rozieDisplay(lc.label)}</span></label>{/each}</div></details>{/if}</div>{#if virtual}<div class="rdt-scroll" style={maxHeight ? 'max-height:' + maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + maxHeight : 'overflow:auto'} data-rozie-s-d5dcab4c><table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c><tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padTop() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr>{#each windowedRows() as wr (wr.row.id)}<tr class="rdt-tr" role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-rozie-s-d5dcab4c>{#each visibleCellsFor(wr.row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onchange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}<tr class="rdt-spacer" aria-hidden="true" data-rozie-s-d5dcab4c><td colspan={rozieAttr(visibleColCount())} style={'height:' + padBottom() + 'px;padding:0;border:0'} data-rozie-s-d5dcab4c></td></tr></tbody></table></div>{:else}<table class={["rozie-data-table", { 'rdt-sticky': stickyHeader }]} role={rozieAttr(tableRole())} onkeydown={($event) => { onGridKeyDown($event); }} onfocusin={($event) => { syncActiveFromEvent($event); }} onfocusout={($event) => { onGridFocusOut($event); }} data-rozie-s-d5dcab4c><thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>{#each headerGroups as hg (hg.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each hg.headers as header (header.id)}<th class={["rdt-th", { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabindex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={thStyle(header.column.id)} data-rozie-s-d5dcab4c>{#if isSelectColumn(header.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectAll}{@render selectAll({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows })}{:else}{#if selectionMode === 'multiple'}<input class="rdt-select-all" type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onchange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c />{/if}{/if}</span>{:else}<span style="display:contents" data-rozie-s-d5dcab4c>{#if header.column.getCanSort && header.column.getCanSort()}<button type="button" class="rdt-sort-btn" onclick={($event) => { onHeaderSort(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span><span class="rdt-sort-ind" aria-hidden="true" data-rozie-s-d5dcab4c>{rozieDisplay(sortIndicator(header.column.id))}</span></button>{:else}<span style="display:contents" data-rozie-s-d5dcab4c><span class="rdt-header-label" data-rozie-s-d5dcab4c>{#if colHeader}{@render colHeader({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) })}{:else}{rozieDisplay(headerLabel(header.column.id))}{/if}</span></span>{/if}{#if columnIsFilterable(header.column.id)}<input class="rdt-col-filter" type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} oninput={($event) => { onColumnFilterInput(header.column.id, $event); }} onclick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c />{/if}<span class="rdt-pin-controls" role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c><button type="button" class="rdt-pin-btn rdt-pin-left" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onclick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button><button type="button" class="rdt-pin-btn rdt-pin-none" aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onclick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button><button type="button" class="rdt-pin-btn rdt-pin-right" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onclick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button></span><button type="button" class="rdt-resize-handle" aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onpointerdown={($event) => { onResizeStart(header.column.id, $event); }} ontouchstart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button></span>{/if}</th>{/each}</tr>{/each}</thead><tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>{#each rows as row (row.id)}<tr class="rdt-tr" role="row" data-rozie-s-d5dcab4c>{#each visibleCellsFor(row) as cellCtx (cellCtx.id)}<td class={["rdt-td", { 'rdt-select-td': isSelectColumn(cellCtx.column.id) }]} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabindex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={pinStyle(cellCtx.column.id)} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-rozie-s-d5dcab4c>{#if isSelectColumn(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{#if selectCell}{@render selectCell({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) })}{:else}<input class="rdt-select-row" type="checkbox" aria-label="Select row" checked={rowIsSelected(row)} onchange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else if isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))}<span style="display:contents" data-rozie-s-d5dcab4c>{#if hasEditorSlot(cellCtx.column.id)}<span style="display:contents" data-rozie-s-d5dcab4c>{@render editor?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}</span>{:else if editorTypeOf(cellCtx.column.id) === 'number'}<input class="rdt-cell-editor" type="number" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else if editorTypeOf(cellCtx.column.id) === 'select'}<select class="rdt-cell-editor" data-editing-cell="" value={rozieAttr(editorValueFor(cellCtx.column.id))} onchange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c>{#each editorOptionsOf(cellCtx.column.id) as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c>{rozieDisplay(opt.label)}</option>{/each}</select>{:else if editorTypeOf(cellCtx.column.id) === 'checkbox'}<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onchange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{:else}<input class="rdt-cell-editor" type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} oninput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onkeydown={($event) => { onEditorKeyDown($event); }} onblur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c />{/if}</span>{:else}<span class="rdt-cell-value" data-rozie-s-d5dcab4c>{#if cell}{@render cell({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() })}{:else}{rozieDisplay(cellCtx.getValue())}{/if}</span>{/if}</td>{/each}</tr>{/each}</tbody></table>{/if}{#if !virtual}<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c><button type="button" class="rdt-page-btn rdt-page-prev" disabled={!canPrevPage()} onclick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button><span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>{rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}</span><button type="button" class="rdt-page-btn rdt-page-next" disabled={!canNextPage()} onclick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c>Next</button><select class="rdt-page-size" aria-label="Rows per page" value={rozieAttr(pageSize())} onchange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c><option value={10} data-rozie-s-d5dcab4c>10</option><option value={25} data-rozie-s-d5dcab4c>25</option><option value={50} data-rozie-s-d5dcab4c>50</option><option value={100} data-rozie-s-d5dcab4c>100</option></select></div>{/if}</div>
 
 <style>
 :global {

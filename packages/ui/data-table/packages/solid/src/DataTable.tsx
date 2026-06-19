@@ -285,6 +285,7 @@ interface DataTableProps {
   onPinChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
   onCellEditCommit?: (...args: unknown[]) => void;
+  onRowEditCommit?: (...args: unknown[]) => void;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
@@ -314,13 +315,14 @@ export interface DataTableHandle {
   clearActiveCell: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
+  editRow: (...args: any[]) => any;
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -377,6 +379,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const [draftValue, setDraftValue] = createSignal(null);
   const [invalidMsg, setInvalidMsg] = createSignal('');
   const [editVer, setEditVer] = createSignal(0);
+  const [editingRowIndex, setEditingRowIndex] = createSignal(null);
+  const [rowDraft, setRowDraft] = createSignal({});
   onMount(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
     // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
@@ -1874,6 +1878,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // early so the grid nav keymap never hijacks an arrow/Tab/Enter while editing — the three
     // modes (editing / in-control / navigation) stay mutually exclusive and ordered.
     if (editingRow() >= 0) return;
+    // Full-row edit (phase 51 req-6): an OPEN row editor owns Enter/Escape/Tab via the cell
+    // editors' local onEditorKeyDown. Return early (before activeInControl) so the grid nav
+    // keymap never hijacks while a row is in edit — the three modes stay mutually exclusive.
+    if (editingRowIndex() != null) return;
     // Interaction mode (D-08): Tab cycles within the cell, Escape exits. Focus containment.
     if (activeInControl()) {
       if (key === 'Escape') {
@@ -1954,6 +1962,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       } else {
         nextCol = gotoColEdge(true);
       }
+    }
+    // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
+    // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
+    // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
+    // collision risk against the Phase-49 keymap. Gated by isActiveCellEditable() (the row has
+    // at least the active editable column); a non-editable active cell falls through unchanged.
+    else if (key === 'F2' && e.shiftKey && isActiveCellEditable()) {
+      e.preventDefault();
+      beginRowEdit((rows() || [])[activeRow()]);
+      return;
     }
     // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
     // Gated by isActiveCellEditable(): a non-editable active cell falls through to
@@ -2076,12 +2094,24 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return colId != null && columnEditable(colId);
   }
 
-  // isEditing: is the cell at (rowIndex, colIndex) over the visible model the one in edit?
-  // Pure index compare against the editing pair (-1/-1 = none) → the byte-identical-off
-  // guard for the editor template branch. Called per-cell in both <td> bodies with the
-  // body-specific row index (rowIndexOf(row) non-virtual, wr.vi.index virtual).
+  // isEditing: is the cell at (rowIndex, colIndex) over the visible model in edit? ONE
+  // predicate covers BOTH modes (RESEARCH Pattern 6):
+  //  - row mode (req-6): editingRowIndex === rowIndex AND the column at colIndex is editable —
+  //    so EVERY editable cell in the row enters edit simultaneously (the editor template branch
+  //    re-uses this gate verbatim, no template fork);
+  //  - single-cell mode (req-1/3): the editingRow/editingCol pair matches exactly.
+  // Pure index compare (editingRowIndex null + editingRow -1 = none) → the byte-identical-off
+  // guard for the editor template branch. $data.editVer is read first so the per-cell branch
+  // re-derives on Svelte/Solid when editing state mutates from a foreign slot-callback scope.
+  // Called per-cell in both <td> bodies with the body-specific row index (rowIndexOf(row)
+  // non-virtual, wr.vi.index virtual).
   function isEditing(rowIndex: any, colIndex: any) {
-    return editVer() >= 0 && editingRow() === rowIndex && editingCol() === colIndex;
+    if (editVer() < 0) return false;
+    if (editingRowIndex() != null && editingRowIndex() === rowIndex) {
+      const colId = columnIdAt(rowIndex, colIndex);
+      return colId != null && columnEditable(colId);
+    }
+    return editingRow() === rowIndex && editingCol() === colIndex;
   }
 
   // cellAriaInvalid (req-5/D-01): the STRING 'true' ONLY for the editing cell while it holds
@@ -2245,6 +2275,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const colId = columnIdAt(rowIndex, colIndex);
     if (colId == null || !columnEditable(colId)) return;
     setInvalid('');
+    // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
+    // editor clears any row-edit state so isEditing never resolves both modes for one cell.
+    setEditingRowIndex(null);
+    setRowDraft({});
     setEditingRow(rowIndex);
     setEditingCol(colIndex);
     setDraftValue(seed != null ? seed : cellValueAt(rowIndex, colIndex));
@@ -2282,6 +2316,17 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setEditingRow(-1);
     setEditingCol(-1);
     setDraftValue(null);
+    setInvalidMsg('');
+    setActiveInControl(false);
+    setEditVer(editVer() + 1);
+  }
+
+  // endRowEdit: tear down full-row edit (shared by commitRow/cancelRow). Clears the row
+  // index + the per-cell drafts + invalid state and returns to navigation mode. Does NOT
+  // move focus (callers return it to the active cell). Mirrors endEdit for the row mode.
+  function endRowEdit() {
+    setEditingRowIndex(null);
+    setRowDraft({});
     setInvalidMsg('');
     setActiveInControl(false);
     setEditVer(editVer() + 1);
@@ -2355,6 +2400,161 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     focusCellWhenReady(focusRow, focusCol);
   }
 
+  // ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+  // Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+  // edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+  // replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+  // validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+  // editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+
+  // The editable [columnId, field] pairs for a body row at the given visible-model index,
+  // in visible-cell order. field is the column's accessorKey (the row-object key to write).
+  function editableColumnsForRow(rowIndex: any) {
+    const rowList = rows() || [];
+    const row = rowList[rowIndex];
+    if (!row) return [];
+    const cells = visibleCellsFor(row);
+    const out = [];
+    for (let c = 0; c < cells.length; c++) {
+      const cell = cells[c];
+      const colId = cell && cell.column ? cell.column.id : null;
+      if (colId == null || !columnEditable(colId)) continue;
+      const d = defFor(colId);
+      const field = d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+      out.push({
+        colId,
+        field
+      });
+    }
+    return out;
+  }
+
+  // beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+  // editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+  // edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+  // rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+  // focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+  // internally via rowIndexOf so it stays in the editingRow/activeRow index space.
+  function beginRowEdit(row: any) {
+    const rowIndex = rowIndexOf(row);
+    if (rowIndex < 0) return;
+    const editable = editableColumnsForRow(rowIndex);
+    if (editable.length === 0) return;
+    // Clear any single-cell editor first (mutual exclusivity).
+    setEditingRow(-1);
+    setEditingCol(-1);
+    setDraftValue(null);
+    setInvalid('');
+    // Seed each editable cell's draft from its current value.
+    const draft = {};
+    const rowList = rows() || [];
+    const r = rowList[rowIndex];
+    const orig = r ? r.original : null;
+    for (let i = 0; i < editable.length; i++) {
+      const ec = editable[i];
+      draft[ec.colId] = orig ? orig[ec.field] : null;
+    }
+    setRowDraft(draft);
+    setEditingRowIndex(rowIndex);
+    setActiveInControl(true);
+    setEditVer(editVer() + 1);
+    focusEditorWhenReady();
+  }
+
+  // commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+  // invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+  // the single row object with all rowDraft values applied at once, call writeData ONCE, then
+  // emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+  // Returns true on a written commit, false when a validation failure kept the row open.
+  function commitRow() {
+    if (editingRowIndex() == null) return false;
+    const rowIndex = editingRowIndex();
+    const editable = editableColumnsForRow(rowIndex);
+    if (editable.length === 0) {
+      endRowEdit();
+      return false;
+    }
+    const rowList = rows() || [];
+    const r = rowList[rowIndex];
+    const rowOriginal = r ? r.original : null;
+    const rowId = r ? r.id : null;
+    const draft = rowDraft() || {};
+    // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
+    for (let i = 0; i < editable.length; i++) {
+      const ec = editable[i];
+      const err = runValidator(ec.colId, draft[ec.colId], rowOriginal);
+      if (err !== true) {
+        setInvalid(err);
+        focusEditorWhenReady();
+        return false;
+      }
+    }
+    setInvalid('');
+    // Build the changes payload (only the columns whose value actually changed) + the field→
+    // value map for the single row-object replace.
+    const changes = [];
+    const fieldValues = {};
+    for (let i = 0; i < editable.length; i++) {
+      const ec = editable[i];
+      const newValue = draft[ec.colId];
+      const oldValue = rowOriginal ? rowOriginal[ec.field] : null;
+      fieldValues[ec.field] = newValue;
+      if (oldValue !== newValue) changes.push({
+        columnId: ec.colId,
+        oldValue,
+        newValue
+      });
+    }
+    // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
+    const srcIndex = sourceIndexOfRow(rowIndex);
+    const next = replaceRowValues(currentData(), srcIndex, fieldValues);
+    const focusRow = rowIndex;
+    const focusCol = activeColIndex();
+    editTransition = true;
+    writeData(next);
+    // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
+    _props.onRowEditCommit?.({
+      rowId,
+      changes
+    });
+    endRowEdit();
+    editTransition = false;
+    focusCellWhenReady(focusRow, focusCol);
+    return true;
+  }
+
+  // cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+  // return focus to the active cell.
+  function cancelRow() {
+    if (editingRowIndex() == null) return;
+    const focusRow = activeRow();
+    const focusCol = activeColIndex();
+    editTransition = true;
+    endRowEdit();
+    editTransition = false;
+    focusCellWhenReady(focusRow, focusCol);
+  }
+
+  // replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
+  // in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
+  function replaceRowValues(rows: any, rowIndex: any, fieldValues: any) {
+    const src = rows || [];
+    const fv = fieldValues || {};
+    const out = [];
+    for (let i = 0; i < src.length; i++) {
+      if (i === rowIndex) {
+        const merged = {};
+        const orig = src[i] || {};
+        for (const k in orig) merged[k] = orig[k];
+        for (const k in fv) merged[k] = fv[k];
+        out.push(merged);
+      } else {
+        out.push(src[i]);
+      }
+    }
+    return out;
+  }
+
   // Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
   // rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
   // cell at the row's end; stop (return null) at grid end. Pure index math over the visible
@@ -2389,14 +2589,76 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
   let editTransition = false;
 
+  // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
+  // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
+  // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
+  // rowDraft — so the four editors open simultaneously never clobber one shared value. These
+  // helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
+  // the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
+  // onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
+  function inRowEdit() {
+    return editingRowIndex() != null;
+  }
+  function editorValueFor(colId: any) {
+    return inRowEdit() ? rowDraft() ? rowDraft()[colId] : null : draftValue();
+  }
+  function editorCheckedFor(colId: any) {
+    return !!(inRowEdit() ? rowDraft() ? rowDraft()[colId] : null : draftValue());
+  }
+
+  // #editor custom-slot callbacks (req-2/6): the consumer's slot calls commit(value)/cancel().
+  // In SINGLE-CELL mode commit(v) commits that cell (commitEdit override); in ROW mode commit(v)
+  // only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
+  // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
+  // row-mode commit targets the right draft key.
+  function editorCommitFor(colId: any) {
+    return (value: any) => {
+      if (inRowEdit()) {
+        setRowDraft$local(colId, value);
+        return;
+      }
+      commitEdit(value);
+    };
+  }
+  function editorCancelFor() {
+    return () => {
+      if (inRowEdit()) {
+        cancelRow();
+        return;
+      }
+      cancelEdit();
+    };
+  }
+
   // Editor input handlers (the global-filter `evt.target.value` idiom — an untyped param
   // neutralizes to `any`, so reading .value/.checked typechecks ×6; an inline
   // `$data.x = $event.target.value` binding does NOT neutralize and breaks Lit/React JSX).
-  function onEditorInput(evt: any) {
-    setDraftValue(evt && evt.target ? evt.target.value : '');
+  // Column-aware: in row mode they write rowDraft[colId] (a FRESH object so Solid/Svelte/React
+  // re-derive); single-cell they write the shared draftValue.
+  function onCellEditorInput(colId: any, evt: any) {
+    const v = evt && evt.target ? evt.target.value : '';
+    if (inRowEdit()) {
+      setRowDraft$local(colId, v);
+      return;
+    }
+    setDraftValue(v);
   }
-  function onEditorCheckboxChange(evt: any) {
-    setDraftValue(!!(evt && evt.target && evt.target.checked));
+  function onCellEditorCheckbox(colId: any, evt: any) {
+    const v = !!(evt && evt.target && evt.target.checked);
+    if (inRowEdit()) {
+      setRowDraft$local(colId, v);
+      return;
+    }
+    setDraftValue(v);
+  }
+  // setRowDraft: write ONE key into a FRESH rowDraft object (whole-object replace — an
+  // in-place mutation is silently dropped on React/Solid; the family immutable rule).
+  function setRowDraft$local(colId: any, value: any) {
+    const src = rowDraft() || {};
+    const next = {};
+    for (const k in src) next[k] = src[k];
+    next[colId] = value;
+    setRowDraft(next);
   }
 
   // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
@@ -2405,6 +2667,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function onEditorKeyDown(e: any) {
     if (!e) return;
     const key = e.key;
+    // Full-row mode (req-6): Enter from ANY cell editor commits the WHOLE row at once (ONE
+    // model write + ONE row-edit-commit); Escape reverts the whole row. Tab moves between the
+    // row's editors NATIVELY (no commit-per-cell) — let the browser advance focus, so we don't
+    // preventDefault it here.
+    if (inRowEdit()) {
+      if (key === 'Enter') {
+        e.preventDefault();
+        commitRow();
+      } else if (key === 'Escape') {
+        e.preventDefault();
+        cancelRow();
+      }
+      return;
+    }
     if (key === 'Enter') {
       e.preventDefault();
       commitEdit(undefined);
@@ -2437,6 +2713,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   //    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
   //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
   function onEditorBlur(e: any) {
+    // Full-row mode (req-6): blur NEVER commits — the row commits as a UNIT only on an
+    // explicit Enter / save / editRow-driven flow (a per-cell blur-commit would split the row
+    // into N writes + N events, violating the one-write/one-event contract). Tabbing between
+    // the row's own editors is a normal focus move, not a commit.
+    if (inRowEdit()) return;
     if (editingRow() < 0 || editTransition) return;
     const next = e ? e.relatedTarget : null;
     // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
@@ -2470,6 +2751,24 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // no cell is editing. Collision-clean (not `commit`).
   function commitEditing() {
     if (editingRow() >= 0) commitEdit(undefined);
+  }
+
+  // editRow(rowIndex) — programmatically enter full-row edit on a body row ($expose, req-6 /
+  // D-06), the API twin of the Shift+F2 shortcut. Addressed BY INDEX over the visible model
+  // (coerced + clamped); no-op on a row with no editable columns. Collision-clean (RESEARCH
+  // name-check): `editRow` is not in the 15 existing verbs, not a prop, not a *-change/commit
+  // event, not a Lit ROZ137-reserved host member. Moves the active cell to the row first so the
+  // commit/cancel focus-return lands in the right row.
+  function editRow(rowIndex: any) {
+    const lastRow = bodyRowCount() - 1;
+    const maxRow = lastRow < 0 ? 0 : lastRow;
+    const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
+    const rowList = rows() || [];
+    const row = rowList[r];
+    if (!row) return;
+    setActiveIsHeader(false);
+    setActiveRow(r);
+    beginRowEdit(row);
   }
 
   // ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
@@ -2602,10 +2901,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={!!draftValue()} onChange={($event) => { onEditorCheckboxChange($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onChange={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onChange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <For each={editorOptionsOf(cellCtx.column.id)}>{(opt) => <option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>}</For>
-              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: draftValue(), commit: commitEdit, cancel: cancelEdit })}
+              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: row.original, checked: rowIsSelected(row), toggle: e => onToggleRow(row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(row)} onChange={($event) => { onToggleRow(row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}</td>}</For>
@@ -2649,10 +2948,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={!!draftValue()} onChange={($event) => { onEditorCheckboxChange($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onChange={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onChange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <For each={editorOptionsOf(cellCtx.column.id)}>{(opt) => <option value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>}</For>
-              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={draftValue()} onInput={($event) => { onEditorInput($event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: draftValue(), commit: commitEdit, cancel: cancelEdit })}
+              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}</td>}</For>
