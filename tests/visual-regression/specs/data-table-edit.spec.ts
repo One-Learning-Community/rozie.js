@@ -8,34 +8,32 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Phase 51 (data-table editable cells) — the DOM/behavioral VR matrix for
- * spreadsheet-grade inline editing (req-11). This file is stood up in the Wave-0
- * de-risking plan (51-01) with TWO real (non-fixme) assertion blocks and the editing
- * reqs stubbed behind `test.fixme` pending the Wave-(a)..(c) builds (Plans 51-02..04):
+ * spreadsheet-grade inline editing (req-11). FINAL state (phase gate, Plan 51-05): reqs
+ * 1-9 are ALL real assertions ×6 — there is NO permanent fixme stub anywhere in this
+ * file (`KNOWN_FAILING` is the empty set; the only `.fixme` runner is the `runnerFor`
+ * build-gate below, the Phase-49/53 precedent that skips a target whose host bundle has
+ * not been built). The file was stood up in the Wave-0 de-risking plan (51-01)
+ * with two probe blocks and the editing reqs stubbed; each stub was promoted to a real
+ * assertion as its wave shipped (Plans 51-02..04), and this plan (51-05) consolidates +
+ * stabilizes the matrix for the pinned-container single-worker gate.
  *
- *   D-02 PIN-ROW PROBE (51-01, the only genuinely UNPROVEN cross-target surface,
- *     RESEARCH A4 / Pitfall 3 / Open-Q2) — drives the STANDALONE
+ *   D-02 PIN-ROW PROBE (51-01, RESEARCH A4 / Pitfall 3 / Open-Q2) — drives the STANDALONE
  *     examples/demos/DataTablePinProbeDemo.rozie (NO DataTable / @tanstack import; a
- *     minimal LOCAL copy of the Phase-53 windowedRows/padTop/padBottom math). Proves
- *     that a keyed editing <tr> stays MOUNTED in-flow when it scrolls outside the
- *     virtual window, with aria-rowindex monotonic + total scroll height (padTop + Σ +
- *     padBottom = getTotalSize()) invariant — across all six reactivity systems
- *     (especially Solid's fine-grained <For> + Svelte's {#each} subscription + Lit's
- *     repeat recycling). This resolves the in-flow-vs-out-of-flow question that Plan
- *     51-04 wires into the real DataTable.rozie windowing.
+ *     minimal LOCAL copy of the Phase-53 windowedRows/padTop/padBottom math). Proves a
+ *     keyed editing <tr> stays MOUNTED in-flow when it scrolls outside the virtual window,
+ *     with aria-rowindex monotonic + total scroll height (padTop + Σ + padBottom =
+ *     getTotalSize()) invariant — across all six reactivity systems. Resolves the
+ *     in-flow-vs-out-of-flow question Plan 51-04 wired into the real DataTable.rozie.
  *
  *   CLIPBOARD SPIKE (51-01, RESEARCH A3 / Pitfall 4) — confirms Playwright grants
  *     clipboard-read + clipboard-write in the pinned Linux Chromium container under
- *     single-worker, so the later clipboard wave (req-8) has a working harness. A TSV
- *     string written via navigator.clipboard.writeText reads back identically via
- *     readText. If grantPermissions is blocked, the documented page.evaluate shim
- *     fallback is asserted through instead (the SUMMARY records which path won).
+ *     single-worker, so the clipboard wave (req-8) has a working harness. A TSV string
+ *     written via navigator.clipboard.writeText reads back identically via readText; the
+ *     documented page.evaluate shim fallback is asserted if grantPermissions is blocked.
  *
- * The editing reqs 1-9 (built-in editors, #editor slot, lifecycle, write-back,
- * validation, full-row, range, clipboard paste, virtualization-survival) are stubbed
- * as `test.fixme` below — they reference Column `editable`/`editor`/`validate` props +
- * `r-model:data` that DO NOT EXIST until Plan 51-02 lands, so the DataTableEdit*Demo
- * fixtures cannot be exercised yet. They become real assertions as each wave ships
- * (req-11 acceptance = no permanent fixme by phase end).
+ *   EDITING REQS 1-9 (built-in editors, #editor slot, lifecycle, write-back, validation,
+ *     full-row, range, clipboard paste, virtualization-survival) — real assertions ×6,
+ *     driving DataTableEdit{,Virtual}Demo against the Plan-02..04 editing surface.
  *
  * PER-TARGET activeElement READ (A1, pinned by the Phase-49 grid spec): the editor
  * focus checks read the focused element UNIFORMLY across all six via
@@ -470,34 +468,66 @@ async function srLiveText(page: Page): Promise<string> {
   });
 }
 
-/** Focus (row, col) and KEEP it focused until the active cell settles there — re-focuses if
- *  a stray deferred focus-return (the commit/cancel rAF poll from a prior block) steals focus
- *  away. Returns once activeCellCoords reports the target col, or after the retry budget. */
+/** Focus (row, col) and KEEP it focused until the active cell settles there AND HOLDS across a
+ *  stability window. A pending deferred focus-return (the commit/cancel rAF poll from a prior
+ *  block — `focusCellWhenReady`) can fire AFTER focus first lands on the target and steal it
+ *  back; checking once (the old behavior) could return during that window, so a subsequent F2
+ *  lands on the wrong cell. We wait a settle tick AFTER focusing (so a pending steal manifests
+ *  and is detected), then require the target to still hold after a second tick before returning
+ *  — the deterministic root-cause fix for the editor-open-after-Escape race (51-02/04
+ *  focus-settle / `rangeTransition` precedent), NOT a retry-budget bump. */
 async function focusBodyCellStable(page: Page, row: number, col: number): Promise<void> {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 24; i++) {
     await focusBodyCell(page, row, col);
-    const coords = await activeCellCoords(page);
-    if (coords?.col === String(col) && coords?.row === String(row)) return;
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(40); // let any pending deferred focus-return fire + steal.
+    const a = await activeCellCoords(page);
+    if (a?.col !== String(col) || a?.row !== String(row)) continue;
+    await page.waitForTimeout(40); // confirm it HOLDS (no further pending steal).
+    const b = await activeCellCoords(page);
+    if (b?.col === String(col) && b?.row === String(row)) return;
   }
 }
 
-/** Settle focus on (row, col) and press F2 to open its editor, retrying if a stray deferred
- *  focus-return (a prior block's commit/cancel rAF) steals focus before the editor mounts.
- *  Returns once a built-in editor is open at `col` (or after the retry budget). */
+/** Settle the grid to an idle state, focus (row, col), and press F2 to open its editor. The
+ *  editor-open-after-Escape race (the rotating-target flake at the built-in-editors block,
+ *  51-04 deferred-items) had THREE deterministic causes, each fixed here so the gate is green
+ *  by construction rather than retry-masked:
+ *    (1) a prior step's editor must be FULLY unmounted before we steer focus — its async
+ *        focus-return rAF (`focusCellWhenReady`) fires on unmount and yanks focus mid-enter;
+ *    (2) focus must be STABLE on the target cell before F2 (a pending deferred focus-return
+ *        can steal it after it first lands) — `focusBodyCellStable` now holds across a window;
+ *    (3) no editor may be open at the instant of F2, else `onGridKeyDown`'s editing-mode
+ *        early-return swallows the keypress (the F2 routes to the editor keymap, not the
+ *        grid edit-entry seam).
+ *  The loop remains as a belt-and-suspenders bound; the deterministic settles mean it
+ *  normally enters on the first pass. */
 async function enterEditAt(page: Page, row: number, col: number): Promise<void> {
   for (let i = 0; i < 8; i++) {
+    // Fast path: already editing this EXACT cell (a prior retry's F2 may have landed late).
+    const cur = await openEditor(page);
+    if (cur?.col === String(col)) return;
+    // (1) Close any editor open at a different cell and wait for it to FULLY unmount, so its
+    //     focus-return rAF has fired + stopped before we steer focus.
+    if (cur) {
+      await page.keyboard.press('Escape');
+      await expect.poll(async () => openEditor(page), { timeout: 5_000 }).toBeNull().catch(() => {});
+    }
+    // (2) Steer focus to the target cell and confirm it HOLDS (no pending focus-return steal).
     await focusBodyCellStable(page, row, col);
-    const open = await openEditor(page);
-    if (open) return; // already editing this cell (rare; from a prior retry)
+    const coords = await activeCellCoords(page);
+    if (coords?.row !== String(row) || coords?.col !== String(col)) continue;
+    // (3) No editor may be open at the instant of F2 (else onGridKeyDown swallows it).
+    if (await openEditor(page)) continue;
     await page.keyboard.press('F2');
     try {
-      await expect.poll(async () => (await openEditor(page))?.col, { timeout: 2_000 }).toBe(String(col));
+      await expect.poll(async () => (await openEditor(page))?.col, { timeout: 3_000 }).toBe(String(col));
       return;
     } catch {
-      // editor didn't open (focus stolen / F2 swallowed) — re-settle and retry.
+      // opened at the wrong col / not at all — re-settle and retry.
     }
   }
+  // Surface a genuine failure clearly instead of a silent fallthrough past the budget.
+  await expect.poll(async () => (await openEditor(page))?.col, { timeout: 3_000 }).toBe(String(col));
 }
 
 /** Focus the grid's roving entry cell (data-row=0, data-col-index=0) to begin keyboard nav. */
@@ -754,12 +784,11 @@ for (const target of TARGETS) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════
-// EDITING REQS 1-9 — STUBBED behind test.fixme pending Plans 51-02..04 (Wave-(a)..(c)).
-//   These reference Column `editable`/`editor`/`validate` props + the DataTable #editor
-//   slot + `r-model:data` + `cell-edit-commit` that DO NOT EXIST until Plan 51-02
-//   declares them, so the DataTableEdit{,Virtual}Demo fixtures cannot be exercised yet.
-//   Each becomes a real assertion as its wave ships (req-11 acceptance = no permanent
-//   fixme by phase end). Listed here so the spec's coverage shape is visible from Wave-0.
+// EDITING REQS 1-9 — REAL assertions ×6 (phase gate, Plan 51-05). These drive the
+//   DataTableEdit{,Virtual}Demo fixtures against the Plan-02..04 editing surface (Column
+//   `editable`/`editor`/`editorOptions`/`validate`, the DataTable `#editor` slot,
+//   `r-model:data` write-back, `cell-edit-commit`/`row-edit-commit`/`range-change`). No
+//   fixme stub remains (req-11 acceptance: no permanent fixme by phase end).
 // ════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
   // req-1/2/3/4 — built-in editors + #editor slot + lifecycle + write-back (Wave-(a),
