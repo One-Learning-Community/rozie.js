@@ -163,6 +163,25 @@ let table: any = null;
 let virtualizer: any = null;
 let virtualizerCleanup: any = null;
 let gridScrollEl: any = null;
+// CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
+// rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
+// pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
+// callbacks were what broke the Solid scroll-then-focus seam (D-12 focusActiveCell →
+// scrollToIndex → double-rAF focus): a stray remeasure firing inside that focus deferral
+// disrupted the focus landing. The sweep ALSO bails while virtual-core is mid-scroll
+// (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
+// onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
+// once motion settles between scroll steps) is unaffected.
+// CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
+// rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
+// pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
+// callbacks were what broke the Solid scroll-then-focus seam (D-12 focusActiveCell →
+// scrollToIndex → double-rAF focus): a stray remeasure firing inside that focus deferral
+// disrupted the focus landing. The sweep ALSO bails while virtual-core is mid-scroll
+// (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
+// onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
+// once motion settles between scroll steps) is unaffected.
+let remeasurePending = false;
 
 // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
 // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -630,8 +649,40 @@ const virtualizerOptions = (): any => ({
   getItemKey: virtualItemKey,
   onChange: () => {
     windowVer = windowVer + 1;
+    // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+    // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+    // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+    // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+    // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+    // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+    // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+    // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+    // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+    // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+    // re-measure is a no-op.
+    scheduleRemeasure();
   }
 });
+
+// Defer remeasureWindow() one frame (the recycled <tr> nodes must exist in the DOM first —
+// onChange fires BEFORE React/Solid commit the new window), falling back to a microtask/timeout
+// where rAF is unavailable (SSR / test envs). DEDUPED via remeasurePending so a scroll burst
+// queues at most one sweep per frame (piled-up rAF sweeps broke the Solid scroll-then-focus
+// seam). The sweep clears the flag first, then measures.
+// Defer remeasureWindow() one frame (the recycled <tr> nodes must exist in the DOM first —
+// onChange fires BEFORE React/Solid commit the new window), falling back to a microtask/timeout
+// where rAF is unavailable (SSR / test envs). DEDUPED via remeasurePending so a scroll burst
+// queues at most one sweep per frame (piled-up rAF sweeps broke the Solid scroll-then-focus
+// seam). The sweep clears the flag first, then measures.
+const scheduleRemeasure = () => {
+  if (remeasurePending) return;
+  remeasurePending = true;
+  const run = () => {
+    remeasurePending = false;
+    remeasureWindow();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else if (typeof queueMicrotask !== 'undefined') queueMicrotask(run);else setTimeout(run, 0);
+};
 
 // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
 // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
@@ -653,7 +704,7 @@ const windowedRows = () => {
   // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
   // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
   // first re-run that picks up the now-non-null virtualizer.
-  const ver = windowVer;
+  void windowVer;
   if (!virtualizer) {
     // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -668,13 +719,16 @@ const windowedRows = () => {
     }
     return [];
   }
-  if (ver < 0) return [];
   const items = virtualizer.getVirtualItems();
   const rowList = rows || [];
+  // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+  // shrink window where the virtualizer count is stale relative to $data.rows on the async
+  // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+  // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
   return items.map((vi: any) => ({
     vi,
     row: rowList[vi.index]
-  }));
+  })).filter((wr: any) => wr.row);
 };
 
 // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
@@ -684,16 +738,18 @@ const windowedRows = () => {
 // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
 // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
 const padTop = () => {
-  // SUBSCRIBE FIRST (the windowedRows() discipline): read windowVer at the TOP so the spacer-<td>
+  // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer at the TOP so the spacer-<td>
   // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
-  const ver = windowVer;
-  if (!virtual || !virtualizer || ver < 0) return 0;
+  void windowVer;
+  if (!virtual || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
   return items.length ? items[0].start : 0;
 };
 const padBottom = () => {
-  const ver = windowVer;
-  if (!virtual || !virtualizer || ver < 0) return 0;
+  // subscribe-first, see windowedRows() (IN-04): touch windowVer before the early return so the
+  // fine-grained spacer :style binding subscribes on its first eval while virtualizer is null.
+  void windowVer;
+  if (!virtual || !virtualizer) return 0;
   const items = virtualizer.getVirtualItems();
   if (!items.length) return 0;
   return virtualizer.getTotalSize() - items[items.length - 1].end;
@@ -708,16 +764,34 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
-// measureElement sweep (D-10): refine estimated heights to MEASURED ones. The off-root
-// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref); virtual-core
-// registers each <tr> with its internal ResizeObserver keyed by data-index, so later content
-// height changes re-fire onChange. Idempotent on already-observed rows. Deferred (double-rAF).
-// measureElement sweep (D-10): refine estimated heights to MEASURED ones. The off-root
-// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref); virtual-core
-// registers each <tr> with its internal ResizeObserver keyed by data-index, so later content
-// height changes re-fire onChange. Idempotent on already-observed rows. Deferred (double-rAF).
+// measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+// <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+// virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+// internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+// getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+// scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+// idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+// visible window each commit is cheap and loop-free.
+// measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+// querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+// <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+// virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+// internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+// getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+// scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+// idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+// visible window each commit is cheap and loop-free.
 const remeasureWindow = () => {
   if (!virtualizer || !gridRoot) return;
+  // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
+  // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
+  // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
+  // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
+  // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
+  // regression); the next settled onChange re-measures the stable window. Manual-scroll
+  // recycling (the CR-01 case) has scrollState === null, so it measures normally.
+  if (virtualizer.scrollState) return;
   const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
   for (const tr of trs as any) virtualizer.measureElement(tr);
 };

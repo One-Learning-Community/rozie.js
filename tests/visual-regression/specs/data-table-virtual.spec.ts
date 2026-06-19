@@ -428,6 +428,20 @@ async function trailingSpacerHeight(page: Page): Promise<number | null> {
   });
 }
 
+/**
+ * Drive the windowed container from top to bottom in small steps so EVERY full-model row
+ * recycles into the rendered window at least once. With the CR-01 per-commit remeasure each
+ * recycled row's true (variable) height is measured as it passes through the window, so
+ * virtual-core's getTotalSize() converges from the estimate-seeded total to the real
+ * measured total. `step` is kept below the bounded viewport (~400px) so no band is skipped.
+ */
+async function scrollThroughAll(page: Page, totalHeight: number, step = 200): Promise<void> {
+  for (let y = 0; y <= totalHeight; y += step) {
+    await scrollWindowTo(page, y);
+    await page.waitForTimeout(40);
+  }
+}
+
 /** Σ of the rendered windowed tr heights (req-2 height-alignment numerator). */
 async function sumRenderedRowHeights(page: Page): Promise<number | null> {
   return page.evaluate(() => {
@@ -482,16 +496,110 @@ for (const target of TARGETS) {
     // req-2 — the rendered slice is self-consistent with getTotalSize: padTop + Σ(rendered
     // tr heights) + padBottom == getTotalSize. We read Σ rendered heights + the trailing
     // spacer (padBottom); since padTop = getTotalSize - Σheights - padBottom by construction,
-    // Σheights + padBottom must be ≤ getTotalSize (no overlap) and within one window of it.
-    const sumH = await sumRenderedRowHeights(page);
-    const padBottom0 = await trailingSpacerHeight(page);
-    expect(sumH).not.toBeNull();
-    expect(padBottom0).not.toBeNull();
-    // No overlap/gap: the rendered rows + the trailing spacer never exceed the total.
-    expect((sumH as number) + (padBottom0 as number)).toBeLessThanOrEqual((total as number) + 2);
+    // Σheights + padBottom must be ≤ getTotalSize (no overlap). Read all THREE on a CONSISTENT
+    // snapshot inside one poll: the CR-01 per-commit remeasure can grow the measured rendered
+    // heights and getTotalSize together a frame apart, so reading `total` once up-front and
+    // `sumH`/`padBottom` later races (Σ catches up before the stale total) — re-read getTotalSize
+    // alongside them and poll until the no-overlap invariant holds on a single committed frame.
+    await expect
+      .poll(
+        async () => {
+          const t = await getTotalSize(page);
+          const s = await sumRenderedRowHeights(page);
+          const pb = await trailingSpacerHeight(page);
+          if (t == null || s == null || pb == null) return null;
+          // Positive == overlap (rows + trailing spacer exceed the total). ≤ 2 px slack for
+          // sub-pixel rounding across the 6 targets; on a consistent frame this is ~0.
+          return s + pb - t;
+        },
+        { timeout: 15_000 },
+      )
+      .toBeLessThanOrEqual(2);
 
     // req-2 — scroll to the END: the trailing spacer (padBottom) converges to ~0 (the last
     // row's end == getTotalSize). A non-zero residual at the bottom would be cumulative drift.
+    await scrollWindowToBottom(page);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect
+      .poll(async () => trailingSpacerHeight(page), { timeout: 15_000 })
+      .toBeLessThanOrEqual(1);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// req-2 / CR-01 — RECYCLED variable-height rows are actually MEASURED, not just the initial
+//   window. This is the gap that slipped past the original req-2 case: virtual-core only
+//   observe()s a node handed to measureElement (its SOLE observer.observe call site,
+//   virtual-core@3.17.1 dist/esm/index.js:794-817), and the engine called that once (at
+//   mount) for the FIRST window only. Rows that recycle into view on scroll get NEW DOM
+//   nodes that were never measured → they keep the 40px estimateRowHeight seed in
+//   virtual-core's size cache forever, so getTotalSize() (the windowing scroll range, ==
+//   the .rdt-scroll scrollHeight) stays pinned near the estimate-derived total
+//   (500 rows × 40px = 20000) instead of converging to the real MEASURED total.
+//
+//   The fixture's 500 rows cycle 1/2/3 detail lines (20px line-height) → real heights of
+//   ~20/40/60px+chrome, so the TRUE measured total (~26.3k) is ~30% ABOVE the 20k estimate.
+//   We drive the window top→bottom in small steps so EVERY row recycles into view at least
+//   once; with the CR-01 per-commit remeasure each recycled row gets measured as it passes,
+//   and getTotalSize() converges up to the real ~26.3k. On the PRE-FIX engine the recycled
+//   rows are never measured, so getTotalSize() stays stuck at ~20.3k. Asserting the post-
+//   scroll-through total is well ABOVE the estimate cleanly separates the two engines:
+//   fixed → ~26.3k (>> 20k), pre-fix → ~20.3k. (Verified: this case PASSES on the fixed
+//   engine and FAILS on the pre-CR-01-fix engine — falsified in both directions.)
+//
+//   Plus the standing invariants: at the very bottom the trailing spacer (padBottom)
+//   converges to ~0 (the last row's measured end == getTotalSize, no cumulative drift).
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-virtual [${target}]: RECYCLED variable-height rows are measured — getTotalSize converges to the MEASURED total after full scroll-through (CR-01)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableVirtualVarHeight&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 20_000 })
+      .toBe('500');
+    const scroll = mount.locator('.rdt-scroll');
+    await expect(scroll).toBeVisible({ timeout: 15_000 });
+
+    await scrollWindowTo(page, 0);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(200);
+
+    // Before recycling, only the initial window is measured → getTotalSize is dominated by
+    // the 40px estimate (≈ 500 × 40 = 20000, ±a window of measured initial rows; the exact
+    // pre-recycle value varies a little per target by how many rows the first window measures).
+    const totalBefore = await getTotalSize(page);
+    expect(totalBefore).not.toBeNull();
+    // Sanity: windowing is engaged — the bounded ~400px viewport holds far less than the
+    // total content, and the pre-recycle total is in the estimate-dominated band (well below
+    // the real measured total of ~26.3k, since the unseen rows are still at the 40px seed).
+    expect(totalBefore as number).toBeGreaterThan(10_000);
+    expect(totalBefore as number).toBeLessThan(22_000);
+
+    // Drive the window top→bottom in small steps so EVERY row recycles into view and (with
+    // the fix) gets measured. getTotalSize then converges UP to the real measured total.
+    // Scroll past the (growing) total so the final rows are reached even as it expands.
+    await scrollThroughAll(page, (totalBefore as number) + 8_000, 200);
+    await scrollWindowTo(page, 0);
+    await page.waitForTimeout(300);
+
+    // CR-01 — after full recycling, getTotalSize must have converged WELL ABOVE the estimate
+    // (the real measured total is ~26.3k for this fixture). A 24000 floor sits comfortably
+    // between the pre-fix stuck value (~17–20.3k, recycled rows never measured) and the
+    // measured total (~26.3k):
+    //   fixed engine   → ~26305  (PASS)
+    //   pre-fix engine → ~17–20.3k  (FAIL)
+    // AND it must have grown substantially vs the pre-recycle baseline (convergence, not a
+    // target that happened to start high).
+    const totalAfter = await getTotalSize(page);
+    expect(totalAfter as number).toBeGreaterThan(24_000);
+    expect(totalAfter as number).toBeGreaterThan((totalBefore as number) + 3_000);
+
+    // Standing invariant — scroll to the very END: the trailing spacer (padBottom) converges
+    // to ~0 (the last measured row's end == getTotalSize → no cumulative offset drift).
     await scrollWindowToBottom(page);
     await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
     await expect

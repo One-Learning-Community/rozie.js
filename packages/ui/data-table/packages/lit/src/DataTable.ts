@@ -785,6 +785,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   gridScrollEl: any = null;
 
+  remeasurePending = false;
+
   GRID_PAGE_STEP = 10;
 
   gridRoot: any = null;
@@ -1088,8 +1090,30 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   getItemKey: this.virtualItemKey,
   onChange: () => {
     this._windowVer.value = this._windowVer.value + 1;
+    // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+    // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+    // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+    // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+    // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+    // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+    // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+    // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+    // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+    // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+    // re-measure is a no-op.
+    this.scheduleRemeasure();
   }
 });
+
+  scheduleRemeasure = () => {
+  if (this.remeasurePending) return;
+  this.remeasurePending = true;
+  const run = () => {
+    this.remeasurePending = false;
+    this.remeasureWindow();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else if (typeof queueMicrotask !== 'undefined') queueMicrotask(run);else setTimeout(run, 0);
+};
 
   windowedRows = () => {
   // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
@@ -1101,7 +1125,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
   // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
   // first re-run that picks up the now-non-null virtualizer.
-  const ver = this._windowVer.value;
+  void this._windowVer.value;
   if (!this.virtualizer) {
     // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
     // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
@@ -1116,27 +1140,32 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     }
     return [];
   }
-  if (ver < 0) return [];
   const items = this.virtualizer.getVirtualItems();
   const rowList = this._rows.value || [];
+  // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+  // shrink window where the virtualizer count is stale relative to $data.rows on the async
+  // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+  // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
   return items.map((vi: any) => ({
     vi,
     row: rowList[vi.index]
-  }));
+  })).filter((wr: any) => wr.row);
 };
 
   padTop = () => {
-  // SUBSCRIBE FIRST (the windowedRows() discipline): read windowVer at the TOP so the spacer-<td>
+  // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer at the TOP so the spacer-<td>
   // :style binding subscribes on the fine-grained targets before the `!virtualizer` early return.
-  const ver = this._windowVer.value;
-  if (!this.virtual || !this.virtualizer || ver < 0) return 0;
+  void this._windowVer.value;
+  if (!this.virtual || !this.virtualizer) return 0;
   const items = this.virtualizer.getVirtualItems();
   return items.length ? items[0].start : 0;
 };
 
   padBottom = () => {
-  const ver = this._windowVer.value;
-  if (!this.virtual || !this.virtualizer || ver < 0) return 0;
+  // subscribe-first, see windowedRows() (IN-04): touch windowVer before the early return so the
+  // fine-grained spacer :style binding subscribes on its first eval while virtualizer is null.
+  void this._windowVer.value;
+  if (!this.virtual || !this.virtualizer) return 0;
   const items = this.virtualizer.getVirtualItems();
   if (!items.length) return 0;
   return this.virtualizer.getTotalSize() - items[items.length - 1].end;
@@ -1151,6 +1180,14 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
 
   remeasureWindow = () => {
   if (!this.virtualizer || !this.gridRoot) return;
+  // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
+  // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
+  // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
+  // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
+  // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
+  // regression); the next settled onChange re-measures the stable window. Manual-scroll
+  // recycling (the CR-01 case) has scrollState === null, so it measures normally.
+  if (this.virtualizer.scrollState) return;
   const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
   for (const tr of trs as any) this.virtualizer.measureElement(tr);
 };
