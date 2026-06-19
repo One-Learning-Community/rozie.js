@@ -135,10 +135,11 @@
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ data: any[]; columns?: any[]; selectionMode?: string; manual?: boolean; stickyHeader?: boolean; interactionMode?: string; virtual?: boolean; estimateRowHeight?: number; maxHeight?: string }>(),
+  defineProps<{ columns?: any[]; selectionMode?: string; manual?: boolean; stickyHeader?: boolean; interactionMode?: string; virtual?: boolean; estimateRowHeight?: number; maxHeight?: string }>(),
   { columns: () => [], selectionMode: 'none', manual: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }
 );
 
+const data = defineModel<any[]>('data', { required: true });
 const sorting = defineModel<any[]>('sorting', { default: () => [] });
 const globalFilter = defineModel<string>('globalFilter', { default: '' });
 const columnFilters = defineModel<any[]>('columnFilters', { default: () => [] });
@@ -181,6 +182,7 @@ defineSlots<{
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
 }>();
 
+const dataDefault = ref<any[]>([]);
 const sortingDefault = ref<any[]>([]);
 const globalFilterDefault = ref('');
 const columnFiltersDefault = ref<any[]>([]);
@@ -336,6 +338,16 @@ const currentState = (): any => ({
   columnSizingInfo: columnSizingInfo.value
 });
 
+// The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+// uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+// A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+// re-feed sources here so editing works whether or not the consumer binds r-model:data.
+// The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+// uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+// A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+// re-feed sources here so editing works whether or not the consumer binds r-model:data.
+const currentData = (): any => data.value != null ? data.value : dataDefault.value;
+
 // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
 // applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
 // byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
@@ -371,7 +383,15 @@ const columnDefs = () => {
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
       pinned: c.pinned != null ? c.pinned : '',
-      width: c.width != null ? c.width : ''
+      width: c.width != null ? c.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+      // metadata carrier the display↔editor branch + runValidator read. Off by default.
+      meta: {
+        editable: c.editable === true,
+        editor: c.editor != null ? c.editor : 'text',
+        editorOptions: c.editorOptions != null ? c.editorOptions : [],
+        validate: typeof c.validate === 'function' ? c.validate : null
+      }
     };
   }
   const reg = colReg.value || {};
@@ -388,7 +408,14 @@ const columnDefs = () => {
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
       pinned: spec.pinned != null ? spec.pinned : '',
-      width: spec.width != null ? spec.width : ''
+      width: spec.width != null ? spec.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+      meta: {
+        editable: spec.editable === true,
+        editor: spec.editor != null ? spec.editor : 'text',
+        editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+        validate: typeof spec.validate === 'function' ? spec.validate : null
+      }
     };
   }
   const out = [];
@@ -585,6 +612,32 @@ const writeColumnPinning = (next: any) => {
   columnPinningDefault.value = next;
   columnPinning.value = next;
   emit('pin-change', next);
+  programmatic--;
+};
+
+// ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
+// A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
+// a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
+// model so editing works controlled OR uncontrolled. CRITICAL: writeData does NOT emit —
+// unlike the 9 state slices (each has one change event fired inside its funnel), the
+// `data` slice's commit event (`cell-edit-commit`) carries a PER-CELL payload and fires
+// from the SINGLE commitEdit call site so the count stays exactly one per commit (React
+// multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
+// re-feed watch never re-enters mid-write.
+// ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
+// A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
+// a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
+// model so editing works controlled OR uncontrolled. CRITICAL: writeData does NOT emit —
+// unlike the 9 state slices (each has one change event fired inside its funnel), the
+// `data` slice's commit event (`cell-edit-commit`) carries a PER-CELL payload and fires
+// from the SINGLE commitEdit call site so the count stays exactly one per commit (React
+// multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
+// re-feed watch never re-enters mid-write.
+const writeData = (next: any) => {
+  if (programmatic) return;
+  programmatic++;
+  dataDefault.value = next; // fresh array only (never in-place)
+  data.value = next; // two-way emit if bound (no-op-diff if not)
   programmatic--;
 };
 
@@ -926,7 +979,7 @@ const reFeed = () => {
   if (!table) return;
   table.setOptions((prev: any) => ({
     ...prev,
-    data: props.data,
+    data: currentData(),
     columns: tableColumns(),
     state: currentState(),
     enableRowSelection: props.selectionMode !== 'none',
@@ -2053,6 +2106,11 @@ provide('data-table:columns', {
 });
 
 onMounted(() => {
+  // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
+  // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
+  // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
+  // the bound prop when controlled, this fallback otherwise.
+  dataDefault.value = data.value || [];
   // Build the table instance HERE so the closures below capture the live `table`.
   table = createTable({
     // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -2061,7 +2119,9 @@ onMounted(() => {
     // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
     // on every change by the watch's setOptions below, exactly like columns/state, so
     // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
-    data: props.data,
+    // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
+    // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
+    data: currentData(),
     columns: tableColumns(),
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
@@ -2202,14 +2262,24 @@ onBeforeUnmount(() => {
 });
 onUpdated(() => {
   if (!table) return;
-  const d = props.data || [];
+  // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+  // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+  // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+  // identical length) still re-feeds.
+  const d = currentData() || [];
   if (d === lastData && d.length === lastDataLen) return;
   lastData = d;
   lastDataLen = d.length;
   reFeed();
 });
 
-watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value, rowSelection.value, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (props.data || []).length, colReg.value], () => {
+watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value, rowSelection.value, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
+// Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+// even when the fresh array is the SAME length (a single-cell edit replaces one row
+// object → new array ref, identical length → the .length key alone would miss it). The
+// controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+// writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+data.value, dataDefault.value, colReg.value], () => {
   reFeed();
 });
 

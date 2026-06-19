@@ -10,11 +10,15 @@ interface ColumnProps {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  editable?: boolean;
+  editor?: string;
+  editorOptions?: any[];
+  validate?: ((...args: unknown[]) => unknown) | null;
 }
 
 export default function Column(_props: ColumnProps): JSX.Element {
-  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width']);
+  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));
   onMount(() => {
@@ -40,7 +44,7 @@ export default function Column(_props: ColumnProps): JSX.Element {
     registered = true;
     reg.registerColumn(colId(), buildSpec());
   });
-  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width])(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
     if (reg) reg.registerColumn(colId(), buildSpec());
   })()), { defer: true }));
 
@@ -72,7 +76,13 @@ export default function Column(_props: ColumnProps): JSX.Element {
       sortable: local.sortable,
       filterable: local.filterable,
       pinned: local.pinned,
-      width: local.width
+      width: local.width,
+      // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+      // registry (the existing per-column metadata path; NO parallel registry).
+      editable: local.editable,
+      editor: local.editor,
+      editorOptions: local.editorOptions,
+      validate: local.validate
     };
   }
 

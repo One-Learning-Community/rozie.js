@@ -105,7 +105,7 @@ import '@rozie-ui/data-table-svelte/themes/shadcn.css';    // or material.css, b
 
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
-| `data` | `Array` | `—` |  | ✓ |
+| `data` | `Array` | `—` | ✓ | ✓ |
 | `columns` | `Array` | `[]` |  |  |
 | `selectionMode` | `String` | `"none"` |  |  |
 | `sorting` | `Array` | `[]` | ✓ |  |

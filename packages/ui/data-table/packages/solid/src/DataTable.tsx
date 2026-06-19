@@ -216,6 +216,8 @@ interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
 
 interface DataTableProps {
   data: any[];
+  defaultData?: any[];
+  onDataChange?: (data: any[]) => void;
   columns?: any[];
   selectionMode?: string;
   sorting?: any[];
@@ -295,6 +297,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   onMount(() => { local.ref?.({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
+  const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
   const [sorting, setSorting] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'sorting', (() => [])());
   const [globalFilter, setGlobalFilter] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'globalFilter', '');
   const [columnFilters, setColumnFilters] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'columnFilters', (() => [])());
@@ -310,6 +313,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     left: [],
     right: []
   }))());
+  const [dataDefault, setDataDefault] = createSignal([]);
   const [sortingDefault, setSortingDefault] = createSignal([]);
   const [globalFilterDefault, setGlobalFilterDefault] = createSignal('');
   const [columnFiltersDefault, setColumnFiltersDefault] = createSignal([]);
@@ -343,6 +347,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const [activeIsHeader, setActiveIsHeader] = createSignal(false);
   const [activeInControl, setActiveInControl] = createSignal(false);
   onMount(() => {
+    // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
+    // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
+    // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
+    // the bound prop when controlled, this fallback otherwise.
+    setDataDefault(data() || []);
     // Build the table instance HERE so the closures below capture the live `table`.
     table = createTable({
       // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -351,7 +360,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
       // on every change by the watch's setOptions below, exactly like columns/state, so
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
-      data: local.data,
+      // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
+      // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
+      data: currentData(),
       columns: tableColumns(),
       state: currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -492,13 +503,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   });
   createEffect(() => {
     if (!table) return;
-    const d = local.data || [];
+    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+    // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+    // identical length) still re-feeds.
+    const d = currentData() || [];
     if (d === lastData && d.length === lastDataLen) return;
     lastData = d;
     lastDataLen = d.length;
     reFeed();
   });
-  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (local.data || []).length, colReg()])(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(), rowSelection(), columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+  // even when the fresh array is the SAME length (a single-cell edit replaces one row
+  // object → new array ref, identical length → the .length key alone would miss it). The
+  // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+  // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+  data(), dataDefault(), colReg()])(), (v) => untrack(() => (() => {
     reFeed();
   })()), { defer: true }));
   let __rozieRootRef: HTMLElement | null = null;
@@ -575,6 +595,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     };
   }
 
+  // The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+  // uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+  // A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+  // re-feed sources here so editing works whether or not the consumer binds r-model:data.
+  function currentData(): any {
+    return data() != null ? data() : dataDefault();
+  }
+
   // Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
   // applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
   // byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
@@ -606,7 +634,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
         pinned: c.pinned != null ? c.pinned : '',
-        width: c.width != null ? c.width : ''
+        width: c.width != null ? c.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+        // metadata carrier the display↔editor branch + runValidator read. Off by default.
+        meta: {
+          editable: c.editable === true,
+          editor: c.editor != null ? c.editor : 'text',
+          editorOptions: c.editorOptions != null ? c.editorOptions : [],
+          validate: typeof c.validate === 'function' ? c.validate : null
+        }
       };
     }
     const reg = colReg() || {};
@@ -623,7 +659,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
         pinned: spec.pinned != null ? spec.pinned : '',
-        width: spec.width != null ? spec.width : ''
+        width: spec.width != null ? spec.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+        meta: {
+          editable: spec.editable === true,
+          editor: spec.editor != null ? spec.editor : 'text',
+          editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+          validate: typeof spec.validate === 'function' ? spec.validate : null
+        }
       };
     }
     const out = [];
@@ -781,6 +824,23 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setColumnPinningDefault(next);
     setColumnPinning(next);
     _props.onPinChange?.(next);
+    programmatic--;
+  }
+
+  // ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
+  // A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
+  // a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
+  // model so editing works controlled OR uncontrolled. CRITICAL: writeData does NOT emit —
+  // unlike the 9 state slices (each has one change event fired inside its funnel), the
+  // `data` slice's commit event (`cell-edit-commit`) carries a PER-CELL payload and fires
+  // from the SINGLE commitEdit call site so the count stays exactly one per commit (React
+  // multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
+  // re-feed watch never re-enters mid-write.
+  function writeData(next: any) {
+    if (programmatic) return;
+    programmatic++;
+    setDataDefault(next); // fresh array only (never in-place)
+    setData(next); // two-way emit if bound (no-op-diff if not)
     programmatic--;
   }
 
@@ -1048,7 +1108,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (!table) return;
     table.setOptions((prev: any) => ({
       ...prev,
-      data: local.data,
+      data: currentData(),
       columns: tableColumns(),
       state: currentState(),
       enableRowSelection: local.selectionMode !== 'none',

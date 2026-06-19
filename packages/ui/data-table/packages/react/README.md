@@ -116,7 +116,7 @@ import '@rozie-ui/data-table-react/themes/shadcn.css';    // or material.css, bo
 
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
-| `data` | `Array` | `—` |  | ✓ |
+| `data` | `Array` | `—` | ✓ | ✓ |
 | `columns` | `Array` | `[]` |  |  |
 | `selectionMode` | `String` | `"none"` |  |  |
 | `sorting` | `Array` | `[]` | ✓ |  |

@@ -9,8 +9,8 @@
 import { inject, onBeforeUnmount, onMounted, onUpdated, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ id?: string; field?: string; header?: string; sortable?: boolean; filterable?: boolean; pinned?: string; width?: string | number }>(),
-  { id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '' }
+  defineProps<{ id?: string; field?: string; header?: string; sortable?: boolean; filterable?: boolean; pinned?: string; width?: string | number; editable?: boolean; editor?: string; editorOptions?: any[]; validate?: ((...args: any[]) => any) | null }>(),
+  { id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', editable: false, editor: 'text', editorOptions: () => [], validate: null }
 );
 
 const registry = inject('data-table:columns');
@@ -45,7 +45,13 @@ const buildSpec = () => ({
   sortable: props.sortable,
   filterable: props.filterable,
   pinned: props.pinned,
-  width: props.width
+  width: props.width,
+  // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+  // registry (the existing per-column metadata path; NO parallel registry).
+  editable: props.editable,
+  editor: props.editor,
+  editorOptions: props.editorOptions,
+  validate: props.validate
 });
 
 let _cleanup_0: (() => void) | undefined;
@@ -71,7 +77,7 @@ onUpdated(() => {
   reg.registerColumn(colId(), buildSpec());
 });
 
-watch(() => [props.id, props.field, props.header, props.sortable, props.filterable, props.pinned, props.width], () => {
+watch(() => [props.id, props.field, props.header, props.sortable, props.filterable, props.pinned, props.width, props.editable, props.editor, props.editorOptions, props.validate], () => {
   if (reg) reg.registerColumn(colId(), buildSpec());
 });
 </script>

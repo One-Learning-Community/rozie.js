@@ -49,6 +49,23 @@
   pinned:     { type: String,  default: '' },
   // Optional fixed/initial column width (CSS length or px number).
   width:      { type: [String, Number], default: '' },
+
+  // ── Editable-cell config (Phase 51, req-1/2/5) ────────────────────────────────
+  // Whether this column's cells are editable (opt-in). Default false → the column is
+  // read-only and the parent's display↔editor branch never mounts an editor for it.
+  // Bare `<Column editable>` only coerces "" → true on Vue+Lit, so consumers bind
+  // `:editable="true"` (same bare-bool-attr-on-component caveat as `sortable`).
+  editable:      { type: Boolean,  default: false },
+  // Built-in editor type for this column: 'text' | 'number' | 'select' | 'checkbox'.
+  // Ignored when a custom #editor scoped slot handles the column. Default 'text'.
+  editor:        { type: String,   default: 'text' },
+  // Options for editor='select' — `[{ value, label }]`. Empty for other editor types.
+  editorOptions: { type: Array,    default: () => [] },
+  // Synchronous per-column validator `(value, row) => true | string` (req-5/D-01). A
+  // string return is the error message (editor stays OPEN, aria-live announces). Null
+  // (default) = no validation. The parent wraps it defensively (runValidator coerces a
+  // thrown/non-bool/non-string return to a generic message — Security V5 DoS).
+  validate:      { type: Function, default: null },
 }
 </props>
 
@@ -83,6 +100,12 @@ const buildSpec = () => ({
   filterable: $props.filterable,
   pinned: $props.pinned,
   width: $props.width,
+  // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+  // registry (the existing per-column metadata path; NO parallel registry).
+  editable: $props.editable,
+  editor: $props.editor,
+  editorOptions: $props.editorOptions,
+  validate: $props.validate,
 })
 
 $onMount(() => {
@@ -119,7 +142,7 @@ $onUpdate(() => {
 // (possibly new) id with a fresh spec (the parent registry whole-object-replaces by
 // id, so a live edit re-projects idempotently).
 $watch(
-  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width],
+  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width, $props.editable, $props.editor, $props.editorOptions, $props.validate],
   () => {
     if (reg) reg.registerColumn(colId(), buildSpec())
   },

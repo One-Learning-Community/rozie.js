@@ -31,6 +31,8 @@ interface CellCtx { columnId: any; column: any; row: any; value: any; }
 
 interface DataTableProps {
   data: any[];
+  defaultData?: any[];
+  onDataChange?: (data: any[]) => void;
   columns?: any[];
   selectionMode?: string;
   sorting?: any[];
@@ -126,6 +128,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const selectAllBox = useRef<any>(null);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
+  const [data, setData] = useControllableState({
+    value: props.data,
+    defaultValue: props.defaultData ?? [],
+    onValueChange: props.onDataChange,
+  });
   const [sorting, setSorting] = useControllableState({
     value: props.sorting,
     defaultValue: props.defaultSorting ?? (() => [])(),
@@ -177,12 +184,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }))(),
     onValueChange: props.onColumnPinningChange,
   });
-  const _dataRef = useRef(props.data);
-  _dataRef.current = props.data;
   const _selectionModeRef = useRef(props.selectionMode);
   _selectionModeRef.current = props.selectionMode;
+  const _dataRef = useRef(data);
+  _dataRef.current = data;
   const _paginationRef = useRef(pagination);
   _paginationRef.current = pagination;
+  const [dataDefault, setDataDefault] = useState<any[]>([]);
   const [sortingDefault, setSortingDefault] = useState<any[]>([]);
   const [globalFilterDefault, setGlobalFilterDefault] = useState('');
   const [columnFiltersDefault, setColumnFiltersDefault] = useState<any[]>([]);
@@ -248,6 +256,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
     columnSizingInfo: columnSizingInfo
   }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, globalFilter, globalFilterDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
+  const currentData = useCallback((): any => data != null ? data : dataDefault, [data, dataDefault]);
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
   }
@@ -273,7 +282,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
         pinned: c.pinned != null ? c.pinned : '',
-        width: c.width != null ? c.width : ''
+        width: c.width != null ? c.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+        // metadata carrier the display↔editor branch + runValidator read. Off by default.
+        meta: {
+          editable: c.editable === true,
+          editor: c.editor != null ? c.editor : 'text',
+          editorOptions: c.editorOptions != null ? c.editorOptions : [],
+          validate: typeof c.validate === 'function' ? c.validate : null
+        }
       };
     }
     const reg = colReg || {};
@@ -290,7 +307,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
         pinned: spec.pinned != null ? spec.pinned : '',
-        width: spec.width != null ? spec.width : ''
+        width: spec.width != null ? spec.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+        meta: {
+          editable: spec.editable === true,
+          editor: spec.editor != null ? spec.editor : 'text',
+          editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+          validate: typeof spec.validate === 'function' ? spec.validate : null
+        }
       };
     }
     const out = [];
@@ -406,6 +430,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setColumnPinningDefault(next);
     setColumnPinning(next);
     props.onPinChange && props.onPinChange(next);
+    programmatic.current--;
+  }
+  function writeData(next: any) {
+    if (programmatic.current) return;
+    programmatic.current++;
+    setDataDefault(next); // fresh array only (never in-place)
+    setData(next); // two-way emit if bound (no-op-diff if not)
     programmatic.current--;
   }
   function columnFilterValue(colId: any) {
@@ -582,7 +613,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!table.current) return;
     table.current.setOptions((prev: any) => ({
       ...prev,
-      data: props.data,
+      data: currentData(),
       columns: tableColumns(),
       state: currentState(),
       enableRowSelection: props.selectionMode !== 'none',
@@ -601,7 +632,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onGlobalFilterChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.data, props.selectionMode, tableColumns]);
+  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onGlobalFilterChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.selectionMode, tableColumns]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -1216,6 +1247,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
 
   useEffect(() => {
+    // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
+    // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
+    // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
+    // the bound prop when controlled, this fallback otherwise.
+    setDataDefault(_dataRef.current || []);
     // Build the table instance HERE so the closures below capture the live `table`.
     table.current = createTable({
       // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -1224,7 +1260,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
       // on every change by the watch's setOptions below, exactly like columns/state, so
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
-      data: _dataRef.current,
+      // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
+      // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
+      data: currentData(),
       columns: tableColumns(),
       state: currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -1367,16 +1405,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }, []);
   useEffect(() => {
     if (!table.current) return;
-    const d = _dataRef.current || [];
+    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+    // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+    // identical length) still re-feeds.
+    const d = currentData() || [];
     if (d === lastData.current && d.length === lastDataLen.current) return;
     lastData.current = d;
     lastDataLen.current = d.length;
     reFeed();
-  }, [lastData, lastDataLen, reFeed, table]);
+  }, [currentData, lastData, lastDataLen, reFeed, table]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     reFeed();
-  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, globalFilter, pagination, props.data, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, globalFilter, pagination, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell });
   _rozieExposeRef.current = { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell };

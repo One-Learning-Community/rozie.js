@@ -135,7 +135,7 @@ import '@rozie-ui/data-table-angular/themes/shadcn.css';    // or material.css, 
 
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
-| `data` | `Array` | `—` |  | ✓ |
+| `data` | `Array` | `—` | ✓ | ✓ |
 | `columns` | `Array` | `[]` |  |  |
 | `selectionMode` | `String` | `"none"` |  |  |
 | `sorting` | `Array` | `[]` | ✓ |  |

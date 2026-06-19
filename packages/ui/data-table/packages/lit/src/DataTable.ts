@@ -240,7 +240,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
 }
 `;
 
-  @property({ type: Array }) data!: any[];
+  @property({ type: Array, attribute: 'data' }) _data_attr!: any[];
+  private _dataControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'data-change', defaultValue: [], initialControlledValue: undefined });
   @property({ type: Array }) columns: any[] = [];
   @property({ type: String, reflect: true }) selectionMode: string = 'none';
   @property({ type: Array, attribute: 'sorting' }) _sorting_attr: any[] = [];
@@ -279,6 +280,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) virtual: boolean = false;
   @property({ type: Number, reflect: true }) estimateRowHeight: number = 40;
   @property({ type: String, reflect: true }) maxHeight: string = '';
+  private _dataDefault = signal([]);
   private _sortingDefault = signal([]);
   private _globalFilterDefault = signal('');
   private _columnFiltersDefault = signal([]);
@@ -424,7 +426,12 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+    // even when the fresh array is the SAME length (a single-cell edit replaces one row
+    // object → new array ref, identical length → the .length key alone would miss it). The
+    // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+    // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+    this.data, this._dataDefault.value, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
     })(); }); }));
 
@@ -448,6 +455,12 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       }
     }))(this)); }));
 
+    // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
+    // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
+    // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
+    // the bound prop when controlled, this fallback otherwise.
+    this._dataDefault.value = this.data || [];
+    // Build the table instance HERE so the closures below capture the live `table`.
     // Build the table instance HERE so the closures below capture the live `table`.
     this.table = createTable({
       // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -456,7 +469,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
       // on every change by the watch's setOptions below, exactly like columns/state, so
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
-      data: this.data,
+      // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
+      // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
+      data: this.currentData(),
       columns: this.tableColumns(),
       state: this.currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -611,7 +626,15 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   updated(changedProperties: Map<string, unknown>): void {
     if (!this.table) return;
-    const d = this.data || [];
+    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+    // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+    // identical length) still re-feeds.
+    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+    // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+    // identical length) still re-feeds.
+    const d = this.currentData() || [];
     if (d === this.lastData && d.length === this.lastDataLen) return;
     this.lastData = d;
     this.lastDataLen = d.length;
@@ -633,6 +656,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
+    if (name === 'data') this._dataControllable.notifyAttributeChange(value as unknown as any[]);
     if (name === 'sorting') this._sortingControllable.notifyAttributeChange(value as unknown as any[]);
     if (name === 'global-filter') this._globalFilterControllable.notifyAttributeChange(value as unknown as string);
     if (name === 'column-filters') this._columnFiltersControllable.notifyAttributeChange(value as unknown as any[]);
@@ -814,6 +838,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   columnSizingInfo: this._columnSizingInfo.value
 });
 
+  currentData = (): any => this.data != null ? this.data : this._dataDefault.value;
+
   isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
 
   columnDefs = () => {
@@ -838,7 +864,15 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
       pinned: c.pinned != null ? c.pinned : '',
-      width: c.width != null ? c.width : ''
+      width: c.width != null ? c.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+      // metadata carrier the display↔editor branch + runValidator read. Off by default.
+      meta: {
+        editable: c.editable === true,
+        editor: c.editor != null ? c.editor : 'text',
+        editorOptions: c.editorOptions != null ? c.editorOptions : [],
+        validate: typeof c.validate === 'function' ? c.validate : null
+      }
     };
   }
   const reg = this._colReg.value || {};
@@ -855,7 +889,14 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
       pinned: spec.pinned != null ? spec.pinned : '',
-      width: spec.width != null ? spec.width : ''
+      width: spec.width != null ? spec.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+      meta: {
+        editable: spec.editable === true,
+        editor: spec.editor != null ? spec.editor : 'text',
+        editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+        validate: typeof spec.validate === 'function' ? spec.validate : null
+      }
     };
   }
   const out = [];
@@ -1004,6 +1045,14 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
     bubbles: true,
     composed: true
   }));
+  this.programmatic--;
+};
+
+  writeData = (next: any) => {
+  if (this.programmatic) return;
+  this.programmatic++;
+  this._dataDefault.value = next; // fresh array only (never in-place)
+  this._dataControllable.write(next); // two-way emit if bound (no-op-diff if not)
   this.programmatic--;
 };
 
@@ -1204,7 +1253,7 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   if (!this.table) return;
   this.table.setOptions((prev: any) => ({
     ...prev,
-    data: this.data,
+    data: this.currentData(),
     columns: this.tableColumns(),
     state: this.currentState(),
     enableRowSelection: this.selectionMode !== 'none',
@@ -1892,6 +1941,8 @@ ${this.virtual ? html`<div class="rdt-scroll" style=${this.maxHeight ? 'max-heig
   this._activeColIndex.value = 0;
 };
 
+  get data(): any[] { return this._dataControllable.read(); }
+  set data(v: any[]) { this._dataControllable.notifyPropertyWrite(v); }
   get sorting(): any[] { return this._sortingControllable.read(); }
   set sorting(v: any[]) { this._sortingControllable.notifyPropertyWrite(v); }
   get globalFilter(): string { return this._globalFilterControllable.read(); }

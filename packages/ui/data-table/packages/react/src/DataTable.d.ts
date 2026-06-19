@@ -3,7 +3,9 @@ import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
 export interface DataTableProps {
-  data: unknown[];
+  data?: unknown[];
+  defaultData?: unknown[];
+  onDataChange?: (next: unknown[]) => void;
   columns?: unknown[];
   selectionMode?: string;
   sorting?: unknown[];

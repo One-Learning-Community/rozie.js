@@ -9,7 +9,13 @@ interface Props {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  editable?: boolean;
+  editor?: string;
+  editorOptions?: any[];
+  validate?: ((...args: any[]) => any) | null;
 }
+
+let __defaultEditorOptions = (() => [])();
 
 let {
   id = '',
@@ -18,7 +24,11 @@ let {
   sortable = false,
   filterable = false,
   pinned = '',
-  width = ''
+  width = '',
+  editable = false,
+  editor = 'text',
+  editorOptions = __defaultEditorOptions,
+  validate = null
 }: Props = $props();
 
 const registry = getContext('data-table:columns');
@@ -53,7 +63,13 @@ const buildSpec = () => ({
   sortable: sortable,
   filterable: filterable,
   pinned: pinned,
-  width: width
+  width: width,
+  // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+  // registry (the existing per-column metadata path; NO parallel registry).
+  editable: editable,
+  editor: editor,
+  editorOptions: editorOptions,
+  validate: validate
 });
 
 onMount(() => {
@@ -78,7 +94,7 @@ $effect(() => (() => {
 })());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (reg) reg.registerColumn(colId(), buildSpec());
 })(); }); });
 </script>

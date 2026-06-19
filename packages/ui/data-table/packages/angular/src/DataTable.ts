@@ -575,7 +575,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
   ],
 })
 export class DataTable {
-  data = input.required<any[]>();
+  data = model.required<any[]>();
   columns = input<any[]>((() => [])());
   selectionMode = input<string>('none');
   sorting = model<any[]>((() => [])());
@@ -599,6 +599,7 @@ export class DataTable {
   virtual = input<boolean>(false);
   estimateRowHeight = input<number>(40);
   maxHeight = input<string>('');
+  dataDefault = signal<any[]>([]);
   sortingDefault = signal<any[]>([]);
   globalFilterDefault = signal('');
   columnFiltersDefault = signal<any[]>([]);
@@ -661,13 +662,23 @@ export class DataTable {
     });
     effect(() => () => {
       if (!this.table) return;
-      const d = this.data() || [];
+      // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+      // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
+      // bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+      // identical length) still re-feeds.
+      const d = this.currentData() || [];
       if (d === this.lastData && d.length === this.lastDataLen) return;
       this.lastData = d;
       this.lastDataLen = d.length;
       this.reFeed();
     });
-    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length, this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length,
+    // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+    // even when the fresh array is the SAME length (a single-cell edit replaces one row
+    // object → new array ref, identical length → the .length key alone would miss it). The
+    // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+    // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+    this.data(), this.dataDefault(), this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
     })(); }); });
   }
@@ -675,6 +686,12 @@ export class DataTable {
   ngAfterViewInit() {
     const __manual = this.manual();
     const __selectionMode = this.selectionMode();
+    // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
+    // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
+    // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
+    // the bound prop when controlled, this fallback otherwise.
+    this.dataDefault.set(this.data() || []);
+    // Build the table instance HERE so the closures below capture the live `table`.
     // Build the table instance HERE so the closures below capture the live `table`.
     this.table = createTable({
       // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -683,7 +700,9 @@ export class DataTable {
       // re-entering the getter → infinite recursion (max call stack). `data` is re-fed
       // on every change by the watch's setOptions below, exactly like columns/state, so
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
-      data: this.data(),
+      // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
+      // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
+      data: this.currentData(),
       columns: this.tableColumns(),
       state: this.currentState(),
       getCoreRowModel: getCoreRowModel(),
@@ -864,6 +883,7 @@ export class DataTable {
     // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
     columnSizingInfo: this.columnSizingInfo()
   });
+  currentData = (): any => this.data() != null ? this.data() : this.dataDefault();
   isSafeKey = (k: any) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
   columnDefs = () => {
     const byId = Object.create(null);
@@ -887,7 +907,15 @@ export class DataTable {
         enableColumnFilter: c.filterable === true,
         filterable: c.filterable === true,
         pinned: c.pinned != null ? c.pinned : '',
-        width: c.width != null ? c.width : ''
+        width: c.width != null ? c.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+        // metadata carrier the display↔editor branch + runValidator read. Off by default.
+        meta: {
+          editable: c.editable === true,
+          editor: c.editor != null ? c.editor : 'text',
+          editorOptions: c.editorOptions != null ? c.editorOptions : [],
+          validate: typeof c.validate === 'function' ? c.validate : null
+        }
       };
     }
     const reg = this.colReg() || {};
@@ -904,7 +932,14 @@ export class DataTable {
         enableColumnFilter: spec.filterable === true,
         filterable: spec.filterable === true,
         pinned: spec.pinned != null ? spec.pinned : '',
-        width: spec.width != null ? spec.width : ''
+        width: spec.width != null ? spec.width : '',
+        // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+        meta: {
+          editable: spec.editable === true,
+          editor: spec.editor != null ? spec.editor : 'text',
+          editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+          validate: typeof spec.validate === 'function' ? spec.validate : null
+        }
       };
     }
     const out = [];
@@ -1004,6 +1039,13 @@ export class DataTable {
     this.columnPinningDefault.set(next);
     this.columnPinning.set(next);
     this.pinChange.emit(next);
+    this.programmatic--;
+  };
+  writeData = (next: any) => {
+    if (this.programmatic) return;
+    this.programmatic++;
+    this.dataDefault.set(next); // fresh array only (never in-place)
+    this.data.set(next); // two-way emit if bound (no-op-diff if not)
     this.programmatic--;
   };
   columnFilterValue = (colId: any) => {
@@ -1182,7 +1224,7 @@ export class DataTable {
     if (!this.table) return;
     this.table.setOptions((prev: any) => ({
       ...prev,
-      data: this.data(),
+      data: this.currentData(),
       columns: this.tableColumns(),
       state: this.currentState(),
       enableRowSelection: this.selectionMode() !== 'none',

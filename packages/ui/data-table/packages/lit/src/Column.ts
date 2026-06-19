@@ -14,6 +14,10 @@ export default class Column extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) filterable: boolean = false;
   @property({ type: String, reflect: true }) pinned: string = '';
   @property({ type: String }) width: string | number = '';
+  @property({ type: Boolean, reflect: true }) editable: boolean = false;
+  @property({ type: String, reflect: true }) editor: string = 'text';
+  @property({ type: Array }) editorOptions: any[] = [];
+  @property({ type: Function }) validate: ((...args: unknown[]) => unknown) | null = null;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_data_table_columns = new ContextConsumer(this, { context: __rozieCtx_data_table_columns, subscribe: true });
 private get registry() { return this.__rozieCtxConsumer_data_table_columns.value; }
@@ -43,7 +47,7 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('id') || changedProperties.has('field') || changedProperties.has('header') || changedProperties.has('sortable') || changedProperties.has('filterable') || changedProperties.has('pinned') || changedProperties.has('width'))) { const __watchVal = (() => [this.id, this.field, this.header, this.sortable, this.filterable, this.pinned, this.width])(); (() => {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('id') || changedProperties.has('field') || changedProperties.has('header') || changedProperties.has('sortable') || changedProperties.has('filterable') || changedProperties.has('pinned') || changedProperties.has('width') || changedProperties.has('editable') || changedProperties.has('editor') || changedProperties.has('editorOptions') || changedProperties.has('validate'))) { const __watchVal = (() => [this.id, this.field, this.header, this.sortable, this.filterable, this.pinned, this.width, this.editable, this.editor, this.editorOptions, this.validate])(); (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }
     this.__rozieFirstUpdateDone = true;
@@ -86,6 +90,12 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
   sortable: this.sortable,
   filterable: this.filterable,
   pinned: this.pinned,
-  width: this.width
+  width: this.width,
+  // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+  // registry (the existing per-column metadata path; NO parallel registry).
+  editable: this.editable,
+  editor: this.editor,
+  editorOptions: this.editorOptions,
+  validate: this.validate
 });
 }

@@ -8,6 +8,10 @@ export interface ColumnProps {
   filterable?: boolean;
   pinned?: string;
   width?: string | number;
+  editable?: boolean;
+  editor?: string;
+  editorOptions?: unknown[];
+  validate?: ((...args: unknown[]) => unknown) | null;
 }
 
 declare function Column(props: ColumnProps): JSX.Element;

@@ -32,6 +32,10 @@ export class Column {
   filterable = input<boolean>(false);
   pinned = input<string>('');
   width = input<string | number>('');
+  editable = input<boolean>(false);
+  editor = input<string>('text');
+  editorOptions = input<any[]>((() => [])());
+  validate = input<((...args: unknown[]) => unknown) | null>(null);
   registry = inject(rozieToken('data-table:columns'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -49,7 +53,7 @@ export class Column {
       this.registered = true;
       this.reg.registerColumn(this.colId(), this.buildSpec());
     });
-    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }); });
   }
@@ -77,7 +81,13 @@ export class Column {
     sortable: this.sortable(),
     filterable: this.filterable(),
     pinned: this.pinned(),
-    width: this.width()
+    width: this.width(),
+    // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+    // registry (the existing per-column metadata path; NO parallel registry).
+    editable: this.editable(),
+    editor: this.editor(),
+    editorOptions: this.editorOptions(),
+    validate: this.validate()
   });
 }
 
