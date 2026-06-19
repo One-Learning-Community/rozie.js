@@ -50,6 +50,16 @@
   // Optional fixed/initial column width (CSS length or px number).
   width:      { type: [String, Number], default: '' },
 
+  // ── Expandable rows (phase 50, D-04) ──────────────────────────────────────────
+  // Reserved per-column metadata: whether this column participates in the expand
+  // affordance. The expander chevron is its OWN auto-injected leading column on
+  // <DataTable expandable> (so this flag is forward-compat metadata, not the toggle
+  // host). getSubRows — the parent/child accessor that drives nested sub-rows — is a
+  // TABLE-LEVEL option on <DataTable> (`:getSubRows`), NOT a per-<Column> field
+  // (table-core anti-pattern). Default false. Bare `<Column expandable>` only coerces
+  // "" → true on Vue+Lit, so consumers bind `:expandable="true"`.
+  expandable: { type: Boolean, default: false },
+
   // ── Editable-cell config (Phase 51, req-1/2/5) ────────────────────────────────
   // Whether this column's cells are editable (opt-in). Default false → the column is
   // read-only and the parent's display↔editor branch never mounts an editor for it.
@@ -100,6 +110,8 @@ const buildSpec = () => ({
   filterable: $props.filterable,
   pinned: $props.pinned,
   width: $props.width,
+  // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
+  expandable: $props.expandable,
   // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
   // registry (the existing per-column metadata path; NO parallel registry).
   editable: $props.editable,
@@ -142,7 +154,7 @@ $onUpdate(() => {
 // (possibly new) id with a fresh spec (the parent registry whole-object-replaces by
 // id, so a live edit re-projects idempotently).
 $watch(
-  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width, $props.editable, $props.editor, $props.editorOptions, $props.validate],
+  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width, $props.expandable, $props.editable, $props.editor, $props.editorOptions, $props.validate],
   () => {
     if (reg) reg.registerColumn(colId(), buildSpec())
   },

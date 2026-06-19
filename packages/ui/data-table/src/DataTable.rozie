@@ -132,6 +132,30 @@
   // rows verbatim and only emits the change events (the consumer fetches the page).
   manual: { type: Boolean, default: false },
 
+  // ── Expandable rows (phase 50 reqs 1-3, D-04) ────────────────────────────────
+  // expandable: opt-in gate. Default false → byte-identical-OFF (req-10): no expander
+  // column injects and getExpandedRowModel is inert (empty `expanded` + no getSubRows →
+  // getRowModel().rows unchanged). When true, a LEADING chevron expander column auto-
+  // injects (after the select column) and every row can expand (the #detail seam) unless
+  // getSubRows is supplied (then only rows with children expand). Bare `<DataTable
+  // expandable>` only coerces "" → true on Vue+Lit, so consumers bind `:expandable="true"`.
+  expandable: { type: Boolean, default: false },
+
+  // expanded (ExpandedState = { [rowId]: true } | true) — req-1/3. model:true → two-way.
+  // `true` is the expand-ALL literal (Pitfall 2 — pass through verbatim, never Object.keys
+  // without a `=== true` guard). Multi-expand by default (multiple rows open at once).
+  // onExpandedChange funnels a FRESH value → expanded-change (regardless of binding).
+  // Uncontrolled fallback $data.expandedDefault. The 11th two-way slice — Angular CVA stays
+  // disabled (already disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
+  expanded: { type: [Object, Boolean], default: () => ({}), model: true },
+
+  // getSubRows (TABLE option, NOT a per-Column field — RESEARCH anti-pattern): an accessor
+  // `(originalRow, index) => TData[] | undefined` that returns a row's child rows. When
+  // supplied (with expandable), table-core flattens the hierarchy into getRowModel().rows
+  // and the expand seam reveals depth-indented child rows off the SAME D-04 branch (no
+  // nested r-for — Pitfall 1). Null (default) → the #detail scoped slot is the expand mode.
+  getSubRows: { type: Function, default: null },
+
   // rowSelection (RowSelectionState = { [rowId]: true }) — req-7. model:true → two-way.
   // selectionMode drives the chrome: 'none' injects no column; 'single' keeps ≤1
   // (enableMultiRowSelection:false); 'multiple' auto-injects a LEADING checkbox column
@@ -215,6 +239,12 @@
   columnFiltersDefault: [],
   paginationDefault: { pageIndex: 0, pageSize: 10 },
   rowSelectionDefault: {},
+
+  // Uncontrolled fallback for the expanded slice (phase 50 req-1/3) — used when the
+  // consumer did NOT bind r-model:expanded. ExpandedState ({ [rowId]: true } | true).
+  // Whole-value-replace on write (never in-place mutation → silent on
+  // React/Solid/Angular/Lit).
+  expandedDefault: {},
 
   // Uncontrolled fallbacks for the column-management slices (used when the consumer
   // did NOT bind the matching r-model). Each is whole-value-replace on write (never
@@ -341,6 +371,7 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  getExpandedRowModel,
 } from '@tanstack/table-core'
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
@@ -410,6 +441,10 @@ const currentState = (): any => ({
   columnFilters: $props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault,
   pagination: $props.pagination != null ? $props.pagination : $data.paginationDefault,
   rowSelection: $props.rowSelection != null ? $props.rowSelection : $data.rowSelectionDefault,
+  // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+  // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+  // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+  expanded: $props.expanded != null ? $props.expanded : $data.expandedDefault,
   columnVisibility: $props.columnVisibility != null ? $props.columnVisibility : $data.columnVisibilityDefault,
   columnSizing: $props.columnSizing != null ? $props.columnSizing : $data.columnSizingDefault,
   columnOrder: $props.columnOrder != null ? $props.columnOrder : $data.columnOrderDefault,
@@ -459,6 +494,8 @@ const columnDefs = () => {
       // filtered (and renders no per-column filter input in the chrome below).
       enableColumnFilter: c.filterable === true,
       filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -484,6 +521,8 @@ const columnDefs = () => {
       enableSorting: spec.sortable === true,
       enableColumnFilter: spec.filterable === true,
       filterable: spec.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: spec.expandable === true,
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -504,6 +543,11 @@ const columnDefs = () => {
 // any consumer column id (the registry/config guard never produces a leading "__").
 const SELECT_COL_ID = '__rdt_select'
 
+// The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+// Distinct from any consumer column id (the registry/config guard never produces a leading
+// "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
+const EXPANDER_COL_ID = '__rdt_expander'
+
 // The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
 // user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
 // 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
@@ -516,6 +560,23 @@ const SELECT_COL_ID = '__rdt_select'
 const selectionEnabled = () => $props.selectionMode === 'single' || $props.selectionMode === 'multiple'
 const tableColumns = () => {
   const cols = columnDefs()
+  // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+  // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+  // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+  // → byte-identical-off (req-10).
+  let withExpander = cols
+  if ($props.expandable === true) {
+    const expanderCol = {
+      id: EXPANDER_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isExpanderColumn: true,
+      pinned: '',
+      width: '',
+    }
+    withExpander = [expanderCol].concat(cols)
+  }
   if (selectionEnabled()) {
     const selectCol = {
       id: SELECT_COL_ID,
@@ -526,9 +587,9 @@ const tableColumns = () => {
       pinned: '',
       width: '',
     }
-    return [selectCol].concat(cols)
+    return [selectCol].concat(withExpander)
   }
-  return cols
+  return withExpander
 }
 
 // ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
@@ -548,6 +609,22 @@ const writeSorting = (next) => {
 }
 const applyUpdater = (updater, current) =>
   (typeof updater === 'function' ? updater(current) : updater)
+
+// ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+// applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+// uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+// `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+// verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+// React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
+const writeExpanded = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.expandedDefault = next   // fresh value only (never in-place)
+  $model.expanded = next          // two-way emit if bound (no-op-diff if not)
+  $emit('expanded-change', next)
+  programmatic--
+}
 
 // ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
 // A fresh string (primitive) to the uncontrolled default + the two-way model + fires
@@ -699,6 +776,7 @@ let refreshRowModel = null
 // fresh (recreated each render on React, reading fresh currentState) in the re-feed
 // keeps the Updater base value current. No-op cost on the other five.
 const onSortingChangeCb = (updater) => { writeSorting(applyUpdater(updater, currentState().sorting)) }
+const onExpandedChangeCb = (updater) => { writeExpanded(applyUpdater(updater, currentState().expanded)) }
 const onGlobalFilterChangeCb = (updater) => { writeGlobalFilter(applyUpdater(updater, currentState().globalFilter)) }
 const onColumnFiltersChangeCb = (updater) => { writeColumnFilters(applyUpdater(updater, currentState().columnFilters)) }
 const onPaginationChangeCb = (updater) => { writePagination(applyUpdater(updater, currentState().pagination)) }
@@ -992,6 +1070,16 @@ $onMount(() => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
+    // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
+    // (byte-identical-off, req-10). getSubRows is the TABLE-level child accessor (NOT a
+    // ColumnDef field). getRowCanExpand makes EVERY row expandable for the #detail seam
+    // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
+    // default `!!subRows.length` rule applies (only parents with children expand).
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: $props.getSubRows || undefined,
+    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
+    onExpandedChange: onExpandedChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -1145,6 +1233,8 @@ $watch(
     $props.columnFilters,
     $props.pagination,
     $props.rowSelection,
+    $props.expanded,
+    $props.expandable,
     $props.columnVisibility,
     $props.columnSizing,
     $props.columnOrder,
@@ -1174,6 +1264,13 @@ const reFeed = () => {
     state: currentState(),
     enableRowSelection: $props.selectionMode !== 'none',
     enableMultiRowSelection: $props.selectionMode === 'multiple',
+    // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
+    // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
+    // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: $props.getSubRows || undefined,
+    getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
+    onExpandedChange: onExpandedChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
