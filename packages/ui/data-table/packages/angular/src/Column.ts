@@ -34,7 +34,7 @@ export class Column {
   width = input<string | number>('');
   expandable = input<boolean>(false);
   groupable = input<boolean>(true);
-  aggregationFn = input<(string | (...args: unknown[]) => unknown) | null>(null);
+  aggregationFn = input<(string | ((...args: unknown[]) => unknown)) | null>(null);
   editable = input<boolean>(false);
   editor = input<string>('text');
   editorOptions = input<any[]>((() => [])());

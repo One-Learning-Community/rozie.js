@@ -10,7 +10,7 @@ export interface ColumnProps {
   width?: string | number;
   expandable?: boolean;
   groupable?: boolean;
-  aggregationFn?: (string | (...args: unknown[]) => unknown) | null;
+  aggregationFn?: (string | ((...args: unknown[]) => unknown)) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: unknown[];

@@ -11,7 +11,7 @@ interface ColumnProps {
   width?: string | number;
   expandable?: boolean;
   groupable?: boolean;
-  aggregationFn?: (string | (...args: any[]) => any) | null;
+  aggregationFn?: (string | ((...args: any[]) => any)) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];
@@ -21,7 +21,7 @@ interface ColumnProps {
 export default function Column(_props: ColumnProps): JSX.Element {
   const registry = useContext(rozieContext("data-table:columns"));
   const __defaultEditorOptions = useState(() => (() => [])())[0];
-  const props: Omit<ColumnProps, 'id' | 'field' | 'header' | 'sortable' | 'filterable' | 'pinned' | 'width' | 'expandable' | 'groupable' | 'aggregationFn' | 'editable' | 'editor' | 'editorOptions' | 'validate'> & { id: string; field: string; header: string; sortable: boolean; filterable: boolean; pinned: string; width: string | number; expandable: boolean; groupable: boolean; aggregationFn: (string | (...args: any[]) => any) | null; editable: boolean; editor: string; editorOptions: any[]; validate: ((...args: any[]) => any) | null } = {
+  const props: Omit<ColumnProps, 'id' | 'field' | 'header' | 'sortable' | 'filterable' | 'pinned' | 'width' | 'expandable' | 'groupable' | 'aggregationFn' | 'editable' | 'editor' | 'editorOptions' | 'validate'> & { id: string; field: string; header: string; sortable: boolean; filterable: boolean; pinned: string; width: string | number; expandable: boolean; groupable: boolean; aggregationFn: (string | ((...args: any[]) => any)) | null; editable: boolean; editor: string; editorOptions: any[]; validate: ((...args: any[]) => any) | null } = {
     ..._props,
     id: _props.id ?? '',
     field: _props.field ?? '',

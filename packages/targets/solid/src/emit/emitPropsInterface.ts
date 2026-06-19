@@ -45,7 +45,18 @@ export function renderType(ann: PropTypeAnnotation): string {
     }
   }
   if (ann.kind === 'union') {
-    return ann.members.map(renderType).join(' | ');
+    // A function-type member MUST be parenthesized inside a union — `string | (...) => x`
+    // is ambiguous/invalid TS (the arrow binds the whole union); `string | ((...) => x)` is
+    // correct. Only function members need wrapping.
+    return ann.members
+      .map((m) => {
+        const r = renderType(m);
+        const isFn =
+          (m.kind === 'identifier' && m.name === 'Function') ||
+          (m.kind === 'literal' && m.value === 'function');
+        return isFn ? `(${r})` : r;
+      })
+      .join(' | ');
   }
   if (ann.kind === 'literal') {
     if (ann.value === 'array') return 'any[]';

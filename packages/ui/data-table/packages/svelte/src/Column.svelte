@@ -11,7 +11,7 @@ interface Props {
   width?: string | number;
   expandable?: boolean;
   groupable?: boolean;
-  aggregationFn?: (string | (...args: any[]) => any) | null;
+  aggregationFn?: (string | ((...args: any[]) => any)) | null;
   editable?: boolean;
   editor?: string;
   editorOptions?: any[];

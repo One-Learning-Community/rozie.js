@@ -235,7 +235,18 @@ export function renderPropType(ann: PropTypeAnnotation): string {
     }
   }
   if (ann.kind === 'union') {
-    return ann.members.map(renderPropType).join(' | ');
+    // A function-type member MUST be parenthesized inside a union — `string | (...) => x`
+    // is ambiguous/invalid TS (the arrow binds the whole union); `string | ((...) => x)` is
+    // correct. Only function members need wrapping; primitives/objects/arrays do not.
+    return ann.members
+      .map((m) => {
+        const r = renderPropType(m);
+        const isFn =
+          (m.kind === 'identifier' && m.name === 'Function') ||
+          (m.kind === 'literal' && m.value === 'function');
+        return isFn ? `(${r})` : r;
+      })
+      .join(' | ');
   }
   return 'unknown';
 }
