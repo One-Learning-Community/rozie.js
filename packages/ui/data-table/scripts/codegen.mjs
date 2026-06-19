@@ -82,9 +82,11 @@ const TARGETS = {
   lit: { dir: 'lit', ext: 'ts', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
 };
 
-// REQ-1: forbidden per-framework adapter specifiers. The leaves must import ONLY
-// `@tanstack/table-core` — a `@tanstack/<fw>-table` adapter would defeat the
-// single-core no-adapter design.
+// REQ-1 / REQ-4: forbidden per-framework adapter specifiers. The leaves must import
+// ONLY the framework-agnostic cores `@tanstack/table-core` and `@tanstack/virtual-core`
+// — a `@tanstack/<fw>-table` or `@tanstack/<fw>-virtual` adapter would defeat the
+// single-core no-adapter design (D-02). NOTE: `@tanstack/virtual-core` is the ALLOWED
+// virtualization import and is deliberately NOT in this list.
 const FORBIDDEN_ADAPTERS = [
   '@tanstack/react-table',
   '@tanstack/vue-table',
@@ -92,6 +94,12 @@ const FORBIDDEN_ADAPTERS = [
   '@tanstack/solid-table',
   '@tanstack/angular-table',
   '@tanstack/lit-table',
+  '@tanstack/react-virtual',
+  '@tanstack/vue-virtual',
+  '@tanstack/svelte-virtual',
+  '@tanstack/solid-virtual',
+  '@tanstack/angular-virtual',
+  '@tanstack/lit-virtual',
 ];
 
 function leafPkgName(dir) {
@@ -113,8 +121,9 @@ function assertNoAdapterImport(target, componentName, code) {
     if (code.includes(adapter)) {
       throw new Error(
         `codegen ${target} ${componentName}: REQ-1 VIOLATION — emitted code imports the per-framework ` +
-          `adapter "${adapter}". The leaves must import ONLY "@tanstack/table-core" (the single ` +
-          `framework-agnostic core wired by hand). Remove the adapter import from the .rozie source.`,
+          `adapter "${adapter}". The leaves must import ONLY "@tanstack/table-core" and ` +
+          `"@tanstack/virtual-core" (the framework-agnostic cores wired by hand). ` +
+          `Remove the adapter import from the .rozie source.`,
       );
     }
   }
