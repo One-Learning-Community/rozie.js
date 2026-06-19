@@ -92,6 +92,50 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Editable cells (inline edit + validation)
+
+```svelte
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // The component OWNS edit state — bind ONE model (bind:data) + listen for commits.
+  let rows = $state([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+  onroweditcommit={(p) => console.log('row commit', p)}
+>
+  <Column field="name" header="Name" editable editor="text" />
+  <Column field="qty" header="Qty" editable editor="number" validate={validateQty} />
+  <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+  <Column field="active" header="Active" editable editor="checkbox" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- The #editor scoped slot is a snippet on Svelte; it replaces the built-in editor. -->
+  {#snippet editor({ columnId, value, commit, cancel })}
+    {#if columnId === 'score'}
+      <span>
+        <button type="button" onclick={() => commit(Number(value) - 1)}>−</button>
+        <button type="button" onclick={() => commit(Number(value) + 1)}>+</button>
+        <button type="button" onclick={() => cancel()}>esc</button>
+      </span>
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -174,6 +218,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 <DataTable bind:this={tbl} data={rows} />
 <button onclick={() => tbl.clearSelection()}>Clear</button>
+<button onclick={() => tbl.editRow(0)}>Edit row 0</button>
+<button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>
 ```
 
 ## Slots

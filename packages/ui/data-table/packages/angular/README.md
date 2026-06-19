@@ -122,6 +122,59 @@ export class DemoComponent {
 }
 ```
 
+### Editable cells (inline edit + validation)
+
+```ts
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- The component OWNS edit state — bind ONE model [(data)] + listen for commits. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+      (row-edit-commit)="onRowCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="text" />
+      <Column field="qty" header="Qty" [editable]="true" editor="number" [validate]="validateQty" />
+      <Column field="status" header="Status" [editable]="true" editor="select" [editorOptions]="statusOptions" />
+      <Column field="active" header="Active" [editable]="true" editor="checkbox" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <!-- The #editor scoped slot is an ng-template; it replaces the built-in editor. -->
+      <ng-template #editor let-columnId="columnId" let-value="value" let-commit="commit" let-cancel="cancel">
+        @if (columnId === 'score') {
+          <span>
+            <button type="button" (click)="commit(+value - 1)">−</button>
+            <button type="button" (click)="commit(+value + 1)">+</button>
+            <button type="button" (click)="cancel()">esc</button>
+          </span>
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+  statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+  onRowCommit(p: unknown) { console.log('row commit', p); }
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -203,6 +256,8 @@ export class DemoComponent {
   @ViewChild(DataTable) tbl!: DataTable;   // or the viewChild() signal
   selectAll() { this.tbl.toggleAllRows(true); }
   read() { return this.tbl.getSelectedRows(); }
+  editFirstRow() { this.tbl.editRow(0); }            // full-row edit on row 0
+  readRange() { return this.tbl.getSelectedRange(); } // the active cell-range rectangle
 }
 ```
 

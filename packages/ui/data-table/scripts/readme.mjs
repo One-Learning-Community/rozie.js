@@ -89,6 +89,21 @@ const COLS = `[
 const SET_A_TITLE = 'Columns as a config array';
 const SET_B_TITLE = 'Declarative `<Column>` children + a custom cell';
 const SET_C_TITLE = 'Virtualized rows (windowing)';
+const SET_D_TITLE = 'Editable cells (inline edit + validation)';
+
+// Editing example dataset — one field per built-in editor type (text/number/select/
+// checkbox) + the `score` field routed through the custom `#editor` scoped slot. The
+// component OWNS edit state: the consumer binds ONE model (`data`) and listens for the
+// commit events; no manual re-sync.
+const EDIT_ROWS = `[
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]`;
+const STATUS_OPTIONS = `[
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ]`;
 
 // A larger row set for the windowing example (the windowing path only earns its
 // keep past a few hundred rows). Synthesised inline so the snippet stays short.
@@ -170,6 +185,45 @@ export function Demo() {
 // <DataTable data={rows} virtual estimateRowHeight={48}
 //   style={{ '--rozie-data-table-max-height': '400px' } as React.CSSProperties} />`,
     },
+    {
+      title: SET_D_TITLE,
+      lang: 'tsx',
+      code: `import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = useState(${EDIT_ROWS});
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows}
+      onDataChange={setRows}
+      onCellEditCommit={({ rowId, columnId, oldValue, newValue }) =>
+        console.log('cell commit', rowId, columnId, oldValue, '→', newValue)
+      }
+      onRowEditCommit={({ rowId, changes }) => console.log('row commit', rowId, changes)}
+      // The #editor scoped slot is a render prop on React (the documented edge).
+      renderEditor={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={cancel}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={${STATUS_OPTIONS}} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   vue: [
     {
@@ -244,6 +298,43 @@ const rows = ${MANY_ROWS};
   </DataTable>
 </template>`,
     },
+    {
+      title: SET_D_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+// The component OWNS edit state — bind ONE model (v-model:data) + listen for commits.
+const rows = ref(${EDIT_ROWS});
+const statusOptions = ${STATUS_OPTIONS};
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+    @row-edit-commit="(p) => console.log('row commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="text" />
+    <Column field="qty" header="Qty" :editable="true" editor="number" :validate="validateQty" />
+    <Column field="status" header="Status" :editable="true" editor="select" :editorOptions="statusOptions" />
+    <Column field="active" header="Active" :editable="true" editor="checkbox" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- The #editor scoped slot replaces the built-in editor for one column. -->
+    <template #editor="{ columnId, value, commit, cancel }">
+      <span v-if="columnId === 'score'">
+        <button type="button" @click="commit(Number(value) - 1)">−</button>
+        <button type="button" @click="commit(Number(value) + 1)">+</button>
+        <button type="button" @click="cancel()">esc</button>
+      </span>
+    </template>
+  </DataTable>
+</template>`,
+    },
   ],
   svelte: [
     {
@@ -302,6 +393,42 @@ const rows = ${MANY_ROWS};
   <Column field="name" header="Name" />
   <Column field="email" header="Email" />
   <Column field="status" header="Status" />
+</DataTable>`,
+    },
+    {
+      title: SET_D_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // The component OWNS edit state — bind ONE model (bind:data) + listen for commits.
+  let rows = $state(${EDIT_ROWS});
+  const statusOptions = ${STATUS_OPTIONS};
+  const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+  onroweditcommit={(p) => console.log('row commit', p)}
+>
+  <Column field="name" header="Name" editable editor="text" />
+  <Column field="qty" header="Qty" editable editor="number" validate={validateQty} />
+  <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+  <Column field="active" header="Active" editable editor="checkbox" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- The #editor scoped slot is a snippet on Svelte; it replaces the built-in editor. -->
+  {#snippet editor({ columnId, value, commit, cancel })}
+    {#if columnId === 'score'}
+      <span>
+        <button type="button" onclick={() => commit(Number(value) - 1)}>−</button>
+        <button type="button" onclick={() => commit(Number(value) + 1)}>+</button>
+        <button type="button" onclick={() => cancel()}>esc</button>
+      </span>
+    {/if}
+  {/snippet}
 </DataTable>`,
     },
   ],
@@ -394,6 +521,51 @@ export class DemoComponent {
   rows = ${MANY_ROWS};
 }`,
     },
+    {
+      title: SET_D_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: \`
+    <!-- The component OWNS edit state — bind ONE model [(data)] + listen for commits. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+      (row-edit-commit)="onRowCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="text" />
+      <Column field="qty" header="Qty" [editable]="true" editor="number" [validate]="validateQty" />
+      <Column field="status" header="Status" [editable]="true" editor="select" [editorOptions]="statusOptions" />
+      <Column field="active" header="Active" [editable]="true" editor="checkbox" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <!-- The #editor scoped slot is an ng-template; it replaces the built-in editor. -->
+      <ng-template #editor let-columnId="columnId" let-value="value" let-commit="commit" let-cancel="cancel">
+        @if (columnId === 'score') {
+          <span>
+            <button type="button" (click)="commit(+value - 1)">−</button>
+            <button type="button" (click)="commit(+value + 1)">+</button>
+            <button type="button" (click)="cancel()">esc</button>
+          </span>
+        }
+      </ng-template>
+    </DataTable>
+  \`,
+})
+export class DemoComponent {
+  rows = ${EDIT_ROWS};
+  statusOptions = ${STATUS_OPTIONS};
+  validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+  onRowCommit(p: unknown) { console.log('row commit', p); }
+}`,
+    },
   ],
   solid: [
     {
@@ -460,6 +632,44 @@ export function Demo() {
 // <DataTable data={rows} virtual estimateRowHeight={48}
 //   style={{ '--rozie-data-table-max-height': '400px' }} />`,
     },
+    {
+      title: SET_D_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = createSignal(${EDIT_ROWS});
+  const statusOptions = ${STATUS_OPTIONS};
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      onRowEditCommit={(p) => console.log('row commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={() => cancel()}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   lit: [
     {
@@ -522,6 +732,41 @@ render(html\`
 //   <rozie-data-table .data=\${rows} virtual estimate-row-height="48"
 //     style="--rozie-data-table-max-height: 400px"> … </rozie-data-table>`,
     },
+    {
+      title: SET_D_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+// The component OWNS edit state — set the \`data\` property + listen for commits.
+let rows = ${EDIT_ROWS};
+const statusOptions = ${STATUS_OPTIONS};
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+
+render(html\`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=\${rows}
+    @data-change=\${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=\${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    @row-edit-commit=\${(e: CustomEvent) => console.log('row commit', e.detail)}
+    .editor=\${({ columnId, value, commit, cancel }) =>
+      columnId === 'score'
+        ? html\`<span>
+            <button @click=\${() => commit(Number(value) - 1)}>−</button>
+            <button @click=\${() => commit(Number(value) + 1)}>+</button>
+            <button @click=\${() => cancel()}>esc</button>
+          </span>\`
+        : null}
+  >
+    <rozie-column field="name" header="Name" editable editor="text"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="number" .validate=\${validateQty}></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="select" .editorOptions=\${statusOptions}></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="checkbox"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
   ],
 };
 
@@ -544,7 +789,9 @@ import { DataTable, type DataTableHandle } from '@rozie-ui/data-table-react';
 const tbl = useRef<DataTableHandle>(null);
 // <DataTable ref={tbl} ... />
 tbl.current?.toggleAllRows(true);
-const selected = tbl.current?.getSelectedRows();`,
+const selected = tbl.current?.getSelectedRows();
+tbl.current?.editRow(0);                       // full-row edit on row 0
+const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle`,
   },
   vue: {
     lang: 'vue',
@@ -556,6 +803,8 @@ const tbl = ref();          // template ref
 <template>
   <DataTable ref="tbl" :data="rows" />
   <button @click="tbl.clearSelection()">Clear</button>
+  <button @click="tbl.editRow(0)">Edit row 0</button>
+  <button @click="console.log(tbl.getSelectedRange())">Read range</button>
 </template>`,
   },
   svelte: {
@@ -565,7 +814,9 @@ const tbl = ref();          // template ref
 </script>
 
 <DataTable bind:this={tbl} data={rows} />
-<button onclick={() => tbl.clearSelection()}>Clear</button>`,
+<button onclick={() => tbl.clearSelection()}>Clear</button>
+<button onclick={() => tbl.editRow(0)}>Edit row 0</button>
+<button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>`,
   },
   angular: {
     lang: 'ts',
@@ -574,6 +825,8 @@ export class DemoComponent {
   @ViewChild(DataTable) tbl!: DataTable;   // or the viewChild() signal
   selectAll() { this.tbl.toggleAllRows(true); }
   read() { return this.tbl.getSelectedRows(); }
+  editFirstRow() { this.tbl.editRow(0); }            // full-row edit on row 0
+  readRange() { return this.tbl.getSelectedRange(); } // the active cell-range rectangle
 }`,
   },
   solid: {
@@ -583,7 +836,9 @@ export class DemoComponent {
 let handle: DataTableHandle | undefined;
 // The ref callback receives the HANDLE object (not the DOM node).
 <DataTable ref={(h) => (handle = h)} data={rows} />;
-handle?.toggleAllRows(true);`,
+handle?.toggleAllRows(true);
+handle?.editRow(0);                       // full-row edit on row 0
+const range = handle?.getSelectedRange(); // the active cell-range rectangle`,
   },
   lit: {
     lang: 'ts',
@@ -591,7 +846,9 @@ handle?.toggleAllRows(true);`,
 // methods.
 const el = document.querySelector('rozie-data-table');
 el.toggleAllRows(true);
-const selected = el.getSelectedRows();`,
+const selected = el.getSelectedRows();
+el.editRow(0);                       // full-row edit on row 0
+const range = el.getSelectedRange();  // the active cell-range rectangle`,
   },
 };
 

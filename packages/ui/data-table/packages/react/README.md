@@ -103,6 +103,53 @@ export function Demo() {
 //   style={{ '--rozie-data-table-max-height': '400px' } as React.CSSProperties} />
 ```
 
+### Editable cells (inline edit + validation)
+
+```tsx
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = useState([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows}
+      onDataChange={setRows}
+      onCellEditCommit={({ rowId, columnId, oldValue, newValue }) =>
+        console.log('cell commit', rowId, columnId, oldValue, '→', newValue)
+      }
+      onRowEditCommit={({ rowId, changes }) => console.log('row commit', rowId, changes)}
+      // The #editor scoped slot is a render prop on React (the documented edge).
+      renderEditor={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={cancel}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={[
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ]} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -186,6 +233,8 @@ const tbl = useRef<DataTableHandle>(null);
 // <DataTable ref={tbl} ... />
 tbl.current?.toggleAllRows(true);
 const selected = tbl.current?.getSelectedRows();
+tbl.current?.editRow(0);                       // full-row edit on row 0
+const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle
 ```
 
 ## Slots

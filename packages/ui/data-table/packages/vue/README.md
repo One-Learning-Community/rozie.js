@@ -106,6 +106,51 @@ const rows = Array.from({ length: 10_000 }, (_, i) => ({
 </template>
 ```
 
+### Editable cells (inline edit + validation)
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+// The component OWNS edit state — bind ONE model (v-model:data) + listen for commits.
+const rows = ref([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+    @row-edit-commit="(p) => console.log('row commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="text" />
+    <Column field="qty" header="Qty" :editable="true" editor="number" :validate="validateQty" />
+    <Column field="status" header="Status" :editable="true" editor="select" :editorOptions="statusOptions" />
+    <Column field="active" header="Active" :editable="true" editor="checkbox" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- The #editor scoped slot replaces the built-in editor for one column. -->
+    <template #editor="{ columnId, value, commit, cancel }">
+      <span v-if="columnId === 'score'">
+        <button type="button" @click="commit(Number(value) - 1)">−</button>
+        <button type="button" @click="commit(Number(value) + 1)">+</button>
+        <button type="button" @click="cancel()">esc</button>
+      </span>
+    </template>
+  </DataTable>
+</template>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -190,6 +235,8 @@ const tbl = ref();          // template ref
 <template>
   <DataTable ref="tbl" :data="rows" />
   <button @click="tbl.clearSelection()">Clear</button>
+  <button @click="tbl.editRow(0)">Edit row 0</button>
+  <button @click="console.log(tbl.getSelectedRange())">Read range</button>
 </template>
 ```
 

@@ -98,6 +98,52 @@ export function Demo() {
 //   style={{ '--rozie-data-table-max-height': '400px' }} />
 ```
 
+### Editable cells (inline edit + validation)
+
+```tsx
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = createSignal([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      onRowEditCommit={(p) => console.log('row commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={() => cancel()}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -180,6 +226,8 @@ let handle: DataTableHandle | undefined;
 // The ref callback receives the HANDLE object (not the DOM node).
 <DataTable ref={(h) => (handle = h)} data={rows} />;
 handle?.toggleAllRows(true);
+handle?.editRow(0);                       // full-row edit on row 0
+const range = handle?.getSelectedRange(); // the active cell-range rectangle
 ```
 
 ## Slots

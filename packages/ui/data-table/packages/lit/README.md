@@ -94,6 +94,49 @@ render(html`
 //     style="--rozie-data-table-max-height: 400px"> … </rozie-data-table>
 ```
 
+### Editable cells (inline edit + validation)
+
+```ts
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+// The component OWNS edit state — set the `data` property + listen for commits.
+let rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+
+render(html`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=${rows}
+    @data-change=${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    @row-edit-commit=${(e: CustomEvent) => console.log('row commit', e.detail)}
+    .editor=${({ columnId, value, commit, cancel }) =>
+      columnId === 'score'
+        ? html`<span>
+            <button @click=${() => commit(Number(value) - 1)}>−</button>
+            <button @click=${() => commit(Number(value) + 1)}>+</button>
+            <button @click=${() => cancel()}>esc</button>
+          </span>`
+        : null}
+  >
+    <rozie-column field="name" header="Name" editable editor="text"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="number" .validate=${validateQty}></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="select" .editorOptions=${statusOptions}></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="checkbox"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
@@ -175,6 +218,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 const el = document.querySelector('rozie-data-table');
 el.toggleAllRows(true);
 const selected = el.getSelectedRows();
+el.editRow(0);                       // full-row edit on row 0
+const range = el.getSelectedRange();  // the active cell-range rectangle
 ```
 
 ## Slots
