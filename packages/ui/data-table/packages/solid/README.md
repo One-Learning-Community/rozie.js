@@ -98,6 +98,9 @@ import '@rozie-ui/data-table-solid/themes/shadcn.css';    // or material.css, bo
 | `columnPinning` | `Object` | `{…}` | ✓ |  |
 | `stickyHeader` | `Boolean` | `false` |  |  |
 | `interactionMode` | `String` | `"table"` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `40` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 

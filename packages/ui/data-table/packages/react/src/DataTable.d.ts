@@ -36,6 +36,9 @@ export interface DataTableProps {
   onColumnPinningChange?: (next: Record<string, unknown>) => void;
   stickyHeader?: boolean;
   interactionMode?: string;
+  virtual?: boolean;
+  estimateRowHeight?: number;
+  maxHeight?: string;
   onSortChange?: (...args: unknown[]) => void;
   onFilterChange?: (...args: unknown[]) => void;
   onPageChange?: (...args: unknown[]) => void;

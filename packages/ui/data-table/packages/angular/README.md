@@ -108,6 +108,9 @@ import '@rozie-ui/data-table-angular/themes/shadcn.css';    // or material.css, 
 | `columnPinning` | `Object` | `{…}` | ✓ |  |
 | `stickyHeader` | `Boolean` | `false` |  |  |
 | `interactionMode` | `String` | `"table"` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `40` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 

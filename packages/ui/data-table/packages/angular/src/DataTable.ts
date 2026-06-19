@@ -2,6 +2,17 @@ import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Templa
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
@@ -448,6 +459,9 @@ export class DataTable {
   }))());
   stickyHeader = input<boolean>(false);
   interactionMode = input<string>('table');
+  virtual = input<boolean>(false);
+  estimateRowHeight = input<number>(40);
+  maxHeight = input<string>('');
   sortingDefault = signal<any[]>([]);
   globalFilterDefault = signal('');
   columnFiltersDefault = signal<any[]>([]);
@@ -475,6 +489,7 @@ export class DataTable {
   rows = signal<any[]>([]);
   headerGroups = signal<any[]>([]);
   rowModelVer = signal(0);
+  windowVer = signal(0);
   activeRow = signal(0);
   activeColIndex = signal(0);
   activeIsHeader = signal(false);
@@ -499,6 +514,9 @@ export class DataTable {
   private __rozieWatchInitial_0 = true;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.virtualizerCleanup) this.virtualizerCleanup();
+    });
     effect(() => () => {
       if (!this.table) return;
       const d = this.data() || [];
@@ -571,11 +589,21 @@ export class DataTable {
       // Capture fresh locals; never write a $data key then re-read it in the same fn
       // (ROZ138 / React stale-read — setState is async on React, the closure binds the
       // PRE-write value).
-      const nextRows = this.table.getRowModel().rows.slice();
+      // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+      // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
+      const nextRows = this.windowingSource().slice();
       const nextGroups = this.table.getHeaderGroups().slice();
       this.rows.set(nextRows);
       this.headerGroups.set(nextGroups);
       this.rowModelVer.set(this.rowModelVer() + 1);
+      // Vertical windowing re-feed (Pitfall 2 — stale count): push the fresh full-model count
+      // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
+      // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
+      // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
+      if (this.virtual() && this.virtualizer) {
+        this.virtualizer.setOptions(this.virtualizerOptions());
+        this.virtualizer._willUpdate();
+      }
       // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
       // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
       // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
@@ -605,9 +633,34 @@ export class DataTable {
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
     // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
     // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
+
+    // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
+    // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+    // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
+    // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
+    // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
+    // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
+    // page load AND was non-deterministic on React/Solid (the entry cell may not be
+    // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
+    // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
+    // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
+
+    // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
+    // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+    // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
+    // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
+    // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
+    if (this.virtual()) {
+      this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rdt-scroll') : null;
+      this.virtualizer = new Virtualizer(this.virtualizerOptions());
+      this.virtualizerCleanup = this.virtualizer._didMount();
+    }
   }
 
   table: any = null;
+  virtualizer: any = null;
+  virtualizerCleanup: any = null;
+  gridScrollEl: any = null;
   GRID_PAGE_STEP = 10;
   gridRoot: any = null;
   programmatic = 0;
@@ -819,6 +872,46 @@ export class DataTable {
   onColumnSizingInfoChangeCb = (updater: any) => {
     const next = this.applyUpdater(updater, this.columnSizingInfo());
     this.columnSizingInfo.set(next != null ? next : this.columnSizingInfo());
+  };
+  windowingSource = () => {
+    if (!this.table) return [];
+    if (this.virtual()) return this.table.getPrePaginationRowModel().rows;
+    return this.table.getRowModel().rows;
+  };
+  virtualItemKey = (i: any) => {
+    const src = this.windowingSource();
+    return src && src[i] ? src[i].id : undefined;
+  };
+  virtualizerOptions = (): any => ({
+    count: this.windowingSource().length,
+    getScrollElement: () => this.gridScrollEl,
+    estimateSize: () => this.estimateRowHeight(),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: this.virtualItemKey,
+    onChange: () => {
+      this.windowVer.set(this.windowVer() + 1);
+    }
+  });
+  windowedRows = () => {
+    const __rows = this.rows();
+    if (!this.virtual() || !this.virtualizer) {
+      const rowList = __rows || [];
+      return rowList.map((r: any) => ({
+        vi: null,
+        row: r
+      }));
+    }
+    if (this.windowVer() < 0) return [];
+    const items = this.virtualizer.getVirtualItems();
+    const rowList = __rows || [];
+    return items.map((vi: any) => ({
+      vi,
+      row: rowList[vi.index]
+    }));
   };
   reFeed = () => {
     if (!this.table) return;

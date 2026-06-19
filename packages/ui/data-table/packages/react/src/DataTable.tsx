@@ -3,6 +3,17 @@ import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
@@ -52,6 +63,9 @@ interface DataTableProps {
   onColumnPinningChange?: (columnPinning: Record<string, any>) => void;
   stickyHeader?: boolean;
   interactionMode?: string;
+  virtual?: boolean;
+  estimateRowHeight?: number;
+  maxHeight?: string;
   onSortChange?: (...args: any[]) => void;
   onFilterChange?: (...args: any[]) => void;
   onPageChange?: (...args: any[]) => void;
@@ -90,17 +104,23 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'stickyHeader' | 'interactionMode'> & { columns: any[]; selectionMode: string; manual: boolean; stickyHeader: boolean; interactionMode: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'stickyHeader' | 'interactionMode' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; stickyHeader: boolean; interactionMode: string; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
     manual: _props.manual ?? false,
     stickyHeader: _props.stickyHeader ?? false,
     interactionMode: _props.interactionMode ?? 'table',
+    virtual: _props.virtual ?? false,
+    estimateRowHeight: _props.estimateRowHeight ?? 40,
+    maxHeight: _props.maxHeight ?? '',
   };
   const table = useRef<any>(null);
   const refreshRowModel = useRef<any>(null);
+  const virtualizer = useRef<any>(null);
   const gridRoot = useRef<any>(null);
+  const gridScrollEl = useRef<any>(null);
+  const virtualizerCleanup = useRef<any>(null);
   const programmatic = useRef(0);
   const selectAllBox = useRef<any>(null);
   const lastData = useRef<any>(null);
@@ -187,6 +207,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [rows, setRows] = useState<any[]>([]);
   const [headerGroups, setHeaderGroups] = useState<any[]>([]);
   const [rowModelVer, setRowModelVer] = useState(0);
+  const [windowVer, setWindowVer] = useState(0);
   const [activeRow, setActiveRow] = useState(0);
   const [activeColIndex, setActiveColIndex] = useState(0);
   const [activeIsHeader, setActiveIsHeader] = useState(false);
@@ -430,6 +451,45 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const next = applyUpdater(updater, columnSizingInfo);
     setColumnSizingInfo(prev => next != null ? next : prev);
   }, [applyUpdater, columnSizingInfo]);
+  const windowingSource = useCallback(() => {
+    if (!table.current) return [];
+    if (props.virtual) return table.current.getPrePaginationRowModel().rows;
+    return table.current.getRowModel().rows;
+  }, [props.virtual]);
+  function virtualItemKey(i: any) {
+    const src = windowingSource();
+    return src && src[i] ? src[i].id : undefined;
+  }
+  const virtualizerOptions = useCallback((): any => ({
+    count: windowingSource().length,
+    getScrollElement: () => gridScrollEl.current,
+    estimateSize: () => props.estimateRowHeight,
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: virtualItemKey,
+    onChange: () => {
+      setWindowVer(prev => prev + 1);
+    }
+  }), [props.estimateRowHeight, virtualItemKey, windowingSource]);
+  function windowedRows() {
+    if (!props.virtual || !virtualizer.current) {
+      const rowList = rows || [];
+      return rowList.map((r: any) => ({
+        vi: null,
+        row: r
+      }));
+    }
+    if (windowVer < 0) return [];
+    const items = virtualizer.current.getVirtualItems();
+    const rowList = rows || [];
+    return items.map((vi: any) => ({
+      vi,
+      row: rowList[vi.index]
+    }));
+  }
   const reFeed = useCallback(() => {
     if (!table.current) return;
     table.current.setOptions((prev: any) => ({
@@ -1093,11 +1153,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Capture fresh locals; never write a $data key then re-read it in the same fn
       // (ROZ138 / React stale-read — setState is async on React, the closure binds the
       // PRE-write value).
-      const nextRows = table.current.getRowModel().rows.slice();
+      // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+      // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
+      const nextRows = windowingSource().slice();
       const nextGroups = table.current.getHeaderGroups().slice();
       setRows(nextRows);
       setHeaderGroups(nextGroups);
       setRowModelVer(prev => prev + 1);
+      // Vertical windowing re-feed (Pitfall 2 — stale count): push the fresh full-model count
+      // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
+      // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
+      // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
+      if (props.virtual && virtualizer.current) {
+        virtualizer.current.setOptions(virtualizerOptions());
+        virtualizer.current._willUpdate();
+      }
       // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
       // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
       // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
@@ -1122,7 +1192,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
     // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
     // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
+
+    // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
+    // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+    // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
+    // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
+    // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
+    if (props.virtual) {
+      gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rdt-scroll') : null;
+      virtualizer.current = new Virtualizer(virtualizerOptions());
+      virtualizerCleanup.current = virtualizer.current._didMount();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    return () => {
+      if (virtualizerCleanup.current) virtualizerCleanup.current();
+    };
+  }, []);
   useEffect(() => {
     if (!table.current) return;
     const d = _dataRef.current || [];

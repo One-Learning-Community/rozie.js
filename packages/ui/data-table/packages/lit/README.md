@@ -94,6 +94,9 @@ import '@rozie-ui/data-table-lit/themes/shadcn.css';    // or material.css, boot
 | `columnPinning` | `Object` | `{…}` | ✓ |  |
 | `stickyHeader` | `Boolean` | `false` |  |  |
 | `interactionMode` | `String` | `"table"` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `40` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 

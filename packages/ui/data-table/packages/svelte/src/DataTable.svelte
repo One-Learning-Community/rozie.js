@@ -2,7 +2,7 @@
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
-import { onMount, setContext, untrack } from 'svelte';
+import { onDestroy, onMount, setContext, untrack } from 'svelte';
 
 interface Props {
   data: any[];
@@ -20,6 +20,9 @@ interface Props {
   columnPinning?: any;
   stickyHeader?: boolean;
   interactionMode?: string;
+  virtual?: boolean;
+  estimateRowHeight?: number;
+  maxHeight?: string;
   children?: Snippet;
   selectAll?: Snippet<[{ checked: any; indeterminate: any; toggle: any }]>;
   colHeader?: Snippet<[{ columnId: any; column: any; label: any }]>;
@@ -61,6 +64,9 @@ let {
 }))()),
   stickyHeader = false,
   interactionMode = 'table',
+  virtual = false,
+  estimateRowHeight = 40,
+  maxHeight = '',
   children: __childrenProp,
   selectAll: __selectAllProp,
   colHeader: __colHeaderProp,
@@ -111,6 +117,7 @@ let colReg = $state({});
 let rows: any[] = $state([]);
 let headerGroups: any[] = $state([]);
 let rowModelVer = $state(0);
+let windowVer = $state(0);
 let activeRow = $state(0);
 let activeColIndex = $state(0);
 let activeIsHeader = $state(false);
@@ -119,6 +126,17 @@ let activeInControl = $state(false);
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel } from '@tanstack/table-core';
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
+// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
+// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
+// guard so they never execute when off — the import token is the only static virtual-core
+// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
@@ -131,6 +149,20 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 let table: any = null;
+
+// ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
+// Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
+// const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
+// holds the _didMount() teardown for $onUnmount; gridScrollEl is the captured .rdt-scroll div
+// the virtualizer observes.
+// ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
+// Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
+// const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
+// holds the _didMount() teardown for $onUnmount; gridScrollEl is the captured .rdt-scroll div
+// the virtualizer observes.
+let virtualizer: any = null;
+let virtualizerCleanup: any = null;
+let gridScrollEl: any = null;
 
 // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
 // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -533,6 +565,99 @@ const onColumnPinningChangeCb = (updater: any) => {
 const onColumnSizingInfoChangeCb = (updater: any) => {
   const next = applyUpdater(updater, columnSizingInfo);
   columnSizingInfo = next != null ? next : columnSizingInfo;
+};
+
+// ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
+// virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount
+// (ONLY when $props.virtual), its imperative onChange push converted to per-target reactivity
+// via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
+// refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
+// so the virtual=false emitted path is dead (req-1).
+
+// windowingSource(): the rows fed to the virtualizer AND held in $data.rows. When virtual, the
+// FULL filtered+sorted PRE-PAGINATION model (A2-verified table.getPrePaginationRowModel()) so
+// windowing REPLACES client pagination (req-9); else the normal (paginated) row model — the
+// non-virtual path is byte-unchanged.
+// ══ Vertical row windowing (phase 53, req-1/2/3/6/9/10) — the virtual-core bridge ════════
+// virtual-core is a pure state machine EXACTLY like table-core: constructed once in $onMount
+// (ONLY when $props.virtual), its imperative onChange push converted to per-target reactivity
+// via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
+// refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
+// so the virtual=false emitted path is dead (req-1).
+
+// windowingSource(): the rows fed to the virtualizer AND held in $data.rows. When virtual, the
+// FULL filtered+sorted PRE-PAGINATION model (A2-verified table.getPrePaginationRowModel()) so
+// windowing REPLACES client pagination (req-9); else the normal (paginated) row model — the
+// non-virtual path is byte-unchanged.
+const windowingSource = () => {
+  if (!table) return [];
+  if (virtual) return table.getPrePaginationRowModel().rows;
+  return table.getRowModel().rows;
+};
+
+// getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+// React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+// id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
+// getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+// React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+// id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
+const virtualItemKey = (i: any) => {
+  const src = windowingSource();
+  return src && src[i] ? src[i].id : undefined;
+};
+
+// The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+// `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+// source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+// Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+// on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+// increment the React emitter lowers to functional setState — correct even from a mount closure.
+// The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+// `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+// source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+// Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+// on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+// increment the React emitter lowers to functional setState — correct even from a mount closure.
+const virtualizerOptions = (): any => ({
+  count: windowingSource().length,
+  getScrollElement: () => gridScrollEl,
+  estimateSize: () => estimateRowHeight,
+  observeElementRect,
+  observeElementOffset,
+  scrollToFn: elementScroll,
+  measureElement,
+  overscan: 8,
+  getItemKey: virtualItemKey,
+  onChange: () => {
+    windowVer = windowVer + 1;
+  }
+});
+
+// windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+// { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+// $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+// full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+// `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+// windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+// { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+// $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+// full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+// `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+const windowedRows = () => {
+  if (!virtual || !virtualizer) {
+    const rowList = rows || [];
+    return rowList.map((r: any) => ({
+      vi: null,
+      row: r
+    }));
+  }
+  if (windowVer < 0) return [];
+  const items = virtualizer.getVirtualItems();
+  const rowList = rows || [];
+  return items.map((vi: any) => ({
+    vi,
+    row: rowList[vi.index]
+  }));
 };
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
@@ -1691,11 +1816,21 @@ onMount(() => {
     // Capture fresh locals; never write a $data key then re-read it in the same fn
     // (ROZ138 / React stale-read — setState is async on React, the closure binds the
     // PRE-write value).
-    const nextRows = table.getRowModel().rows.slice();
+    // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+    // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
+    const nextRows = windowingSource().slice();
     const nextGroups = table.getHeaderGroups().slice();
     rows = nextRows;
     headerGroups = nextGroups;
     rowModelVer = rowModelVer + 1;
+    // Vertical windowing re-feed (Pitfall 2 — stale count): push the fresh full-model count
+    // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
+    // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
+    // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
+    if (virtual && virtualizer) {
+      virtualizer.setOptions(virtualizerOptions());
+      virtualizer._willUpdate();
+    }
     // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
     // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
     // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
@@ -1720,7 +1855,21 @@ onMount(() => {
   // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
   // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
   // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
+
+  // ── Vertical windowing: construct the virtualizer (req-1/2 — ONLY when virtual) ───────
+  // Built HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
+  // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
+  // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
+  // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
+  if (virtual) {
+    gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rdt-scroll') : null;
+    virtualizer = new Virtualizer(virtualizerOptions());
+    virtualizerCleanup = virtualizer._didMount();
+  }
 });
+onDestroy(() => (() => {
+  if (virtualizerCleanup) virtualizerCleanup();
+})());
 $effect(() => (() => {
   if (!table) return;
   const d = data || [];
