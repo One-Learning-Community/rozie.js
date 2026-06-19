@@ -539,6 +539,15 @@ export const EXAMPLES = [
   // cross-tree AOT in phase 48).
   'DataTableVirtual',
   'DataTableVirtualVarHeight',
+  // Phase 53 plan 04 (grid + virtual scroll-then-focus, req-5 / D-12) — the
+  // intersection fixture (loader → examples/demos/DataTableVirtualGridDemo.rozie,
+  // importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie). A 5,000-row
+  // grid (interactionMode="grid") with :virtual + maxHeight="400px": a focusCell(4000,1)
+  // handle call targets a row FAR outside the rendered window, proving focusActiveCell
+  // scrollToIndex-then-double-rAF-focus lands DOM focus on the (4000,1) cell across the
+  // window boundary. Behavioral-only (DOM assert, NOT in matrix.spec.ts — no pixel
+  // baseline); lives under examples/demos/ so no Angular 3-file registration is needed.
+  'DataTableVirtualGrid',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -745,6 +754,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of DataTableVirtualDemo / DataTableVirtualVarHeightDemo.
   DataTableVirtual: 'rozie-data-table-virtual',
   DataTableVirtualVarHeight: 'rozie-data-table-virtual-var-height',
+  // = kebab of DataTableVirtualGridDemo (name="DataTableVirtualGridDemo").
+  DataTableVirtualGrid: 'rozie-data-table-virtual-grid',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -997,6 +1008,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // --rozie-data-table-max-height token on a wrapper). No parent-supplied props.
   DataTableVirtual: {},
   DataTableVirtualVarHeight: {},
+  // Phase 53 plan 04 grid+virtual — self-contained ($data only: 5,000 rows seeded in
+  // $onMount + the readouts; the DataTable is mounted inline with its props). No
+  // parent-supplied props.
+  DataTableVirtualGrid: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

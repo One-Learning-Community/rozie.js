@@ -1,0 +1,164 @@
+<!--
+  DataTableVirtualGridDemo.rozie — GRID + VIRTUAL scroll-then-focus fixture (phase 53,
+  plan 04, req-5 / decision D-12).
+
+  The intersection cell the windowing engine has to get right: grid interaction mode
+  (role=grid, roving tabindex, index-pair active cell, the focusCell()/getActiveCell()
+  $expose handle) ON TOP of row windowing (only a small <tr> window renders inside the
+  bounded rdt-scroll viewport). It proves the ONE behavior plans 49 + 53 jointly demand:
+  a focus move to a row OUTSIDE the rendered window scrolls that row in FIRST, then lands
+  DOM focus on the correct cell on the next frame (the double-rAF flush — Rozie has no
+  per-target $nextTick sigil; a single rAF can fire before React's async commit).
+
+  Mirrors DataTableGridNavDemo (the $refs.dt handle read LIVE in the click handler — a
+  cached handle can be captured before the child publishes $expose on Solid; the
+  activecell-change readout) bumped onto the large-dataset windowing case from
+  DataTableVirtualDemo (seed-rows $onMount loop + :virtual + maxHeight):
+
+    - 5,000 rows seeded in $onMount → row index 4000 is FAR outside the initial ~40px-row
+      window (only the first ~10-15 rows render inside the 400px viewport). Static content
+      (no clock / no random) so the window + Linux VR baselines stay deterministic.
+    - `interactionMode="grid"` flips to role=grid/gridcell and arms the roving-tabindex
+      keyboard model + the focusCell/getActiveCell/activecell-change surface.
+    - `:virtual="true"` + `maxHeight="400px"` opts into windowing (pagination chrome is
+      auto-suppressed; NO consumer pagination is bound — that would trip the D-07 warn).
+    - A `call-focuscell-far` button calls focusCell(4000, 1) via the live handle: row 4000
+      is outside the window → focusActiveCell's scroll-then-focus path runs (scrollToIndex
+      then double-rAF then .focus()); the activecell-change readout records the (4000,1)
+      index pair.
+
+  data-table-grid.spec.ts (the off-window case) asserts — DOM, not screenshot — that after
+  the far-row click the focused cell's data-row becomes '4000', activeCellCoords(page).row
+  is '4000' (the row scrolled in AND focus landed), and the activecell-change readout is
+  '4000,1'. Run across all six built targets (Linux baselines, pinned Docker).
+-->
+
+<rozie name="DataTableVirtualGridDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  // Full-model size, surfaced as a readout so the spec/eyeball can confirm the model is
+  // 5,000 rows while only a small window renders.
+  rowCount: 0,
+  // Last activecell-change payload as a "r,c" string (REQ-5 / D-02). Written on every
+  // active-cell move (here: the programmatic far-row focusCell).
+  lastActiveCell: '',
+  // Result of an explicit getActiveCell() handle call (REQ-5 read verb).
+  getActiveResult: '',
+}
+</data>
+
+<script lang="ts">
+// Seed 5,000 rows of deterministic content (no clock / no random) so the window and the
+// Linux VR baselines are stable across the six targets. Row index 4000 is far outside the
+// initial window — the off-window scroll-then-focus target. (The DataTable's post-mount
+// window-init kick recomputes the window deterministically after this re-feed lands.)
+$onMount(() => {
+  const out = []
+  for (let i = 0; i < 5000; i++) {
+    out.push({ id: i, name: 'Row ' + i, value: i * 10 })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+
+// activecell-change is a one-way notification {rowIndex,colIndex}; stash the latest as a
+// "r,c" string so the spec can poll it against the focused cell's data-* coords.
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+
+// Read $refs.dt LIVE in the handler (post-mount click), never cached in $onMount — a
+// cached handle can be captured before the child publishes $expose on the fine-grained
+// targets (Solid), leaving a stale reference (the ColumnMgmtDemo / DataTableGridNav lesson).
+const callFocusFar = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(4000, 1)
+}
+
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
+  }
+}
+</script>
+
+<template>
+<div class="dt-virtual-grid-demo">
+  <h3>DataTable — grid + virtual (5k rows, off-window focus)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-focuscell-far" @click="callFocusFar">focusCell(4000,1)</button>
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+    <span class="label">activecell-change:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+  </div>
+
+  <!-- GRID interaction mode + row windowing. role=grid/gridcell + roving tabindex over a
+       windowed <tbody>; a far-row focusCell() scrolls the target into view then focuses. -->
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      :data="$data.rows"
+      interactionMode="grid"
+      :virtual="true"
+      maxHeight="400px"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-virtual-grid-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 420px;
+}
+.dt-virtual-grid-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+/* Make the roving active cell visible (token surface; :focus-visible parity). */
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>

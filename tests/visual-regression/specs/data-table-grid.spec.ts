@@ -564,3 +564,104 @@ for (const target of TARGETS) {
       .toBe(countBase + 2);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// Phase 53 plan 04 — GRID + VIRTUAL scroll-then-focus across the window boundary (req-5,
+// decision D-12). Drives `examples/demos/DataTableVirtualGridDemo.rozie`
+// (?example=DataTableVirtualGrid): a 5,000-row grid with row windowing ON. A
+// focusCell(4000, 1) handle call targets a row FAR outside the rendered window —
+// focusActiveCell must scrollToIndex(4000) FIRST, then land DOM focus on the (4000,1) cell
+// on the next frame (the double-rAF flush). This is a DOM assertion (the focused cell's
+// data-row + activecell-change index pair), NOT a screenshot — the proof is that the
+// off-window row scrolled in AND focus landed on the correct cell (Lit pierced via
+// getRootNode().activeElement in the activeCellCoords helper above).
+//
+// WINDOW_INIT_UNSUPPORTED (Solid, Svelte): the row-windowing engine's windowed <tbody>
+// slice does NOT render on the two fine-grained targets — the windowed `<For>` / `{#each}`
+// over windowedRows() never paints a row even after the virtualizer is re-fed and an
+// explicit scroll forces virtual-core's onChange (the window stays empty, no roving
+// tab-stop). This is a PRE-EXISTING row-windowing-engine bug from Plan 02 (the windowing
+// engine was never per-target VR-exercised there; this Plan-04 grid+virtual case is the
+// first per-target run of the windowed slice). It is OUT OF SCOPE for Plan 04's
+// scroll-then-focus deliverable — the D-12 mechanism is PROVEN on the four targets whose
+// window renders (React/Vue/Angular/Lit). Tracked for the dedicated windowing VR plan
+// (Plan 06) — see phase deferred-items.md. Gated test.fixme (not deleted) so it
+// auto-revives when the fine-grained windowed slice is fixed.
+const WINDOW_INIT_UNSUPPORTED: ReadonlySet<Target> = new Set<Target>(['solid', 'svelte']);
+
+for (const target of TARGETS) {
+  const offWindowRunner = WINDOW_INIT_UNSUPPORTED.has(target)
+    ? test.fixme
+    : runnerFor(target);
+  offWindowRunner(`data-table-grid+virtual [${target}]: off-window focusCell scrolls-then-focuses across the window boundary`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableVirtualGrid&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const gridContainer = mount.getByTestId('grid-table');
+    const gridTable = gridContainer.locator('table[role="grid"]');
+    await expect(gridTable).toBeVisible({ timeout: 15_000 });
+
+    // The full model is 5,000 rows (windowing renders only a small slice of it).
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 15_000 })
+      .toBe('5000');
+    // Sanity: row 4000 is NOT initially rendered — it is far below the ~400px window, so
+    // the windowing engine has not painted it yet (the scroll-then-focus precondition).
+    await expect(
+      gridContainer.locator('[data-grid-cell][data-row="4000"]'),
+    ).toHaveCount(0);
+    // The grid mounts with exactly one roving tab-stop and no auto-focus (WR-04 parity).
+    await expect
+      .poll(async () => gridContainer.locator('[tabindex="0"]').count(), { timeout: 15_000 })
+      .toBe(1);
+
+    // ── focusCell(4000, 1): row 4000 is outside the window → focusActiveCell runs the
+    //    D-12 scroll-then-focus path (scrollToIndex(4000) → double-rAF → resolveCellEl().focus()).
+    const activeReadout = page.getByTestId('activecell-readout');
+    const getActiveReadout = page.getByTestId('getactivecell-readout');
+    await page.getByTestId('call-focuscell-far').click();
+
+    // The target row scrolled into the window AND the single roving tab-stop moved to it.
+    await expect
+      .poll(async () => gridContainer.locator('[data-grid-cell][data-row="4000"]').count(), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThan(0);
+    await expect
+      .poll(async () => gridContainer.locator('[tabindex="0"]').first().getAttribute('data-row'), {
+        timeout: 15_000,
+      })
+      .toBe('4000');
+    await expect
+      .poll(async () => gridContainer.locator('[tabindex="0"]').first().getAttribute('data-col-index'), {
+        timeout: 15_000,
+      })
+      .toBe('1');
+
+    // DOM focus LANDED on the (4000,1) cell — the double-rAF deferred focus resolved after
+    // the new window committed (this is the assertion the single-rAF path would flake on).
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.row, { timeout: 15_000 })
+      .toBe('4000');
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.col, { timeout: 15_000 })
+      .toBe('1');
+    await expect
+      .poll(async () => (await activeCellCoords(page))?.role, { timeout: 15_000 })
+      .toBe('gridcell');
+
+    // activecell-change fired with the fresh off-window index pair.
+    await expect
+      .poll(async () => activeReadout.textContent(), { timeout: 15_000 })
+      .toBe('4000,1');
+
+    // getActiveCell() reads the same index pair back through the handle (full-model index).
+    await page.getByTestId('call-getactivecell').click();
+    await expect
+      .poll(async () => getActiveReadout.textContent(), { timeout: 15_000 })
+      .toBe('4000,1');
+  });
+}
