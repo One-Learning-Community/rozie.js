@@ -548,6 +548,15 @@ export const EXAMPLES = [
   // window boundary. Behavioral-only (DOM assert, NOT in matrix.spec.ts — no pixel
   // baseline); lives under examples/demos/ so no Angular 3-file registration is needed.
   'DataTableVirtualGrid',
+  // Phase 53 plan 06 (windowing verification matrix, req-3/7/8) — the COMBINED
+  // sticky+pinned+selection virtual fixture (loader →
+  // examples/demos/DataTableVirtualStickySelectDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). ~2,000 rows with
+  // :virtual + :stickyHeader + maxHeight="400px" + selectionMode="multiple" +
+  // r-model:columnPinning (left-pinned name col). Behavioral-only (DOM assert, NOT in
+  // matrix.spec.ts — no pixel baseline); lives under examples/demos/ so no Angular
+  // 3-file registration is needed.
+  'DataTableVirtualStickySelect',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -756,6 +765,8 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableVirtualVarHeight: 'rozie-data-table-virtual-var-height',
   // = kebab of DataTableVirtualGridDemo (name="DataTableVirtualGridDemo").
   DataTableVirtualGrid: 'rozie-data-table-virtual-grid',
+  // = kebab of DataTableVirtualStickySelectDemo (name="DataTableVirtualStickySelectDemo").
+  DataTableVirtualStickySelect: 'rozie-data-table-virtual-sticky-select',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -1012,6 +1023,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // $onMount + the readouts; the DataTable is mounted inline with its props). No
   // parent-supplied props.
   DataTableVirtualGrid: {},
+  DataTableVirtualStickySelect: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

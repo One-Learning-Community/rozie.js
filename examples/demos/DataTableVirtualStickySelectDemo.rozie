@@ -1,0 +1,120 @@
+<!--
+  DataTableVirtualStickySelectDemo.rozie — COMBINED windowing fixture (phase 53, req-3/7/8).
+
+  One virtual table that simultaneously exercises:
+    - :virtual="true" → row windowing (only a small <tr> slice renders).
+    - :stickyHeader="true" → the <thead> .rdt-th cells get position:sticky;top:0, so the
+      header stays pinned to the top of the rdt-scroll viewport during vertical scroll
+      (req-7 — sticky-thead-under-scroll, DOM-asserted via getBoundingClientRect().top).
+    - maxHeight="400px" → bounded rdt-scroll container (req-3 prop form).
+    - selectionMode="multiple" → a LEADING auto-injected checkbox column (.rdt-select-row)
+      + a select-all header checkbox (.rdt-select-all) that goes :indeterminate on a partial
+      selection (req-8 — selection survival + select-all indeterminate/count).
+    - r-model:columnPinning binding a left-pinned data column → the pinned column gets
+      position:sticky + a computed left offset so its cell stays put during scroll
+      (req-7 — pinned-column-offset-invariance, DOM-asserted).
+
+  ~2,000 rows (enough that the selected/pinned cells scroll well out of the window and back,
+  but small enough to stay deterministic + fast in the pinned Linux Playwright container).
+  Static dataset (no clock / no random) for VR determinism.
+
+  data-table-virtual.spec.ts (Plan 06) drives ?example=DataTableVirtualStickySelect and asserts:
+    - bounded rdt-scroll clientHeight (~400) (req-3 prop form);
+    - thead getBoundingClientRect().top invariance + pinned-column cell left invariance under
+      programmatic scroll (req-7);
+    - a checked row scrolled out + back retains its checked checkbox; select-all-over-all sets
+      the header checkbox checked, a partial selection sets it indeterminate; the bound
+      selection count round-trips (req-8).
+-->
+
+<rozie name="DataTableVirtualStickySelectDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  rowCount: 0,
+  // Two-way bound RowSelectionState — proves the selection round-trips OUT and survives a
+  // scroll out/in (req-8). A live count readout makes the bound state observable.
+  sel: {},
+  // Left-pin the "name" data column so the spec can prove the pinned cell's left offset is
+  // invariant under horizontal/vertical scroll (req-7 pinned-column path). table-core's
+  // ColumnPinningState shape.
+  pinning: { left: ['name'], right: [] },
+}
+</data>
+
+<script>
+// Seed ~2,000 rows. Plain deterministic content (no clock / no random) so the window,
+// measured total, sticky/pin offsets, and selection survival are stable across the six
+// targets and the Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 2000; i++) {
+    out.push({ id: i, name: 'Row ' + i, city: 'City ' + i, value: i * 10 })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+
+// Selected-key count for the bound multiple-selection slice (proves the two-way round-trip
+// OUT, and lets the spec assert the select-all-over-all count is correct — req-8).
+const selCount = $computed(() => Object.keys($data.sel || {}).length)
+</script>
+
+<template>
+<div class="dt-vss-demo">
+  <h3>DataTable — virtual + sticky + pinned + selection</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+    <span class="label">selected:</span>
+    <span class="readout" data-testid="sel-count">{{ selCount }}</span>
+  </div>
+
+  <div data-testid="vss-table">
+    <DataTable
+      :data="$data.rows"
+      :virtual="true"
+      :stickyHeader="true"
+      maxHeight="400px"
+      selectionMode="multiple"
+      r-model:rowSelection="$data.sel"
+      r-model:columnPinning="$data.pinning"
+    >
+      <Column field="name" header="Name" />
+      <Column field="city" header="City" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-vss-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 440px;
+}
+.dt-vss-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 2ch; }
+</style>
+
+</rozie>
