@@ -549,6 +549,49 @@ function lowerElement(
     const iterableDeps = computeExpressionDeps(iterableExpression, bindings);
     const keyExpression = findKeyExpression(el.attributes, bindings);
 
+    // Phase 50 — a `<template r-for>` host is NON-RENDERING: lift its CHILDREN
+    // into the loop body directly, so a single iteration can render MULTIPLE
+    // sibling roots (e.g. a data <tr> plus a conditional detail <tr>). Each
+    // target's emitLoop already has a wrapper-free `body.length > 1` branch
+    // (Solid `<>…</>`, Svelte bare siblings, Vue `<template v-for>`, Angular
+    // `@for {}`, Lit multi-node `repeat`, React keyed `React.Fragment`). A real
+    // element host (`<div r-for>`) keeps `body: [inner]` byte-for-byte
+    // unchanged. Mirrors the `<template r-match>`/`<template r-case>`
+    // host-unwrap precedent above. The `:key` / `r-for` live on the
+    // `<template>` itself; any `r-if` is handled by the parent walker (the
+    // r-if ladder wraps this whole loop), so children carry no leftover
+    // structural directive. A single-child body (`body.length === 1`) behaves
+    // exactly as today.
+    if (el.tagName === 'template') {
+      const body = lowerNodeList(
+        el.children,
+        bindings,
+        depGraph,
+        registry,
+        diagnostics,
+        templateListeners,
+        elPath,
+        outerName,
+        componentsTable,
+        declaredNames,
+        usedNames,
+        lowerInFillBody,
+        matchCounter,
+      );
+
+      const templateLoop: TemplateLoopIR = {
+        type: 'TemplateLoop',
+        itemAlias: aliases?.item ?? 'item',
+        indexAlias: aliases?.index ?? null,
+        iterableExpression,
+        iterableDeps,
+        keyExpression,
+        body,
+        sourceLoc: el.loc,
+      };
+      return templateLoop;
+    }
+
     // Inner element WITHOUT r-for/r-if conditional (we strip below to
     // avoid an infinite recursion / double processing).
     const innerEl: ASTTemplateElement = {
