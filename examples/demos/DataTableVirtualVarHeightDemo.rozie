@@ -1,0 +1,117 @@
+<!--
+  DataTableVirtualVarHeightDemo.rozie — NON-UNIFORM-HEIGHT windowing fixture
+  (phase 53, req-2 / D-10 measureElement de-risk).
+
+  Same seed-rows scaffold as DataTableStickyDemo.rozie, plus a #cell scoped slot (the
+  DataTableGridNavDemo.rozie idiom — ONE #cell slot dispatched by columnId) injecting
+  DETERMINISTIC-but-NON-UNIFORM row content so virtual-core's measureElement sweep is
+  exercised yet the measured total stays stable:
+
+    - ~500 rows; each row's "detail" cell renders ((index % 3) + 1) stacked lines, so
+      row heights cycle 1/2/3 lines (deterministic non-uniform — measureElement must
+      refine the estimateRowHeight=40 seed to the real measured height of each row).
+    - The content is FIXED text (no clock / no random) so the measured Σ-heights total
+      is identical across the six targets and the Linux VR baselines.
+    - TOKEN-form sizing (D-06): the bounded scroll viewport is sized PURELY via the
+      `--rozie-data-table-max-height: 400px` custom property on the .vh-wrap ancestor
+      (custom properties inherit down to the component's internal .rdt-scroll), with NO
+      `maxHeight` prop — demonstrating the token-fallback path the prop-form
+      DataTableVirtualDemo does not.
+    - `:virtual="true"` opts into windowing; pagination is auto-suppressed (req-9), so
+      no consumer pagination is bound (it would trip the D-07 virtual+pagination warn).
+
+  Wave-0 de-risk probe (Plan 03 Task 2) + data-table-virtual.spec.ts (Plan 06) assert
+  the variable-height rows abut with NO gap/overlap (no cumulative offset drift) and the
+  scroll thumb tracks the MEASURED total (not estimateRowHeight × rowCount).
+-->
+
+<rozie name="DataTableVirtualVarHeightDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  rowCount: 0,
+}
+</data>
+
+<script>
+// Seed 500 rows whose "detail" cell carries ((index % 3) + 1) FIXED lines, so the
+// rendered row height is deterministic-but-non-uniform (1/2/3 stacked lines) — exactly
+// what measureElement must measure-and-refine. Pre-build each row's line array so the
+// #cell slot only iterates (no per-render allocation), and the measured total is stable.
+$onMount(() => {
+  const out = []
+  for (let i = 0; i < 500; i++) {
+    const lineCount = (i % 3) + 1
+    const detailLines = []
+    for (let n = 1; n <= lineCount; n++) {
+      detailLines.push('Row ' + (i + 1) + ' — detail line ' + n)
+    }
+    out.push({ id: i + 1, name: 'Row ' + (i + 1), detailLines })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+</script>
+
+<template>
+<div class="dt-vh-demo">
+  <h3>DataTable — virtual (variable-height rows)</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+  </div>
+
+  <!-- TOKEN-form sizing: --rozie-data-table-max-height set on the wrapper inherits down
+       to the component's internal .rdt-scroll viewport (NO maxHeight prop). -->
+  <div class="vh-wrap" style="--rozie-data-table-max-height: 400px" data-testid="varheight-table">
+    <DataTable :data="$data.rows" :virtual="true">
+      <Column field="name" header="Name" />
+      <Column field="detail" header="Detail" />
+
+      <!-- ONE #cell scoped slot dispatched by columnId (D-A). The "detail" column
+           renders ((index % 3) + 1) stacked lines → deterministic non-uniform row
+           height; every other column falls through to the plain accessor value. -->
+      <template #cell="{ columnId, value, row }">
+        <div r-if="columnId === 'detail'" class="vh-detail">
+          <div r-for="ln in row.detailLines" :key="ln" class="vh-line">{{ ln }}</div>
+        </div>
+        <span r-else>{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-vh-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 420px;
+}
+.dt-vh-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+/* Fixed line-height so each detail line contributes a deterministic pixel height —
+   measureElement refines the row to lineCount × line-box, with no fractional drift. */
+.vh-detail { display: flex; flex-direction: column; }
+.vh-line { line-height: 20px; font-size: 0.8125rem; }
+</style>
+
+</rozie>

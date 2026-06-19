@@ -1,0 +1,104 @@
+<!--
+  DataTableVirtualDemo.rozie — LARGE-DATASET windowing fixture (phase 53, req-2).
+
+  Mounts the published tested-to ceiling (D-13: 100,000 rows) with `virtual` ON so
+  ONLY a small windowed <tr> set renders inside the bounded rdt-scroll viewport. This
+  is the analog of DataTableStickyDemo.rozie (seed-rows $onMount loop + a height-
+  constrained scroll container + <Column> children) bumped to the windowing case:
+
+    - 100,000 rows seeded in $onMount (the D-13 ceiling; if 100k proves CI-flaky in
+      the Plan 06 VR matrix, BOTH this `count` AND the published figure drop to the
+      largest deterministically-passing value — figure == fixture count, falsifiable
+      per A4).
+    - `:virtual="true"` opts into the row-windowing engine; pagination chrome is
+      auto-suppressed (windowing sources from getPrePaginationRowModel, req-9), so NO
+      consumer pagination is bound (binding a configured pagination would trip the
+      D-07 virtual+pagination dev warn).
+    - `maxHeight="400px"` exercises the PROP form of the bounded container (D-06): the
+      component sets max-height inline on .rdt-scroll AND mirrors it to the
+      --rozie-data-table-max-height token. (The sibling VarHeight fixture exercises the
+      TOKEN-only form.)
+    - UNIFORM, content-guaranteed ~40px rows (one line of text per cell, fixed
+      estimateRowHeight=40 default) so getVirtualItems() is deterministic and there is
+      NO measureElement drift here — variable-height measurement is the VarHeight
+      fixture's job.
+
+  data-table-virtual.spec.ts (Plan 06) asserts aria-rowcount === "100000", the rendered
+  <tr data-index> count stays small (< ~50 for 100k rows), and the scroll thumb tracks
+  the measured total. Static dataset (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableVirtualDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  // Published tested-to ceiling (D-13). Surfaced as a readout so the spec/eyeball can
+  // confirm the full-model size while only a window renders.
+  rowCount: 0,
+}
+</data>
+
+<script>
+// Seed the 100,000-row tested-to ceiling. Plain, deterministic content (no clock /
+// no random) so the window + measured total are stable across the six targets and the
+// Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 100000; i++) {
+    out.push({ id: i, name: 'Row ' + i, value: i * 10 })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+</script>
+
+<template>
+<div class="dt-virtual-demo">
+  <h3>DataTable — virtual (100k rows)</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+  </div>
+
+  <div data-testid="virtual-table">
+    <DataTable
+      :data="$data.rows"
+      :virtual="true"
+      maxHeight="400px"
+    >
+      <Column field="name" header="Name" />
+      <Column field="value" header="Value" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-virtual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.dt-virtual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+</style>
+
+</rozie>

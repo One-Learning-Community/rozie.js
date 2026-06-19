@@ -522,6 +522,23 @@ export const EXAMPLES = [
   // glob-driven build-cells demos sweep) and imports the SAME data-table source
   // pkg already registered for Angular cross-tree AOT in phase 48.
   'DataTableGridNav',
+  // Phase 53 (data-table virtualization / row-windowing) — the two windowing
+  // fixtures (loaders → examples/demos/DataTableVirtual{,VarHeight}Demo.rozie, each
+  // importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie).
+  // DataTableVirtual is the LARGE-DATASET fixture: 100,000 rows (the D-13 tested-to
+  // ceiling) with :virtual + maxHeight="400px" (PROP form, D-06), uniform ~40px rows
+  // so getVirtualItems() is deterministic — proving only a small windowed <tr> set
+  // renders. DataTableVirtualVarHeight is the NON-UNIFORM-height fixture: ~500 rows
+  // whose "detail" #cell renders ((index % 3) + 1) stacked lines (deterministic non-
+  // uniform), sized via the --rozie-data-table-max-height TOKEN form (no maxHeight
+  // prop) — the measureElement de-risk fixture. Both behavioral-only; NOT in
+  // matrix.spec.ts EXAMPLES (no pixel baseline). They live under examples/demos/ so
+  // no new Angular 3-file registration is needed (prebuildExtraRoots[examplesRoot] +
+  // the examples tsconfig include + the glob-driven build-cells demos sweep already
+  // cover them, importing the data-table source pkg already registered for Angular
+  // cross-tree AOT in phase 48).
+  'DataTableVirtual',
+  'DataTableVirtualVarHeight',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -723,6 +740,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 49 grid-nav — '-demo' appended on Lit → 'rozie-data-table-grid-nav-demo'
   // = kebab of DataTableGridNavDemo (the component is name="DataTableGridNavDemo").
   DataTableGridNav: 'rozie-data-table-grid-nav',
+  // Phase 53 virtualization — '-demo' appended on Lit → tags
+  // 'rozie-data-table-virtual-demo' / 'rozie-data-table-virtual-var-height-demo' =
+  // kebab of DataTableVirtualDemo / DataTableVirtualVarHeightDemo.
+  DataTableVirtual: 'rozie-data-table-virtual',
+  DataTableVirtualVarHeight: 'rozie-data-table-virtual-var-height',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -969,6 +991,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 49 grid-nav — self-contained ($data only: the rows + sorting + the two
   // readouts). The DataTable instances are mounted inline with their props.
   DataTableGridNav: {},
+  // Phase 53 virtualization — both windowing demos are self-contained: each seeds its
+  // own rows in $onMount and passes :virtual + the bounded-container sizing inline
+  // (DataTableVirtual via maxHeight prop, DataTableVirtualVarHeight via the
+  // --rozie-data-table-max-height token on a wrapper). No parent-supplied props.
+  DataTableVirtual: {},
+  DataTableVirtualVarHeight: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state
