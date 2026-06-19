@@ -44,7 +44,8 @@
     "@angular/core": "^19 || ^20 || ^21",
     "@angular/common": "^19 || ^20 || ^21",
     "@angular/forms": "^19 || ^20 || ^21",
-    "@tanstack/table-core": "^8.21"
+    "@tanstack/table-core": "^8.21",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
@@ -57,6 +58,9 @@
       "optional": false
     },
     "@tanstack/table-core": {
+      "optional": false
+    },
+    "@tanstack/virtual-core": {
       "optional": false
     }
   },

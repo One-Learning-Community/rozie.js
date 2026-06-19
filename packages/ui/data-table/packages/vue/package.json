@@ -45,13 +45,17 @@
   },
   "peerDependencies": {
     "vue": "^3.4",
-    "@tanstack/table-core": "^8.21"
+    "@tanstack/table-core": "^8.21",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "vue": {
       "optional": false
     },
     "@tanstack/table-core": {
+      "optional": false
+    },
+    "@tanstack/virtual-core": {
       "optional": false
     }
   },
