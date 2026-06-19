@@ -156,6 +156,28 @@
   // nested r-for — Pitfall 1). Null (default) → the #detail scoped slot is the expand mode.
   getSubRows: { type: Function, default: null },
 
+  // ── Grouping (phase 50 reqs 4-7, D-01/D-05/D-06) ─────────────────────────────
+  // groupable: opt-in gate for the HEADLESS #groupBar host region. Default false →
+  // byte-identical-OFF (req-10): the #groupBar host <div> never renders and no group
+  // chrome appears. getGroupedRowModel is supplied UNCONDITIONALLY (inert when
+  // `grouping` is empty — mirrors getExpandedRowModel), so grouping is driven purely by
+  // the `grouping` model slice; `groupable` only gates the consumer-facing group-bar
+  // surface (no built-in drag — D-02 REVISED).
+  groupable: { type: Boolean, default: false },
+
+  // grouping (GroupingState = string[]) — reqs 4/7. model:true → two-way. An ORDERED
+  // list of column ids (multi-column → nested groups, e.g. ['region','category']). []
+  // (default) → ungrouped (flat table, byte-identical-off). onGroupingChange funnels a
+  // FRESH array → `group-change` (NOT `grouping-change`: the model:true `grouping` prop
+  // auto-generates an `onGroupingChange` callback on the React/Solid flat Props interface,
+  // and a `grouping-change` event would camelCase to the SAME identifier → duplicate
+  // identifier TS2300 — the model-prop==emit-name collision 50-02 hit with expanded/
+  // expanded-change → expand-change. The house convention stems the event off a DISTINCT
+  // name: sorting→sort-change, rowSelection→selection-change, grouping→group-change).
+  // Uncontrolled fallback $data.groupingDefault. The 12th two-way slice — Angular CVA stays
+  // disabled (already disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
+  grouping: { type: Array, default: () => [], model: true },
+
   // rowSelection (RowSelectionState = { [rowId]: true }) — req-7. model:true → two-way.
   // selectionMode drives the chrome: 'none' injects no column; 'single' keeps ≤1
   // (enableMultiRowSelection:false); 'multiple' auto-injects a LEADING checkbox column
@@ -245,6 +267,12 @@
   // Whole-value-replace on write (never in-place mutation → silent on
   // React/Solid/Angular/Lit).
   expandedDefault: {},
+
+  // Uncontrolled fallback for the grouping slice (phase 50 reqs 4-7) — used when the
+  // consumer did NOT bind r-model:grouping. GroupingState (ordered string[] of column ids).
+  // Whole-array-replace on write (never in-place push → silent on React/Solid/Angular/Lit).
+  // [] = ungrouped (byte-identical-off, req-10).
+  groupingDefault: [],
 
   // Uncontrolled fallbacks for the column-management slices (used when the consumer
   // did NOT bind the matching r-model). Each is whole-value-replace on write (never
@@ -372,6 +400,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getExpandedRowModel,
+  getGroupedRowModel,
 } from '@tanstack/table-core'
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
@@ -428,6 +457,21 @@ let gridRoot = null
 // the funnel. A counter (not a boolean) so nested writes are safe.
 let programmatic = 0
 
+// Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
+// has not bound `expanded` and has not yet toggled any group, group-header rows default to
+// EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
+// roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
+// writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
+// non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
+// exactly as before, both for the plain table AND the expandable-rows feature).
+let expandedTouched = false
+
+// groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+// the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+// the expanded auto-default below tracks the live grouping state on every target.
+const groupingActiveDefault = () =>
+  ((($props.grouping != null ? $props.grouping : $data.groupingDefault) || []).length > 0)
+
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
 // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
 // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -444,7 +488,19 @@ const currentState = (): any => ({
   // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
   // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
   // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
-  expanded: $props.expanded != null ? $props.expanded : $data.expandedDefault,
+  // GROUPING AUTO-EXPAND (req-4): when grouping is active and the consumer has neither bound
+  // `expanded` nor toggled a group yet (!expandedTouched), default to the `true` expand-all
+  // literal so the grouped subtree is visible by default; the first toggle latches
+  // expandedTouched and the user's expanded state wins thereafter. Non-grouping path is
+  // unchanged → byte-identical-off (the table + the expandable-rows feature both keep
+  // $data.expandedDefault).
+  expanded: $props.expanded != null
+    ? $props.expanded
+    : (groupingActiveDefault() && !expandedTouched ? true : $data.expandedDefault),
+  // grouping (phase 50 reqs 4-7): GroupingState = ordered string[] of column ids. Falls back
+  // to $data.groupingDefault when r-model:grouping is unbound. table-core's getGroupedRowModel
+  // is inert when this is empty (byte-identical-off, req-10).
+  grouping: $props.grouping != null ? $props.grouping : $data.groupingDefault,
   columnVisibility: $props.columnVisibility != null ? $props.columnVisibility : $data.columnVisibilityDefault,
   columnSizing: $props.columnSizing != null ? $props.columnSizing : $data.columnSizingDefault,
   columnOrder: $props.columnOrder != null ? $props.columnOrder : $data.columnOrderDefault,
@@ -473,6 +529,25 @@ const currentData = (): any => ($props.data != null ? $props.data : $data.dataDe
 // render callbacks — cells render via the single #cell/#header scoped slot on this
 // component, dispatched by columnId; <Column> carries metadata only.)
 const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
+// wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+// aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+// anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+// 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+// built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+// is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+// throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+// Anything else → undefined (no aggregation; the cell renders as a placeholder).
+const wrapAggregationFn = (fn) => {
+  if (typeof fn === 'string') return fn
+  if (typeof fn !== 'function') return undefined
+  return (columnId, leafRows, childRows) => {
+    try {
+      return fn(columnId, leafRows, childRows)
+    } catch (err) {
+      return undefined
+    }
+  }
+}
 const columnDefs = () => {
   const byId = Object.create(null)
   const order = []
@@ -496,6 +571,12 @@ const columnDefs = () => {
       filterable: c.filterable === true,
       // Expandable-rows reserved per-column metadata (phase 50, D-04).
       expandable: c.expandable === true,
+      // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+      // so every data column is offered to the headless #groupBar by default; the per-column
+      // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+      // a custom fn defensively wrapped (T-50-04).
+      groupable: c.groupable !== false,
+      aggregationFn: wrapAggregationFn(c.aggregationFn),
       pinned: c.pinned != null ? c.pinned : '',
       width: c.width != null ? c.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
@@ -523,6 +604,9 @@ const columnDefs = () => {
       filterable: spec.filterable === true,
       // Expandable-rows reserved per-column metadata (phase 50, D-04).
       expandable: spec.expandable === true,
+      // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
+      groupable: spec.groupable !== false,
+      aggregationFn: wrapAggregationFn(spec.aggregationFn),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
@@ -620,6 +704,10 @@ const applyUpdater = (updater, current) =>
 const writeExpanded = (next) => {
   if (programmatic) return
   programmatic++
+  // Latch the grouping auto-expand default (req-4): the FIRST expand/collapse toggle means
+  // the user now owns the expanded state, so currentState() stops defaulting grouped rows to
+  // the `true` expand-all literal and honors $data.expandedDefault from here on.
+  expandedTouched = true
   $data.expandedDefault = next   // fresh value only (never in-place)
   $model.expanded = next          // two-way emit if bound (no-op-diff if not)
   // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
@@ -629,6 +717,26 @@ const writeExpanded = (next) => {
   // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
   // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
   $emit('expand-change', next)
+  programmatic--
+}
+
+// ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+// table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+// against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+// uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+// emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+// STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+// `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+// on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+// SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+// hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+// name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
+const writeGrouping = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.groupingDefault = next   // fresh ordered array only (never in-place push)
+  $model.grouping = next          // two-way emit if bound (no-op-diff if not)
+  $emit('group-change', next)
   programmatic--
 }
 
@@ -783,6 +891,7 @@ let refreshRowModel = null
 // keeps the Updater base value current. No-op cost on the other five.
 const onSortingChangeCb = (updater) => { writeSorting(applyUpdater(updater, currentState().sorting)) }
 const onExpandedChangeCb = (updater) => { writeExpanded(applyUpdater(updater, currentState().expanded)) }
+const onGroupingChangeCb = (updater) => { writeGrouping(applyUpdater(updater, currentState().grouping)) }
 const onGlobalFilterChangeCb = (updater) => { writeGlobalFilter(applyUpdater(updater, currentState().globalFilter)) }
 const onColumnFiltersChangeCb = (updater) => { writeColumnFilters(applyUpdater(updater, currentState().columnFilters)) }
 const onPaginationChangeCb = (updater) => { writePagination(applyUpdater(updater, currentState().pagination)) }
@@ -1086,6 +1195,15 @@ $onMount(() => {
     getSubRows: ($props.getSubRows || undefined) as any,
     getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
+    // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
+    // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
+    // table-core FLATTENS group-header rows (carrying getIsGrouped()/subRows) and their
+    // members into getRowModel().rows, so they ride the SAME D-04 <template r-for> seam (no
+    // nested r-for — Pitfall 1). Group rows are expandable via the EXISTING expanded model
+    // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
+    getGroupedRowModel: getGroupedRowModel(),
+    onGroupingChange: onGroupingChangeCb,
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
@@ -1241,6 +1359,8 @@ $watch(
     $props.rowSelection,
     $props.expanded,
     $props.expandable,
+    $props.grouping,
+    $props.groupable,
     $props.columnVisibility,
     $props.columnSizing,
     $props.columnOrder,
@@ -1277,6 +1397,11 @@ const reFeed = () => {
     getSubRows: ($props.getSubRows || undefined) as any,
     getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
+    // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
+    // fresh currentState each cycle, F6).
+    getGroupedRowModel: getGroupedRowModel(),
+    onGroupingChange: onGroupingChangeCb,
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
