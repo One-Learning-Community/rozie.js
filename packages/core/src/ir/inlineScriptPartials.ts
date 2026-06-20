@@ -273,6 +273,7 @@ function hoistSpecifier(
   sourceNode: t.StringLiteral,
   declKind: string,
   spec: t.ImportDeclaration['specifiers'][number],
+  sourceImport?: t.ImportDeclaration,
 ): void {
   const source = sourceNode.value;
   const key = specifierKey(source, declKind, spec);
@@ -293,6 +294,23 @@ function hoistSpecifier(
   // origin for source maps (R7).
   const decl = t.importDeclaration([spec], sourceNode);
   if (groupKind === 'type') decl.importKind = 'type';
+  // Phase 55 (byte-identity): carry the original import's BETWEEN-STATEMENT
+  // comments + its `.rzts` `loc` onto the hoisted node. The TRAILING/INNER
+  // comments are the content between this import and the next surviving
+  // declaration (e.g. a block comment shared with the next decl's leading
+  // comments) — the inline-authored form emits them after the import, so the
+  // hoisted form must too. LEADING comments are deliberately NOT copied: on a
+  // partial's first import they are the file-header banner (partial-file
+  // metadata that legitimately vanishes, like a tree-shaken decl's comments),
+  // and the inline-equivalent host carries no such header. Copying `loc` (whose
+  // `filename` is the `.rzts`, R7) gives @babel/generator the line delta it
+  // needs to space the trailing comment correctly; `normalizeSplicedEmitLines`
+  // then re-anchors it host-contiguously like every other spliced node.
+  if (sourceImport) {
+    if (sourceImport.loc) decl.loc = sourceImport.loc;
+    if (sourceImport.trailingComments) decl.trailingComments = sourceImport.trailingComments;
+    if (sourceImport.innerComments) decl.innerComments = sourceImport.innerComments;
+  }
   ctx.hoistGroups.set(groupKey, decl);
   ctx.hoistImports.push(decl);
 }
@@ -725,7 +743,7 @@ function inlineResolvedPartial(
       const declKind = imp.importKind ?? 'value';
       for (const spec of imp.specifiers) {
         if (referencedAll.has(spec.local.name)) {
-          hoistSpecifier(ctx, imp.source, declKind, spec);
+          hoistSpecifier(ctx, imp.source, declKind, spec, imp);
         }
       }
     }
