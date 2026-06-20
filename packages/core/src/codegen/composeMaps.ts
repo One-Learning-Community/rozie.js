@@ -64,6 +64,40 @@ export interface ComposeMapsOpts {
 }
 
 /**
+ * Phase 55 Plan 03 — per-target script-map flow survey (Task 1, Assumption A3).
+ *
+ * SURVEY RESULT (confirmed on disk 2026-06-20):
+ *
+ *  1. CONVERGENCE — all SIX per-target `sourcemap/compose.ts` wrappers
+ *     (react/vue/svelte/solid/lit/angular) import THIS `composeMaps` and route
+ *     their @babel/generator <script> child map through it as `children[0]`. No
+ *     target hand-rolls a second map merge; `composeMaps` is the single
+ *     convergence point, so the spliced-line restore arithmetic lives here ONCE
+ *     (D-03/D-05 uniformity) — never in a per-target wrapper or `emitScript.ts`.
+ *
+ *  2. ACTIVE MAP PATH — the five map-EMITTING targets (react/vue/svelte/solid/
+ *     angular) all pass a defined `userCodeLineOffset`, so each takes the
+ *     `userCodeLineOffset` branch below (step 3). Empirically, that branch
+ *     discarded the child map's per-node `sources` (it hardcoded `[opts.filename]`),
+ *     collapsing a spliced node's `.rzts` origin to the host `.rozie` — which is
+ *     exactly why the SC-2 line-fidelity smoke test was red/skipped. The restore
+ *     therefore lives in step 3 (and is mirrored in the step-4 remapping path for
+ *     robustness).
+ *
+ *  3. TABLE BUILD SITE — each of those five `emitXxx.ts` holds the lowered `ir`
+ *     (whose `ir.setupBody.scriptProgram` script AST carries the spliced nodes'
+ *     `extra.__roziePartialOrigin` stashes from Plan 02). Each builds the
+ *     `partialLineOffsets` table via {@link buildPartialLineOffsets} and threads
+ *     it into the `ComposeOpts` it already constructs. The table derives from the
+ *     IR, NOT from generator output — so NO `emitScript.ts` (the @babel/generator
+ *     caller) is touched (D-03).
+ *
+ *  4. LIT EXCEPTION — `packages/targets/lit/src/emitLit.ts` returns `map: null`
+ *     in v1 and does NOT call `composeSourceMap` (the wrapper is implemented but
+ *     dead until Phase 7 wires it). Lit therefore has no build+set site; its
+ *     wrapper still receives the `partialLineOffsets` field for forward-compat so
+ *     the restore flows automatically once Lit's map path is connected.
+ *
  * Merge the shell map + zero-or-more child maps into a single Source Map v3
  * anchored to .rozie. Defensively re-asserts sources/sourcesContent per
  * Pitfall 2 mitigation.
