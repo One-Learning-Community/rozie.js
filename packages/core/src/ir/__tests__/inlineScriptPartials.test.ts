@@ -343,6 +343,159 @@ describe('inlineScriptPartials', () => {
       partial.dispose();
     }
   });
+
+  // IN-01 — a re-export-from form (`export { X } from 'pkg'` /
+  // `export { Bar as Baz } from 'pkg'`) is NOT a local declaration: it maps an
+  // exported name to a SOURCE module. It must be hoisted into the host as an
+  // import so a host `import { X }` resolves (alias preserved), never silently
+  // dropped (which left the host reference dangling with no ROZ explanation).
+  it('IN-01: re-export-from is hoisted into the host as an import (alias preserved)', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      're-export.rzts',
+      [
+        `export { ExpandedState } from '@tanstack/table-core';`,
+        `export { Bar as Baz } from '@pkg';`,
+        `export const usedLocal = $computed(() => 1);`,
+        `export { Unused } from '@noise';`, // tree-shaken: host never imports it
+      ].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { ExpandedState, Baz, usedLocal } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const imports = bodyOf(result.ast ?? host).filter(
+        (s): s is t.ImportDeclaration => s.type === 'ImportDeclaration',
+      );
+      // The partial import statement is gone.
+      expect(imports.some((i) => /\.rz(ts|js)$/.test(i.source.value))).toBe(false);
+      // `ExpandedState` hoisted from @tanstack/table-core as a host binding.
+      const tanstack = imports.find((i) => i.source.value === '@tanstack/table-core');
+      expect(tanstack).toBeDefined();
+      expect(
+        tanstack?.specifiers.map((sp) => (sp.local as t.Identifier).name),
+      ).toContain('ExpandedState');
+      // `Baz` aliased: `import { Bar as Baz } from '@pkg'` — local Baz, imported Bar.
+      const pkg = imports.find((i) => i.source.value === '@pkg');
+      expect(pkg).toBeDefined();
+      const bazSpec = pkg?.specifiers.find(
+        (sp): sp is t.ImportSpecifier =>
+          sp.type === 'ImportSpecifier' && (sp.local as t.Identifier).name === 'Baz',
+      );
+      expect(bazSpec).toBeDefined();
+      expect((bazSpec?.imported as t.Identifier).name).toBe('Bar');
+      // The locally-declared export still inlines normally.
+      const names = bodyOf(result.ast ?? host)
+        .filter((s): s is t.VariableDeclaration => s.type === 'VariableDeclaration')
+        .flatMap((s) => s.declarations.map((d) => (d.id as t.Identifier).name));
+      expect(names).toContain('usedLocal');
+      // The un-imported re-export is tree-shaken — no @noise import is hoisted.
+      expect(imports.some((i) => i.source.value === '@noise')).toBe(false);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // IN-01 — a bare `export * from 'pkg'` star re-export has no statically-known
+  // named surface to inline; it produces an explicit ROZ141 diagnostic (never a
+  // silent drop, never a throw — D-08).
+  it('IN-01: a star re-export (export * from) produces a ROZ141 diagnostic', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const partial = stagePartial(
+      'star.rzts',
+      [`export * from '@pkg';`, `export const keep = $computed(() => 1);`].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { keep } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const diag = result.diagnostics.find(
+        (d) => d.code === RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+      );
+      expect(diag).toBeDefined();
+      expect(diag?.severity).toBe('error');
+      // The legitimately-imported local export still inlines.
+      const names = bodyOf(result.ast ?? host)
+        .filter((s): s is t.VariableDeclaration => s.type === 'VariableDeclaration')
+        .flatMap((s) => s.declarations.map((d) => (d.id as t.Identifier).name));
+      expect(names).toContain('keep');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // IN-02 — a type-only import used SOLELY in TS type-annotation positions
+  // (`param: MyType`) is NOT a Babel `ReferencedIdentifier`, so before the fix
+  // its `import type` was not hoisted and the consumer's `tsc` errored on the
+  // dangling type reference. The extended reference collection captures type
+  // positions, so the `import type` IS hoisted into the host.
+  it('IN-02: hoists a type-only import used only in annotations', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'typed.rzts',
+      [
+        `import type { MyType } from 'pkg';`,
+        `const toLabel = (x: MyType): string => x.label;`,
+        `export { toLabel };`,
+      ].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { toLabel } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const imports = bodyOf(result.ast ?? host).filter(
+        (s): s is t.ImportDeclaration => s.type === 'ImportDeclaration',
+      );
+      const pkgImport = imports.find((i) => i.source.value === 'pkg');
+      expect(pkgImport).toBeDefined();
+      // The hoisted import is type-only (declaration-level OR per-specifier).
+      const isTypeOnly =
+        pkgImport?.importKind === 'type' ||
+        (pkgImport?.specifiers ?? []).some(
+          (sp) => sp.type === 'ImportSpecifier' && sp.importKind === 'type',
+        );
+      expect(isTypeOnly).toBe(true);
+      expect(
+        pkgImport?.specifiers.map((sp) => (sp.local as t.Identifier).name),
+      ).toContain('MyType');
+      // The annotated helper still inlines.
+      const names = bodyOf(result.ast ?? host)
+        .filter((s): s is t.VariableDeclaration => s.type === 'VariableDeclaration')
+        .flatMap((s) => s.declarations.map((d) => (d.id as t.Identifier).name));
+      expect(names).toContain('toLabel');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // IN-02 — a type-only HELPER declaration referenced only in a type position
+  // (`type Alias = Helper`) is pulled into the inline closure by the extended
+  // reference collection, not tree-shaken away.
+  it('IN-02: pulls a type-only helper decl referenced only in a type position into the closure', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'typedecls.rzts',
+      [
+        `interface Helper { id: number }`,
+        `type Row = Helper;`,
+        `export type { Row };`,
+      ].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(`import { Row } from '${esc}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const text = JSON.stringify(bodyOf(result.ast ?? host));
+      expect(text).toContain('Row'); // the alias inlines
+      expect(text).toContain('Helper'); // its type-position dependency is pulled in
+    } finally {
+      partial.dispose();
+    }
+  });
 });
 
 describe('inlineScriptPartials — negative routing', () => {

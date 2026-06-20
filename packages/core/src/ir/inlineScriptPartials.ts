@@ -176,6 +176,17 @@ function importLocalNames(imp: t.ImportDeclaration): string[] {
   return imp.specifiers.map((s) => s.local.name);
 }
 
+/**
+ * Root identifier of a TS entity name (`Foo` or `Foo.Bar.Baz` → `Foo`). A
+ * `TSImportType` (`import('pkg').Foo`) has no root local identifier — returns
+ * null (its module surface is already self-contained, never a hoist target).
+ */
+function rootTypeIdentifier(name: t.Node | null | undefined): string | null {
+  let node: t.Node | null | undefined = name;
+  while (node && t.isTSQualifiedName(node)) node = node.left;
+  return node && t.isIdentifier(node) ? node.name : null;
+}
+
 /** Referenced identifier names within a statement (excludes bindings/keys). */
 function referencedNames(stmt: Statement): Set<string> {
   const out = new Set<string>();
@@ -184,11 +195,49 @@ function referencedNames(stmt: Statement): Set<string> {
       ReferencedIdentifier(path) {
         out.add(path.node.name);
       },
+      // IN-02: identifiers used SOLELY in TS type positions are NOT
+      // `ReferencedIdentifier`s — Babel's `t.isReferenced` deliberately excludes
+      // type-annotation references. Without capturing them, a `import type { T }`
+      // (or a type-only helper decl) used only in annotations (`param: T`,
+      // `type A = T`, `Array<T>`) would not be hoisted/included → the host
+      // emits a reference to `T` with no import, and the consumer's `tsc` errors.
+      // Capture the ROOT identifier of every type reference + `typeof`-type-query
+      // so type-only imports/decls referenced only in annotations ARE pulled in.
+      // Value-import behavior is unchanged: a name already collected as a
+      // `ReferencedIdentifier` is just re-added to the same Set (idempotent).
+      TSTypeReference(path) {
+        const root = rootTypeIdentifier(path.node.typeName);
+        if (root) out.add(root);
+      },
+      TSTypeQuery(path) {
+        const root = rootTypeIdentifier(path.node.exprName);
+        if (root) out.add(root);
+      },
     });
   } catch {
     // Defensive (D-08) — a traverse failure yields an empty reference set.
   }
   return out;
+}
+
+/**
+ * Effective import kind of a single specifier. A specifier is type-only when
+ * EITHER the declaration is `import type { … }` (declKind === 'type', in which
+ * case Babel reports the per-specifier `importKind` as `'value'`) OR the
+ * specifier itself is the inline `import { type X }` form (spec.importKind ===
+ * 'type'). The old `spec.importKind ? spec.importKind : declKind` form let the
+ * `'value'` per-specifier kind of a declaration-level `import type` mask the
+ * declaration's type-ness, so a hoisted `import type { T }` lost its type-only
+ * marker and emitted as a runtime `import { T }` (IN-02). Value imports are
+ * unaffected (both kinds are `'value'`).
+ */
+function effectiveImportKind(
+  declKind: string,
+  spec: t.ImportDeclaration['specifiers'][number],
+): 'value' | 'type' {
+  if (declKind === 'type') return 'type';
+  if (t.isImportSpecifier(spec) && spec.importKind === 'type') return 'type';
+  return 'value';
 }
 
 /**
@@ -203,8 +252,7 @@ function specifierKey(
   declKind: string,
   spec: t.ImportDeclaration['specifiers'][number],
 ): string {
-  const kind =
-    (t.isImportSpecifier(spec) && spec.importKind ? spec.importKind : declKind) || 'value';
+  const kind = effectiveImportKind(declKind, spec);
   if (t.isImportDefaultSpecifier(spec)) {
     return `${source}\0${kind}\0default\0${spec.local.name}`;
   }
@@ -230,8 +278,7 @@ function hoistSpecifier(
   const key = specifierKey(source, declKind, spec);
   if (ctx.hoistKeys.has(key)) return;
   ctx.hoistKeys.add(key);
-  const groupKind =
-    (t.isImportSpecifier(spec) && spec.importKind ? spec.importKind : declKind) || 'value';
+  const groupKind = effectiveImportKind(declKind, spec);
   const groupKey = `${source}\0${groupKind}`;
   const existing = ctx.hoistGroups.get(groupKey);
   if (existing) {
@@ -348,6 +395,18 @@ function inlineResolvedPartial(
     const nestedImports: t.ImportDeclaration[] = [];
     /** local name -> nested partial resolved path + the imported name. */
     const nestedLocalMap = new Map<string, { absPath: string; imported: string }>();
+    // IN-01: re-export-from specifiers (`export { Bar as Baz } from '@pkg'`).
+    // Each provides a host binding equal to its EXPORTED name, mapping to the
+    // source module's ORIGINAL name (alias preserved). Collected here and hoisted
+    // as host imports below, gated on the live closure (tree-shaken like module
+    // imports). A re-export does NOT create a local binding inside the partial,
+    // so it is only ever consumed by an IMPORTER — never a sibling decl.
+    const reExports: Array<{
+      exportedName: string;
+      source: t.StringLiteral;
+      kind: 'value' | 'type';
+      build: () => t.ImportSpecifier | t.ImportNamespaceSpecifier;
+    }> = [];
     let order = 0;
 
     for (const stmt of partialBody) {
@@ -380,6 +439,63 @@ function inlineResolvedPartial(
         } else {
           moduleImports.push(stmt);
         }
+        continue;
+      }
+
+      // IN-01: re-export-from — `export { Bar } from '@pkg'` /
+      // `export { Bar as Baz } from '@pkg'` / `export * as ns from '@pkg'`. No
+      // inline `declaration` and no local binding; the exported name resolves to
+      // the source module. Map each to a host import so a host `import { Baz }`
+      // binds. A bare `export * from '@pkg'` (ExportAllDeclaration) has no
+      // statically-known named surface → ROZ141 (never a silent drop, D-08).
+      if (t.isExportNamedDeclaration(stmt) && !stmt.declaration && stmt.source) {
+        const src = stmt.source;
+        const declTypeOnly = stmt.exportKind === 'type';
+        for (const spec of stmt.specifiers) {
+          if (t.isExportSpecifier(spec)) {
+            const exportedName = t.isIdentifier(spec.exported)
+              ? spec.exported.name
+              : spec.exported.value;
+            const kind: 'value' | 'type' =
+              declTypeOnly || spec.exportKind === 'type' ? 'type' : 'value';
+            const localId = spec.local; // name in the SOURCE module (alias source)
+            reExports.push({
+              exportedName,
+              source: src,
+              kind,
+              build: () =>
+                // `import { <local> as <exported> }`: local binding = the
+                // exported name the importer pulls; imported = source name. The
+                // type-only marker rides the declaration via `re.kind` (passed as
+                // declKind to hoistSpecifier), grouping type re-exports into a
+                // dedicated `import type { … }` statement.
+                t.importSpecifier(
+                  t.identifier(exportedName),
+                  t.identifier(localId.name),
+                ),
+            });
+          } else if (t.isExportNamespaceSpecifier(spec)) {
+            // `export * as ns from '@pkg'` — `exported` is always an Identifier.
+            const nsName = spec.exported.name;
+            reExports.push({
+              exportedName: nsName,
+              source: src,
+              kind: declTypeOnly ? 'type' : 'value',
+              build: () => t.importNamespaceSpecifier(t.identifier(nsName)),
+            });
+          }
+        }
+        continue;
+      }
+      if (t.isExportAllDeclaration(stmt)) {
+        ctx.diagnostics.push({
+          code: RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+          severity: 'error',
+          message: `Script partial '${absPath}' uses \`export * from '${stmt.source.value}'\`. A star re-export has no statically-known named surface to inline — a partial is a compile-time inline, so each re-exported symbol must be named (e.g. \`export { foo } from '${stmt.source.value}'\`).`,
+          loc: nodeLoc(stmt),
+          ...(absPath ? { filename: absPath } : {}),
+          hint: `Replace the star re-export with explicit named re-exports: export { foo, bar } from '${stmt.source.value}'.`,
+        });
         continue;
       }
 
@@ -483,6 +599,17 @@ function inlineResolvedPartial(
         if (referencedAll.has(spec.local.name)) {
           hoistSpecifier(ctx, imp.source, declKind, spec);
         }
+      }
+    }
+
+    // IN-01: hoist re-export-from specifiers whose EXPORTED name is consumed by
+    // this importer (or the live closure). The exported name is the host-visible
+    // binding; building it as `import { <source> as <exported> }` makes a host
+    // `import { <exported> }` resolve, alias preserved. Tree-shaken: a
+    // re-exported symbol nobody imports contributes no host import.
+    for (const re of reExports) {
+      if (importedNames.includes(re.exportedName) || referencedAll.has(re.exportedName)) {
+        hoistSpecifier(ctx, re.source, re.kind, re.build());
       }
     }
 
