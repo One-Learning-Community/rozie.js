@@ -1,0 +1,266 @@
+/**
+ * inlineScriptPartials — Phase 54 Wave-0 unit contract (R1–R7) + negative routing.
+ *
+ * Nyquist discipline (54-VALIDATION.md): this suite is authored BEFORE the
+ * `inlineScriptPartials` pass exists. Every `it` is `it.skip` for now —
+ * "green-by-skip" — and Wave 2/3 flip each to a real assertion once the pass
+ * (`../inlineScriptPartials.ts`) and its diagnostics (ROZ139 collision /
+ * ROZ140-adjacent cycle) land.
+ *
+ * The pass inlines a `.rzts`/`.rzjs` script partial's EXPORTED declarations
+ * (sigils intact) into the host component's `<script>` AST BEFORE `analyzeAST`
+ * runs — so the partial rides the host's single per-target lowering. The
+ * north-star invariant (proven in tests/dist-parity/partial-inline-parity.test.ts)
+ * is byte-identity between the same logic authored inline vs. in a partial.
+ *
+ * IMPORTANT (acceptance criterion): there is NO top-level static import of
+ * `../inlineScriptPartials.js` — it does not exist yet. Each skipped `it`
+ * dynamically `import()`s it INSIDE the test body (mirrors the repo's
+ * in-it() dynamic-import hoist guidance so the suite does not hard-fail on
+ * the not-yet-created module). No watch-mode flags.
+ */
+import { describe, it, expect } from 'vitest';
+import { parseExpression } from '@babel/parser';
+import { parse as babelParse } from '@babel/parser';
+import type { File, Program, Statement } from '@babel/types';
+import * as t from '@babel/types';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const LOC = { start: 0, end: 0 };
+
+/** Parse a module-source string into a Babel File (the `<script>` program shape). */
+function moduleFile(src: string): File {
+  return babelParse(src, { sourceType: 'module', plugins: ['typescript'] });
+}
+
+/** Convenience: the top-level statement list of a parsed module. */
+function bodyOf(file: File): Statement[] {
+  return (file.program as Program).body;
+}
+
+/**
+ * Stage a partial source on disk under a fresh tmp dir so the real
+ * resolver/`readFileSync` path can locate it. Returns the absolute partial
+ * path + a disposer. Wave 2/3 implementations call the pass with a host whose
+ * ImportDeclaration source resolves to this file. (Currently unused by the
+ * skipped bodies — retained as the shared fixture helper the flips will use.)
+ */
+function stagePartial(name: string, src: string): { path: string; dispose: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), 'rozie-partial-'));
+  const path = join(dir, name);
+  writeFileSync(path, src, 'utf8');
+  return { path, dispose: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+describe('inlineScriptPartials', () => {
+  // R1 — detection + import removal. A host program with an ImportDeclaration
+  // whose source ends in `.rzts`/`.rzjs` is detected, and that import statement
+  // is REMOVED from the program body after the pass (its declarations are
+  // spliced in instead of left as a runtime import).
+  it.skip('R1: detects a .rzts/.rzjs import and removes the import statement after inline', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      `export const usedName = $computed(() => $props.value + 1);`,
+    );
+    try {
+      const host = moduleFile(`import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      // Wave 2/3: inlineScriptPartials(host, { resolverRoot, diagnostics, ... })
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const stillImported = bodyOf(result.ast ?? host).some(
+        (s) => s.type === 'ImportDeclaration' && /\.rz(ts|js)$/.test(s.source.value),
+      );
+      expect(stillImported).toBe(false);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // R2 — tree-shake. Only the IMPORTED names plus their transitive in-file
+  // helper closure are spliced. An UNUSED export of the partial adds nothing
+  // to the merged host body.
+  it.skip('R2: splices only imported names + their transitive helper closure (unused export tree-shaken)', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      [
+        `const helper = (n) => n * 2;`,
+        `export const usedName = $computed(() => helper($props.value));`,
+        `export const neverImported = $computed(() => 999);`, // must NOT inline
+      ].join('\n'),
+    );
+    try {
+      const host = moduleFile(`import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const text = JSON.stringify(bodyOf(result.ast ?? host));
+      expect(text).toContain('usedName');
+      expect(text).toContain('helper'); // transitive closure pulled in
+      expect(text).not.toContain('neverImported'); // unused export dropped
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // R3 — pre-lowering placement. A $computed/$onMount moved into a partial
+  // lands in `ast.script.program.body` BEFORE `analyzeAST` runs, so the inlined
+  // reactive reads are analyzed identically to host-authored reads (shared
+  // ReactiveDepGraph). Assert via merged-body inspection.
+  it.skip('R3: inlined declarations land in the merged host body before analyzeAST', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      `export const onReady = $onMount(() => { $data.ready = true; });`,
+    );
+    try {
+      const host = moduleFile(`import { onReady } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const merged = bodyOf(result.ast ?? host);
+      const hasInlined = merged.some(
+        (s) =>
+          s.type === 'VariableDeclaration' &&
+          s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === 'onReady'),
+      );
+      expect(hasInlined).toBe(true);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // R4 — import hoist + dedup. Partial top-level ImportDeclarations are hoisted
+  // to the host and deduped by the (source, importKind, imported/local,
+  // default/namespace) tuple; aliases are preserved.
+  it.skip('R4: hoists + dedups partial top-level imports by (source, kind, name) tuple, preserving aliases', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      [
+        `import { thing as aliased } from 'engine';`,
+        `export const usedName = $computed(() => aliased($props.value));`,
+      ].join('\n'),
+    );
+    try {
+      // Host already imports `thing` from 'engine' under a DIFFERENT local name;
+      // the dedup must keep both bindings distinct (alias preserved), not merge.
+      const host = moduleFile(
+        [
+          `import { thing } from 'engine';`,
+          `import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`,
+        ].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const imports = bodyOf(result.ast ?? host).filter(
+        (s): s is t.ImportDeclaration => s.type === 'ImportDeclaration',
+      );
+      const engineSpecifiers = imports
+        .filter((i) => i.source.value === 'engine')
+        .flatMap((i) => i.specifiers.map((sp) => (sp.local as t.Identifier).name));
+      expect(engineSpecifiers).toContain('thing');
+      expect(engineSpecifiers).toContain('aliased');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // R5 — recursion + cycle detection. A 2-level partial chain inlines fully; an
+  // import CYCLE pushes a clean diagnostic (no stack overflow). The exact code
+  // is ROZ140-adjacent; left as a TODO until Wave 3 assigns the canonical value.
+  it.skip('R5: inlines a 2-level partial chain; an import cycle pushes a clean diagnostic (no stack overflow)', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    // TODO(Wave 3): import the canonical cycle diagnostic constant from
+    // ../../diagnostics/codes.js once it is assigned (ROZ140-adjacent).
+    const CYCLE_DIAGNOSTIC_CODE = 'ROZ140'; // TODO(Wave 3): replace with RozieErrorCode constant
+    const a = stagePartial('a.rzts', `import { b } from './b.rzts';\nexport const a = $computed(() => b);`);
+    const cyclic = stagePartial('cyclic.rzts', `import { self } from './cyclic.rzts';\nexport const self = 1;`);
+    try {
+      const host = moduleFile(`import { a } from '${a.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      // 2-level chain inlines without throwing.
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+
+      const cyclicHost = moduleFile(`import { self } from '${cyclic.path.replace(/\\/g, '\\\\')}';`);
+      const cyclicResult = inlineScriptPartials(cyclicHost, { hostFilename: 'Host.rozie' });
+      expect(cyclicResult.diagnostics.map((d) => d.code)).toContain(CYCLE_DIAGNOSTIC_CODE);
+    } finally {
+      a.dispose();
+      cyclic.dispose();
+    }
+  });
+
+  // R6 — collision diagnostic. A partial declaration whose name collides with a
+  // host binding pushes PARTIAL_INLINE_COLLISION (ROZ139) with a code-frame
+  // citing BOTH sites (host + partial).
+  it.skip('R6: a partial-vs-host name collision pushes ROZ139 with a frame citing both sites', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    // TODO(Wave 3): replace literal with RozieErrorCode.PARTIAL_INLINE_COLLISION.
+    const COLLISION_CODE = 'ROZ139';
+    const partial = stagePartial(
+      'logic.rzts',
+      `export const value = $computed(() => $props.value);`, // collides with host `value`
+    );
+    try {
+      const host = moduleFile(
+        [
+          `const value = 1;`, // host already binds `value`
+          `import { value } from '${partial.path.replace(/\\/g, '\\\\')}';`,
+        ].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const collision = result.diagnostics.find((d) => d.code === COLLISION_CODE);
+      expect(collision).toBeDefined();
+      // Frame must cite both the host binding and the partial declaration.
+      expect(collision?.filename ?? '').toContain('logic.rzts');
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // R7 — source-map / diagnostic fidelity. An inlined statement's Babel
+  // loc.filename / start resolves to the PARTIAL's `.rzts` absolute path, not
+  // the host `.rozie` — so error frames + source maps cite the partial origin.
+  it.skip('R7: an inlined statement carries the partial .rzts origin in its loc, not the host .rozie', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      `export const usedName = $computed(() => $props.value + 1);`,
+    );
+    try {
+      const host = moduleFile(`import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const inlined = bodyOf(result.ast ?? host).find(
+        (s) =>
+          s.type === 'VariableDeclaration' &&
+          s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === 'usedName'),
+      );
+      expect(inlined?.loc?.filename).toContain('logic.rzts');
+    } finally {
+      partial.dispose();
+    }
+  });
+});
+
+describe('inlineScriptPartials — negative routing', () => {
+  // A `.rzts`/`.rzjs` import is a COMPILE-TIME inline, NOT a module — it must
+  // NOT produce an `@rozie/unplugin` virtual id. (Contrast `.rozie`, which IS
+  // replaced with a compiled module + virtual id.)
+  it.skip('a .rzts import yields NO unplugin virtual id', async () => {
+    const { isPartialExtension } = await import('../inlineScriptPartials.js');
+    // The routing predicate the unplugin resolveId path consults: a partial
+    // extension is handled inline (no virtual id emitted), never as a module.
+    expect(isPartialExtension('./logic.rzts')).toBe(true);
+    expect(isPartialExtension('./logic.rzjs')).toBe(true);
+    expect(isPartialExtension('./component.rozie')).toBe(false);
+    expect(isPartialExtension('./plain.ts')).toBe(false);
+  });
+
+  // A `.rzts`/`.rzjs` import must NOT produce a `babel-plugin-rozie` sibling
+  // file (the `.rozie` path writes a compiled sibling; the partial path does
+  // not — it is consumed by the host's compile, never emitted standalone).
+  it.skip('a .rzts import produces NO babel sibling artifact', async () => {
+    const { isPartialExtension } = await import('../inlineScriptPartials.js');
+    // The babel-plugin import-interception consults the same predicate to skip
+    // sibling emission for partials.
+    expect(isPartialExtension('./logic.rzts')).toBe(true);
+  });
+});
