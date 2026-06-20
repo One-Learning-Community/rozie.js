@@ -86,6 +86,7 @@ import { emitListeners } from './emit/emitListeners.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 
 export interface EmitSvelteOptions {
   filename?: string;
@@ -280,6 +281,8 @@ export function emitSvelte(
           scriptMap: shellScriptMap,
           scriptOutputOffset,
           userCodeLineOffset,
+          // Phase 55 Plan 03 (SC-2): spliced `.rzts` line-restore table.
+          partialLineOffsets: buildPartialLineOffsets(ir.setupBody.scriptProgram),
         })
       : null;
 

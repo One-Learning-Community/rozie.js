@@ -90,6 +90,7 @@ import { emitStyle } from './emit/emitStyle.js';
 import { emitDecorator, registerDecoratorImports } from './emit/emitDecorator.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
 import {
@@ -883,6 +884,8 @@ export function emitAngular(
           scriptMap: shellScriptMap,
           scriptOutputOffset,
           userCodeLineOffset,
+          // Phase 55 Plan 03 (SC-2): spliced `.rzts` line-restore table.
+          partialLineOffsets: buildPartialLineOffsets(ir.setupBody.scriptProgram),
         })
       : null;
 

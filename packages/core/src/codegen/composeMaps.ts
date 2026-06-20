@@ -20,8 +20,10 @@
  */
 import _remapping from '@ampproject/remapping';
 import type { EncodedSourceMap, SourceMapInput } from '@ampproject/remapping';
+import { decode, encode } from '@jridgewell/sourcemap-codec';
 import type MagicString from 'magic-string';
 import type { SourceMap as MagicStringSourceMap } from 'magic-string';
+import type { File as BabelFile } from '@babel/types';
 
 // CJS-interop normalization — mirror of `_generate` pattern at
 // packages/targets/vue/src/emit/emitScript.ts:38-62.
@@ -61,6 +63,94 @@ export interface ComposeMapsOpts {
    * rather than the script-body-relative line numbers from @babel/generator.
    */
   userCodeLineOffset?: number | undefined;
+  /**
+   * Phase 55 Plan 03 (SC-2) — per-partial-file constant emit-line offset table,
+   * keyed by the partial's absolute `loc.filename` (`.rzts`/`.rzjs`). Built from
+   * the lowered script AST via {@link buildPartialLineOffsets}. When present, the
+   * line-restore subtracts a source's offset from the ORIGINAL line of every
+   * mapping whose `source` is that partial, recovering the true `.rzts`-local line
+   * after Plan 02 shifted `loc.start.line` to a host-contiguous emit value. Absent
+   * or empty → byte-identical to today (no restore). Never throws (D-04).
+   */
+  partialLineOffsets?: Map<string, number> | undefined;
+}
+
+/** Source-file extension test: a spliced script partial origin (Phase 54/55). */
+function isPartialSource(src: string | null | undefined): boolean {
+  return !!src && (src.endsWith('.rzts') || src.endsWith('.rzjs'));
+}
+
+/**
+ * Recover a partial source's constant emit-line offset from the table. The table
+ * is keyed by the absolute `loc.filename` stashed at splice time; a child map's
+ * `sources` entry is the same absolute path, so an exact lookup is tried first,
+ * then a suffix/basename match as a defensive fallback (path normalization can
+ * differ between the IR `loc.filename` and the generator's emitted `sources`).
+ * Returns `undefined` when no offset is known (mapping left as-is — D-04).
+ */
+function lookupPartialOffset(
+  src: string | null | undefined,
+  offsets: Map<string, number> | undefined,
+): number | undefined {
+  if (!src || !offsets || offsets.size === 0) return undefined;
+  const exact = offsets.get(src);
+  if (exact !== undefined) return exact;
+  for (const [file, off] of offsets) {
+    if (src === file || src.endsWith(file) || file.endsWith(src)) return off;
+  }
+  return undefined;
+}
+
+/**
+ * Phase 55 Plan 03 (SC-2) — build the per-partial-file constant emit-line offset
+ * table from the lowered script AST.
+ *
+ * Plan 02 shifted each spliced node's `loc.start.line` to a host-contiguous emit
+ * value while stashing the true `.rzts` origin on `extra.__roziePartialOrigin`.
+ * The per-partial offset is therefore the (constant) delta
+ * `loc.start.line − __roziePartialOrigin.line`; subtracting it from a mapping's
+ * original line restores the `.rzts`-local line. The offset is constant per
+ * spliced block (Plan 02 anchored it), so one entry per partial `source` file
+ * suffices — the first stashed node per file wins.
+ *
+ * Walks `scriptAst.program.body` (the spliced statements sit at top level) and
+ * their attached leading/trailing comments (comments carry the stash directly).
+ * Never throws (D-04): a missing/zero stash is skipped, a null AST yields an
+ * empty table.
+ */
+export function buildPartialLineOffsets(
+  scriptAst: BabelFile | null | undefined,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const body = scriptAst?.program?.body;
+  if (!body) return out;
+  const record = (
+    carrier: { __roziePartialOrigin?: { line: number; filename?: string } } | undefined,
+    locLine: number | undefined,
+  ): void => {
+    const origin = carrier?.__roziePartialOrigin;
+    if (!origin || locLine === undefined) return;
+    const key = origin.filename;
+    if (!key || out.has(key)) return;
+    out.set(key, locLine - origin.line);
+  };
+  for (const node of body) {
+    const extra = node.extra as
+      | { __roziePartialOrigin?: { line: number; filename?: string } }
+      | undefined;
+    record(extra, node.loc?.start.line);
+    for (const c of node.leadingComments ?? [])
+      record(
+        c as unknown as { __roziePartialOrigin?: { line: number; filename?: string } },
+        c.loc?.start.line,
+      );
+    for (const c of node.trailingComments ?? [])
+      record(
+        c as unknown as { __roziePartialOrigin?: { line: number; filename?: string } },
+        c.loc?.start.line,
+      );
+  }
+  return out;
 }
 
 /**
@@ -81,8 +171,9 @@ export interface ComposeMapsOpts {
  *     discarded the child map's per-node `sources` (it hardcoded `[opts.filename]`),
  *     collapsing a spliced node's `.rzts` origin to the host `.rozie` — which is
  *     exactly why the SC-2 line-fidelity smoke test was red/skipped. The restore
- *     therefore lives in step 3 (and is mirrored in the step-4 remapping path for
- *     robustness).
+ *     therefore lives in step 3. The step-4 remapping path is NOT exercised by
+ *     partials (every map-emitting target passes `userCodeLineOffset`), so it is
+ *     deliberately left untouched rather than carrying speculative dead code.
  *
  *  3. TABLE BUILD SITE — each of those five `emitXxx.ts` holds the lowered `ir`
  *     (whose `ir.setupBody.scriptProgram` script AST carries the spliced nodes'
@@ -142,6 +233,57 @@ export function composeMaps(opts: ComposeMapsOpts): MagicStringSourceMap {
   //    maps tsx-output-lines → .rozie-lines for user-authored statements.
   if (opts.userCodeLineOffset !== undefined) {
     const childMap = opts.children[0]!.map;
+
+    // Phase 55 Plan 03 (SC-2): when the child map carries spliced `.rzts`/`.rzjs`
+    // sources AND we have an offset table, PRESERVE those per-node sources (so a
+    // spliced node's map resolves to its `.rzts` origin FILE — D-01) and RESTORE
+    // the original LINE by subtracting the partial's constant emit-line offset.
+    // The legacy branch below hardcoded `sources:[opts.filename]`, collapsing the
+    // `.rzts` origin onto the host `.rozie` and discarding the line entirely.
+    const childSources = childMap.sources ?? [];
+    const hasPartial =
+      childSources.some((s) => isPartialSource(s)) &&
+      !!opts.partialLineOffsets &&
+      opts.partialLineOffsets.size > 0;
+
+    if (hasPartial) {
+      // Decode → subtract the per-source offset from each `.rzts`-sourced segment's
+      // original line → re-encode. Subtracting a constant from selected original
+      // lines is the entire restore (the constant per-block offset preserves all
+      // intra-block deltas — RESEARCH Key Finding). Guarded so a malformed segment
+      // never throws (D-04).
+      const decoded = decode(childMap.mappings);
+      for (const line of decoded) {
+        for (const seg of line) {
+          // seg = [genCol, srcIdx, origLine, origCol, (nameIdx)] — only segments
+          // with a source (length >= 4) carry an original line to restore. The
+          // length guard narrows to the sourced-segment tuple; mutating `full`
+          // mutates the same array reference the encoder re-reads.
+          if (seg.length >= 4) {
+            const full = seg as [number, number, number, number, number?];
+            const src = childSources[full[1]];
+            const off = lookupPartialOffset(src, opts.partialLineOffsets);
+            if (off !== undefined) full[2] -= off;
+          }
+        }
+      }
+      const restoredMappings = encode(decoded);
+      const sources = childSources.slice();
+      const sourcesContent = sources.map((s, i) =>
+        s === opts.filename ? opts.source : (childMap.sourcesContent?.[i] ?? null),
+      );
+      const adjusted: EncodedSourceMap = {
+        version: 3,
+        file: `${opts.filename}${opts.fileExt}`,
+        sources,
+        sourcesContent,
+        names: childMap.names ?? [],
+        mappings: ';'.repeat(opts.userCodeLineOffset) + restoredMappings,
+      };
+      return adjusted as unknown as MagicStringSourceMap;
+    }
+
+    // Legacy (no spliced-partial sources) — byte-identical to pre-Phase-55.
     const adjusted: EncodedSourceMap = {
       version: 3,
       file: `${opts.filename}${opts.fileExt}`,

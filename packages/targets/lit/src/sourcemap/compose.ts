@@ -30,6 +30,11 @@ export interface ComposeOpts {
    * 0-indexed line offset of the user-authored statements within the .ts output.
    */
   userCodeLineOffset?: number;
+  /**
+   * Phase 55 Plan 03 (SC-2) — per-partial-file emit-line offset table; threaded
+   * straight into composeMaps for the spliced `.rzts` line-restore (one line).
+   */
+  partialLineOffsets?: Map<string, number>;
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
@@ -43,5 +48,6 @@ export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap 
         : [],
     fileExt: '.ts',
     userCodeLineOffset: opts.userCodeLineOffset,
+    partialLineOffsets: opts.partialLineOffsets,
   });
 }
