@@ -59,7 +59,7 @@ describe('inlineScriptPartials', () => {
   // whose source ends in `.rzts`/`.rzjs` is detected, and that import statement
   // is REMOVED from the program body after the pass (its declarations are
   // spliced in instead of left as a runtime import).
-  it.skip('R1: detects a .rzts/.rzjs import and removes the import statement after inline', async () => {
+  it('R1: detects a .rzts/.rzjs import and removes the import statement after inline', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     const partial = stagePartial(
       'logic.rzts',
@@ -81,7 +81,7 @@ describe('inlineScriptPartials', () => {
   // R2 — tree-shake. Only the IMPORTED names plus their transitive in-file
   // helper closure are spliced. An UNUSED export of the partial adds nothing
   // to the merged host body.
-  it.skip('R2: splices only imported names + their transitive helper closure (unused export tree-shaken)', async () => {
+  it('R2: splices only imported names + their transitive helper closure (unused export tree-shaken)', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     const partial = stagePartial(
       'logic.rzts',
@@ -107,7 +107,7 @@ describe('inlineScriptPartials', () => {
   // lands in `ast.script.program.body` BEFORE `analyzeAST` runs, so the inlined
   // reactive reads are analyzed identically to host-authored reads (shared
   // ReactiveDepGraph). Assert via merged-body inspection.
-  it.skip('R3: inlined declarations land in the merged host body before analyzeAST', async () => {
+  it('R3: inlined declarations land in the merged host body before analyzeAST', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     const partial = stagePartial(
       'logic.rzts',
