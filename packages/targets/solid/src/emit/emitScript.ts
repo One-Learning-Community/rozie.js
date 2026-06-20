@@ -128,6 +128,49 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
 }
 
 /**
+ * Phase 55-04 (literal byte-identity) — reproduce the inline-authored comment
+ * doubling at a script-partial splice boundary.
+ *
+ * In an inline-authored `<script>`, a comment block BETWEEN two statements is
+ * attached by `@babel/parser` to BOTH neighbours (the earlier statement's
+ * `trailingComments` AND the later statement's `leadingComments`). The `.rzts`
+ * script-partial splice instead attaches the boundary banner ONLY to the spliced
+ * node's `leadingComments` — the preceding statement lives in a different source
+ * file and so carries no matching trailing comment. Re-mirroring the spliced
+ * node's leading comments back onto the preceding statement's trailing comments
+ * restores the inline form byte-for-byte:
+ *   - whole-program generation (Solid here) prints the (deduped) banner once AND
+ *     gets the boundary blank line from `@babel/generator`'s `printJoin`
+ *     `_lastCommentLine` path — a trailing comment on the previous statement is
+ *     exactly what triggers the loc-delta blank-line insertion; and
+ *   - per-statement generation (Vue/Svelte) doubles the banner (one copy as the
+ *     previous statement's trailing, one as the next statement's leading).
+ *
+ * Fires ONLY at a genuine splice boundary: the current statement carries
+ * `extra.__roziePartialOrigin` AND its leading comments are not ALREADY shared as
+ * the previous statement's trailing comments (within-partial statement pairs
+ * already share the same comment objects; host-only pairs are left exactly as
+ * authored). MUST run before the arrow→function hoist — `t.inherits` does not
+ * copy `extra`, so the spliced marker is only visible on the original nodes.
+ */
+function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
+  for (let i = 1; i < stmts.length; i++) {
+    const cur = stmts[i]!;
+    const prev = stmts[i - 1]!;
+    const lead = cur.leadingComments;
+    if (!lead || lead.length === 0) continue;
+    const extra = cur.extra as Record<string, unknown> | undefined;
+    if (!extra || extra.__roziePartialOrigin === undefined) continue;
+    const prevTrail = prev.trailingComments;
+    const lastLead = lead[lead.length - 1];
+    if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {
+      continue;
+    }
+    prev.trailingComments = [...(prevTrail ?? []), ...lead];
+  }
+}
+
+/**
  * WR-01 ROOT CAUSE 2 — re-project an author function-type annotation written
  * on a `VariableDeclarator` `id` (`const f: (e: E) => R = …`) onto a rebuilt
  * `FunctionDeclaration` (which has no annotatable `id`). Each declarator-type
@@ -569,7 +612,7 @@ export function emitScript(
 
   // 5. Emit user-authored top-level statements from the rewritten program.
   //    Skip: $computed declarators (handled above), $onMount/$onUnmount calls.
-  const filteredStmts: t.Statement[] = [];
+  const residualStmts: t.Statement[] = [];
   for (const stmt of rewriteResult.rewrittenProgram.program.body) {
     // Skip $computed variable declarations.
     if (t.isVariableDeclaration(stmt)) {
@@ -621,11 +664,20 @@ export function emitScript(
         continue;
       }
     }
-    // Hoist `const X = () => …` helpers to `function X() {…}` so they are
-    // defined before any eagerly-evaluated `createMemo` callback in
-    // hookSection references them (TDZ fix — see tryHoistArrowToFunction).
-    filteredStmts.push(tryHoistArrowToFunction(stmt) ?? stmt);
+    residualStmts.push(stmt);
   }
+
+  // Phase 55-04 — restore the inline-authored splice-boundary comment doubling
+  // (and the boundary blank line) BEFORE the arrow→function hoist; `t.inherits`
+  // drops `extra`, so the spliced marker is only visible on the originals here.
+  mirrorSpliceBoundaryComments(residualStmts);
+
+  // Hoist `const X = () => …` helpers to `function X() {…}` so they are defined
+  // before any eagerly-evaluated `createMemo` callback in hookSection references
+  // them (TDZ fix — see tryHoistArrowToFunction).
+  const filteredStmts: t.Statement[] = residualStmts.map(
+    (stmt) => tryHoistArrowToFunction(stmt) ?? stmt,
+  );
 
   // Generate user statements as a single Babel program so we get one coherent
   // source map. The AST nodes already carry correct .rozie line numbers

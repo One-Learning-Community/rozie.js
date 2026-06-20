@@ -107,6 +107,48 @@ function arrowBody(body: t.Expression | t.BlockStatement): string {
 }
 
 /**
+ * Phase 55-04 (literal byte-identity) — reproduce the inline-authored comment
+ * doubling at a script-partial splice boundary.
+ *
+ * In an inline-authored `<script>`, a comment block BETWEEN two statements is
+ * attached by `@babel/parser` to BOTH neighbours (the earlier statement's
+ * `trailingComments` AND the later statement's `leadingComments`). The `.rzts`
+ * script-partial splice attaches the boundary banner ONLY to the spliced node's
+ * `leadingComments` — the preceding statement lives in a different source file and
+ * carries no matching trailing comment. Vue emits the residual body one statement
+ * at a time (`stmts.map((s) => genCode(s)).join('\n')`), so each `genCode` call has
+ * its own comment-dedup set: in the inline form the boundary banner therefore
+ * prints TWICE (once as the previous statement's trailing, once as the next
+ * statement's leading), with a blank line after the previous closing brace.
+ * Re-mirroring the spliced node's leading comments back onto the preceding
+ * statement's trailing comments restores that byte-for-byte.
+ *
+ * Fires ONLY at a genuine splice boundary: the current statement carries
+ * `extra.__roziePartialOrigin` AND its leading comments are not ALREADY shared as
+ * the previous statement's trailing comments (within-partial statement pairs
+ * already share the same comment objects; host-only pairs are left exactly as
+ * authored). `normalizeSplicedEmitLines` (core) has already anchored the spliced
+ * leading comments one blank line below the preceding statement, so the mirrored
+ * trailing copy spaces correctly.
+ */
+function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
+  for (let i = 1; i < stmts.length; i++) {
+    const cur = stmts[i]!;
+    const prev = stmts[i - 1]!;
+    const lead = cur.leadingComments;
+    if (!lead || lead.length === 0) continue;
+    const extra = cur.extra as Record<string, unknown> | undefined;
+    if (!extra || extra.__roziePartialOrigin === undefined) continue;
+    const prevTrail = prev.trailingComments;
+    const lastLead = lead[lead.length - 1];
+    if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {
+      continue;
+    }
+    prev.trailingComments = [...(prevTrail ?? []), ...lead];
+  }
+}
+
+/**
  * Render a PropTypeAnnotation as a TypeScript type string.
  *
  * Reference examples produce these patterns:
@@ -839,6 +881,10 @@ function emitResidualScriptBody(
 
     stmts.push(stmt);
   }
+
+  // Phase 55-04 — restore the inline-authored splice-boundary comment doubling
+  // (and the boundary blank line) before per-statement generation below.
+  mirrorSpliceBoundaryComments(stmts);
 
   const code = stmts.map((s) => genCode(s)).join('\n');
   return { code, stmts };
