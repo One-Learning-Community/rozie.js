@@ -11,7 +11,14 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 // getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
 // box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
 // ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
-getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
+getFacetedRowModel,
+// Aliased to make<…> so the bare names `getFacetedUniqueValues`/`getFacetedMinMaxValues`
+// are FREE for the $expose verb helpers below. The $expose IR carries only the verb NAME
+// (the `key:value` alias is discarded — ExposedMethod.name), so an exposed
+// `getFacetedUniqueValues` lowers to the shorthand `{ getFacetedUniqueValues }`, which MUST
+// resolve to the in-scope helper, NOT this table-core factory import (the collision that made
+// the verb return the factory fn instead of the keys array — roundout facet block).
+getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as makeFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -357,8 +364,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
 }, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) manual: boolean = false;
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
-  @property({ type: Object, attribute: 'expanded' }) _expanded_attr: any | boolean = {};
-  private _expandedControllable = createLitControllableProperty<any | boolean>({ host: this, eventName: 'expanded-change', defaultValue: {}, initialControlledValue: undefined });
+  @property({ type: Object, attribute: 'expanded' }) _expanded_attr: any | boolean = null;
+  private _expandedControllable = createLitControllableProperty<any | boolean>({ host: this, eventName: 'expanded-change', defaultValue: null, initialControlledValue: undefined });
   @property({ type: Function }) getSubRows: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Boolean, reflect: true }) groupable: boolean = false;
   @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] = [];
@@ -664,6 +671,16 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       getSubRows: (this.getSubRows || undefined) as any,
       getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
       onExpandedChange: this.onExpandedChangeCb,
+      // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+      // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+      // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+      // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+      // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+      // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+      // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+      // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+      // are unaffected (they fire regardless of this flag).
+      autoResetExpanded: false,
       // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
       // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
       // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
@@ -678,8 +695,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
       // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
       getFacetedRowModel: getFacetedRowModel(),
-      getFacetedUniqueValues: getFacetedUniqueValues(),
-      getFacetedMinMaxValues: getFacetedMinMaxValues(),
+      getFacetedUniqueValues: makeFacetedUniqueValues(),
+      getFacetedMinMaxValues: makeFacetedMinMaxValues(),
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -918,7 +935,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
           </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
+            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
           </span>` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
             <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
             <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
@@ -979,7 +996,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
           </span>`}${this.columnIsFilterable(header.column.id) ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.facetedUniqueValuesFor(header.column.id), minMax: this.facetedMinMaxFor(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
+            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()}></slot>`}
           </span>` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
             <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
             <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
@@ -1693,6 +1710,16 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     getSubRows: (this.getSubRows || undefined) as any,
     getRowCanExpand: this.expandable === true && this.getSubRows == null ? () => true : undefined,
     onExpandedChange: this.onExpandedChangeCb,
+    // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+    // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+    // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+    // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+    // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+    // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+    // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+    // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+    // are unaffected (they fire regardless of this flag).
+    autoResetExpanded: false,
     // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
     // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
     // fresh currentState each cycle, F6).
@@ -1702,8 +1729,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     // drop the model on re-feed; on React the faceted closures must re-capture so exposed
     // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
     getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    getFacetedUniqueValues: makeFacetedUniqueValues(),
+    getFacetedMinMaxValues: makeFacetedMinMaxValues(),
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: this.onSortingChangeCb,
@@ -1961,7 +1988,23 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   onToggleExpand = (row: any, evt: any) => {
   if (!row || !row.toggleExpanded) return;
+  // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
+  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
+  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
+  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
+  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
+  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
+  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
+  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
+  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null;
   row.toggleExpanded();
+  if (ownerRow && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      const btn = ownerRow.querySelector('[data-expander]');
+      if (btn) btn.focus();
+    });
+  }
 };
 
   bodyCellStyle = (row: any, colId: any) => {
@@ -3501,7 +3544,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this.table) this.table.setGrouping([]);
 };
 
-  facetedUniqueValuesFor = (colId: any) => {
+  getFacetedUniqueValues = (colId: any) => {
   if (this.tick() < 0 || !this.table) return [];
   const col = this.table.getColumn(colId);
   if (!col || !col.getFacetedUniqueValues) return [];
@@ -3509,7 +3552,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
 };
 
-  facetedMinMaxFor = (colId: any) => {
+  getFacetedMinMaxValues = (colId: any) => {
   if (this.tick() < 0 || !this.table) return null;
   const col = this.table.getColumn(colId);
   if (!col || !col.getFacetedMinMaxValues) return null;

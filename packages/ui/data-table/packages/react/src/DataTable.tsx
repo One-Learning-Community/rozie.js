@@ -9,7 +9,14 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 // getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
 // box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
 // ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
-getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
+getFacetedRowModel,
+// Aliased to make<…> so the bare names `getFacetedUniqueValues`/`getFacetedMinMaxValues`
+// are FREE for the $expose verb helpers below. The $expose IR carries only the verb NAME
+// (the `key:value` alias is discarded — ExposedMethod.name), so an exposed
+// `getFacetedUniqueValues` lowers to the shorthand `{ getFacetedUniqueValues }`, which MUST
+// resolve to the in-scope helper, NOT this table-core factory import (the collision that made
+// the verb return the factory fn instead of the keys array — roundout facet block).
+getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as makeFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -64,9 +71,9 @@ interface DataTableProps {
   onPaginationChange?: (pagination: Record<string, any>) => void;
   manual?: boolean;
   expandable?: boolean;
-  expanded?: Record<string, any> | boolean;
-  defaultExpanded?: Record<string, any> | boolean;
-  onExpandedChange?: (expanded: Record<string, any> | boolean) => void;
+  expanded?: (Record<string, any> | boolean) | null;
+  defaultExpanded?: (Record<string, any> | boolean) | null;
+  onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
   getSubRows?: ((...args: any[]) => any) | null;
   groupable?: boolean;
   grouping?: any[];
@@ -210,7 +217,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   });
   const [expanded, setExpanded] = useControllableState({
     value: props.expanded,
-    defaultValue: props.defaultExpanded ?? (() => ({}))(),
+    defaultValue: props.defaultExpanded ?? null,
     onValueChange: props.onExpandedChange,
   });
   const [grouping, setGrouping] = useControllableState({
@@ -879,6 +886,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+      // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+      // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+      // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+      // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+      // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+      // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+      // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+      // are unaffected (they fire regardless of this flag).
+      autoResetExpanded: false,
       // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
       // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
       // fresh currentState each cycle, F6).
@@ -888,8 +905,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // drop the model on re-feed; on React the faceted closures must re-capture so exposed
       // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
       getFacetedRowModel: getFacetedRowModel(),
-      getFacetedUniqueValues: getFacetedUniqueValues(),
-      getFacetedMinMaxValues: getFacetedMinMaxValues(),
+      getFacetedUniqueValues: makeFacetedUniqueValues(),
+      getFacetedMinMaxValues: makeFacetedMinMaxValues(),
       // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
       // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
       onSortingChange: onSortingChangeCb,
@@ -1122,7 +1139,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   const onToggleExpand = useCallback((row: any, evt: any) => {
     if (!row || !row.toggleExpanded) return;
+    // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
+    // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
+    // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
+    // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
+    // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
+    // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
+    // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
+    // reactive flush so the fresh node exists. Harmless on the targets that keep the node
+    // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+    const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null;
     row.toggleExpanded();
+    if (ownerRow && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        const btn = ownerRow.querySelector('[data-expander]');
+        if (btn) btn.focus();
+      });
+    }
   }, []);
   function bodyCellStyle(row: any, colId: any) {
     const base = pinStyle(colId);
@@ -2588,14 +2621,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function clearGrouping() {
     if (table.current) table.current.setGrouping([]);
   }
-  function facetedUniqueValuesFor(colId: any) {
+  function getFacetedUniqueValues(colId: any) {
     if (tick() < 0 || !table.current) return [];
     const col = table.current.getColumn(colId);
     if (!col || !col.getFacetedUniqueValues) return [];
     const map = col.getFacetedUniqueValues(); // Map<any, number>
     return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
   }
-  function facetedMinMaxFor(colId: any) {
+  function getFacetedMinMaxValues(colId: any) {
     if (tick() < 0 || !table.current) return null;
     const col = table.current.getColumn(colId);
     if (!col || !col.getFacetedMinMaxValues) return null;
@@ -2635,6 +2668,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       getSubRows: (props.getSubRows || undefined) as any,
       getRowCanExpand: _expandableRef.current === true && props.getSubRows == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
+      // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+      // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+      // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+      // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+      // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+      // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+      // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+      // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+      // are unaffected (they fire regardless of this flag).
+      autoResetExpanded: false,
       // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
       // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
       // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
@@ -2649,8 +2692,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
       // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
       getFacetedRowModel: getFacetedRowModel(),
-      getFacetedUniqueValues: getFacetedUniqueValues(),
-      getFacetedMinMaxValues: getFacetedMinMaxValues(),
+      getFacetedUniqueValues: makeFacetedUniqueValues(),
+      getFacetedMinMaxValues: makeFacetedMinMaxValues(),
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
@@ -2868,7 +2911,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
               </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) })}
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id) })}
               </span>}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
                 <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
@@ -2925,7 +2968,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
               </span>}{(columnIsFilterable(header.column.id)) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: facetedUniqueValuesFor(header.column.id), minMax: facetedMinMaxFor(header.column.id) })}
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id) })}
               </span>}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
                 <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
                 <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>

@@ -258,7 +258,7 @@ import '@rozie-ui/data-table-lit/themes/shadcn.css';    // or material.css, boot
 | `pagination` | `Object` | `{…}` | ✓ |  |
 | `manual` | `Boolean` | `false` |  |  |
 | `expandable` | `Boolean` | `false` |  |  |
-| `expanded` | `any` | `{}` | ✓ |  |
+| `expanded` | `any` | `null` | ✓ |  |
 | `getSubRows` | `Function` | `null` |  |  |
 | `groupable` | `Boolean` | `false` |  |  |
 | `grouping` | `Array` | `[]` | ✓ |  |

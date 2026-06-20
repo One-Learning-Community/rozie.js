@@ -22,9 +22,9 @@ export interface DataTableProps {
   onPaginationChange?: (next: Record<string, unknown>) => void;
   manual?: boolean;
   expandable?: boolean;
-  expanded?: Record<string, unknown> | boolean;
-  defaultExpanded?: Record<string, unknown> | boolean;
-  onExpandedChange?: (next: Record<string, unknown> | boolean) => void;
+  expanded?: (Record<string, unknown> | boolean) | null;
+  defaultExpanded?: (Record<string, unknown> | boolean) | null;
+  onExpandedChange?: (next: (Record<string, unknown> | boolean) | null) => void;
   getSubRows?: ((...args: unknown[]) => unknown) | null;
   groupable?: boolean;
   grouping?: unknown[];

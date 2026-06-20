@@ -42,7 +42,7 @@
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
           </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :uniqueValues="facetedUniqueValuesFor(header.column.id)" :minMax="facetedMinMaxFor(header.column.id)"></slot>
+            <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)"></slot>
           </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
             <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">⇔</button>
@@ -103,7 +103,7 @@
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
           </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :uniqueValues="facetedUniqueValuesFor(header.column.id)" :minMax="facetedMinMaxFor(header.column.id)"></slot>
+            <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)"></slot>
           </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
             <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">⇔</button>
@@ -180,7 +180,7 @@ const pagination = defineModel<Record<string, any>>('pagination', { default: () 
   pageIndex: 0,
   pageSize: 10
 }) });
-const expanded = defineModel<Record<string, any> | boolean>('expanded', { default: () => ({}) });
+const expanded = defineModel<Record<string, any> | boolean>('expanded', { default: null });
 const grouping = defineModel<any[]>('grouping', { default: () => [] });
 const rowSelection = defineModel<Record<string, any>>('rowSelection', { default: () => ({}) });
 const columnVisibility = defineModel<Record<string, any>>('columnVisibility', { default: () => ({}) });
@@ -286,7 +286,14 @@ import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, g
 // getFacetedUniqueValues/getFacetedMinMaxValues default impls are CROSS-FILTERED out of the
 // box (D-03 — reflect rows passing all OTHER active column filters); unique values + min/max
 // ONLY — occurrence counts are deliberately NOT exposed (Array.from(map.keys()) — D-03).
-getFacetedRowModel, getFacetedUniqueValues, getFacetedMinMaxValues } from '@tanstack/table-core';
+getFacetedRowModel,
+// Aliased to make<…> so the bare names `getFacetedUniqueValues`/`getFacetedMinMaxValues`
+// are FREE for the $expose verb helpers below. The $expose IR carries only the verb NAME
+// (the `key:value` alias is discarded — ExposedMethod.name), so an exposed
+// `getFacetedUniqueValues` lowers to the shorthand `{ getFacetedUniqueValues }`, which MUST
+// resolve to the in-scope helper, NOT this table-core factory import (the collision that made
+// the verb return the factory fn instead of the keys array — roundout facet block).
+getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as makeFacetedMinMaxValues } from '@tanstack/table-core';
 // Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
 // (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
@@ -1334,6 +1341,16 @@ const reFeed = () => {
     getSubRows: (props.getSubRows || undefined) as any,
     getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+    // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+    // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+    // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+    // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+    // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+    // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+    // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+    // are unaffected (they fire regardless of this flag).
+    autoResetExpanded: false,
     // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
     // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
     // fresh currentState each cycle, F6).
@@ -1343,8 +1360,8 @@ const reFeed = () => {
     // drop the model on re-feed; on React the faceted closures must re-capture so exposed
     // unique values + min/max update when an upstream filter changes, F6 / req-8 cross-filter).
     getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    getFacetedUniqueValues: makeFacetedUniqueValues(),
+    getFacetedMinMaxValues: makeFacetedMinMaxValues(),
     // Re-pass the per-slice callbacks so React captures fresh currentState each cycle
     // (table-core keeps the prior callbacks otherwise → mount-time stale closure, F6).
     onSortingChange: onSortingChangeCb,
@@ -1771,7 +1788,23 @@ const rowShowsDetail = (row: any) => props.getSubRows == null && rowIsExpanded(r
 // a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
 const onToggleExpand = (row: any, evt: any) => {
   if (!row || !row.toggleExpanded) return;
+  // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
+  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
+  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
+  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
+  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
+  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
+  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
+  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
+  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null;
   row.toggleExpanded();
+  if (ownerRow && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      const btn = ownerRow.querySelector('[data-expander]');
+      if (btn) btn.focus();
+    });
+  }
 };
 // bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
 // left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
@@ -4188,9 +4221,12 @@ const clearGrouping = () => {
 // touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
 // upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
 //
-// facetedUniqueValuesFor: the column's distinct values, KEYS ONLY — occurrence counts are
-// deliberately NOT exposed (D-03; getFacetedUniqueValues() returns Map<any,number>, we return
-// Array.from(map.keys()) — no .entries()/count surface). Empty array on missing column/table.
+// getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
+// we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
+// column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
+// contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
+// helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
 // ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
 // Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
 // column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
@@ -4199,19 +4235,24 @@ const clearGrouping = () => {
 // touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
 // upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
 //
-// facetedUniqueValuesFor: the column's distinct values, KEYS ONLY — occurrence counts are
-// deliberately NOT exposed (D-03; getFacetedUniqueValues() returns Map<any,number>, we return
-// Array.from(map.keys()) — no .entries()/count surface). Empty array on missing column/table.
-const facetedUniqueValuesFor = (colId: any) => {
+// getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
+// we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
+// column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
+// contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
+// helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
+const getFacetedUniqueValues = (colId: any) => {
   if (tick() < 0 || !table) return [];
   const col = table.getColumn(colId);
   if (!col || !col.getFacetedUniqueValues) return [];
   const map = col.getFacetedUniqueValues(); // Map<any, number>
   return map ? Array.from(map.keys()) : []; // KEYS only — counts deferred (D-03)
 };
-// facetedMinMaxFor: the column's [min, max] numeric range, or null when unavailable.
-// facetedMinMaxFor: the column's [min, max] numeric range, or null when unavailable.
-const facetedMinMaxFor = (colId: any) => {
+// getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
+// Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
+// getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
+// Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
+const getFacetedMinMaxValues = (colId: any) => {
   if (tick() < 0 || !table) return null;
   const col = table.getColumn(colId);
   if (!col || !col.getFacetedMinMaxValues) return null;
@@ -4271,6 +4312,16 @@ onMounted(() => {
     getSubRows: (props.getSubRows || undefined) as any,
     getRowCanExpand: props.expandable === true && props.getSubRows == null ? () => true : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+    // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+    // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+    // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+    // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+    // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+    // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+    // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+    // are unaffected (they fire regardless of this flag).
+    autoResetExpanded: false,
     // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
     // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
     // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
@@ -4285,8 +4336,8 @@ onMounted(() => {
     // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
     // The default getFacetedUniqueValues/getFacetedMinMaxValues impls are cross-filtered (D-03).
     getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    getFacetedUniqueValues: makeFacetedUniqueValues(),
+    getFacetedMinMaxValues: makeFacetedMinMaxValues(),
     // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
     // rows verbatim (no client-side filter/sort/paginate) and only emits the change
     // events so the consumer can fetch the next page/filtered slice.
