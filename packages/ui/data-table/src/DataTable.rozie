@@ -147,7 +147,14 @@
   // onExpandedChange funnels a FRESH value → expanded-change (regardless of binding).
   // Uncontrolled fallback $data.expandedDefault. The 11th two-way slice — Angular CVA stays
   // disabled (already disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
-  expanded: { type: [Object, Boolean], default: () => ({}), model: true },
+  // Default NULL (not `{}`): the `$props.expanded != null ? … : <uncontrolled>` idiom in
+  // currentState() needs an UNBOUND expanded to read as null so the uncontrolled fallback
+  // ($data.expandedDefault) AND the grouping auto-expand default (req-4) are reachable. A
+  // non-null `{}` default would make $props.expanded always non-null → the first ternary
+  // branch always wins → the auto-expand (and uncontrolled expand) path is dead code (the
+  // post-mount grouping subtrees stayed collapsed). Bound consumers are unaffected (the bound
+  // value is non-null). Uncontrolled expand now correctly funnels through $data.expandedDefault.
+  expanded: { type: [Object, Boolean], default: null, model: true },
 
   // getSubRows (TABLE option, NOT a per-Column field — RESEARCH anti-pattern): an accessor
   // `(originalRow, index) => TData[] | undefined` that returns a row's child rows. When
@@ -1204,6 +1211,16 @@ $onMount(() => {
     getSubRows: ($props.getSubRows || undefined) as any,
     getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+    // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+    // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+    // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+    // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+    // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+    // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+    // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+    // are unaffected (they fire regardless of this flag).
+    autoResetExpanded: false,
     // Grouping (phase 50 reqs 4-7, D-04/D-05): the grouped row model is supplied
     // UNCONDITIONALLY (mirrors the expand model) — inert when `grouping` is empty
     // (byte-identical-off, req-10). When `grouping` is a non-empty ordered key list,
@@ -1413,6 +1430,16 @@ const reFeed = () => {
     getSubRows: ($props.getSubRows || undefined) as any,
     getRowCanExpand: ($props.expandable === true && $props.getSubRows == null) ? (() => true) : undefined,
     onExpandedChange: onExpandedChangeCb,
+    // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
+    // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
+    // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
+    // writeExpanded and would LATCH expandedTouched=true — defeating the grouping auto-expand
+    // default (currentState().expanded would fall back to {} → nested group subtrees collapsed).
+    // Disabling it makes post-mount grouping behave like initial grouping (subtrees auto-expanded
+    // until the FIRST real user toggle). Inert for the plain/expand-only table (no grouping/sort/
+    // filter mutation triggers an auto-reset there); explicit expandAll/collapseAll/toggle verbs
+    // are unaffected (they fire regardless of this flag).
+    autoResetExpanded: false,
     // Re-pass the grouped row model + callback (Pitfall 4 — setOptions REPLACES, so an
     // omitted fn would drop the model on re-feed; on React onGroupingChange must re-capture
     // fresh currentState each cycle, F6).

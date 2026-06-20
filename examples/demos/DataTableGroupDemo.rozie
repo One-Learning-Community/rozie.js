@@ -63,8 +63,13 @@
     { id: 6, region: 'South', category: 'Software', units: 4, score: 92 },
   ],
   // Controlled grouping state (req-4/6/7) — ordered array of column keys. model:true
-  // two-way write-back from the component; [] = ungrouped (flat table).
-  grouping: [],
+  // two-way write-back from the component; [] = ungrouped (flat table). NAMED groupingModel
+  // (NOT `grouping`): the #groupBar scoped slot exposes a let-var named `grouping`, and on
+  // Angular a $data field named `grouping` becomes a component signal that SHADOWS the slot
+  // let-var — the Angular emitter then signal-CALLS the let-var (`grouping_r7()`) inside the
+  // slot template, throwing "grouping_r7 is not a function" and hiding the whole table. A
+  // distinct field name avoids the slot-var/signal shadow (the consumer-side Angular footgun).
+  groupingModel: [],
   // Last grouping-change payload rendered as a comma-joined ordered key list (req-7),
   // surfaced as a readout. The spec asserts it fires once per change with the ordered keys.
   lastGrouping: '',
@@ -123,7 +128,7 @@ const callClearGrouping = (): void => {
       ref="dt"
       :groupable="true"
       :data="$data.rows"
-      r-model:grouping="$data.grouping"
+      r-model:grouping="$data.groupingModel"
       @group-change="onGroupingChange($event)"
     >
       <Column field="region"   header="Region" />
