@@ -264,7 +264,7 @@ describe('inlineScriptPartials', () => {
   // remains recoverable (D-01: file+line). SKIPPED in Plan 01: un-skip in Plan 02
   // after normalizeSplicedEmitLines lands. extra.__roziePartialOrigin does not
   // exist yet, so this would fail today.
-  it.skip('R7-line: a spliced statement carries its .rzts origin LINE on extra.__roziePartialOrigin while loc.start.line is host-contiguous', async () => {
+  it('R7-line: a spliced statement carries its .rzts origin LINE on extra.__roziePartialOrigin while loc.start.line is host-contiguous', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     // `usedName` sits on partial-local line 2 (a leading helper occupies line 1).
     const ORIGIN_LINE = 2;
@@ -306,6 +306,54 @@ describe('inlineScriptPartials', () => {
       // (4) the EMIT line was normalized to a host-contiguous value — proving the
       // decoupling (it is NOT the partial-local origin line anymore).
       expect(inlined?.loc?.start.line).not.toBe(ORIGIN_LINE);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // Clone-survival (Phase 55, Pitfall 4) — each per-target emitter deep-clones the
+  // program (`t.cloneNode(node, /*deep*/ true)`) before serialization. The
+  // host-contiguous `loc`, the attached comments, AND the stashed
+  // `extra.__roziePartialOrigin` (Plan 03's map-line-restore anchor) must all
+  // survive that clone; a shallow clone that strips `extra` would lose the
+  // origin. Assert on a spliced node carrying a comment.
+  it('clone-survival: t.cloneNode(spliced, true) preserves loc, attached comments, and extra.__roziePartialOrigin', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    // `helper` is a NON-exported closure decl on partial-local line 1 carrying a
+    // trailing comment ON THE BARE declaration (so it survives the export-unwrap
+    // independent of comment-transfer) — the spliced node we clone.
+    const partial = stagePartial(
+      'logic.rzts',
+      [
+        `const helper = (n) => n + 1; // helper-trailing-marker`,
+        `export const usedName = $computed(() => helper($props.value));`,
+      ].join('\n'),
+    );
+    try {
+      const host = moduleFile(
+        [`const padA = 1;`, `import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const helperDecl = bodyOf(result.ast ?? host).find(
+        (s) =>
+          s.type === 'VariableDeclaration' &&
+          s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === 'helper'),
+      );
+      expect(helperDecl).toBeDefined();
+      const cloned = t.cloneNode(helperDecl as Statement, /*deep*/ true);
+      // (1) loc (filename + the rewritten host-contiguous line) survives the deep clone.
+      expect(cloned.loc?.filename).toContain('logic.rzts');
+      expect(cloned.loc?.start.line).toBe(helperDecl?.loc?.start.line);
+      // (2) extra.__roziePartialOrigin (the .rzts origin LINE) survives the clone.
+      const origin = (
+        cloned.extra as { __roziePartialOrigin?: { line?: number; filename?: string } } | undefined
+      )?.__roziePartialOrigin;
+      expect(origin?.line).toBe(1);
+      expect(origin?.filename ?? '').toContain('logic.rzts');
+      // (3) the attached trailing comment survives the deep clone.
+      expect(
+        (cloned.trailingComments ?? []).some((c) => c.value.includes('helper-trailing-marker')),
+      ).toBe(true);
     } finally {
       partial.dispose();
     }
