@@ -96,3 +96,40 @@ describe('Phase 54 — inline-vs-partial byte-identity', () => {
     });
   });
 });
+
+/**
+ * Phase 55 (script-partial-literal-byte-identity) — LITERAL byte-identity gate.
+ *
+ * The Phase 54 oracle above uses COMMENT-FREE helpers, so it stays 6/6 green with
+ * or without the emit-line decoupling and CANNOT catch the comment/blank-line
+ * drift this phase exists to close (Research Pitfall 3). This describe pins the
+ * comment-bearing pair:
+ *
+ *   • examples/PartialInlineHostC.rozie — imports `{ usedName }` from the sibling
+ *     ./partialLogicC.rzts (the compiler inlines it pre-lowering); the partial
+ *     carries leading / between-statement / trailing comments on its surviving
+ *     declarations.
+ *   • examples/InlineEquivHostC.rozie — the SAME logic + comments written inline.
+ *
+ * We reuse `normalizeName` VERBATIM — it canonicalizes only the three
+ * content-INDEPENDENT identity tokens (PascalCase name, `rozie-<kebab>` selector,
+ * `data-rozie-s-<hash>`), so any comment/blank-line drift in the spliced script
+ * still surfaces as a byte diff and fails. normalizeName is NOT loosened.
+ *
+ * SKIPPED in Plan 01: un-skip in Plan 02 after normalizeSplicedEmitLines lands —
+ * this is the literal byte-identity gate (comments/blank lines INCLUDED) that
+ * fails today. The HostC fixtures are not yet blessed (Plan 02 blesses them after
+ * the seam), so loadFixture would also miss until then.
+ */
+const PARTIAL_HOST_C = 'PartialInlineHostC';
+const INLINE_HOST_C = 'InlineEquivHostC';
+
+describe.skip('Phase 55 — comment-bearing inline-vs-partial literal byte-identity', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('comment-bearing partial-inlined host === inline-equivalent host (literal, comments/blank lines included)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_C, target), PARTIAL_HOST_C);
+      const inline = normalizeName(loadFixture(INLINE_HOST_C, target), INLINE_HOST_C);
+      expect(partial).toBe(inline);
+    });
+  });
+});

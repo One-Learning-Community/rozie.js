@@ -1,0 +1,43 @@
+<!--
+  PartialInlineHostC.rozie — Phase 55 COMMENT-BEARING host that imports a .rzts partial.
+
+  The <script lang="ts"> imports `{ usedName }` from ./partialLogicC.rzts; the
+  compiler inlines that exported $computed (plus its transitive `double` helper
+  and the hoisted `clamp` value import) into THIS component's script before
+  lowering. The unused `neverUsed` export is tree-shaken.
+
+  Unlike the Phase 54 PartialInlineHost pair, partialLogicC.rzts carries
+  leading / between-statement / trailing comments on its SURVIVING declarations.
+  Paired with InlineEquivHostC.rozie (the same logic + comments written inline) —
+  their emitted output MUST be LITERAL byte-identical (comments AND blank lines
+  included) on all six targets once the Phase 55 emit-line decoupling lands. That
+  is the gate that fails today and the comment-free pair cannot catch.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute
+  that the byte-identity oracle (which normalizes ONLY the component name) could
+  not reconcile against InlineEquivHostC. This fixture proves SCRIPT inline
+  parity, not styling.
+
+  References ./partialLogicC.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostC">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { usedName } from './partialLogicC.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedName }}</span>
+</div>
+</template>
+
+</rozie>

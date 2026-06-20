@@ -1,0 +1,26 @@
+// partialLogicC.rzts — Phase 55 COMMENT-BEARING script-partial fixture.
+//
+// Mirrors partialLogic.rzts (hoisted value import + transitive helper + used
+// $computed export + tree-shaken unused export) but carries comments ON THE
+// SURVIVING declarations so the inline splice exercises @babel/generator's
+// comment-adjacency + blank-line math at the host↔partial boundary — the exact
+// path the comment-FREE oracle (partialLogic.rzts) cannot reach:
+//
+//   • a BETWEEN-STATEMENT block comment between two retained declarations
+//     (the hoisted `clamp` import and the `double` helper);
+//   • a LEADING line comment immediately above the used `usedName` export;
+//   • a TRAILING line comment on the retained `double` helper.
+//
+// Comments on the tree-shaken `neverUsed` export legitimately vanish, so it
+// carries none. The hoisted import keeps its single-quoted source (the
+// `extra.raw` preservation path proven in 54-05).
+
+import { clamp } from './partial-helpers.js';
+
+/* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
+const double = (n: number): number => n * 2; // trailing: doubles its input
+
+// leading: the used $computed export (comment immediately above)
+export const usedName = $computed(() => clamp(double($props.base)));
+
+export const neverUsed = $computed(() => $props.base * 999);

@@ -1,0 +1,45 @@
+<!--
+  InlineEquivHostC.rozie — Phase 55 COMMENT-BEARING byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostC.rozie inlines from
+  ./partialLogicC.rzts, written inline in this component's own <script lang="ts">:
+  the hoisted `clamp` value import, the transitive `double` helper, and the
+  `usedName` $computed — WITH the identical leading / between-statement / trailing
+  comments in the identical relative positions. The unused `neverUsed` export does
+  NOT appear here (it is tree-shaken from the partial path too), so its (absent)
+  comments are absent here as well.
+
+  The <template> is byte-identical to PartialInlineHostC.rozie. The emitted output
+  of the two hosts MUST match — LITERALLY, comments and blank lines included — on
+  all six targets after normalizing only the component identifier token
+  (PartialInlineHostC ↔ InlineEquivHostC), once the Phase 55 emit-line decoupling
+  lands. This is the literal byte-identity oracle.
+
+  No <style> block — see the PartialInlineHostC.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostC">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { clamp } from './partial-helpers.js';
+
+/* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
+const double = (n: number): number => n * 2; // trailing: doubles its input
+
+// leading: the used $computed export (comment immediately above)
+const usedName = $computed(() => clamp(double($props.base)));
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedName }}</span>
+</div>
+</template>
+
+</rozie>

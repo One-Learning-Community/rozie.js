@@ -276,6 +276,19 @@ const EXAMPLES = [
   // the pass, runs bootstrap, and un-skips the parity test.
   'PartialInlineHost',
   'InlineEquivHost',
+  // Phase 55 (script-partial-literal-byte-identity) — the COMMENT-BEARING
+  // analog of the PartialInlineHost/InlineEquivHost pair. partialLogicC.rzts
+  // carries leading / between-statement / trailing comments on its surviving
+  // declarations, so the inline splice exercises @babel/generator's
+  // comment-adjacency + blank-line math at the host↔partial boundary — the path
+  // the comment-FREE Phase 54 pair cannot reach. PartialInlineHostC references a
+  // sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below;
+  // InlineEquivHostC is single-file and stays OUT of RESOLVER_ROOT.
+  // NOTE: these fixtures are NOT blessed in Plan 01 (no committed per-target
+  // output) — the literal byte-identity drift would be baked in today. Plan 02
+  // lands normalizeSplicedEmitLines, then blesses + un-skips the parity gate.
+  'PartialInlineHostC',
+  'InlineEquivHostC',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -312,6 +325,13 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // only via inline — it is NOT itself an EXAMPLES entry and stays OUT of
   // RESOLVER_ROOT. The single-file InlineEquivHost oracle also stays OUT.
   'PartialInlineHost',
+  // Phase 55 — references ./partialLogicC.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling comment-bearing partial at
+  // compile/inline time (same pattern as PartialInlineHost). The .rzts partial
+  // is a LEAF source consumed only via inline — it is NOT an EXAMPLES entry and
+  // stays OUT of RESOLVER_ROOT. The single-file InlineEquivHostC oracle also
+  // stays OUT.
+  'PartialInlineHostC',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
