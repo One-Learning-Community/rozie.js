@@ -26,7 +26,7 @@ import type { File, Program, Statement } from '@babel/types';
 import * as t from '@babel/types';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const LOC = { start: 0, end: 0 };
 
@@ -131,7 +131,7 @@ describe('inlineScriptPartials', () => {
   // R4 — import hoist + dedup. Partial top-level ImportDeclarations are hoisted
   // to the host and deduped by the (source, importKind, imported/local,
   // default/namespace) tuple; aliases are preserved.
-  it.skip('R4: hoists + dedups partial top-level imports by (source, kind, name) tuple, preserving aliases', async () => {
+  it('R4: hoists + dedups partial top-level imports by (source, kind, name) tuple, preserving aliases', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     const partial = stagePartial(
       'logic.rzts',
@@ -166,18 +166,23 @@ describe('inlineScriptPartials', () => {
   // R5 — recursion + cycle detection. A 2-level partial chain inlines fully; an
   // import CYCLE pushes a clean diagnostic (no stack overflow). The exact code
   // is ROZ140-adjacent; left as a TODO until Wave 3 assigns the canonical value.
-  it.skip('R5: inlines a 2-level partial chain; an import cycle pushes a clean diagnostic (no stack overflow)', async () => {
+  it('R5: inlines a 2-level partial chain; an import cycle pushes a clean diagnostic (no stack overflow)', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
-    // TODO(Wave 3): import the canonical cycle diagnostic constant from
-    // ../../diagnostics/codes.js once it is assigned (ROZ140-adjacent).
-    const CYCLE_DIAGNOSTIC_CODE = 'ROZ140'; // TODO(Wave 3): replace with RozieErrorCode constant
-    const a = stagePartial('a.rzts', `import { b } from './b.rzts';\nexport const a = $computed(() => b);`);
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const CYCLE_DIAGNOSTIC_CODE = RozieErrorCode.PARTIAL_INLINE_CYCLE;
+    // a.rzts imports b from a sibling b.rzts (a real 2-level chain); both staged
+    // in the SAME tmp dir so `./b.rzts` resolves.
+    const a = stagePartial('a.rzts', `import { b } from './b.rzts';\nexport const a = $computed(() => b + 1);`);
+    writeFileSync(join(dirname(a.path), 'b.rzts'), `export const b = $computed(() => 1);`, 'utf8');
     const cyclic = stagePartial('cyclic.rzts', `import { self } from './cyclic.rzts';\nexport const self = 1;`);
     try {
       const host = moduleFile(`import { a } from '${a.path.replace(/\\/g, '\\\\')}';`);
       const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
-      // 2-level chain inlines without throwing.
+      // 2-level chain inlines without throwing — both `a` and `b` land in the body.
       expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const text = JSON.stringify(bodyOf(result.ast ?? host));
+      expect(text).toContain('"name":"a"');
+      expect(text).toContain('"name":"b"');
 
       const cyclicHost = moduleFile(`import { self } from '${cyclic.path.replace(/\\/g, '\\\\')}';`);
       const cyclicResult = inlineScriptPartials(cyclicHost, { hostFilename: 'Host.rozie' });

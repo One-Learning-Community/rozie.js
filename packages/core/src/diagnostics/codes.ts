@@ -382,6 +382,30 @@ export const RozieErrorCode = {
   // for both compile() and @rozie/unplugin (both route through lowerToIR).
   // ROZ138 is the next free code after ROZ137 in the 100 authoring cluster.
   REACT_STALE_READ: 'ROZ138', // warn — read of $data/$model/$props.x dominated by an earlier write to the same key in one function body; React setState is async so the read binds the pre-write value. Capture the fresh local instead.
+  // Phase 54 (R6, D-04) — a `.rzts`/`.rzjs` script-partial inlined declaration
+  // whose name equals an EXISTING host-<script> top-level binding OR a name
+  // already inlined from an EARLIER partial. The splice lands in host scope, so
+  // two same-named top-level declarations would emit structurally-invalid code
+  // (`const value` twice). This is a LEXICAL collision and a HARD error — the
+  // colliding declaration is dropped from the splice and ROZ139 is collected
+  // with a `related` frame citing BOTH the existing site and the partial site.
+  // DISTINCT from expose/emit MERGED-surface collisions (ROZ137/ROZ138/*-change),
+  // which already run post-splice over the merged program inside lowerToIR
+  // (deconflictStateExposeCollision) — do NOT duplicate those here.
+  // Emitted from inlineScriptPartials (ir/inlineScriptPartials.ts), which runs
+  // as the first statement of lowerToIR for both compile() and @rozie/unplugin.
+  // ROZ139 is the next free code after ROZ138 in the 100 authoring cluster.
+  PARTIAL_INLINE_COLLISION: 'ROZ139', // error — an inlined .rzts/.rzjs declaration name collides with a host binding or an already-inlined partial name; rename one. Frame cites both sites.
+  // Phase 54 (R5, T-54-03 DoS mitigation) — a script-partial import CYCLE: a
+  // `.rzts`/`.rzjs` partial that (transitively) imports itself. Detected via a
+  // fresh `visiting` Set<resolvedPath> per inlineScriptPartials invocation; when
+  // a resolution re-enters a path already on the recursion stack the cycle is
+  // reported and recursion terminates — never recurses to a stack overflow at
+  // compile time (the only attack surface; no runtime surface). Diamond imports
+  // (the same partial reached twice via distinct paths) are NOT a cycle — they
+  // dedup once by resolved path (D-03). Emitted from inlineScriptPartials.
+  // ROZ140 is the next free code after ROZ139 in the 100 authoring cluster.
+  PARTIAL_INLINE_CYCLE: 'ROZ140', // error — a .rzts/.rzjs script partial (transitively) imports itself; the cycle is broken and reported instead of overflowing the stack.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
