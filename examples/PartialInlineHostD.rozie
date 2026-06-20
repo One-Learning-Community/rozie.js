@@ -1,0 +1,44 @@
+<!--
+  PartialInlineHostD.rozie — Phase 55 quick-task (WR-01) heterogeneous-block host.
+
+  The <script lang="ts"> imports `{ outer }` from ./partialOuterD.rzts. Inlining
+  that partial exercises the heterogeneous-block path WR-01 regressed:
+    • partialOuterD FRESHLY HOISTS `{ clampD }` from ./wr01-helpers.js (a plain .js
+      module the host does NOT import) into the host import region, AND
+    • it imports `{ inner }` from ./partialInnerD.rzts (a partial-of-partial), so a
+      nested-file decl is spliced ahead of the parent-file `outer` decl.
+  Under the pre-fix single-offset block these distinct line-spaces collapsed into
+  one hoist-anchored offset, over-shifting the first spliced decl and corrupting the
+  nested↔parent boundary — a spurious blank line on whole-program targets (Solid).
+
+  Paired with InlineEquivHostD.rozie (the SAME logic + fresh hoist + nested helper
+  written inline) — their emitted output MUST be byte-identical on all six targets
+  after normalizing only the component identifier token. This is the Solid-exercising
+  permanent byte-identity regression the WR-01 fix is gated by.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived, so a
+  style block would inject a name-divergent attribute the byte-identity oracle (which
+  normalizes ONLY the component name) could not reconcile against InlineEquivHostD.
+
+  References ./partialOuterD.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostD">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { outer } from './partialOuterD.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ outer }}</span>
+</div>
+</template>
+
+</rozie>

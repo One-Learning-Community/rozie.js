@@ -1,0 +1,14 @@
+// partialOuterD.rzts — Phase 55 quick-task (WR-01) heterogeneous parent partial.
+//
+// Combines the two shapes WR-01 regresses in ONE splice:
+//   1. a FRESH module hoist — `{ clampD }` from a plain `.js` module the host does
+//      NOT already import (emitted at the host import region / file top), and
+//   2. a NESTED partial — `{ inner }` from ./partialInnerD.rzts (a partial-of-
+//      partial whose decl lives in a different source-file line-space).
+// `outer` consumes both. PartialInlineHostD.rozie imports `{ outer }` from here;
+// the inlined output MUST be byte-identical to InlineEquivHostD.rozie (the same
+// logic written inline) on all six targets — Solid included (whole-program emit,
+// the target whose blank-line math the pre-fix over-shift broke).
+import { clampD } from './wr01-helpers.js';
+import { inner } from './partialInnerD.rzts';
+export const outer = $computed(() => clampD(inner + $props.base));

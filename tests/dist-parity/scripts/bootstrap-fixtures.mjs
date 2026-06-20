@@ -289,6 +289,18 @@ const EXAMPLES = [
   // lands normalizeSplicedEmitLines, then blesses + un-skips the parity gate.
   'PartialInlineHostC',
   'InlineEquivHostC',
+  // Phase 55 quick-task (WR-01) — the HETEROGENEOUS-BLOCK analog of the
+  // PartialInlineHost pairs. partialOuterD.rzts FRESHLY HOISTS `{ clampD }` from a
+  // plain .js module the host does NOT import AND imports `{ inner }` from a nested
+  // ./partialInnerD.rzts (a partial-of-partial), so the inline splice mixes a
+  // file-top hoist with decls from two different source files — the shape the
+  // pre-fix single-offset block over-shifted (a spurious blank line on whole-program
+  // targets like Solid). PartialInlineHostD references siblings and is added to
+  // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostD is single-file and stays
+  // OUT. The .rzts/.js partials are LEAF sources consumed only via inline — not
+  // EXAMPLES entries.
+  'PartialInlineHostD',
+  'InlineEquivHostD',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -332,6 +344,13 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // stays OUT of RESOLVER_ROOT. The single-file InlineEquivHostC oracle also
   // stays OUT.
   'PartialInlineHostC',
+  // Phase 55 quick-task (WR-01) — references ./partialOuterD.rzts (which in turn
+  // references ./partialInnerD.rzts and ./wr01-helpers.js); needs resolver root so
+  // the ProducerResolver locates the sibling partials at compile/inline time. The
+  // .rzts/.js partials are LEAF sources consumed only via inline — NOT EXAMPLES
+  // entries and OUT of RESOLVER_ROOT. The single-file InlineEquivHostD oracle also
+  // stays OUT.
+  'PartialInlineHostD',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

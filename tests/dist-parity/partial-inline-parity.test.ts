@@ -133,3 +133,38 @@ describe('Phase 55 — comment-bearing inline-vs-partial literal byte-identity',
     });
   });
 });
+
+/**
+ * Phase 55 quick-task (WR-01) — HETEROGENEOUS-BLOCK literal byte-identity gate.
+ *
+ * The Phase 54/55 pairs above each splice a FLAT partial whose imports are either
+ * already in the host (zero fresh hoists) or trivially contiguous with its decls,
+ * so neither catches the WR-01 over-shift: a single SplicedEmitBlock that groups a
+ * FRESH file-top hoist together with decls from TWO different source files (a
+ * partial-of-partial) under ONE constant offset. On whole-program targets (Solid),
+ * whose blank-line math reads `loc` deltas across the entire program, that
+ * over-shifts the first spliced decl and corrupts the nested↔parent boundary —
+ * inserting a spurious blank line the inline oracle does not have.
+ *
+ *   • examples/PartialInlineHostD.rozie — imports `{ outer }` from
+ *     ./partialOuterD.rzts, which freshly hoists `{ clampD }` from a plain .js
+ *     module AND imports `{ inner }` from ./partialInnerD.rzts (nested).
+ *   • examples/InlineEquivHostD.rozie   — the SAME logic + fresh hoist + nested
+ *     helper written inline (the byte-identity oracle).
+ *
+ * Reuses `normalizeName` VERBATIM (only the three content-INDEPENDENT identity
+ * tokens are canonicalized), so the spurious blank line still surfaces as a byte
+ * diff and fails. Solid is the load-bearing cell; all six are asserted.
+ */
+const PARTIAL_HOST_D = 'PartialInlineHostD';
+const INLINE_HOST_D = 'InlineEquivHostD';
+
+describe('WR-01 — heterogeneous-block (fresh hoist + nested partial) literal byte-identity', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('heterogeneous-block partial-inlined host === inline-equivalent host (literal, Solid included)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_D, target), PARTIAL_HOST_D);
+      const inline = normalizeName(loadFixture(INLINE_HOST_D, target), INLINE_HOST_D);
+      expect(partial).toBe(inline);
+    });
+  });
+});

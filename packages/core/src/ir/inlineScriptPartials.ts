@@ -331,15 +331,29 @@ interface PartialEmitOrigin {
 type WithPartialOrigin = { __roziePartialOrigin?: PartialEmitOrigin };
 
 /**
- * A contiguous group of spliced nodes that share ONE constant emit-line offset.
- * `nodes` lists this partial's freshly-hoisted imports FIRST, then its closure
- * declarations (the .rzts-earliest node anchors the offset), so the whole group
- * reproduces the partial's intra-file relative line layout at host-contiguous
- * positions — which is exactly the inline-authored form (byte-identity).
+ * A contiguous run of spliced nodes that share ONE constant emit-line offset and
+ * therefore preserve their intra-run relative line deltas.
+ *
+ * WR-01 split model: a single splice site no longer produces ONE block spanning
+ * `[...newHoists, ...spliced]`. Heterogeneous nodes live in DIFFERENT line-spaces
+ * — a freshly-hoisted import emits at the FILE TOP (the import region), while a
+ * nested-partial decl and the parent-partial decl that consumes it come from two
+ * DIFFERENT source files. Grouping them under one hoist-anchored offset over-shifts
+ * the first body decl by the partial's import-section height and corrupts the
+ * nested↔parent boundary delta (only visible on whole-program targets like Solid,
+ * whose blank-line math reads `loc` deltas across the whole program). Instead each
+ * splice emits:
+ *  - ONE block per freshly-hoisted import (a single ImportDeclaration), anchored
+ *    CONTIGUOUSLY in the import region (no blank line between consecutive imports);
+ *  - ONE block per MAXIMAL contiguous same-source-file decl run, anchored
+ *    SEQUENTIALLY in the body (one blank line below the preceding statement), so a
+ *    nested-partial (file-B) decl run flows one blank line below the parent
+ *    (file-A) decl run — exactly the inline-authored layout (byte-identity).
  */
 interface SplicedEmitBlock {
   nodes: t.Node[];
-  /** Host line the group's first (.rzts-earliest) node should emit-anchor to. */
+  /** Host line this run should emit-anchor to when it is the FIRST walked block
+   *  (no preceding statement to flow below). */
   anchorLine: number;
 }
 
@@ -431,10 +445,22 @@ function blockFirstEmitLine(firstNode: t.Node): number {
   return firstLeading ? firstLeading.start.line : firstNode.loc!.start.line;
 }
 
-/** Shift every node + attached comment in a block by `offset`, deduping on the
- *  underlying `Position` objects (see {@link shiftPositionLine}). Never throws. */
-function shiftBlock(block: SplicedEmitBlock, offset: number): void {
-  const shifted = new Set<object>();
+/**
+ * Shift every node + attached comment in a block by `offset`, deduping on the
+ * underlying `Position` objects (see {@link shiftPositionLine}). Never throws.
+ *
+ * WR-01: `shifted` is supplied by the CALLER and SHARED across every block in one
+ * normalize pass. A between-statement comment can be aliased across two blocks —
+ * `@babel/parser` attaches the comment between a hoisted import and the first decl
+ * to BOTH the import's `trailingComments` and the decl's `leadingComments` (the
+ * SAME `Position` objects). When the hoist and that decl run land in separate
+ * blocks, a per-block `shifted` set would shift the aliased comment TWICE (once per
+ * block), corrupting its emit line. A shared set shifts each unique `Position`
+ * exactly once. The adjacent hoist/decl offsets are equal by construction (the
+ * sequential decl anchor is derived from the shifted hoist end + the same gap the
+ * partial's import→decl delta encodes), so first-touch-wins is the correct offset.
+ */
+function shiftBlock(block: SplicedEmitBlock, offset: number, shifted: Set<object>): void {
   for (const top of block.nodes) {
     stashAndShiftNode(top, offset, shifted);
     shiftAttachedComments(top, offset, shifted);
@@ -471,13 +497,33 @@ function shiftBlock(block: SplicedEmitBlock, offset: number): void {
  *
  * SEQUENTIAL ANCHOR (Phase 55-04): each block's first emitted line (its banner
  * comment, else its first node) is anchored ONE blank line below the PRECEDING
- * statement in the final residual body. Anchoring every block at its own replaced
- * import line (Plan 02's approach) collapsed multi-partial hosts: three consecutive
+ * statement in the final body. Anchoring every block at its own replaced import
+ * line (Plan 02's approach) collapsed multi-partial hosts: three consecutive
  * mid-body imports made expand/group/facet pile onto adjacent host lines, so each
  * 30-45-line block overlapped the next and the partial↔partial comment deltas went
  * negative (`}; // banner` collapse). Flowing the blocks sequentially reproduces the
  * inline-authored contiguous layout. The first block (or any block preceded only by
  * un-located content) falls back to its replaced import's host line.
+ *
+ * WR-01 (whole-program byte-identity): the walk runs over the FULL emit body
+ * (`[...hoistImports, ...residualBody]`), NOT just the residual body, so a
+ * freshly-hoisted import flows in true emit order ahead of the decls. Consecutive
+ * IMPORT blocks anchor CONTIGUOUSLY (gap 1 — no blank between imports); every other
+ * run anchors one blank line below the preceding statement (gap 2). Because each
+ * source-file decl run is now its OWN block (see {@link SplicedEmitBlock}), a
+ * nested-partial decl run flows one blank line below the parent decl run rather than
+ * inheriting the hoist's incommensurate file-top offset.
+ *
+ * TWO PASSES (WR-01): a between-statement comment is aliased across blocks — the
+ * `Position` that is a hoisted import's `trailingComments[i]` is the SAME object as
+ * the next decl's `leadingComments[i]`. If offsets were applied while walking, the
+ * hoist block would shift that comment, and the decl block's `blockFirstEmitLine`
+ * would then read the ALREADY-SHIFTED comment line and derive a wrong offset
+ * (collapsing the comment onto the decl). So PASS 1 MEASURES every block's offset
+ * from ORIGINAL (unmutated) lines, tracking the running emit end arithmetically;
+ * PASS 2 MUTATES, applying every offset with ONE shared dedup set so each aliased
+ * `Position` shifts exactly once (adjacent hoist/decl offsets are equal by
+ * construction, so first-touch-wins is the correct line).
  *
  * Runs AFTER all diagnostics are collected (they captured true `.rzts` byte loc via
  * `nodeLoc`, which reads `node.start`/`node.end`, NOT `loc.{line,column}`), so the
@@ -488,37 +534,57 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   // walking the body in emit order.
   const nodeToBlock = new Map<t.Node, SplicedEmitBlock>();
   for (const b of blocks) for (const n of b.nodes) nodeToBlock.set(n, b);
-  const processed = new Set<SplicedEmitBlock>();
+  const measured = new Set<SplicedEmitBlock>();
 
-  // `prevEnd` tracks the emit end line of the previously walked statement (after any
-  // shift), so each block anchors one blank line below it.
+  // PASS 1 — MEASURE. Compute each block's constant offset from ORIGINAL lines
+  // (nothing mutated yet) and accumulate the plan; `prevEnd` tracks the running
+  // emit end line ARITHMETICALLY (maxOriginalEnd + offset), never by reading a
+  // mutated `loc`, so an aliased comment a prior block will shift cannot perturb a
+  // later block's anchor. `prevWasImport` lets consecutive imports flow contiguously.
+  const plan: Array<{ block: SplicedEmitBlock; offset: number }> = [];
   let prevEnd = 0;
+  let prevWasImport = false;
   for (const stmt of body) {
     const block = nodeToBlock.get(stmt);
     if (block) {
-      if (processed.has(block)) continue;
-      processed.add(block);
+      if (measured.has(block)) continue;
+      measured.add(block);
       const firstNode = block.nodes.find((n) => n.loc);
       if (!firstNode?.loc) continue;
-      const anchorLine = prevEnd > 0 ? prevEnd + 2 : block.anchorLine;
-      shiftBlock(block, anchorLine - blockFirstEmitLine(firstNode));
-      let blockEnd = prevEnd;
-      for (const n of block.nodes) if (n.loc) blockEnd = Math.max(blockEnd, n.loc.end.line);
-      prevEnd = blockEnd;
+      // A hoist block is a single ImportDeclaration. Consecutive import blocks flow
+      // CONTIGUOUSLY (gap 1 — imports carry no inter-statement blank line); every
+      // other run flows one blank line below the preceding statement (gap 2).
+      const isImportBlock = t.isImportDeclaration(block.nodes[0] as t.Node);
+      const gap = isImportBlock && prevWasImport ? 1 : 2;
+      const anchorLine = prevEnd > 0 ? prevEnd + gap : block.anchorLine;
+      const offset = anchorLine - blockFirstEmitLine(firstNode);
+      let maxEnd = 0;
+      for (const n of block.nodes) if (n.loc) maxEnd = Math.max(maxEnd, n.loc.end.line);
+      prevEnd = maxEnd + offset;
+      prevWasImport = isImportBlock;
+      plan.push({ block, offset });
       continue;
     }
-    if (stmt.loc) prevEnd = stmt.loc.end.line;
+    if (stmt.loc) {
+      prevEnd = stmt.loc.end.line;
+      prevWasImport = t.isImportDeclaration(stmt);
+    }
   }
 
-  // Safety net: any block not reached via the body walk (e.g. hoisted-import-only
-  // groups that live at the body top, outside the residual body) still gets its
-  // original import-line anchor so nothing is left un-normalized.
+  // Safety net: any block not reached via the body walk keeps its own import-line
+  // anchor so nothing is left un-normalized (still measured against original lines).
   for (const block of blocks) {
-    if (processed.has(block)) continue;
+    if (measured.has(block)) continue;
+    measured.add(block);
     const firstNode = block.nodes.find((n) => n.loc);
     if (!firstNode?.loc) continue;
-    shiftBlock(block, block.anchorLine - blockFirstEmitLine(firstNode));
+    plan.push({ block, offset: block.anchorLine - blockFirstEmitLine(firstNode) });
   }
+
+  // PASS 2 — MUTATE. Apply every measured offset with ONE shared dedup set so a
+  // `Position` aliased across blocks shifts exactly once.
+  const shifted = new Set<object>();
+  for (const { block, offset } of plan) shiftBlock(block, offset, shifted);
 }
 
 /** Build the named imported-name list for a (host or nested) partial import. */
@@ -1019,16 +1085,35 @@ export function inlineScriptPartials(
       splicedAbs.add(absPath);
       const unionNames = hostPartialNames.get(absPath) ?? namedImports(stmt);
       // Phase 55: snapshot the hoist list around this splice so THIS partial's
-      // freshly-hoisted imports share one emit-line offset with its spliced decls
-      // (preserving the .rzts relative layout → byte-identity with inline form).
+      // freshly-hoisted imports can be re-anchored independently of its decls.
       const hoistBefore = ctx.hoistImports.length;
       const spliced = inlineResolvedPartial(absPath, unionNames, stmt, fromFile, ctx);
       const newHoists = ctx.hoistImports.slice(hoistBefore);
-      if (stmt.loc && (spliced.length > 0 || newHoists.length > 0)) {
-        splicedBlocks.push({
-          nodes: [...newHoists, ...spliced],
-          anchorLine: stmt.loc.start.line,
-        });
+      if (stmt.loc) {
+        const anchorLine = stmt.loc.start.line;
+        // WR-01: do NOT group file-top hoists with body decls (and do NOT group
+        // decls from different source files) under one constant offset. Emit each
+        // freshly-hoisted import as its OWN block (anchored contiguously in the
+        // import region) and each MAXIMAL contiguous same-source-file decl run as
+        // its own block (anchored sequentially in the body). A nested-partial
+        // (file-B) decl run then flows one blank line below the parent (file-A)
+        // decl run instead of inheriting the hoist's incommensurate line-space.
+        for (const hoist of newHoists) {
+          splicedBlocks.push({ nodes: [hoist], anchorLine });
+        }
+        let runStart = 0;
+        while (runStart < spliced.length) {
+          const fname = spliced[runStart]!.loc?.filename ?? null;
+          let runEnd = runStart + 1;
+          while (
+            runEnd < spliced.length &&
+            (spliced[runEnd]!.loc?.filename ?? null) === fname
+          ) {
+            runEnd++;
+          }
+          splicedBlocks.push({ nodes: spliced.slice(runStart, runEnd), anchorLine });
+          runStart = runEnd;
+        }
       }
       newBody.push(...spliced);
     } else {
@@ -1044,8 +1129,9 @@ export function inlineScriptPartials(
   // origin on `extra.__roziePartialOrigin`. Runs LAST so all diagnostics kept
   // their true `.rzts` loc (Pitfall 1). Decouples generator spacing from the
   // source-map origin (D-01: filename preserved, line recoverable). Walks the
-  // residual body (no hoisted imports) so blocks anchor SEQUENTIALLY in emit order.
-  normalizeSplicedEmitLines(newBody, splicedBlocks);
+  // FULL emit body (hoisted imports INCLUDED — WR-01) so hoists flow in true emit
+  // order ahead of the decls and each source-file run anchors SEQUENTIALLY.
+  normalizeSplicedEmitLines(file.program.body, splicedBlocks);
 
   return { ast: file, diagnostics };
 }

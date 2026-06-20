@@ -1,0 +1,41 @@
+<!--
+  InlineEquivHostD.rozie — Phase 55 quick-task (WR-01) byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostD.rozie inlines from
+  ./partialOuterD.rzts (+ its nested ./partialInnerD.rzts), written inline in this
+  component's own <script lang="ts">: the freshly-hoisted `clampD` value import, the
+  nested `inner` $computed, and the `outer` $computed that consumes both — in the
+  identical relative positions (one blank line between the import block and each
+  top-level decl).
+
+  The <template> is byte-identical to PartialInlineHostD.rozie. The emitted output
+  of the two hosts MUST match on all six targets (Solid included) after normalizing
+  only the component identifier token (PartialInlineHostD ↔ InlineEquivHostD). This
+  is the inline oracle for the WR-01 heterogeneous-block byte-identity gate.
+
+  No <style> block — see the PartialInlineHostD.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostD">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { clampD } from './wr01-helpers.js';
+
+const inner = $computed(() => $props.base + 10);
+
+const outer = $computed(() => clampD(inner + $props.base));
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ outer }}</span>
+</div>
+</template>
+
+</rozie>
