@@ -297,6 +297,134 @@ function hoistSpecifier(
   ctx.hoistImports.push(decl);
 }
 
+/**
+ * The `.rzts` origin stashed on a spliced node/comment BEFORE its emit-position
+ * line is normalized to a host-contiguous value (Phase 55). Plan 03 reads this
+ * parallel channel to restore strict source-map LINE fidelity; `loc.filename`
+ * (R7 file origin) is preserved on `loc` itself and never moves here.
+ */
+interface PartialEmitOrigin {
+  line: number;
+  column: number;
+  filename?: string;
+}
+
+/** A `node`/`comment` that may carry a stashed {@link PartialEmitOrigin}. */
+type WithPartialOrigin = { __roziePartialOrigin?: PartialEmitOrigin };
+
+/**
+ * A contiguous group of spliced nodes that share ONE constant emit-line offset.
+ * `nodes` lists this partial's freshly-hoisted imports FIRST, then its closure
+ * declarations (the .rzts-earliest node anchors the offset), so the whole group
+ * reproduces the partial's intra-file relative line layout at host-contiguous
+ * positions — which is exactly the inline-authored form (byte-identity).
+ */
+interface SplicedEmitBlock {
+  nodes: t.Node[];
+  /** Host line the group's first (.rzts-earliest) node should emit-anchor to. */
+  anchorLine: number;
+}
+
+/**
+ * Stash a node's `.rzts` origin (once, idempotent) then shift its `loc` lines by
+ * `offset`. Byte offsets (`loc.start.index`/`loc.end.index`) and `loc.filename`
+ * are NEVER touched. `seen` dedupes shared `loc` objects so a comment attached to
+ * two adjacent statements is shifted exactly once (Pitfall 2). Never throws (D-04).
+ */
+function stashAndShiftNode(node: t.Node, offset: number, seen: Set<object>): void {
+  const loc = node.loc;
+  if (!loc || seen.has(loc)) return;
+  seen.add(loc);
+  const extra = (node.extra ?? {}) as Record<string, unknown>;
+  if (!('__roziePartialOrigin' in extra)) {
+    node.extra = {
+      ...extra,
+      __roziePartialOrigin: {
+        line: loc.start.line,
+        column: loc.start.column,
+        filename: loc.filename,
+      } satisfies PartialEmitOrigin,
+    };
+  }
+  loc.start.line += offset;
+  loc.end.line += offset;
+}
+
+/** As {@link stashAndShiftNode} but for a comment (origin stashed on the comment). */
+function stashAndShiftComment(comment: t.Comment, offset: number, seen: Set<object>): void {
+  const loc = comment.loc;
+  if (!loc || seen.has(loc)) return;
+  seen.add(loc);
+  const c = comment as t.Comment & WithPartialOrigin;
+  if (c.__roziePartialOrigin === undefined) {
+    c.__roziePartialOrigin = {
+      line: loc.start.line,
+      column: loc.start.column,
+      filename: loc.filename,
+    };
+  }
+  loc.start.line += offset;
+  loc.end.line += offset;
+}
+
+/** Shift every leading/trailing/inner comment attached to `node`. */
+function shiftAttachedComments(node: t.Node, offset: number, seen: Set<object>): void {
+  for (const c of node.leadingComments ?? []) stashAndShiftComment(c, offset, seen);
+  for (const c of node.trailingComments ?? []) stashAndShiftComment(c, offset, seen);
+  for (const c of node.innerComments ?? []) stashAndShiftComment(c, offset, seen);
+}
+
+/**
+ * FINAL inline-pass step (Phase 55) — decouple the line `@babel/generator` reads
+ * for blank-line/comment placement from the line it reads for the source-map
+ * origin, for every spliced partial node.
+ *
+ * Rationale (RESEARCH Key Finding 1): under `retainLines:false` the generator's
+ * comment-adjacency + blank-line math reads `node.loc.start.line` and
+ * `comment.loc.start.line` only as DELTAS; only the host↔partial BOUNDARY delta is
+ * wrong (a spliced node carries a small `.rzts`-local line discontinuous with its
+ * ~3500 host neighbour). A CONSTANT per-block offset that lands the block's first
+ * node on its host-contiguous anchor preserves intra-block deltas and repairs the
+ * boundary delta — the entire fix surface.
+ *
+ * OFFSET ANCHOR (Open Question 2 / Assumption A1): the anchor is the replaced host
+ * import's line (`importStmt.loc.start.line`). The partial's own imports and decls
+ * already carry their .rzts-relative layout, so re-anchoring the whole group at the
+ * import line reproduces the inline-authored spacing exactly. The comment-bearing
+ * oracle (Plan 02 Task 2) confirms this empirically on all six targets.
+ *
+ * Runs AFTER all diagnostics are collected (they captured true `.rzts` byte loc via
+ * `nodeLoc`, which reads `node.start`/`node.end`, NOT `loc.{line,column}`), so the
+ * R7 error-frame path is untouched (Pitfall 1). Never throws (D-04).
+ */
+function normalizeSplicedEmitLines(blocks: SplicedEmitBlock[]): void {
+  for (const block of blocks) {
+    const first = block.nodes.find((n) => n.loc)?.loc;
+    if (!first) continue;
+    const offset = block.anchorLine - first.start.line;
+    const seen = new Set<object>();
+    for (const top of block.nodes) {
+      stashAndShiftNode(top, offset, seen);
+      shiftAttachedComments(top, offset, seen);
+      // Reach NESTED nodes + their attached comments (Pitfall 2). Reuse the
+      // already-imported `traverse` over a synthetic File wrapping the SAME node
+      // objects (the established `referencedNames` pattern) — mutations land on
+      // the real spliced nodes. Guarded so a traverse failure never throws (D-04);
+      // the top-level shift above is already applied.
+      try {
+        traverse(t.file(t.program([top as Statement])), {
+          enter(path) {
+            stashAndShiftNode(path.node, offset, seen);
+            shiftAttachedComments(path.node, offset, seen);
+          },
+        });
+      } catch {
+        // D-04: nested shift is best-effort; top-level normalization stands.
+      }
+    }
+  }
+}
+
 /** Build the named imported-name list for a (host or nested) partial import. */
 function namedImports(imp: t.ImportDeclaration): string[] {
   const out: string[] = [];
@@ -756,6 +884,9 @@ export function inlineScriptPartials(
   }
   const splicedAbs = new Set<string>();
 
+  // Phase 55: emit-line normalization blocks, collected per splice site below.
+  const splicedBlocks: SplicedEmitBlock[] = [];
+
   const newBody: Statement[] = [];
   for (const stmt of file.program.body) {
     if (t.isImportDeclaration(stmt) && PARTIAL_EXT.test(stmt.source.value)) {
@@ -791,9 +922,19 @@ export function inlineScriptPartials(
       if (splicedAbs.has(absPath)) continue;
       splicedAbs.add(absPath);
       const unionNames = hostPartialNames.get(absPath) ?? namedImports(stmt);
-      newBody.push(
-        ...inlineResolvedPartial(absPath, unionNames, stmt, fromFile, ctx),
-      );
+      // Phase 55: snapshot the hoist list around this splice so THIS partial's
+      // freshly-hoisted imports share one emit-line offset with its spliced decls
+      // (preserving the .rzts relative layout → byte-identity with inline form).
+      const hoistBefore = ctx.hoistImports.length;
+      const spliced = inlineResolvedPartial(absPath, unionNames, stmt, fromFile, ctx);
+      const newHoists = ctx.hoistImports.slice(hoistBefore);
+      if (stmt.loc && (spliced.length > 0 || newHoists.length > 0)) {
+        splicedBlocks.push({
+          nodes: [...newHoists, ...spliced],
+          anchorLine: stmt.loc.start.line,
+        });
+      }
+      newBody.push(...spliced);
     } else {
       newBody.push(stmt);
     }
@@ -801,6 +942,13 @@ export function inlineScriptPartials(
 
   // Prepend hoisted partial imports to the host import region (imports hoist).
   file.program.body = [...ctx.hoistImports, ...newBody];
+
+  // Phase 55 FINAL step: normalize spliced nodes' emit-position lines (and their
+  // attached comments) to host-contiguous values, stashing the true `.rzts`
+  // origin on `extra.__roziePartialOrigin`. Runs LAST so all diagnostics kept
+  // their true `.rzts` loc (Pitfall 1). Decouples generator spacing from the
+  // source-map origin (D-01: filename preserved, line recoverable).
+  normalizeSplicedEmitLines(splicedBlocks);
 
   return { ast: file, diagnostics };
 }
