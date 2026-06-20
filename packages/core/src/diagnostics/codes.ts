@@ -406,6 +406,21 @@ export const RozieErrorCode = {
   // dedup once by resolved path (D-03). Emitted from inlineScriptPartials.
   // ROZ140 is the next free code after ROZ139 in the 100 authoring cluster.
   PARTIAL_INLINE_CYCLE: 'ROZ140', // error — a .rzts/.rzjs script partial (transitively) imports itself; the cycle is broken and reported instead of overflowing the stack.
+  // Phase 54 (code-review WR-02) — a `.rzts`/`.rzjs` script-partial import that
+  // carries NO named specifiers: a default (`import Foo from './p.rzts'`) or a
+  // namespace (`import * as p from './p.rzts'`) import. A partial is a
+  // compile-time INLINE, not a module — it has no default/namespace module
+  // surface to bind, so `namedImports()` returns `[]` and the importer's
+  // BFS finds nothing. Previously the import statement was silently removed and
+  // nothing inlined, leaving any reference to `Foo`/`p.x` as a confusing
+  // downstream "unknown identifier" with no Rozie-level explanation (the ROZ977
+  // silent-compile-failure anti-pattern). Error severity; the statement is
+  // removed (no inline) and this diagnostic is collected (never thrown, D-08).
+  // Emitted from inlineScriptPartials for both the HOST loop and nested
+  // partial-of-partial imports. Remediation: switch to a named import
+  // (`import { foo } from './partial.rzts'`). ROZ141 is the next free code after
+  // ROZ140 in the 100 authoring cluster.
+  PARTIAL_UNSUPPORTED_IMPORT_FORM: 'ROZ141', // error — a .rzts/.rzjs partial imported via a default or namespace import; only named imports have an inlinable surface. Use `import { foo } from './partial.rzts'`.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

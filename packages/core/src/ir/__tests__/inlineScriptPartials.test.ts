@@ -254,6 +254,95 @@ describe('inlineScriptPartials', () => {
       partial.dispose();
     }
   });
+
+  // CR-01 — an exported `enum` (a RUNTIME TypeScript value) is recognized by
+  // bindingNames() and inlined, not silently dropped.
+  it('CR-01: inlines an exported enum from a partial (TSEnumDeclaration recognized)', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'status.rzts',
+      `export enum Status { Idle, Busy }`,
+    );
+    try {
+      const host = moduleFile(`import { Status } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const hasEnum = bodyOf(result.ast ?? host).some(
+        (s) => s.type === 'TSEnumDeclaration' && s.id.name === 'Status',
+      );
+      expect(hasEnum).toBe(true);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // WR-01 — two distinct host import statements naming DIFFERENT symbols from
+  // the SAME partial must BOTH inline (the union is spliced once; neither name
+  // is silently dropped by the diamond `visited` guard).
+  it('WR-01: two host imports of the same partial with different names both inline', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'expand.rzts',
+      [
+        `export const toggleRowExpanded = $computed(() => 1);`,
+        `export const collapseAll = $computed(() => 2);`,
+      ].join('\n'),
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      const host = moduleFile(
+        [
+          `import { toggleRowExpanded } from '${esc}';`,
+          `import { collapseAll } from '${esc}';`,
+        ].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const names = bodyOf(result.ast ?? host)
+        .filter((s): s is t.VariableDeclaration => s.type === 'VariableDeclaration')
+        .flatMap((s) => s.declarations.map((d) => (d.id as t.Identifier).name));
+      expect(names).toContain('toggleRowExpanded');
+      expect(names).toContain('collapseAll');
+      // No leftover partial import statement remains.
+      const stillImported = bodyOf(result.ast ?? host).some(
+        (s) => s.type === 'ImportDeclaration' && /\.rz(ts|js)$/.test(s.source.value),
+      );
+      expect(stillImported).toBe(false);
+    } finally {
+      partial.dispose();
+    }
+  });
+
+  // WR-02 — a default or namespace import of a partial has no inlinable surface
+  // and must produce an explicit ROZ141 diagnostic (never a silent drop, and
+  // never a throw — D-08).
+  it('WR-02: a default/namespace import of a partial produces a ROZ141 diagnostic', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      `export const usedName = $computed(() => 1);`,
+    );
+    try {
+      const esc = partial.path.replace(/\\/g, '\\\\');
+      // Default import form.
+      const defaultHost = moduleFile(`import Logic from '${esc}';`);
+      const defaultResult = inlineScriptPartials(defaultHost, { hostFilename: 'Host.rozie' });
+      expect(defaultResult.diagnostics.map((d) => d.code)).toContain(
+        RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+      );
+      // Namespace import form.
+      const nsHost = moduleFile(`import * as logic from '${esc}';`);
+      const nsResult = inlineScriptPartials(nsHost, { hostFilename: 'Host.rozie' });
+      const nsDiag = nsResult.diagnostics.find(
+        (d) => d.code === RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+      );
+      expect(nsDiag).toBeDefined();
+      expect(nsDiag?.severity).toBe('error');
+    } finally {
+      partial.dispose();
+    }
+  });
 });
 
 describe('inlineScriptPartials — negative routing', () => {

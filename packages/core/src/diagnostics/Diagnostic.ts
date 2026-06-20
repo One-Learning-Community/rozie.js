@@ -29,5 +29,5 @@ export interface Diagnostic {
   filename?: string;
   hint?: string;
   frame?: string;
-  related?: Array<{ message: string; loc: SourceLoc }>;
+  related?: Array<{ message: string; loc: SourceLoc; filename?: string }>;
 }

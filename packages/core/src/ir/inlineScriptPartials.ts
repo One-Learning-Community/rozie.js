@@ -160,6 +160,14 @@ function bindingNames(stmt: Statement): string[] {
   if (t.isTSInterfaceDeclaration(stmt) || t.isTSTypeAliasDeclaration(stmt)) {
     return [stmt.id.name];
   }
+  // Phase 54 (CR-01) — also recognize runtime `enum` and `declare function`
+  // declarations. A `TSEnumDeclaration` is a RUNTIME value in TypeScript, so an
+  // exported enum dropped here is a real behavioral defect (the host import
+  // finds nothing in nameToDecl and the enum reference becomes an unknown-id
+  // error with no ROZ explanation). `TSModuleDeclaration` (namespaces) stays
+  // deferred (IN-tier) — namespace exports in reactive partials are rare.
+  if (t.isTSEnumDeclaration(stmt)) return [stmt.id.name];
+  if (t.isTSDeclareFunction(stmt) && stmt.id) return [stmt.id.name];
   return [];
 }
 
@@ -287,7 +295,11 @@ function inlineResolvedPartial(
   // Diamond: already inlined via another path — bind the same decls once (D-03).
   if (ctx.visited.has(absPath)) return [];
   ctx.visiting.add(absPath);
-  ctx.visited.add(absPath);
+  // WR-01: do NOT add to `visited` yet. Adding it before the read means a
+  // read FAILURE still marks the path visited, so a SECOND import site for the
+  // same (unreadable) path gets silently swallowed by the diamond guard with no
+  // diagnostic. Mark visited only after a successful read, below — so the
+  // diamond-dedup memory reflects "actually inlined" rather than "attempted".
 
   try {
     if (importedNames.length === 0) return [];
@@ -305,6 +317,10 @@ function inlineResolvedPartial(
       });
       return [];
     }
+
+    // Successfully read — mark visited NOW so a genuine diamond (the same
+    // partial reached again transitively) deduplicates against a real inline.
+    ctx.visited.add(absPath);
 
     // Parse with the SAME parseScript the host <script> uses — `.rzts` → TS,
     // `.rzjs` → plain JS. Its OWN 0-based contentLoc + sourceFilename=absPath
@@ -375,7 +391,12 @@ function inlineResolvedPartial(
         t.isFunctionDeclaration(stmt) ||
         t.isClassDeclaration(stmt) ||
         t.isTSInterfaceDeclaration(stmt) ||
-        t.isTSTypeAliasDeclaration(stmt)
+        t.isTSTypeAliasDeclaration(stmt) ||
+        // Phase 54 (CR-01) — bare (non-exported) enum / declare-function forms
+        // must be recognized too so a closure-referenced helper enum survives
+        // tree-shaking. Mirrors the bindingNames() extension above.
+        t.isTSEnumDeclaration(stmt) ||
+        t.isTSDeclareFunction(stmt)
       ) {
         bare = stmt;
       }
@@ -432,7 +453,19 @@ function inlineResolvedPartial(
     const nestedDecls: Statement[] = [];
     for (const nested of nestedImports) {
       const names = namedImports(nested);
-      if (names.length === 0) continue;
+      if (names.length === 0) {
+        // WR-02: a nested partial imported via default/namespace form has no
+        // inlinable surface — emit ROZ141 rather than silently dropping it.
+        ctx.diagnostics.push({
+          code: RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+          severity: 'error',
+          message: `Script partial '${nested.source.value}' imported by '${absPath}' uses a default or namespace import. Only named imports (e.g. \`import { foo } from './partial.rzts'\`) are supported — a partial is a compile-time inline with no default/namespace module surface.`,
+          loc: nodeLoc(nested),
+          ...(absPath ? { filename: absPath } : {}),
+          hint: "Switch to a named import: import { foo } from './partial.rzts'.",
+        });
+        continue;
+      }
       const info = nestedLocalMap.get(nested.specifiers[0]?.local.name ?? '');
       const nestedAbs = info?.absPath;
       if (nestedAbs === undefined) continue;
@@ -456,11 +489,17 @@ function inlineResolvedPartial(
     // Splice the closure (R3 source order), enforcing lexical-collision (R6).
     const out: Statement[] = [];
     for (const decl of includedSorted) {
-      let collided = false;
+      // WR-03: iterate ALL names in a multi-name declaration (`export let a, b`)
+      // and emit a diagnostic PER colliding name — not just the first. The old
+      // `break`-after-first form forced the author into a "fix one, recompile,
+      // get the next" loop. The whole declaration is still dropped (drop
+      // semantics unchanged) if ANY name collides, so a half-declaration is
+      // never spliced.
+      const collidingNames: string[] = [];
       for (const name of decl.names) {
         const prior = ctx.hostNames.get(name) ?? ctx.inlinedNames.get(name);
         if (prior) {
-          collided = true;
+          collidingNames.push(name);
           ctx.diagnostics.push({
             code: RozieErrorCode.PARTIAL_INLINE_COLLISION,
             severity: 'error',
@@ -471,14 +510,19 @@ function inlineResolvedPartial(
               {
                 message: `Existing '${name}' declared here${prior.filename ? ` (${prior.filename})` : ''}.`,
                 loc: prior.loc,
+                // WR-04: expose the prior site's filename as a STRUCTURED field
+                // (not only smuggled into the message text) so a renderer can
+                // load that file and frame the actual source line at `prior.loc`
+                // — essential for cross-file collisions, the primary motivation
+                // for the `related` frame.
+                ...(prior.filename ? { filename: prior.filename } : {}),
               },
             ],
             hint: 'Rename the declaration in the script partial or the host <script> so the inlined name is unique.',
           });
-          break;
         }
       }
-      if (collided) continue;
+      if (collidingNames.length > 0) continue;
       for (const name of decl.names) {
         ctx.inlinedNames.set(name, { ...(absPath ? { filename: absPath } : {}), loc: nodeLoc(decl.stmt) });
       }
@@ -561,10 +605,34 @@ export function inlineScriptPartials(
     }
   }
 
-  const newBody: Statement[] = [];
+  // WR-01 pre-pass: group host-level partial imports by resolved absolute path
+  // and UNION their named specifiers. Two distinct host import statements that
+  // name DIFFERENT symbols from the SAME partial
+  // (`import { a } from './p.rzts'` then `import { b } from './p.rzts'`) must
+  // BOTH inline. The naive per-statement form inlined the first and let the
+  // diamond `visited` guard silently drop the second. We splice the UNION once,
+  // at the first named-import occurrence, and remove every later occurrence.
+  const hostPartialNames = new Map<string, string[]>();
+  const hostPartialAbs = new Map<t.ImportDeclaration, string | null>();
   for (const stmt of file.program.body) {
     if (t.isImportDeclaration(stmt) && PARTIAL_EXT.test(stmt.source.value)) {
       const absPath = resolver.resolveProducerPath(stmt.source.value, fromFile);
+      hostPartialAbs.set(stmt, absPath);
+      if (absPath !== null) {
+        const union = hostPartialNames.get(absPath) ?? [];
+        for (const n of namedImports(stmt)) {
+          if (!union.includes(n)) union.push(n);
+        }
+        hostPartialNames.set(absPath, union);
+      }
+    }
+  }
+  const splicedAbs = new Set<string>();
+
+  const newBody: Statement[] = [];
+  for (const stmt of file.program.body) {
+    if (t.isImportDeclaration(stmt) && PARTIAL_EXT.test(stmt.source.value)) {
+      const absPath = hostPartialAbs.get(stmt) ?? null;
       if (absPath === null) {
         diagnostics.push({
           code: RozieErrorCode.CROSS_PACKAGE_LOOKUP_FAILED,
@@ -576,8 +644,28 @@ export function inlineScriptPartials(
         });
         continue;
       }
+      // WR-02: this specific import statement carries no named specifiers — a
+      // default (`import Foo from`) or namespace (`import * as p from`) form.
+      // It has no inlinable surface; emit ROZ141 and remove it (no inline).
+      if (namedImports(stmt).length === 0) {
+        diagnostics.push({
+          code: RozieErrorCode.PARTIAL_UNSUPPORTED_IMPORT_FORM,
+          severity: 'error',
+          message: `Script partial '${stmt.source.value}' was imported via a default or namespace import. Only named imports (e.g. \`import { foo } from './partial.rzts'\`) are supported — a partial is a compile-time inline with no default/namespace module surface to bind.`,
+          loc: nodeLoc(stmt),
+          ...(fromFile ? { filename: fromFile } : {}),
+          hint: "Switch to a named import: import { foo } from './partial.rzts'.",
+        });
+        continue;
+      }
+      // WR-01: splice the UNION of all named symbols pulled from this partial
+      // exactly once (at the first named-import occurrence). Later host imports
+      // of the same partial are removed without re-splicing.
+      if (splicedAbs.has(absPath)) continue;
+      splicedAbs.add(absPath);
+      const unionNames = hostPartialNames.get(absPath) ?? namedImports(stmt);
       newBody.push(
-        ...inlineResolvedPartial(absPath, namedImports(stmt), stmt, fromFile, ctx),
+        ...inlineResolvedPartial(absPath, unionNames, stmt, fromFile, ctx),
       );
     } else {
       newBody.push(stmt);
