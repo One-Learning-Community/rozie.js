@@ -406,8 +406,10 @@ function composeClassValue(
     // renders a valid space-joined string instead of `a,b` / `[object Object]`.
     // `rozieClass(...)` stays the DIRECT binding-site value (never a hoisted
     // const) so Solid fine-grained reactivity re-reads it. Provably-string
-    // bindings (`wrapForDisplay=false`) stay byte-identical (raw renderExpr).
-    if (a.wrapForDisplay) {
+    // bindings (`wrapForDisplay=false`) AND template literals (provably a
+    // string — `wrapForDisplay=true` only because the IR checker doesn't model
+    // template literals) stay byte-identical (raw renderExpr).
+    if (a.wrapForDisplay && !t.isTemplateLiteral(a.expression)) {
       runtime?.add('rozieClass');
       return `rozieClass(${renderExpr(a.expression, ir, exprOpts)})`;
     }
@@ -462,8 +464,9 @@ function composeClassValue(
       // A non-provably-string merge member (`wrapForDisplay=true`) is normalized
       // through `rozieClass` (quick task 260620-kby) — a self-delimited call, so
       // it needs no extra parens in the `+ " " +` concat. Provably-string
-      // members stay the byte-identical parenthesized raw form.
-      if (a.wrapForDisplay) {
+      // members AND template literals (provably a string) stay the
+      // byte-identical parenthesized raw form.
+      if (a.wrapForDisplay && !t.isTemplateLiteral(a.expression)) {
         runtime?.add('rozieClass');
         parts.push(`rozieClass(${renderExpr(a.expression, ir, exprOpts)})`);
       } else {

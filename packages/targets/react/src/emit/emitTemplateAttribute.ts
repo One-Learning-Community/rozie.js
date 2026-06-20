@@ -505,7 +505,7 @@ function composeClassName(
   const segments: Array<
     | { kind: 'staticTokens'; tokens: string[] }
     | { kind: 'objectBinding'; expr: t.ObjectExpression }
-    | { kind: 'plainBinding'; expr: t.Expression; wrapForDisplay?: boolean }
+    | { kind: 'plainBinding'; expr: t.Expression; wrapForDisplay?: boolean | undefined }
     | { kind: 'interpolated'; segments: InterpolatedSeg[] }
   > = [];
 
@@ -566,17 +566,8 @@ function composeClassName(
     const seg = segments[0]! as {
       kind: 'plainBinding';
       expr: t.Expression;
-      wrapForDisplay?: boolean;
+      wrapForDisplay?: boolean | undefined;
     };
-    // A non-provably-string `:class` binding (array/object/identifier/member/
-    // call/conditional — `wrapForDisplay=true`) is normalized through `clsx`
-    // (quick task 260620-kby) so an array/object class value renders a valid
-    // space-joined string instead of `a,b` / `[object Object]` / JSON. Provably-
-    // string bindings (`wrapForDisplay=false`) stay byte-identical below.
-    if (seg.wrapForDisplay) {
-      ctx.collectors.runtime.add('clsx');
-      return `clsx(${renderExpr(seg.expr, ir)})`;
-    }
     // A plain-binding `:class` whose expression is a statically-shaped string
     // — a string literal or a template literal — IS tokenisable at compile
     // time, so it is routed through `renderInterpolatedClass` for consistent
@@ -584,9 +575,22 @@ function composeClassName(
     // not a `styles.X` lookup — React no longer hashes class names). Non-
     // decomposable expressions (identifiers, calls, members) still pass through
     // as-is — a documented v1 limitation.
+    // String/template-literal `:class` is provably a string — route it through
+    // the statically-shaped per-token renderer FIRST (Phase 25 plain-token
+    // decompose), keeping it byte-identical. `clsx` is reserved for genuinely
+    // non-decomposable non-string bindings below.
     const staticSegs = decomposeStaticClassExpr(seg.expr);
     if (staticSegs) {
       return renderInterpolatedClass(staticSegs, ctx);
+    }
+    // A non-decomposable, non-provably-string `:class` binding (array/object/
+    // identifier/member/call/conditional — `wrapForDisplay=true`) is normalized
+    // through `clsx` (quick task 260620-kby) so an array/object class value
+    // renders a valid space-joined string instead of `a,b` / `[object Object]` /
+    // JSON. Provably-string bindings (`wrapForDisplay=false`) fall through raw.
+    if (seg.wrapForDisplay) {
+      ctx.collectors.runtime.add('clsx');
+      return `clsx(${renderExpr(seg.expr, ir)})`;
     }
     return renderExpr(seg.expr, ir);
   }

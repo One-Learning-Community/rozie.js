@@ -707,10 +707,14 @@ export function emitSingleAttr(
     // string instead of `String()`-ing it to `a,b`. `rozieClass(...)` stays the
     // DIRECT binding-site value (never a hoisted const) so Svelte 5 rune
     // reactivity re-reads it. This precedes the generic `rozieAttr` wrap below.
+    // A template literal is provably a string (`wrapForDisplay=true` only
+    // because the IR checker doesn't model template literals) → fall through to
+    // the generic block below for its byte-identical pre-fix output.
     if (
       attr.name === 'class' &&
       attr.wrapForDisplay &&
       !t.isObjectExpression(attr.expression) &&
+      !t.isTemplateLiteral(attr.expression) &&
       shouldWrapSvelteAttrBinding(attr.name, attr.expression, ctx)
     ) {
       ctx.runtimeImports?.add('rozieClass');
@@ -806,8 +810,9 @@ function attrToArraySegment(
       // 260620-kby — a class merge member normalizes an array/object class
       // value through `rozieClass` (valid space-joined string) instead of
       // `rozieDisplay` (which JSON-stringified an array). The style merge keeps
-      // `rozieDisplay`.
-      if (isClass) {
+      // `rozieDisplay`. A template literal is provably a string → keep its
+      // pre-fix `rozieDisplay` passthrough (byte-identical).
+      if (isClass && !t.isTemplateLiteral(attr.expression)) {
         runtimeImports?.add('rozieClass');
         return `rozieClass(${code})`;
       }

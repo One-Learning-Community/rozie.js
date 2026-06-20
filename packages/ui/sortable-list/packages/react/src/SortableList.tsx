@@ -322,9 +322,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   return (
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
-      <div className={listClasses()} ref={listEl} part="list" data-rozie-s-0af24eae="">
+      <div className={clsx(listClasses())} ref={listEl} part="list" data-rozie-s-0af24eae="">
         {(props.renderHeader ?? props.slots?.['header'])?.()}
-        {items.map((item, index) => <div key={keyFor(item, index)} className={itemClasses(index)} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
+        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx(itemClasses(index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}
         {(props.renderFooter ?? props.slots?.['footer'])?.()}

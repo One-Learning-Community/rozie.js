@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieClass } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
@@ -314,7 +314,7 @@ let __rozieWatchInitial_7 = true;
 $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieAttr(listClasses())} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieAttr(itemClasses(index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(listClasses())} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(itemClasses(index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
 
 <style>
 :global {

@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 import { useSortableJS } from './internal/useSortableJS';
 
 __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
@@ -285,9 +285,9 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
-      <div class={listClasses()} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
+      <div class={rozieClass(listClasses())} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={itemClasses(index())} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(itemClasses(index()))} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>
         {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}

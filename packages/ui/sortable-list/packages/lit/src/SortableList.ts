@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
@@ -238,9 +238,9 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
-  <div class="${(rozieDisplay(this.listClasses()))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+  <div class="${(rozieClass(this.listClasses()))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieDisplay(this.itemClasses(index)))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(this.itemClasses(index)))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>

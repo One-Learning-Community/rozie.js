@@ -41,10 +41,10 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-      <div [attr.class]="rozieAttr(listClasses())" #listEl part="list">
+      <div [class]="listClasses()" #listEl part="list">
         <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [attr.class]="rozieAttr(itemClasses(index))" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div [class]="itemClasses(index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }

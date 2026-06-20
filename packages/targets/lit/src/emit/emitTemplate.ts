@@ -1219,12 +1219,19 @@ function emitElementOpenTag(
       // through `rozieClass` so an array/object class value renders a valid
       // space-joined string instead of JSON / `a,b` / `[object Object]` (this
       // REPLACES the prior `rozieDisplay` wrap, which JSON-stringified an array).
-      // `rozieClass(...)` stays the DIRECT binding-site value. Raw otherwise
-      // (provably-string, `wrapForDisplay=false` → byte-identical, SPEC-3).
+      // `rozieClass(...)` stays the DIRECT binding-site value. A template literal
+      // is provably a string (`wrapForDisplay=true` only because the IR checker
+      // doesn't model template literals) → keep its pre-fix `rozieDisplay`
+      // passthrough (byte-identical). Raw otherwise (`wrapForDisplay=false`).
       let classExpr = expr;
       if (bindingClass.wrapForDisplay) {
-        opts.runtime.add('rozieClass');
-        classExpr = `rozieClass(${expr})`;
+        if (bt.isTemplateLiteral(bindingClass.expression)) {
+          opts.runtime.add('rozieDisplay');
+          classExpr = `rozieDisplay(${expr})`;
+        } else {
+          opts.runtime.add('rozieClass');
+          classExpr = `rozieClass(${expr})`;
+        }
       }
       // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
       parts.push(`class="${staticPart}\${(${classExpr})}"`);
