@@ -1,14 +1,18 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
-import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { useSortableJS } from './internal/useSortableJS';
+
+interface HeaderCtx {}
 
 interface DefaultCtx {
   $implicit: { item: any; index: any };
   item: any;
   index: any;
 }
+
+interface FooterCtx {}
 
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
@@ -33,16 +37,18 @@ function __rozieAttr(v: unknown): string | null {
 @Component({
   selector: 'rozie-sortable-list',
   standalone: true,
-  imports: [NgTemplateOutlet, NgClass],
+  imports: [NgTemplateOutlet],
   template: `
 
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-      <div class="rozie-sortable-list" #listEl part="list">
+      <div [attr.class]="rozieAttr(listClasses())" #listEl part="list">
+        <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div [attr.class]="rozieAttr(itemClasses(index))" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
+        <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])" />
       </div>
       <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText() }}</div>
     </div>
@@ -95,6 +101,8 @@ export class SortableList {
   forceFallback = input<boolean>(false);
   swapThreshold = input<number>(1);
   cloneable = input<boolean>(false);
+  listClass = input<string>('');
+  itemClass = input<string>('');
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
@@ -104,7 +112,9 @@ export class SortableList {
   remove = output<unknown>();
   start = output<unknown>();
   end = output<unknown>();
+  @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -202,6 +212,8 @@ export class SortableList {
     }
     return item ?? index;
   };
+  listClasses = () => ['rozie-sortable-list', this.listClass()].filter(Boolean).join(' ');
+  itemClasses = (index: any) => ['rozie-sortable-item', this.itemClass(), this.liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
   getLabel = (idx: any) => {
     const __labelFor = this.labelFor();
     const item = this.items()[idx];
@@ -298,7 +310,7 @@ export class SortableList {
   static ngTemplateContextGuard(
     _dir: SortableList,
     _ctx: unknown,
-  ): _ctx is DefaultCtx {
+  ): _ctx is HeaderCtx | DefaultCtx | FooterCtx {
     return true;
   }
 

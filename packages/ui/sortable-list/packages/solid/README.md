@@ -49,6 +49,8 @@ export function Demo() {
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
+| `listClass` | `String` | `""` |  |  |
+| `itemClass` | `String` | `""` |  |  |
 
 ## Events
 
@@ -84,4 +86,6 @@ const order = handle?.toArray();
 
 | Slot | Params |
 | --- | --- |
+| header |  |
 | (default) | item, index |
+| footer |  |

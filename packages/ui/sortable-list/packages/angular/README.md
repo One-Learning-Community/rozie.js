@@ -91,6 +91,8 @@ The accessor contract: only real user interaction dirties the control — progra
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
+| `listClass` | `String` | `""` |  |  |
+| `itemClass` | `String` | `""` |  |  |
 
 ## Events
 
@@ -126,4 +128,6 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
+| header |  |
 | (default) | item, index |
+| footer |  |

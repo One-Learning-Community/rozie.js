@@ -21,12 +21,16 @@ export interface SortableListProps {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
+  listClass?: string;
+  itemClass?: string;
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
   onStart?: (...args: unknown[]) => void;
   onEnd?: (...args: unknown[]) => void;
+  renderHeader?: () => ReactNode;
   children?: ReactNode | ((params: { item: () => void; index: () => void }) => ReactNode);
+  renderFooter?: () => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

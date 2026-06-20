@@ -42,13 +42,17 @@ interface SortableListProps {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
+  listClass?: string;
+  itemClass?: string;
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
   onStart?: (...args: unknown[]) => void;
   onEnd?: (...args: unknown[]) => void;
+  headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  footerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: SortableListHandle) => void;
 }
@@ -61,8 +65,8 @@ export interface SortableListHandle {
 }
 
 export default function SortableList(_props: SortableListProps): JSX.Element {
-  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'children', 'ref']);
+  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
@@ -154,6 +158,20 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       return item[local.itemKey] ?? index;
     }
     return item ?? index;
+  }
+
+  // Class hooks. Both helpers return a single space-joined class STRING (not an
+  // array / object) — the ONE :class input shape that lowers identically across
+  // all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
+  // [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
+  // stray/trailing class is emitted when listClass/itemClass are omitted. An
+  // array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
+  // ("base,[object Object]") and a comma-joined value on React — hence the helper.
+  function listClasses() {
+    return ['rozie-sortable-list', local.listClass].filter(Boolean).join(' ');
+  }
+  function itemClasses(index: any) {
+    return ['rozie-sortable-item', local.itemClass, liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
   }
 
   // Read the display label for an item — used by the aria-live announcer.
@@ -267,10 +285,12 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
-      <div class={"rozie-sortable-list"} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={"rozie-sortable-item"} classList={{ 'rozie-sortable-item-lifted': liftedIndex() === index() }} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+      <div class={listClasses()} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
+        {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={itemClasses(index())} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>
+        {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
       </div>
       <div class={"rozie-sortable-aria-live"} data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae="">{ariaLiveText()}</div>
     </div>

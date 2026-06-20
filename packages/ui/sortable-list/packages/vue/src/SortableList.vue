@@ -1,10 +1,12 @@
 <template>
 
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
-  <div class="rozie-sortable-list" ref="listElRef" part="list">
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', { 'rozie-sortable-item-lifted': liftedIndex === index }]" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
+  <div :class="listClasses()" ref="listElRef" part="list">
+    <slot name="header"></slot>
+    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="itemClasses(index)" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>
+    <slot name="footer"></slot>
   </div>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText }}</div>
 </div>
@@ -15,8 +17,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ itemKey?: string | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean }>(),
-  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false }
+  defineProps<{ itemKey?: string | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean; listClass?: string; itemClass?: string }>(),
+  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '' }
 );
 
 const items = defineModel<any[]>('items', { default: () => [] });
@@ -30,7 +32,9 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  header(props: {  }): any;
   default(props: { item: any; index: any }): any;
+  footer(props: {  }): any;
 }>();
 
 const liftedIndex = ref<any>(null);
@@ -47,6 +51,23 @@ const keyFor = (item: any, index: any) => {
   }
   return item ?? index;
 };
+
+// Class hooks. Both helpers return a single space-joined class STRING (not an
+// array / object) — the ONE :class input shape that lowers identically across
+// all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
+// [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
+// stray/trailing class is emitted when listClass/itemClass are omitted. An
+// array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
+// ("base,[object Object]") and a comma-joined value on React — hence the helper.
+// Class hooks. Both helpers return a single space-joined class STRING (not an
+// array / object) — the ONE :class input shape that lowers identically across
+// all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
+// [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
+// stray/trailing class is emitted when listClass/itemClass are omitted. An
+// array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
+// ("base,[object Object]") and a comma-joined value on React — hence the helper.
+const listClasses = () => ['rozie-sortable-list', props.listClass].filter(Boolean).join(' ');
+const itemClasses = (index: any) => ['rozie-sortable-item', props.itemClass, liftedIndex.value === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
 
 // Read the display label for an item — used by the aria-live announcer.
 // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when

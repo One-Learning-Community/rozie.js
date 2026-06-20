@@ -21,7 +21,11 @@ interface Props {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
+  listClass?: string;
+  itemClass?: string;
+  header?: Snippet;
   children?: Snippet<[{ item: any; index: any }]>;
+  footer?: Snippet;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
   onadd?: (...args: unknown[]) => void;
@@ -50,7 +54,11 @@ let {
   forceFallback = false,
   swapThreshold = 1,
   cloneable = false,
+  listClass = '',
+  itemClass = '',
+  header: __headerProp,
   children: __childrenProp,
+  footer: __footerProp,
   snippets,
   onchange,
   onadd,
@@ -60,7 +68,9 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
+const header = $derived(__headerProp ?? snippets?.header);
 const children = $derived(__childrenProp ?? snippets?.children);
+const footer = $derived(__footerProp ?? snippets?.footer);
 
 let liftedIndex: any = $state(null);
 let ariaLiveText = $state('');
@@ -76,6 +86,23 @@ const keyFor = (item: any, index: any) => {
   }
   return item ?? index;
 };
+
+// Class hooks. Both helpers return a single space-joined class STRING (not an
+// array / object) — the ONE :class input shape that lowers identically across
+// all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
+// [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
+// stray/trailing class is emitted when listClass/itemClass are omitted. An
+// array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
+// ("base,[object Object]") and a comma-joined value on React — hence the helper.
+// Class hooks. Both helpers return a single space-joined class STRING (not an
+// array / object) — the ONE :class input shape that lowers identically across
+// all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
+// [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
+// stray/trailing class is emitted when listClass/itemClass are omitted. An
+// array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
+// ("base,[object Object]") and a comma-joined value on React — hence the helper.
+const listClasses = () => ['rozie-sortable-list', listClass].filter(Boolean).join(' ');
+const itemClasses = (index: any) => ['rozie-sortable-item', itemClass, liftedIndex === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
 
 // Read the display label for an item — used by the aria-live announcer.
 // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
@@ -287,7 +314,7 @@ let __rozieWatchInitial_7 = true;
 $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class="rozie-sortable-list" bind:this={listEl} part="list" data-rozie-s-0af24eae>{#each items as item, index (keyFor(item, index))}<div class={["rozie-sortable-item", { 'rozie-sortable-item-lifted': liftedIndex === index }]} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieAttr(listClasses())} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieAttr(itemClasses(index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
 
 <style>
 :global {

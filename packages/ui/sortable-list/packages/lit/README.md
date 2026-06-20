@@ -48,6 +48,8 @@ el.addEventListener('items-change', (e) => {
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
+| `listClass` | `String` | `""` |  |  |
+| `itemClass` | `String` | `""` |  |  |
 
 ## Events
 
@@ -82,4 +84,6 @@ el.option('disabled', true);
 
 | Slot | Params |
 | --- | --- |
+| header |  |
 | (default) | item, index |
+| footer |  |

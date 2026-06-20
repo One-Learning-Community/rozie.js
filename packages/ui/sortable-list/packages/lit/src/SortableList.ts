@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
@@ -52,15 +52,21 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) forceFallback: boolean = false;
   @property({ type: Number, reflect: true }) swapThreshold: number = 1;
   @property({ type: Boolean, reflect: true }) cloneable: boolean = false;
+  @property({ type: String, reflect: true }) listClass: string = '';
+  @property({ type: String, reflect: true }) itemClass: string = '';
   private _liftedIndex = signal(null);
   private _ariaLiveText = signal('');
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 
+  @state() private _hasSlotHeader = false;
+  @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: unknown; index: unknown }) => unknown;
+  @state() private _hasSlotFooter = false;
+  @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -71,9 +77,31 @@ private __rozieFirstUpdateDone = false;
 
   private _armListeners(): void {
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="header"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotHeader = this._slotHeaderElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="footer"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotFooter = this._slotFooterElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -84,7 +112,9 @@ private __rozieFirstUpdateDone = false;
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -208,10 +238,12 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
-  <div class="rozie-sortable-list" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${Object.entries({ "rozie-sortable-item": true, 'rozie-sortable-item-lifted': this._liftedIndex.value === index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+  <div class="${(rozieDisplay(this.listClasses()))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+    <slot name="header"></slot>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieDisplay(this.itemClasses(index)))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
+    <slot name="footer"></slot>
   `)}</div>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>${this._ariaLiveText.value}</div>
 </div>
@@ -226,6 +258,10 @@ private __rozieFirstUpdateDone = false;
   }
   return item ?? index;
 };
+
+  listClasses = () => ['rozie-sortable-list', this.listClass].filter(Boolean).join(' ');
+
+  itemClasses = (index: any) => ['rozie-sortable-item', this.itemClass, this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
 
   getLabel = (idx: any) => {
   const item = this.items[idx];
@@ -324,7 +360,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable']);
+    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

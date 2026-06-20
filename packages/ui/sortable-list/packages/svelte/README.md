@@ -49,6 +49,8 @@ Peer dependencies: `sortablejs ^1.15` + `svelte`. Install them alongside this pa
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
+| `listClass` | `String` | `""` |  |  |
+| `itemClass` | `String` | `""` |  |  |
 
 ## Events
 
@@ -84,4 +86,6 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
+| header |  |
 | (default) | item, index |
+| footer |  |

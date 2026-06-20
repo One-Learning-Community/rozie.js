@@ -84,6 +84,8 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `cloneable` | `Boolean` | `false` | **NO** | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). **Construction-time only**. |
 | `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
+| `listClass` | `String` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
+| `itemClass` | `String` | `""` | yes | Extra class(es) merged onto every item row. Bridges `.list-group-item` and per-row layout/styling. |
 
 ### Emits
 
@@ -95,9 +97,11 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `start` | `SortableEvent` | Drag starts |
 | `end` | `SortableEvent` | Drag ends (source side) |
 
-### Scoped slot
+### Slots
 
-The default slot receives `{ item, index }`:
+#### Default (scoped) slot
+
+The default slot renders each row and receives `{ item, index }`:
 
 ```rozie
 <template #default="{ item, index }">
@@ -106,6 +110,26 @@ The default slot receives `{ item, index }`:
 ```
 
 To rename a slot param to a more readable local name in nested-template contexts, use the slot-param rename form `{ item: column }` — see [scoped slot params](/guide/features#slots-with-scoped-params).
+
+#### `#header` / `#footer` slots
+
+`#header` and `#footer` render inside the SortableJS container, as non-draggable siblings of the item rows (`#header` first, `#footer` last). Use them for an "Add item" row, a running total, an empty-state message, or any chrome that should sit with the list but not participate in the drag order.
+
+```rozie
+<SortableList r-model:items="$data.items" itemKey="id">
+  <template #header>
+    <div class="list-heading">Tasks ({{ $data.items.length }})</div>
+  </template>
+  <template #default="{ item }">
+    <span>{{ item.label }}</span>
+  </template>
+  <template #footer>
+    <button @click="addItem">+ Add item</button>
+  </template>
+</SortableList>
+```
+
+Header and footer are non-draggable: SortableJS is scoped to `.rozie-sortable-item` rows only (`draggable: '.rozie-sortable-item'`), so dropping onto or near the header/footer never reorders them and the DOM-restore index math stays item-relative.
 
 ### Imperative handle
 

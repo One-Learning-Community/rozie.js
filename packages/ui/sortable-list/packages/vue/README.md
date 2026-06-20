@@ -52,6 +52,8 @@ const items = ref([
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
+| `listClass` | `String` | `""` |  |  |
+| `itemClass` | `String` | `""` |  |  |
 
 ## Events
 
@@ -90,4 +92,6 @@ const sl = ref();          // template ref
 
 | Slot | Params |
 | --- | --- |
+| header |  |
 | (default) | item, index |
+| footer |  |

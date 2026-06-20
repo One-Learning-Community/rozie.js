@@ -25,12 +25,16 @@ interface SortableListProps {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
+  listClass?: string;
+  itemClass?: string;
   onChange?: (...args: any[]) => void;
   onAdd?: (...args: any[]) => void;
   onRemove?: (...args: any[]) => void;
   onStart?: (...args: any[]) => void;
   onEnd?: (...args: any[]) => void;
+  renderHeader?: () => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
+  renderFooter?: () => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -43,7 +47,7 @@ export interface SortableListHandle {
 
 const SortableList = forwardRef<SortableListHandle, SortableListProps>(function SortableList(_props: SortableListProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable'> & { itemKey: (string) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean } = {
+  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass'> & { itemKey: (string) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string; itemClass: string } = {
     ..._props,
     itemKey: _props.itemKey ?? null,
     handle: _props.handle ?? null,
@@ -60,10 +64,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     forceFallback: _props.forceFallback ?? false,
     swapThreshold: _props.swapThreshold ?? 1,
     cloneable: _props.cloneable ?? false,
+    listClass: _props.listClass ?? '',
+    itemClass: _props.itemClass ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, itemKey, handle, group, animation, disabled, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, defaultValue, onItemsChange, defaultItems, ...rest } = _props as SortableListProps & Record<string, unknown>;
-    void items; void itemKey; void handle; void group; void animation; void disabled; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void defaultValue; void onItemsChange; void defaultItems;
+    const { items, itemKey, handle, group, animation, disabled, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, defaultValue, onItemsChange, defaultItems, ...rest } = _props as SortableListProps & Record<string, unknown>;
+    void items; void itemKey; void handle; void group; void animation; void disabled; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void defaultValue; void onItemsChange; void defaultItems;
     return rest;
   })();
   const instance = useRef<any>(null);
@@ -108,6 +114,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       return item[props.itemKey] ?? index;
     }
     return item ?? index;
+  }
+  function listClasses() {
+    return ['rozie-sortable-list', props.listClass].filter(Boolean).join(' ');
+  }
+  function itemClasses(index: any) {
+    return ['rozie-sortable-item', props.itemClass, liftedIndex === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
   }
   function getLabel(idx: any) {
     const item = items[idx];
@@ -310,10 +322,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   return (
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
-      <div className={"rozie-sortable-list"} ref={listEl} part="list" data-rozie-s-0af24eae="">
-        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
+      <div className={listClasses()} ref={listEl} part="list" data-rozie-s-0af24eae="">
+        {(props.renderHeader ?? props.slots?.['header'])?.()}
+        {items.map((item, index) => <div key={keyFor(item, index)} className={itemClasses(index)} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}
+        {(props.renderFooter ?? props.slots?.['footer'])?.()}
       </div>
       <div className={"rozie-sortable-aria-live"} data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae="">{ariaLiveText}</div>
     </div>
