@@ -1787,7 +1787,23 @@ const rowShowsDetail = (row) => ($props.getSubRows == null && rowIsExpanded(row)
 // a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
 const onToggleExpand = (row, evt) => {
   if (!row || !row.toggleExpanded) return
+  // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
+  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
+  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
+  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
+  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
+  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
+  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
+  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
+  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null
   row.toggleExpanded()
+  if (ownerRow && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      const btn = ownerRow.querySelector('[data-expander]')
+      if (btn) btn.focus()
+    })
+  }
 }
 // bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
 // left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).

@@ -76,20 +76,20 @@ function runnerFor(target: Target) {
  */
 async function focusedAriaExpanded(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const findMount = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-testid="rozie-mount"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = findMount(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const mount = findMount(document) ?? document.body;
-    const active = (mount.getRootNode() as Document | ShadowRoot).activeElement;
+    // Walk to the DEEPEST focused element across nested OPEN shadow roots. The 5 light-DOM
+    // targets keep the focused control directly under `document.activeElement`; Lit double-nests
+    // it (demo host → DataTable host → the expander <button>), and `document.activeElement` only
+    // ever returns the OUTERMOST shadow host. Descend `activeElement → shadowRoot.activeElement`
+    // until a leaf so the read pierces Lit's shadow uniformly — the same recursive-descent the
+    // passing data-table-grid.spec.ts uses to reach the focused grid cell.
+    let active: Element | null = document.activeElement;
+    while (
+      active &&
+      (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot &&
+      (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot!.activeElement
+    ) {
+      active = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot!.activeElement;
+    }
     if (!active) return null;
     const exp = active.closest('[aria-expanded]');
     return exp ? exp.getAttribute('aria-expanded') : null;
