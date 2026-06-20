@@ -1,0 +1,11 @@
+// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
+// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
+// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
+// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
+// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
+// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
+// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
+const applyGrouping = (cols) => { if (table) table.setGrouping(cols) }
+const clearGrouping = () => { if (table) table.setGrouping([]) }
+
+export { applyGrouping, clearGrouping }

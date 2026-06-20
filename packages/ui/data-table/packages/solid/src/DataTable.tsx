@@ -3830,7 +3830,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setActiveRow(0);
     setActiveColIndex(0);
   }
-
   // ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
   // Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
   // not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
@@ -3877,7 +3876,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
     return out;
   }
-
   // ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
   // applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
   // React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
@@ -3891,7 +3889,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function clearGrouping() {
     if (table) table.setGrouping([]);
   }
-
   // ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
   // Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
   // column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,

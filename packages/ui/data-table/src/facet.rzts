@@ -1,0 +1,31 @@
+// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
+// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
+// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
+// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
+// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
+// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
+// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
+//
+// getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
+// deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
+// we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
+// column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
+// contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
+// helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
+const getFacetedUniqueValues = (colId) => {
+  if (tick() < 0 || !table) return []
+  const col = table.getColumn(colId)
+  if (!col || !col.getFacetedUniqueValues) return []
+  const map = col.getFacetedUniqueValues()   // Map<any, number>
+  return map ? Array.from(map.keys()) : []     // KEYS only — counts deferred (D-03)
+}
+// getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
+// Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
+const getFacetedMinMaxValues = (colId) => {
+  if (tick() < 0 || !table) return null
+  const col = table.getColumn(colId)
+  if (!col || !col.getFacetedMinMaxValues) return null
+  return col.getFacetedMinMaxValues() || null  // [number, number] | null
+}
+
+export { getFacetedUniqueValues, getFacetedMinMaxValues }

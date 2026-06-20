@@ -138,8 +138,14 @@ function main() {
   // (2) parse + lower the PARENT ONCE for the doc tables + manifests. The
   // renderless <Column> child has no $expose and no docs page, so the
   // handle-manifest + docs-table validation gates apply to DataTable only.
-  const { ast } = parse(sources[PARENT], { filename: `${PARENT}.rozie` });
-  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+  // Phase 54: pass the ABSOLUTE host path so inlineScriptPartials (inside lowerToIR)
+  // can resolve the sibling expand/group/facet .rzts partials relative to src/. The
+  // scope hash uses only the BASENAME, so absolute vs relative is byte-identical.
+  const { ast } = parse(sources[PARENT], { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
+  const { ir } = lowerToIR(ast, {
+    modifierRegistry: createDefaultRegistry(),
+    filename: resolve(ROOT, 'src', `${PARENT}.rozie`),
+  });
 
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
@@ -162,7 +168,11 @@ function main() {
     // applied to EACH compile — an error means a mis-wired codegen/authoring
     // path, NEVER an emitter edit (escalate as a compiler gap instead).
     for (const componentName of COMPONENTS) {
-      const filename = `${componentName}.rozie`;
+      // Phase 54: ABSOLUTE host path so the .rzts/.rzjs script-partial inline pass
+      // resolves sibling partials against src/ (the DataTable host imports
+      // ./expand.rzts / ./group.rzts / ./facet.rzts). Basename-only scope hash →
+      // byte-identical leaf output vs the relative-filename pre-extraction form.
+      const filename = resolve(ROOT, 'src', `${componentName}.rozie`);
       const r = compile(sources[componentName], { target, filename });
       const errs = r.diagnostics.filter((d) => d.severity === 'error');
       if (errs.length) {

@@ -3499,92 +3499,9 @@ const clearActiveCell = () => {
   $data.activeColIndex = 0
 }
 
-// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
-// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
-// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
-// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
-// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
-// one expanded-change. ──────────────────────────────────────────────────────────────────
-
-// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
-// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
-// rows regardless of current expansion) so a collapsed parent is still resolvable.
-const toggleRowExpanded = (rowId) => {
-  if (!table) return
-  const target = String(rowId)
-  const flat = table.getCoreRowModel().flatRows
-  for (const r of flat) {
-    if (r.id === target || (r.original && String(r.original.id) === target)) {
-      r.toggleExpanded()
-      return
-    }
-  }
-}
-
-// expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
-// literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
-const expandAll = () => {
-  if (!table) return
-  table.toggleAllRowsExpanded(true)
-}
-
-// collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
-// blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
-const collapseAll = () => {
-  if (!table) return
-  table.resetExpanded(true)
-}
-
-// getExpandedRows() — return the original row data for every currently-expanded row
-// (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
-// filters by getIsExpanded(). Empty when nothing is expanded.
-const getExpandedRows = () => {
-  if (!table) return []
-  const out = []
-  const flat = table.getCoreRowModel().flatRows
-  for (const r of flat) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original)
-  return out
-}
-
-// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
-// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
-// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
-// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
-// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
-// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
-// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
-const applyGrouping = (cols) => { if (table) table.setGrouping(cols) }
-const clearGrouping = () => { if (table) table.setGrouping([]) }
-
-// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
-// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
-// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
-// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
-// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
-// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
-// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
-//
-// getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
-// deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
-// we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
-// column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
-// contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
-// helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
-const getFacetedUniqueValues = (colId) => {
-  if (tick() < 0 || !table) return []
-  const col = table.getColumn(colId)
-  if (!col || !col.getFacetedUniqueValues) return []
-  const map = col.getFacetedUniqueValues()   // Map<any, number>
-  return map ? Array.from(map.keys()) : []     // KEYS only — counts deferred (D-03)
-}
-// getFacetedMinMaxValues: the column's [min, max] numeric range, or null when unavailable.
-// Named to match the $expose verb (same shorthand contract as getFacetedUniqueValues above).
-const getFacetedMinMaxValues = (colId) => {
-  if (tick() < 0 || !table) return null
-  const col = table.getColumn(colId)
-  if (!col || !col.getFacetedMinMaxValues) return null
-  return col.getFacetedMinMaxValues() || null  // [number, number] | null
-}
+import { toggleRowExpanded, expandAll, collapseAll, getExpandedRows } from './expand.rzts'
+import { applyGrouping, clearGrouping } from './group.rzts'
+import { getFacetedUniqueValues, getFacetedMinMaxValues } from './facet.rzts'
 
 $expose({
   sortColumn,

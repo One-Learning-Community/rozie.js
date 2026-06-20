@@ -1,0 +1,48 @@
+// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
+// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
+// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
+// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
+// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
+// one expanded-change. ──────────────────────────────────────────────────────────────────
+
+// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
+// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
+// rows regardless of current expansion) so a collapsed parent is still resolvable.
+const toggleRowExpanded = (rowId) => {
+  if (!table) return
+  const target = String(rowId)
+  const flat = table.getCoreRowModel().flatRows
+  for (const r of flat) {
+    if (r.id === target || (r.original && String(r.original.id) === target)) {
+      r.toggleExpanded()
+      return
+    }
+  }
+}
+
+// expandAll() — open every expandable row (table-core sets ExpandedState to the `true`
+// literal under the hood → Pitfall 2: writeExpanded passes it through verbatim).
+const expandAll = () => {
+  if (!table) return
+  table.toggleAllRowsExpanded(true)
+}
+
+// collapseAll() — reset to a blank expanded state ({}). resetExpanded(true) forces the
+// blank reset (NOT the initialState) and fires onExpandedChange → one expanded-change.
+const collapseAll = () => {
+  if (!table) return
+  table.resetExpanded(true)
+}
+
+// getExpandedRows() — return the original row data for every currently-expanded row
+// (read-verb twin of expanded-change). Integers/data only — scans the core flat rows and
+// filters by getIsExpanded(). Empty when nothing is expanded.
+const getExpandedRows = () => {
+  if (!table) return []
+  const out = []
+  const flat = table.getCoreRowModel().flatRows
+  for (const r of flat) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original)
+  return out
+}
+
+export { toggleRowExpanded, expandAll, collapseAll, getExpandedRows }

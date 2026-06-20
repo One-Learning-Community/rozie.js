@@ -4017,17 +4017,6 @@ export const clearActiveCell = () => {
   activeRow = 0;
   activeColIndex = 0;
 };
-
-// ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
-// Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
-// not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
-// or *-change events; getExpandedRows is a read-style getter (twin of getSelectedRows).
-// Each drives @tanstack/table-core so the onExpandedChange → writeExpanded funnel fires
-// one expanded-change. ──────────────────────────────────────────────────────────────────
-
-// toggleRowExpanded(rowId) — toggle ONE row's expanded state, addressed by the consumer's
-// row id (the data `id` field) OR the table-core row id. Scans the core flat-row set (all
-// rows regardless of current expansion) so a collapsed parent is still resolvable.
 // ── Expand $expose verbs (phase 50 req-3, D-06) — joining the existing 19 (→ 23).
 // Collision-safe names (ROZ121/137/524): toggleRowExpanded / expandAll / collapseAll are
 // not inherited HTMLElement members, Lit lifecycle names, React auto-setters, prop names,
@@ -4080,14 +4069,6 @@ export const getExpandedRows = () => {
   for (const r of flat as any) if (r.getIsExpanded && r.getIsExpanded()) out.push(r.original);
   return out;
 };
-
-// ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
-// applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
-// React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
-// $expose verb is PUBLIC-CONTRACT-PROTECTED from the deconfliction rename; same precedent as
-// setColumnOrder→applyColumnOrder) + clearGrouping. Both drive @tanstack/table-core's
-// table.setGrouping so the onGroupingChange → writeGrouping funnel fires one group-change with
-// the fresh ordered key list. Also handed to the headless #groupBar slot as apply/clear helpers.
 // ── Grouping $expose verbs (phase 50 reqs 4-7, D-06 name-check) ────────────────────────────
 // applyGrouping (RENAMED from setGrouping — ROZ524: a bare `set<ModelProp>` verb shadows
 // React's auto-generated `setGrouping` useState setter for the `grouping` model slice, and an
@@ -4101,21 +4082,6 @@ export const applyGrouping = (cols: any) => {
 export const clearGrouping = () => {
   if (table) table.setGrouping([]);
 };
-
-// ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
-// Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
-// column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
-// T-50-06 / the T-49-01 index-only discipline) and read table-core's CROSS-FILTERED faceted
-// values (default impl — reflects rows passing all OTHER active column filters, D-03). They
-// touch the reactive tick (`tick() < 0` guard) so the #filter slot props re-derive when an
-// upstream filter changes on the fine-grained targets (Solid/Lit) — the visibleCellsFor idiom.
-//
-// getFacetedUniqueValues: the column's distinct values, KEYS ONLY — occurrence counts are
-// deliberately NOT exposed (D-03; the column's getFacetedUniqueValues() returns Map<any,number>,
-// we return Array.from(map.keys()) — no .entries()/count surface). Empty array on missing
-// column/table. NAMED to match the $expose verb exactly (the ExposedMethod.name shorthand
-// contract: an exposed verb lowers to `{ getFacetedUniqueValues }`, which must resolve to THIS
-// helper — the table-core factory was aliased to makeFacetedUniqueValues to free this name).
 // ── Faceted filtering read helpers (phase 50 reqs 8-9, D-03) ────────────────────────────────
 // Shared by BOTH the getFaceted* $expose verbs AND the #filter slot props. They resolve a
 // column via table.getColumn(colId) (a table-core lookup — NEVER a string-built querySelector,
