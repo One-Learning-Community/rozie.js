@@ -156,6 +156,13 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
     // WR-03's soft missing-sidecar note). Accumulate thrown failures and raise a
     // single aggregated error at the end so the build fails loudly.
     const failures: string[] = [];
+    // Phase 54 negative route: `walkRozieFiles` yields ONLY `.rozie` files
+    // (`entry.endsWith('.rozie')`), so a `.rzts`/`.rzjs` script partial is never
+    // walked and never gets a `.d.rzts.ts` sidecar. This is load-bearing: a
+    // type-only sidecar next to a partial would shadow nothing useful and (for
+    // Angular) re-introduce the ngtsc `.d.rozie.ts` disk-cache-shadow trap
+    // (D-01). Partials carry no standalone module surface — they vanish into the
+    // host at lowerToIR — so there is nothing to type a sidecar against.
     for (const rootDir of allowedRoots) {
       for (const roziePath of walkRozieFiles(rootDir)) {
         if (seen.has(roziePath)) continue;

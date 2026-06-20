@@ -37,6 +37,14 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSy
 import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
+// Phase 54 (Plan 04) — `.rzts`/`.rzjs` script-partial negative-routing predicate.
+// A partial import is a COMPILE-TIME inline (spliced into the host at lowerToIR),
+// NEVER a module: it must produce NO virtual id and NO sidecar. We consult this
+// shared predicate in resolveId + transformInclude so the negative-route
+// guarantee is explicit and durable against future catch-all branches, rather
+// than relying on the incidental fact that `.rzts`/`.rzjs` don't `endsWith` any
+// existing `.rozie*` suffix.
+import { isPartialExtension } from '../../core/src/ir/inlineScriptPartials.js';
 import { splitBlocks } from '../../core/src/splitter/splitBlocks.js';
 import type { BlockMap } from '../../core/src/ast/types.js';
 // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
@@ -174,6 +182,12 @@ const QUERY_STYLE_GLOBAL = '?style=global';
  * and vite-plugin-react handles `.tsx`.
  */
 export function transformIncludeRozie(id: string): boolean {
+  // Phase 54 negative route: a `.rzts`/`.rzjs` script partial is inlined into
+  // its host at lowerToIR — it is never transformed as its own module. Exclude
+  // it explicitly so no future synthetic-suffix addition can accidentally route
+  // a partial through the per-target transform pipeline (which would mis-handle
+  // a template-less partial as a component → ROZ977).
+  if (isPartialExtension(id)) return false;
   return (
     id.endsWith(VIRTUAL_SUFFIX_VUE) ||
     id.endsWith(VIRTUAL_SUFFIX_REACT) || // VIRTUAL_SUFFIX_REACT === VIRTUAL_SUFFIX_SOLID by construction; both targets share the .rozie.tsx suffix.
@@ -242,6 +256,9 @@ export function createResolveIdHook(
 ): (id: string, importer: string | undefined) => string | null {
   if (target === 'angular') {
     return function resolveIdAngular(id: string, importer: string | undefined): string | null {
+      // Phase 54 negative route: never resolve a `.rzts`/`.rzjs` partial to a
+      // virtual/synthetic id — it inlines into the host at lowerToIR.
+      if (isPartialExtension(id)) return null;
       // D-70 disk-cache: `.rozie.ts` files are now real files on disk
       // (written by `prebuildAngularRozieFiles` during Vite's
       // configResolved hook). Returning the absolute path lets Vite read
@@ -280,6 +297,9 @@ export function createResolveIdHook(
   }
   if (target === 'svelte') {
     return function resolveIdSvelte(id: string, importer: string | undefined): string | null {
+      // Phase 54 negative route: a `.rzts`/`.rzjs` partial is inlined at
+      // lowerToIR, never resolved to a synthetic id.
+      if (isPartialExtension(id)) return null;
       // Pass-through for the synthetic id itself (load handles it).
       if (id.endsWith(VIRTUAL_SUFFIX_SVELTE)) return id;
       // Bare `.rozie` import → `<abs>/Foo.rozie.svelte`.
@@ -303,6 +323,9 @@ export function createResolveIdHook(
   }
   if (target === 'solid') {
     return function resolveIdSolid(id: string, importer: string | undefined): string | null {
+      // Phase 54 negative route: a `.rzts`/`.rzjs` partial is inlined at
+      // lowerToIR, never resolved to a synthetic id.
+      if (isPartialExtension(id)) return null;
       // 1) Bare `.rozie` import → `<abs>/Foo.rozie.tsx` (same shape as React).
       if (id.endsWith('.rozie')) {
         const abs = absolutize(id, importer);
@@ -322,6 +345,9 @@ export function createResolveIdHook(
   }
   if (target === 'lit') {
     return function resolveIdLit(id: string, importer: string | undefined): string | null {
+      // Phase 54 negative route: a `.rzts`/`.rzjs` partial is inlined at
+      // lowerToIR, never resolved to a synthetic id.
+      if (isPartialExtension(id)) return null;
       // 1) Pass-through for the synthetic id itself.
       if (id.endsWith(VIRTUAL_SUFFIX_LIT)) return id;
       // 2) Bare `.rozie` import → `<abs>/Foo.rozie.ts`.
@@ -344,6 +370,9 @@ export function createResolveIdHook(
   }
   if (target === 'react') {
     return function resolveIdReact(id: string, importer: string | undefined): string | null {
+      // Phase 54 negative route: a `.rzts`/`.rzjs` partial is inlined at
+      // lowerToIR, never resolved to a synthetic id.
+      if (isPartialExtension(id)) return null;
       // 1) Bare `.rozie` import → `<abs>/Foo.rozie.tsx`.
       if (id.endsWith('.rozie')) {
         const abs = absolutize(id, importer);
@@ -406,6 +435,9 @@ export function createResolveIdHook(
   }
   // Vue (default) — Phase 3 behaviour preserved verbatim.
   return function resolveIdVue(id: string, importer: string | undefined): string | null {
+    // Phase 54 negative route: a `.rzts`/`.rzjs` partial is inlined at
+    // lowerToIR, never resolved to a synthetic id.
+    if (isPartialExtension(id)) return null;
     if (id.endsWith('.rozie')) {
       const abs = absolutize(id, importer);
       return abs + '.vue';
@@ -699,6 +731,31 @@ function threadParamTypesForPipeline(
   threadParamTypes(ir, filePath, cache, resolver, acc);
 }
 
+/**
+ * Phase 54 (Plan 04) — build the `LowerOptions` fields that drive
+ * `inlineScriptPartials` for one per-target unplugin pipeline.
+ *
+ * `inlineScriptPartials` runs as the FIRST pass inside `lowerToIR` (the single
+ * chokepoint compile()/CLI and all six per-target unplugin pipelines share). To
+ * make the `.rzts`/`.rzjs` splice run IDENTICALLY at every build-tool
+ * entrypoint, each pipeline must thread the same `resolver` + host `filename`
+ * that `compile()` threads. We construct the resolver with the SAME discipline
+ * `threadParamTypesForPipeline` already uses — a `ProducerResolver` rooted at
+ * the host file's directory — so the inline pass resolves sibling `./expand`
+ * → `expand.rzts` requests consistently. Output stays a pure function of inputs
+ * (a fresh, short-lived resolver per call — no cross-pipeline cache state),
+ * preserving the byte-identical dist-parity invariant (RESEARCH Pitfall 1/2).
+ */
+function partialInlineLowerOptions(filePath: string): {
+  resolver: ProducerResolver;
+  filename: string;
+} {
+  return {
+    resolver: new ProducerResolver({ root: dirname(filePath) }),
+    filename: filePath,
+  };
+}
+
 // Phase 07.3 Plan 02 — parallel mediation for the consumer-side two-way
 // validator. Mirrors threadParamTypesForPipeline so each pipeline call site
 // runs ROZ949/ROZ950/ROZ951 against the same per-call cache + resolver as
@@ -769,7 +826,12 @@ function runRoziePipeline(
   }
 
   // 2. lowerToIR (semantic + IR build)
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  // Phase 54 — thread the producer resolver + host filename so the
+  // `.rzts`/`.rzjs` inline pass runs identically to compile()/CLI here.
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...partialInlineLowerOptions(filePath),
+  });
   // Surface parse-time warnings + IR-time warnings together
   const warnings: Diagnostic[] = [...parseDiags.filter((d) => d.severity === 'warning'), ...irDiags.filter((d) => d.severity === 'warning')];
   const irErrors = irDiags.filter((d) => d.severity === 'error');
@@ -846,6 +908,10 @@ function runReactPipeline(
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
+    // Phase 54 — thread the producer resolver + host filename so the
+    // `.rzts`/`.rzjs` inline pass (first step of lowerToIR) runs identically
+    // to compile()/CLI at this build-tool entrypoint.
+    ...partialInlineLowerOptions(filePath),
     ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
   });
   const warnings: Diagnostic[] = [
@@ -923,6 +989,10 @@ function runSveltePipeline(
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
+    // Phase 54 — thread the producer resolver + host filename so the
+    // `.rzts`/`.rzjs` inline pass (first step of lowerToIR) runs identically
+    // to compile()/CLI at this build-tool entrypoint.
+    ...partialInlineLowerOptions(filePath),
     ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
   });
   const warnings: Diagnostic[] = [
@@ -1002,6 +1072,10 @@ function runSolidPipeline(
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
+    // Phase 54 — thread the producer resolver + host filename so the
+    // `.rzts`/`.rzjs` inline pass (first step of lowerToIR) runs identically
+    // to compile()/CLI at this build-tool entrypoint.
+    ...partialInlineLowerOptions(filePath),
     ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
   });
   const warnings: Diagnostic[] = [
@@ -1080,6 +1154,10 @@ function runLitPipeline(
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
+    // Phase 54 — thread the producer resolver + host filename so the
+    // `.rzts`/`.rzjs` inline pass (first step of lowerToIR) runs identically
+    // to compile()/CLI at this build-tool entrypoint.
+    ...partialInlineLowerOptions(filePath),
     ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
   });
   const warnings: Diagnostic[] = [
@@ -1169,6 +1247,10 @@ function runAngularPipeline(
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
+    // Phase 54 — thread the producer resolver + host filename so the
+    // `.rzts`/`.rzjs` inline pass (first step of lowerToIR) runs identically
+    // to compile()/CLI at this build-tool entrypoint.
+    ...partialInlineLowerOptions(filePath),
     ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
   });
   const warnings: Diagnostic[] = [
@@ -1495,7 +1577,13 @@ function runAngularEmitForDisk(
     const first = parseDiags.find((d) => d.severity === 'error');
     throw new Error(`[${first?.code ?? 'parse'}] ${first?.message ?? 'parse error'}`);
   }
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  // Phase 54 — thread the producer resolver + host filename so the
+  // `.rzts`/`.rzjs` inline pass runs IDENTICALLY to the Vite-runtime leg
+  // (runAngularPipeline) and compile()/CLI; the two Angular legs cannot diverge.
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...partialInlineLowerOptions(filePath),
+  });
   const irError = irDiags.find((d) => d.severity === 'error');
   if (!ir || irError) {
     throw new Error(`[${irError?.code ?? 'lower'}] ${irError?.message ?? 'lowering error'}`);
