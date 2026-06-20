@@ -575,6 +575,98 @@ describe('inlineScriptPartials', () => {
     }
   });
 
+  // WR-01 (RED) — heterogeneous SplicedEmitBlock over-shift on whole-program
+  // (Solid) emit. A partial that BOTH (a) freshly hoists a NEW module import the
+  // host does not already import AND (b) imports a partial-of-partial groups its
+  // file-top-emitted hoist together with its body-emitted nested + parent decls
+  // under ONE constant emit-line offset anchored to the HOIST. The first spliced
+  // body decl is therefore pushed DOWN by the partial's import-section height
+  // (over-shift), and the nested-file ↔ parent-file decl boundary carries a
+  // meaningless cross-file line delta. This proves both defects numerically; the
+  // Task-2 fix (split the block: hoist group anchored in the import region + one
+  // contiguous decl run per source file anchored sequentially) makes it green.
+  it('WR-01: a fresh-hoist + nested-partial block anchors the first decl host-contiguously and flows the nested boundary by one blank line', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    // partialOuterD freshly hoists `{ clampD }` from a plain .js module (NOT a
+    // partial — hoisted as-is, never read, so the file need not exist) AND imports
+    // `{ inner }` from a sibling .rzts partial (a partial-of-partial). `outer`
+    // sits on partialOuterD-local line 3; `clampD` import on line 1.
+    const outer = stagePartial(
+      'partialOuterD.rzts',
+      [
+        `import { clampD } from './wr01-helpers.js';`,
+        `import { inner } from './partialInnerD.rzts';`,
+        `export const outer = $computed(() => clampD(inner + $props.base));`,
+      ].join('\n'),
+    );
+    // partialInnerD: a LEADING BLANK line pushes `inner` to partialInnerD-local
+    // line 2 (NOT line 1) so its line-space is provably incommensurate with the
+    // hoist's line 1 — without this the buggy single-offset would coincidentally
+    // land `inner` on the right line and mask the defect.
+    writeFileSync(
+      join(dirname(outer.path), 'partialInnerD.rzts'),
+      `\nexport const inner = $computed(() => $props.base + 10);`,
+      'utf8',
+    );
+    try {
+      // Pad the host with three decls so the sequential anchor (prevEnd + 2) is a
+      // meaningful, computable value distinct from the partial-local line-spaces.
+      const host = moduleFile(
+        [
+          `const padA = 1;`,
+          `const padB = 2;`,
+          `const padC = 3;`,
+          `import { outer } from '${outer.path.replace(/\\/g, '\\\\')}';`,
+        ].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const body = bodyOf(result.ast ?? host);
+      const findDecl = (name: string) =>
+        body.find(
+          (s): s is t.VariableDeclaration =>
+            s.type === 'VariableDeclaration' &&
+            s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === name),
+        );
+      const padC = findDecl('padC');
+      const innerDecl = findDecl('inner');
+      const outerDecl = findDecl('outer');
+      expect(padC).toBeDefined();
+      expect(innerDecl).toBeDefined();
+      expect(outerDecl).toBeDefined();
+
+      // The sequential anchor normalizeSplicedEmitLines derives for the first
+      // spliced run: one blank line below the preceding residual-body statement.
+      const expectedAnchor = padC!.loc!.end.line + 2;
+
+      // Test 1 (hoist over-shift): the FIRST spliced body decl (`inner`) is
+      // HOST-CONTIGUOUS — exactly at the sequential anchor — NOT pushed down by the
+      // partial's import-section height. RED today: the single hoist-anchored
+      // offset lands it at anchor + (innerLine − hoistLine).
+      expect(innerDecl!.loc!.start.line).toBe(expectedAnchor);
+
+      // Test 2 (nested boundary): the parent (file-A `outer`) decl run flows ONE
+      // blank line below the nested (file-B `inner`) decl run. RED today: the
+      // shared block offset yields a meaningless cross-file delta.
+      expect(outerDecl!.loc!.start.line - innerDecl!.loc!.end.line).toBe(2);
+
+      // Preserved invariants — `loc.filename` resolves to each decl's OWN .rzts,
+      // and the true partial-local origin line rides extra.__roziePartialOrigin.
+      expect(innerDecl!.loc?.filename ?? '').toContain('partialInnerD.rzts');
+      expect(outerDecl!.loc?.filename ?? '').toContain('partialOuterD.rzts');
+      const innerOrigin = (
+        innerDecl!.extra as { __roziePartialOrigin?: { line?: number } } | undefined
+      )?.__roziePartialOrigin;
+      const outerOrigin = (
+        outerDecl!.extra as { __roziePartialOrigin?: { line?: number } } | undefined
+      )?.__roziePartialOrigin;
+      expect(innerOrigin?.line).toBe(2);
+      expect(outerOrigin?.line).toBe(3);
+    } finally {
+      outer.dispose();
+    }
+  });
+
   // IN-02 — a type-only HELPER declaration referenced only in a type position
   // (`type Alias = Helper`) is pulled into the inline closure by the extended
   // reference collection, not tree-shaken away.
