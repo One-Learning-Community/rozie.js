@@ -74,6 +74,13 @@ export default declare((api, options: RozieBabelPluginOptions): PluginObj => {
     visitor: {
       ImportDeclaration(path, state) {
         const src = path.node.source.value;
+        // Phase 54 negative route: this guard is INTENTIONALLY `.rozie`-only.
+        // A `.rzts`/`.rzjs` script-partial import falls through here and is NOT
+        // intercepted — it has no standalone module surface to compile, so it
+        // must never trigger compileImport → writeSiblingIfStale (no `Foo.tsx`
+        // sibling for a partial). Partials vanish into the host's emitted module
+        // at lowerToIR inline time; the host's compiled sibling already carries
+        // the inlined declarations. Do NOT widen this guard to the partial exts.
         if (!src.endsWith(ROZIE_EXT)) return;
 
         // state.filename is the importer; needed to resolve the relative

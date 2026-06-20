@@ -260,7 +260,19 @@ describe('inlineScriptPartials — negative routing', () => {
   // A `.rzts`/`.rzjs` import is a COMPILE-TIME inline, NOT a module — it must
   // NOT produce an `@rozie/unplugin` virtual id. (Contrast `.rozie`, which IS
   // replaced with a compiled module + virtual id.)
-  it.skip('a .rzts import yields NO unplugin virtual id', async () => {
+  //
+  // Plan 04 wired exactly this predicate into the unplugin entrypoint: every
+  // `createResolveIdHook` branch (Vue/React/Svelte/Solid/Lit/Angular) and
+  // `transformIncludeRozie` now early-return `null`/`false` when
+  // `isPartialExtension(id)` is true (transform.ts), so a partial id never
+  // becomes a synthetic `.rozie.{vue,tsx,svelte,ts}` virtual id. Asserting the
+  // shared predicate here is the entrypoint-agnostic contract; the byte-identity
+  // proof that a partial emits no virtual module is the dist-parity Leg-3 gate
+  // (partial-inline-parity.test.ts, blessed in Plan 05). A direct import of the
+  // unplugin hooks from this core unit test is deliberately avoided — core does
+  // not depend on @rozie/unplugin and inverting that edge would flood turbo with
+  // phantom build-order errors.
+  it('a .rzts import yields NO unplugin virtual id', async () => {
     const { isPartialExtension } = await import('../inlineScriptPartials.js');
     // The routing predicate the unplugin resolveId path consults: a partial
     // extension is handled inline (no virtual id emitted), never as a module.
@@ -268,15 +280,27 @@ describe('inlineScriptPartials — negative routing', () => {
     expect(isPartialExtension('./logic.rzjs')).toBe(true);
     expect(isPartialExtension('./component.rozie')).toBe(false);
     expect(isPartialExtension('./plain.ts')).toBe(false);
+    expect(isPartialExtension('./plain.js')).toBe(false);
   });
 
   // A `.rzts`/`.rzjs` import must NOT produce a `babel-plugin-rozie` sibling
   // file (the `.rozie` path writes a compiled sibling; the partial path does
   // not — it is consumed by the host's compile, never emitted standalone).
-  it.skip('a .rzts import produces NO babel sibling artifact', async () => {
+  //
+  // Plan 04 left babel-plugin/src/index.ts's ImportDeclaration guard
+  // INTENTIONALLY `.rozie`-only (`if (!src.endsWith('.rozie')) return;`), so a
+  // partial import falls through and never reaches compileImport →
+  // writeSiblingIfStale. The same shared predicate gates both entrypoints; the
+  // no-sibling byte proof on the babel path is the dist-parity Leg-3 gate
+  // (Plan 05). See babel-plugin/src/index.ts for the explanatory comment.
+  it('a .rzts import produces NO babel sibling artifact', async () => {
     const { isPartialExtension } = await import('../inlineScriptPartials.js');
     // The babel-plugin import-interception consults the same predicate to skip
     // sibling emission for partials.
     expect(isPartialExtension('./logic.rzts')).toBe(true);
+    expect(isPartialExtension('./logic.rzjs')).toBe(true);
+    // A real `.rozie` import DOES emit a sibling — the partial exts must be the
+    // only ones excluded from that path.
+    expect(isPartialExtension('./Widget.rozie')).toBe(false);
   });
 });
