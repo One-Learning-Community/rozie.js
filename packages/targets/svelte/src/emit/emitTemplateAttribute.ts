@@ -700,6 +700,22 @@ export function emitSingleAttr(
     // structurally (no wrap), and `value`/`checked` on a form input are
     // controlled-input props (no wrap). A non-primitive value renders portable
     // JSON; raw otherwise (SPEC-3).
+    // 260620-kby — a non-provably-string single `:class` binding (array/
+    // identifier/member/call/conditional — `wrapForDisplay=true`, NOT an
+    // object literal which Svelte handles natively) is normalized through
+    // `rozieClass` so an array/object class value renders a valid space-joined
+    // string instead of `String()`-ing it to `a,b`. `rozieClass(...)` stays the
+    // DIRECT binding-site value (never a hoisted const) so Svelte 5 rune
+    // reactivity re-reads it. This precedes the generic `rozieAttr` wrap below.
+    if (
+      attr.name === 'class' &&
+      attr.wrapForDisplay &&
+      !t.isObjectExpression(attr.expression) &&
+      shouldWrapSvelteAttrBinding(attr.name, attr.expression, ctx)
+    ) {
+      ctx.runtimeImports?.add('rozieClass');
+      return `${outName}={rozieClass(${expr})}`;
+    }
     if (attr.wrapForDisplay && shouldWrapSvelteAttrBinding(attr.name, attr.expression, ctx)) {
       // 260608-sya — whole-value attribute binding (`attr.kind === 'binding'`):
       // route through `rozieAttr` so a nullish value DROPS the attribute
@@ -765,6 +781,10 @@ function attrToArraySegment(
   attr: AttributeBinding,
   ir: IRComponent,
   runtimeImports?: Set<string>,
+  // 260620-kby — true when this segment belongs to a `class` merge (vs a
+  // `style` merge). Only a class member swaps the non-object wrap from
+  // `rozieDisplay` to `rozieClass`; the style merge keeps `rozieDisplay`.
+  isClass = false,
 ): string {
   if (attr.kind === 'twoWayBinding') {
     // Phase 07.3 Wave 3 stub — twoWayBinding never valid in class/style merge.
@@ -783,6 +803,14 @@ function attrToArraySegment(
     // class-condition object that Svelte's array-class syntax handles natively
     // — wrapping it would JSON-stringify the conditions and break the toggle.
     if (attr.wrapForDisplay && !t.isObjectExpression(attr.expression)) {
+      // 260620-kby — a class merge member normalizes an array/object class
+      // value through `rozieClass` (valid space-joined string) instead of
+      // `rozieDisplay` (which JSON-stringified an array). The style merge keeps
+      // `rozieDisplay`.
+      if (isClass) {
+        runtimeImports?.add('rozieClass');
+        return `rozieClass(${code})`;
+      }
       runtimeImports?.add('rozieDisplay');
       return `rozieDisplay(${code})`;
     }
@@ -960,7 +988,9 @@ export function emitAttributes(
           }
         }
         for (const x of merged) consumed.add(x);
-        const segments = merged.map((x) => attrToArraySegment(x, ctx.ir, ctx.runtimeImports));
+        const segments = merged.map((x) =>
+          attrToArraySegment(x, ctx.ir, ctx.runtimeImports, a.name === 'class'),
+        );
         // R6 opaque-spread class merge: append a `(spread)?.class` read for
         // every opaque spread to the array tail. Svelte's array-class syntax
         // filters falsy entries, so a consumer who passed no class contributes

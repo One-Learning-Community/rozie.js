@@ -491,8 +491,18 @@ function shouldWrapAttrBinding(
   // React/Solid/Svelte `shouldWrapAttrBinding` style exclusion (260608-sya — this
   // was the lone Angular omission; without it `:style` wrongly routed through the
   // display-wrap branch, and the nullish-drop `[attr.*]` forcing then mangled it
-  // to `[attr.style]`). `:class` never reaches here — it has its own merge path.
+  // to `[attr.style]`).
   if (name === 'style') return false;
+  // 260620-kby — `:class` is a structural binding, not display text. Angular
+  // (≥19 floor) native `[class]="<expr>"` accepts `string | string[] |
+  // Record<string,boolean>` directly, normalizing every shape with NO inlined
+  // helper and NO core edit. Without this exemption a single `:class="arr"`
+  // wrongly routed through the display-wrap branch → `[attr.class]="rozieAttr(
+  // arr)"` → `String()`'d the array to `a,b`. The merge path (`[ngClass]`) is
+  // already natively array/object-capable. Mirrors the `style` exclusion above.
+  // (annotateDisplayWrap skip-:class was rejected to keep the change off
+  // packages/core/* and off the active-core-session file set.)
+  if (name === 'class') return false;
   if (t.isObjectExpression(expr)) return false;
   return true;
 }

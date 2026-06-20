@@ -1,0 +1,9 @@
+{
+  "id": "REG-CLASS-NORM-001",
+  "source": "quick/260620-kby-rozie-class-normalizer",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260620-kby",
+  "desc": "The 7 :class shapes (string-literal, string-typed prop, array literal, object literal, array-via-prop, object-via-prop, static+dynamic merge) lower to a valid single space-joined class string on all 6 targets — never a,b / [object Object] / JSON.",
+  "targets": ["lit", "vue", "react", "svelte", "angular", "solid"],
+  "discoveredBy": "sortable-list class hooks (260620-gqx)"
+}

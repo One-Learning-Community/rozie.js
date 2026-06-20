@@ -175,7 +175,16 @@ export type RuntimeLitImport =
    * on a nullish value so the attribute is DROPPED (matching Vue's `:attr`
    * binding), instead of rendering `attr=""`.
    */
-  | 'rozieAttr';
+  | 'rozieAttr'
+  /**
+   * 260620-kby — clsx-style `:class` normalizer, shipped from
+   * `@rozie/runtime-lit`. Added by the class-binding emitter ONLY on a
+   * non-provably-string (`wrapForDisplay=true`) plain `:class` binding, so a
+   * provably-string / object-literal class component's `@rozie/runtime-lit`
+   * import line stays byte-identical. Replaces the prior `rozieDisplay` wrap on
+   * the plain-class branch (which JSON-stringified an array class value).
+   */
+  | 'rozieClass';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

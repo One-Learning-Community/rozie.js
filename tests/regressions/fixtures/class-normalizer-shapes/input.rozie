@@ -1,0 +1,19 @@
+<rozie name="ClassNormShapes">
+<props>{
+  variant: { type: String, default: 'primary' },
+  arr: { type: Array, default: () => [] },
+  flags: { type: Object, default: () => ({}) }
+}</props>
+<data>{ cond: true }</data>
+<template>
+  <div>
+    <span class="static-a static-b" :class="'lit-a lit-b'">string literal</span>
+    <span :class="$props.variant">string-typed prop</span>
+    <span :class="['arr-a', $props.variant]">array literal</span>
+    <span :class="{ active: $data.cond }">object literal</span>
+    <span :class="$props.arr">array via prop</span>
+    <span :class="$props.flags">object via prop</span>
+    <span class="base" :class="$props.arr">static + dynamic merge</span>
+  </div>
+</template>
+</rozie>

@@ -1215,13 +1215,16 @@ function emitElementOpenTag(
       const staticPart = staticClassValues.length > 0
         ? `${staticClassValues.join(' ')} `
         : '';
-      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive plain `:class` binding so
-      // the class token renders portable JSON instead of `[object Object]`. Raw
-      // otherwise (SPEC-3).
+      // 260620-kby — normalize a non-provably-string plain `:class` binding
+      // through `rozieClass` so an array/object class value renders a valid
+      // space-joined string instead of JSON / `a,b` / `[object Object]` (this
+      // REPLACES the prior `rozieDisplay` wrap, which JSON-stringified an array).
+      // `rozieClass(...)` stays the DIRECT binding-site value. Raw otherwise
+      // (provably-string, `wrapForDisplay=false` → byte-identical, SPEC-3).
       let classExpr = expr;
       if (bindingClass.wrapForDisplay) {
-        opts.runtime.add('rozieDisplay');
-        classExpr = `rozieDisplay(${expr})`;
+        opts.runtime.add('rozieClass');
+        classExpr = `rozieClass(${expr})`;
       }
       // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
       parts.push(`class="${staticPart}\${(${classExpr})}"`);

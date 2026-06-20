@@ -400,6 +400,17 @@ function composeClassValue(
       // Object form: { active: isActive } → keep as-is (no styles lookup)
       return renderExpr(a.expression, ir, exprOpts);
     }
+    // A non-provably-string single `:class` binding (array/identifier/member/
+    // call/conditional — `wrapForDisplay=true`) is normalized through
+    // `rozieClass` (quick task 260620-kby) so an array/object class value
+    // renders a valid space-joined string instead of `a,b` / `[object Object]`.
+    // `rozieClass(...)` stays the DIRECT binding-site value (never a hoisted
+    // const) so Solid fine-grained reactivity re-reads it. Provably-string
+    // bindings (`wrapForDisplay=false`) stay byte-identical (raw renderExpr).
+    if (a.wrapForDisplay) {
+      runtime?.add('rozieClass');
+      return `rozieClass(${renderExpr(a.expression, ir, exprOpts)})`;
+    }
     return renderExpr(a.expression, ir, exprOpts);
   }
 
@@ -447,7 +458,17 @@ function composeClassValue(
       // silently dropping the static class and the intended branch. The wrap
       // isolates the binding as one operand. (Single-source bindings emit via
       // the early-return path above and are already self-delimited.)
-      parts.push(`(${renderExpr(a.expression, ir, exprOpts)})`);
+      //
+      // A non-provably-string merge member (`wrapForDisplay=true`) is normalized
+      // through `rozieClass` (quick task 260620-kby) — a self-delimited call, so
+      // it needs no extra parens in the `+ " " +` concat. Provably-string
+      // members stay the byte-identical parenthesized raw form.
+      if (a.wrapForDisplay) {
+        runtime?.add('rozieClass');
+        parts.push(`rozieClass(${renderExpr(a.expression, ir, exprOpts)})`);
+      } else {
+        parts.push(`(${renderExpr(a.expression, ir, exprOpts)})`);
+      }
     } else if (a.kind === 'spreadBinding') {
       // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
       // class merge (no name to coalesce on). Unreachable; mirrors the

@@ -67,6 +67,11 @@ export type RuntimeSolidImport =
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
   | 'rozieAttr'
+  // 260620-kby — clsx-style `:class` normalizer. Added by the class-binding
+  // emitter ONLY on a non-provably-string (`wrapForDisplay=true`) class binding,
+  // so a provably-string / object-literal class component's
+  // `@rozie/runtime-solid` import line stays byte-identical.
+  | 'rozieClass'
   // Phase 36 ($provide/$inject) — globalThis-backed Solid context registry.
   // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
   // non-context component's `@rozie/runtime-solid` import line stays

@@ -505,7 +505,7 @@ function composeClassName(
   const segments: Array<
     | { kind: 'staticTokens'; tokens: string[] }
     | { kind: 'objectBinding'; expr: t.ObjectExpression }
-    | { kind: 'plainBinding'; expr: t.Expression }
+    | { kind: 'plainBinding'; expr: t.Expression; wrapForDisplay?: boolean }
     | { kind: 'interpolated'; segments: InterpolatedSeg[] }
   > = [];
 
@@ -522,7 +522,11 @@ function composeClassName(
       if (isObjectLiteralExpression(a.expression)) {
         segments.push({ kind: 'objectBinding', expr: a.expression as t.ObjectExpression });
       } else {
-        segments.push({ kind: 'plainBinding', expr: a.expression });
+        segments.push({
+          kind: 'plainBinding',
+          expr: a.expression,
+          wrapForDisplay: a.wrapForDisplay,
+        });
       }
     } else if (a.kind === 'spreadBinding') {
       // Phase 14 — `spreadBinding` is the name-less kind: `bucket()` skips it
@@ -559,7 +563,20 @@ function composeClassName(
 
   // CASE C: Single plain binding (e.g., :class="someComputed")
   if (segments.length === 1 && segments[0]!.kind === 'plainBinding') {
-    const seg = segments[0]! as { kind: 'plainBinding'; expr: t.Expression };
+    const seg = segments[0]! as {
+      kind: 'plainBinding';
+      expr: t.Expression;
+      wrapForDisplay?: boolean;
+    };
+    // A non-provably-string `:class` binding (array/object/identifier/member/
+    // call/conditional — `wrapForDisplay=true`) is normalized through `clsx`
+    // (quick task 260620-kby) so an array/object class value renders a valid
+    // space-joined string instead of `a,b` / `[object Object]` / JSON. Provably-
+    // string bindings (`wrapForDisplay=false`) stay byte-identical below.
+    if (seg.wrapForDisplay) {
+      ctx.collectors.runtime.add('clsx');
+      return `clsx(${renderExpr(seg.expr, ir)})`;
+    }
     // A plain-binding `:class` whose expression is a statically-shaped string
     // — a string literal or a template literal — IS tokenisable at compile
     // time, so it is routed through `renderInterpolatedClass` for consistent
