@@ -53,6 +53,8 @@ import { validateClone } from './validateClone.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import { deconflictStateExposeCollision } from '../rewrite/deconflict.js';
+import { inlineScriptPartials } from './inlineScriptPartials.js';
+import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
 
 /**
@@ -74,6 +76,21 @@ export interface LowerOptions {
    * raw (no `rozieDisplay` wrap). Absent here → falls through to the default.
    */
   safeInterpolation?: boolean;
+  /**
+   * Phase 54 — producer resolver used by `inlineScriptPartials` to resolve
+   * `.rzts`/`.rzjs` partial import specifiers from the host `<script>` block.
+   * Threaded from `compile()` (and each `@rozie/unplugin` pipeline, Plan 04).
+   * When omitted, the inline pass constructs a fresh resolver rooted at
+   * `dirname(filename)` (or cwd) so direct `lowerToIR` callers/tests still
+   * resolve sibling partials.
+   */
+  resolver?: ProducerResolver;
+  /**
+   * Phase 54 — absolute path of the host `.rozie` file. Used as the `fromFile`
+   * for partial resolution and as the origin label on resolve-failure
+   * diagnostics. Absent → the inline pass resolves relative to cwd.
+   */
+  filename?: string;
 }
 
 /**
@@ -123,10 +140,30 @@ function emptyStyles(): StyleSection {
  * @param opts - { modifierRegistry } — must be populated; createDefaultRegistry() for the default set
  */
 export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
-  // Run semantic analysis (collectors + 3 validators) first.
+  const diagnostics: Diagnostic[] = [];
+
+  // Phase 54 — inline `.rzts`/`.rzjs` script partials into the host `<script>`
+  // program BEFORE analyzeAST observes the body. The pass mutates
+  // `ast.script.program` in place (IR-04: that program is referentially the
+  // SAME node threaded into `setupBody.scriptProgram`), so every downstream
+  // stage — binder, dep graph, all six emitters — treats the spliced
+  // declarations as host-authored. This is the byte-identical invariant for
+  // free. Runs HERE (the single lowerToIR chokepoint compile() AND
+  // @rozie/unplugin share) so partials resolve identically on every entrypoint.
+  // Collected-not-thrown (D-08): resolve failures push diagnostics, never throw.
+  if (ast.script) {
+    const { diagnostics: partialDiags } = inlineScriptPartials(ast.script.program, {
+      ...(opts.filename !== undefined ? { hostFilename: opts.filename } : {}),
+      ...(opts.resolver !== undefined ? { resolver: opts.resolver } : {}),
+    });
+    diagnostics.push(...partialDiags);
+  }
+
+  // Run semantic analysis (collectors + 3 validators) after the splice so the
+  // binder validates inlined `$props.x`/`$data.y` refs against the host scope.
   const { bindings, diagnostics: semDiags } = analyzeAST(ast);
   const depGraph = buildReactiveDepGraph(ast, bindings);
-  const diagnostics: Diagnostic[] = [...semDiags];
+  diagnostics.push(...semDiags);
 
   // No content blocks at all → no IR (rare; parse() typically rejects sources
   // without a <rozie> envelope before this point).

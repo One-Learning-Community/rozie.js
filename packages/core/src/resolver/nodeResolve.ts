@@ -5,7 +5,7 @@
  * Phase 07.2 Plan 01 Task 3.
  *
  * Per RESEARCH §"Pattern 2: Module Resolver (D-02 + D-12)" + RESEARCH Pitfall 1:
- *   - extensions:    ['.rozie', '.ts', '.tsx', '.js', '.jsx', '.mjs']
+ *   - extensions:    ['.rozie', '.rzts', '.rzjs', '.ts', '.tsx', '.js', '.jsx', '.mjs']
  *   - conditionNames: ['rozie', 'import', 'default']
  *   - symlinks:       true                                    — pnpm-friendly
  *   - exportsFields: ['exports']
@@ -47,7 +47,10 @@ export function getRozieResolverOptions(): {
 } {
   return {
     fileSystem: fs,
-    extensions: ['.rozie', '.ts', '.tsx', '.js', '.jsx', '.mjs'],
+    // Phase 54 — `.rzts` / `.rzjs` script partials (D-01) ordered BEFORE
+    // `.ts` / `.js` so a bare `./expand` request prefers the partial. MUST stay
+    // lockstep with the frozen mirror below or shape-introspection tests drift.
+    extensions: ['.rozie', '.rzts', '.rzjs', '.ts', '.tsx', '.js', '.jsx', '.mjs'],
     conditionNames: ['rozie', 'import', 'default'],
     symlinks: true,
     exportsFields: ['exports'],
@@ -68,7 +71,8 @@ export function getRozieResolverOptions(): {
  */
 export const ROZIE_RESOLVER_OPTIONS = Object.freeze({
   ...getRozieResolverOptions(),
-  extensions: Object.freeze(['.rozie', '.ts', '.tsx', '.js', '.jsx', '.mjs']),
+  // Phase 54 — keep lockstep with getRozieResolverOptions().extensions above.
+  extensions: Object.freeze(['.rozie', '.rzts', '.rzjs', '.ts', '.tsx', '.js', '.jsx', '.mjs']),
   conditionNames: Object.freeze(['rozie', 'import', 'default']),
   exportsFields: Object.freeze(['exports']),
 });

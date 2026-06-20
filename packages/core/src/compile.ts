@@ -264,6 +264,18 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     return fail(parseDiags);
   }
 
+  // Phase 07.2 — the cache + resolver are per-compiler-instance (D-01).
+  // Construct them HERE (before lowerToIR) — hoisted above the threadParamTypes
+  // site below — so the SAME ProducerResolver also threads into lowerToIR for
+  // Phase 54 `.rzts`/`.rzjs` script-partial resolution. Output is a pure
+  // function of (consumerSource, producerSource), not of cache-fill order
+  // (RESEARCH Pitfall 2). Each entrypoint derives `resolverRoot` from one source
+  // of truth to preserve byte-identical dist-parity (RESEARCH Pitfall 1).
+  const cache = opts.irCache ?? new IRCache({ modifierRegistry: registry });
+  const resolver =
+    opts.resolver ??
+    new ProducerResolver({ root: opts.resolverRoot ?? process.cwd() });
+
   // 2. lowerToIR
   // Phase 26 (D-11) — thread the GLOBAL `safeInterpolation` opt-out into the
   // lowerer via conditional-spread (mirror the `angular.cva` spread below) so
@@ -271,11 +283,18 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // (`?? true`) keeps dist-parity byte-identical to today. The per-component
   // `<rozie safe-interpolation="…">` envelope attr (captured by the splitter,
   // Plan 06) wins over this in lower.ts. NEVER pass `safeInterpolation: undefined`.
+  //
+  // Phase 54 — thread the producer `resolver` + host `filename` so
+  // `inlineScriptPartials` (first pass inside lowerToIR) can resolve + splice
+  // `.rzts`/`.rzjs` script partials. Conditional-spread on `filename` keeps the
+  // key absent under exactOptionalPropertyTypes when no filename was supplied.
   const { ir, diagnostics: irDiags } = lowerToIR(ast, {
     modifierRegistry: registry,
     ...(opts.safeInterpolation !== undefined
       ? { safeInterpolation: opts.safeInterpolation }
       : {}),
+    resolver,
+    ...(filename !== undefined ? { filename } : {}),
   });
   const acc: Diagnostic[] = [...parseDiags, ...irDiags];
   // Phase 07.3 Plan 02 — defer the irDiags-error gate until AFTER validators
@@ -293,14 +312,10 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   }
 
   // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
-  // The cache + resolver are per-compiler-instance (D-01). Construct per-call
-  // when callers don't pass pre-built ones. Output is a pure function of
-  // (consumerSource, producerSource), not of cache-fill order (RESEARCH
-  // Pitfall 2 — cache iteration order MUST NEVER drive emit decisions).
-  const cache = opts.irCache ?? new IRCache({ modifierRegistry: registry });
-  const resolver =
-    opts.resolver ??
-    new ProducerResolver({ root: opts.resolverRoot ?? process.cwd() });
+  // Uses the `cache` + `resolver` constructed above (hoisted so the same
+  // resolver also feeds Phase 54 partial inlining in lowerToIR). Output is a
+  // pure function of (consumerSource, producerSource), not of cache-fill order
+  // (RESEARCH Pitfall 2 — cache iteration order MUST NEVER drive emit decisions).
   threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, acc);
 
   // 2.55. Phase 38 — flag scoped <style> rules whose subject class/tag is used
