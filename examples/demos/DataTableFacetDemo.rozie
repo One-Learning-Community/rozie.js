@@ -88,7 +88,13 @@ const toggleCategory = (value: string): void => {
 
 // Drive the numeric range-slider upper bound (req-9) → rewrite columnFilters with a
 // [min, max] price filter as a FRESH array. The lower bound is the exposed minimum (10).
-const setPriceMax = (value: number, min: number): void => {
+// NAMED applyPriceFilter, NOT setPriceMax: a `set<DataField>` function collides with the
+// React/Solid auto-generated useState setter for the `priceMax` data field (`setPriceMax`),
+// so an `@input="setPriceMax(...)"` binding would call the bare state setter (priceMax=arg0,
+// arg1 dropped) instead of this handler → columnFilters never updates and the range filter
+// silently no-ops on React/Solid (it worked on Vue/Svelte/Angular/Lit, which emit no such
+// setter). Renaming sidesteps the data-field-setter shadow.
+const applyPriceFilter = (value: number, min: number): void => {
   $data.priceMax = value
   const next = $data.columnFilters.filter((f: { id: string }) => f.id !== 'price')
   next.push({ id: 'price', value: [min, value] })
@@ -170,7 +176,7 @@ const callGetMinMax = (): void => {
             :min="minMax[0]"
             :max="minMax[1]"
             :value="$data.priceMax"
-            @input="setPriceMax(Number($event.target.value), minMax[0])"
+            @input="applyPriceFilter(Number($event.target.value), minMax[0])"
           />
           <span class="label">max {{ minMax[1] }}</span>
           <span class="readout" data-testid="facet-price-value">{{ $data.priceMax }}</span>
