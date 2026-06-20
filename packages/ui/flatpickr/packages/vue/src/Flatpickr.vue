@@ -106,7 +106,7 @@ function changeYear(year: any) {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  instance = flatpickr(inputElRef.value!, {
+  instance = (flatpickr as any)(inputElRef.value!, {
     mode: props.mode,
     dateFormat: props.dateFormat,
     altInput: props.altInput,

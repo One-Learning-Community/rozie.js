@@ -18,7 +18,7 @@ export default defineConfig({
       fileName: () => 'index.mjs',
     },
     rollupOptions: {
-      external: ['vue', 'cropperjs', /^vue\//],
+      external: ['vue', 'sortablejs', /^vue\//],
     },
   },
 });

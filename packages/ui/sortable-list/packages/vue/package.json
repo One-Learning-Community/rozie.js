@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/sortable-list-vue",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -27,12 +27,17 @@
   },
   "exports": {
     ".": {
-      "import": "./src/SortableList.vue",
-      "types": "./src/SortableList.vue",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/SortableList.vue",
       "default": "./src/SortableList.vue"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "peerDependencies": {
@@ -48,10 +53,20 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@types/sortablejs": "^1.15",
+    "@vitejs/plugin-vue": "^6",
+    "sortablejs": "^1.15",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
   }
 }

@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  const opts = {
+  const opts: Record<string, any> = {
     // :options passthrough spread FIRST — the curated keys below + the portal
     // *Content handlers added after this object override any colliding key, so
     // an explicitly-bound prop (e.g. :height) wins over options.height.
