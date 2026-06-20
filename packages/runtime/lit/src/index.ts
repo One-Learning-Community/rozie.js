@@ -39,3 +39,4 @@ export {
 } from './reconcileAfterDomMutation.js';
 export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
+export { rozieClass } from './rozieClass.js';

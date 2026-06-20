@@ -24,3 +24,4 @@
 export { applyListeners } from './applyListeners.js';
 export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
+export { rozieClass } from './rozieClass.js';
