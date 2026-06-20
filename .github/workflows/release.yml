@@ -56,8 +56,10 @@ jobs:
 
       # Build ONLY the 9 toolchain packages. We list them explicitly rather than
       # --filter='@rozie/*' because that glob also matches @rozie/docs and would
-      # drag in the heavy (OOM-prone) VitePress build. The 5 Vue leaves ship raw
-      # .vue source and need no build.
+      # drag in the heavy (OOM-prone) VitePress build. The 5 Vue leaves are built
+      # separately (the "Build Vue leaves" step below) into a compiled dist/
+      # drop-in (Vite lib mode + vue-tsc declaration emit) — they no longer ship
+      # raw .vue source only.
       - name: Build toolchain
         run: >
           pnpm turbo run build --force
@@ -110,6 +112,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+      # Build the 5 Vue leaves into their compiled dist/ drop-in (Vite lib mode +
+      # vue-tsc declaration emit). Each leaf's `build` script needs only its own
+      # devDeps (already installed by the frozen install above); it does NOT run
+      # codegen and does NOT depend on @rozie/core, so running it after the
+      # toolchain build is fine.
+      - name: Build Vue leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/flatpickr-vue
+          --filter=@rozie-ui/sortable-list-vue
+          --filter=@rozie-ui/cropper-vue
+          --filter=@rozie-ui/fullcalendar-vue
+          --filter=@rozie-ui/pdf-vue
+          build
 
       # Then the 5 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
