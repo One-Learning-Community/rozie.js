@@ -1,0 +1,127 @@
+name: Release (early subset)
+
+# Manual, provenance-backed npm publish for the FIRST release wave ONLY:
+#   - 9 @rozie/* toolchain packages (core, cli, unplugin, babel-plugin,
+#     runtime-{react,vue,svelte,solid,lit})
+#   - 5 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
+#     fullcalendar / pdf (the `-vue` packages)
+#
+# Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit
+# leaves depend on @rozie/runtime-* (only installable once the toolchain is on
+# npm), and data-table is not release-verified. Do NOT widen the --filter lists
+# below without updating the release runbook.
+#
+# Prerequisites:
+#   - Repo is PUBLIC (npm provenance requires a public source repo) — verified.
+#   - Secret NPM_TOKEN = an npm automation/granular token with publish rights to
+#     BOTH the @rozie and @rozie-ui scopes.
+#   - `id-token: write` (below) lets npm mint the provenance attestation via
+#     GitHub OIDC; without it, --provenance fails.
+#
+# SAFETY: dry_run defaults to TRUE. The first runs pack + validate but do NOT
+# publish. To actually publish, dispatch with dry_run = false.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (pack + validate only; do NOT publish)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance (OIDC)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build ONLY the 9 toolchain packages. We list them explicitly rather than
+      # --filter='@rozie/*' because that glob also matches @rozie/docs and would
+      # drag in the heavy (OOM-prone) VitePress build. The 5 Vue leaves ship raw
+      # .vue source and need no build.
+      - name: Build toolchain
+        run: >
+          pnpm turbo run build --force
+          --filter=@rozie/core
+          --filter=@rozie/cli
+          --filter=@rozie/unplugin
+          --filter=@rozie/babel-plugin
+          --filter=@rozie/runtime-react
+          --filter=@rozie/runtime-vue
+          --filter=@rozie/runtime-svelte
+          --filter=@rozie/runtime-solid
+          --filter=@rozie/runtime-lit
+
+      # Append the registry auth line to the existing project .npmrc. The token
+      # placeholder is left LITERAL here and expanded by pnpm at publish time
+      # from the NODE_AUTH_TOKEN env on the publish steps below.
+      - name: Configure npm auth
+        run: |
+          {
+            echo "registry=https://registry.npmjs.org/"
+            echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}'
+          } >> .npmrc
+
+      - name: Resolve publish flags
+        id: flags
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "extra=--dry-run" >> "$GITHUB_OUTPUT"
+            echo "::notice::DRY RUN — packing and validating only, nothing will be published."
+          else
+            echo "extra=" >> "$GITHUB_OUTPUT"
+            echo "::warning::LIVE PUBLISH — packages will be pushed to npm."
+          fi
+
+      # Toolchain first. pnpm rewrites workspace:* to the concrete 0.1.0 version
+      # in the tarball; npm publish does NOT, so this MUST go through pnpm.
+      - name: Publish toolchain (@rozie/*)
+        run: >
+          pnpm
+          --filter=@rozie/core
+          --filter=@rozie/cli
+          --filter=@rozie/unplugin
+          --filter=@rozie/babel-plugin
+          --filter=@rozie/runtime-react
+          --filter=@rozie/runtime-vue
+          --filter=@rozie/runtime-svelte
+          --filter=@rozie/runtime-solid
+          --filter=@rozie/runtime-lit
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # Then the 5 Vue leaves. They carry zero @rozie/* deps so they don't
+      # actually depend on the step above — ordering just keeps the log readable.
+      - name: Publish Vue leaves (@rozie-ui/*-vue)
+        run: >
+          pnpm
+          --filter=@rozie-ui/flatpickr-vue
+          --filter=@rozie-ui/sortable-list-vue
+          --filter=@rozie-ui/cropper-vue
+          --filter=@rozie-ui/fullcalendar-vue
+          --filter=@rozie-ui/pdf-vue
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
