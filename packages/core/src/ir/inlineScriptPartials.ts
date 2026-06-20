@@ -344,52 +344,84 @@ interface SplicedEmitBlock {
 }
 
 /**
+ * Shift a single Babel `Position` object's `.line` by `offset`, exactly once.
+ *
+ * CRITICAL (Phase 55-04 bug fix): `@babel/parser` SHARES one `Position` object
+ * across the `loc.start`/`loc.end` of nested nodes that begin/end at the same
+ * source position — e.g. a `const f = () => {...}` shares ONE `loc.end` object
+ * between the VariableDeclaration, VariableDeclarator, ArrowFunctionExpression
+ * and BlockStatement (verified: all four `.loc.end` are `===`). The earlier
+ * `seen`-keyed-on-the-`loc`-WRAPPER dedupe therefore shifted such a shared
+ * `Position` once PER wrapping node (4× for the example above), corrupting
+ * `loc.end.line` to `original + 4·offset` (~13985 for a host-line-3502 decl).
+ * That blew the trailing-comment delta hugely negative, collapsing a between-
+ * declaration comment onto the prior closing brace (`}; // comment`). Deduping on
+ * the `Position` object itself shifts each unique position exactly once. Never
+ * throws (D-04).
+ */
+function shiftPositionLine(
+  pos: { line: number } | null | undefined,
+  offset: number,
+  shifted: Set<object>,
+): void {
+  if (!pos || shifted.has(pos)) return;
+  shifted.add(pos);
+  pos.line += offset;
+}
+
+/**
  * Stash a node's `.rzts` origin (once, idempotent) then shift its `loc` lines by
  * `offset`. Byte offsets (`loc.start.index`/`loc.end.index`) and `loc.filename`
- * are NEVER touched. `seen` dedupes shared `loc` objects so a comment attached to
- * two adjacent statements is shifted exactly once (Pitfall 2). Never throws (D-04).
+ * are NEVER touched. `shifted` dedupes shared `Position` objects (see
+ * {@link shiftPositionLine}) so a position aliased across nested nodes — or a
+ * comment attached to two adjacent statements — is shifted exactly once
+ * (Pitfall 2). Never throws (D-04).
  */
-function stashAndShiftNode(node: t.Node, offset: number, seen: Set<object>): void {
+function stashAndShiftNode(node: t.Node, offset: number, shifted: Set<object>): void {
   const loc = node.loc;
-  if (!loc || seen.has(loc)) return;
-  seen.add(loc);
+  if (!loc) return;
   const extra = (node.extra ?? {}) as Record<string, unknown>;
   if (!('__roziePartialOrigin' in extra)) {
+    // Stash the pre-shift `.rzts` line. `loc.start` may already have been shifted
+    // if a previously-processed node aliases this exact start Position (rare for
+    // top-level decls, whose origins are the only ones Plan 03 reads); compensate
+    // so the stashed origin is always the true partial-local line.
+    const startAlreadyShifted = shifted.has(loc.start);
     node.extra = {
       ...extra,
       __roziePartialOrigin: {
-        line: loc.start.line,
+        line: loc.start.line - (startAlreadyShifted ? offset : 0),
         column: loc.start.column,
         filename: loc.filename,
       } satisfies PartialEmitOrigin,
     };
   }
-  loc.start.line += offset;
-  loc.end.line += offset;
+  shiftPositionLine(loc.start, offset, shifted);
+  shiftPositionLine(loc.end, offset, shifted);
 }
 
 /** As {@link stashAndShiftNode} but for a comment (origin stashed on the comment). */
-function stashAndShiftComment(comment: t.Comment, offset: number, seen: Set<object>): void {
+function stashAndShiftComment(comment: t.Comment, offset: number, shifted: Set<object>): void {
   const loc = comment.loc;
-  if (!loc || seen.has(loc)) return;
-  seen.add(loc);
+  if (!loc) return;
   const c = comment as t.Comment & WithPartialOrigin;
   if (c.__roziePartialOrigin === undefined) {
+    const startAlreadyShifted = shifted.has(loc.start);
     c.__roziePartialOrigin = {
-      line: loc.start.line,
+      line: loc.start.line - (startAlreadyShifted ? offset : 0),
       column: loc.start.column,
       filename: loc.filename,
     };
   }
-  loc.start.line += offset;
-  loc.end.line += offset;
+  shiftPositionLine(loc.start, offset, shifted);
+  shiftPositionLine(loc.end, offset, shifted);
 }
 
 /** Shift every leading/trailing/inner comment attached to `node`. */
-function shiftAttachedComments(node: t.Node, offset: number, seen: Set<object>): void {
-  for (const c of node.leadingComments ?? []) stashAndShiftComment(c, offset, seen);
-  for (const c of node.trailingComments ?? []) stashAndShiftComment(c, offset, seen);
-  for (const c of node.innerComments ?? []) stashAndShiftComment(c, offset, seen);
+function shiftAttachedComments(node: t.Node, offset: number, shifted: Set<object>): void {
+  for (const c of node.leadingComments ?? []) stashAndShiftComment(c, offset, shifted);
+  for (const c of node.trailingComments ?? []) stashAndShiftComment(c, offset, shifted);
+  for (const c of node.innerComments ?? []) stashAndShiftComment(c, offset, shifted);
 }
 
 /**
@@ -420,10 +452,13 @@ function normalizeSplicedEmitLines(blocks: SplicedEmitBlock[]): void {
     const first = block.nodes.find((n) => n.loc)?.loc;
     if (!first) continue;
     const offset = block.anchorLine - first.start.line;
-    const seen = new Set<object>();
+    // Dedupe on `Position` objects (not `loc` wrappers): `@babel/parser` aliases
+    // one `Position` across nested nodes' start/end, so wrapper-keyed dedupe
+    // double-shifts shared positions (Phase 55-04 bug; see shiftPositionLine).
+    const shifted = new Set<object>();
     for (const top of block.nodes) {
-      stashAndShiftNode(top, offset, seen);
-      shiftAttachedComments(top, offset, seen);
+      stashAndShiftNode(top, offset, shifted);
+      shiftAttachedComments(top, offset, shifted);
       // Reach NESTED nodes + their attached comments (Pitfall 2). Reuse the
       // already-imported `traverse` over a synthetic File wrapping the SAME node
       // objects (the established `referencedNames` pattern) — mutations land on
@@ -432,8 +467,8 @@ function normalizeSplicedEmitLines(blocks: SplicedEmitBlock[]): void {
       try {
         traverse(t.file(t.program([top as Statement])), {
           enter(path) {
-            stashAndShiftNode(path.node, offset, seen);
-            shiftAttachedComments(path.node, offset, seen);
+            stashAndShiftNode(path.node, offset, shifted);
+            shiftAttachedComments(path.node, offset, shifted);
           },
         });
       } catch {
