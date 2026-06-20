@@ -147,4 +147,83 @@ describe('composeMaps — D-100 shared helper', () => {
     expect(legacy.sources).toEqual(['Host.rozie']);
     expect(decode(legacy.mappings)[0]![0]![2]).toBe(39);
   });
+
+  it('Test 6 (WR-02): the line-restore clamps to 0 — never a negative original line', () => {
+    const ms = new MagicString('shell');
+    ms.overwrite(0, 1, 'S');
+    const RZTS = '/abs/p.rzts';
+    // A mis-attributed segment: original line 3, offset 16 → 3 − 16 = −13. The
+    // clamp must floor it at 0 so the encoded map stays a structurally-valid v3.
+    const childMap: EncodedSourceMap = {
+      version: 3,
+      sources: [RZTS],
+      sourcesContent: ['x'],
+      names: [],
+      mappings: encode([[[0, 0, 3, 0]]]),
+    };
+    const map = composeMaps({
+      filename: 'Host.rozie',
+      source: 'host source',
+      shellMs: ms,
+      children: [{ map: childMap, outputOffset: 0 }],
+      fileExt: '.tsx',
+      userCodeLineOffset: 0,
+      partialLineOffsets: new Map([[RZTS, 16]]),
+    });
+    const restored = decode(map.mappings)[0]![0]![2];
+    expect(restored).toBe(0); // clamped, NOT −13
+    expect(restored).toBeGreaterThanOrEqual(0);
+    // Round-trips through decode → encode without throwing (valid v3).
+    expect(() => encode(decode(map.mappings))).not.toThrow();
+  });
+
+  it('Test 7 (WR-03): exact source wins; an ambiguous bare basename never mis-attributes', () => {
+    // Two partials sharing the basename `a.rzts` in DIFFERENT nested dirs, each with
+    // its OWN offset. An EXACT `sources` path must resolve to its own offset; an
+    // ambiguous bare basename (matching both at a segment boundary) must NOT restore.
+    const A = '/abs/x/a.rzts';
+    const B = '/abs/y/a.rzts';
+    const offsets = new Map([
+      [A, 10],
+      [B, 20],
+    ]);
+    const mk = (src: string): EncodedSourceMap => ({
+      version: 3,
+      sources: [src],
+      sourcesContent: ['x'],
+      names: [],
+      mappings: encode([[[0, 0, 30, 0]]]),
+    });
+    const shell = () => {
+      const m = new MagicString('shell');
+      m.overwrite(0, 1, 'S');
+      return m;
+    };
+
+    // Exact A → restored by A's OWN offset (30 − 10 = 20), not B's.
+    const exactMap = composeMaps({
+      filename: 'Host.rozie',
+      source: 'host source',
+      shellMs: shell(),
+      children: [{ map: mk(A), outputOffset: 0 }],
+      fileExt: '.tsx',
+      userCodeLineOffset: 0,
+      partialLineOffsets: offsets,
+    });
+    expect(exactMap.sources).toEqual([A]);
+    expect(decode(exactMap.mappings)[0]![0]![2]).toBe(20);
+
+    // Ambiguous bare basename `a.rzts` matches BOTH A and B at a segment boundary →
+    // lookup bails, the original line is left UNTOUCHED (no mis-attribution).
+    const ambigMap = composeMaps({
+      filename: 'Host.rozie',
+      source: 'host source',
+      shellMs: shell(),
+      children: [{ map: mk('a.rzts'), outputOffset: 0 }],
+      fileExt: '.tsx',
+      userCodeLineOffset: 0,
+      partialLineOffsets: offsets,
+    });
+    expect(decode(ambigMap.mappings)[0]![0]![2]).toBe(30);
+  });
 });

@@ -6,7 +6,8 @@
  * (the "parent" map) via @ampproject/remapping. Result: a single Source Map
  * v3 that resolves emitted-output positions all the way back to .rozie.
  *
- * Used by all 4 target compose.ts files. Replaces the per-target
+ * Used by all 6 target compose.ts files (react/vue/svelte/solid/lit/angular).
+ * Replaces the per-target
  * single-segment re-projection hack (Phase 3 WR-01 / Phase 4 Plan 04-05
  * Task 1) removed in P2 (D-109).
  *
@@ -83,10 +84,15 @@ function isPartialSource(src: string | null | undefined): boolean {
 /**
  * Recover a partial source's constant emit-line offset from the table. The table
  * is keyed by the absolute `loc.filename` stashed at splice time; a child map's
- * `sources` entry is the same absolute path, so an exact lookup is tried first,
- * then a suffix/basename match as a defensive fallback (path normalization can
- * differ between the IR `loc.filename` and the generator's emitted `sources`).
- * Returns `undefined` when no offset is known (mapping left as-is — D-04).
+ * `sources` entry is the same absolute path, so an EXACT lookup is tried first.
+ *
+ * WR-03: the defensive fallback is restricted to a path-SEGMENT-BOUNDARY match
+ * (`src.endsWith('/' + file) || file.endsWith('/' + src)`) so a partial whose path
+ * is a bare substring of another's (e.g. `xa.rzts` vs `a.rzts`) never collides, and
+ * — critically — if TWO OR MORE table entries match the boundary test (an ambiguous
+ * bare basename shared across nested dirs) the lookup BAILS (returns `undefined`)
+ * rather than mis-attributing one partial's offset to another. Returns `undefined`
+ * when no unambiguous offset is known (mapping left as-is — D-04).
  */
 function lookupPartialOffset(
   src: string | null | undefined,
@@ -95,10 +101,15 @@ function lookupPartialOffset(
   if (!src || !offsets || offsets.size === 0) return undefined;
   const exact = offsets.get(src);
   if (exact !== undefined) return exact;
+  let match: number | undefined;
+  let matchCount = 0;
   for (const [file, off] of offsets) {
-    if (src === file || src.endsWith(file) || file.endsWith(src)) return off;
+    if (src.endsWith(`/${file}`) || file.endsWith(`/${src}`)) {
+      match = off;
+      matchCount++;
+    }
   }
-  return undefined;
+  return matchCount === 1 ? match : undefined;
 }
 
 /**
@@ -114,9 +125,15 @@ function lookupPartialOffset(
  * suffices — the first stashed node per file wins.
  *
  * Walks `scriptAst.program.body` (the spliced statements sit at top level) and
- * their attached leading/trailing comments (comments carry the stash directly).
- * Never throws (D-04): a missing/zero stash is skipped, a null AST yields an
- * empty table.
+ * their attached leading/trailing/inner comments (comments carry the stash
+ * directly). Never throws (D-04): a missing/zero stash is skipped, a null AST
+ * yields an empty table.
+ *
+ * IN-02: the `innerComments` loop mirrors `shiftAttachedComments`
+ * (inlineScriptPartials.ts) which walks leading/trailing/inner. In practice the
+ * offset is per-file and first-stash-wins, so a leading/trailing comment or the
+ * decl itself almost always supplies it — the inner loop is additive and harmless,
+ * kept only so the stash-channel scan is symmetric with where stashes are written.
  */
 export function buildPartialLineOffsets(
   scriptAst: BabelFile | null | undefined,
@@ -145,6 +162,12 @@ export function buildPartialLineOffsets(
         c.loc?.start.line,
       );
     for (const c of node.trailingComments ?? [])
+      record(
+        c as unknown as { __roziePartialOrigin?: { line: number; filename?: string } },
+        c.loc?.start.line,
+      );
+    // IN-02: inner comments — symmetric with shiftAttachedComments.
+    for (const c of node.innerComments ?? [])
       record(
         c as unknown as { __roziePartialOrigin?: { line: number; filename?: string } },
         c.loc?.start.line,
@@ -263,7 +286,15 @@ export function composeMaps(opts: ComposeMapsOpts): MagicStringSourceMap {
             const full = seg as [number, number, number, number, number?];
             const src = childSources[full[1]];
             const off = lookupPartialOffset(src, opts.partialLineOffsets);
-            if (off !== undefined) full[2] -= off;
+            // WR-02: clamp the restored line to 0. A `.rzts`/`.rzjs`-sourced segment
+            // that was NOT stashed (e.g. a synthesized/sub-expression node a per-
+            // target transform tagged with the partial `loc.filename` at a host-
+            // contiguous line — deferred-items.md #2) still matches `isPartialSource`
+            // and gets the constant offset subtracted from a line it was not derived
+            // for. Without the clamp `full[2]` could go negative and `encode()` would
+            // emit a structurally-invalid Source Map v3 (some consumers throw on a
+            // negative line). Never produce a negative original line.
+            if (off !== undefined) full[2] = Math.max(0, full[2] - off);
           }
         }
       }
