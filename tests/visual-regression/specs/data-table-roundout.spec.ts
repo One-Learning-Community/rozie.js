@@ -40,7 +40,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     shows its value; binding/mutating the grouping model regroups; the #groupBar slot
  *     receives the grouping state + groupable columns + apply/clear helpers and a
  *     consumer-built bar drives grouping; NO built-in [draggable] / drag handle renders;
- *     applyGrouping/clearGrouping + grouping-change carry the ordered key list.
+ *     applyGrouping/clearGrouping + group-change carry the ordered key list.
  *   reqs 8-9 — FACET (DataTableFacet): the exposed unique-value list matches the data's
  *     distinct values; the exposed min/max equals the data's range; a consumer-built
  *     category checkbox list + numeric range slider built PURELY from the exposed
@@ -210,7 +210,7 @@ for (const target of TARGETS) {
 // headless #groupBar (no drag), grouping API + event.
 // ═══════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-roundout group [${target}]: nested group-header rows; collapse subtree; aggregationFn sum + custom; #groupBar (no drag); applyGrouping/clearGrouping + grouping-change`, async ({
+  runnerFor(target)(`data-table-roundout group [${target}]: nested group-header rows; collapse subtree; aggregationFn sum + custom; #groupBar (no drag); applyGrouping/clearGrouping + group-change`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableGroup&target=${target}`);
@@ -247,7 +247,7 @@ for (const target of TARGETS) {
       .poll(async () => groupTable.getByTestId('group-bar-state').textContent(), { timeout: 10_000 })
       .toBe('region,category');
 
-    // ── REQ-7 — grouping-change fired with the ordered key list.
+    // ── REQ-7 — group-change fired with the ordered key list.
     await expect
       .poll(async () => groupingReadout.textContent(), { timeout: 10_000 })
       .toBe('region,category');
@@ -294,7 +294,7 @@ for (const target of TARGETS) {
       .toBeLessThan(leafCountBefore);
 
     // ── REQ-7 — clearGrouping via the handle returns to the ungrouped (flat) table; the
-    //    group-header rows disappear and grouping-change carries the empty list.
+    //    group-header rows disappear and group-change carries the empty list.
     await page.getByTestId('call-clear-grouping').click();
     await expect
       .poll(async () => groupTable.locator('[data-group-header]').count(), { timeout: 10_000 })

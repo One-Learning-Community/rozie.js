@@ -16,7 +16,7 @@ export default class Column extends SignalWatcher(LitElement) {
   @property({ type: String }) width: string | number = '';
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
   @property({ type: Boolean, reflect: true }) groupable: boolean = true;
-  @property({ type: String }) aggregationFn: string | ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: String }) aggregationFn: string | (((...args: unknown[]) => unknown) | null) = null;
   @property({ type: Boolean, reflect: true }) editable: boolean = false;
   @property({ type: String, reflect: true }) editor: string = 'text';
   @property({ type: Array }) editorOptions: any[] = [];

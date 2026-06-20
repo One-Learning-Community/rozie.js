@@ -181,7 +181,7 @@ const pagination = defineModel<Record<string, any>>('pagination', { default: () 
   pageSize: 10
 }) });
 const expanded = defineModel<Record<string, any> | boolean>('expanded', { default: null });
-const grouping = defineModel<any[]>('grouping', { default: () => [] });
+const grouping = defineModel<any[]>('grouping', { default: null });
 const rowSelection = defineModel<Record<string, any>>('rowSelection', { default: () => ({}) });
 const columnVisibility = defineModel<Record<string, any>>('columnVisibility', { default: () => ({}) });
 const columnSizing = defineModel<Record<string, any>>('columnSizing', { default: () => ({}) });

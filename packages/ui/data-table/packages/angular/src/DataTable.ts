@@ -816,7 +816,7 @@ export class DataTable {
   expanded = model<(Record<string, any> | boolean) | null>(null);
   getSubRows = input<((...args: unknown[]) => unknown) | null>(null);
   groupable = input<boolean>(false);
-  grouping = model<any[]>((() => [])());
+  grouping = model<(any[]) | null>(null);
   rowSelection = model<Record<string, any>>((() => ({}))());
   columnVisibility = model<Record<string, any>>((() => ({}))());
   columnSizing = model<Record<string, any>>((() => ({}))());

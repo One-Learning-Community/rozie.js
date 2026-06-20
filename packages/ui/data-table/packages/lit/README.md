@@ -261,7 +261,7 @@ import '@rozie-ui/data-table-lit/themes/shadcn.css';    // or material.css, boot
 | `expanded` | `any` | `null` | ✓ |  |
 | `getSubRows` | `Function` | `null` |  |  |
 | `groupable` | `Boolean` | `false` |  |  |
-| `grouping` | `Array` | `[]` | ✓ |  |
+| `grouping` | `Array` | `null` | ✓ |  |
 | `rowSelection` | `Object` | `{}` | ✓ |  |
 | `columnVisibility` | `Object` | `{}` | ✓ |  |
 | `columnSizing` | `Object` | `{}` | ✓ |  |

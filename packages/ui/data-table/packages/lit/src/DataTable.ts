@@ -368,8 +368,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _expandedControllable = createLitControllableProperty<any | boolean>({ host: this, eventName: 'expanded-change', defaultValue: null, initialControlledValue: undefined });
   @property({ type: Function }) getSubRows: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Boolean, reflect: true }) groupable: boolean = false;
-  @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] = [];
-  private _groupingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'grouping-change', defaultValue: [], initialControlledValue: undefined });
+  @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] = null;
+  private _groupingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'grouping-change', defaultValue: null, initialControlledValue: undefined });
   @property({ type: Object, attribute: 'row-selection' }) _rowSelection_attr: any = {};
   private _rowSelectionControllable = createLitControllableProperty<any>({ host: this, eventName: 'row-selection-change', defaultValue: {}, initialControlledValue: undefined });
   @property({ type: Object, attribute: 'column-visibility' }) _columnVisibility_attr: any = {};

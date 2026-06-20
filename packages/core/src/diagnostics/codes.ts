@@ -427,6 +427,7 @@ export const RozieErrorCode = {
   RFOR_KEY_IS_NON_PRIMITIVE: 'ROZ302', // :key="someObj" (Pitfall 6 secondary case)
   /** @deprecated placeholder — accessibility lint warnings deferred per CONTEXT.md A7. */
   RIF_ACCESSIBILITY_PLACEHOLDER: 'ROZ303', // RESERVED — not emitted in Phase 2 (deferred per A7)
+  TEMPLATE_FOR_EMPTY_BODY: 'ROZ304', // warning — `<template r-for>` with no children (empty loop body; produces no output, and broke React/Solid emit before the guard)
 
   // ---- @rozie/unplugin configuration errors (Phase 3 D-52) — ROZ400..ROZ419 ----
   UNPLUGIN_TARGET_REQUIRED: 'ROZ400', // D-49: target option missing

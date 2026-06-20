@@ -325,9 +325,9 @@ interface DataTableProps {
   onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
   getSubRows?: ((...args: unknown[]) => unknown) | null;
   groupable?: boolean;
-  grouping?: any[];
-  defaultGrouping?: any[];
-  onGroupingChange?: (grouping: any[]) => void;
+  grouping?: (any[]) | null;
+  defaultGrouping?: (any[]) | null;
+  onGroupingChange?: (grouping: (any[]) | null) => void;
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
@@ -422,7 +422,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     pageSize: 10
   }))());
   const [expanded, setExpanded] = createControllableSignal<Record<string, any> | boolean>(_props as unknown as Record<string, unknown>, 'expanded', null);
-  const [grouping, setGrouping] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'grouping', (() => [])());
+  const [grouping, setGrouping] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'grouping', null);
   const [rowSelection, setRowSelection] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'rowSelection', (() => ({}))());
   const [columnVisibility, setColumnVisibility] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnVisibility', (() => ({}))());
   const [columnSizing, setColumnSizing] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnSizing', (() => ({}))());

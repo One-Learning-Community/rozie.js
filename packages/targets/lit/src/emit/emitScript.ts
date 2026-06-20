@@ -164,7 +164,21 @@ function renderTsType(ann: PropTypeAnnotation): string {
     }
   }
   if (ann.kind === 'union') {
-    return ann.members.map(renderTsType).join(' | ');
+    // A function-type member MUST be parenthesized inside a union — `string |
+    // (...) => x` is ambiguous/invalid TS (the arrow binds the whole union);
+    // `string | ((...) => x)` is correct. Mirrors the same guard applied to the
+    // other five targets (renderPropsInterface.ts + react/solid/angular/svelte).
+    // Lit's `Function` identifier already pre-expands to a parenthesized form,
+    // so this is consistency insurance for future literal-`function` members.
+    return ann.members
+      .map((m) => {
+        const r = renderTsType(m);
+        const isFn =
+          (m.kind === 'identifier' && m.name === 'Function') ||
+          (m.kind === 'literal' && m.value === 'function');
+        return isFn ? `(${r})` : r;
+      })
+      .join(' | ');
   }
   return 'unknown';
 }

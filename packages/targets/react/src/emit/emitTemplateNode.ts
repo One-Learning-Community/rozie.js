@@ -156,7 +156,12 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
       ctx.collectors.react.add('Fragment');
       bodyJsx = `<Fragment key={${keyCode}}>${parts}</Fragment>`;
     } else {
-      bodyJsx = parts;
+      // Keyless multi-root: a bare concatenation (`<tr/><tr/>`) is INVALID JSX
+      // ("Adjacent JSX elements must be wrapped in an enclosing tag"). Wrap in a
+      // short-form fragment — valid here precisely because there is no key (the
+      // `<>` shorthand cannot carry `key=`; the keyed branch above uses the named
+      // `Fragment` for that reason). Mirrors the Solid emitter's keyless behavior.
+      bodyJsx = `<>${parts}</>`;
     }
   }
   return `{${iterableCode}.map(${aliasStr} => ${bodyJsx})}`;

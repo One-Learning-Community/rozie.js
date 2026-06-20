@@ -196,4 +196,80 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
     expect(loop.body[0]!['type']).toBe('TemplateElement');
     expect(loop.body[0]!['tagName']).toBe('li');
   });
+
+  // IN-01 (Phase 50 review) — a `<template r-for>` whose body contains ANOTHER
+  // `<template r-for>` (recursive lowering via lowerNodeList). Each level is a
+  // self-contained TemplateLoop; the OUTER loop's body must carry the INNER
+  // TemplateLoop as a direct (structural) child.
+  it('lowers a NESTED <template r-for> inside <template r-for> (recursive)', () => {
+    const src = `<rozie name="ForProbe">
+<data>
+{ groups: [] }
+</data>
+<template>
+<table>
+  <tbody>
+    <template r-for="group in $data.groups" :key="group.id">
+      <tr class="group-header"><td>{{ group.label }}</td></tr>
+      <template r-for="row in group.rows" :key="row.id">
+        <tr class="data"><td>{{ row.label }}</td></tr>
+      </template>
+    </template>
+  </tbody>
+</table>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    expect(ir).not.toBeNull();
+    const loops = loopNodes(ir!.template);
+    // Two distinct TemplateLoop nodes (outer + inner).
+    expect(loops.length).toBe(2);
+
+    // Identify the OUTER loop (iterates `group`) and assert its body contains the
+    // INNER loop (iterates `row`) as a direct structural child.
+    const outer = loops.find((l) => l.itemAlias === 'group');
+    expect(outer).toBeDefined();
+    const structural = outer!.body.filter(
+      (n) => n['type'] !== 'TemplateStaticText',
+    );
+    // group-header <tr> + the inner TemplateLoop.
+    expect(structural.length).toBe(2);
+    expect(structural[0]!['type']).toBe('TemplateElement');
+    expect(structural[1]!['type']).toBe('TemplateLoop');
+    expect((structural[1]! as unknown as LoopNode).itemAlias).toBe('row');
+
+    // The inner loop lowers its single <tr> child normally.
+    const inner = structural[1]! as unknown as LoopNode;
+    const innerStructural = inner.body.filter(
+      (n) => n['type'] !== 'TemplateStaticText',
+    );
+    expect(innerStructural.length).toBe(1);
+    expect(innerStructural[0]!['type']).toBe('TemplateElement');
+    expect(innerStructural[0]!['tagName']).toBe('tr');
+  });
+
+  // WR-02 (Phase 50 review) — an empty `<template r-for></template>` (no
+  // children) yields `body: []`, which breaks downstream emit (React `{xs.map(x
+  // => )}` syntax error; Solid `body[0]!` undefined). The lowerer must surface a
+  // ROZ304 warning rather than letting the broken output escape silently.
+  it('emits a ROZ304 warning for an empty <template r-for> body', () => {
+    const src = `<rozie name="ForProbe">
+<data>
+{ rows: [] }
+</data>
+<template>
+<tbody>
+  <template r-for="row in $data.rows" :key="row.id"></template>
+</tbody>
+</template>
+</rozie>
+`;
+    const { ir, diagnostics } = lowerSource(src);
+    const loop = loopNodes(ir!.template)[0]!;
+    expect(loop.body.length).toBe(0);
+    const empty = diagnostics.find((d) => d.code === 'ROZ304');
+    expect(empty).toBeDefined();
+    expect(empty!.severity).toBe('warning');
+  });
 });

@@ -76,9 +76,9 @@ interface DataTableProps {
   onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
   getSubRows?: ((...args: any[]) => any) | null;
   groupable?: boolean;
-  grouping?: any[];
-  defaultGrouping?: any[];
-  onGroupingChange?: (grouping: any[]) => void;
+  grouping?: (any[]) | null;
+  defaultGrouping?: (any[]) | null;
+  onGroupingChange?: (grouping: (any[]) | null) => void;
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
@@ -222,7 +222,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   });
   const [grouping, setGrouping] = useControllableState({
     value: props.grouping,
-    defaultValue: props.defaultGrouping ?? (() => [])(),
+    defaultValue: props.defaultGrouping ?? null,
     onValueChange: props.onGroupingChange,
   });
   const [rowSelection, setRowSelection] = useControllableState({

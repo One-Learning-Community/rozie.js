@@ -323,7 +323,7 @@ import '@rozie-ui/data-table-angular/themes/shadcn.css';    // or material.css, 
 | `expanded` | `any` | `null` | ✓ |  |
 | `getSubRows` | `Function` | `null` |  |  |
 | `groupable` | `Boolean` | `false` |  |  |
-| `grouping` | `Array` | `[]` | ✓ |  |
+| `grouping` | `Array` | `null` | ✓ |  |
 | `rowSelection` | `Object` | `{}` | ✓ |  |
 | `columnVisibility` | `Object` | `{}` | ✓ |  |
 | `columnSizing` | `Object` | `{}` | ✓ |  |

@@ -173,17 +173,26 @@
   groupable: { type: Boolean, default: false },
 
   // grouping (GroupingState = string[]) — reqs 4/7. model:true → two-way. An ORDERED
-  // list of column ids (multi-column → nested groups, e.g. ['region','category']). []
-  // (default) → ungrouped (flat table, byte-identical-off). onGroupingChange funnels a
-  // FRESH array → `group-change` (NOT `grouping-change`: the model:true `grouping` prop
-  // auto-generates an `onGroupingChange` callback on the React/Solid flat Props interface,
-  // and a `grouping-change` event would camelCase to the SAME identifier → duplicate
-  // identifier TS2300 — the model-prop==emit-name collision 50-02 hit with expanded/
-  // expanded-change → expand-change. The house convention stems the event off a DISTINCT
-  // name: sorting→sort-change, rowSelection→selection-change, grouping→group-change).
-  // Uncontrolled fallback $data.groupingDefault. The 12th two-way slice — Angular CVA stays
-  // disabled (already disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
-  grouping: { type: Array, default: () => [], model: true },
+  // list of column ids (multi-column → nested groups, e.g. ['region','category']).
+  // onGroupingChange funnels a FRESH array → `group-change` (NOT `grouping-change`: the
+  // model:true `grouping` prop auto-generates an `onGroupingChange` callback on the
+  // React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+  // SAME identifier → duplicate identifier TS2300 — the model-prop==emit-name collision
+  // 50-02 hit with expanded/expanded-change → expand-change. The house convention stems the
+  // event off a DISTINCT name: sorting→sort-change, rowSelection→selection-change,
+  // grouping→group-change).
+  // Default NULL (not `[]`), mirroring the `expanded` slice (WR-04, 50 review): the
+  // `$props.grouping != null ? … : $data.groupingDefault` idiom in currentState() /
+  // groupingActiveDefault() needs an UNBOUND grouping to read as null so the uncontrolled
+  // fallback ($data.groupingDefault, default []) is reachable and the grouping auto-expand
+  // default (req-4) can activate when a consumer applies grouping WITHOUT binding
+  // r-model:grouping. A non-null `[]` default would make $props.grouping always non-null →
+  // the first ternary branch always wins → the uncontrolled fallback is dead code. Bound
+  // consumers are unaffected (the bound value is a non-null array); all reads go through the
+  // null-guarded currentState().grouping / groupingActiveDefault() (`|| []`), so table-core
+  // still receives an array. The 12th two-way slice — Angular CVA stays disabled (already
+  // disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
+  grouping: { type: Array, default: null, model: true },
 
   // rowSelection (RowSelectionState = { [rowId]: true }) — req-7. model:true → two-way.
   // selectionMode drives the chrome: 'none' injects no column; 'single' keeps ≤1

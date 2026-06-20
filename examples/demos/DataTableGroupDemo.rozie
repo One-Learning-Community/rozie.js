@@ -19,12 +19,12 @@
       the `#groupBar` scoped slot receives the current grouping + the groupable columns +
       apply/clear helpers; a CONSUMER-built bar (apply/clear buttons — NO drag) drives the
       grouping model. The component renders NO built-in drag affordance.
-    - Grouping state API + event (req-7): @grouping-change wired to a readout + counter,
+    - Grouping state API + event (req-7): @group-change wired to a readout + counter,
       and $expose-handle buttons for applyGrouping / clearGrouping.
 
   IMPORTANT (Wave-0 status, Plan 50-01): the `groupable` table prop, the per-Column
   `aggregationFn` prop, the `#groupBar` slot, the `grouping` model:true slice, the
-  `grouping-change` event, and the applyGrouping/clearGrouping $expose verbs DO NOT EXIST
+  `group-change` event, and the applyGrouping/clearGrouping $expose verbs DO NOT EXIST
   in DataTable.rozie/Column.rozie until Plan 50-03 (Wave-(b)) lands — they pass through as
   inert undeclared props/events/slots today (the `#groupBar` slot emits a harmless ROZ941
   "slot not declared" WARNING; the fixture still compiles + renders the read-only flat

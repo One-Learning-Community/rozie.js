@@ -579,6 +579,24 @@ function lowerElement(
         matchCounter,
       );
 
+      // WR-02 (Phase 50 review) — an empty `<template r-for></template>` (no
+      // children) yields `body: []`, which breaks downstream emit (React emits
+      // `{items.map(i => )}` — a syntax error; Solid derefs `body[0]!` →
+      // undefined). Surface an author-facing warning at the lowering site rather
+      // than letting the broken output escape silently. A real element host
+      // (`<div r-for>`) always has `body: [inner]`, so this only fires for the
+      // non-rendering template-host with literally no children.
+      if (body.length === 0) {
+        diagnostics.push({
+          code: RozieErrorCode.TEMPLATE_FOR_EMPTY_BODY,
+          severity: 'warning',
+          message:
+            '<template r-for> has no children — the loop body is empty and will produce no output.',
+          loc: el.loc,
+          hint: 'Add at least one child element inside the <template r-for>, or remove the empty loop.',
+        });
+      }
+
       const templateLoop: TemplateLoopIR = {
         type: 'TemplateLoop',
         itemAlias: aliases?.item ?? 'item',

@@ -17,7 +17,7 @@ interface Props {
   expanded?: (any | boolean) | null;
   getSubRows?: ((...args: any[]) => any) | null;
   groupable?: boolean;
-  grouping?: any[];
+  grouping?: (any[]) | null;
   rowSelection?: any;
   columnVisibility?: any;
   columnSizing?: any;
@@ -72,7 +72,7 @@ let {
   expanded = $bindable(null),
   getSubRows = null,
   groupable = false,
-  grouping = $bindable((() => [])()),
+  grouping = $bindable(null),
   rowSelection = $bindable((() => ({}))()),
   columnVisibility = $bindable((() => ({}))()),
   columnSizing = $bindable((() => ({}))()),

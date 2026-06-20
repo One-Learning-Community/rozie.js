@@ -27,9 +27,9 @@ export interface DataTableProps {
   onExpandedChange?: (next: (Record<string, unknown> | boolean) | null) => void;
   getSubRows?: ((...args: unknown[]) => unknown) | null;
   groupable?: boolean;
-  grouping?: unknown[];
-  defaultGrouping?: unknown[];
-  onGroupingChange?: (next: unknown[]) => void;
+  grouping?: (unknown[]) | null;
+  defaultGrouping?: (unknown[]) | null;
+  onGroupingChange?: (next: (unknown[]) | null) => void;
   rowSelection?: Record<string, unknown>;
   defaultRowSelection?: Record<string, unknown>;
   onRowSelectionChange?: (next: Record<string, unknown>) => void;

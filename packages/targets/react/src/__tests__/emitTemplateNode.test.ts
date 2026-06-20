@@ -170,6 +170,41 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
     expect(jsx).not.toContain('<template');
   });
 
+  // CR-01 (Phase 50 review) — the KEYLESS multi-root branch (`body.length > 1`
+  // AND no `:key`) previously emitted a BARE concatenation (`<tr/><tr/>`), which
+  // is INVALID JSX ("Adjacent JSX elements must be wrapped in an enclosing tag").
+  // It must wrap the siblings in a SHORT-FORM fragment (`<>…</>`) — valid here
+  // precisely because there is no key (the keyed branch above uses the named
+  // `Fragment` for the key carrier). This branch had NO coverage before.
+  it('emits a short-form fragment (no key) for a keyless 2-root loop body', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<data>{ rows: [], openId: null }</data>
+<template>
+<table><tbody>
+  <template r-for="row in $data.rows">
+    <tr className="data"><td>{{ row.label }}</td></tr>
+    <tr className="detail" r-if="$data.openId === row.id"><td>detail</td></tr>
+  </template>
+</tbody></table>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    expect(jsx).toMatch(/rows\.map/);
+    // Short-form fragment wraps the keyless siblings (valid JSX root).
+    expect(jsx).toContain('<>');
+    expect(jsx).toContain('</>');
+    // No KEYED Fragment (there is no :key) and never the `React.` namespace form.
+    expect(jsx).not.toContain('key={');
+    expect(jsx).not.toContain('React.Fragment');
+    // Both sibling roots live inside the fragment.
+    expect(jsx).toContain('data');
+    expect(jsx).toContain('detail');
+    // The transparent host is NOT rendered as a literal <template> element.
+    expect(jsx).not.toContain('<template');
+  });
+
   it('emits a keyed map for a single-child <template r-for> (no literal <template>)', () => {
     const ir = lowerInline(`
 <rozie name="X">
