@@ -196,10 +196,10 @@ describe('inlineScriptPartials', () => {
   // R6 — collision diagnostic. A partial declaration whose name collides with a
   // host binding pushes PARTIAL_INLINE_COLLISION (ROZ139) with a code-frame
   // citing BOTH sites (host + partial).
-  it.skip('R6: a partial-vs-host name collision pushes ROZ139 with a frame citing both sites', async () => {
+  it('R6: a partial-vs-host name collision pushes ROZ139 with a frame citing both sites', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
-    // TODO(Wave 3): replace literal with RozieErrorCode.PARTIAL_INLINE_COLLISION.
-    const COLLISION_CODE = 'ROZ139';
+    const { RozieErrorCode } = await import('../../diagnostics/codes.js');
+    const COLLISION_CODE = RozieErrorCode.PARTIAL_INLINE_COLLISION;
     const partial = stagePartial(
       'logic.rzts',
       `export const value = $computed(() => $props.value);`, // collides with host `value`
@@ -214,8 +214,19 @@ describe('inlineScriptPartials', () => {
       const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
       const collision = result.diagnostics.find((d) => d.code === COLLISION_CODE);
       expect(collision).toBeDefined();
-      // Frame must cite both the host binding and the partial declaration.
+      expect(collision?.severity).toBe('error');
+      // Frame must cite BOTH sites: the diagnostic loc/filename points at the
+      // partial declaration; the `related` entry points at the host binding.
       expect(collision?.filename ?? '').toContain('logic.rzts');
+      expect(collision?.related?.length ?? 0).toBeGreaterThan(0);
+      // The colliding declaration is dropped — the host body never has two
+      // top-level `value` declarations (no structurally-invalid emit).
+      const valueDecls = bodyOf(result.ast ?? host).filter(
+        (s) =>
+          s.type === 'VariableDeclaration' &&
+          s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === 'value'),
+      );
+      expect(valueDecls.length).toBe(1);
     } finally {
       partial.dispose();
     }
@@ -224,7 +235,7 @@ describe('inlineScriptPartials', () => {
   // R7 — source-map / diagnostic fidelity. An inlined statement's Babel
   // loc.filename / start resolves to the PARTIAL's `.rzts` absolute path, not
   // the host `.rozie` — so error frames + source maps cite the partial origin.
-  it.skip('R7: an inlined statement carries the partial .rzts origin in its loc, not the host .rozie', async () => {
+  it('R7: an inlined statement carries the partial .rzts origin in its loc, not the host .rozie', async () => {
     const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
     const partial = stagePartial(
       'logic.rzts',
