@@ -124,7 +124,7 @@ describe('Phase 54 — inline-vs-partial byte-identity', () => {
 const PARTIAL_HOST_C = 'PartialInlineHostC';
 const INLINE_HOST_C = 'InlineEquivHostC';
 
-describe.skip('Phase 55 — comment-bearing inline-vs-partial literal byte-identity', () => {
+describe('Phase 55 — comment-bearing inline-vs-partial literal byte-identity', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('comment-bearing partial-inlined host === inline-equivalent host (literal, comments/blank lines included)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_C, target), PARTIAL_HOST_C);
