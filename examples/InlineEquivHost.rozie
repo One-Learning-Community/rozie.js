@@ -1,0 +1,39 @@
+<!--
+  InlineEquivHost.rozie — Phase 54 Wave-0 byte-identity ORACLE.
+
+  Carries the EXACT logic that PartialInlineHost.rozie inlines from
+  ./partialLogic.rzts, but written inline in this component's own
+  <script lang="ts">: the hoisted `clamp` value import, the transitive `double`
+  helper, and the `usedName` $computed. The unused `neverUsed` export does NOT
+  appear here (it is tree-shaken from the partial path too).
+
+  The <template> is byte-identical to PartialInlineHost.rozie. The emitted
+  output of the two hosts MUST match on all six targets after normalizing only
+  the component identifier token (PartialInlineHost ↔ InlineEquivHost).
+
+  No <style> block — see the PartialInlineHost.rozie header for why.
+-->
+
+<rozie name="InlineEquivHost">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { clamp } from './partial-helpers.js';
+
+const double = (n: number): number => n * 2;
+
+const usedName = $computed(() => clamp(double($props.base)));
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedName }}</span>
+</div>
+</template>
+
+</rozie>

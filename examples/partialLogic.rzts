@@ -1,0 +1,23 @@
+// partialLogic.rzts — Phase 54 Wave-0 script-partial fixture (sigil-bearing TS).
+//
+// A `.rzts` script partial carries full sigil-bearing reactive logic that the
+// compiler INLINES into a host component's <script> AST before lowering (it is
+// NOT a runtime composable). This fixture exercises three Wave-0 invariants:
+//
+//   1. value import      — `clamp` is hoisted into the host on inline (R4).
+//   2. transitive helper — `double` is pulled in as the closure of `usedName`,
+//                          even though it is not itself exported (R2).
+//   3. unused export     — `neverUsed` is tree-shaken: importing only `usedName`
+//                          must add nothing for `neverUsed` to the host (R2).
+//
+// `PartialInlineHost.rozie` imports `{ usedName }` from this file; the inlined
+// output MUST be byte-identical to `InlineEquivHost.rozie` (same logic inline)
+// on all six targets — the north-star invariant (partial-inline-parity.test.ts).
+
+import { clamp } from './partial-helpers.js';
+
+const double = (n: number): number => n * 2;
+
+export const usedName = $computed(() => clamp(double($props.base)));
+
+export const neverUsed = $computed(() => $props.base * 999);

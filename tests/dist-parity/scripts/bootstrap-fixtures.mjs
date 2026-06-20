@@ -260,6 +260,22 @@ const EXAMPLES = [
   // single-rozie producer and stays OUT of RESOLVER_ROOT.
   'BareAttrChild',
   'BareAttrComponent',
+  // Phase 54 (rozie-script-partials-rzts-rzjs) Wave-0 — the inline-vs-partial
+  // byte-identity PAIR. PartialInlineHost imports `{ usedName }` from the
+  // sibling script partial ./partialLogic.rzts; the compiler inlines that
+  // exported $computed (+ its transitive `double` helper + the hoisted `clamp`
+  // value import) into the host script before lowering, tree-shaking the unused
+  // `neverUsed` export. InlineEquivHost carries the SAME logic written inline —
+  // the byte-identity oracle. Their per-target emit MUST be byte-identical after
+  // normalizing only the component identifier token (asserted by
+  // tests/dist-parity/partial-inline-parity.test.ts). PartialInlineHost
+  // references a sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT
+  // below; InlineEquivHost is single-file and stays OUT of RESOLVER_ROOT.
+  // NOTE: these fixtures CANNOT be blessed until the inline pass lands — the
+  // bootstrap compile of PartialInlineHost throws until then. Plan 05 enables
+  // the pass, runs bootstrap, and un-skips the parity test.
+  'PartialInlineHost',
+  'InlineEquivHost',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -290,6 +306,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // producer at compile time. The leaf producer BareAttrChild stays OUT of
   // RESOLVER_ROOT (the same ThemedButton-vs-ThemedButtonConsumer split).
   'BareAttrComponent',
+  // Phase 54 — references ./partialLogic.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling partial at compile/inline time (same
+  // pattern as PartCardConsumer). The .rzts partial is a LEAF source consumed
+  // only via inline — it is NOT itself an EXAMPLES entry and stays OUT of
+  // RESOLVER_ROOT. The single-file InlineEquivHost oracle also stays OUT.
+  'PartialInlineHost',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

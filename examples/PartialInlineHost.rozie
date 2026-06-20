@@ -1,0 +1,40 @@
+<!--
+  PartialInlineHost.rozie — Phase 54 Wave-0 host that imports a .rzts partial.
+
+  The <script lang="ts"> imports `{ usedName }` from ./partialLogic.rzts; the
+  compiler inlines that exported $computed (plus its transitive `double` helper
+  and the hoisted `clamp` value import) into THIS component's script before
+  lowering. The unused `neverUsed` export is tree-shaken.
+
+  Paired with InlineEquivHost.rozie (the same logic written inline) — their
+  emitted output MUST be byte-identical on all six targets after normalizing
+  only the component identifier token (tests/dist-parity/partial-inline-parity).
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute
+  that the byte-identity oracle (which normalizes ONLY the component name) could
+  not reconcile against InlineEquivHost. This fixture proves SCRIPT inline
+  parity, not styling.
+
+  References ./partialLogic.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHost">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { usedName } from './partialLogic.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedName }}</span>
+</div>
+</template>
+
+</rozie>
