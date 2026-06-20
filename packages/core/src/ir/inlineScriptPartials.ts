@@ -424,6 +424,38 @@ function shiftAttachedComments(node: t.Node, offset: number, shifted: Set<object
   for (const c of node.innerComments ?? []) stashAndShiftComment(c, offset, shifted);
 }
 
+/** The line a block's first emitted token occupies: its banner comment if it has
+ *  leading comments, else the node itself. */
+function blockFirstEmitLine(firstNode: t.Node): number {
+  const firstLeading = firstNode.leadingComments?.[0]?.loc;
+  return firstLeading ? firstLeading.start.line : firstNode.loc!.start.line;
+}
+
+/** Shift every node + attached comment in a block by `offset`, deduping on the
+ *  underlying `Position` objects (see {@link shiftPositionLine}). Never throws. */
+function shiftBlock(block: SplicedEmitBlock, offset: number): void {
+  const shifted = new Set<object>();
+  for (const top of block.nodes) {
+    stashAndShiftNode(top, offset, shifted);
+    shiftAttachedComments(top, offset, shifted);
+    // Reach NESTED nodes + their attached comments (Pitfall 2). Reuse the
+    // already-imported `traverse` over a synthetic File wrapping the SAME node
+    // objects (the established `referencedNames` pattern) — mutations land on the
+    // real spliced nodes. Guarded so a traverse failure never throws (D-04); the
+    // top-level shift above is already applied.
+    try {
+      traverse(t.file(t.program([top as Statement])), {
+        enter(path) {
+          stashAndShiftNode(path.node, offset, shifted);
+          shiftAttachedComments(path.node, offset, shifted);
+        },
+      });
+    } catch {
+      // D-04: nested shift is best-effort; top-level normalization stands.
+    }
+  }
+}
+
 /**
  * FINAL inline-pass step (Phase 55) — decouple the line `@babel/generator` reads
  * for blank-line/comment placement from the line it reads for the source-map
@@ -431,50 +463,61 @@ function shiftAttachedComments(node: t.Node, offset: number, shifted: Set<object
  *
  * Rationale (RESEARCH Key Finding 1): under `retainLines:false` the generator's
  * comment-adjacency + blank-line math reads `node.loc.start.line` and
- * `comment.loc.start.line` only as DELTAS; only the host↔partial BOUNDARY delta is
- * wrong (a spliced node carries a small `.rzts`-local line discontinuous with its
- * ~3500 host neighbour). A CONSTANT per-block offset that lands the block's first
- * node on its host-contiguous anchor preserves intra-block deltas and repairs the
- * boundary delta — the entire fix surface.
+ * `comment.loc.start.line` only as DELTAS; only the host↔partial (and
+ * partial↔partial) BOUNDARY deltas are wrong (a spliced node carries a small
+ * `.rzts`-local line discontinuous with its host neighbour). A CONSTANT per-block
+ * offset preserves each block's intra deltas; the right boundary delta is restored
+ * by anchoring each block SEQUENTIALLY in residual-body order.
  *
- * OFFSET ANCHOR (Open Question 2 / Assumption A1): the anchor is the replaced host
- * import's line (`importStmt.loc.start.line`). The partial's own imports and decls
- * already carry their .rzts-relative layout, so re-anchoring the whole group at the
- * import line reproduces the inline-authored spacing exactly. The comment-bearing
- * oracle (Plan 02 Task 2) confirms this empirically on all six targets.
+ * SEQUENTIAL ANCHOR (Phase 55-04): each block's first emitted line (its banner
+ * comment, else its first node) is anchored ONE blank line below the PRECEDING
+ * statement in the final residual body. Anchoring every block at its own replaced
+ * import line (Plan 02's approach) collapsed multi-partial hosts: three consecutive
+ * mid-body imports made expand/group/facet pile onto adjacent host lines, so each
+ * 30-45-line block overlapped the next and the partial↔partial comment deltas went
+ * negative (`}; // banner` collapse). Flowing the blocks sequentially reproduces the
+ * inline-authored contiguous layout. The first block (or any block preceded only by
+ * un-located content) falls back to its replaced import's host line.
  *
  * Runs AFTER all diagnostics are collected (they captured true `.rzts` byte loc via
  * `nodeLoc`, which reads `node.start`/`node.end`, NOT `loc.{line,column}`), so the
  * R7 error-frame path is untouched (Pitfall 1). Never throws (D-04).
  */
-function normalizeSplicedEmitLines(blocks: SplicedEmitBlock[]): void {
-  for (const block of blocks) {
-    const first = block.nodes.find((n) => n.loc)?.loc;
-    if (!first) continue;
-    const offset = block.anchorLine - first.start.line;
-    // Dedupe on `Position` objects (not `loc` wrappers): `@babel/parser` aliases
-    // one `Position` across nested nodes' start/end, so wrapper-keyed dedupe
-    // double-shifts shared positions (Phase 55-04 bug; see shiftPositionLine).
-    const shifted = new Set<object>();
-    for (const top of block.nodes) {
-      stashAndShiftNode(top, offset, shifted);
-      shiftAttachedComments(top, offset, shifted);
-      // Reach NESTED nodes + their attached comments (Pitfall 2). Reuse the
-      // already-imported `traverse` over a synthetic File wrapping the SAME node
-      // objects (the established `referencedNames` pattern) — mutations land on
-      // the real spliced nodes. Guarded so a traverse failure never throws (D-04);
-      // the top-level shift above is already applied.
-      try {
-        traverse(t.file(t.program([top as Statement])), {
-          enter(path) {
-            stashAndShiftNode(path.node, offset, shifted);
-            shiftAttachedComments(path.node, offset, shifted);
-          },
-        });
-      } catch {
-        // D-04: nested shift is best-effort; top-level normalization stands.
-      }
+function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]): void {
+  // Map every block-member node to its block so block starts are detectable while
+  // walking the body in emit order.
+  const nodeToBlock = new Map<t.Node, SplicedEmitBlock>();
+  for (const b of blocks) for (const n of b.nodes) nodeToBlock.set(n, b);
+  const processed = new Set<SplicedEmitBlock>();
+
+  // `prevEnd` tracks the emit end line of the previously walked statement (after any
+  // shift), so each block anchors one blank line below it.
+  let prevEnd = 0;
+  for (const stmt of body) {
+    const block = nodeToBlock.get(stmt);
+    if (block) {
+      if (processed.has(block)) continue;
+      processed.add(block);
+      const firstNode = block.nodes.find((n) => n.loc);
+      if (!firstNode?.loc) continue;
+      const anchorLine = prevEnd > 0 ? prevEnd + 2 : block.anchorLine;
+      shiftBlock(block, anchorLine - blockFirstEmitLine(firstNode));
+      let blockEnd = prevEnd;
+      for (const n of block.nodes) if (n.loc) blockEnd = Math.max(blockEnd, n.loc.end.line);
+      prevEnd = blockEnd;
+      continue;
     }
+    if (stmt.loc) prevEnd = stmt.loc.end.line;
+  }
+
+  // Safety net: any block not reached via the body walk (e.g. hoisted-import-only
+  // groups that live at the body top, outside the residual body) still gets its
+  // original import-line anchor so nothing is left un-normalized.
+  for (const block of blocks) {
+    if (processed.has(block)) continue;
+    const firstNode = block.nodes.find((n) => n.loc);
+    if (!firstNode?.loc) continue;
+    shiftBlock(block, block.anchorLine - blockFirstEmitLine(firstNode));
   }
 }
 
@@ -1000,8 +1043,9 @@ export function inlineScriptPartials(
   // attached comments) to host-contiguous values, stashing the true `.rzts`
   // origin on `extra.__roziePartialOrigin`. Runs LAST so all diagnostics kept
   // their true `.rzts` loc (Pitfall 1). Decouples generator spacing from the
-  // source-map origin (D-01: filename preserved, line recoverable).
-  normalizeSplicedEmitLines(splicedBlocks);
+  // source-map origin (D-01: filename preserved, line recoverable). Walks the
+  // residual body (no hoisted imports) so blocks anchor SEQUENTIALLY in emit order.
+  normalizeSplicedEmitLines(newBody, splicedBlocks);
 
   return { ast: file, diagnostics };
 }
