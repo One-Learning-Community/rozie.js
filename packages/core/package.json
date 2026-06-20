@@ -1,6 +1,7 @@
 {
   "name": "@rozie/core",
   "version": "0.1.0",
+  "description": "The Rozie.js compiler — turns a single .rozie component definition into idiomatic React, Vue, Svelte, Angular, Solid, and Lit source.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -56,5 +57,15 @@
   "license": "MIT",
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "author": "One Learning Community (https://github.com/One-Learning-Community)"
 }

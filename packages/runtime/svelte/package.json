@@ -1,11 +1,12 @@
 {
   "name": "@rozie/runtime-svelte",
   "version": "0.1.0",
+  "description": "Svelte runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
   "type": "module",
   "sideEffects": false,
   "private": false,
   "license": "MIT",
-  "author": "Rozie maintainers",
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
   "exports": {
     ".": {
       "svelte": "./src/index.ts",
@@ -44,5 +45,14 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/runtime/svelte"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
   }
 }

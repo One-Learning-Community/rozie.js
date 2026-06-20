@@ -1,6 +1,7 @@
 {
   "name": "@rozie/babel-plugin",
   "version": "0.1.0",
+  "description": "Babel plugin for Rozie.js — resolves .rozie imports and compiles them to idiomatic target-framework code.",
   "type": "module",
   "private": false,
   "main": "./dist/index.cjs",
@@ -41,5 +42,15 @@
   "license": "MIT",
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/babel-plugin"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "author": "One Learning Community (https://github.com/One-Learning-Community)"
 }

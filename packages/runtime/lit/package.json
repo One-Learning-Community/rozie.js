@@ -1,11 +1,12 @@
 {
   "name": "@rozie/runtime-lit",
   "version": "0.1.0",
+  "description": "Lit runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
   "type": "module",
   "sideEffects": false,
   "private": false,
   "license": "MIT",
-  "author": "Rozie maintainers",
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -62,5 +63,14 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/runtime/lit"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
   }
 }

@@ -1,6 +1,7 @@
 {
   "name": "@rozie/cli",
   "version": "0.1.0",
+  "description": "Command-line interface for Rozie.js — compile .rozie files to React, Vue, Svelte, Angular, Solid, and Lit from the terminal.",
   "type": "module",
   "private": false,
   "main": "./dist/index.cjs",
@@ -66,5 +67,15 @@
   "license": "MIT",
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "author": "One Learning Community (https://github.com/One-Learning-Community)"
 }
