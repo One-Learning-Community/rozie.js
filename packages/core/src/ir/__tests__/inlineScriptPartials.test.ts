@@ -255,6 +255,62 @@ describe('inlineScriptPartials', () => {
     }
   });
 
+  // R7-line — POST-SEAM expectation (Phase 55, script-partial literal
+  // byte-identity). A spliced statement's emit line (loc.start.line) is rewritten
+  // to a HOST-contiguous value so @babel/generator's comment/blank-line math is
+  // continuous at the host↔partial boundary, while the true `.rzts` ORIGIN
+  // (file + line) is stashed on a parallel channel (extra.__roziePartialOrigin)
+  // and loc.filename (R7 file origin) is preserved — so source-map line fidelity
+  // remains recoverable (D-01: file+line). SKIPPED in Plan 01: un-skip in Plan 02
+  // after normalizeSplicedEmitLines lands. extra.__roziePartialOrigin does not
+  // exist yet, so this would fail today.
+  it.skip('R7-line: a spliced statement carries its .rzts origin LINE on extra.__roziePartialOrigin while loc.start.line is host-contiguous', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    // `usedName` sits on partial-local line 2 (a leading helper occupies line 1).
+    const ORIGIN_LINE = 2;
+    const partial = stagePartial(
+      'logic.rzts',
+      [
+        `const helper = (n) => n + 1;`,
+        `export const usedName = $computed(() => helper($props.value));`,
+      ].join('\n'),
+    );
+    try {
+      // Pad the host so its contiguous insertion line cannot coincidentally equal
+      // the partial-local ORIGIN_LINE (the !== assertion must be meaningful).
+      const host = moduleFile(
+        [
+          `const padA = 1;`,
+          `const padB = 2;`,
+          `const padC = 3;`,
+          `import { usedName } from '${partial.path.replace(/\\/g, '\\\\')}';`,
+        ].join('\n'),
+      );
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const inlined = bodyOf(result.ast ?? host).find(
+        (s) =>
+          s.type === 'VariableDeclaration' &&
+          s.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === 'usedName'),
+      );
+      const origin = (
+        inlined?.extra as
+          | { __roziePartialOrigin?: { line?: number; filename?: string } }
+          | undefined
+      )?.__roziePartialOrigin;
+      // (1) the .rzts ORIGIN LINE is stashed on the parallel channel.
+      expect(origin?.line).toBe(ORIGIN_LINE);
+      // (2) the .rzts ORIGIN FILE is stashed too.
+      expect(origin?.filename ?? '').toContain('logic.rzts');
+      // (3) R7 file origin is preserved on loc.filename (the existing gate).
+      expect(inlined?.loc?.filename).toContain('logic.rzts');
+      // (4) the EMIT line was normalized to a host-contiguous value — proving the
+      // decoupling (it is NOT the partial-local origin line anymore).
+      expect(inlined?.loc?.start.line).not.toBe(ORIGIN_LINE);
+    } finally {
+      partial.dispose();
+    }
+  });
+
   // CR-01 — an exported `enum` (a RUNTIME TypeScript value) is recognized by
   // bindingNames() and inlined, not silently dropped.
   it('CR-01: inlines an exported enum from a partial (TSEnumDeclaration recognized)', async () => {
