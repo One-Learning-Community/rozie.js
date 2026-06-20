@@ -5,8 +5,7 @@ export default defineConfig({
     globals: false,
     environment: 'node',
     // Phase 54 — partial-inline-parity.test.ts is the inline-vs-partial
-    // byte-identity gate (currently describe.skip until Plan 05 blesses the
-    // fixtures). Added to include so it is discoverable now (Wave 0).
+    // byte-identity gate (active since Plan 05 blessed the fixtures).
     include: ['parity.test.ts', 'partial-inline-parity.test.ts'],
     // Parity gate runs in-process — no Vite/server overhead, so default
     // pool semantics are fine. Limit to 30s per test to surface hangs.

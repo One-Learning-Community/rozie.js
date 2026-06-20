@@ -214,10 +214,11 @@ function specifierKey(
  */
 function hoistSpecifier(
   ctx: InlineCtx,
-  source: string,
+  sourceNode: t.StringLiteral,
   declKind: string,
   spec: t.ImportDeclaration['specifiers'][number],
 ): void {
+  const source = sourceNode.value;
   const key = specifierKey(source, declKind, spec);
   if (ctx.hoistKeys.has(key)) return;
   ctx.hoistKeys.add(key);
@@ -229,7 +230,13 @@ function hoistSpecifier(
     existing.specifiers.push(spec);
     return;
   }
-  const decl = t.importDeclaration([spec], t.stringLiteral(source));
+  // Reuse the partial's ORIGINAL source StringLiteral node (carries `extra.raw`)
+  // rather than rebuilding via `t.stringLiteral(source)` — a fresh literal has no
+  // raw, so @babel/generator would emit DOUBLE quotes while an inline-authored
+  // import preserves the source's quote style. Reusing the node keeps the
+  // hoisted import byte-identical to the inline form AND preserves the `.rzts`
+  // origin for source maps (R7).
+  const decl = t.importDeclaration([spec], sourceNode);
   if (groupKind === 'type') decl.importKind = 'type';
   ctx.hoistGroups.set(groupKey, decl);
   ctx.hoistImports.push(decl);
@@ -441,7 +448,7 @@ function inlineResolvedPartial(
       const declKind = imp.importKind ?? 'value';
       for (const spec of imp.specifiers) {
         if (referencedAll.has(spec.local.name)) {
-          hoistSpecifier(ctx, imp.source.value, declKind, spec);
+          hoistSpecifier(ctx, imp.source, declKind, spec);
         }
       }
     }

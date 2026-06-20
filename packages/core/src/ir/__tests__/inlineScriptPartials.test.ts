@@ -1,11 +1,11 @@
 /**
- * inlineScriptPartials — Phase 54 Wave-0 unit contract (R1–R7) + negative routing.
+ * inlineScriptPartials — Phase 54 unit contract (R1–R7) + negative routing.
  *
- * Nyquist discipline (54-VALIDATION.md): this suite is authored BEFORE the
- * `inlineScriptPartials` pass exists. Every `it` is `it.skip` for now —
- * "green-by-skip" — and Wave 2/3 flip each to a real assertion once the pass
+ * Nyquist discipline (54-VALIDATION.md): this suite was authored BEFORE the
+ * `inlineScriptPartials` pass existed (Wave-0, "green-by-skip"). Waves 2–4 then
+ * flipped every `it` to a real assertion as the pass
  * (`../inlineScriptPartials.ts`) and its diagnostics (ROZ139 collision /
- * ROZ140-adjacent cycle) land.
+ * ROZ140 cycle) landed; all R1–R7 + negative-routing cases are now active.
  *
  * The pass inlines a `.rzts`/`.rzjs` script partial's EXPORTED declarations
  * (sigils intact) into the host component's `<script>` AST BEFORE `analyzeAST`
