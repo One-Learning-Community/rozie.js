@@ -29,6 +29,7 @@
     "@fullcalendar/daygrid": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
+    "@rozie-ui/captcha-vue": "workspace:*",
     "@rozie-ui/chartjs-vue": "workspace:*",
     "@rozie-ui/codemirror-vue": "workspace:*",
     "@rozie-ui/cropper-vue": "workspace:*",

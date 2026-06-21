@@ -100,6 +100,9 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1.20
         version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@rozie-ui/captcha-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/captcha/packages/vue
       '@rozie-ui/chartjs-vue':
         specifier: workspace:*
         version: link:../packages/ui/chartjs/packages/vue
@@ -19663,7 +19666,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:
