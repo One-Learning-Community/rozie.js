@@ -1,0 +1,166 @@
+// ══ Full-row edit lifecycle (phase 51 plan 03 / req-6 / D-06, RESEARCH Pattern 6) ════════
+// Shift+F2 (and the editRow $expose verb) put EVERY editable cell in the active row into
+// edit at once; one save commits the whole row in ONE writeData (a single fresh-array row
+// replace) + ONE row-edit-commit event; Escape reverts the whole row as a unit. Per-column
+// validation still runs on each edited cell at commit (D-01 keep-open if ANY fails). The
+// editor template branch (isEditing's row arm) is re-used verbatim — no per-mode fork.
+
+// The editable [columnId, field] pairs for a body row at the given visible-model index,
+// in visible-cell order. field is the column's accessorKey (the row-object key to write).
+const editableColumnsForRow = (rowIndex) => {
+  const rowList = $data.rows || []
+  const row = rowList[rowIndex]
+  if (!row) return []
+  const cells = visibleCellsFor(row)
+  const out = []
+  for (let c = 0; c < cells.length; c++) {
+    const cell = cells[c]
+    const colId = cell && cell.column ? cell.column.id : null
+    if (colId == null || !columnEditable(colId)) continue
+    const d = defFor(colId)
+    const field = d ? (d.accessorKey != null ? d.accessorKey : colId) : colId
+    out.push({ colId, field })
+  }
+  return out
+}
+
+// beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
+// editable column's CURRENT value (so an immediate save is a no-op), clears any single-cell
+// edit (mutual exclusivity), and focuses the first editable cell's editor (the bounded
+// rAF-poll resolves the first [data-editing-cell] off gridRoot — same mechanism as
+// focusEditorWhenReady). Accepts the row OBJECT (the template/Shift+F2 path) — index-resolved
+// internally via rowIndexOf so it stays in the editingRow/activeRow index space.
+const beginRowEdit = (row) => {
+  const rowIndex = rowIndexOf(row)
+  if (rowIndex < 0) return
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) return
+  // Clear any single-cell editor first (mutual exclusivity).
+  $data.editingRow = -1
+  $data.editingCol = -1
+  $data.draftValue = null
+  setInvalid('')
+  // Seed each editable cell's draft from its current value.
+  const draft = {}
+  const rowList = $data.rows || []
+  const r = rowList[rowIndex]
+  const orig = r ? r.original : null
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    draft[ec.colId] = orig ? orig[ec.field] : null
+  }
+  $data.rowDraft = draft
+  $data.editingRowIndex = rowIndex
+  $data.activeInControl = true
+  $data.editVer = $data.editVer + 1
+  focusEditorWhenReady()
+}
+
+// commitRow(): validate EVERY edited column (D-01 — keep the row open if ANY fails: set
+// invalid + announce, NEVER write the model); on all-valid build ONE fresh array replacing
+// the single row object with all rowDraft values applied at once, call writeData ONCE, then
+// emit ONE row-edit-commit from THIS single call site, clear the row state, return focus.
+// Returns true on a written commit, false when a validation failure kept the row open.
+const commitRow = () => {
+  if ($data.editingRowIndex == null) return false
+  const rowIndex = $data.editingRowIndex
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) { endRowEdit(); return false }
+  const rowList = $data.rows || []
+  const r = rowList[rowIndex]
+  const rowOriginal = r ? r.original : null
+  const rowId = r ? r.id : null
+  const draft = $data.rowDraft || {}
+  // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    const err = runValidator(ec.colId, draft[ec.colId], rowOriginal)
+    if (err !== true) {
+      setInvalid(err)
+      focusEditorWhenReady()
+      return false
+    }
+  }
+  setInvalid('')
+  // Build the changes payload (only the columns whose value actually changed) + the field→
+  // value map for the single row-object replace.
+  const changes = []
+  const fieldValues = {}
+  for (let i = 0; i < editable.length; i++) {
+    const ec = editable[i]
+    const newValue = draft[ec.colId]
+    const oldValue = rowOriginal ? rowOriginal[ec.field] : null
+    fieldValues[ec.field] = newValue
+    if (oldValue !== newValue) changes.push({ columnId: ec.colId, oldValue, newValue })
+  }
+  // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
+  const srcIndex = sourceIndexOfRow(rowIndex)
+  const next = replaceRowValues(currentData(), srcIndex, fieldValues)
+  const focusRow = rowIndex
+  const focusCol = $data.activeColIndex
+  editTransition = true
+  writeData(next)
+  // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
+  $emit('row-edit-commit', { rowId, changes })
+  endRowEdit()
+  editTransition = false
+  focusCellWhenReady(focusRow, focusCol)
+  return true
+}
+
+// cancelRow(): revert the whole row as a unit (D-06 — drop every draft, NO model write) and
+// return focus to the active cell.
+const cancelRow = () => {
+  if ($data.editingRowIndex == null) return
+  const focusRow = $data.activeRow
+  const focusCol = $data.activeColIndex
+  editTransition = true
+  endRowEdit()
+  editTransition = false
+  focusCellWhenReady(focusRow, focusCol)
+}
+
+// replaceRowValues: like replaceRowValue but applies a MAP of field→value to ONE row object
+// in a single fresh-array replace (req-6 — the whole-row commit is ONE write, not per cell).
+const replaceRowValues = (rows, rowIndex, fieldValues) => {
+  const src = rows || []
+  const fv = fieldValues || {}
+  const out = []
+  for (let i = 0; i < src.length; i++) {
+    if (i === rowIndex) {
+      // WR-03: own-property spread (orig then the field→value map), NOT a `for..in`
+      // prototype-walking copy. Spread copies own enumerable props only.
+      out.push({ ...(src[i] || {}), ...fv })
+    } else {
+      out.push(src[i])
+    }
+  }
+  return out
+}
+
+// Compute the next editable cell for Tab-advance (req-3, RESEARCH Open-Q3 deterministic
+// rule): skip non-editable columns within the row; wrap to the NEXT row's first editable
+// cell at the row's end; stop (return null) at grid end. Pure index math over the visible
+// model. Returns { row, col } or null.
+const nextEditableCell = (fromRow, fromCol) => {
+  const rowList = $data.rows || []
+  const rowCount = rowList.length
+  if (rowCount === 0) return null
+  let r = fromRow
+  let c = fromCol + 1
+  while (r < rowCount) {
+    const row = rowList[r]
+    const cells = row ? visibleCellsFor(row) : []
+    while (c < cells.length) {
+      const cell = cells[c]
+      const cid = cell && cell.column ? cell.column.id : null
+      if (cid != null && columnEditable(cid)) return { row: r, col: c }
+      c = c + 1
+    }
+    r = r + 1
+    c = 0
+  }
+  return null
+}
+
+export { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell }
