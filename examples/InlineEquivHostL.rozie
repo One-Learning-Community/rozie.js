@@ -1,0 +1,49 @@
+<!--
+  InlineEquivHostL.rozie — Phase 56-R10 BLANK-SEPARATED LEADING-seam byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostL.rozie inlines from
+  ./partialLogicL.rzts, written inline in this component's own <script lang="ts">: the host
+  arrow-const `headL`, the sigil-lowered `$provide(...)`, then ONE BLANK line, then the
+  run-LEADING comment block and the two used arrow consts (`verbL`, `verb2L`). The unused
+  `neverUsedL` export does NOT appear here (it is tree-shaken from the partial path too).
+
+  The blank line above the comment breaks @babel's prev-trailing attachment, so the comment
+  attaches to `verbL`'s leadingComments ONLY — it SINGLE-emits on svelte/vue. This is the
+  blank-separated LEADING-seam target the partial form MUST reproduce byte-for-byte on all
+  six targets after normalizing only the component identifier token
+  (PartialInlineHostL ↔ InlineEquivHostL).
+
+  No <style> block — see the PartialInlineHostL.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostL">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headL = () => $props.base + 1;
+// the registry API handed to children (the $provide leading comment that STAYS in
+// residual position when $provide lowers to provide()/Provider — the real shape).
+$provide('themeL', { v: 1 });
+
+// imperative handle (consumer-callable) — the run-LEADING comment block that is
+// SEPARATED from the host predecessor by one blank line (beforeGap=2). Inline, the
+// blank breaks @babel's prev-trailing attachment, so this block attaches to verbL's
+// leadingComments ONLY → single-emit on svelte/vue. The partial-splice mirror must
+// NOT re-create the prev-trailing copy (doubling it = the R10 bug this guards).
+const verbL = (n: number): number => headL() + n;
+const verb2L = (n: number): number => verbL(n) + 1;
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ verbL(1) }}</span>
+  <span class="echo">{{ verb2L(1) }}</span>
+</div>
+</template>
+
+</rozie>

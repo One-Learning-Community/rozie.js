@@ -438,6 +438,26 @@ const EXAMPLES = [
   // consumed only via inline — not an EXAMPLES entry.
   'PartialInlineHostK',
   'InlineEquivHostK',
+  // Phase 56-R10 (script-partial-cross-target-comment-placement-parity) — the
+  // BLANK-SEPARATED LEADING-SEAM red→green guard surfaced by the 56-08 DataTable Wave-8
+  // exposeStateVerbs (imperative-handle) extraction. partialLogicL.rzts's FIRST surviving
+  // decl carries a multi-line run-LEADING comment block and hoists NO import (the arrow
+  // bodies close over the host `headL`). The host import sits ONE BLANK line below a
+  // sigil-lowered `$provide(...)` statement (the `$provide('data-table:columns', …)` shape),
+  // so beforeGap = 2. The inline oracle attaches that comment to verbL's leadingComments
+  // ONLY (the blank breaks @babel's prev-trailing attachment) → single-emit on svelte/vue.
+  // Before the fix, the vue/svelte mirror re-creates the prev-trailing copy unconditionally
+  // → DOUBLES the comment block (RED on exactly vue/svelte; react/angular/solid/lit
+  // reconstruct/strip/whole-program-dedup the comment so they single-emit and stay
+  // byte-identical). This is the blank-separated sibling of the R9 gap-0 leading seam
+  // (beforeGap = 1, which SHOULD double). The R10 fix stamps cur.extra.__rozieBeforeGap when
+  // a spliced leading-comment run sits >= 1 blank below a host statement, and the vue/svelte
+  // mirror suppresses the LEADING-seam doubling for that seam. PartialInlineHostL references
+  // a sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostL is
+  // single-file and stays OUT. The .rzts partial is a LEAF source consumed only via inline —
+  // not an EXAMPLES entry.
+  'PartialInlineHostL',
+  'InlineEquivHostL',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -538,6 +558,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostK oracle also stays OUT.
   'PartialInlineHostK',
+  // Phase 56-R10 — references ./partialLogicL.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling blank-separated leading-seam partial at
+  // compile/inline time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF
+  // source consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostL oracle also stays OUT.
+  'PartialInlineHostL',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

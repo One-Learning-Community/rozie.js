@@ -475,3 +475,45 @@ describe('Phase 56-R9 — gap-0 leading-seam literal byte-identity (before-side 
     });
   });
 });
+
+/**
+ * Phase 56-R10 — BLANK-SEPARATED LEADING-seam literal byte-identity (before-side host gap,
+ * comment NOT doubled).
+ *
+ * The blank-separated sibling of the R9 gap-0 leading seam, surfaced by the 56-08 DataTable
+ * Wave-8 `exposeStateVerbs` (imperative-handle) extraction: when a spliced (extracted)
+ * partial run's FIRST emitted token is a multi-line run-LEADING comment block, and in the
+ * host source that comment is SEPARATED from the preceding statement (a sigil-lowered
+ * `$provide(...)`) by ONE blank line (beforeGap = 2), the vue/svelte
+ * `mirrorSpliceBoundaryComments` LEADING-seam branch re-creates the prev-trailing copy
+ * UNCONDITIONALLY and DOUBLES the comment block at the splice seam.
+ *
+ *   • examples/PartialInlineHostL.rozie — a host arrow-const `const headL`, a sigil-lowered
+ *     `$provide(...)` (with its own leading comment, the registry-API shape), then ONE blank
+ *     line, then imports `{ verbL, verb2L }` (BARE const-arrow decls whose first surviving
+ *     decl carries a multi-line run-LEADING comment block; the partial hoists NO import — the
+ *     arrow bodies close over the host `headL`) from the sibling ./partialLogicL.rzts.
+ *   • examples/InlineEquivHostL.rozie — the SAME logic + comment + blank written inline.
+ *
+ * Inline, the blank above the comment breaks @babel's prev-trailing attachment, so the
+ * comment attaches to verbL's leadingComments ONLY → SINGLE-emit on svelte/vue. This is the
+ * INVERSE of R9's gap-0 seam (beforeGap = 1, no blank → the comment IS shared on both
+ * neighbours → SHOULD double). RED on exactly vue/svelte before the fix (the comment block is
+ * doubled); GREEN ×6 after. react/angular/solid/lit reconstruct/strip/whole-program-dedup the
+ * comment so they single-emit and stay byte-identical throughout. The R10 fix stamps
+ * `cur.extra.__rozieBeforeGap` in core when a spliced leading-comment run sits >= 1 blank below
+ * a host statement, and the vue/svelte mirror suppresses the LEADING-seam doubling for that
+ * seam. Reuses `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_L = 'PartialInlineHostL';
+const INLINE_HOST_L = 'InlineEquivHostL';
+
+describe('Phase 56-R10 — blank-separated leading-seam literal byte-identity (comment not doubled)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('blank-separated leading-seam partial-inlined host === inline-equivalent host (literal, comment single-emit)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_L, target), PARTIAL_HOST_L);
+      const inline = normalizeName(loadFixture(INLINE_HOST_L, target), INLINE_HOST_L);
+      expect(partial).toBe(inline);
+    });
+  });
+});

@@ -1,0 +1,56 @@
+<!--
+  PartialInlineHostL.rozie — Phase 56-R10 BLANK-SEPARATED LEADING-seam red→green guard host.
+
+  The <script lang="ts"> declares a host arrow-const `const headL`, then a sigil-lowered
+  `$provide(...)` statement (the real DataTable shape — the `$provide('data-table:columns', …)`
+  registry that immediately precedes the imperative-handle block), then ONE BLANK line, then
+  imports `{ verbL, verb2L }` from ./partialLogicL.rzts. The compiler inlines those exported
+  arrow consts into THIS component's script below `$provide`, before lowering; the unused
+  `neverUsedL` export is tree-shaken.
+
+  This is the BLANK-SEPARATED LEADING seam: the spliced run's FIRST emitted token is a
+  multi-line run-LEADING comment block, and in the host source ONE blank line separates that
+  comment from the preceding `$provide` statement (beforeGap = 2). The inline oracle
+  (InlineEquivHostL.rozie) attaches that comment to `verbL`'s leadingComments ONLY (the blank
+  breaks @babel's prev-trailing attachment), so it SINGLE-emits on svelte/vue.
+
+  Before the R10 fix, the vue/svelte `mirrorSpliceBoundaryComments` LEADING-seam branch
+  re-creates the prev-trailing copy unconditionally, DOUBLING the comment block at the splice
+  seam → byte diff (RED on exactly vue/svelte; react/angular/solid/lit reconstruct/strip or
+  whole-program-dedup the comment so they single-emit and stay byte-identical). This is the
+  blank-separated sibling of the R9 gap-0 LEADING seam (which is beforeGap = 1 and SHOULD
+  double, matching the inline oracle).
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute the
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostL. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicL.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostL">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headL = () => $props.base + 1;
+// the registry API handed to children (the $provide leading comment that STAYS in
+// residual position when $provide lowers to provide()/Provider — the real shape).
+$provide('themeL', { v: 1 });
+
+import { verbL, verb2L } from './partialLogicL.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ verbL(1) }}</span>
+  <span class="echo">{{ verb2L(1) }}</span>
+</div>
+</template>
+
+</rozie>
