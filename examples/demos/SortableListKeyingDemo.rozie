@@ -1,0 +1,136 @@
+<!--
+  SortableListKeyingDemo.rozie — behavioral fixture for the SortableList keying
+  data-corruption fix (quick 260620-o6a).
+
+  Proves KEY-01/KEY-02/KEY-03 BEHAVIORALLY (a static screenshot cannot catch
+  instance/state corruption). Two SortableLists hold ID-LESS object items (no
+  `id` field), so the per-row key cannot come from an item property:
+
+    - "keying-default": NO itemKey -> the wrapper's WeakMap synthetic-id default
+      path (KEY-02). The synthetic id is keyed by object identity, so it survives
+      a reorder and the framework reconciler rebinds each row component instance
+      to its ORIGINAL item.
+    - "keying-fn": a FUNCTION itemKey (KEY-01, the consumer's literal ask) — a
+      WeakMap-backed extractor returning a stable key per object item.
+
+  Each row renders a KeyMarkerRow that stamps a distinct mount-time marker (from
+  a shared module counter). The companion sortable-keying.spec.ts drags a row and
+  asserts the (label -> mark) pair SET is unchanged — which holds under stable
+  keying and fails under position-keying.
+
+  SOLID NOTE: Solid's <For> keys by element REFERENCE and ignores :key, so an
+  id-less same-ref reorder is inherently stable on Solid regardless of keyFor.
+  The spec therefore proves the fix on Vue + React (the keyFor/:key-keyed
+  reconcilers); the cell still BUILDS for all six.
+-->
+
+<rozie name="SortableListKeyingDemo">
+
+<components>
+{
+  SortableList: '../../packages/ui/sortable-list/src/SortableList.rozie',
+  KeyMarkerRow: './KeyMarkerRow.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+  fnItems: [],
+}
+</data>
+
+<script>
+// Id-less object items (NO id field) — the path under test. Fresh array per list
+// so the two lists reorder independently.
+const SEED = () => [
+  { label: 'Alpha' },
+  { label: 'Bravo' },
+  { label: 'Charlie' },
+  { label: 'Delta' },
+  { label: 'Echo' },
+]
+
+// Function itemKey (KEY-01): a WeakMap-backed extractor — the consumer's literal
+// ask. Map + counter live in ONE member-mutated object so React hoists both via a
+// single useMemo (a bare top-level `let seq` would reset every render -> id churn
+// -> the same hoist gap the wrapper's keyFor folds around).
+const fnKey = { map: new WeakMap(), seq: 0 }
+const fnItemKey = (item) => {
+  if (!fnKey.map.has(item)) {
+    fnKey.map.set(item, 'fk' + fnKey.seq++)
+  }
+  return fnKey.map.get(item)
+}
+
+$onMount(() => {
+  $data.items = SEED()
+  $data.fnItems = SEED()
+})
+</script>
+
+<template>
+<div class="keying-demo">
+  <section class="keying-section" data-testid="keying-default">
+    <h4>WeakMap default (no itemKey)</h4>
+    <SortableList r-model:items="$data.items" :handle="$classSelector('grip')">
+      <template #default="{ item }">
+        <span class="row">
+          <span class="grip" aria-label="Drag handle">::</span>
+          <KeyMarkerRow :item="item" />
+        </span>
+      </template>
+    </SortableList>
+  </section>
+
+  <section class="keying-section" data-testid="keying-fn">
+    <h4>Function itemKey (WeakMap-backed extractor)</h4>
+    <SortableList r-model:items="$data.fnItems" :itemKey="fnItemKey" :handle="$classSelector('grip')">
+      <template #default="{ item }">
+        <span class="row">
+          <span class="grip" aria-label="Drag handle">::</span>
+          <KeyMarkerRow :item="item" />
+        </span>
+      </template>
+    </SortableList>
+  </section>
+</div>
+</template>
+
+<style>
+.keying-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  max-width: 720px;
+}
+.keying-section h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+</style>
+
+</rozie>

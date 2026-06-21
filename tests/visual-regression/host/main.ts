@@ -115,6 +115,16 @@ export const EXAMPLES = [
   'SortableListClone',
   'SortableListFilter',
   'SortableListShowcase',
+  // Quick 260620-o6a — SortableListKeying is the BEHAVIORAL-only keying fixture
+  // (loader → examples/demos/SortableListKeyingDemo.rozie, which imports
+  // ../../packages/ui/sortable-list/src/SortableList.rozie + a per-row
+  // KeyMarkerRow mount-marker child). It proves the id-less-object-list keying
+  // data-corruption fix: two SortableLists of id-less objects (WeakMap default +
+  // a function itemKey) reordered, asserting each row's mount marker stays bound
+  // to its ORIGINAL item — see sortable-keying.spec.ts. Built for all 6 targets
+  // but NOT a screenshot cell — deliberately NOT in matrix.spec.ts EXAMPLES
+  // (behavioral-only; no pixel baseline).
+  'SortableListKeying',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -685,6 +695,9 @@ export const LIT_TAGS: Record<Example, string> = {
   SortableListClone: 'rozie-sortable-list-clone',
   SortableListFilter: 'rozie-sortable-list-filter',
   SortableListShowcase: 'rozie-sortable-list-showcase',
+  // Quick 260620-o6a — the lit entry appends '-demo' → tag
+  // 'rozie-sortable-list-keying-demo' = kebab of SortableListKeyingDemo.
+  SortableListKeying: 'rozie-sortable-list-keying',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -926,6 +939,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // props, but the demo consumers are self-contained, so `{}`.
   SortableListClone: {},
   SortableListFilter: {},
+  // Quick 260620-o6a — SortableListKeying is self-contained: both lists' id-less
+  // object arrays live in the demo's <data> (items / fnItems), seeded in $onMount.
+  SortableListKeying: {},
   SortableListShowcase: {},
   Flatpickr: {},
   LeafletMap: {},

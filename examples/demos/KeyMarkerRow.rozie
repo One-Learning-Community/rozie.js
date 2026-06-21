@@ -1,0 +1,58 @@
+<!--
+  KeyMarkerRow.rozie — per-row mount-marker child for the SortableList keying
+  behavioral fixture (quick 260620-o6a).
+
+  Each instance stamps a mount-time marker EXACTLY ONCE in $onMount, pulled from
+  the shared module-level counter in ./keyMarkerCounter.js. Because the marker is
+  set at mount and never recomputed, it travels with the component INSTANCE:
+
+    - Stable item-bound key (the WeakMap synthetic id or a function itemKey) ⇒
+      the framework reconciler moves this instance WITH its original item on a
+      reorder ⇒ the (label, mark) pair is preserved.
+    - Position-keying (the corruption bug) ⇒ the instance stays at its slot while
+      a different item's label flows in beneath it ⇒ the pairs scramble.
+
+  The spec asserts the (label -> mark) PAIR SET is invariant across a reorder,
+  which fails under the position-keying bug and passes under stable keying.
+-->
+
+<rozie name="KeyMarkerRow">
+
+<props>
+{
+  item: { type: Object, default: null },
+}
+</props>
+
+<data>
+{
+  mark: '',
+}
+</data>
+
+<script>
+import { nextKeyMark } from './keyMarkerCounter.js'
+
+// Stamp the mount-time marker ONCE, from the shared singleton counter, so each
+// row across all six targets gets a DISTINCT marker bound to its instance.
+$onMount(() => { $data.mark = nextKeyMark() })
+</script>
+
+<template>
+<span class="km-row">
+  <span class="km-label">{{ $props.item.label }}</span>
+  <span class="km-mark">#{{ $data.mark }}</span>
+</span>
+</template>
+
+<style>
+.km-row { display: inline-flex; gap: 0.4rem; align-items: baseline; }
+.km-label { font-weight: 500; }
+.km-mark {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8em;
+  color: rgba(0, 0, 0, 0.45);
+}
+</style>
+
+</rozie>
