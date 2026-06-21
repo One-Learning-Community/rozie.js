@@ -158,6 +158,119 @@ export function subtreeReads(
 }
 
 /**
+ * Returns true if the subtree rooted at `node` contains a BARE Identifier READ of
+ * `name` — the exact shape the Vue `$computed` lowering wraps to `<name>.value`.
+ *
+ * The Vue trigger condition for the `$computed` shadow bug: a `$computed` name is
+ * read as a BARE identifier in source (there is NO `$computed.<name>` accessor
+ * member to gate on), and the downstream Identifier visitor `.value`-wraps every
+ * such bare read. A colliding param/local only mis-captures that wrap when it
+ * actually performs a bare read of `name` within its scope — so a `binding`
+ * trigger (mere existence) would over-apply (renaming an unused same-named param
+ * → corpus drift), and the `accessor` trigger cannot fire (no member access).
+ *
+ * Excludes the SAME non-read positions the Vue Identifier visitor skips, so the
+ * gate matches the rewrite exactly: declaration ids, non-computed member
+ * properties, object keys (shorthand or not), TS type positions, function names,
+ * function params, and import/export specifier ids. A computed member property
+ * (`obj[name]`) IS a bare read and counts.
+ *
+ * Hand-rolled own-child walk (the `subtreeReads` twin): a direct walk with
+ * parent-context tracking is simpler than a Program-rooted Babel traverse and
+ * has no rooting constraint.
+ */
+export function subtreeReadsBareIdentifier(
+  node: t.Node | null | undefined,
+  name: string,
+): boolean {
+  if (!node) return false;
+  let found = false;
+  function walk(n: t.Node | null | undefined, parent: t.Node | null): void {
+    if (found || !n || typeof n !== 'object' || !('type' in n)) return;
+
+    if (t.isIdentifier(n) && n.name === name) {
+      if (isBareRead(n, parent)) {
+        found = true;
+        return;
+      }
+    }
+    // TS type subtrees never contribute a runtime bare read (mirrors the Vue
+    // Identifier visitor's `isInTypePosition` skip). The value-bearing TS wrapper
+    // nodes (`x as T`, `x!`, `x satisfies T`, `<T>x`) carry a runtime expression
+    // child and must NOT be pruned.
+    if (
+      n.type.startsWith('TS') &&
+      n.type !== 'TSNonNullExpression' &&
+      n.type !== 'TSAsExpression' &&
+      n.type !== 'TSSatisfiesExpression' &&
+      n.type !== 'TSTypeAssertion'
+    ) {
+      return;
+    }
+
+    for (const key of Object.keys(n)) {
+      if (
+        key === 'loc' ||
+        key === 'start' ||
+        key === 'end' ||
+        key === 'leadingComments' ||
+        key === 'trailingComments' ||
+        key === 'innerComments'
+      ) {
+        continue;
+      }
+      const v = (n as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item && typeof item === 'object' && 'type' in item) {
+            walk(item as t.Node, n);
+          }
+        }
+      } else if (v && typeof v === 'object' && 'type' in v) {
+        walk(v as t.Node, n);
+      }
+    }
+  }
+  // Decide whether an Identifier node named `name` is a genuine bare READ (the
+  // position the Vue Identifier visitor would `.value`-wrap) given its parent.
+  function isBareRead(id: t.Identifier, parent: t.Node | null): boolean {
+    if (!parent) return true;
+    // `const name = ...` / declarator id.
+    if (t.isVariableDeclarator(parent) && parent.id === id) return false;
+    // `name.foo` non-computed member PROPERTY (`x.name`) — not a bare read.
+    if (
+      (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+      parent.property === id &&
+      !parent.computed
+    ) {
+      return false;
+    }
+    // Object KEY position (`{ name: ... }`) — a property name, not a read. A
+    // shorthand `{ name }` has `key === value === id`; the Vue Identifier visitor
+    // SKIPS shorthand (it leaves `{ name }` reading the param as-authored, no
+    // `.value` wrap), so it is NOT a triggering read either. Both → false.
+    if (t.isObjectProperty(parent) && parent.key === id && !parent.computed) {
+      return false;
+    }
+    // Function NAME (`function name() {}`).
+    if (t.isFunctionDeclaration(parent) && parent.id === id) return false;
+    if (t.isFunctionExpression(parent) && parent.id === id) return false;
+    // Function PARAMETER binding (`(name) => ...`).
+    if (t.isFunction(parent) && parent.params.includes(id)) return false;
+    // import/export specifier ids.
+    if (t.isImportSpecifier(parent)) return false;
+    if (t.isImportDefaultSpecifier(parent)) return false;
+    if (t.isImportNamespaceSpecifier(parent)) return false;
+    if (t.isExportSpecifier(parent)) return false;
+    // Labeled-statement / break / continue labels.
+    if (t.isLabeledStatement(parent) && parent.label === id) return false;
+    return true;
+  }
+  walk(node, null);
+  return found;
+}
+
+/**
  * One generated-symbol group: a set of names the EMITTER will mint as a binding,
  * plus the predicate that decides whether a user binding actually collides.
  */
@@ -176,8 +289,20 @@ export interface GeneratedSymbolGroup {
    *     destructure binding) AND the Angular/Lit reserved-class-member case (a
    *     user local that becomes a colliding class field). The renameable side is
    *     always the user binding; the generated symbol is the contract.
+   *   - `{ kind: 'bare-read' }` — a user binding for `name` collides ONLY when
+   *     its scope contains a BARE Identifier READ of `name` (gated via
+   *     `subtreeReadsBareIdentifier`). This is the Vue `$computed` case: a
+   *     computed name has NO `$computed.<name>` accessor member (so the
+   *     `accessor` trigger cannot fire), yet the Vue Identifier visitor
+   *     `.value`-wraps every bare read of the name — a same-named param/local
+   *     would capture that wrap. A `binding` trigger would over-apply (rename a
+   *     same-named param that never reads the computed → corpus drift), so the
+   *     actual bare read is the gate. Consumed ONLY by Vue's computed group.
    */
-  trigger: { kind: 'accessor'; accessor: string } | { kind: 'binding' };
+  trigger:
+    | { kind: 'accessor'; accessor: string }
+    | { kind: 'binding' }
+    | { kind: 'bare-read' };
 }
 
 /**
@@ -220,6 +345,9 @@ export function deconflictGeneratedSymbols(
     if (!group.names.has(name)) return false;
     if (protectedNames.has(name)) return false; // public contract — never rename
     if (group.trigger.kind === 'binding') return true;
+    if (group.trigger.kind === 'bare-read') {
+      return subtreeReadsBareIdentifier(scopeBlock, name);
+    }
     return subtreeReads(scopeBlock, group.trigger.accessor, name);
   };
 
@@ -253,6 +381,20 @@ export function deconflictGeneratedSymbols(
           if (!patternIntroducesBinding(id, name)) continue;
           const binding = path.scope.getBinding(name);
           const ownerScope = binding ? binding.scope : path.scope;
+          // `bare-read` (Vue `$computed`) is the ONLY trigger whose generated
+          // symbol is itself DECLARED in the source program (`const <name> =
+          // $computed(...)`). A program-scope declarator for that name therefore
+          // IS the generated symbol — never a user shadow (a second top-level
+          // `const <name>` would be a duplicate-binding error). Renaming it would
+          // tamper the generated computed (T-57-01). A genuine bare-read shadow
+          // only arises in a NESTED scope (a function-local `const`/param), which
+          // is still handled below. Accessor/binding triggers do NOT declare their
+          // symbol in source (defineModel/$data/setX are emitter-minted), so a
+          // program-scope `const <name> = $accessor.<name>` self-shadow is a real
+          // user binding and stays renameable.
+          if (group.trigger.kind === 'bare-read' && t.isProgram(ownerScope.block)) {
+            continue;
+          }
           if (collides(group, name, ownerScope.block)) {
             ownerScope.rename(name, alias(name));
           }

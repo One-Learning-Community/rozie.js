@@ -36,6 +36,10 @@ import { portalKey } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import {
+  deconflictGeneratedSymbols,
+  type GeneratedSymbolGroup,
+} from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -222,6 +226,46 @@ export function rewriteRozieIdentifiers(
   // through the IDENTICAL `$props.<modelProp>` Vue lowering and yields
   // byte-identical emit. Reuse, not reimplement (SPEC Req 2).
   normalizeModelAccessor(program);
+
+  // UNIFIED DECONFLICTION PASS — the Vue arm (Phase 57). The shared,
+  // target-parameterized, collision-aware rename pass in @rozie/core (the same
+  // entrypoint Svelte calls). Runs on the freshly-cloned, not-yet-mutated Program
+  // AFTER `$model`→`$props` normalization (so model props are visible to the
+  // `$props` accessor trigger) and BEFORE the scope-blind bare-identifier rewrite
+  // below.
+  //
+  // Vue's GENERATED same-named bare refs (the symbols a `<name>` param can
+  // silently shadow) are EXACTLY the three lowered to a bare `<name>(.value)`:
+  //   - model props   → `const <name> = defineModel(...)`  (post-normalization a
+  //                      `$props.<name>` read → `<name>.value`; `$props` accessor)
+  //   - `$data` keys   → `const <name> = ref(...)`          (`$data.<name>` read →
+  //                      `<name>.value`; `$data` accessor)
+  //   - `$computed`    → `const <name> = computed(...)`      (bare-ident read →
+  //                      `<name>.value`; the additive `bare-read` gate — computeds
+  //                      have NO `$computed.<name>` accessor member to gate on)
+  // A param/local shadowing any of these captures the rewritten bare identifier:
+  // `$model.token = token` (param `token`) → `token.value = token` writes the
+  // PARAM not the model ref (`v-model:token` never updates); `$data.status =
+  // status` (param `status`) → `status.value = status` never refreshes the state
+  // ref. Each arm is gated on an ACTUAL offending read so a non-colliding corpus
+  // stays byte-identical (over-apply guard — Plan 57-02's cross-target gate proves
+  // it). The renameable side is the USER param/local (suffix `$local`), NEVER the
+  // generated symbol name — same discipline as Svelte.
+  //
+  // EXCLUDED: non-model props (`$props.step` → `props.step`, no bare binding) and
+  // refs (`$refs.x` → `xRef.value`, suffixed) — neither is a same-named bare ref a
+  // `<name>` param can shadow. The three group name sets are disjoint (ROZ420
+  // already errors on a ref colliding with data/computed/props; data/computed/model
+  // name overlaps are rejected upstream), so the groups never double-rename.
+  // PUBLIC-CONTRACT guard: `$expose` verb names are never renamed (mirror Svelte's
+  // `svelteProtected`).
+  const vueProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
+  const vueGroups: GeneratedSymbolGroup[] = [
+    { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
+    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
+    { names: computedNames, trigger: { kind: 'bare-read' } },
+  ];
+  deconflictGeneratedSymbols(program, vueGroups, vueProtected);
 
   traverse(program, {
     MemberExpression(path) {
