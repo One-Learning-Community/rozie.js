@@ -203,12 +203,35 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       const afterGap = (curExtra as { __rozieAfterGap?: number } | undefined)?.__rozieAfterGap;
       const anchorLine =
         (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
-      toAppend = lead.map((c) => ({
-        ...c,
-        loc: c.loc
-          ? { ...c.loc, start: { ...c.loc.start, line: anchorLine }, end: { ...c.loc.end, line: anchorLine } }
-          : c.loc,
-      }));
+      // Phase 56-R11 (after-side INTER-COMMENT-BLOCK seam): when CUR (the host successor)
+      // carries MORE THAN ONE leading comment block — `[comment A][blank][comment B]` (the
+      // real 56-09 Wave-9 P9 `gridKeydownHandlers` / P12 `fillDrag` after-sides, two
+      // consecutive host comment-blocks downstream of the spliced run) — anchoring EVERY
+      // cloned comment on the SAME `anchorLine` collapses the blank BETWEEN the blocks (and
+      // any multi-line block's own height). The first blank (spliced tail → block A) is the
+      // `afterGap` reproduced by `anchorLine`; the SECOND blank (block A → block B) lives in
+      // the source line delta between the comments. Preserve each comment's delta from the
+      // FIRST comment's start line so the inter-comment-block blank renders, anchoring block A
+      // at `anchorLine` and block B (and its own lines) `delta` lines past it. For a SINGLE
+      // comment (HostJ/HostE/HostI) every delta is 0 → byte-identical to the prior flatten.
+      // react/angular/solid/lit are unaffected (they reconstruct/strip/whole-program-dedup the
+      // comment, reading the core loc deltas directly — solid already preserves both blanks).
+      const baseLine = lead[0]?.loc?.start.line;
+      toAppend = lead.map((c) => {
+        if (!c.loc) return { ...c };
+        const startLine =
+          baseLine === undefined ? anchorLine : anchorLine + (c.loc.start.line - baseLine);
+        const endLine =
+          baseLine === undefined ? anchorLine : anchorLine + (c.loc.end.line - baseLine);
+        return {
+          ...c,
+          loc: {
+            ...c.loc,
+            start: { ...c.loc.start, line: startLine },
+            end: { ...c.loc.end, line: endLine },
+          },
+        };
+      });
     }
     prev.trailingComments = [...(prevTrail ?? []), ...toAppend];
   }
