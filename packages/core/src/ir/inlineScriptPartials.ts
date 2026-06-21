@@ -355,6 +355,27 @@ interface SplicedEmitBlock {
   /** Host line this run should emit-anchor to when it is the FIRST walked block
    *  (no preceding statement to flow below). */
   anchorLine: number;
+  /**
+   * The ORIGINAL source gap above this run's first declaration (D-02, R2), as the
+   * `prevEnd + gap` delta `normalizeSplicedEmitLines` should apply when flowing this
+   * block below its preceding emitted statement: `gap = 1` reproduces a zero-blank
+   * source adjacency (the block's first emit token lands on the next line), `gap = 2`
+   * reproduces one source blank, `gap = N+1` reproduces N source blanks (no clamp).
+   *
+   * Measured PARTIAL-LOCAL at splice time (pre-shift) from the run's first emit token
+   * (its banner comment if any, else its first node) to the nearest preceding node IN
+   * THE SAME SOURCE FILE — a same-file freshly-hoisted import or a prior same-file decl
+   * run. By the extraction rule (the host import sits at the run's first source line)
+   * that partial-local delta equals the blank delta the run had above it in the host
+   * source before extraction, so it reproduces the inline adjacency (Pitfall 3: measure
+   * source-side, NOT the host splice seam). When the run's first decl has NO same-file
+   * predecessor (a file-top nested-partial decl, e.g. HostD's `inner`), this is the
+   * legacy default `2` — preserving the pre-D-02 behavior for that shape.
+   *
+   * Consumed ONLY by the non-import branch at the `gap` anchor; consecutive import
+   * blocks keep their `gap = 1` contiguity special case.
+   */
+  originalGap: number;
 }
 
 /**
@@ -443,6 +464,49 @@ function shiftAttachedComments(node: t.Node, offset: number, shifted: Set<object
 function blockFirstEmitLine(firstNode: t.Node): number {
   const firstLeading = firstNode.leadingComments?.[0]?.loc;
   return firstLeading ? firstLeading.start.line : firstNode.loc!.start.line;
+}
+
+/**
+ * Measure the ORIGINAL source gap above a decl run's first emit token (D-02, R2).
+ *
+ * Returns the `prevEnd + gap` delta the run should flow at: the distance, in source
+ * lines, from the run's first emit token (its banner comment if any, else its first
+ * node) DOWN from the END of the nearest preceding node IN THE SAME SOURCE FILE — a
+ * same-file freshly-hoisted import (`sameFileHoists`) or the prior same-file decl run's
+ * last node (`prevRunLastNode`). `gap = firstEmitLine − precedingEnd` so a zero-blank
+ * adjacency yields `1` (next line) and N blanks yield `N+1` (no clamp). All `loc`s are
+ * still PARTIAL-LOCAL here (the normalize shift runs later), so this reproduces the
+ * partial's own pre-extraction layout — which, by the extraction rule, equals the host
+ * adjacency the inline oracle has (Pitfall 3: measure source-side, NOT the host seam).
+ *
+ * When the run's first decl has NO same-file predecessor (a file-top nested-partial
+ * decl, e.g. HostD's `inner` at the top of its own file), there is no source delta to
+ * measure, so this falls back to the legacy default `2` — preserving the pre-D-02
+ * behavior for that shape (no regression). Never throws.
+ */
+function measureOriginalGap(
+  firstNode: t.Node,
+  sameFileHoists: readonly t.Node[],
+  prevRunLastNode: t.Node | null,
+): number {
+  const loc = firstNode.loc;
+  if (!loc) return 2;
+  const firstEmitLine = blockFirstEmitLine(firstNode);
+  const fname = loc.filename;
+  let precedingEnd = 0;
+  for (const h of sameFileHoists) {
+    const hl = h.loc;
+    if (hl && hl.filename === fname && hl.end.line < firstEmitLine) {
+      precedingEnd = Math.max(precedingEnd, hl.end.line);
+    }
+  }
+  const pl = prevRunLastNode?.loc;
+  if (pl && pl.filename === fname && pl.end.line < firstEmitLine) {
+    precedingEnd = Math.max(precedingEnd, pl.end.line);
+  }
+  // No same-file predecessor → no source delta to reproduce; keep the legacy gap.
+  if (precedingEnd === 0) return 2;
+  return Math.max(1, firstEmitLine - precedingEnd);
 }
 
 /**
@@ -555,7 +619,12 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       // CONTIGUOUSLY (gap 1 — imports carry no inter-statement blank line); every
       // other run flows one blank line below the preceding statement (gap 2).
       const isImportBlock = t.isImportDeclaration(block.nodes[0] as t.Node);
-      const gap = isImportBlock && prevWasImport ? 1 : 2;
+      // D-02 (R2): consecutive import blocks stay contiguous (no inter-import
+      // blank); every other run flows the block's ORIGINAL source gap below its
+      // preceding emitted statement instead of a hardcoded one-blank `+2`, so a
+      // zero-blank source adjacency stays zero-blank (gap 1) and an intentional
+      // 2+-blank gap is reproduced faithfully (no clamp).
+      const gap = isImportBlock && prevWasImport ? 1 : block.originalGap;
       const anchorLine = prevEnd > 0 ? prevEnd + gap : block.anchorLine;
       const offset = anchorLine - blockFirstEmitLine(firstNode);
       let maxEnd = 0;
@@ -1098,10 +1167,14 @@ export function inlineScriptPartials(
         // its own block (anchored sequentially in the body). A nested-partial
         // (file-B) decl run then flows one blank line below the parent (file-A)
         // decl run instead of inheriting the hoist's incommensurate line-space.
+        // Hoist blocks are single imports; they only ever flow via the import
+        // contiguity special case (gap 1) or the first-block anchorLine fallback,
+        // so their originalGap is never read — set the contiguous default.
         for (const hoist of newHoists) {
-          splicedBlocks.push({ nodes: [hoist], anchorLine });
+          splicedBlocks.push({ nodes: [hoist], anchorLine, originalGap: 1 });
         }
         let runStart = 0;
+        let prevRunLastNode: t.Node | null = null;
         while (runStart < spliced.length) {
           const fname = spliced[runStart]!.loc?.filename ?? null;
           let runEnd = runStart + 1;
@@ -1111,7 +1184,14 @@ export function inlineScriptPartials(
           ) {
             runEnd++;
           }
-          splicedBlocks.push({ nodes: spliced.slice(runStart, runEnd), anchorLine });
+          const nodes = spliced.slice(runStart, runEnd);
+          // D-02 (R2): capture this run's ORIGINAL source gap (partial-local, pre-shift)
+          // so normalizeSplicedEmitLines reproduces the source blank-delta above its
+          // first decl instead of a hardcoded one-blank `+2`.
+          const firstNode = nodes.find((n) => n.loc) ?? nodes[0]!;
+          const originalGap = measureOriginalGap(firstNode, newHoists, prevRunLastNode);
+          splicedBlocks.push({ nodes, anchorLine, originalGap });
+          prevRunLastNode = nodes[nodes.length - 1] ?? prevRunLastNode;
           runStart = runEnd;
         }
       }
