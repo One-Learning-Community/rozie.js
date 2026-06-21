@@ -163,6 +163,20 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // The remaining (LEADING / TRAILING) seams require CUR to carry the boundary
     // comment; with none there is nothing further to mirror.
     if (!lead || lead.length === 0) continue;
+    // Phase 56-R10 (STRIPPED-PREDECESSOR LEADING seam): CUR is the spliced node and its run's
+    // first emit token is a LEADING comment whose IMMEDIATE source predecessor is a sigil
+    // DIRECTIVE that the residual emit STRIPS (`normalizeSplicedEmitLines` stamps
+    // `cur.extra.__rozieLeadingSeamPrevStripped` — the real DataTable `exposeStateVerbs` run
+    // sits directly below `$provide('data-table:columns', …)`). Inline, @babel shares the
+    // boundary comment as the predecessor's trailing + the spliced decl's leading, but the
+    // predecessor's trailing copy is dropped WITH the stripped statement → the comment
+    // SINGLE-emits. The splice severs the shared object, so the LEADING-seam mirror below would
+    // re-create the prev-trailing copy and DOUBLE it. Skip the mirror for this seam to match the
+    // inline oracle. Gated to curSpliced (the leading seam) so the R1 TRAILING seam (prevSpliced)
+    // and the after-side branch are untouched; a SURVIVING predecessor (plain `let`/`const`,
+    // e.g. `let expandedTouched` above `groupingActiveDefault`) leaves the seam UNSTAMPED → the
+    // mirror still doubles, matching ITS inline oracle (data-table baseline + HostK unchanged).
+    if (curSpliced && (curExtra as { __rozieLeadingSeamPrevStripped?: boolean } | undefined)?.__rozieLeadingSeamPrevStripped === true) continue;
     const lastLead = lead[lead.length - 1];
     // Identity guard (Pitfall 2 / A4): a node can be simultaneously the spliced
     // successor of one seam and the spliced predecessor of the next. If the comment

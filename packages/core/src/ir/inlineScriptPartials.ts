@@ -467,6 +467,52 @@ function blockFirstEmitLine(firstNode: t.Node): number {
 }
 
 /**
+ * Phase 56-R10 — true when `stmt` is a sigil DIRECTIVE that every target's residual-body
+ * emit STRIPS (it is consumed into a non-residual section: lifecycle / context / computed /
+ * expose / watch). Mirrors the strip lists in each `emitResidualScriptBody`
+ * (`$onMount`/`$onUnmount`/`$onUpdate`/`$watch`/`$expose`/`$provide` ExpressionStatements,
+ * and `$computed`/`$inject` VariableDeclarations).
+ *
+ * USED ONLY to decide whether a spliced LEADING-comment run's IMMEDIATE source predecessor
+ * survives in the residual body. When that predecessor is STRIPPED (e.g. the real DataTable
+ * `exposeStateVerbs` run sits below a `$provide(...)`), the inline-authored form attaches the
+ * boundary comment to the predecessor's `trailingComments` + the spliced decl's
+ * `leadingComments` (shared object), but per-statement generation drops the predecessor's
+ * trailing copy WITH the stripped statement → the comment SINGLE-emits. The vue/svelte splice
+ * mirror would otherwise re-create that prev-trailing copy and DOUBLE it (the R10 bug). When
+ * the predecessor SURVIVES (a plain `let`/`const`, e.g. `let expandedTouched` above
+ * `groupingActiveDefault`), both copies survive → the inline form DOUBLES and the mirror must
+ * keep doing so. Never throws.
+ */
+function isStrippedSigilDirective(stmt: t.Statement): boolean {
+  if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
+    const callee = stmt.expression.callee;
+    if (t.isIdentifier(callee)) {
+      return (
+        callee.name === '$onMount' ||
+        callee.name === '$onUnmount' ||
+        callee.name === '$onUpdate' ||
+        callee.name === '$watch' ||
+        callee.name === '$expose' ||
+        callee.name === '$provide'
+      );
+    }
+    return false;
+  }
+  if (t.isVariableDeclaration(stmt) && stmt.declarations.length > 0) {
+    return stmt.declarations.every(
+      (d) =>
+        d.init !== null &&
+        d.init !== undefined &&
+        t.isCallExpression(d.init) &&
+        t.isIdentifier(d.init.callee) &&
+        (d.init.callee.name === '$computed' || d.init.callee.name === '$inject'),
+    );
+  }
+  return false;
+}
+
+/**
  * Measure the ORIGINAL source gap above a decl run's first emit token (D-02, R2).
  *
  * Returns the `prevEnd + gap` delta the run should flow at: the distance, in source
@@ -667,7 +713,7 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   // and is LEFT UN-SHIFTED so the proven baseline stays byte-identical (no existing
   // fixture has an `afterGap >= 2` host-after-spliced seam — only the new HostJ guard).
   const plan: Array<
-    | { block: SplicedEmitBlock; offset: number }
+    | { block: SplicedEmitBlock; offset: number; leadingSeamPrevStripped?: boolean }
     | { hostNode: t.Statement; offset: number; afterGap?: number }
   > = [];
   let prevEnd = 0;
@@ -681,6 +727,7 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   let seamAfterGap: number | undefined;
   let prevWasHostStmt = false;
   let prevHostOrigEnd = 0;
+  let prevHostStmt: t.Statement | null = null;
   for (const stmt of body) {
     const block = nodeToBlock.get(stmt);
     if (block) {
@@ -720,12 +767,30 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       // blank). Correcting the loc here fixes ALL THREE comment-preserving targets uniformly
       // (svelte/vue read the shifted loc via the mirror; solid via whole-program generation)
       // with NO per-target mirror change.
+      // Phase 56-R10 (STRIPPED-PREDECESSOR LEADING seam) — the spliced run's first emit
+      // token is a LEADING comment whose IMMEDIATE source predecessor is a sigil DIRECTIVE
+      // that the residual-body emit STRIPS (the real DataTable `exposeStateVerbs` run sits
+      // directly below `$provide('data-table:columns', …)`). Inline, @babel attaches the
+      // boundary comment to BOTH the predecessor's `trailingComments` and the spliced decl's
+      // `leadingComments` (one shared object); per-statement generation drops the predecessor's
+      // trailing copy WITH the stripped statement, so the comment SINGLE-emits. The splice
+      // severs the shared object (comment only on the spliced decl's leading), so the vue/svelte
+      // mirror's LEADING-seam branch would re-create the prev-trailing copy and DOUBLE it.
+      // Stamp the seam (PASS 2) so the mirror suppresses the doubling. Gated to a STRIPPED
+      // predecessor: when the predecessor SURVIVES (a plain `let`/`const`, e.g. `let
+      // expandedTouched` above `groupingActiveDefault`, or `let refreshRowModel` /
+      // `const editRow`), BOTH copies survive inline → the form DOUBLES and the mirror must
+      // keep doing so (the live data-table baseline + HostK gap-0 stay byte-identical).
+      let stampLeadingSeamStripped = false;
       if (!isImportBlock && prevWasHostStmt) {
         const beforeGap = block.anchorLine - prevHostOrigEnd;
         const firstTokenIsLeadingComment =
           blockFirstEmitLine(firstNode) < firstNode.loc.start.line;
-        if (firstTokenIsLeadingComment && beforeGap >= 1 && beforeGap < gap) {
-          gap = beforeGap;
+        if (firstTokenIsLeadingComment) {
+          if (beforeGap >= 1 && beforeGap < gap) gap = beforeGap;
+          if (prevHostStmt && isStrippedSigilDirective(prevHostStmt)) {
+            stampLeadingSeamStripped = true;
+          }
         }
       }
       const anchorLine = prevEnd > 0 ? prevEnd + gap : block.anchorLine;
@@ -736,8 +801,11 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       prevWasImport = isImportBlock;
       prevWasBlock = true;
       prevWasHostStmt = false;
+      prevHostStmt = null;
       prevBlockAnchorLine = block.anchorLine;
-      plan.push({ block, offset });
+      plan.push(
+        stampLeadingSeamStripped ? { block, offset, leadingSeamPrevStripped: true } : { block, offset },
+      );
       continue;
     }
     if (stmt.loc) {
@@ -780,6 +848,7 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       prevWasBlock = false;
       prevWasHostStmt = true;
       prevHostOrigEnd = stmt.loc.end.line;
+      prevHostStmt = stmt;
     }
   }
 
@@ -801,6 +870,20 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   for (const entry of plan) {
     if ('block' in entry) {
       shiftBlock(entry.block, entry.offset, shifted);
+      // Phase 56-R10 — stamp the stripped-predecessor leading-seam marker on the block's first
+      // emitted node so the vue/svelte mirror suppresses the LEADING-seam comment doubling.
+      // Stamped ONLY when the spliced run's immediate source predecessor is a STRIPPED sigil
+      // directive (set in PASS 1) — so the inline form single-emits (the predecessor's trailing
+      // copy is dropped with the stripped statement) and the mirror must NOT re-create it. A
+      // SURVIVING predecessor (plain `let`/`const`) leaves the seam unstamped → the mirror still
+      // doubles, matching the inline form (the live data-table baseline + HostK gap-0 unchanged).
+      if (entry.leadingSeamPrevStripped) {
+        const firstNode = entry.block.nodes.find((n) => n.loc);
+        if (firstNode) {
+          const extra = (firstNode.extra ?? {}) as Record<string, unknown>;
+          firstNode.extra = { ...extra, __rozieLeadingSeamPrevStripped: true };
+        }
+      }
     } else {
       shiftHostNodeLines(entry.hostNode, entry.offset, shifted);
       // Stamp the after-side gap marker on the seam node so the per-target
