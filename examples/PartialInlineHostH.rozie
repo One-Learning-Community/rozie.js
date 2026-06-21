@@ -1,0 +1,53 @@
+<!--
+  PartialInlineHostH.rozie — Phase 56 Shape-3 after-`let` / import-FLOAT guard host.
+
+  The <script lang="ts"> declares a host `let editTransitionH` that is REASSIGNED
+  inside `$onMount` (so react hoists it to `useRef` and removes the `let` from the
+  body via `body.filter`), then imports `{ editorBindingsH }` from ./partialLogicH.rzts
+  DIRECTLY AFTER that `let` — so the spliced partial decl lands at the after-`let`
+  seam (the real DataTable P15/editTransition shape). The compiler inlines
+  `editorBindingsH` (plus its hoisted `clampH` import) into THIS component's script
+  before lowering; the unused `neverUsedH` export is tree-shaken.
+
+  The partial's OWN module import (`clampH`) is HOISTED to module-top. A leading
+  comment sits between that import and `editorBindingsH` in the partial source, so
+  @babel/parser shares the comment object across import.trailing + decl.leading.
+  Pre-fix the inliner copies the import's trailingComments onto the hoisted node, so
+  the comment FLOATS to module-top instead of staying with the spliced decl — a
+  partial-vs-inline divergence on all six targets. Paired with InlineEquivHostH.rozie
+  (the same logic + comment written inline) — their emitted output MUST be LITERAL
+  byte-identical on all six targets once the inliner keeps the comment on the decl's
+  leadingComments.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute that
+  the byte-identity oracle (which normalizes ONLY the component name) could not
+  reconcile against InlineEquivHostH. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicH.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostH">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+let editTransitionH = 1;
+import { editorBindingsH } from './partialLogicH.rzts';
+$onMount(() => {
+  editTransitionH = 2;
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ editTransitionH }}</span>
+  <span class="echo">{{ editorBindingsH(1) }}</span>
+</div>
+</template>
+
+</rozie>

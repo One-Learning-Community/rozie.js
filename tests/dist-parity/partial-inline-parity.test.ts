@@ -322,3 +322,39 @@ describe('Phase 56 — shared module-let after-side literal byte-identity (svelt
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — Shape-3
+ * after-`let` / import-FLOAT literal byte-identity gate. The REAL Shape-3 divergence:
+ * an extracted decl whose LEADING comment is shared (in the partial source) with the
+ * partial's OWN module import floats to module-top in the decomposed form because the
+ * inliner copies the import's trailingComments onto the HOISTED import node.
+ *
+ *   • examples/PartialInlineHostH.rozie — declares a host `let editTransitionH`
+ *     reassigned inside `$onMount` (react useRef hoist + body.filter removal), then
+ *     imports `{ editorBindingsH }` from ./partialLogicH.rzts DIRECTLY below it. The
+ *     partial carries its OWN `clampH` import with a leading comment between it and
+ *     `editorBindingsH`.
+ *   • examples/InlineEquivHostH.rozie — the SAME logic written inline, with `clampH`
+ *     at module-top and the leading comment authored directly above `editorBindingsH`
+ *     (far below the import), so the comment attaches ONLY to the decl's leadingComments.
+ *
+ * Inline, the comment lives only on `editorBindingsH`'s leadingComments. In the
+ * decomposed form @babel/parser shares it across import.trailing + decl.leading; the
+ * inliner's hoistSpecifier (pre-fix) copies it onto the hoisted `clampH` import, so it
+ * FLOATS to module-top — RED on all six targets (svelte/vue double, react/angular/lit
+ * drop, solid dedups) until the inliner stops the floating and keeps the comment on the
+ * spliced decl's leadingComments. Reuses `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_H = 'PartialInlineHostH';
+const INLINE_HOST_H = 'InlineEquivHostH';
+
+describe('Phase 56 — Shape-3 after-let import-float literal byte-identity (core inliner)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('after-let import-float partial-inlined host === inline-equivalent host (literal, leading comment stays with the decl)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_H, target), PARTIAL_HOST_H);
+      const inline = normalizeName(loadFixture(INLINE_HOST_H, target), INLINE_HOST_H);
+      expect(partial).toBe(inline);
+    });
+  });
+});

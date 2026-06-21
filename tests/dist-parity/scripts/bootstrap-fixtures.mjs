@@ -368,6 +368,20 @@ const EXAMPLES = [
   // InlineEquivHostI is single-file and stays OUT.
   'PartialInlineHostI',
   'InlineEquivHostI',
+  // Phase 56 (script-partial-cross-target-comment-placement-parity) — the Shape-3
+  // after-`let` / import-FLOAT red→green guard. partialLogicH.rzts carries its OWN
+  // module import (`clampH`) with a LEADING comment between it and the first extracted
+  // decl (`editorBindingsH`). The decl is spliced DIRECTLY below a host `let`
+  // (`editTransitionH`) reassigned inside `$onMount` (react useRef hoist + body.filter
+  // removal). @babel/parser shares the comment object across import.trailing +
+  // decl.leading; pre-fix the inliner's hoistSpecifier copies it onto the HOISTED
+  // import, so it FLOATS to module-top — partial-vs-inline divergence on all six
+  // targets (svelte/vue double, react/angular/lit drop, solid dedups). The inliner
+  // fix keeps the comment on the spliced decl's leadingComments (the inline placement).
+  // PartialInlineHostH references a sibling .rzts and is added to
+  // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostH is single-file and stays OUT.
+  'PartialInlineHostH',
+  'InlineEquivHostH',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -442,6 +456,13 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostI oracle also stays OUT.
   'PartialInlineHostI',
+  // Phase 56 — references ./partialLogicH.rzts (which freshly hoists `{ clampH }`
+  // from a plain .js module); needs resolver root so the ProducerResolver locates the
+  // sibling Shape-3 after-`let` / import-float partial at compile/inline time (same
+  // pattern as PartialInlineHostC). The .rzts partial is a LEAF source consumed only
+  // via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The single-file
+  // InlineEquivHostH oracle also stays OUT.
+  'PartialInlineHostH',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

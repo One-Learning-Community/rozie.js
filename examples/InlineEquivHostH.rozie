@@ -1,0 +1,48 @@
+<!--
+  InlineEquivHostH.rozie — Phase 56 Shape-3 after-`let` / import-FLOAT byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostH.rozie inlines from
+  ./partialLogicH.rzts, written inline in this component's own <script lang="ts">:
+  the hoisted `clampH` import at module-top, the host `let editTransitionH` (reassigned
+  inside `$onMount`), and the `editorBindingsH` arrow const — WITH the identical
+  leading comment in the identical relative position, sitting DIRECTLY above
+  `editorBindingsH` (far below the import), so @babel/parser attaches it ONLY to the
+  decl's leadingComments. The unused `neverUsedH` export does NOT appear here (it is
+  tree-shaken from the partial path too).
+
+  The <template> is byte-identical to PartialInlineHostH.rozie. The emitted output of
+  the two hosts MUST match — LITERALLY, comments and blank lines included — on all six
+  targets after normalizing only the component identifier token (PartialInlineHostH ↔
+  InlineEquivHostH) once the inliner keeps the spliced decl's leading comment on the
+  decl (not floating it to the hoisted import). This is the literal byte-identity
+  oracle the Shape-3 fix is gated by.
+
+  No <style> block — see the PartialInlineHostH.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostH">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { clampH } from './partial-helpers.js';
+let editTransitionH = 1;
+// leading: stays with the extracted decl, must NOT float to the hoisted import
+const editorBindingsH = (k: number): number => clampH(k * 2);
+$onMount(() => {
+  editTransitionH = 2;
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ editTransitionH }}</span>
+  <span class="echo">{{ editorBindingsH(1) }}</span>
+</div>
+</template>
+
+</rozie>

@@ -1,0 +1,28 @@
+// partialLogicH.rzts — Phase 56 Shape-3 after-`let` / import-FLOAT guard partial.
+//
+// The partial carries its OWN module import (`clampH`); a LEADING comment sits
+// between that import and the first extracted decl (`editorBindingsH`). @babel/parser
+// attaches that one comment object to BOTH the import's trailingComments AND the
+// decl's leadingComments (a shared between-statement comment).
+//
+// In the inline oracle (InlineEquivHostH) the import is authored at host module-top
+// while the comment is authored DIRECTLY above `editorBindingsH`, far below the
+// import — so the comment attaches ONLY to the decl's leadingComments. In the
+// decomposed form the import is HOISTED to module-top; pre-fix the inliner's
+// `hoistSpecifier` copies the import's trailingComments onto the hoisted node, so the
+// shared comment rides the import and FLOATS to module-top — a partial-vs-inline
+// divergence on all six targets (svelte/vue double it, react/angular/lit drop it,
+// solid dedups). The fix keeps the comment on the surviving decl's leadingComments
+// (the inline placement) and stops it riding the hoisted import.
+//
+// The extracted `editorBindingsH` is spliced DIRECTLY below the host `let`
+// `editTransitionH` (which is reassigned inside `$onMount` → react hoists it to
+// `useRef` and removes the `let` from the body via `body.filter`), so the splice
+// lands at the real DataTable P15/editTransition after-`let` seam. `neverUsedH` is
+// tree-shaken (unused by the host).
+
+import { clampH } from './partial-helpers.js';
+// leading: stays with the extracted decl, must NOT float to the hoisted import
+export const editorBindingsH = (k: number): number => clampH(k * 2);
+
+export const neverUsedH = (k: number): number => k * 999;
