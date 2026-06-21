@@ -358,3 +358,47 @@ describe('Phase 56 — Shape-3 after-let import-float literal byte-identity (cor
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — MULTI-BOUNDARY
+ * DataTable-shaped permanent guard (R7). The FINAL arbiter for A4 and the GATE before
+ * the 16-partial DataTable decomposition (Waves 6-10).
+ *
+ * The per-gap fixtures above (HostC/D/E/F/G/H/I) each isolate ONE drift shape. This
+ * fixture STACKS all four real DataTable shapes in ONE host with THREE partials the way
+ * DataTable actually stacks them, so the svelte/vue mirror's TWO trigger branches fire
+ * at STACKED ADJACENT seams around the same spliced node:
+ *
+ *   • examples/PartialInlineHostMulti.rozie — imports `{ editorBindingsM }`
+ *     (./partialLogicMultiA — flat A4 centerpiece), `{ columnChromeM }`
+ *     (./partialLogicMultiB — gap-0 columnChrome + import-float), and `{ outerM }`
+ *     (./partialLogicMultiC — nested/heterogeneous HostD shape, freshly hoists clampD +
+ *     consumes a nested partialInnerD). `editorBindingsM` is the spliced SUCCESSOR at the
+ *     after-side host-`let`-trailing seam (Plan 03 branch, below a `let` react useRef-hoists
+ *     via $onMount reassign + body.filter) AND the spliced PREDECESSOR at the trailing seam
+ *     into the inline host const `hostTailM` (Plan 02 branch). `columnChromeM` sits ZERO
+ *     blanks below the host const `tickM` with a leading comment shared with its own hoisted
+ *     import (gap-0 + Shape-3 float). This also closes the deferred comment-bearing gap-0
+ *     columnChrome demonstration (deferred-items.md).
+ *   • examples/InlineEquivHostMulti.rozie — the SAME surviving logic + comments + blank
+ *     layout written inline (the byte-identity oracle).
+ *
+ * Reuses `normalizeName` VERBATIM (only the three content-INDEPENDENT identity tokens are
+ * canonicalized), so any stacked-seam drift still surfaces as a byte diff and fails. All
+ * four comment fixes (Plans 01-04) have landed, so this is a permanent GREEN-×6 guard (NOT
+ * red→green): it proves the four fixes COMPOSE at real-world stacked boundaries before any
+ * DataTable extraction begins. Solid is load-bearing for the heterogeneous-block math;
+ * svelte/vue are load-bearing for the two-branch mirror at adjacent seams.
+ */
+const PARTIAL_HOST_MULTI = 'PartialInlineHostMulti';
+const INLINE_HOST_MULTI = 'InlineEquivHostMulti';
+
+describe('Phase 56 — multi-boundary literal byte-identity (DataTable-shaped permanent guard)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('multi-boundary partial-inlined host === inline-equivalent host (literal, all four stacked shapes)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_MULTI, target), PARTIAL_HOST_MULTI);
+      const inline = normalizeName(loadFixture(INLINE_HOST_MULTI, target), INLINE_HOST_MULTI);
+      expect(partial).toBe(inline);
+    });
+  });
+});

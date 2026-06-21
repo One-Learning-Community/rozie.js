@@ -1,0 +1,25 @@
+// partialLogicMultiA.rzts — Phase 56 MULTI-BOUNDARY guard: the A4 two-branch CENTERPIECE.
+//
+// A FLAT single-decl partial (`editorBindingsM`, a self-contained arrow const — no
+// hoisted import) so it splices as exactly ONE declaration at its host import site.
+// That makes `editorBindingsM` the load-bearing node for the A4 STACKED-SEAM arbiter:
+// in PartialInlineHostMulti.rozie it is spliced DIRECTLY below a host `let`
+// (`editTransitionM`, reassigned inside `$onMount` → react useRef hoist + body.filter
+// removal) whose authored comment TRAILS it (the after-side seam, Plan 03 branch), AND
+// it trails DIRECTLY into an INLINE host const (`hostTailM`) whose authored leading
+// comment is shared across the seam (the trailing seam, Plan 02 branch).
+//
+// So `editorBindingsM` is simultaneously:
+//   • the spliced SUCCESSOR at the after-side seam (host-`let`-trailing comment leads it
+//     → the Plan 03 mirror branch must fire), and
+//   • the spliced PREDECESSOR at the trailing seam (its inline successor `hostTailM`
+//     carries the shared leading comment → the Plan 02 mirror branch must fire).
+// Both svelte/vue mirror branches must fire correctly at these ADJACENT seams around the
+// same spliced node without double-applying — the final A4 arbiter the per-gap fixtures
+// (HostE prev-spliced trailing, HostI after-side) could only exercise in isolation.
+//
+// `neverUsedMultiA` is tree-shaken (unused by the host).
+
+export const editorBindingsM = (k: number): number => k * 2;
+
+export const neverUsedMultiA = (k: number): number => k * 999;

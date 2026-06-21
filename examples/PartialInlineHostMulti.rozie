@@ -1,0 +1,77 @@
+<!--
+  PartialInlineHostMulti.rozie — Phase 56 MULTI-BOUNDARY DataTable-shaped permanent guard (R7).
+
+  ONE host with MULTIPLE partials that STACKS all four real DataTable drift shapes the
+  way DataTable actually stacks them — the final arbiter for A4 and the canary gating the
+  16-partial DataTable decomposition (Waves 6-10):
+
+    1. AFTER-side host-`let`-trailing comment (Plan 03) + react useRef hoist (P15 /
+       editTransition): `let editTransitionM` is reassigned inside `$onMount` (react
+       hoists it to `useRef` + removes the `let` via body.filter); a host-authored
+       comment TRAILS it and LEADS the spliced `editorBindingsM` (from ./partialLogicMultiA).
+    2. TRAILING seam (Plan 02): the spliced `editorBindingsM` trails DIRECTLY into the
+       INLINE host const `hostTailM`, whose shared leading comment the svelte/vue mirror
+       must print on both sides. `editorBindingsM` is thus the spliced SUCCESSOR at seam (1)
+       AND the spliced PREDECESSOR at seam (2) — the STACKED-SEAM A4 arbiter: both mirror
+       branches must fire at adjacent seams around the same node without double-applying.
+    3. GAP-0 `columnChrome`/`fillDrag` + import-FLOAT (Plans 01 + 04): `columnChromeM`
+       (from ./partialLogicMultiB) is spliced ZERO blank lines below the host const `tickM`
+       (originalGap host-seam) AND carries a leading comment shared with the partial's own
+       hoisted `clampB` import (must NOT float to module-top). This also closes the deferred
+       comment-bearing gap-0 columnChrome demonstration (deferred-items.md).
+    4. NESTED / heterogeneous block (WR-01 / HostD): `outerM` (from ./partialLogicMultiC)
+       freshly hoists `{ clampD }` from a plain .js module AND consumes `{ inner }` from a
+       nested ./partialInnerD.rzts (partial-of-partial) — the offset math (per-block
+       originalGap) must compose with the comment fixes (Solid is load-bearing).
+
+  Since all four comment fixes (Plans 01-04) have landed, this stacked guard MUST be
+  byte-identical ×6 immediately (a permanent GREEN guard, not red→green). If any target
+  drifts, the stacked-seam case has exposed an incomplete fix the per-gap fixtures could
+  not catch — diagnose against HostC/D/E/F/G/H/I and report which fix plan needs revisiting
+  (do NOT loosen the oracle). Paired with InlineEquivHostMulti.rozie (the same surviving
+  logic + comments + blank layout written inline) — emitted output MUST be LITERAL
+  byte-identical on all six targets after normalizing only the component identifier token.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute the
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostMulti. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicMultiA.rzts, ./partialLogicMultiB.rzts, ./partialLogicMultiC.rzts
+  (which in turn references ./partialInnerD.rzts + ./wr01-helpers.js) — registered in
+  EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostMulti">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headM = (n: number): number => n + 1;
+let editTransitionM = 1;
+// after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
+import { editorBindingsM } from './partialLogicMultiA.rzts';
+// trailing-seam: the inline host successor trails the spliced editorBindingsM
+const hostTailM = (n: number): number => editorBindingsM(1) + headM(n);
+const tickM = (): number => $props.base * 2;
+import { columnChromeM } from './partialLogicMultiB.rzts';
+import { outerM } from './partialLogicMultiC.rzts';
+$onMount(() => {
+  editTransitionM = 2;
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ editTransitionM }}</span>
+  <span class="echo">{{ hostTailM(1) }}</span>
+  <span class="echo">{{ columnChromeM(1) }}</span>
+  <span class="echo">{{ outerM }}</span>
+</div>
+</template>
+
+</rozie>

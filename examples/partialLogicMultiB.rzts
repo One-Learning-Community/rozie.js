@@ -1,0 +1,37 @@
+// partialLogicMultiB.rzts — Phase 56 MULTI-BOUNDARY guard: GAP-0 comment-bearing
+// `columnChrome`/`fillDrag` shape + import-FLOAT, combined.
+//
+// This partial picks up the deferred "comment-bearing gap-0 columnChrome-shape" demo
+// (deferred-items.md, 56-01): its FIRST (and only) surviving decl `columnChromeM` is
+// spliced ZERO blank lines below the host body const `tickM` (the gap-0 host-seam,
+// D-02 `originalGap`), AND it carries a LEADING comment shared (in this partial source)
+// with the partial's OWN hoisted `clampB` import — so it simultaneously exercises the
+// Shape-3 import-FLOAT fix (the comment must stay on the spliced decl's leadingComments,
+// NOT ride the hoisted import to module-top). Before all four comment fixes this shape
+// could not be isolated (gap-0's comment manifestation was entangled with the per-target
+// comment-placement bugs 56-02/03/04 own); now that they have landed this is a permanent
+// GREEN-×6 demonstration — the comment stays on `columnChromeM` at a zero-blank seam.
+//
+// `columnChromeM` is an ARROW-function const — the SHAPE the real DataTable chrome
+// helpers use (`const ariaSortFor = (colId) => …` near `const tick = () => …`), and the
+// shape HostH proves green with an import-float leading comment. It is deliberately NOT a
+// `$computed` (which lowers to a memo react/solid/vue HOIST above the body, stranding the
+// leading comment — the confound HostF sidesteps by staying comment-free) and NOT a plain
+// VALUE const (a plain const→const seam makes react double a shared boundary comment in
+// the inline form only — an unrealistic shape real DataTable never uses). An arrow const
+// converts to a `function` declaration on react. Its host predecessor `tickM` is ALSO an
+// arrow → `function` (faithful to the real DataTable `const tick = () => …` it sits under),
+// so on react the shared zero-blank boundary comment drops SYMMETRICALLY in BOTH the inline
+// and decomposed forms (both halves ride function-converted arrows whose declaration
+// comments are not re-emitted — the HostH precedent) → byte-identical; svelte/vue/solid
+// keep the comment glued to the spliced decl in both forms. A plain VALUE-const predecessor
+// would instead keep the comment on its trailing in the inline form only (an asymmetry real
+// DataTable never has, since `tick` is an arrow). `columnChromeM` closes over the host
+// `tickM()` arrow (host-scope closure, the byte-identity extraction contract).
+// `neverUsedMultiB` is tree-shaken (unused).
+
+import { clampB } from './partial-helpers.js';
+// gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
+export const columnChromeM = (k: number): number => clampB(tickM() + k);
+
+export const neverUsedMultiB = $computed(() => $props.base * 999);

@@ -1,0 +1,65 @@
+<!--
+  InlineEquivHostMulti.rozie — Phase 56 MULTI-BOUNDARY guard byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostMulti.rozie inlines from its
+  three partials (./partialLogicMultiA / B / C + the nested ./partialInnerD), written
+  inline in this component's own <script lang="ts"> in the identical relative positions
+  with the identical comments and blank layout:
+    • the two freshly-hoisted value imports (`clampB`, `clampD`) at module-top;
+    • the host head const `headM`;
+    • the host `let editTransitionM` (reassigned inside `$onMount`) with the after-side
+      comment trailing it and leading `editorBindingsM`;
+    • `editorBindingsM` (the A4 centerpiece) and the trailing-seam comment leading the
+      inline host successor `hostTailM`;
+    • the host const `tickM`, then the gap-0 leading comment + `columnChromeM` sitting
+      ZERO blank lines below `tickM` (comment stays with the decl, never floats);
+    • the nested `inner` $computed + the `outerM` $computed that consumes `inner` + `clampD`.
+  The unused `neverUsed*` exports do NOT appear here (tree-shaken from the partial path too).
+
+  The <template> is byte-identical to PartialInlineHostMulti.rozie. The emitted output of
+  the two hosts MUST match — LITERALLY, comments and blank lines included — on all six
+  targets after normalizing only the component identifier token (PartialInlineHostMulti ↔
+  InlineEquivHostMulti). This is the inline oracle the stacked multi-boundary guard is
+  gated by; all four comment fixes already landed, so it is GREEN ×6.
+
+  No <style> block — see the PartialInlineHostMulti.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostMulti">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+import { clampB } from './partial-helpers.js';
+import { clampD } from './wr01-helpers.js';
+
+const headM = (n: number): number => n + 1;
+let editTransitionM = 1;
+// after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
+const editorBindingsM = (k: number): number => k * 2;
+// trailing-seam: the inline host successor trails the spliced editorBindingsM
+const hostTailM = (n: number): number => editorBindingsM(1) + headM(n);
+const tickM = (): number => $props.base * 2;
+// gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
+const columnChromeM = (k: number): number => clampB(tickM() + k);
+const inner = $computed(() => $props.base + 10);
+const outerM = $computed(() => clampD(inner + $props.base));
+$onMount(() => {
+  editTransitionM = 2;
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ editTransitionM }}</span>
+  <span class="echo">{{ hostTailM(1) }}</span>
+  <span class="echo">{{ columnChromeM(1) }}</span>
+  <span class="echo">{{ outerM }}</span>
+</div>
+</template>
+
+</rozie>

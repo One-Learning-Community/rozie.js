@@ -382,6 +382,25 @@ const EXAMPLES = [
   // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostH is single-file and stays OUT.
   'PartialInlineHostH',
   'InlineEquivHostH',
+  // Phase 56 (script-partial-cross-target-comment-placement-parity) — the
+  // MULTI-BOUNDARY DataTable-shaped permanent guard (R7). ONE host with THREE
+  // partials that STACKS all four real DataTable drift shapes the way DataTable
+  // stacks them: (1) the after-side host-`let`-trailing comment + react useRef hoist
+  // (P15/editTransition) leading the spliced editorBindingsM (partialLogicMultiA),
+  // (2) the trailing seam where editorBindingsM trails the INLINE host const hostTailM
+  // — so editorBindingsM is the spliced SUCCESSOR at (1) and PREDECESSOR at (2), the
+  // STACKED-SEAM A4 arbiter for the svelte/vue mirror's two branches firing at adjacent
+  // seams around one node — (3) the gap-0 columnChrome/fillDrag + import-FLOAT
+  // (columnChromeM spliced ZERO blanks below the host const tickM with a leading comment
+  // shared with the partial's own hoisted clampB import; partialLogicMultiB — also closes
+  // the deferred comment-bearing gap-0 demo), and (4) the nested/heterogeneous block
+  // (outerM freshly hoists clampD + consumes a nested partialInnerD; partialLogicMultiC).
+  // All four comment fixes (Plans 01-04) have landed, so this stacked guard is GREEN ×6
+  // (permanent, not red→green). PartialInlineHostMulti references siblings and is added to
+  // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostMulti is single-file and stays OUT.
+  // The .rzts partials are LEAF sources consumed only via inline — not EXAMPLES entries.
+  'PartialInlineHostMulti',
+  'InlineEquivHostMulti',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -463,6 +482,13 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The single-file
   // InlineEquivHostH oracle also stays OUT.
   'PartialInlineHostH',
+  // Phase 56 — references ./partialLogicMultiA.rzts, ./partialLogicMultiB.rzts, and
+  // ./partialLogicMultiC.rzts (which in turn references ./partialInnerD.rzts +
+  // ./wr01-helpers.js); needs resolver root so the ProducerResolver locates the sibling
+  // multi-boundary partials at compile/inline time (same pattern as PartialInlineHostC).
+  // The .rzts partials are LEAF sources consumed only via inline — NOT EXAMPLES entries
+  // and OUT of RESOLVER_ROOT. The single-file InlineEquivHostMulti oracle also stays OUT.
+  'PartialInlineHostMulti',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

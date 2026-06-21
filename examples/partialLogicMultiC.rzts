@@ -1,0 +1,20 @@
+// partialLogicMultiC.rzts — Phase 56 MULTI-BOUNDARY guard: NESTED / heterogeneous block
+// (the HostD shape) stacked into the multi-boundary host.
+//
+// Mirrors partialOuterD.rzts: it FRESHLY HOISTS `{ clampD }` from a plain `.js` module
+// the host does NOT import AND imports `{ inner }` from a NESTED ./partialInnerD.rzts
+// (a partial-of-partial, reused verbatim from the HostD triplet), so the inline splice
+// mixes a file-top hoist with decls from two different source-file line-spaces. `outerM`
+// consumes both. Stacking this alongside the A4 centerpiece (partial A) and the gap-0 /
+// import-float shape (partial B) proves the WR-01 heterogeneous-block offset math
+// (`originalGap` per spliced block, not one global offset) composes with the comment-
+// placement fixes at real-world adjacent boundaries — Solid is the load-bearing target
+// (whole-program blank-line math).
+//
+// `neverUsedMultiC` is tree-shaken (unused by the host).
+
+import { clampD } from './wr01-helpers.js';
+import { inner } from './partialInnerD.rzts';
+export const outerM = $computed(() => clampD(inner + $props.base));
+
+export const neverUsedMultiC = $computed(() => $props.base * 999);
