@@ -1,0 +1,31 @@
+// partialLogicJ.rzts — Phase 56-R8 GAP-1 TRAILING-SEAM guard partial.
+//
+// Models the REAL DataTable gap-1 trailing-seam shape surfaced by the 56-06
+// decomposition: the partial's LAST surviving declaration (`setColumnFilterJ`, a
+// MULTI-LINE block-body arrow const) is spliced into the host and is succeeded in
+// the HOST source by `[blank line][host leading-comment][host decl]` — exactly the
+// `const setColumnFilter = (colId, value) => { … } ⏎ ⏎ // comment ⏎ let refreshRowModel`
+// extraction shape. The host comment + `let refreshRowModelJ` STAY in the host
+// <script>; they are NOT part of this partial.
+//
+// The bug (gap-1 trailing seam): the SEPARATING BLANK LINE between the spliced decl
+// and the host leading-comment is DROPPED on vue/svelte/solid (react/angular/lit are
+// byte-identical). The spliced decl is MULTI-LINE, so after the inliner shifts the
+// spliced run host-contiguous, the host successor's ORIGINAL (un-shifted) comment line
+// falls BEHIND the spliced run's emit end → @babel/generator computes a non-positive
+// line delta → no blank line emitted → the intended source blank collapses. The
+// after-side seam is gap-direction-asymmetric: the gap-0 trailing seam (HostE) already
+// renders zero blanks correctly, but the gap-1 variant (one intended blank) collapses
+// to zero. Plan 56-05's multi-boundary guard only exercised the gap-0 trailing seam.
+//
+// `neverUsedJ` is tree-shaken (unused by the host). No hoisted import is needed — the
+// arrow body is self-contained — which keeps the spliced run a pure body run and
+// isolates the after-side BLANK drift from any import-region arithmetic or comment
+// doubling.
+
+export const setColumnFilterJ = (colId: number, value: number): number => {
+  const next = colId + value;
+  return next;
+};
+
+export const neverUsedJ = (k: number): number => k * 999;

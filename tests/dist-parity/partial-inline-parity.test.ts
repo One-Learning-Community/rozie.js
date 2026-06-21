@@ -402,3 +402,39 @@ describe('Phase 56 — multi-boundary literal byte-identity (DataTable-shaped pe
     });
   });
 });
+
+/**
+ * Phase 56-R8 (script-partial-cross-target-comment-placement-parity) — GAP-1
+ * TRAILING-SEAM literal byte-identity gate. The drift the 56-06 DataTable
+ * decomposition surfaced: when a spliced (extracted) partial decl is succeeded in the
+ * HOST source by `[blank line][host leading-comment][host decl]`, the separating BLANK
+ * LINE is DROPPED on vue/svelte/solid (react/angular/lit byte-identical).
+ *
+ *   • examples/PartialInlineHostJ.rozie — a host body decl `headJ`, then imports
+ *     `{ setColumnFilterJ }` (a MULTI-LINE block arrow const) from ./partialLogicJ.rzts,
+ *     succeeded by a BLANK line, a leading comment, and the host `let refreshRowModelJ`
+ *     (reassigned in `$onMount` → react useRef + body.filter removal).
+ *   • examples/InlineEquivHostJ.rozie — the SAME logic + comment + blank written inline.
+ *
+ * Because the spliced decl is MULTI-LINE, after the inliner shifts the spliced run
+ * host-contiguous the host comment's ORIGINAL (un-shifted) line falls BEHIND the spliced
+ * run's emit end, so @babel/generator computes a non-positive line delta and emits NO
+ * blank — the intended source blank collapses on vue/svelte/solid. This is gap-direction-
+ * asymmetric: the gap-0 trailing seam (HostE) already renders zero blanks correctly, but
+ * the gap-1 variant (one intended blank) collapses to zero. Plan 56-05's multi-boundary
+ * guard only exercised the gap-0 trailing seam. RED on vue/svelte/solid before the
+ * after-side host-gap reproduction lands in normalizeSplicedEmitLines; GREEN ×6 after.
+ * react/angular/lit are byte-identical throughout. Reuses `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_J = 'PartialInlineHostJ';
+const INLINE_HOST_J = 'InlineEquivHostJ';
+
+describe('Phase 56-R8 — gap-1 trailing-seam literal byte-identity (after-side host gap)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('gap-1 trailing-seam partial-inlined host === inline-equivalent host (literal, after-side blank preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_J, target), PARTIAL_HOST_J);
+      const inline = normalizeName(loadFixture(INLINE_HOST_J, target), INLINE_HOST_J);
+      expect(partial).toBe(inline);
+    });
+  });
+});

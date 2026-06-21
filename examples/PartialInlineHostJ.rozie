@@ -1,0 +1,61 @@
+<!--
+  PartialInlineHostJ.rozie — Phase 56-R8 GAP-1 TRAILING-SEAM red→green guard host.
+
+  The <script lang="ts"> keeps a host body decl `headJ` ABOVE the import (so the
+  spliced run lands mid-body, mirroring the real DataTable seams), imports
+  `{ setColumnFilterJ }` from ./partialLogicJ.rzts, and is succeeded by
+  `[blank line][host leading-comment][host decl]`: a BLANK line, then a leading
+  comment, then a host `let refreshRowModelJ` that is REASSIGNED inside `$onMount`
+  (so react hoists it to `useRef` and removes the `let` from the body via
+  `body.filter`) — exactly the real
+  `const setColumnFilter = (colId, value) => { … } ⏎ ⏎ // comment ⏎ let refreshRowModel`
+  extraction shape from the 56-06 DataTable decomposition. The compiler inlines the
+  MULTI-LINE `setColumnFilterJ` into THIS component's script before lowering; the
+  unused `neverUsedJ` export is tree-shaken.
+
+  This is the GAP-1 TRAILING SEAM: the spliced partial decl (`setColumnFilterJ`)
+  trails into a host successor that is ONE BLANK LINE below it (the host comment leads
+  the host `let`). Because the spliced decl is MULTI-LINE, after the inliner shifts the
+  spliced run host-contiguous the host comment's ORIGINAL (un-shifted) line falls BEHIND
+  the spliced run's emit end, so @babel/generator computes a non-positive line delta and
+  DROPS the intended blank on vue/svelte/solid (RED) — react/angular/lit are byte-
+  identical. Paired with InlineEquivHostJ.rozie (the same logic + comment + blank written
+  inline); their emitted output MUST be LITERAL byte-identical on all six targets once the
+  inliner reproduces the after-side source gap below the spliced run.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute that the
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostJ. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicJ.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostJ">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headJ = (n: number): number => n + 1;
+
+import { setColumnFilterJ } from './partialLogicJ.rzts';
+
+// Re-read the row model + header groups into $data
+let refreshRowModelJ = 0;
+$onMount(() => {
+  refreshRowModelJ = setColumnFilterJ(1, headJ(2));
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ setColumnFilterJ(1, 2) }}</span>
+  <span class="echo">{{ refreshRowModelJ }}</span>
+</div>
+</template>
+
+</rozie>

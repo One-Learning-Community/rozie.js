@@ -1,0 +1,54 @@
+<!--
+  InlineEquivHostJ.rozie — Phase 56-R8 GAP-1 TRAILING-SEAM byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostJ.rozie inlines from
+  ./partialLogicJ.rzts, written inline in this component's own <script lang="ts">:
+  the host body decl `headJ`, the MULTI-LINE `setColumnFilterJ` arrow const (the
+  partial's last surviving decl), and the host successor `let refreshRowModelJ`
+  (reassigned inside `$onMount`) — WITH the identical leading comment ONE BLANK LINE
+  below `setColumnFilterJ` (the gap-1 trailing seam), in the identical relative
+  position. The unused `neverUsedJ` export does NOT appear here (it is tree-shaken from
+  the partial path too).
+
+  The <template> is byte-identical to PartialInlineHostJ.rozie. The emitted output of
+  the two hosts MUST match — LITERALLY, comments and blank lines included — on all six
+  targets after normalizing only the component identifier token (PartialInlineHostJ ↔
+  InlineEquivHostJ) once the inliner reproduces the after-side source gap below the
+  spliced run (so the blank between `setColumnFilterJ` and the host comment is preserved
+  on vue/svelte/solid, matching this inline oracle). This is the literal byte-identity
+  oracle the gap-1 after-side fix is gated by.
+
+  No <style> block — see the PartialInlineHostJ.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostJ">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headJ = (n: number): number => n + 1;
+
+const setColumnFilterJ = (colId: number, value: number): number => {
+  const next = colId + value;
+  return next;
+};
+
+// Re-read the row model + header groups into $data
+let refreshRowModelJ = 0;
+$onMount(() => {
+  refreshRowModelJ = setColumnFilterJ(1, headJ(2));
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ setColumnFilterJ(1, 2) }}</span>
+  <span class="echo">{{ refreshRowModelJ }}</span>
+</div>
+</template>
+
+</rozie>

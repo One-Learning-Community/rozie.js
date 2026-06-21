@@ -401,6 +401,24 @@ const EXAMPLES = [
   // The .rzts partials are LEAF sources consumed only via inline — not EXAMPLES entries.
   'PartialInlineHostMulti',
   'InlineEquivHostMulti',
+  // Phase 56-R8 (script-partial-cross-target-comment-placement-parity) — the GAP-1
+  // TRAILING-SEAM red→green guard surfaced by the 56-06 DataTable decomposition.
+  // partialLogicJ.rzts's last surviving decl (`setColumnFilterJ`, a MULTI-LINE block
+  // arrow const) is spliced into the host and is succeeded by `[blank][host leading-
+  // comment][host let]` (the real `const setColumnFilter = … ⏎ ⏎ // comment ⏎ let
+  // refreshRowModel` shape). Because the spliced decl is MULTI-LINE, after the inliner
+  // shifts the spliced run host-contiguous the host comment's ORIGINAL un-shifted line
+  // falls BEHIND the spliced run's emit end, so @babel/generator computes a non-positive
+  // line delta and DROPS the intended separating blank on vue/svelte/solid (RED) —
+  // react/angular/lit byte-identical. Plan 56-05's multi-boundary guard only exercised
+  // the gap-0 trailing seam (zero intended blanks, which already render correct); the
+  // gap-1 variant (one intended blank) is uncovered until the after-side host-gap
+  // reproduction lands in normalizeSplicedEmitLines. PartialInlineHostJ references a
+  // sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostJ
+  // is single-file and stays OUT. The .rzts partial is a LEAF source consumed only via
+  // inline — not an EXAMPLES entry.
+  'PartialInlineHostJ',
+  'InlineEquivHostJ',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -489,6 +507,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // The .rzts partials are LEAF sources consumed only via inline — NOT EXAMPLES entries
   // and OUT of RESOLVER_ROOT. The single-file InlineEquivHostMulti oracle also stays OUT.
   'PartialInlineHostMulti',
+  // Phase 56-R8 — references ./partialLogicJ.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling gap-1 trailing-seam partial at compile/inline
+  // time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF source
+  // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostJ oracle also stays OUT.
+  'PartialInlineHostJ',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
