@@ -73,7 +73,7 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
 
   disposed = false;
 
-  execute(action: any) {
+  execute(action = null) {
     const a = action != null ? action : this.action;
     return loadRecaptchaV3(this.sitekey).then(() => v3Execute(this.sitekey, {
       action: a

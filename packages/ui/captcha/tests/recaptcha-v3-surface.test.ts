@@ -11,11 +11,11 @@
  *      (ROZ127 slot==prop, ROZ121 expose-verb==event, ROZ524 React model-setter,
  *      Lit reserved-lifecycle all surface here as compile() errors).
  *
- * Pure GLUE over the @rozie/core public API — no compiler/emitter/IR change, no
- * codegen. codegen.mjs is hardcoded to the single Captcha component and therefore
- * does NOT emit RecaptchaV3 into the leaf packages yet; that multi-component
- * codegen wiring is a separate follow-up. This test proves the ×6 clean compile
- * in the meantime, WITHOUT touching codegen.mjs.
+ * Pure GLUE over the @rozie/core public API — no compiler/emitter/IR change.
+ * codegen.mjs now loops over a COMPONENTS list and emits RecaptchaV3 into every
+ * leaf package alongside Captcha (the multi-component codegen wiring shipped); the
+ * RecaptchaV3.execute verb is covered by this test's EXPECT array + a per-component
+ * handle-manifest entry. This surface gate re-asserts the ×6 clean compile.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

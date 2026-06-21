@@ -51,7 +51,15 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
   // NOT be named `token` — on Vue, $model.token lowers to a `defineModel('token')`
   // ref named `token`, and a same-named param shadows it (`token.value = token`
   // would write the param). Use `tok` (mirrors Captcha.rozie's `response`).
-  function execute(action: any) {
+  //
+  // `action = null` (an explicit DEFAULT, not a bare `action`) makes the param
+  // OPTIONAL — required so the no-arg call in $onMount's executeOnMount path
+  // (`execute()`) typechecks. The type-neutralizer otherwise lowers a bare param
+  // to a REQUIRED `action: any`, which Vue's strict declaration emit (vue-tsc)
+  // rejects at the `execute()` call (TS2554) — the other five targets don't
+  // body-typecheck the emitted leaf, so the issue is Vue-only but real. The
+  // default is logic-neutral: the body already guards `action != null`.
+  function execute(action = null) {
     const a = action != null ? action : props.action;
     return loadRecaptchaV3(props.sitekey).then(() => v3Execute(props.sitekey, {
       action: a

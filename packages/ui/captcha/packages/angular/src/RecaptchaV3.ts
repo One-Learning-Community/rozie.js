@@ -58,7 +58,7 @@ export class RecaptchaV3 {
   }
 
   disposed = false;
-  execute = (action: any) => {
+  execute = (action: any = null) => {
     const a = action != null ? action : this.action();
     return loadRecaptchaV3(this.sitekey()).then(() => v3Execute(this.sitekey(), {
       action: a
