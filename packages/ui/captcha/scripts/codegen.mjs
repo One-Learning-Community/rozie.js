@@ -325,22 +325,40 @@ function main() {
     console.log('codegen: ' + target.padEnd(8) + ' -> ' + cfg.dir + '/src/  (' + names + ')  OK');
   }
 
-  // Docs props-table validation. Task A keeps the single 2-arg Captcha call;
-  // Task B adds opts.heading + the second RecaptchaV3 validation.
-  const captcha = comps.find((c) => c.name === 'Captcha');
+  // Docs props-table validation — per component. The primary Captcha table lives
+  // under '### Props'; RecaptchaV3 under '### RecaptchaV3 Props' (a distinct
+  // literal — `indexOf('### Props')` never matches it, and Captcha's scan
+  // terminates at the '## RecaptchaV3' section heading placed after its table).
+  const DOCS_VALIDATION = [
+    { name: 'Captcha', heading: '### Props' },
+    { name: 'RecaptchaV3', heading: '### RecaptchaV3 Props' },
+  ];
   const guidePath = resolve(REPO_ROOT, 'docs/components/' + SLUG + '.md');
   if (existsSync(guidePath)) {
     const docs = readFileSync(guidePath, 'utf8');
-    const result = validateDocsPropsTable(captcha.ir, docs);
-    if (!result.ok) {
+    const allErrors = [];
+    for (const { name, heading } of DOCS_VALIDATION) {
+      const comp = comps.find((c) => c.name === name);
+      const result = validateDocsPropsTable(comp.ir, docs, { heading });
+      if (!result.ok) {
+        allErrors.push(
+          ...result.errors.map((e) => name + ' (' + heading + '): ' + e),
+        );
+      } else {
+        console.log(
+          'codegen: docs props-table validation PASS — ' +
+            result.checkedRows + ' rows match ' + name + ' ir.props (' + heading + ')',
+        );
+      }
+    }
+    if (allErrors.length) {
       throw new Error(
         'codegen: docs props-table validation DRIFT in ' +
           guidePath +
           ':\n' +
-          result.errors.map((e) => '  - ' + e).join('\n'),
+          allErrors.map((e) => '  - ' + e).join('\n'),
       );
     }
-    console.log('codegen: docs props-table validation PASS — ' + result.checkedRows + ' rows match Captcha ir.props');
   } else {
     console.log('codegen: docs props-table validation SKIPPED — no docs/components/' + SLUG + '.md');
   }

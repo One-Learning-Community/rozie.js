@@ -2,7 +2,9 @@
 
 Every CAPTCHA provider ships a vanilla-JS widget that does the real work in the browser — but the framework wrappers around them are **fragmented per provider per framework**: `react-google-recaptcha`, `vue-recaptcha`, `svelte-recaptcha-v2`, `ngx-captcha`, `@hcaptcha/react-hcaptcha` plus separate Vue/Svelte hCaptcha wrappers, `react-turnstile`, and so on — *N providers × M frameworks* of independently-maintained, drifting glue. That combinatorial sprawl is exactly what Rozie's write-once-ship-six thesis exists to collapse.
 
-One `Captcha.rozie` source compiles to six idiomatic packages, and a single `provider` prop switches between **Google reCAPTCHA v2**, **hCaptcha**, and **Cloudflare Turnstile** — three widgets that share a near-identical explicit-render API, so one component covers them all.
+One `Captcha.rozie` source compiles to six idiomatic packages, and a single `provider` prop switches between **Google reCAPTCHA v2**, **hCaptcha**, **Cloudflare Turnstile**, and **Friendly Captcha** — the first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface, so one component covers all four.
+
+> Looking for the **scoreless reCAPTCHA v3**? That is a fundamentally different, widget-less integration — it ships as the separate [`RecaptchaV3`](#recaptchav3) component in this same package.
 
 ## The `@rozie-ui/captcha` packages
 
@@ -150,7 +152,7 @@ el.addEventListener('verify', (e) => console.log('verified', e.detail.token));
 
 | Name | Type | Default | Two-way | Description |
 | --- | --- | --- | :---: | --- |
-| `provider` | `String` | `"recaptcha"` | | Which widget to render: `'recaptcha'` (Google reCAPTCHA v2), `'hcaptcha'`, or `'turnstile'` (Cloudflare). |
+| `provider` | `String` | `"recaptcha"` | | Which widget to render: `'recaptcha'` (Google reCAPTCHA v2), `'hcaptcha'`, `'turnstile'` (Cloudflare), or `'friendly'` (Friendly Captcha). |
 | `sitekey` | `String` | `—` | | **Required.** The public site key from your provider dashboard. |
 | `token` | `String` | `""` | ✓ | The verified response token. Written by the widget on success, cleared on expire/reset. Read it for form submission. |
 | `theme` | `String` | `"light"` | | `'light'` / `'dark'` (all three) / `'auto'` (Turnstile only). |
@@ -247,6 +249,7 @@ Each provider's `api.js` is injected from its CDN at mount. Allow the relevant o
 - reCAPTCHA — `https://www.google.com` `https://www.gstatic.com`
 - hCaptcha — `https://js.hcaptcha.com` `https://*.hcaptcha.com`
 - Turnstile — `https://challenges.cloudflare.com`
+- Friendly Captcha — `script-src https://cdn.jsdelivr.net` (the `@friendlycaptcha/sdk` compat build, loaded from the CDN — no npm peer), plus `connect-src https://api.friendlycaptcha.com https://*.frcapi.com` for its solver API. (Verify the current origins against the [Friendly Captcha docs](https://developer.friendlycaptcha.com/) — they evolve.)
 
 ### Construction-time config — re-key to change it
 
@@ -256,13 +259,71 @@ Each provider's `api.js` is injected from its CDN at mount. Allow the relevant o
 
 Each provider ships always-pass keys for local dev: reCAPTCHA `6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI`, hCaptcha `10000000-ffff-ffff-ffff-000000000001`, Turnstile `1x00000000000000000000AA`. Never ship a test key to production — and always verify the token server-side.
 
-### reCAPTCHA v3 is a separate integration {#why-no-v3}
+### Friendly Captcha {#friendly}
 
-reCAPTCHA **v3** is scoreless and widget-less — you call `execute(sitekey, { action })` and get a risk score, with no checkbox to render. That is a fundamentally different shape from the explicit-render v2/hCaptcha/Turnstile contract this component unifies, so it is tracked as a follow-on rather than bent into this surface. `size="invisible"` plus the `execute()` handle already cover the no-visible-challenge case for v2-family widgets.
+`provider="friendly"` joins `recaptcha` / `hcaptcha` / `turnstile` as a 4th provider. Friendly Captcha's SDK exposes a different shape (`createWidget` returning an event-emitter handle), so an internal `adapt()` bridge maps it onto the same `CaptchaApi` surface — from the consumer's side it behaves like any other provider.
 
-### ALTCHA & Friendly Captcha
+- **CDN-only, no peer dependency.** The `@friendlycaptcha/sdk` compat build is injected from the CDN (`https://cdn.jsdelivr.net`) — there is **no `@friendlycaptcha/sdk` npm peer to install**, consistent with the family's zero-engine-dependency design. Allow its [CSP origins](#the-provider-script-loads-from-a-cdn).
+- **`size` is a no-op for Friendly Captcha** — FC has no size concept. Its `startMode` analog (e.g. `'auto'` / `'focus'` / `'none'`) rides through the [`options` escape hatch](#props) instead: `:options="{ startMode: 'auto' }"`.
 
-The privacy-first, self-hostable alternatives — [ALTCHA](https://altcha.org) (a web component) and [Friendly Captcha](https://friendlycaptcha.com) (an npm SDK) — use different integration shapes than the script-tag explicit-render contract here, and are tracked as a future provider-adapter rather than shipped in this first cut.
+### reCAPTCHA v3 is a separate component {#why-no-v3}
+
+reCAPTCHA **v3** is scoreless and widget-less — you call `execute(sitekey, { action })` and get a risk score, with no checkbox to render. That is a fundamentally different shape from the explicit-render v2/hCaptcha/Turnstile/Friendly contract `<Captcha>` unifies, so it ships as the separate [`RecaptchaV3`](#recaptchav3) component (same package, named export) rather than being bent into this surface. `size="invisible"` plus the `execute()` handle still cover the no-visible-challenge case for the v2-family widgets here.
+
+### ALTCHA
+
+[ALTCHA](https://altcha.org) — the privacy-first, self-hostable alternative — is a **web component**, a different integration shape than the script-tag explicit-render contract here. Consuming a foreign web component cleanly across all six targets needs a compiler capability Rozie does not yet have, so ALTCHA remains the lone tracked follow-on provider.
+
+## RecaptchaV3 {#recaptchav3}
+
+Google **reCAPTCHA v3** is a fundamentally different integration from the v2-family widgets `<Captcha>` unifies: there is no checkbox, no challenge, and no DOM element — it scores every interaction invisibly and yields a fresh verification token on demand via `grecaptcha.execute(sitekey, { action })`. Bending that into the explicit-render `<Captcha>` surface would distort both, so v3 ships as its own **imperative-first** component, `RecaptchaV3`, alongside `Captcha` in the same package.
+
+```ts
+// Named export — ships beside the default Captcha export.
+import { RecaptchaV3 } from '@rozie-ui/captcha-react';
+```
+
+**Imperative-first.** The primary use is "right before you submit a form, get a fresh token for *this* action": call the exposed `execute(action?)` handle, await the `Promise<token>`, and attach the token to your request. The optional `action` arg overrides the `action` prop for that one call. Load-time auto-execution is opt-in (`executeOnMount`, default `false`) because a v3 token is short-lived (~2 min) — fetching one at mount is usually wasted; fetch it at the moment of submission.
+
+```tsx
+import { useRef } from 'react';
+import { RecaptchaV3, type RecaptchaV3Handle } from '@rozie-ui/captcha-react';
+
+const captcha = useRef<RecaptchaV3Handle>(null);
+// <RecaptchaV3 ref={captcha} sitekey="your-site-key" action="signup" />
+const onSubmit = async () => {
+  const token = await captcha.current?.execute('signup'); // fresh token for THIS action
+  await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+};
+```
+
+The same value contract as `<Captcha>`: `token` is **two-way** (written on each successful execute), `@verify` fires `{ token, action }` on success, `@error` fires `{ error? }` on failure (load timeout, script error, or a rejected `execute()`).
+
+::: warning Floating badge & attribution
+reCAPTCHA v3 shows a floating badge in the corner of the page. If you hide it, Google requires you to display the [reCAPTCHA branding text](https://developers.google.com/recaptcha/docs/faq#id-like-to-hide-the-recaptcha-badge.-what-is-allowed) in your form instead. And as always: a v3 token is only a *signal* — **verify the score server-side** against `siteverify` and decide your own threshold.
+:::
+
+### RecaptchaV3 Props
+
+| Name | Type | Default | Two-way | Description |
+| --- | --- | --- | :---: | --- |
+| `sitekey` | `String` | `—` | | **Required.** The public reCAPTCHA v3 site key from your Google admin console. |
+| `action` | `String` | `"submit"` | | The default action label reported to reCAPTCHA's risk analysis (e.g. `'submit'`, `'login'`). Overridable per call via `execute(action)`. |
+| `token` | `String` | `""` | ✓ | The latest verification token. Written on each successful execute — read it for the request via `r-model="token"`. |
+| `executeOnMount` | `Boolean` | `false` | | Opt-in: run one `execute()` at mount and emit `@verify` with the initial token. Off by default — v3 is imperative-first (tokens are short-lived). |
+
+### RecaptchaV3 events
+
+| Event | Payload | Fires when |
+| --- | --- | --- |
+| `verify` | `{ token, action }` | A `execute()` call succeeds — `token` is the fresh response to verify server-side. Also drives the two-way `token` model. |
+| `error` | `{ error? }` | The script failed to load (timeout / error) or a `execute()` call rejected. |
+
+### RecaptchaV3 handle
+
+| Method | Description |
+| --- | --- |
+| `execute` | `execute(action?) → Promise<token>`. Run a v3 challenge for the optional `action` (defaults to the `action` prop), resolve with a fresh token, write the two-way `token`, and emit `@verify`. There is no `render`/`reset`/`getResponse` verb — v3 has nothing to render and no cached widget state. |
 
 ## Cross-references
 

@@ -645,13 +645,14 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
   return lines.join('\n');
 }
 
-export function validateDocsPropsTable(ir, docsMarkdown) {
+export function validateDocsPropsTable(ir, docsMarkdown, opts = {}) {
+  const heading = opts.heading ?? '### Props';
   const errors = [];
-  const propsHeadingIdx = docsMarkdown.indexOf('### Props');
+  const propsHeadingIdx = docsMarkdown.indexOf(heading);
   if (propsHeadingIdx === -1) {
-    return { ok: false, errors: ['docs: "### Props" heading not found'], checkedRows: 0 };
+    return { ok: false, errors: ['docs: "' + heading + '" heading not found'], checkedRows: 0 };
   }
-  const afterHeading = docsMarkdown.slice(propsHeadingIdx + '### Props'.length);
+  const afterHeading = docsMarkdown.slice(propsHeadingIdx + heading.length);
   const nextHeadingIdx = afterHeading.search(/\n#{1,3}\s/);
   const section = nextHeadingIdx === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIdx);
 
