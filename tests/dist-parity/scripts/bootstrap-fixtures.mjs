@@ -301,6 +301,18 @@ const EXAMPLES = [
   // EXAMPLES entries.
   'PartialInlineHostD',
   'InlineEquivHostD',
+  // Phase 56 (script-partial-cross-target-comment-placement-parity) — the GAP-0
+  // (R2) analog. partialLogicF.rzts places its FIRST surviving declaration ZERO
+  // blank lines below the hoisted import (the gap-0 seam), so the hardcoded
+  // one-blank gap in normalizeSplicedEmitLines injects a spurious blank above the
+  // first spliced decl that the inline oracle does not have — a literal byte diff
+  // the comment-FREE Phase 54 pair and the one-blank Phase 55 HostC pair cannot
+  // reach. PartialInlineHostF references a sibling .rzts and is added to
+  // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostF is single-file and stays
+  // OUT. The .rzts partial is a LEAF source consumed only via inline — not an
+  // EXAMPLES entry.
+  'PartialInlineHostF',
+  'InlineEquivHostF',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -351,6 +363,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // entries and OUT of RESOLVER_ROOT. The single-file InlineEquivHostD oracle also
   // stays OUT.
   'PartialInlineHostD',
+  // Phase 56 — references ./partialLogicF.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling gap-0 partial at compile/inline time
+  // (same pattern as PartialInlineHostC). The .rzts partial is a LEAF source
+  // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT.
+  // The single-file InlineEquivHostF oracle also stays OUT.
+  'PartialInlineHostF',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

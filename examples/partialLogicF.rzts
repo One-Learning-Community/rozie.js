@@ -1,0 +1,32 @@
+// partialLogicF.rzts — Phase 56 GAP-0 (R2) script-partial fixture.
+//
+// Isolates the gap-0 forced-blank seam, mirroring the real DataTable boundaries
+// (`columnChrome` after `const tick`; `fillDrag` after `let fillDragUp`): a
+// spliced decl run whose FIRST declaration sits ZERO blank lines below the host
+// body statement it is spliced beneath. normalizeSplicedEmitLines hardcodes a
+// one-blank gap above every non-import spliced block (`gap = … ? 1 : 2`), so the
+// inline-vs-partial byte-identity oracle drifts by exactly one spurious blank
+// line above `usedFirstF` until the original source gap is threaded through the
+// block model (D-02). The first decl sits ZERO blank lines below this partial's
+// own hoisted `clamp` import — by the extraction rule (the host import is at the
+// run's first source line) that zero-blank source delta equals the host-side
+// `tickF` → `usedFirstF` delta, so the partial-local gap measurement reproduces
+// the inline adjacency.
+//
+//   • a LEADING line comment immediately above `usedFirstF`, which sits ZERO blank
+//     lines below the hoisted `clamp` import (the gap-0 seam under test);
+//   • `usedFirstF` closes over the host `tickF` body const (the partial closes
+//     over host scope, per the byte-identity extraction contract);
+//   • a second used export `usedSecondF` that sits ZERO blank lines below the
+//     first (the intra-run gap-0, preserved by the constant block offset — a
+//     control that must already be green).
+//
+// `neverUsedF` is tree-shaken (unused by the host); its comments legitimately
+// vanish, so it carries none. The hoisted import keeps its single-quoted source.
+
+import { clamp } from './partial-helpers.js';
+// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
+export const usedFirstF = $computed(() => clamp(tickF + $props.base));
+export const usedSecondF = $computed(() => clamp(usedFirstF + 1));
+
+export const neverUsedF = $computed(() => $props.base * 999);

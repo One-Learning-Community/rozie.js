@@ -168,3 +168,38 @@ describe('WR-01 — heterogeneous-block (fresh hoist + nested partial) literal b
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — GAP-0 (R2)
+ * literal byte-identity gate.
+ *
+ * The Phase 54/55 pairs above each place their first spliced declaration ONE blank
+ * line below the import region (or trivially contiguous), so the hardcoded one-blank
+ * gap in `normalizeSplicedEmitLines` (`gap = isImportBlock && prevWasImport ? 1 : 2`)
+ * is coincidentally correct and they stay green. This describe pins the GAP-0 shape
+ * the hardcoded gap gets WRONG: a spliced run whose first declaration sits ZERO blank
+ * lines below the hoisted import.
+ *
+ *   • examples/PartialInlineHostF.rozie — imports `{ usedFirstF, usedSecondF }` from
+ *     the sibling ./partialLogicF.rzts, whose first surviving decl `usedFirstF` sits
+ *     ZERO blank lines below the hoisted `clamp` import (the gap-0 seam).
+ *   • examples/InlineEquivHostF.rozie — the SAME logic + comments written inline with
+ *     the identical zero-blank adjacency (the byte-identity oracle).
+ *
+ * Reuses `normalizeName` VERBATIM (only the three content-INDEPENDENT identity tokens
+ * are canonicalized), so the spurious blank line the hardcoded gap injects above the
+ * first spliced decl still surfaces as a byte diff and fails until D-02 threads the
+ * original source gap through the block model.
+ */
+const PARTIAL_HOST_F = 'PartialInlineHostF';
+const INLINE_HOST_F = 'InlineEquivHostF';
+
+describe('Phase 56 — gap-0 literal byte-identity', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('gap-0 partial-inlined host === inline-equivalent host (literal, zero-blank adjacency preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_F, target), PARTIAL_HOST_F);
+      const inline = normalizeName(loadFixture(INLINE_HOST_F, target), INLINE_HOST_F);
+      expect(partial).toBe(inline);
+    });
+  });
+});

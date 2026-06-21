@@ -1,0 +1,46 @@
+<!--
+  PartialInlineHostF.rozie — Phase 56 GAP-0 (R2) host that imports a .rzts partial.
+
+  The <script lang="ts"> imports `{ usedFirstF, usedSecondF }` from
+  ./partialLogicF.rzts; the compiler inlines those exported $computed values (plus
+  the hoisted `clamp` value import) into THIS component's script before lowering.
+  The unused `neverUsedF` export is tree-shaken.
+
+  partialLogicF.rzts places its FIRST surviving declaration ZERO blank lines below
+  the hoisted import (the gap-0 seam). normalizeSplicedEmitLines hardcodes a
+  one-blank gap above every non-import spliced block, so the emitted output gains a
+  spurious blank line above `usedFirstF` that InlineEquivHostF.rozie (the inline
+  oracle, authored with the same zero-blank adjacency) does NOT have — a LITERAL
+  byte diff on the affected targets. That drift is the red this fixture pins; it
+  goes green once the ORIGINAL source gap is threaded through SplicedEmitBlock and
+  consumed at the normalize anchor instead of the hardcoded `+2` (D-02).
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute the
+  byte-identity oracle (which normalizes ONLY the component name) could not
+  reconcile against InlineEquivHostF. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicF.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostF">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const tickF = $props.base * 2;
+import { usedFirstF, usedSecondF } from './partialLogicF.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedFirstF }}</span>
+  <span class="echo">{{ usedSecondF }}</span>
+</div>
+</template>
+
+</rozie>
