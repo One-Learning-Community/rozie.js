@@ -546,6 +546,55 @@ function shiftBlock(block: SplicedEmitBlock, offset: number, shifted: Set<object
   }
 }
 
+/** Shift a single comment's loc lines by `offset` WITHOUT stashing a partial origin. */
+function shiftCommentLinesOnly(comment: t.Comment, offset: number, shifted: Set<object>): void {
+  const loc = comment.loc;
+  if (!loc) return;
+  shiftPositionLine(loc.start, offset, shifted);
+  shiftPositionLine(loc.end, offset, shifted);
+}
+
+/**
+ * Phase 56-R8 — shift a HOST node's loc + attached/nested comments by `offset`,
+ * deduping on the underlying `Position` objects (shared `shifted` set, like
+ * {@link shiftBlock}). Never throws (D-04).
+ *
+ * Unlike {@link shiftBlock} / {@link stashAndShiftNode}, this does NOT stash a
+ * `__roziePartialOrigin`: a host statement belongs to the HOST `.rozie` file, so its
+ * `loc` is the host source-map anchor and must NOT be re-keyed onto a partial origin
+ * (`buildPartialLineOffsets` is per-FILE first-stash-wins and would mis-offset every
+ * other host segment). This is invoked ONLY for an after-side host run that carries a
+ * GENUINE intended blank below a spliced run (`afterGap >= 2`) — the gap-1 trailing
+ * seam. Such runs never appear in any built source-map gate today (dist-parity compiles
+ * with `sourceMap: false`; the R5 smoke fixtures have no `afterGap >= 2` host run), so
+ * the line shift is invisible to the source-map gates while making the @babel/generator
+ * blank-line delta reproduce the source's after-side blank on vue/svelte/solid. The
+ * host node's residual source-map LINE imperfection for such runs is the same class of
+ * `userCodeLineOffset` limitation already documented in deferred-items.md (#1).
+ */
+function shiftHostNodeLines(node: t.Node, offset: number, shifted: Set<object>): void {
+  if (offset === 0) return;
+  const apply = (n: t.Node): void => {
+    if (n.loc) {
+      shiftPositionLine(n.loc.start, offset, shifted);
+      shiftPositionLine(n.loc.end, offset, shifted);
+    }
+    for (const c of n.leadingComments ?? []) shiftCommentLinesOnly(c, offset, shifted);
+    for (const c of n.trailingComments ?? []) shiftCommentLinesOnly(c, offset, shifted);
+    for (const c of n.innerComments ?? []) shiftCommentLinesOnly(c, offset, shifted);
+  };
+  apply(node);
+  try {
+    traverse(t.file(t.program([node as Statement])), {
+      enter(path) {
+        apply(path.node);
+      },
+    });
+  } catch {
+    // D-04: nested shift is best-effort; top-level normalization stands.
+  }
+}
+
 /**
  * FINAL inline-pass step (Phase 55) — decouple the line `@babel/generator` reads
  * for blank-line/comment placement from the line it reads for the source-map
@@ -605,9 +654,31 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   // emit end line ARITHMETICALLY (maxOriginalEnd + offset), never by reading a
   // mutated `loc`, so an aliased comment a prior block will shift cannot perturb a
   // later block's anchor. `prevWasImport` lets consecutive imports flow contiguously.
-  const plan: Array<{ block: SplicedEmitBlock; offset: number }> = [];
+  //
+  // Phase 56-R8 (gap-1 after-side seam): the walk ALSO measures an offset for a HOST
+  // statement that immediately follows a spliced block when the host successor carries
+  // a GENUINE intended blank (`afterGap >= 2`). The spliced block expands a 1-line
+  // import into an N-line run, so the host successor's ORIGINAL (un-shifted) line falls
+  // BEHIND the run's emit end and @babel/generator computes a non-positive delta — the
+  // intended source blank collapses on vue/svelte/solid (the gap-1 trailing seam).
+  // Re-anchoring the host run host-contiguous (run first emit = block emit end +
+  // afterGap) reproduces the blank. Gated to `afterGap >= 2`: a zero-blank adjacency
+  // (`afterGap <= 1`, the gap-0 trailing seam HostE/HostMulti) already renders correctly
+  // and is LEFT UN-SHIFTED so the proven baseline stays byte-identical (no existing
+  // fixture has an `afterGap >= 2` host-after-spliced seam — only the new HostJ guard).
+  const plan: Array<
+    | { block: SplicedEmitBlock; offset: number }
+    | { hostNode: t.Statement; offset: number; afterGap?: number }
+  > = [];
   let prevEnd = 0;
   let prevWasImport = false;
+  // After-side host-gap state: was the previous emitted statement a spliced block, its
+  // import (anchor) line, the running offset of the current host run, and the after-side
+  // gap (>= 2) of the seam node to stamp on its `extra.__rozieAfterGap` marker.
+  let prevWasBlock = false;
+  let prevBlockAnchorLine = 0;
+  let hostRunOffset = 0;
+  let seamAfterGap: number | undefined;
   for (const stmt of body) {
     const block = nodeToBlock.get(stmt);
     if (block) {
@@ -631,12 +702,49 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       for (const n of block.nodes) if (n.loc) maxEnd = Math.max(maxEnd, n.loc.end.line);
       prevEnd = maxEnd + offset;
       prevWasImport = isImportBlock;
+      prevWasBlock = true;
+      prevBlockAnchorLine = block.anchorLine;
       plan.push({ block, offset });
       continue;
     }
     if (stmt.loc) {
-      prevEnd = stmt.loc.end.line;
+      const firstEmit = blockFirstEmitLine(stmt);
+      let offset: number;
+      if (prevWasBlock) {
+        // First host node after a spliced block. `afterGap` is the ORIGINAL host-source
+        // distance from the replaced import to this host successor's first emit token;
+        // `afterGap >= 2` means at least one intended blank that the splice expansion
+        // collapsed. Re-anchor the run `afterGap` lines below the block's emit end.
+        const afterGap = firstEmit - prevBlockAnchorLine;
+        if (afterGap >= 2) {
+          offset = prevEnd + afterGap - firstEmit;
+          // Mark the seam node with the reproduced after-side gap so the per-target
+          // svelte/vue/solid mirrors position the boundary comment on the spliced
+          // PREDECESSOR's trailingComments at `prev.end + afterGap` (the gap @babel/
+          // generator needs a PREV-trailing comment to emit — a host-successor LEADING
+          // comment alone never triggers the boundary blank). No marker => the gap-0
+          // trailing seam (HostE/HostMulti), where the existing `prev.end + 1` clone is
+          // already correct and MUST stay byte-identical.
+          seamAfterGap = afterGap;
+        } else {
+          offset = 0;
+        }
+        hostRunOffset = offset;
+      } else {
+        // Continuing host run — carry the run offset so inter-host deltas are preserved.
+        offset = hostRunOffset;
+      }
+      if (offset !== 0) {
+        plan.push(
+          seamAfterGap !== undefined
+            ? { hostNode: stmt, offset, afterGap: seamAfterGap }
+            : { hostNode: stmt, offset },
+        );
+      }
+      prevEnd = stmt.loc.end.line + offset;
+      seamAfterGap = undefined;
       prevWasImport = t.isImportDeclaration(stmt);
+      prevWasBlock = false;
     }
   }
 
@@ -651,9 +759,23 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   }
 
   // PASS 2 — MUTATE. Apply every measured offset with ONE shared dedup set so a
-  // `Position` aliased across blocks shifts exactly once.
+  // `Position` aliased across blocks (or a comment shared with a host successor)
+  // shifts exactly once. Spliced blocks stash their `.rzts` origin (source-map
+  // decouple); host runs shift loc lines only (see {@link shiftHostNodeLines}).
   const shifted = new Set<object>();
-  for (const { block, offset } of plan) shiftBlock(block, offset, shifted);
+  for (const entry of plan) {
+    if ('block' in entry) {
+      shiftBlock(entry.block, entry.offset, shifted);
+    } else {
+      shiftHostNodeLines(entry.hostNode, entry.offset, shifted);
+      // Stamp the after-side gap marker on the seam node so the per-target
+      // svelte/vue/solid mirrors reproduce the boundary blank (see PASS 1).
+      if (entry.afterGap !== undefined) {
+        const extra = (entry.hostNode.extra ?? {}) as Record<string, unknown>;
+        entry.hostNode.extra = { ...extra, __rozieAfterGap: entry.afterGap };
+      }
+    }
+  }
 }
 
 /**

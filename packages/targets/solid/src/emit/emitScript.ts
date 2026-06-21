@@ -160,7 +160,29 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     const lead = cur.leadingComments;
     if (!lead || lead.length === 0) continue;
     const extra = cur.extra as Record<string, unknown> | undefined;
-    if (!extra || extra.__roziePartialOrigin === undefined) continue;
+    const curSpliced = extra?.__roziePartialOrigin !== undefined;
+    const prevExtra = prev.extra as Record<string, unknown> | undefined;
+    const prevSpliced = prevExtra?.__roziePartialOrigin !== undefined;
+    // Phase 56-R8 (gap-1 after-side seam): a HOST successor (`cur`, NOT spliced) sitting
+    // ONE-OR-MORE intended blank lines below the spliced run (`prev`) carries the boundary
+    // comment ONLY on its leadingComments. Whole-program generation gets the boundary
+    // blank from a PREV-TRAILING comment (a host-successor LEADING comment alone never
+    // triggers it), so mirror the SHARED comment objects onto prev's trailing —
+    // @babel/generator dedups them to ONE printed copy and `normalizeSplicedEmitLines`
+    // already shifted their `loc` to `prev.end + afterGap`, reproducing the blank. Gated
+    // to the `cur.extra.__rozieAfterGap` marker so the gap-0 trailing seam (HostE), which
+    // already prints the single leading comment with zero blank correctly, is untouched.
+    if (!curSpliced) {
+      if (prevSpliced && extra?.__rozieAfterGap !== undefined) {
+        const prevTrail = prev.trailingComments;
+        const lastLead = lead[lead.length - 1];
+        if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {
+          continue;
+        }
+        prev.trailingComments = [...(prevTrail ?? []), ...lead];
+      }
+      continue;
+    }
     const prevTrail = prev.trailingComments;
     const lastLead = lead[lead.length - 1];
     if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {

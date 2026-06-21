@@ -180,7 +180,15 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       // on their OWN lines. Clone the comments with a `loc` one line past PREV so the
       // trailing copy renders own-line, reproducing the oracle byte-for-byte. Cloning
       // leaves CUR's leadingComments (the shared host objects) untouched.
-      const anchorLine = (prev.loc?.end.line ?? 0) + 1;
+      //
+      // Phase 56-R8 (gap-1 after-side seam): when CUR sits ONE-OR-MORE intended blank
+      // lines below the spliced run in the host source, `normalizeSplicedEmitLines`
+      // stamps `cur.extra.__rozieAfterGap` (the reproduced gap; gap 2 = one blank).
+      // Anchor the cloned trailing copy `afterGap` lines past PREV so the boundary blank
+      // is reproduced (a gap-0 trailing seam carries no marker → +1, byte-identical).
+      const afterGap = (curExtra as { __rozieAfterGap?: number } | undefined)?.__rozieAfterGap;
+      const anchorLine =
+        (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
       toAppend = lead.map((c) => ({
         ...c,
         loc: c.loc
