@@ -1,0 +1,26 @@
+// PER-SLICE callbacks hoisted to top-level consts (NOT inlined in createTable) so the
+// re-feed $watch can re-pass them on every setOptions. On React the createTable
+// callbacks would otherwise capture the MOUNT-render's currentState() closure (table
+// instance is built once in $onMount); table-core's setOptions keeps the prior
+// callbacks unless new ones are supplied, so a stale callback applied each updater
+// against the mount-time empty slice → the sort cycle never advances + multi-row
+// selection collapses to the last row (React stale-closure, F6). Re-passing these
+// fresh (recreated each render on React, reading fresh currentState) in the re-feed
+// keeps the Updater base value current. No-op cost on the other five.
+const onSortingChangeCb = (updater) => { writeSorting(applyUpdater(updater, currentState().sorting)) }
+const onExpandedChangeCb = (updater) => { writeExpanded(applyUpdater(updater, currentState().expanded)) }
+const onGroupingChangeCb = (updater) => { writeGrouping(applyUpdater(updater, currentState().grouping)) }
+const onGlobalFilterChangeCb = (updater) => { writeGlobalFilter(applyUpdater(updater, currentState().globalFilter)) }
+const onColumnFiltersChangeCb = (updater) => { writeColumnFilters(applyUpdater(updater, currentState().columnFilters)) }
+const onPaginationChangeCb = (updater) => { writePagination(applyUpdater(updater, currentState().pagination)) }
+const onRowSelectionChangeCb = (updater) => { writeRowSelection(applyUpdater(updater, currentState().rowSelection)) }
+const onColumnVisibilityChangeCb = (updater) => { writeColumnVisibility(applyUpdater(updater, currentState().columnVisibility)) }
+const onColumnSizingChangeCb = (updater) => { writeColumnSizing(applyUpdater(updater, currentState().columnSizing)) }
+const onColumnOrderChangeCb = (updater) => { writeColumnOrder(applyUpdater(updater, currentState().columnOrder)) }
+const onColumnPinningChangeCb = (updater) => { writeColumnPinning(applyUpdater(updater, currentState().columnPinning)) }
+const onColumnSizingInfoChangeCb = (updater) => {
+  const next = applyUpdater(updater, $data.columnSizingInfo)
+  $data.columnSizingInfo = next != null ? next : $data.columnSizingInfo
+}
+
+export { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb }

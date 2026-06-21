@@ -1,0 +1,45 @@
+// ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
+// existing 12 (→ 15). Collision-safe names (Pitfall 1): focusCell NOT `focus` (would shadow
+// HTMLElement.focus on Lit — ROZ137); clearActiveCell NOT `clear` (listbox already exposes
+// `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
+// any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
+
+// focusCell(rowIndex, colIndex) — move + focus the active cell, addressed BY INDEX over the
+// visible model (D-03 — no id overload). Args are COERCED to integers and CLAMPED to [0,max]
+// before the data-* selector is built (T-49-01: never interpolate a raw consumer string).
+// Threads the SAME fresh clamped locals into focusActiveCell AND activecell-change (no $data
+// re-read — consistent with the Task-1 fresh-local rule).
+const focusCell = (rowIndex, colIndex) => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const maxCol = visibleColCount() - 1
+  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
+  const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
+  $data.activeIsHeader = false
+  $data.activeInControl = false
+  $data.activeRow = r
+  $data.activeColIndex = c
+  // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
+  // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
+  // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
+  // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
+  // last clicked, so a stale read would resolve focus to the header instead of body row r.
+  focusActiveCell(r, c, false)
+  $emit('activecell-change', { rowIndex: r, colIndex: c })
+}
+
+// getActiveCell() — return the current active-cell position. Integers only — no row data,
+// no DOM node (T-49-02 Information-Disclosure: return the screen position, nothing else).
+const getActiveCell = () => ({ rowIndex: $data.activeRow, colIndex: $data.activeColIndex })
+
+// clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
+// exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
+// (no move to a new addressable cell — a reset, not a navigation).
+const clearActiveCell = () => {
+  $data.activeIsHeader = false
+  $data.activeInControl = false
+  $data.activeRow = 0
+  $data.activeColIndex = 0
+}
+
+export { focusCell, getActiveCell, clearActiveCell }
