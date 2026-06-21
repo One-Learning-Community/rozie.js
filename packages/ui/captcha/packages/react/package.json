@@ -4,7 +4,7 @@
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Idiomatic React Captcha — one Rozie source compiled to React.",
+  "description": "Idiomatic React CAPTCHA — Google reCAPTCHA (v2 + v3), hCaptcha, Cloudflare Turnstile & Friendly Captcha from one Rozie source.",
   "keywords": [
     "rozie",
     "rozie-ui",
