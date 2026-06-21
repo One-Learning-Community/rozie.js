@@ -1,0 +1,39 @@
+// Imperative handle (consumer-callable). Each verb is a PRE-DECLARED top-level
+// `const` (the canonical $expose contract — `$expose({ name })` references a
+// binding ALREADY in scope; an INLINE-defined verb `$expose({ name: () => {} })`
+// is dropped on ALL SIX targets, only the by-reference key survives → a
+// runtime ReferenceError at `defineExpose`/`useImperativeHandle`). Sorting verbs +
+// a fresh column-def readout, selection, pagination, and column-management verbs.
+const sortColumn = (colId, desc) => {
+  if (table) table.getColumn(colId) && table.getColumn(colId).toggleSorting(desc, false)
+}
+const clearSorting = () => { if (table) table.resetSorting(true) }
+const getColumnDefs = () => columnDefs()
+// selection verbs (req-7) — drive table-core so the onRowSelectionChange funnel
+// emits the fresh state + selection-change.
+const toggleAllRows = (value) => { if (table) table.toggleAllRowsSelected(value) }
+const clearSelection = () => { if (table) table.resetRowSelection(true) }
+const getSelectedRows = () => (table ? table.getSelectedRowModel().rows.map((r) => r.original) : [])
+// pagination verbs.
+const setPage = (idx) => { if (table) table.setPageIndex(idx) }
+const setRowsPerPage = (size) => { if (table) table.setPageSize(size) }
+// column-management verbs (req-8/9/10/11) — drive table-core so the funnels fire.
+const toggleColumnVisibility = (colId) => {
+  if (table) { const c = table.getColumn(colId); if (c && c.toggleVisibility) c.toggleVisibility() }
+}
+// NOT `setColumnOrder`: a verb named `set<ModelProp>` collides with React's
+// auto-generated `setColumnOrder` useState setter for the `columnOrder` model
+// prop, and an $expose verb is PUBLIC-CONTRACT-PROTECTED from the React
+// deconfliction rename (ROZ524 — the rename target is the verb, which is
+// off-limits). So the public verb is `applyColumnOrder` (semantically: apply a
+// new column order). The other set* verbs (setPage/setRowsPerPage) do NOT match
+// any model prop's setter, so they are collision-free.
+const applyColumnOrder = (order) => { if (table) table.setColumnOrder(order) }
+const resetColumnSizing = () => { if (table) table.resetColumnSizing(true) }
+// pinColumn: the verb that drives column.pin; distinct from the template handler
+// onPinColumn (no shadow — the deferred-items finding #4 collision check).
+const pinColumn = (colId, side) => {
+  if (table) { const c = table.getColumn(colId); if (c && c.pin) c.pin(side) }
+}
+
+export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn }

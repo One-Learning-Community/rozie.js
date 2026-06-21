@@ -1,0 +1,260 @@
+// ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
+// This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
+// the active-cell index-pair state, the data-* cell markers, and the SINGLE
+// focusActiveCell() seam. Plan 03 adds the keydown navigation math, the $expose verbs
+// (focusCell/getActiveCell/clearActiveCell), and the activecell-change event ON TOP.
+
+// interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
+// identical to phase 48 (roles fall back to the literals, tabindex drops).
+const isGrid = () => $props.interactionMode === 'grid'
+
+// Role computeds (RESEARCH Pattern 4). The 'table' branch returns the EXACT phase-48
+// literal so 'table'-mode DOM is unchanged. Header cells keep 'columnheader' and rows keep
+// 'row'/'rowgroup' in BOTH modes (APG grid) — those stay static literals in the template.
+const tableRole = () => (isGrid() ? 'grid' : 'table')
+const cellRole = () => (isGrid() ? 'gridcell' : 'cell')
+
+// ── Cell addressing helpers (plain fns — no $computed alias trap; safe in template) ────
+// rowIndexOf: a body row's index over the visible model ($data.rows). tick() puts the read
+// in the fine-grained reactive scope (Solid/Lit) so the data-row marker re-derives on a
+// re-pull (reorder/filter) — matching visibleCellsFor's discipline.
+const rowIndexOf = (row) => (tick() >= 0 ? ($data.rows || []).indexOf(row) : -1)
+// colIndexOf: a body cell's position in its row's visible cell list.
+const colIndexOf = (row, cellCtx) => (tick() >= 0 ? visibleCellsFor(row).indexOf(cellCtx) : -1)
+// headerColIndexOf: a header cell's position in its header group's leaf headers.
+const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).indexOf(header))
+
+// Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
+// fine-grained-reactive). Returns null in 'table' mode → the bound numeric attribute
+// DROPS entirely (IN-01: on React via the `cellTabindex(...) ?? undefined` numeric-attr
+// emitter path landed in 4bec3b8e — NOT rozieAttr, which would string-widen tabIndex and
+// TS2322; the other five targets drop it via their own nullish-attr handling), keeping
+// 'table'-mode DOM clean. rowKey is the literal
+// '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
+// header state (activeIsHeader) is addressable through the same computed.
+const cellTabindex = (rowKey, colIndex) => {
+  if (!isGrid()) return null
+  const activeKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  const isActive = rowKey === activeKey && colIndex === $data.activeColIndex
+  return isActive ? 0 : -1
+}
+
+// ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
+// resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
+// post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
+// component's own scope). rowKey is the literal '__header' or a String(integer index) and
+// colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
+const resolveCellEl = (rowKey, colIndex) => {
+  if (!gridRoot) return null
+  return gridRoot.querySelector(
+    '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]'
+  )
+}
+
+// focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
+// the D-04 entry cell here, and (plan 03) arrow nav / focusCell() / the data-change clamp —
+// routes through this one function, so a verifier can point to it and phase 53 windowing
+// hooks it without a rewrite. Accepts OPTIONAL explicit (nextRow,nextCol) so callers can
+// pass FRESH post-write locals (React ROZ138 / Angular signal async — pinned by plan 01);
+// falls back to $data when none passed. NEVER stores a DOM node (index-only state).
+// 260618-ao9 — params carry explicit `= null` defaults so the cross-target
+// emitters type them OPTIONAL (untyped params lower to REQUIRED `any`, making the
+// 2-arg `focusActiveCell(r, c)` call sites a TS2554 on React/Solid/Lit — a
+// pre-existing regression from the d7166c5e header-crossing `nextIsHeader` add).
+// The `= null` default reproduces the documented "falls back to $data when
+// omitted" contract: an omitted arg arrives as `null`, and the body's `== null`
+// checks already route those to the live `$data` value — behavior-identical.
+const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
+  if (!isGrid() || !gridRoot) return
+  const r = nextRow == null ? $data.activeRow : nextRow
+  const c = nextCol == null ? $data.activeColIndex : nextCol
+  // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
+  // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
+  // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
+  // here returns the PRE-write value, resolving focus to the BODY cell instead of the
+  // header. Callers pass the fresh isHeader local; falls back to $data when omitted.
+  const header = nextIsHeader == null ? $data.activeIsHeader : nextIsHeader
+  // ── phase 53 scroll-then-focus (D-12): when windowing AND the target body row is OUTSIDE the
+  // rendered window, scroll it in first, then defer focus to AFTER the new window commits (the
+  // double-rAF — a single rAF can fire before React's async commit, Pitfall 4). Header cells and
+  // in-window rows keep the synchronous path below (table-mode / non-windowed stay byte-stable).
+  // The guard reads the resolved `header` (NOT the raw `nextIsHeader`) so an omitted-arg call
+  // while a header cell is active falls back to $data.activeIsHeader and skips the scroll path.
+  if ($props.virtual && virtualizer && !header && rowIsOutsideWindow(r)) {
+    virtualizer.scrollToIndex(r, { align: 'center' })
+    // Bounded rAF-poll-until-cell-present (D-12): scrollToIndex → virtual-core onChange → windowVer
+    // bump → the framework commits the scrolled-in row. On React that commit is async (setState →
+    // reconcile) and for a far scroll (e.g. row 4000) spans several frames — a one-shot double-rAF
+    // fires BEFORE resolveCellEl can find the cell, so focus is silently lost (the deterministic
+    // React off-window-focus failure). Poll resolveCellEl for up to ~30 frames: the five
+    // fast-committing targets resolve on the first attempt (behavior unchanged), React retries
+    // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
+    // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
+    let focusAttempts = 0
+    const focusWhenReady = () => {
+      const el = resolveCellEl(String(r), c)
+      if (el) { el.focus(); return }
+      focusAttempts = focusAttempts + 1
+      if (focusAttempts >= 30) return
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady)
+      else setTimeout(focusWhenReady, 16)
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusWhenReady)
+    else setTimeout(focusWhenReady, 0)
+    return
+  }
+  const rowKey = header ? '__header' : String(r)
+  const el = resolveCellEl(rowKey, c)
+  if (el) el.focus()
+}
+
+// ══ Grid keyboard navigation (phase 49 plan 03 — RESEARCH Pattern 5 + the delegated handler) ═══
+// The nav model is plain ARRAY-INDEX MATH over the VISIBLE model. table-core has already
+// done the hard part: $data.rows (body) and $data.headerGroups (header) hold the visible,
+// reordered, pinned cell set (row.getVisibleCells() / getHeaderGroups()) — hidden columns
+// are ALREADY ABSENT, reorder/pinning is ALREADY REFLECTED (REQ-7). There is NO separate
+// "compute visible order" step. Every index is clamped to [0,max] so an out-of-range key
+// never throws or builds an injection-shaped selector (Security V5 / T-49-03).
+
+// IN-01: aria-rowcount for the NON-VIRTUAL table. The virtual table binds $data.rows.length
+// (the full pre-pagination model). For the non-virtual path $data.rows is the PAGINATED slice,
+// so report the FILTERED (pre-pagination) total instead — the count AT users need to know "row N
+// of TOTAL". Falls back to $data.rows.length pre-mount (table is null until $onMount).
+// NB the helper is named `totalRowCount`, NOT `ariaRowCount`: `ariaRowCount` is an inherited
+// HTMLElement ARIA-reflected property (`Element.ariaRowCount: string`), so a same-named method
+// becomes a class field that shadows it on Lit → TS2416 cascades to EVERY @property decorator
+// (the `valueOf`/`nodeType` inherited-DOM-member collision class, authoring playbook §6).
+const totalRowCount = () => {
+  if (!table) return ($data.rows || []).length
+  const fm = table.getFilteredRowModel()
+  return fm && fm.rows ? fm.rows.length : ($data.rows || []).length
+}
+
+// Column count = the visible cell list length (uniform header+body in a flat grid). Reads
+// $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
+// header leaf count when there are no body rows.
+const visibleColCount = () => {
+  // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
+  // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same
+  // self-shadow class as the deconflictPropShadows finding; avoid the $data-key name as a local.
+  const rowList = $data.rows || []
+  if (rowList.length) return rowList[0].getVisibleCells().length
+  const hg = $data.headerGroups || []
+  return hg.length ? ((hg[hg.length - 1].headers || []).length) : 0
+}
+const bodyRowCount = () => ($data.rows || []).length
+const clamp = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v))
+
+// ── Nav helpers: compute the NEXT indices into LOCAL consts, write $data from them, and
+// RETURN the fresh locals so the caller threads the SAME values into BOTH focusActiveCell
+// AND the activecell-change emit. NEVER re-read $data.activeRow/activeColIndex after the
+// write (React setState is async — ROZ138 — the re-read binds the PRE-write value; Angular
+// signal writes are async too — both proven live by plan 01's probe). ──────────────────────
+
+// ArrowRight/Left — clamp colIndex over [0, visibleColCount()-1] (no wrap; hidden cols
+// already excluded from the visible list per REQ-7).
+const moveCol = (delta) => {
+  const max = visibleColCount() - 1
+  const nextCol = clamp($data.activeColIndex + delta, 0, (max < 0 ? 0 : max))
+  $data.activeColIndex = nextCol
+  return nextCol
+}
+
+// ArrowUp/Down + PageUp/Down — cross the header boundary and clamp at body edges (no
+// page-cross per D-06/REQ-7). Returns { row, isHeader } fresh locals.
+//  - From the header, ArrowDown (delta>0) drops into body row 0 (activeIsHeader=false).
+//  - From body row 0, ArrowUp (delta<0) crosses into the header (activeIsHeader=true).
+//  - PageUp/Down jump by ±GRID_PAGE_STEP, clamped to the current page bounds (no cross).
+const moveRow = (delta) => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  if ($data.activeIsHeader) {
+    // In the header: any downward move lands on body row 0; upward stays in the header.
+    if (delta > 0) {
+      $data.activeIsHeader = false
+      $data.activeRow = 0
+      return { row: 0, isHeader: false }
+    }
+    return { row: $data.activeRow, isHeader: true }
+  }
+  // In the body: an upward move from row 0 crosses into the header.
+  if (delta < 0 && $data.activeRow === 0) {
+    $data.activeIsHeader = true
+    return { row: $data.activeRow, isHeader: true }
+  }
+  const nextRow = clamp($data.activeRow + delta, 0, maxRow)
+  $data.activeRow = nextRow
+  $data.activeIsHeader = false
+  return { row: nextRow, isHeader: false }
+}
+
+// Home/End within the current row → col 0 / max. Returns the fresh colIndex.
+const gotoColEdge = (toEnd) => {
+  const max = visibleColCount() - 1
+  const nextCol = toEnd ? (max < 0 ? 0 : max) : 0
+  $data.activeColIndex = nextCol
+  return nextCol
+}
+
+// Ctrl+Home → first body cell (0,0); Ctrl+End → last body cell (lastRow,max). Returns the
+// fresh { row, col } locals. Both land in the body (activeIsHeader=false).
+const gotoStart = () => {
+  $data.activeIsHeader = false
+  $data.activeRow = 0
+  $data.activeColIndex = 0
+  return { row: 0, col: 0 }
+}
+const gotoEnd = () => {
+  const lastRow = bodyRowCount() - 1
+  const maxRow = lastRow < 0 ? 0 : lastRow
+  const max = visibleColCount() - 1
+  const maxCol = max < 0 ? 0 : max
+  $data.activeIsHeader = false
+  $data.activeRow = maxRow
+  $data.activeColIndex = maxCol
+  return { row: maxRow, col: maxCol }
+}
+
+// Resolve the active cell element (for the in-cell trap) — uses the same data-* query as
+// the focus seam. rowKey is the literal '__header' or String(integer) — no consumer string.
+const currentCellEl = () => {
+  const rowKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
+  return resolveCellEl(rowKey, $data.activeColIndex)
+}
+
+// The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
+const focusables = (cellEl) => {
+  if (!cellEl || !cellEl.querySelectorAll) return []
+  const list = Array.prototype.slice.call(
+    cellEl.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')
+  )
+  return list.filter((n) => !n.disabled)
+}
+
+// Enter/F2 → enter interaction mode: focus the active cell's FIRST interactive control
+// (D-07 — uniform for header sort buttons and body controls; Enter does NOT sort directly).
+// No-op (stay in navigation mode) if the cell has no focusable control.
+const enterControl = () => {
+  const cellEl = currentCellEl()
+  const list = focusables(cellEl)
+  if (!list.length) return
+  $data.activeInControl = true
+  list[0].focus()
+}
+
+// Cycle focus among the controls WITHIN the active cell (D-08 focus containment) — Tab
+// forward / Shift+Tab backward, wrapping at the ends. Uses the plan-01-PROVEN per-target
+// activeElement read: gridRoot.getRootNode().activeElement is the UNIFORM correct read on
+// ALL SIX (document in light DOM; the shadow root on Lit). Reuse verbatim — do NOT re-derive.
+const cycleWithinCell = (cellEl, forward) => {
+  const list = focusables(cellEl)
+  if (!list.length) return
+  const active = gridRoot ? gridRoot.getRootNode().activeElement : null
+  const cur = list.indexOf(active)
+  let i = cur < 0 ? 0 : (forward ? cur + 1 : cur - 1)
+  if (i >= list.length) i = 0
+  if (i < 0) i = list.length - 1
+  list[i].focus()
+}
+
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
