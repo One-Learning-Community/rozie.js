@@ -99,9 +99,13 @@ const buildConfig = () => ({
   theme: $props.theme,
   size: $props.size,
   ...($props.tabindex != null ? { tabindex: $props.tabindex } : {}),
-  callback: (token) => {
-    $model.token = token
-    $emit('verify', { token, provider: $props.provider })
+  // NB: the param must NOT be named `token` — on Vue, $model.token lowers to a
+  // `defineModel('token')` ref named `token`, and a same-named param shadows it
+  // (`token.value = token` would write the param, not the model → v-model:token
+  // never populates). Vue-only footgun (React/Solid lower to a setToken call).
+  callback: (response) => {
+    $model.token = response
+    $emit('verify', { token: response, provider: $props.provider })
   },
   'expired-callback': () => {
     $model.token = ''

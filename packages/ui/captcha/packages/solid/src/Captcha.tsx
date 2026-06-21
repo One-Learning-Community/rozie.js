@@ -86,10 +86,14 @@ export default function Captcha(_props: CaptchaProps): JSX.Element {
       ...(local.tabindex != null ? {
         tabindex: local.tabindex
       } : {}),
-      callback: (token$local: any) => {
-        setToken(token$local);
+      // NB: the param must NOT be named `token` — on Vue, $model.token lowers to a
+      // `defineModel('token')` ref named `token`, and a same-named param shadows it
+      // (`token.value = token` would write the param, not the model → v-model:token
+      // never populates). Vue-only footgun (React/Solid lower to a setToken call).
+      callback: (response: any) => {
+        setToken(response);
         _props.onVerify?.({
-          token: token$local,
+          token: response,
           provider: local.provider
         });
       },

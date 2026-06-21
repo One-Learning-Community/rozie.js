@@ -11,8 +11,10 @@
   },
   "devDependencies": {
     "@rozie/core": "workspace:*",
+    "@vitejs/plugin-vue": "^6",
     "happy-dom": "^15.0.0",
     "typescript": "~5.6.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "vue": "^3.5"
   }
 }

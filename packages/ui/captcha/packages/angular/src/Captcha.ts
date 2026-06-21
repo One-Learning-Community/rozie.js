@@ -74,10 +74,14 @@ export class Captcha {
     ...(this.tabindex() != null ? {
       tabindex: this.tabindex()
     } : {}),
-    callback: (token: any) => {
-      this.token.set(token), this.__rozieCvaOnChange(token);
+    // NB: the param must NOT be named `token` — on Vue, $model.token lowers to a
+    // `defineModel('token')` ref named `token`, and a same-named param shadows it
+    // (`token.value = token` would write the param, not the model → v-model:token
+    // never populates). Vue-only footgun (React/Solid lower to a setToken call).
+    callback: (response: any) => {
+      this.token.set(response), this.__rozieCvaOnChange(response);
       this.verify.emit({
-        token: this.token(),
+        token: response,
         provider: this.provider()
       });
     },

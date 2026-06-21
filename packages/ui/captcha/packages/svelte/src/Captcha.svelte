@@ -70,10 +70,14 @@ const buildConfig = () => ({
   ...(tabindex != null ? {
     tabindex: tabindex
   } : {}),
-  callback: (token$local: any) => {
-    token = token$local;
+  // NB: the param must NOT be named `token` — on Vue, $model.token lowers to a
+  // `defineModel('token')` ref named `token`, and a same-named param shadows it
+  // (`token.value = token` would write the param, not the model → v-model:token
+  // never populates). Vue-only footgun (React/Solid lower to a setToken call).
+  callback: (response: any) => {
+    token = response;
     onverify?.({
-      token: token$local,
+      token: response,
       provider: provider
     });
   },

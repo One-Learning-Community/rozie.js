@@ -90,11 +90,15 @@ export default class Captcha extends SignalWatcher(LitElement) {
   ...(this.tabindex != null ? {
     tabindex: this.tabindex
   } : {}),
-  callback: (token: any) => {
-    this._tokenControllable.write(token);
+  // NB: the param must NOT be named `token` — on Vue, $model.token lowers to a
+  // `defineModel('token')` ref named `token`, and a same-named param shadows it
+  // (`token.value = token` would write the param, not the model → v-model:token
+  // never populates). Vue-only footgun (React/Solid lower to a setToken call).
+  callback: (response: any) => {
+    this._tokenControllable.write(response);
     this.dispatchEvent(new CustomEvent("verify", {
       detail: {
-        token,
+        token: response,
         provider: this.provider
       },
       bubbles: true,
