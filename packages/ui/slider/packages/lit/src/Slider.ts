@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -251,7 +251,7 @@ export default class Slider extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-slider": true, 'rozie-slider--vertical': this.orientation === 'vertical', 'rozie-slider--horizontal': this.orientation !== 'vertical', 'rozie-slider--range': this.range, 'rozie-slider--disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" style=${this.fillStyle} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-4e6f0be6>
+<div class="${Object.entries({ "rozie-slider": true, 'rozie-slider--vertical': this.orientation === 'vertical', 'rozie-slider--horizontal': this.orientation !== 'vertical', 'rozie-slider--range': this.range, 'rozie-slider--disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" style=${rozieStyle(this.fillStyle)} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-4e6f0be6>
   
   <div class="rozie-slider-track" aria-hidden="true" data-rozie-s-4e6f0be6>
     <div class="rozie-slider-fill" data-rozie-s-4e6f0be6></div>
