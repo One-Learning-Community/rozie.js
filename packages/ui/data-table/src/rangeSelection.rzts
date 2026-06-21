@@ -1,0 +1,96 @@
+const inRange = (rIdx, cIdx) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return false
+  const r0 = a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex
+  const c0 = a.colIndex < f.colIndex ? a.colIndex : f.colIndex
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1
+}
+
+// getSelectedRange(): the current range as plain integers — { anchor, focus } each a
+// { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
+// data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
+// (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
+const getSelectedRange = () => ({ anchor: $data.rangeAnchor, focus: $data.rangeFocus })
+
+// isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
+// That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
+// byte-identical-off guard for the handle markup (no range → no handle).
+const isFillHandleCell = (rIdx, cIdx) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return false
+  const r1 = a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex
+  const c1 = a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+  return rIdx === r1 && cIdx === c1
+}
+
+// emitRangeChange(anchor, focus): fire range-change with the FRESH range corners passed by
+// the caller — NOT a re-read of $data.rangeAnchor/rangeFocus. The range corners are <data>
+// (useState on React), so re-reading right after the same-tick setState returns the STALE
+// pre-write value (ROZ138). extendRange/setRangeFocus thread the just-computed locals through
+// here so the emitted payload matches the write. The single call site keeps the count
+// predictable (React multi-emit dedup, D-07). One-way notification.
+const emitRangeChange = (anchor, focus) => { $emit('range-change', { anchor, focus }) }
+
+// extendRange(dRow, dCol): move rangeFocus by the (row,col) delta, clamped to the grid
+// bounds, seeding rangeAnchor from the active cell when no range exists yet (Shift+Arrow
+// from a bare active cell starts a 1×N / N×1 rectangle anchored at that cell). Body cells
+// only (header rows are not range-selectable). Emits range-change from this single site.
+const extendRange = (dRow, dCol) => {
+  if ($data.activeIsHeader) return
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
+  let anchor = $data.rangeAnchor
+  let focus = $data.rangeFocus
+  if (!anchor || !focus) {
+    anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+    focus = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  }
+  const nextRow = clamp(focus.rowIndex + dRow, 0, maxRow)
+  const nextCol = clamp(focus.colIndex + dCol, 0, maxCol)
+  const nextFocus = { rowIndex: nextRow, colIndex: nextCol }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
+  // from the range's leading edge, the spreadsheet convention).
+  $data.activeRow = nextRow
+  $data.activeColIndex = nextCol
+  // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
+  // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
+  rangeTransition = true
+  focusActiveCell(nextRow, nextCol, false)
+  emitRangeChange(anchor, nextFocus)
+}
+
+// setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
+// seeding the anchor from the active cell when no range exists yet. Clamped to bounds.
+// Emits range-change from this single site.
+const setRangeFocus = (rIdx, cIdx) => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  let anchor = $data.rangeAnchor
+  if (!anchor) anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
+  const r = clamp(Math.trunc(Number(rIdx)) || 0, 0, maxRow)
+  const c = clamp(Math.trunc(Number(cIdx)) || 0, 0, maxCol)
+  const nextFocus = { rowIndex: r, colIndex: c }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = nextFocus
+  emitRangeChange(anchor, nextFocus)
+}
+
+// clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
+// range back to a single active cell). No emit on a clear (a collapse is not a selection
+// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+const clearRange = () => {
+  if ($data.rangeAnchor == null && $data.rangeFocus == null) return
+  $data.rangeAnchor = null
+  $data.rangeFocus = null
+}
+
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange }

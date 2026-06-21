@@ -1,0 +1,190 @@
+// ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
+// The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
+// TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
+// N-of-M aria-live announce + one cell-edit-commit per committed cell; drag-fill = value-copy
+// ONLY (D-04, NO series detection). T-51-01 (BLOCKING-high): pasted TSV is UNTRUSTED — every
+// cell is written as plain string DATA through the per-column validator and rendered via the
+// SAME {{ }}/rozieDisplay text path as #cell (never innerHTML / a template / a selector); the
+// cell-resolution query interpolates integer indices only (resolveCellEl, T-49-01).
+
+// announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
+// pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
+const announce = (msg) => { $data.pasteAnnounce = msg != null ? msg : '' }
+
+// fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
+// accessorKey-or-id rule the edit funnels use. Used by paste/fill to apply values by field.
+const fieldOfColId = (colId) => {
+  const d = defFor(colId)
+  return d ? (d.accessorKey != null ? d.accessorKey : colId) : colId
+}
+
+// normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
+// or null when no range. The shared rectangle source for copy/paste/fill.
+const normalizedRange = () => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a || !f) return null
+  return {
+    r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
+    r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
+    c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
+    c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex,
+  }
+}
+
+// rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
+// reading each cell's value off the visible model by index (cellValueAt). A single active
+// cell (no range) serializes that one cell. Pure read — never writes.
+const rangeToTsv = () => {
+  const box = normalizedRange()
+  const r0 = box ? box.r0 : $data.activeRow
+  const r1 = box ? box.r1 : $data.activeRow
+  const c0 = box ? box.c0 : $data.activeColIndex
+  const c1 = box ? box.c1 : $data.activeColIndex
+  const lines = []
+  for (let r = r0; r <= r1; r++) {
+    const cells = []
+    for (let c = c0; c <= c1; c++) {
+      const v = cellValueAt(r, c)
+      cells.push(v == null ? '' : String(v))
+    }
+    lines.push(cells.join('\t'))
+  }
+  return lines.join('\n')
+}
+
+// parseTsv(text): a TSV string → string[][] (rows of cells). Tolerates \r\n; a trailing
+// newline does not add a phantom empty row. Pure — produces plain string DATA only (T-51-01:
+// the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
+const parseTsv = (text) => {
+  const str = text != null ? String(text) : ''
+  // CR-03: length guard BEFORE the normalize/split allocations — an empty string is a no-op,
+  // and a pathologically large clipboard payload (>2M chars) is rejected outright rather than
+  // forcing two full-string regex passes + a split into millions of cells (DoS-shaped input).
+  if (str === '' || str.length > 2000000) return []
+  const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rawLines = norm.split('\n')
+  // Drop a single trailing empty line (a TSV that ends with a newline).
+  if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop()
+  return rawLines.map((line) => line.split('\t'))
+}
+
+// copyRange(): write the current range as TSV to the clipboard (async). No-op when the
+// async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
+const copyRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return
+  try {
+    const p = navigator.clipboard.writeText(rangeToTsv())
+    if (p && p.catch) p.catch(() => {})
+  } catch (err) { /* best-effort copy */ }
+}
+
+// applyGridToRange(grid, originRow, originCol): the SHARED write path for paste + fill. Walks
+// the grid (string[][]) anchored at (originRow, originCol), CLAMPED to the grid bounds (no
+// unbounded loop — T-51-02). For each target cell: count it (total); SKIP if the column is
+// non-editable (D-03) or the per-column validator rejects the value (D-03, T-51-01 — the
+// value passes runValidator as plain string DATA before any write); else stage it into ONE
+// running fresh array (replaceRowValue) and record the committed cell. After the walk: ONE
+// writeData (the single r-model:data write), ONE cell-edit-commit per COMMITTED cell, and the
+// N-of-M aria-live announce. Returns { wrote, total }.
+const applyGridToRange = (grid, originRow, originCol) => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return { wrote: 0, total: 0 }
+  let total = 0
+  let wrote = 0
+  const committed = []
+  // Build the fresh data array incrementally so the whole paste is ONE writeData.
+  let next = currentData()
+  for (let gr = 0; gr < grid.length; gr++) {
+    const r = originRow + gr
+    if (r > maxRow) break
+    const cols = grid[gr] || []
+    for (let gc = 0; gc < cols.length; gc++) {
+      const c = originCol + gc
+      if (c > maxCol) break
+      total = total + 1
+      const colId = columnIdAt(r, c)
+      if (colId == null || !columnEditable(colId)) continue
+      const rowObj = rowOriginalAt(r)
+      const value = cols[gc]
+      // T-51-01: validate the pasted value as plain string DATA before any write.
+      if (runValidator(colId, value, rowObj) !== true) continue
+      const field = fieldOfColId(colId)
+      const srcIndex = sourceIndexOfRow(r)
+      const oldValue = rowObj ? rowObj[field] : null
+      next = replaceRowValue(next, srcIndex, field, value)
+      committed.push({ rowId: rowIdAt(r), columnId: colId, oldValue, newValue: value })
+      wrote = wrote + 1
+    }
+  }
+  if (wrote > 0) {
+    editTransition = true
+    writeData(next)
+    editTransition = false
+    // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
+    for (let i = 0; i < committed.length; i++) $emit('cell-edit-commit', committed[i])
+  }
+  // WR-02: announce the N-of-M summary only when at least one cell was written. When the paste
+  // targeted real cells but every one was skipped (validation-failed / non-editable), announce a
+  // distinct validation-failed message instead of a misleading "0 of M cells pasted".
+  if (wrote > 0) announce(wrote + ' of ' + total + ' cells pasted')
+  else if (total > 0) announce('No cells pasted — ' + total + ' cells were invalid or read-only')
+  return { wrote, total }
+}
+
+// rowOriginalAt / rowIdAt: the underlying row object / id at a visible-model body index.
+const rowOriginalAt = (rowIndex) => {
+  const rowList = $data.rows || []
+  const row = rowList[rowIndex]
+  return row ? row.original : null
+}
+const rowIdAt = (rowIndex) => {
+  const rowList = $data.rows || []
+  const row = rowList[rowIndex]
+  return row ? row.id : null
+}
+
+// pasteRange(): read TSV from the clipboard (async), parse it, and apply it anchored at the
+// active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
+// failed/empty read is a silent no-op.
+const pasteRange = () => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return
+  // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
+  // On React these are useState-backed; re-reading $data inside the async .then() returns the
+  // mount-render stale value, so a cell move between Ctrl+V and the read resolving would anchor
+  // the paste at the wrong cell. Capture the locals now and pass them into applyGridToRange.
+  const anchorRow = $data.activeRow
+  const anchorCol = $data.activeColIndex
+  let p = null
+  try { p = navigator.clipboard.readText() } catch (err) { return }
+  if (!p || !p.then) return
+  p.then((text) => {
+    const grid = parseTsv(text)
+    if (!grid.length) return
+    applyGridToRange(grid, anchorRow, anchorCol)
+  }).catch(() => {})
+}
+
+// fillRange(): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). Propagate the anchor
+// cell's value across the whole current rectangle, honoring the SAME editable + validation
+// skip rule as paste (D-03). The anchor cell is the rectangle's top-left (r0,c0); its value
+// fills every cell of the box. One writeData + one cell-edit-commit per committed cell + the
+// N-of-M announce (via the shared applyGridToRange path). No-op without a range.
+const fillRange = () => {
+  const box = normalizedRange()
+  if (!box) return
+  const anchorVal = cellValueAt(box.r0, box.c0)
+  const fillStr = anchorVal == null ? '' : String(anchorVal)
+  // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
+  // numeric/date series, D-04), anchored at (r0,c0).
+  const grid = []
+  for (let r = box.r0; r <= box.r1; r++) {
+    const cols = []
+    for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr)
+    grid.push(cols)
+  }
+  applyGridToRange(grid, box.r0, box.c0)
+}
+
+export { announce, fieldOfColId, normalizedRange, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, pasteRange, fillRange }

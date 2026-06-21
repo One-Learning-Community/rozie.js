@@ -1,0 +1,48 @@
+const teardownFillDrag = () => {
+  if (typeof document !== 'undefined') {
+    if (fillDragMove) document.removeEventListener('pointermove', fillDragMove)
+    if (fillDragUp) document.removeEventListener('pointerup', fillDragUp)
+  }
+  fillDragMove = null
+  fillDragUp = null
+  fillDragging = false
+}
+const cellIndexFromPoint = (clientX, clientY) => {
+  if (typeof document === 'undefined' || !document.elementFromPoint) return null
+  const el = document.elementFromPoint(clientX, clientY)
+  if (!el || !el.closest) return null
+  const cellEl = el.closest('[data-grid-cell]')
+  if (!cellEl) return null
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return null
+  const r = parseInt(rowAttr, 10)
+  const c = parseInt(colAttr, 10)
+  if (!Number.isFinite(r) || !Number.isFinite(c)) return null
+  return { r, c }
+}
+const onFillHandlePointerDown = (e) => {
+  if (!e) return
+  if (e.preventDefault) e.preventDefault()
+  if (e.stopPropagation) e.stopPropagation()
+  fillDragging = true
+  const move = (ev) => {
+    if (!fillDragging) return
+    const cell = cellIndexFromPoint(ev.clientX, ev.clientY)
+    if (cell) setRangeFocus(cell.r, cell.c)
+  }
+  const up = () => {
+    // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
+    teardownFillDrag()
+    fillRange()
+  }
+  // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+  fillDragMove = move
+  fillDragUp = up
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
+}
+
+export { teardownFillDrag, cellIndexFromPoint, onFillHandlePointerDown }
