@@ -656,6 +656,74 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   for (const { block, offset } of plan) shiftBlock(block, offset, shifted);
 }
 
+/**
+ * Phase 56 (Shape-3, R4) — un-FLOAT a hoisted import's between-statement comment that
+ * has separated from its owning declaration.
+ *
+ * `hoistSpecifier` copies a partial import's `trailingComments` onto the HOISTED import
+ * node so a comment authored BETWEEN that import and the next surviving decl rides the
+ * import to the host module-top (Phase 55 byte-identity). @babel/parser attaches such a
+ * between-statement comment to BOTH neighbours: the import's `trailingComments` AND the
+ * following decl's `leadingComments` (the SAME comment object). That copy is CORRECT
+ * only when the import and its decl stay ADJACENT in the final body (e.g. HostC: the
+ * hoisted `clamp` import is immediately followed by the `double` decl it shares the
+ * comment with — the inline oracle ALSO has the comment on both neighbours, so
+ * per-statement targets double it identically).
+ *
+ * When the spliced decl lands NON-adjacent to its hoisted import — a host statement
+ * (e.g. a reassigned module-`let`) sits between them (HostH/the DataTable P15
+ * `editTransition` after-`let` seam) — the import's copy FLOATS the comment to
+ * module-top, away from the decl. The inline oracle keeps the comment ONLY on the decl
+ * (its import is authored far above, never adjacent), so the float is a partial-vs-inline
+ * divergence on ALL six targets (svelte/vue double it at the wrong place, react/angular/
+ * lit drop it, solid dedups). This pass restores the inline placement by STRIPPING the
+ * floated comment from the import's `trailingComments`; the decl keeps it on its
+ * `leadingComments` (object identity preserved), and the per-target emitters then handle
+ * the decl-attached comment exactly as they do for the inline oracle (svelte/vue's
+ * `mirrorSpliceBoundaryComments` restores the doubling at the decl seam).
+ *
+ * Runs BEFORE `normalizeSplicedEmitLines` so the corrected attachment is in place when
+ * the emit-line shift runs. A comment is treated as FLOATED iff it is shared (object
+ * identity) with some body node's `leadingComments` whose owner is NOT the import's
+ * immediate body-successor; a genuine import-only trailing comment (owned by no decl's
+ * leadingComments) and the adjacent-decl case (HostC) are both left untouched. Never
+ * throws (D-04).
+ */
+function defloatHoistedImportComments(
+  body: Statement[],
+  hoistImports: readonly t.ImportDeclaration[],
+): void {
+  if (hoistImports.length === 0) return;
+  const hoistSet = new Set<t.Node>(hoistImports);
+  // Map every leading-comment object to the index of its FIRST owning body node.
+  const leadOwnerIndex = new Map<t.Comment, number>();
+  for (let i = 0; i < body.length; i++) {
+    for (const c of body[i]!.leadingComments ?? []) {
+      if (!leadOwnerIndex.has(c)) leadOwnerIndex.set(c, i);
+    }
+  }
+  for (let hi = 0; hi < body.length; hi++) {
+    const node = body[hi]!;
+    if (!hoistSet.has(node)) continue;
+    const trailing = node.trailingComments;
+    if (!trailing || trailing.length === 0) continue;
+    const kept = trailing.filter((c) => {
+      const owner = leadOwnerIndex.get(c);
+      // Genuine import-only trailing comment (no decl claims it as a leading) → keep.
+      if (owner === undefined) return true;
+      // Shared with the IMMEDIATE successor's leadingComments (adjacent decl, HostC) →
+      // keep both copies; the inline oracle doubles them too.
+      if (owner === hi + 1) return true;
+      // Shared with a NON-adjacent decl's leadingComments → FLOATED to module-top when
+      // the import hoisted away from its decl → strip from the import (decl keeps it).
+      return false;
+    });
+    if (kept.length !== trailing.length) {
+      node.trailingComments = kept.length > 0 ? kept : null;
+    }
+  }
+}
+
 /** Build the named imported-name list for a (host or nested) partial import. */
 function namedImports(imp: t.ImportDeclaration): string[] {
   const out: string[] = [];
@@ -861,6 +929,36 @@ function inlineResolvedPartial(
       let bare: Statement | null = null;
       if (t.isExportNamedDeclaration(stmt) && stmt.declaration) {
         bare = stmt.declaration;
+        // Phase 56 (Shape-3, R4): preserve the export wrapper's leading comments onto
+        // the bare declaration ONLY when @babel shared that comment with a PRECEDING
+        // module IMPORT's trailing comments — the Shape-3 import-FLOAT case. @babel
+        // attaches a comment authored above `export const X` to the
+        // ExportNamedDeclaration WRAPPER; unwrapping to `stmt.declaration` discards it (a
+        // "banner-drop"). When the comment sits between the partial's OWN module import
+        // and this first exported decl, that import is HOISTED to module-top and the
+        // shared copy FLOATS there (`defloatHoistedImportComments` then strips it) — so
+        // WITHOUT preserving it on the decl the comment is lost from BOTH places. The
+        // predecessor-IS-an-import gate is what makes this surgical: a comment shared with
+        // an adjacent DECL predecessor (HostC's `double`) survives via that decl's
+        // trailing and needs no preservation, and a pure banner not shared with any
+        // predecessor (HostE/G/I) is untouched — keeping the proven baseline byte-identical.
+        const prevStmt = partialBody[partialBody.indexOf(stmt) - 1];
+        const floatedViaImport =
+          prevStmt &&
+          t.isImportDeclaration(prevStmt) &&
+          !PARTIAL_EXT.test(prevStmt.source.value) &&
+          prevStmt.trailingComments &&
+          stmt.leadingComments
+            ? stmt.leadingComments.some((c) => prevStmt.trailingComments!.includes(c))
+            : false;
+        if (
+          floatedViaImport &&
+          stmt.leadingComments &&
+          stmt.leadingComments.length > 0 &&
+          (!bare.leadingComments || bare.leadingComments.length === 0)
+        ) {
+          bare.leadingComments = stmt.leadingComments;
+        }
       } else if (
         t.isVariableDeclaration(stmt) ||
         t.isFunctionDeclaration(stmt) ||
@@ -1203,6 +1301,12 @@ export function inlineScriptPartials(
 
   // Prepend hoisted partial imports to the host import region (imports hoist).
   file.program.body = [...ctx.hoistImports, ...newBody];
+
+  // Phase 56 (Shape-3, R4): un-float a hoisted import's between-statement comment that
+  // separated from its owning decl when the import hoisted to module-top but its decl
+  // landed non-adjacent (a host `let` between them). Restores the inline-oracle
+  // placement (comment stays on the decl's leadingComments) before the emit-line shift.
+  defloatHoistedImportComments(file.program.body, ctx.hoistImports);
 
   // Phase 55 FINAL step: normalize spliced nodes' emit-position lines (and their
   // attached comments) to host-contiguous values, stashing the true `.rzts`
