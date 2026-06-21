@@ -211,3 +211,45 @@ describe('Phase 56 — gap-0 host-seam literal byte-identity (originalGap guard)
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — TRAILING-SEAM
+ * (R1) literal byte-identity gate. THE keystone gap: svelte/vue DROP a comment at a
+ * partial's TRAILING seam when the next INLINE (non-extracted) declaration carries a
+ * leading comment.
+ *
+ * `mirrorSpliceBoundaryComments` (svelte/vue, per-statement generation) only
+ * re-mirrors a boundary comment when the CURRENT statement is the spliced one
+ * (`cur.extra.__roziePartialOrigin`). At a TRAILING seam the mirror-image holds:
+ * `prev` is the last spliced decl of the partial and `cur` is the INLINE host
+ * successor carrying the leading comment — so the existing trigger never fires. In
+ * the inline oracle that comment is shared (prev.trailing + cur.leading, one @babel
+ * object) and per-statement generation prints it TWICE; in the decomposed form it
+ * lives only on cur.leading and prints ONCE → one copy dropped → byte diff. This
+ * disqualifies nearly every real boundary (confirmed at DataTable P0→P1, P1→P2, P7,
+ * P10, P13).
+ *
+ *   • examples/PartialInlineHostE.rozie — imports `{ usedNameE }` from the sibling
+ *     ./partialLogicE.rzts, then declares an INLINE host const `hostTailE` with a
+ *     leading comment immediately after the import (the trailing seam).
+ *   • examples/InlineEquivHostE.rozie — the SAME logic + comment written inline,
+ *     with the comment sitting directly between `usedNameE` and `hostTailE`.
+ *
+ * Reuses `normalizeName` VERBATIM (only the three content-INDEPENDENT identity
+ * tokens are canonicalized), so a dropped comment still surfaces as a byte diff and
+ * fails. Before the Plan 02 fix svelte/vue are RED here (comment dropped) while
+ * react/solid/angular/lit are byte-identical (whole-block/program dedup); after the
+ * trailing-seam trigger broadening all six are byte-identical.
+ */
+const PARTIAL_HOST_E = 'PartialInlineHostE';
+const INLINE_HOST_E = 'InlineEquivHostE';
+
+describe('Phase 56 — trailing-seam literal byte-identity (svelte/vue mirror)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('trailing-seam partial-inlined host === inline-equivalent host (literal, commented inline successor preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_E, target), PARTIAL_HOST_E);
+      const inline = normalizeName(loadFixture(INLINE_HOST_E, target), INLINE_HOST_E);
+      expect(partial).toBe(inline);
+    });
+  });
+});

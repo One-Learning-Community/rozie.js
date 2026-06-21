@@ -1,0 +1,47 @@
+<!--
+  InlineEquivHostE.rozie — Phase 56 TRAILING-SEAM (R1) byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostE.rozie inlines from
+  ./partialLogicE.rzts, written inline in this component's own <script lang="ts">:
+  the host body decl `headE`, the `usedNameE` arrow const (the partial's last
+  surviving decl), and the INLINE host successor `hostTailE` — WITH the identical
+  leading comment in the identical relative position, sitting DIRECTLY between
+  `usedNameE` and `hostTailE` (NO blank line, no same-line trailing comment on
+  `usedNameE`), so @babel/parser shares the comment object across both statements.
+  All three are arrow-function consts. Per-statement svelte/vue generation prints the
+  shared comment TWICE here — the doubling the decomposed PartialInlineHostE must
+  reproduce. The unused `neverUsedE` export does NOT appear here (it is tree-shaken
+  from the partial path too).
+
+  The <template> is byte-identical to PartialInlineHostE.rozie. The emitted output
+  of the two hosts MUST match — LITERALLY, comments and blank lines included — on
+  all six targets after normalizing only the component identifier token
+  (PartialInlineHostE ↔ InlineEquivHostE) once the trailing-seam trigger broadening
+  lands. This is the literal byte-identity oracle the R1 fix is gated by.
+
+  No <style> block — see the PartialInlineHostE.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostE">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headE = (n: number): number => n + 1;
+const usedNameE = (k: number): number => k * 2;
+// leading: the inline host successor trails the spliced partial decl
+const hostTailE = (n: number): number => usedNameE(n) + headE(n);
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedNameE(1) }}</span>
+  <span class="echo">{{ hostTailE(1) }}</span>
+</div>
+</template>
+
+</rozie>

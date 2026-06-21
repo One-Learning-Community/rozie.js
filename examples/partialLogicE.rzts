@@ -1,0 +1,32 @@
+// partialLogicE.rzts — Phase 56 TRAILING-SEAM (R1) red→green guard partial.
+//
+// Models the REAL DataTable trailing-seam shape (P0→isSafeKey, P1→writeSorting,
+// P7→selectAllBox, P10→clipboard, P13→fullrow-edit): the partial's LAST surviving
+// declaration (`usedNameE`, an arrow-function const) is spliced into the host and
+// trails into an INLINE (non-extracted) host arrow-const declaration that carries a
+// leading comment (see PartialInlineHostE.rozie). The inline host decl STAYS in the
+// host <script>; it is NOT part of this partial. The host keeps a body decl (`headE`)
+// ABOVE the import so the spliced run lands mid-body, mirroring the real seams where
+// the extracted runs sit deep in `DataTable.rozie`'s `<script>`.
+//
+// Per-target behaviour at this seam (the SHIP-CLEAN finding "react/solid IDENTICAL,
+// svelte/vue DROP"):
+//   • svelte/vue generate the residual body ONE statement at a time, so the boundary
+//     comment that @babel/parser shares between the spliced predecessor's
+//     trailingComments and the inline successor's leadingComments prints TWICE in the
+//     inline oracle but ONCE in the decomposed form (the host comment lives only on
+//     the successor's leadingComments once the predecessor comes from a different
+//     file) — one copy DROPPED → byte diff (RED) until mirrorSpliceBoundaryComments
+//     is broadened to fire on the prev-is-spliced trailing seam.
+//   • react converts arrow-const declarations to `function` declarations and drops
+//     the object-shared boundary comment CONSISTENTLY in BOTH the inline oracle and
+//     the decomposed form → byte-identical (GREEN); solid/angular/lit dedup the
+//     shared comment to one copy in both forms → byte-identical (GREEN).
+//
+// `neverUsedE` is tree-shaken (unused by the host). No hoisted import is needed —
+// the arrow bodies are self-contained — which keeps the spliced run a pure body run
+// and isolates the comment drift from any import-region or blank-line arithmetic.
+
+export const usedNameE = (k: number): number => k * 2;
+
+export const neverUsedE = (k: number): number => k * 999;

@@ -1,0 +1,58 @@
+<!--
+  PartialInlineHostE.rozie — Phase 56 TRAILING-SEAM (R1) red→green guard host.
+
+  The <script lang="ts"> keeps a host body decl `headE` ABOVE the import (so the
+  spliced run lands mid-body, mirroring the real DataTable seams), imports
+  `{ usedNameE }` from ./partialLogicE.rzts, and DIRECTLY AFTER the import declares an
+  INLINE (non-extracted) arrow const `hostTailE` that carries a LEADING comment — so
+  the spliced partial decl (`usedNameE`) trails DIRECTLY into a commented inline host
+  successor. The compiler inlines `usedNameE` into THIS component's script before
+  lowering; the unused `neverUsedE` export is tree-shaken. This is the TRAILING SEAM:
+  `prev` (usedNameE) is the spliced node, `cur` (hostTailE) is the inline host
+  successor with the leading comment. All three are arrow-function consts (mirroring
+  DataTable's `currentData`/`isSafeKey`); there is NO blank line between the spliced
+  predecessor and the comment, so the comment is the ONLY thing under test (no
+  blank-line confound).
+
+  Before the Plan 02 fix, svelte/vue DROP one copy of that leading comment at the
+  trailing seam: their per-statement generation only re-mirrors a comment when the
+  CURRENT statement is spliced (`cur.extra.__roziePartialOrigin`), so the
+  prev-is-spliced trailing-seam case never fires the mirror — the inline oracle
+  prints the shared comment TWICE, the decomposed form prints it ONCE → byte diff.
+  Paired with InlineEquivHostE.rozie (the same logic + comment written inline) —
+  their emitted output MUST be LITERAL byte-identical on all six targets once the
+  trailing-seam trigger broadening lands. react (arrow→`function` conversion drops the
+  shared comment consistently in BOTH forms) and solid/angular/lit (whole-block/program
+  dedup) are already byte-identical here; svelte/vue are RED until the fix.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute that
+  the byte-identity oracle (which normalizes ONLY the component name) could not
+  reconcile against InlineEquivHostE. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicE.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostE">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headE = (n: number): number => n + 1;
+import { usedNameE } from './partialLogicE.rzts';
+// leading: the inline host successor trails the spliced partial decl
+const hostTailE = (n: number): number => usedNameE(n) + headE(n);
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ usedNameE(1) }}</span>
+  <span class="echo">{{ hostTailE(1) }}</span>
+</div>
+</template>
+
+</rozie>
