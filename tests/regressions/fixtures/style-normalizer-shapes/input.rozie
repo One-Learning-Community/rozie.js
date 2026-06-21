@@ -1,0 +1,13 @@
+<rozie name="StyleNormShapes">
+<props>{
+  s: { type: String, default: '' },
+  obj: { type: Object, default: () => ({}) }
+}</props>
+<template>
+  <div>
+    <span :style="{ color: 'red' }">object literal</span>
+    <span :style="$props.s">string via prop</span>
+    <span :style="$props.obj">object via prop</span>
+  </div>
+</template>
+</rozie>

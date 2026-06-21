@@ -695,6 +695,19 @@ export function emitSingleAttr(
     if (styleObjectLowered !== null) return styleObjectLowered;
     const expr = rewriteTemplateExpression(attr.expression, ir);
     const outName = resolveAttrName(attr.name, ctx);
+    // Quick-task 260620-rta — a dynamic (non-literal-object) `:style` reaching
+    // this point (the literal-object form already returned via `tryEmitStyleObjectLiteral`
+    // → `style:` directives above) is routed through `rozieStyle` so an OBJECT
+    // value delivered via a prop / identifier / member / call serializes to a
+    // real CSS string instead of toString-coercing to `[object Object]`; a
+    // string value passes through verbatim, and a nullish/empty value omits the
+    // attribute (`undefined`). `rozieStyle(...)` stays the DIRECT binding-site
+    // value (never a hoisted const) so Svelte 5 rune reactivity re-reads it.
+    // Precedes the class/rozieAttr branches.
+    if (attr.name === 'style') {
+      ctx.runtimeImports?.add('rozieStyle');
+      return `${outName}={rozieStyle(${expr})}`;
+    }
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
     // text position only. Component/self-tag prop bindings pass the value
     // structurally (no wrap), and `value`/`checked` on a form input are

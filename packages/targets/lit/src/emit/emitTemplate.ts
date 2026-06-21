@@ -552,6 +552,22 @@ function emitAttribute(
 
     const expr = rewriteTemplateExpression(attr.expression, ir);
 
+    // Quick-task 260620-rta — a dynamic (non-literal-object) `:style` reaching
+    // this point (the literal-object form already returned via styleMap above)
+    // is routed through `rozieStyle` so an OBJECT value delivered via a prop /
+    // identifier / member / call renders real CSS (styleMap directive) instead
+    // of toString-coercing to `[object Object]`; a string value passes through
+    // verbatim, and a nullish/empty value drops the attribute via `nothing`.
+    // Placed here (parallel to and immediately after the styleMap object-literal
+    // bail, BEFORE the component/self-tag and generic branches) so a dynamic
+    // `:style` is intercepted consistently on both HTML and custom-element hosts.
+    // `rozieStyle(...)` stays the DIRECT binding-site value (never a hoisted
+    // field) so lit-html re-reads it each render.
+    if (attr.name === 'style') {
+      opts?.runtime.add('rozieStyle');
+      return `style=\${rozieStyle(${expr})}`;
+    }
+
     // Composition/self tags are custom elements — all prop bindings must use
     // property-binding syntax (.prop=${expr}) so objects/arrays aren't stringified.
     // Kebab attribute names (`:on-close`) must be camelized to JS identifiers

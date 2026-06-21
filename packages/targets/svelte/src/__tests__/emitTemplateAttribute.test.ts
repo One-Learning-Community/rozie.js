@@ -122,7 +122,7 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
     expect(template).not.toMatch(/\bstyle:--btn-bg=/);
   });
 
-  it('non-object binding falls through to existing passthrough: `:style="$data.s"` → `style={s}`', () => {
+  it('260620-rta: non-object dynamic `:style="$data.s"` routes through rozieStyle → `style={rozieStyle(s)}`', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ s: 'background: red' }</data>
 <template>
@@ -131,7 +131,11 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
 </rozie>`);
     const { template, diagnostics } = emitTemplate(ir, REGISTRY);
     expect(diagnostics).toEqual([]);
-    expect(template).toContain('style={s}');
+    // Dynamic (non-literal-object) `:style` is normalized so an OBJECT value
+    // delivered via the binding serializes to a CSS string instead of
+    // `[object Object]`; a string value passes through verbatim. The call is
+    // the DIRECT binding-site value so Svelte 5 rune reactivity re-reads it.
+    expect(template).toContain('style={rozieStyle(s)}');
     // Must NOT emit any style: directive form for a non-object expression.
     expect(template).not.toMatch(/\bstyle:[a-z]/);
   });

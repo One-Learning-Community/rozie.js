@@ -1,0 +1,9 @@
+{
+  "id": "REG-STYLE-NORM-001",
+  "source": "quick/260620-rta-rozie-style-dynamic-normalizer",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260620-rta",
+  "desc": "Dynamic string|object :style lowers to real CSS on all 6 targets — lit/svelte route through rozieStyle, react/solid through parseInlineStyle, vue/angular native, literal-object via styleMap/style: directives; never [object Object].",
+  "targets": ["lit", "vue", "react", "svelte", "angular", "solid"],
+  "discoveredBy": "rozieClass precedent 260620-kby"
+}

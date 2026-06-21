@@ -184,7 +184,16 @@ export type RuntimeLitImport =
    * import line stays byte-identical. Replaces the prior `rozieDisplay` wrap on
    * the plain-class branch (which JSON-stringified an array class value).
    */
-  | 'rozieClass';
+  | 'rozieClass'
+  /**
+   * 260620-rta — string|object `:style` normalizer, shipped from
+   * `@rozie/runtime-lit`. Added by the template emitter ONLY when a dynamic
+   * (non-literal-object) `:style` lowers, so a literal-object-styleMap /
+   * string-only / styleless component's `@rozie/runtime-lit` import line stays
+   * byte-identical. Routes a dynamic OBJECT `:style` through `styleMap` (real
+   * CSS, not `[object Object]`) and a string value through verbatim.
+   */
+  | 'rozieStyle';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();
