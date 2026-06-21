@@ -1,0 +1,101 @@
+name: ✨ Feature request
+description: Propose a new capability, component, provider, or author-side API.
+title: "[feat]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rozie's guiding question is **"does a component-library author actually need this?"** — the more your request is framed around a concrete cross-framework authoring pain, the easier it is to evaluate. Please tell us which area it touches and whether it needs to work the same across all six targets.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched [existing issues](https://github.com/One-Learning-Community/rozie.js/issues?q=is%3Aissue) and [Discussions](https://github.com/One-Learning-Community/rozie.js/discussions) and this isn't a duplicate.
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: What kind of feature is this?
+      options:
+        - "New component family (@rozie-ui/*)"
+        - "New provider / capability on an existing component"
+        - "New authoring API — directive / sigil / block / modifier"
+        - "Compiler core / IR / a new diagnostic"
+        - "A specific compile target's emitted output"
+        - "Build plugin / Babel plugin / CLI"
+        - "Runtime helpers"
+        - "Docs / Playground / IDE tooling"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Related component family
+      description: If this concerns an existing @rozie-ui component, which one?
+      options:
+        - "N/A — not component-specific"
+        - captcha
+        - chartjs
+        - codemirror
+        - cropper
+        - data-table
+        - embla
+        - flatpickr
+        - fullcalendar
+        - listbox
+        - maplibre
+        - pdf
+        - rete
+        - slider
+        - sortable-list
+        - tiptap
+    validations:
+      required: true
+
+  - type: dropdown
+    id: targets
+    attributes:
+      label: Target(s) this should affect
+      description: Select all that apply.
+      multiple: true
+      options:
+        - react
+        - vue
+        - svelte
+        - angular
+        - solid
+        - lit
+        - "All six targets"
+        - "N/A — toolchain / target-independent"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem / use case?
+      description: The cross-framework authoring pain you're hitting. What do you have to do today (e.g. maintain per-framework wrappers by hand)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would the author-side API or behavior look like? A `.rozie` sketch is welcome. Default to "what would feel natural to a Vue developer?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

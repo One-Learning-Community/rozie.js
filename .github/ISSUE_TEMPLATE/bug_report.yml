@@ -1,0 +1,132 @@
+name: 🐞 Bug report
+description: Something compiled wrong, behaves wrong, or breaks across a framework target.
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! Rozie is a cross-framework compiler, so the two most useful things you can tell us are **which component/package** and **which compile target(s)** are affected. The dropdowns below are required for exactly that reason — a bug that reproduces in Svelte but not React is a very different bug from one that hits all six.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched [existing issues](https://github.com/One-Learning-Community/rozie.js/issues?q=is%3Aissue) and this isn't a duplicate.
+          required: true
+        - label: I'm on the latest published version (or have noted my version below).
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Rozie is this about?
+      options:
+        - "Component family (@rozie-ui/*)"
+        - "Compiler core (@rozie/core)"
+        - "Build plugin (@rozie/unplugin — Vite/Rollup/Webpack/esbuild/Rspack)"
+        - "Babel plugin (@rozie/babel-plugin)"
+        - "CLI (@rozie/cli)"
+        - "Runtime helpers (@rozie/runtime-*)"
+        - "Authoring / .rozie syntax / a directive or sigil"
+        - "Docs site"
+        - "Playground"
+        - "IDE tooling (VS Code / IntelliJ / TextMate)"
+        - "Other / not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component family
+      description: If this is about an @rozie-ui component, which one? (Leave as N/A for toolchain bugs.)
+      options:
+        - "N/A — not a component bug"
+        - captcha
+        - chartjs
+        - codemirror
+        - cropper
+        - data-table
+        - embla
+        - flatpickr
+        - fullcalendar
+        - listbox
+        - maplibre
+        - pdf
+        - rete
+        - slider
+        - sortable-list
+        - tiptap
+    validations:
+      required: true
+
+  - type: dropdown
+    id: targets
+    attributes:
+      label: Compile target(s)
+      description: Which framework output(s) does this reproduce on? Select all that apply.
+      multiple: true
+      options:
+        - react
+        - vue
+        - svelte
+        - angular
+        - solid
+        - lit
+        - "All six targets"
+        - "N/A — toolchain / target-independent"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Affected package + version
+      description: e.g. `@rozie-ui/captcha-svelte@0.1.3` or `@rozie/core@0.1.0`. Run `npm ls @rozie/core` if unsure.
+      placeholder: "@rozie-ui/<name>-<target>@x.y.z"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. Include the actual error message / diagnostic code (e.g. `ROZ127`) verbatim if there is one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: |
+        The single most helpful thing you can provide. Ideally the **`.rozie` source** that triggers it, plus the **emitted output** for the affected target if the bug is in codegen. A link to a minimal repo or a Playground link is even better.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Run and paste, or fill in by hand.
+      value: |
+        - Rozie package + version:
+        - Consumer framework + version (e.g. React 19.0.0):
+        - Build tool (Vite 8 / Rollup / Webpack / esbuild / Babel / CLI):
+        - TypeScript version:
+        - Node version:
+        - OS:
+    validations:
+      required: true

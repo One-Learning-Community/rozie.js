@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & discussion
+    url: https://github.com/One-Learning-Community/rozie.js/discussions
+    about: Usage questions, ideas, and "how do I…" — please ask in Discussions, not Issues.
+  - name: 📚 Documentation
+    url: https://github.com/One-Learning-Community/rozie.js#readme
+    about: Check the docs first — many questions are answered there.
