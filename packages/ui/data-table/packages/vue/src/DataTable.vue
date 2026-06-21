@@ -1325,6 +1325,8 @@ const remeasureWindow = () => {
 };
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
+// Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
+// re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
 const reFeed = () => {
   if (!table) return;
   table.setOptions((prev: any) => ({
