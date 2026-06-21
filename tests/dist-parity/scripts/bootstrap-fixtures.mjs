@@ -302,12 +302,16 @@ const EXAMPLES = [
   'PartialInlineHostD',
   'InlineEquivHostD',
   // Phase 56 (script-partial-cross-target-comment-placement-parity) — the GAP-0
-  // (R2) analog. partialLogicF.rzts places its FIRST surviving declaration ZERO
-  // blank lines below the hoisted import (the gap-0 seam), so the hardcoded
-  // one-blank gap in normalizeSplicedEmitLines injects a spurious blank above the
-  // first spliced decl that the inline oracle does not have — a literal byte diff
-  // the comment-FREE Phase 54 pair and the one-blank Phase 55 HostC pair cannot
-  // reach. PartialInlineHostF references a sibling .rzts and is added to
+  // (R2) originalGap host-seam GREEN-×6 regression guard. partialLogicF.rzts places
+  // its FIRST surviving declaration ZERO blank lines below the partial's own hoisted
+  // import; by the extraction rule that partial-local delta equals the host-side
+  // `tickF` → spliced-run delta, so measureOriginalGap returns 1 and the spliced run
+  // flows zero blanks below the host const (the originalGap host-seam path, D-02).
+  // The fixtures are COMMENT-FREE on the surviving decls: gap-0's COMMENT byte
+  // manifestation is entangled with the comment-placement bugs plans 56-02/03/04 own,
+  // so the comment-bearing red→green demonstration is DEFERRED to a later plan; this
+  // guard isolates the blank-line arithmetic alone and stays GREEN ×6.
+  // PartialInlineHostF references a sibling .rzts and is added to
   // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostF is single-file and stays
   // OUT. The .rzts partial is a LEAF source consumed only via inline — not an
   // EXAMPLES entry.

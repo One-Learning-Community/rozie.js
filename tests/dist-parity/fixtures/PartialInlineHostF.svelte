@@ -9,7 +9,6 @@ interface Props {
 let { base = 1, ...__rozieAttrs }: Props = $props();
 
 import { clamp } from './partial-helpers.js';
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 const tickF = base * 2;
 
 const usedFirstF = $derived(clamp(tickF + base));

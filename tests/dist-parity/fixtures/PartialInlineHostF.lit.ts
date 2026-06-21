@@ -3,7 +3,6 @@ import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { clamp } from './partial-helpers.js';
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 
 @customElement('rozie-partial-inline-host-f')
 export default class PartialInlineHostF extends SignalWatcher(LitElement) {

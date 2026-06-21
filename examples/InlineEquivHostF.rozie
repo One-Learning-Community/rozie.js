@@ -1,21 +1,23 @@
 <!--
-  InlineEquivHostF.rozie — Phase 56 GAP-0 (R2) byte-identity ORACLE.
+  InlineEquivHostF.rozie — Phase 56 GAP-0 (R2) byte-identity ORACLE (GREEN-×6 guard).
 
   Carries the EXACT surviving logic that PartialInlineHostF.rozie inlines from
   ./partialLogicF.rzts, written inline in this component's own <script lang="ts">:
-  the hoisted `clamp` value import and the two used `$computed` exports — WITH the
-  identical leading comments in the identical relative positions, crucially the
-  ZERO-blank adjacency between the `clamp` import and the first `usedFirstF` decl
-  (the gap-0 seam) and between `usedFirstF` and `usedSecondF`. The unused
-  `neverUsedF` export does NOT appear here (it is tree-shaken from the partial path
-  too), so its (absent) comments are absent here as well.
+  the hoisted `clamp` value import, the host body const `tickF`, and the two used
+  `$computed` exports — with the identical ZERO-blank adjacency between `tickF` and
+  `usedFirstF` (the gap-0 host-seam) and between `usedFirstF` and `usedSecondF`. The
+  unused `neverUsedF` export does NOT appear here (it is tree-shaken from the partial
+  path too).
 
-  The <template> is byte-identical to PartialInlineHostF.rozie. The emitted output
-  of the two hosts MUST match — LITERALLY, comments and blank lines included — on
-  all six targets after normalizing only the component identifier token
-  (PartialInlineHostF ↔ InlineEquivHostF). This is the literal byte-identity oracle
-  the gap-0 fix (D-02) is gated by: a hardcoded one-blank gap injects a spurious
-  blank above `usedFirstF` in the partial form but not here.
+  COMMENT-FREE on the surviving decls by design — see the PartialInlineHostF.rozie
+  header: gap-0's COMMENT byte manifestation is entangled with the comment-placement
+  bugs plans 56-02/03/04 own, so this guard isolates the blank-line arithmetic alone.
+
+  The <template> is byte-identical to PartialInlineHostF.rozie. The emitted output of
+  the two hosts MUST match — LITERALLY, blank lines included — on all six targets
+  after normalizing only the component identifier token (PartialInlineHostF ↔
+  InlineEquivHostF). This is the literal byte-identity oracle the originalGap
+  host-seam fix (D-02) is gated by.
 
   No <style> block — see the PartialInlineHostF.rozie header for why.
 -->
@@ -32,7 +34,6 @@
 import { clamp } from './partial-helpers.js';
 
 const tickF = $props.base * 2;
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 const usedFirstF = $computed(() => clamp(tickF + $props.base));
 const usedSecondF = $computed(() => clamp(usedFirstF + 1));
 </script>

@@ -19,6 +19,5 @@ const usedFirstF = computed(() => clamp(tickF + props.base));
 const usedSecondF = computed(() => clamp(usedFirstF.value + 1));
 
 import { clamp } from './partial-helpers.js';
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 const tickF = props.base * 2;
 </script>

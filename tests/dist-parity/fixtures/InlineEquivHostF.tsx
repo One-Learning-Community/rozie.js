@@ -20,7 +20,6 @@ export default function InlineEquivHostF(_props: InlineEquivHostFProps): JSX.Ele
   const usedSecondF = useMemo(() => clamp(usedFirstF + 1), [clamp, usedFirstF]);
 
   const tickF = props.base * 2;
-  // leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 
   return (
     <>

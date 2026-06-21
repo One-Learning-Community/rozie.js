@@ -1,7 +1,6 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, viewChild } from '@angular/core';
 
 import { clamp } from './partial-helpers.js';
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';

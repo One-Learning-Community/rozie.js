@@ -1,24 +1,29 @@
 <!--
-  PartialInlineHostF.rozie — Phase 56 GAP-0 (R2) host that imports a .rzts partial.
+  PartialInlineHostF.rozie — Phase 56 GAP-0 (R2) GREEN-×6 regression guard.
 
-  The <script lang="ts"> imports `{ usedFirstF, usedSecondF }` from
-  ./partialLogicF.rzts; the compiler inlines those exported $computed values (plus
-  the hoisted `clamp` value import) into THIS component's script before lowering.
-  The unused `neverUsedF` export is tree-shaken.
+  The <script lang="ts"> declares a host body const `tickF`, then imports
+  `{ usedFirstF, usedSecondF }` from ./partialLogicF.rzts; the compiler inlines those
+  exported $computed values (plus the hoisted `clamp` value import) into THIS
+  component's script BELOW `tickF`, before lowering. The unused `neverUsedF` export is
+  tree-shaken.
 
-  partialLogicF.rzts places its FIRST surviving declaration ZERO blank lines below
-  the hoisted import (the gap-0 seam). normalizeSplicedEmitLines hardcodes a
-  one-blank gap above every non-import spliced block, so the emitted output gains a
-  spurious blank line above `usedFirstF` that InlineEquivHostF.rozie (the inline
-  oracle, authored with the same zero-blank adjacency) does NOT have — a LITERAL
-  byte diff on the affected targets. That drift is the red this fixture pins; it
-  goes green once the ORIGINAL source gap is threaded through SplicedEmitBlock and
-  consumed at the normalize anchor instead of the hardcoded `+2` (D-02).
+  partialLogicF.rzts places its FIRST surviving declaration (`usedFirstF`) ZERO blank
+  lines below its own hoisted `clamp` import (the gap-0 source adjacency). By the
+  extraction rule that zero-blank partial-local delta equals the host-side `tickF` →
+  spliced-run delta, so measureOriginalGap returns 1 and the spliced `usedFirstF` run
+  flows ZERO blank lines below the host `tickF` const — exactly what the inline oracle
+  (InlineEquivHostF.rozie) has. This pins the `originalGap` host-seam measurement path
+  (D-02) as byte-identical ×6.
+
+  COMMENT-FREE on the surviving decls by design: gap-0's COMMENT byte manifestation is
+  entangled with the per-target comment-placement bugs that plans 56-02/03/04 own, so
+  the comment-bearing gap-0 red→green demonstration is DEFERRED to a later comment-fix
+  plan. This fixture isolates the blank-line arithmetic alone and must stay GREEN ×6.
 
   No <style> block: the scoped-CSS hash is component-name + filename derived
   (computeScopeHash), so a style block would inject a name-divergent attribute the
-  byte-identity oracle (which normalizes ONLY the component name) could not
-  reconcile against InlineEquivHostF. This fixture proves SCRIPT inline parity.
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostF. This fixture proves SCRIPT inline parity.
 
   References ./partialLogicF.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
 -->

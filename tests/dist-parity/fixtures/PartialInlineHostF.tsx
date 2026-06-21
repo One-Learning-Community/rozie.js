@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import { clamp } from './partial-helpers.js';
-// leading: the first used $computed export sits ZERO blank lines below the import (the gap-0 seam)
 
 interface PartialInlineHostFProps {
   base?: number;
