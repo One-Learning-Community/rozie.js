@@ -37,7 +37,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
 
   @property({ type: Array, attribute: 'items' }) _items_attr: any[] = [];
   private _itemsControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
-  @property({ type: String, reflect: true }) itemKey: string = null;
+  @property({ type: String }) itemKey: string | (((...args: unknown[]) => unknown) | null) = null;
   @property({ type: String, reflect: true }) handle: string = null;
   @property({ type: String, reflect: true }) group: string = null;
   @property({ type: Number, reflect: true }) animation: number = 150;
@@ -52,8 +52,8 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) forceFallback: boolean = false;
   @property({ type: Number, reflect: true }) swapThreshold: number = 1;
   @property({ type: Boolean, reflect: true }) cloneable: boolean = false;
-  @property({ type: String, reflect: true }) listClass: string = '';
-  @property({ type: String, reflect: true }) itemClass: string = '';
+  @property({ type: String }) listClass: string | any[] | any = '';
+  @property({ type: String }) itemClass: string | any[] | any = '';
   private _liftedIndex = signal(null);
   private _ariaLiveText = signal('');
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
@@ -238,9 +238,9 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
-  <div class="${(rozieClass(this.listClasses()))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+  <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(this.itemClasses(index)))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClass, { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>
@@ -252,16 +252,32 @@ private __rozieFirstUpdateDone = false;
 
   instance: any = null;
 
-  keyFor = (item: any, index: any) => {
-  if (this.itemKey && item !== null && typeof item === 'object') {
-    return item[this.itemKey] ?? index;
-  }
-  return item ?? index;
+  __rowKey = {
+  map: new WeakMap(),
+  seq: 0
 };
 
-  listClasses = () => ['rozie-sortable-list', this.listClass].filter(Boolean).join(' ');
-
-  itemClasses = (index: any) => ['rozie-sortable-item', this.itemClass, this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
+  keyFor = (item: any, index: any) => {
+  // (a) function itemKey: consumer-supplied (item, index) => key.
+  if (typeof this.itemKey === 'function') {
+    return this.itemKey(item, index);
+  }
+  // (b) string itemKey: a property name on a non-null object item.
+  if (typeof this.itemKey === 'string' && item !== null && typeof item === 'object' && item[this.itemKey] != null) {
+    return item[this.itemKey];
+  }
+  // (c) id-less object (or function) item: assign-on-first-sight WeakMap
+  //     synthetic id. Survives reorder because it is keyed by object identity.
+  if (item !== null && typeof item === 'object' || typeof item === 'function') {
+    if (!this.__rowKey.map.has(item)) {
+      this.__rowKey.map.set(item, '__rk' + this.__rowKey.seq++);
+    }
+    return this.__rowKey.map.get(item);
+  }
+  // (d) primitive item: fall back to index. NOTE: duplicate primitives are
+  //     unsafe to reorder this way — pass a function itemKey for those.
+  return index;
+};
 
   getLabel = (idx: any) => {
   const item = this.items[idx];

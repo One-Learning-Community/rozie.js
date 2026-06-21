@@ -6,7 +6,7 @@ export interface SortableListProps {
   items?: unknown[];
   defaultItems?: unknown[];
   onItemsChange?: (next: unknown[]) => void;
-  itemKey?: (string) | null;
+  itemKey?: (string | ((...args: unknown[]) => unknown)) | null;
   handle?: (string) | null;
   group?: (string) | null;
   animation?: number;
@@ -21,8 +21,8 @@ export interface SortableListProps {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
-  listClass?: string;
-  itemClass?: string;
+  listClass?: string | unknown[] | Record<string, unknown>;
+  itemClass?: string | unknown[] | Record<string, unknown>;
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;

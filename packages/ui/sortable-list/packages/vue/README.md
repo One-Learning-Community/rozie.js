@@ -37,7 +37,7 @@ const items = ref([
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
 | `items` | `Array` | `[]` | ✓ |  |
-| `itemKey` | `String` | `null` |  |  |
+| `itemKey` | `String \| Function` | `null` |  |  |
 | `handle` | `String` | `null` |  |  |
 | `group` | `String` | `null` |  |  |
 | `animation` | `Number` | `150` |  |  |
@@ -52,8 +52,8 @@ const items = ref([
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
-| `listClass` | `String` | `""` |  |  |
-| `itemClass` | `String` | `""` |  |  |
+| `listClass` | `String \| Array \| Object` | `""` |  |  |
+| `itemClass` | `String \| Array \| Object` | `""` |  |  |
 
 ## Events
 

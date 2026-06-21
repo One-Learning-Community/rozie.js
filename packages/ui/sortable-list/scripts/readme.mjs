@@ -22,6 +22,12 @@
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'unknown';
   if (typeAnnotation.kind === 'identifier') return typeAnnotation.name;
+  // A `type: [String, Function]` array decl lowers to a union — render each
+  // member and join with ` | ` (e.g. `String | Function`, matching the docs
+  // table's `String \| Function` union cell).
+  if (typeAnnotation.kind === 'union' && Array.isArray(typeAnnotation.members)) {
+    return typeAnnotation.members.map(renderPropType).join(' | ');
+  }
   // Defensive: support a 'literal' kind too (other components may use it).
   if (typeAnnotation.kind === 'literal') return String(typeAnnotation.value);
   if (typeAnnotation.name) return typeAnnotation.name;
@@ -395,7 +401,10 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('| Name | Type | Default | Two-way (model) | Required |');
   lines.push('| --- | --- | --- | :---: | :---: |');
   for (const p of ir.props) {
-    const type = renderPropType(p.typeAnnotation);
+    // Escape pipes for the GFM table cell — a union type (`String | Function`)
+    // carries literal `|` that must be `\|` so it is not parsed as a column
+    // delimiter (matches the docs/components/sortable-list.md convention).
+    const type = renderPropType(p.typeAnnotation).replace(/\|/g, '\\|');
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';
@@ -523,10 +532,14 @@ export function validateDocsPropsTable(ir, docsMarkdown) {
     if (!doc) continue;
     const irType = renderPropType(p.typeAnnotation);
     const docType = stripCode(doc.type);
-    // Docs may widen a type (e.g. `String | Object`); accept if the IR type
-    // token appears as one of the union members.
     const docTypeTokens = docType.split('|').map((t) => t.trim());
-    if (!docTypeTokens.includes(irType)) {
+    // The IR type may itself be a union (`String | Function`) — every source
+    // member must be present in the docs cell (subset check). The docs may also
+    // WIDEN a single-token IR type (e.g. `String | Object`); a single irType is
+    // accepted when it appears as one of the docs union members.
+    const irTypeTokens = irType.split('|').map((t) => t.trim());
+    const everyMemberDocumented = irTypeTokens.every((t) => docTypeTokens.includes(t));
+    if (!everyMemberDocumented) {
       errors.push(`prop "${p.name}": type drift — source \`${irType}\`, docs \`${docType}\``);
     }
     const irDef = renderPropDefault(p.defaultValue);

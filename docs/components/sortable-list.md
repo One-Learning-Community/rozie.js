@@ -69,7 +69,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | Name | Type | Default | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | --- |
 | `items` | `Array` | `[]` | yes (via `r-model`) | The bound items array. `model: true` — reorders write back through the two-way path. |
-| `itemKey` | `String` | `null` | yes | Property name to use as the per-row key (e.g. `'id'`). Improves keyed-reconciler behavior on Vue / Svelte / React. |
+| `itemKey` | `String \| Function` | `null` | yes | Property name OR a `(item, index) => key` function for the per-row key. With neither, id-less object items get a stable synthetic key via an internal WeakMap; primitive items fall back to index — pass a function for reorderable duplicate primitives. Improves keyed-reconciler behavior on Vue / Svelte / React. |
 | `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
 | `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
@@ -84,8 +84,8 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `cloneable` | `Boolean` | `false` | **NO** | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). **Construction-time only**. |
 | `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
-| `listClass` | `String` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
-| `itemClass` | `String` | `""` | yes | Extra class(es) merged onto every item row. Bridges `.list-group-item` and per-row layout/styling. |
+| `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
+| `itemClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
 
 ### Emits
 

@@ -76,7 +76,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
 | `items` | `Array` | `[]` | ✓ |  |
-| `itemKey` | `String` | `null` |  |  |
+| `itemKey` | `String \| Function` | `null` |  |  |
 | `handle` | `String` | `null` |  |  |
 | `group` | `String` | `null` |  |  |
 | `animation` | `Number` | `150` |  |  |
@@ -91,8 +91,8 @@ The accessor contract: only real user interaction dirties the control — progra
 | `forceFallback` | `Boolean` | `false` |  |  |
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
-| `listClass` | `String` | `""` |  |  |
-| `itemClass` | `String` | `""` |  |  |
+| `listClass` | `String \| Array \| Object` | `""` |  |  |
+| `itemClass` | `String \| Array \| Object` | `""` |  |  |
 
 ## Events
 

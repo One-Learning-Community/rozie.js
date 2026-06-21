@@ -41,10 +41,10 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-      <div [class]="listClasses()" #listEl part="list">
+      <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list">
         <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="itemClasses(index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div [class]="['rozie-sortable-item', itemClass(), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
@@ -86,7 +86,7 @@ function __rozieAttr(v: unknown): string | null {
 })
 export class SortableList {
   items = model<any[]>((() => [])());
-  itemKey = input<(string) | null>(null);
+  itemKey = input<(string | ((...args: unknown[]) => unknown)) | null>(null);
   handle = input<(string) | null>(null);
   group = input<(string) | null>(null);
   animation = input<number>(150);
@@ -101,8 +101,8 @@ export class SortableList {
   forceFallback = input<boolean>(false);
   swapThreshold = input<number>(1);
   cloneable = input<boolean>(false);
-  listClass = input<string>('');
-  itemClass = input<string>('');
+  listClass = input<string | any[] | Record<string, any>>('');
+  itemClass = input<string | any[] | Record<string, any>>('');
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
@@ -205,15 +205,32 @@ export class SortableList {
   }
 
   instance: any = null;
+  __rowKey = {
+    map: new WeakMap(),
+    seq: 0
+  };
   keyFor = (item: any, index: any) => {
     const __itemKey = this.itemKey();
-    if (__itemKey && item !== null && typeof item === 'object') {
-      return item[__itemKey] ?? index;
+    // (a) function itemKey: consumer-supplied (item, index) => key.
+    if (typeof __itemKey === 'function') {
+      return __itemKey(item, index);
     }
-    return item ?? index;
+    // (b) string itemKey: a property name on a non-null object item.
+    if (typeof __itemKey === 'string' && item !== null && typeof item === 'object' && item[__itemKey] != null) {
+      return item[__itemKey];
+    }
+    // (c) id-less object (or function) item: assign-on-first-sight WeakMap
+    //     synthetic id. Survives reorder because it is keyed by object identity.
+    if (item !== null && typeof item === 'object' || typeof item === 'function') {
+      if (!this.__rowKey.map.has(item)) {
+        this.__rowKey.map.set(item, '__rk' + this.__rowKey.seq++);
+      }
+      return this.__rowKey.map.get(item);
+    }
+    // (d) primitive item: fall back to index. NOTE: duplicate primitives are
+    //     unsafe to reorder this way — pass a function itemKey for those.
+    return index;
   };
-  listClasses = () => ['rozie-sortable-list', this.listClass()].filter(Boolean).join(' ');
-  itemClasses = (index: any) => ['rozie-sortable-item', this.itemClass(), this.liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
   getLabel = (idx: any) => {
     const __labelFor = this.labelFor();
     const item = this.items()[idx];

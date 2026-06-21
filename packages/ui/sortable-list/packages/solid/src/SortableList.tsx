@@ -27,7 +27,7 @@ interface SortableListProps {
   items?: any[];
   defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;
-  itemKey?: (string) | null;
+  itemKey?: (string | ((...args: unknown[]) => unknown)) | null;
   handle?: (string) | null;
   group?: (string) | null;
   animation?: number;
@@ -42,8 +42,8 @@ interface SortableListProps {
   forceFallback?: boolean;
   swapThreshold?: number;
   cloneable?: boolean;
-  listClass?: string;
-  itemClass?: string;
+  listClass?: string | any[] | Record<string, any>;
+  itemClass?: string | any[] | Record<string, any>;
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
@@ -153,25 +153,44 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   let __rozieRootRef: HTMLElement | null = null;
 
   let instance: any = null;
-  function keyFor(item: any, index: any) {
-    if (local.itemKey && item !== null && typeof item === 'object') {
-      return item[local.itemKey] ?? index;
-    }
-    return item ?? index;
-  }
 
-  // Class hooks. Both helpers return a single space-joined class STRING (not an
-  // array / object) — the ONE :class input shape that lowers identically across
-  // all six targets (React clsx / Solid+Lit string / Svelte rozieAttr / Angular
-  // [attr.class] / Vue). `.filter(Boolean)` drops the empty-string default so no
-  // stray/trailing class is emitted when listClass/itemClass are omitted. An
-  // array-form :class binding compiles to a stringified array on Solid/Svelte/Lit
-  // ("base,[object Object]") and a comma-joined value on React — hence the helper.
-  function listClasses() {
-    return ['rozie-sortable-list', local.listClass].filter(Boolean).join(' ');
-  }
-  function itemClasses(index: any) {
-    return ['rozie-sortable-item', local.itemClass, liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''].filter(Boolean).join(' ');
+  // Instance-scoped synthetic-id store for id-less object items. Keyed by object
+  // IDENTITY, so the same object keeps its synthetic id across a reorder (the
+  // framework reconciler then rebinds the row component instance to its ORIGINAL
+  // item, not its slot position — the data-corruption fix). BOTH the WeakMap and
+  // the monotonic counter live in ONE member-mutated fresh-instance object so the
+  // React emitter hoists the whole thing to a single useMemo(() => …, []) (the
+  // setup-once-persistence guarantee). Folding the counter in is deliberate: a
+  // bare `let __rowKeySeq = 0` mutated only inside the non-hook keyFor helper is
+  // NOT caught by React's hoistModuleLet (it resets every render → an item added
+  // in a later render collides on an already-issued synthetic id → corruption).
+  // new WeakMap()/seq inside one object dodges that emitter gap. Verified in codegen.
+  const __rowKey = {
+    map: new WeakMap(),
+    seq: 0
+  };
+
+  // 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
+  function keyFor(item: any, index: any) {
+    // (a) function itemKey: consumer-supplied (item, index) => key.
+    if (typeof local.itemKey === 'function') {
+      return local.itemKey(item, index);
+    }
+    // (b) string itemKey: a property name on a non-null object item.
+    if (typeof local.itemKey === 'string' && item !== null && typeof item === 'object' && item[local.itemKey] != null) {
+      return item[local.itemKey];
+    }
+    // (c) id-less object (or function) item: assign-on-first-sight WeakMap
+    //     synthetic id. Survives reorder because it is keyed by object identity.
+    if (item !== null && typeof item === 'object' || typeof item === 'function') {
+      if (!__rowKey.map.has(item)) {
+        __rowKey.map.set(item, '__rk' + __rowKey.seq++);
+      }
+      return __rowKey.map.get(item);
+    }
+    // (d) primitive item: fall back to index. NOTE: duplicate primitives are
+    //     unsafe to reorder this way — pass a function itemKey for those.
+    return index;
   }
 
   // Read the display label for an item — used by the aria-live announcer.
@@ -285,9 +304,9 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
-      <div class={rozieClass(listClasses())} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
+      <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(itemClasses(index()))} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(['rozie-sortable-item', local.itemClass, { 'rozie-sortable-item-lifted': liftedIndex() === index() }])} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>
         {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
