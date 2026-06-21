@@ -1,0 +1,57 @@
+// groupingActiveDefault(): is grouping currently engaged (a non-empty ordered key list)? Reads
+// the same source order as currentState().grouping ($props.grouping ?? $data.groupingDefault) so
+// the expanded auto-default below tracks the live grouping state on every target.
+const groupingActiveDefault = () =>
+  ((($props.grouping != null ? $props.grouping : $data.groupingDefault) || []).length > 0)
+
+// Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
+// All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
+// this whole object as `state`. Return type annotated `any`: the inferred object-literal
+// type does not structurally match table-core's `Partial<TableState>` under the strict
+// bundled-leaf tsc (the columnSizingInfo/pagination shapes widen to Record) — the
+// runtime shape is correct; `any` sidesteps the over-strict structural check (the
+// deferred-items strict-tsc #2 / leaf-output-strict-typecheck close).
+const currentState = (): any => ({
+  sorting: $props.sorting != null ? $props.sorting : $data.sortingDefault,
+  globalFilter: $props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault,
+  columnFilters: $props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault,
+  pagination: $props.pagination != null ? $props.pagination : $data.paginationDefault,
+  rowSelection: $props.rowSelection != null ? $props.rowSelection : $data.rowSelectionDefault,
+  // expanded (phase 50 req-1/3): ExpandedState ({ [rowId]: true } | the `true` expand-all
+  // literal). Passed to table-core verbatim — never Object.keys'd without a `=== true`
+  // guard (Pitfall 2). Falls back to $data.expandedDefault when r-model:expanded is unbound.
+  // GROUPING AUTO-EXPAND (req-4): when grouping is active and the consumer has neither bound
+  // `expanded` nor toggled a group yet (!expandedTouched), default to the `true` expand-all
+  // literal so the grouped subtree is visible by default; the first toggle latches
+  // expandedTouched and the user's expanded state wins thereafter. Non-grouping path is
+  // unchanged → byte-identical-off (the table + the expandable-rows feature both keep
+  // $data.expandedDefault).
+  expanded: $props.expanded != null
+    ? $props.expanded
+    : (groupingActiveDefault() && !expandedTouched ? true : $data.expandedDefault),
+  // grouping (phase 50 reqs 4-7): GroupingState = ordered string[] of column ids. Falls back
+  // to $data.groupingDefault when r-model:grouping is unbound. table-core's getGroupedRowModel
+  // is inert when this is empty (byte-identical-off, req-10).
+  grouping: $props.grouping != null ? $props.grouping : $data.groupingDefault,
+  columnVisibility: $props.columnVisibility != null ? $props.columnVisibility : $data.columnVisibilityDefault,
+  columnSizing: $props.columnSizing != null ? $props.columnSizing : $data.columnSizingDefault,
+  columnOrder: $props.columnOrder != null ? $props.columnOrder : $data.columnOrderDefault,
+  columnPinning: $props.columnPinning != null ? $props.columnPinning : $data.columnPinningDefault,
+  // columnSizingInfo: table-core's transient resize-gesture state. We pass an
+  // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
+  // `column.getIsResizing()` / `getResizeHandler()` read
+  // `getState().columnSizingInfo.isResizingColumn`, which THROWS if the key is
+  // absent. Seed the default shape (matches table-core's
+  // getDefaultColumnSizingInfoState) so the resize-chrome predicates are safe on
+  // every render. Not a two-way model slice (transient gesture state, not consumer
+  // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
+  columnSizingInfo: $data.columnSizingInfo,
+})
+
+// The live row data (Phase 51 req-4): the bound `data` prop when controlled, else the
+// uncontrolled $data.dataDefault fallback (mirrors currentState's per-slice ?? pattern).
+// A committed edit funnels a FRESH array through writeData, which writes BOTH sinks; the
+// re-feed sources here so editing works whether or not the consumer binds r-model:data.
+const currentData = (): any => ($props.data != null ? $props.data : $data.dataDefault)
+
+export { groupingActiveDefault, currentState, currentData }

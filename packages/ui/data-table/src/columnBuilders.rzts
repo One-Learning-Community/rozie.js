@@ -1,0 +1,155 @@
+// Prototype-safe id-keyed column resolution (T-48-PP): the `:columns` config array is
+// applied FIRST (lower precedence), then the <Column> registry OVERRIDES by id (LWW).
+// byId is a null-prototype object so a consumer column id of "__proto__"/"constructor"
+// cannot pollute Object.prototype. Returns the table-core ColumnDef[]. (No per-column
+// render callbacks — cells render via the single #cell/#header scoped slot on this
+// component, dispatched by columnId; <Column> carries metadata only.)
+const isSafeKey = (k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype'
+// wrapAggregationFn (phase 50 req-5, D-05, threat T-50-04): resolve a per-column
+// aggregationFn straight onto the ColumnDef (no component-side switch — RESEARCH
+// anti-pattern). A built-in NAME string ('sum'/'min'/'max'/'extent'/'mean'/'median'/
+// 'unique'/'uniqueCount'/'count') passes through verbatim — table-core resolves it from its
+// built-in `aggregationFns` map. A CUSTOM function `(columnId, leafRows, childRows) => any`
+// is DEFENSIVELY WRAPPED (the runValidator precedent): a consumer fn runs per group, so a
+// throw is coerced to `undefined` and can never crash getGroupedRowModel (DoS guard).
+// Anything else → undefined (no aggregation; the cell renders as a placeholder).
+const wrapAggregationFn = (fn) => {
+  if (typeof fn === 'string') return fn
+  if (typeof fn !== 'function') return undefined
+  return (columnId, leafRows, childRows) => {
+    try {
+      return fn(columnId, leafRows, childRows)
+    } catch (err) {
+      return undefined
+    }
+  }
+}
+const columnDefs = () => {
+  const byId = Object.create(null)
+  const order = []
+  const cfg = $props.columns || []
+  for (const c of cfg) {
+    if (!c) continue
+    const rawId = c.id != null ? c.id : c.field
+    if (rawId == null) continue
+    const id = String(rawId)
+    if (!isSafeKey(id)) continue
+    if (!(id in byId)) order.push(id)
+    byId[id] = {
+      id,
+      accessorKey: c.field != null ? c.field : id,
+      header: c.header != null ? c.header : id,
+      enableSorting: c.sortable === true,
+      // per-column filter opt-in (req-5). table-core gates the filter input + value
+      // funnel on enableColumnFilter; a column with filterable !== true cannot be
+      // filtered (and renders no per-column filter input in the chrome below).
+      enableColumnFilter: c.filterable === true,
+      filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
+      // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+      // so every data column is offered to the headless #groupBar by default; the per-column
+      // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+      // a custom fn defensively wrapped (T-50-04).
+      groupable: c.groupable !== false,
+      aggregationFn: wrapAggregationFn(c.aggregationFn),
+      pinned: c.pinned != null ? c.pinned : '',
+      width: c.width != null ? c.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+      // metadata carrier the display↔editor branch + runValidator read. Off by default.
+      meta: {
+        editable: c.editable === true,
+        editor: c.editor != null ? c.editor : 'text',
+        editorOptions: c.editorOptions != null ? c.editorOptions : [],
+        validate: typeof c.validate === 'function' ? c.validate : null,
+      },
+    }
+  }
+  const reg = $data.colReg || {}
+  for (const id in reg) {
+    if (!isSafeKey(id)) continue
+    const spec = reg[id]
+    if (!spec) continue
+    if (!(id in byId)) order.push(id)
+    byId[id] = {
+      id,
+      accessorKey: spec.field != null ? spec.field : id,
+      header: spec.header != null ? spec.header : id,
+      enableSorting: spec.sortable === true,
+      enableColumnFilter: spec.filterable === true,
+      filterable: spec.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: spec.expandable === true,
+      // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
+      groupable: spec.groupable !== false,
+      aggregationFn: wrapAggregationFn(spec.aggregationFn),
+      pinned: spec.pinned != null ? spec.pinned : '',
+      width: spec.width != null ? spec.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta from the <Column> registry spec.
+      meta: {
+        editable: spec.editable === true,
+        editor: spec.editor != null ? spec.editor : 'text',
+        editorOptions: spec.editorOptions != null ? spec.editorOptions : [],
+        validate: typeof spec.validate === 'function' ? spec.validate : null,
+      },
+    }
+  }
+  const out = []
+  for (const id of order) if (byId[id]) out.push(byId[id])
+  return out
+}
+
+// The constant id of the auto-injected leading checkbox column (D-04). Distinct from
+// any consumer column id (the registry/config guard never produces a leading "__").
+const SELECT_COL_ID = '__rdt_select'
+
+// The constant id of the auto-injected leading chevron expander column (phase 50, D-04).
+// Distinct from any consumer column id (the registry/config guard never produces a leading
+// "__"). Injected AFTER the select column (so order is [select, expander, ...userCols]).
+const EXPANDER_COL_ID = '__rdt_expander'
+
+// The table-core ColumnDef set actually fed to createTable / setOptions: the resolved
+// user columns, PLUS a LEADING checkbox column when selectionMode is 'single' OR
+// 'multiple' (D-04). The select column carries enableSorting/enableColumnFilter:false
+// and an isSelectColumn marker the template uses to render checkbox chrome (NOT an
+// accessor value). 'none' injects nothing. In 'single' mode the per-row checkbox
+// renders but the select-all HEADER checkbox is suppressed (selecting a row caps at
+// ≤1 via enableMultiRowSelection:false) — a single-select needs a per-row control,
+// not a select-all, so without injecting the column single mode would expose NO
+// selection UI at all.
+const selectionEnabled = () => $props.selectionMode === 'single' || $props.selectionMode === 'multiple'
+const tableColumns = () => {
+  const cols = columnDefs()
+  // Expander column (phase 50, D-04): injected LEADING when expandable, carrying an
+  // isExpanderColumn marker the template uses to render the chevron toggle (NOT an accessor
+  // value). enableSorting/enableColumnFilter:false (it is chrome, not data). Off by default
+  // → byte-identical-off (req-10).
+  let withExpander = cols
+  if ($props.expandable === true) {
+    const expanderCol = {
+      id: EXPANDER_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isExpanderColumn: true,
+      pinned: '',
+      width: '',
+    }
+    withExpander = [expanderCol].concat(cols)
+  }
+  if (selectionEnabled()) {
+    const selectCol = {
+      id: SELECT_COL_ID,
+      enableSorting: false,
+      enableColumnFilter: false,
+      filterable: false,
+      isSelectColumn: true,
+      pinned: '',
+      width: '',
+    }
+    return [selectCol].concat(withExpander)
+  }
+  return withExpander
+}
+
+export { isSafeKey, wrapAggregationFn, columnDefs, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns }

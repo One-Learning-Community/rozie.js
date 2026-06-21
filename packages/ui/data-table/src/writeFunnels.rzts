@@ -1,0 +1,199 @@
+// ── sorting slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<SortingState> = value | (old)=>new; the onSortingChange
+// callback applies it against the CURRENT sorting, then this funnel writes a FRESH
+// array to the uncontrolled default + the two-way model + fires the change event
+// REGARDLESS of binding. STATIC key (`$data.sortingDefault` / `$model.sorting`) — a
+// dynamic-key funnel is ROZ106 on all six. The remaining 8 slices each get their own
+// such funnel in Plans 04/05.
+const writeSorting = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.sortingDefault = next   // fresh array only (never in-place)
+  $model.sorting = next          // two-way emit if bound (no-op-diff if not)
+  $emit('sort-change', next)
+  programmatic--
+}
+const applyUpdater = (updater, current) =>
+  (typeof updater === 'function' ? updater(current) : updater)
+
+// ── expanded slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────────
+// table-core hands an Updater<ExpandedState> = value | (old)=>new; onExpandedChange
+// applies it against the CURRENT expanded, then this funnel writes a FRESH value to the
+// uncontrolled default + the two-way model + fires `expanded-change` REGARDLESS of binding.
+// `next` may be the `true` expand-all literal OR a { [rowId]: true } object — written
+// verbatim (Pitfall 2). One emit per change (the shared `programmatic` guard dedups the
+// React multi-render re-entry, D-07). STATIC key ($data.expandedDefault / $model.expanded).
+const writeExpanded = (next) => {
+  if (programmatic) return
+  programmatic++
+  // Latch the grouping auto-expand default (req-4): the FIRST expand/collapse toggle means
+  // the user now owns the expanded state, so currentState() stops defaulting grouped rows to
+  // the `true` expand-all literal and honors $data.expandedDefault from here on.
+  expandedTouched = true
+  $data.expandedDefault = next   // fresh value only (never in-place)
+  $model.expanded = next          // two-way emit if bound (no-op-diff if not)
+  // Event stem is `expand-change`, NOT `expanded-change`: the model:true `expanded`
+  // prop auto-generates an `onExpandedChange` callback on the React/Solid flat Props
+  // interface, and an `expanded-change` event would camelCase to the SAME identifier
+  // → duplicate-identifier TS2300 (the model-prop==emit-name collision class). Every
+  // sibling slice avoids this by stemming the event off a DISTINCT name (sorting→
+  // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
+  $emit('expand-change', next)
+  programmatic--
+}
+
+// ── grouping slice: STATIC-KEY fresh-array echo-guarded write funnel (phase 50 reqs 4-7) ──
+// table-core hands an Updater<GroupingState> = value | (old)=>new; onGroupingChange applies it
+// against the CURRENT grouping, then this funnel writes a FRESH ordered array to the
+// uncontrolled default + the two-way model + fires `group-change` REGARDLESS of binding. One
+// emit per change (the shared `programmatic` guard dedups the React multi-render re-entry, D-07).
+// STATIC key ($data.groupingDefault / $model.grouping). Event stem is `group-change`, NOT
+// `grouping-change`: the model:true `grouping` prop auto-generates an `onGroupingChange` callback
+// on the React/Solid flat Props interface, and a `grouping-change` event would camelCase to the
+// SAME identifier → duplicate-identifier TS2300 (the model-prop==emit-name collision class 50-02
+// hit with expanded/expanded-change → expand-change). Every sibling slice stems off a DISTINCT
+// name (sorting→sort-change, rowSelection→selection-change); grouping→group-change follows suit.
+const writeGrouping = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.groupingDefault = next   // fresh ordered array only (never in-place push)
+  $model.grouping = next          // two-way emit if bound (no-op-diff if not)
+  $emit('group-change', next)
+  programmatic--
+}
+
+// ── globalFilter slice: STATIC-KEY fresh-value echo-guarded write funnel (A4) ──────
+// A fresh string (primitive) to the uncontrolled default + the two-way model + fires
+// `filter-change` REGARDLESS of binding.
+const writeGlobalFilter = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.globalFilterDefault = next
+  $model.globalFilter = next
+  $emit('filter-change', { globalFilter: next })
+  programmatic--
+}
+
+// ── columnFilters slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ─────
+// table-core hands ColumnFiltersState = [{ id, value }]; write a FRESH array (never
+// in-place push) + fire `filter-change`. globalFilter + columnFilters both surface
+// through `filter-change` (per the plan: filter-change fires regardless of binding).
+const writeColumnFilters = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnFiltersDefault = next
+  $model.columnFilters = next
+  $emit('filter-change', { columnFilters: next })
+  programmatic--
+}
+
+// ── pagination slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ───────
+// table-core hands { pageIndex, pageSize }; write a FRESH object + fire `page-change`.
+const writePagination = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.paginationDefault = next
+  $model.pagination = next
+  $emit('page-change', next)
+  programmatic--
+}
+
+// ── rowSelection slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+// table-core hands RowSelectionState = { [rowId]: true }; write a FRESH object (never
+// in-place key-set) + fire `selection-change` REGARDLESS of binding.
+const writeRowSelection = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.rowSelectionDefault = next
+  $model.rowSelection = next
+  $emit('selection-change', next)
+  programmatic--
+}
+
+// ── columnVisibility slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──
+// table-core hands VisibilityState = { [colId]: boolean }; write a FRESH object (never
+// in-place key-set) + fire `visibility-change` REGARDLESS of binding.
+const writeColumnVisibility = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnVisibilityDefault = next
+  $model.columnVisibility = next
+  $emit('visibility-change', next)
+  programmatic--
+}
+
+// ── columnSizing slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ──────
+// table-core hands ColumnSizingState = { [colId]: number }; the pointer-drag resize
+// handle funnels a FRESH sizing object + fires `resize-change` REGARDLESS of binding.
+const writeColumnSizing = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnSizingDefault = next
+  $model.columnSizing = next
+  $emit('resize-change', next)
+  programmatic--
+}
+
+// ── columnOrder slice: STATIC-KEY fresh-array echo-guarded write funnel (A4) ────────
+// table-core hands ColumnOrderState = string[]; write a FRESH order array (never an
+// in-place splice) + fire `reorder-change` REGARDLESS of binding.
+const writeColumnOrder = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnOrderDefault = next
+  $model.columnOrder = next
+  $emit('reorder-change', next)
+  programmatic--
+}
+
+// ── columnPinning slice: STATIC-KEY fresh-object echo-guarded write funnel (A4) ─────
+// table-core hands ColumnPinningState = { left: string[], right: string[] }; write a
+// FRESH object (never in-place push into left/right) + fire `pin-change` REGARDLESS of
+// binding.
+const writeColumnPinning = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.columnPinningDefault = next
+  $model.columnPinning = next
+  $emit('pin-change', next)
+  programmatic--
+}
+
+// ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
+// A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
+// a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
+// model so editing works controlled OR uncontrolled. CRITICAL: writeData does NOT emit —
+// unlike the 9 state slices (each has one change event fired inside its funnel), the
+// `data` slice's commit event (`cell-edit-commit`) carries a PER-CELL payload and fires
+// from the SINGLE commitEdit call site so the count stays exactly one per commit (React
+// multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
+// re-feed watch never re-enters mid-write.
+const writeData = (next) => {
+  if (programmatic) return
+  programmatic++
+  $data.dataDefault = next   // fresh array only (never in-place)
+  $model.data = next          // two-way emit if bound (no-op-diff if not)
+  programmatic--
+}
+
+// Read the live columnFilters value for a given column id (string-safe; drives the
+// per-column filter input's bound value). Reads currentState() (NOT a $data re-read
+// of a just-written key → React stale-read safe).
+const columnFilterValue = (colId) => {
+  const cf = currentState().columnFilters || []
+  for (const f of cf) if (f && f.id === colId) return f.value != null ? f.value : ''
+  return ''
+}
+
+// Apply a per-column filter value: build a FRESH ColumnFiltersState array (drop the
+// column's prior entry, append the new one unless empty) and funnel it. Never mutate
+// the existing array in place (silent on React/Solid/Angular/Lit).
+const setColumnFilter = (colId, value) => {
+  const prev = currentState().columnFilters || []
+  const next = []
+  for (const f of prev) if (f && f.id !== colId) next.push(f)
+  if (value != null && value !== '') next.push({ id: colId, value })
+  writeColumnFilters(next)
+}
+
+export { writeSorting, applyUpdater, writeExpanded, writeGrouping, writeGlobalFilter, writeColumnFilters, writePagination, writeRowSelection, writeColumnVisibility, writeColumnSizing, writeColumnOrder, writeColumnPinning, writeData, columnFilterValue, setColumnFilter }
