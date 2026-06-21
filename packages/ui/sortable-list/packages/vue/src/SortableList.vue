@@ -3,7 +3,7 @@
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
   <div :class="['rozie-sortable-list', props.listClass]" ref="listElRef" part="list">
     <slot name="header"></slot>
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', props.itemClass, { 'rozie-sortable-item-lifted': liftedIndex === index }]" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
+    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }]" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>
     <slot name="footer"></slot>
@@ -17,8 +17,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ itemKey?: string | ((...args: any[]) => any) | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean; listClass?: string | any[] | Record<string, any>; itemClass?: string | any[] | Record<string, any> }>(),
-  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '' }
+  defineProps<{ itemKey?: string | ((...args: any[]) => any) | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean; listClass?: string | any[] | Record<string, any>; itemClass?: string | any[] | Record<string, any> | ((...args: any[]) => any) | null; itemStyle?: string | Record<string, any> | ((...args: any[]) => any) | null }>(),
+  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }
 );
 
 const items = defineModel<any[]>('items', { default: () => [] });
@@ -95,6 +95,25 @@ const keyFor = (item: any, index: any) => {
   // (d) primitive item: fall back to index. NOTE: duplicate primitives are
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
+};
+
+// Resolve itemClass for a row: a static value (string | array | object) OR a
+// per-row (item, index) => class function. The result is fed into the :class
+// array and normalized by each target's class path (rozieClass / clsx / native).
+// Resolve itemClass for a row: a static value (string | array | object) OR a
+// per-row (item, index) => class function. The result is fed into the :class
+// array and normalized by each target's class path (rozieClass / clsx / native).
+const itemClassFor = (item: any, index: any) => typeof props.itemClass === 'function' ? props.itemClass(item, index) : props.itemClass;
+
+// Resolve itemStyle for a row: a static value (string | object) OR a per-row
+// (item, index) => style function. Returns string | object | null; the dynamic
+// :style binding normalizes it per target. null / empty → attribute dropped.
+// Resolve itemStyle for a row: a static value (string | object) OR a per-row
+// (item, index) => style function. Returns string | object | null; the dynamic
+// :style binding normalizes it per target. null / empty → attribute dropped.
+const itemStyleFor = (item: any, index: any) => {
+  const s = typeof props.itemStyle === 'function' ? props.itemStyle(item, index) : props.itemStyle;
+  return s == null || s === '' ? null : s;
 };
 
 // Read the display label for an item — used by the aria-live announcer.

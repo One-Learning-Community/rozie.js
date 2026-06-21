@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
@@ -53,7 +53,8 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @property({ type: Number, reflect: true }) swapThreshold: number = 1;
   @property({ type: Boolean, reflect: true }) cloneable: boolean = false;
   @property({ type: String }) listClass: string | any[] | any = '';
-  @property({ type: String }) itemClass: string | any[] | any = '';
+  @property({ type: String }) itemClass: string | any[] | any | (((...args: unknown[]) => unknown) | null) = '';
+  @property({ type: String }) itemStyle: string | any | (((...args: unknown[]) => unknown) | null) = null;
   private _liftedIndex = signal(null);
   private _ariaLiveText = signal('');
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
@@ -240,7 +241,7 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClass, { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" key=${rozieAttr(this.keyFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" key=${rozieAttr(this.keyFor(item, index))} style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>
@@ -277,6 +278,13 @@ private __rozieFirstUpdateDone = false;
   // (d) primitive item: fall back to index. NOTE: duplicate primitives are
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
+};
+
+  itemClassFor = (item: any, index: any) => typeof this.itemClass === 'function' ? this.itemClass(item, index) : this.itemClass;
+
+  itemStyleFor = (item: any, index: any) => {
+  const s = typeof this.itemStyle === 'function' ? this.itemStyle(item, index) : this.itemStyle;
+  return s == null || s === '' ? null : s;
 };
 
   getLabel = (idx: any) => {
@@ -376,7 +384,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass']);
+    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass', 'item-style', 'itemstyle']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

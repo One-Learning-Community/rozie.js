@@ -44,7 +44,7 @@ function __rozieAttr(v: unknown): string | null {
       <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list">
         <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="['rozie-sortable-item', itemClass(), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div [class]="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
@@ -102,7 +102,8 @@ export class SortableList {
   swapThreshold = input<number>(1);
   cloneable = input<boolean>(false);
   listClass = input<string | any[] | Record<string, any>>('');
-  itemClass = input<string | any[] | Record<string, any>>('');
+  itemClass = input<string | any[] | Record<string, any> | ((...args: unknown[]) => unknown)>('');
+  itemStyle = input<(string | Record<string, any> | ((...args: unknown[]) => unknown)) | null>(null);
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
@@ -230,6 +231,12 @@ export class SortableList {
     // (d) primitive item: fall back to index. NOTE: duplicate primitives are
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
+  };
+  itemClassFor = (item: any, index: any) => typeof this.itemClass() === 'function' ? this.itemClass()(item, index) : this.itemClass();
+  itemStyleFor = (item: any, index: any) => {
+    const __itemStyle = this.itemStyle();
+    const s = typeof __itemStyle === 'function' ? __itemStyle(item, index) : __itemStyle;
+    return s == null || s === '' ? null : s;
   };
   getLabel = (idx: any) => {
     const __labelFor = this.labelFor();

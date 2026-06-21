@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners, rozieAttr, rozieClass } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieClass, rozieStyle } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
@@ -22,7 +22,8 @@ interface Props {
   swapThreshold?: number;
   cloneable?: boolean;
   listClass?: string | any[] | any;
-  itemClass?: string | any[] | any;
+  itemClass?: string | any[] | any | ((...args: any[]) => any);
+  itemStyle?: (string | any | ((...args: any[]) => any)) | null;
   header?: Snippet;
   children?: Snippet<[{ item: any; index: any }]>;
   footer?: Snippet;
@@ -56,6 +57,7 @@ let {
   cloneable = false,
   listClass = '',
   itemClass = '',
+  itemStyle = null,
   header: __headerProp,
   children: __childrenProp,
   footer: __footerProp,
@@ -130,6 +132,25 @@ const keyFor = (item: any, index: any) => {
   // (d) primitive item: fall back to index. NOTE: duplicate primitives are
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
+};
+
+// Resolve itemClass for a row: a static value (string | array | object) OR a
+// per-row (item, index) => class function. The result is fed into the :class
+// array and normalized by each target's class path (rozieClass / clsx / native).
+// Resolve itemClass for a row: a static value (string | array | object) OR a
+// per-row (item, index) => class function. The result is fed into the :class
+// array and normalized by each target's class path (rozieClass / clsx / native).
+const itemClassFor = (item: any, index: any) => typeof itemClass === 'function' ? itemClass(item, index) : itemClass;
+
+// Resolve itemStyle for a row: a static value (string | object) OR a per-row
+// (item, index) => style function. Returns string | object | null; the dynamic
+// :style binding normalizes it per target. null / empty → attribute dropped.
+// Resolve itemStyle for a row: a static value (string | object) OR a per-row
+// (item, index) => style function. Returns string | object | null; the dynamic
+// :style binding normalizes it per target. null / empty → attribute dropped.
+const itemStyleFor = (item: any, index: any) => {
+  const s = typeof itemStyle === 'function' ? itemStyle(item, index) : itemStyle;
+  return s == null || s === '' ? null : s;
 };
 
 // Read the display label for an item — used by the aria-live announcer.
@@ -342,7 +363,7 @@ let __rozieWatchInitial_7 = true;
 $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClass, { 'rozie-sortable-item-lifted': liftedIndex === index }])} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
 
 <style>
 :global {

@@ -85,7 +85,8 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
 | `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
-| `itemClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
+| `itemClass` | `String \| Array \| Object \| Function` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, an object (Vue-style class binding), or a `(item, index) => class` function for per-row classes, normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
+| `itemStyle` | `String \| Object \| Function` | `null` | yes | Per-row inline style on the item wrapper. Accepts a CSS string, a flat style object (`Record<string, string \| number>`), or a `(item, index) => string \| object` function. Lands on the `.rozie-sortable-item` wrapper — the direct child of the list container — so it can drive CSS-grid placement (`grid-column` / `align-self`) when `listClass` sets `display: grid`. Normalized per target (React/Solid `parseInlineStyle`, Lit/Svelte `rozieStyle`, Vue/Angular native); `null` / empty drops the attribute. |
 
 ### Emits
 
@@ -162,6 +163,19 @@ Each rendered row carries `data-id="<key>"`, derived from [`itemKey`](#api) (fal
 :::
 
 ## Recipes
+
+### Stable keys and the WeakMap default
+
+`itemKey` controls the per-row key the framework reconciler tracks each item by across a reorder. It resolves in four tiers, top-down:
+
+1. **Function** — `:itemKey="(item, index) => item.id"`. Use it for a computed/derived key, or to disambiguate reorderable **duplicate primitives** (`['a', 'a', 'b']`) where a value-based key would collide.
+2. **Property name** — `itemKey="id"` reads `item.id`. The common case for object lists with a natural id.
+3. **WeakMap synthetic id (the default for objects)** — with no `itemKey`, each object item is assigned a stable synthetic key the first time it's seen, held in an internal `WeakMap` keyed by **object identity**. The same object keeps the same key across reorders.
+4. **Index (fallback for primitives)** — primitive items with no `itemKey` fall back to their position.
+
+**Why the WeakMap default matters.** Before it, id-less object items were keyed by index. On a reorder the item *contents* move between positions but the index keys stay put, so the framework reconciles "row 0's data changed from A to B" instead of "A moved to row 1." Any per-row local state seeded at mount — an expanded/open flag, an uncontrolled input, a focus marker — then stays bound to the **position**, not the item, and visibly jumps to the wrong row after a drag. Keying by object identity keeps that mount-seeded state with its item.
+
+You only need to set `itemKey` explicitly for object lists with a natural id (marginally cheaper than the WeakMap, and required for [`toArray()` / `sort()`](#imperative-handle) to report meaningful keys rather than `"[object Object]"`) or for reorderable duplicate primitives.
 
 ### Drag handle
 
@@ -317,6 +331,50 @@ This is a **construction-time-only** knob (SortableJS reads it once at `new Sort
 ### Animation tuning
 
 `animation` (ms) and `easing` (CSS easing string) are runtime-updatable. Pair with an `<input type="range">` for a live tuner; the canonical example is [`SortableListShowcaseDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListShowcaseDemo.rozie), which exposes every prop in a control panel.
+
+### List and item class hooks
+
+`listClass` merges extra classes onto the SortableJS container; `itemClass` merges them onto every row. They're the styling hook for bridging a CSS framework (`.list-group` / `.list-group-item`) or a flex/grid parent onto the component's own DOM without forking the wrapper. Both accept any shape a Vue class binding does — a **string**, a **`string[]`**, or a **`Record<string, boolean>`** object — normalized identically across all six targets:
+
+```rozie
+<SortableList
+  r-model:items="$data.items"
+  listClass="list-group"
+  :itemClass="['list-group-item', { compact: $data.dense }]"
+>
+  <template #default="{ item }">{{ item.label }}</template>
+</SortableList>
+```
+
+A static `itemClass` / `itemStyle` is applied to every row uniformly, so its object form keys off component-level state (like `$data.dense` above), not per-item fields. For **per-row** class or style that depends on the item, pass a **function** — see below.
+
+### Per-row class and style (function form)
+
+`itemClass` and `itemStyle` each also accept an `(item, index) => …` function, evaluated per row at render time and applied to that row's `.rozie-sortable-item` wrapper:
+
+- **`itemClass`** → returns a class value (string, array, or object) for the row.
+- **`itemStyle`** → returns a CSS string or a flat style object (`Record<string, string | number>`) for the row.
+
+```rozie
+<SortableList
+  r-model:items="$data.cells"
+  listClass="grid-zone"
+  :itemClass="(item) => ({ active: item.active, bordered: item.bordered })"
+  :itemStyle="(item) => ({ gridColumn: `span ${item.span}`, alignSelf: item.align })"
+>
+  <template #default="{ item }">{{ item.label }}</template>
+</SortableList>
+
+<style>
+.grid-zone { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+</style>
+```
+
+**Why this lands on the wrapper matters for CSS grid.** `itemStyle` is applied to `.rozie-sortable-item` — the *direct child* of the list container. CSS-grid placement (`grid-column`, `grid-row`, `align-self`) only applies to a direct grid child, so styling inner slot content does nothing; putting it on the wrapper is the only way to make each row a correctly-spanning grid cell.
+
+Because evaluation happens during render, changing reactive state the function reads (a selection flag, a span value) re-applies the result on the next render — no manual refresh. A function returning `null`, an empty string, or an empty object adds no `class` / `style` artifact.
+
+Each target normalizes the returned shape natively — React/Solid via `parseInlineStyle`, Lit/Svelte via `rozieStyle`, Vue/Angular via their built-in `:style` handling — so a returned **object** renders real CSS on every target (not `[object Object]`).
 
 ## Remount on construction-time-only changes
 

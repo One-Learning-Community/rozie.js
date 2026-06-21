@@ -22,7 +22,8 @@ export interface SortableListProps {
   swapThreshold?: number;
   cloneable?: boolean;
   listClass?: string | unknown[] | Record<string, unknown>;
-  itemClass?: string | unknown[] | Record<string, unknown>;
+  itemClass?: string | unknown[] | Record<string, unknown> | ((...args: unknown[]) => unknown);
+  itemStyle?: (string | Record<string, unknown> | ((...args: unknown[]) => unknown)) | null;
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;

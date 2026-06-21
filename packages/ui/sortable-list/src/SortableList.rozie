@@ -68,8 +68,18 @@
   // normalizer shipped in 260620-kby); bound DIRECTLY as an array/object
   // :class so the base rozie-sortable-list / rozie-sortable-item classes are
   // preserved and the default '' adds no stray/trailing class on any target.
+  // itemClass ALSO accepts a (item, index) => class function for per-row classes.
   listClass:      { type: [String, Array, Object], default: '' },
-  itemClass:      { type: [String, Array, Object], default: '' },
+  itemClass:      { type: [String, Array, Object, Function], default: '' },
+  // Per-row inline style applied to the .rozie-sortable-item wrapper. Accepts a
+  // string, a flat style object (Record<string, string | number>), or a
+  // (item, index) => string | object function for per-row styling. Bound as a
+  // dynamic :style, so each target normalizes it (React/Solid parseInlineStyle,
+  // Lit/Svelte rozieStyle [260620-rta], Vue/Angular native). Because it lands on
+  // the wrapper — the direct child of the list container — it can drive CSS-grid
+  // placement (grid-column / grid-row / align-self) when the consumer sets
+  // display:grid via listClass. null / empty → no style attribute on any target.
+  itemStyle:      { type: [String, Object, Function], default: null },
 }
 </props>
 
@@ -124,6 +134,20 @@ const keyFor = (item, index) => {
   // (d) primitive item: fall back to index. NOTE: duplicate primitives are
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index
+}
+
+// Resolve itemClass for a row: a static value (string | array | object) OR a
+// per-row (item, index) => class function. The result is fed into the :class
+// array and normalized by each target's class path (rozieClass / clsx / native).
+const itemClassFor = (item, index) =>
+  typeof $props.itemClass === 'function' ? $props.itemClass(item, index) : $props.itemClass
+
+// Resolve itemStyle for a row: a static value (string | object) OR a per-row
+// (item, index) => style function. Returns string | object | null; the dynamic
+// :style binding normalizes it per target. null / empty → attribute dropped.
+const itemStyleFor = (item, index) => {
+  const s = typeof $props.itemStyle === 'function' ? $props.itemStyle(item, index) : $props.itemStyle
+  return s == null || s === '' ? null : s
 }
 
 // Read the display label for an item — used by the aria-live announcer.
@@ -300,7 +324,8 @@ $expose({ getInstance, toArray, sort, option })
     <div
       r-for="item, index in $props.items"
       :key="keyFor(item, index)"
-      :class="['rozie-sortable-item', $props.itemClass, { 'rozie-sortable-item-lifted': $data.liftedIndex === index }]"
+      :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': $data.liftedIndex === index }]"
+      :style="itemStyleFor(item, index)"
       :data-id="keyFor(item, index)"
       role="listitem"
       tabindex="0"

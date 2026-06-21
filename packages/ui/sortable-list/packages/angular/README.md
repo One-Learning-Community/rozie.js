@@ -92,7 +92,8 @@ The accessor contract: only real user interaction dirties the control — progra
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
-| `itemClass` | `String \| Array \| Object` | `""` |  |  |
+| `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
 

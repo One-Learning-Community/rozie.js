@@ -50,7 +50,8 @@ export function Demo() {
 | `swapThreshold` | `Number` | `1` |  |  |
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
-| `itemClass` | `String \| Array \| Object` | `""` |  |  |
+| `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
 
