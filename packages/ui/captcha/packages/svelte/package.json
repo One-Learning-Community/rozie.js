@@ -35,9 +35,18 @@
       "types": "./dist/Captcha.svelte.d.ts",
       "default": "./dist/Captcha.svelte"
     },
+    "./RecaptchaV3": {
+      "svelte": "./dist/RecaptchaV3.svelte",
+      "types": "./dist/RecaptchaV3.svelte.d.ts",
+      "default": "./dist/RecaptchaV3.svelte"
+    },
     "./source": {
       "svelte": "./src/Captcha.svelte",
       "default": "./src/Captcha.svelte"
+    },
+    "./source/RecaptchaV3": {
+      "svelte": "./src/RecaptchaV3.svelte",
+      "default": "./src/RecaptchaV3.svelte"
     }
   },
   "files": [

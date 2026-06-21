@@ -170,6 +170,132 @@ el.addEventListener('verify', (e) => console.log('verified', e.detail.token));`,
   },
 };
 
+// RecaptchaV3 per-framework usage snippets. v3 is imperative-first: there is no
+// widget — call `execute(action?)` (resolves a `Promise<token>`) right before you
+// submit, attach the token to the request, verify the score server-side. The
+// component is the NAMED export `RecaptchaV3`; `token` is two-way; `@verify` fires
+// `{ token, action }`. These are extra module constants consumed only inside
+// renderReadme — they are NOT folded into the exported `USAGE` (which stays
+// Captcha-shaped for the gen-usage-pages.mjs contract).
+export const RECAPTCHA_V3_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: `import { useRef } from 'react';
+import { RecaptchaV3, type RecaptchaV3Handle } from '@rozie-ui/captcha-react';
+
+export function SignupForm() {
+  const captcha = useRef<RecaptchaV3Handle>(null);
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = await captcha.current?.execute('signup'); // fresh token for THIS action
+    await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+  };
+  return (
+    <form onSubmit={onSubmit}>
+      {/* … fields … */}
+      <RecaptchaV3 ref={captcha} sitekey="your-site-key" action="signup" />
+      <button type="submit">Sign up</button>
+    </form>
+  );
+}`,
+  },
+  vue: {
+    lang: 'vue',
+    code: `<script setup lang="ts">
+import { ref } from 'vue';
+import { RecaptchaV3 } from '@rozie-ui/captcha-vue';
+
+const captcha = ref();
+const submit = async () => {
+  const token = await captcha.value.execute('signup'); // fresh token for THIS action
+  await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+};
+</script>
+
+<template>
+  <form @submit.prevent="submit">
+    <!-- … fields … -->
+    <RecaptchaV3 ref="captcha" sitekey="your-site-key" action="signup" />
+    <button type="submit">Sign up</button>
+  </form>
+</template>`,
+  },
+  svelte: {
+    lang: 'svelte',
+    code: `<script lang="ts">
+  import { RecaptchaV3 } from '@rozie-ui/captcha-svelte';
+  let captcha;
+  const submit = async () => {
+    const token = await captcha.execute('signup'); // fresh token for THIS action
+    await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+  };
+</script>
+
+<form on:submit|preventDefault={submit}>
+  <!-- … fields … -->
+  <RecaptchaV3 bind:this={captcha} sitekey="your-site-key" action="signup" />
+  <button type="submit">Sign up</button>
+</form>`,
+  },
+  angular: {
+    lang: 'ts',
+    code: `import { Component, viewChild } from '@angular/core';
+import { RecaptchaV3 } from '@rozie-ui/captcha-angular';
+
+@Component({
+  selector: 'app-signup',
+  standalone: true,
+  imports: [RecaptchaV3],
+  template: \`
+    <form (submit)="submit($event)">
+      <!-- … fields … -->
+      <RecaptchaV3 sitekey="your-site-key" action="signup" />
+      <button type="submit">Sign up</button>
+    </form>
+  \`,
+})
+export class SignupComponent {
+  captcha = viewChild(RecaptchaV3);
+  async submit(e: Event) {
+    e.preventDefault();
+    const token = await this.captcha()!.execute('signup'); // fresh token for THIS action
+    await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+}`,
+  },
+  solid: {
+    lang: 'tsx',
+    code: `import { RecaptchaV3, type RecaptchaV3Handle } from '@rozie-ui/captcha-solid';
+
+export function SignupForm() {
+  let captcha: RecaptchaV3Handle | undefined;
+  const submit = async (e: Event) => {
+    e.preventDefault();
+    const token = await captcha?.execute('signup'); // fresh token for THIS action
+    await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+  };
+  return (
+    <form onSubmit={submit}>
+      {/* … fields … */}
+      <RecaptchaV3 ref={(h) => (captcha = h)} sitekey="your-site-key" action="signup" />
+      <button type="submit">Sign up</button>
+    </form>
+  );
+}`,
+  },
+  lit: {
+    lang: 'ts',
+    code: `import { RecaptchaV3 } from '@rozie-ui/captcha-lit';
+
+// <rozie-recaptcha-v3> is a custom element; the element IS the handle.
+const captcha = document.querySelector('rozie-recaptcha-v3') as RecaptchaV3;
+async function submit() {
+  const token = await captcha.execute('signup'); // fresh token for THIS action
+  await fetch('/signup', { method: 'POST', body: JSON.stringify({ token }) });
+}`,
+  },
+};
+
 const ANGULAR_FORMS_USAGE = {
   lang: 'ts',
   code: [
@@ -250,13 +376,98 @@ export const HANDLE_USAGE = {
   },
 };
 
-export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
-  const usage = USAGE[target];
-  if (!usage) throw new Error('renderReadme: no usage snippet for target "' + target + '"');
+// RecaptchaV3 "how to grab the imperative handle + call execute()" per framework.
+// Extra module constants consumed only inside renderReadme; NOT exported into the
+// gen-usage-pages USAGE/HANDLE_USAGE contract (that stays Captcha-shaped).
+export const RECAPTCHA_V3_HANDLE_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: [
+      "import { useRef } from 'react';",
+      "import { RecaptchaV3, type RecaptchaV3Handle } from '" + SCOPE + '/' + SLUG + "-react';",
+      '',
+      'const handle = useRef<RecaptchaV3Handle>(null);',
+      '// <RecaptchaV3 ref={handle} sitekey="your-site-key" action="submit" />',
+      '// const token = await handle.current?.execute();          // uses the action prop',
+      "// const token = await handle.current?.execute('login');   // override for this call",
+    ].join('\n'),
+  },
+  vue: {
+    lang: 'vue',
+    code: [
+      '<script setup>',
+      "import { ref } from 'vue';",
+      'const handle = ref();',
+      "// const token = await handle.value.execute('submit');",
+      '</script>',
+      '',
+      '<template>',
+      '  <RecaptchaV3 ref="handle" sitekey="your-site-key" />',
+      '</template>',
+    ].join('\n'),
+  },
+  svelte: {
+    lang: 'svelte',
+    code: [
+      '<script>',
+      '  let handle;',
+      "  // const token = await handle.execute('submit');",
+      '</script>',
+      '',
+      '<RecaptchaV3 bind:this={handle} sitekey="your-site-key" />',
+    ].join('\n'),
+  },
+  angular: {
+    lang: 'ts',
+    code: [
+      '@Component({ /* ... */ })',
+      'export class DemoComponent {',
+      '  handle = viewChild(RecaptchaV3);',
+      "  // const token = await this.handle()!.execute('submit');",
+      '}',
+    ].join('\n'),
+  },
+  solid: {
+    lang: 'tsx',
+    code: [
+      "import { RecaptchaV3, type RecaptchaV3Handle } from '" + SCOPE + '/' + SLUG + "-solid';",
+      '',
+      'let handle: RecaptchaV3Handle | undefined;',
+      '// <RecaptchaV3 ref={(h) => (handle = h)} sitekey="your-site-key" />',
+      "// const token = await handle?.execute('submit');",
+    ].join('\n'),
+  },
+  lit: {
+    lang: 'ts',
+    code: [
+      '// The custom element IS the handle — execute() is a public element method.',
+      "const el = document.querySelector('rozie-recaptcha-v3');",
+      "// const token = await el.execute('submit');",
+    ].join('\n'),
+  },
+};
+
+// Per-component usage/handle-usage lookup (selected by component name inside
+// renderReadme). Captcha keeps its exported USAGE/HANDLE_USAGE; RecaptchaV3 rides
+// its own (un-exported) maps.
+const USAGE_BY_COMPONENT = { Captcha: USAGE, RecaptchaV3: RECAPTCHA_V3_USAGE };
+const HANDLE_USAGE_BY_COMPONENT = { Captcha: HANDLE_USAGE, RecaptchaV3: RECAPTCHA_V3_HANDLE_USAGE };
+
+/**
+ * Render one leaf README documenting EVERY component in `components`
+ * (`[{ name, ir }, ...]`, primary first). Intro + Install are rendered once; then
+ * one `## <Name>` section per component (Usage / Angular-forms / Props / Events /
+ * Imperative handle / Slots). `eventManifest` / `handleManifest` are the
+ * per-component-KEYED maps ({ Captcha:{...}, RecaptchaV3:{...} }), indexed here by
+ * component name. Called ONCE PER TARGET.
+ */
+export function renderReadme(target, components, eventManifest, pkgName, handleManifest = {}) {
   const c = (s) => BT + s + BT;
   const fence = (lang) => BT + BT + BT + lang;
   const close = BT + BT + BT;
   const lines = [];
+
+  const primary = components[0];
 
   lines.push('# ' + pkgName);
   lines.push('');
@@ -272,6 +483,19 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       c('src/') +
       ' by hand.',
   );
+  if (components.length > 1) {
+    const others = components.slice(1).map((co) => c(co.name)).join(', ');
+    lines.push('');
+    lines.push(
+      'This package ships ' +
+        c(primary.name) +
+        ' (the default export) alongside ' +
+        others +
+        ' (named export' +
+        (components.length > 2 ? 's' : '') +
+        ').',
+    );
+  }
   lines.push('');
 
   lines.push('## Install');
@@ -291,99 +515,131 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   );
   lines.push('');
 
-  lines.push('## Usage');
-  lines.push('');
-  lines.push(fence(usage.lang));
-  lines.push(usage.code);
-  lines.push(close);
-  lines.push('');
+  // One section per component (primary first). For a single-component family the
+  // section heading still renders (`## <Name>`) — harmless and self-documenting.
+  for (const comp of components) {
+    const ir = comp.ir;
+    const usage = (USAGE_BY_COMPONENT[comp.name] ?? {})[target];
+    if (!usage) {
+      throw new Error(
+        'renderReadme: no usage snippet for component "' + comp.name + '" target "' + target + '"',
+      );
+    }
+    const evManifest = eventManifest[comp.name];
+    if (!evManifest) {
+      throw new Error('renderReadme: no event-manifest entry for component "' + comp.name + '"');
+    }
+    const hManifest = handleManifest[comp.name] ?? {};
 
-  const modelProps = ir.props.filter((p) => p.isModel);
-  if (target === 'angular' && modelProps.length === 1) {
-    const modelProp = modelProps[0];
-    lines.push('## Angular forms');
+    lines.push('## ' + comp.name);
     lines.push('');
-    lines.push(
-      'The generated class implements ' +
-        c('ControlValueAccessor') +
-        ' — the ' +
-        c(modelProp.name) +
-        ' model prop is the control value — so it binds to template-driven and reactive ' +
-        'forms directives directly:',
-    );
+
+    lines.push('### Usage');
     lines.push('');
-    lines.push(fence(ANGULAR_FORMS_USAGE.lang));
-    lines.push(ANGULAR_FORMS_USAGE.code);
+    lines.push(fence(usage.lang));
+    lines.push(usage.code);
     lines.push(close);
     lines.push('');
-  }
 
-  lines.push('## Props');
-  lines.push('');
-  lines.push('| Name | Type | Default | Two-way (model) | Required |');
-  lines.push('| --- | --- | --- | :---: | :---: |');
-  for (const p of ir.props) {
-    const type = renderPropType(p.typeAnnotation);
-    const def = renderPropDefault(p.defaultValue);
-    lines.push(
-      '| ' +
-        c(p.name) +
-        ' | ' +
-        c(type) +
-        ' | ' +
-        c(def) +
-        ' | ' +
-        (p.isModel ? '✓' : '') +
-        ' | ' +
-        (p.required ? '✓' : '') +
-        ' |',
-    );
-  }
-  lines.push('');
+    const modelProps = ir.props.filter((p) => p.isModel);
+    if (target === 'angular' && modelProps.length === 1) {
+      const modelProp = modelProps[0];
+      lines.push('### Angular forms');
+      lines.push('');
+      lines.push(
+        'The generated class implements ' +
+          c('ControlValueAccessor') +
+          ' — the ' +
+          c(modelProp.name) +
+          ' model prop is the control value — so it binds to template-driven and reactive ' +
+          'forms directives directly:',
+      );
+      lines.push('');
+      lines.push(fence(ANGULAR_FORMS_USAGE.lang));
+      lines.push(ANGULAR_FORMS_USAGE.code);
+      lines.push(close);
+      lines.push('');
+    }
 
-  lines.push('## Events');
-  lines.push('');
-  lines.push('| Event | Description |');
-  lines.push('| --- | --- |');
-  for (const ev of ir.emits) {
-    const desc = eventManifest[ev];
-    if (!desc) throw new Error('renderReadme: event "' + ev + '" missing from event-manifest');
-    lines.push('| ' + c(ev) + ' | ' + desc + ' |');
-  }
-  lines.push('');
-
-  if (ir.expose && ir.expose.length > 0) {
-    const handleUsage = HANDLE_USAGE[target];
-    if (!handleUsage) throw new Error('renderReadme: no handle-usage snippet for target "' + target + '"');
-    lines.push('## Imperative handle');
+    lines.push('### Props');
     lines.push('');
-    lines.push(
-      'The component exposes imperative methods (declared once in the Rozie source via ' +
-        c('$expose') +
-        '). Grab a handle with the native ref mechanism and call them directly:',
-    );
-    lines.push('');
-    lines.push(fence(handleUsage.lang));
-    lines.push(handleUsage.code);
-    lines.push(close);
-    lines.push('');
-    lines.push('| Method | Description |');
-    lines.push('| --- | --- |');
-    for (const m of ir.expose) {
-      const desc = handleManifest[m.name];
-      if (!desc) throw new Error('renderReadme: exposed method "' + m.name + '" missing from handle-manifest');
-      lines.push('| ' + c(m.name) + ' | ' + desc + ' |');
+    lines.push('| Name | Type | Default | Two-way (model) | Required |');
+    lines.push('| --- | --- | --- | :---: | :---: |');
+    for (const p of ir.props) {
+      const type = renderPropType(p.typeAnnotation);
+      const def = renderPropDefault(p.defaultValue);
+      lines.push(
+        '| ' +
+          c(p.name) +
+          ' | ' +
+          c(type) +
+          ' | ' +
+          c(def) +
+          ' | ' +
+          (p.isModel ? '✓' : '') +
+          ' | ' +
+          (p.required ? '✓' : '') +
+          ' |',
+      );
     }
     lines.push('');
-  }
 
-  if (ir.slots && ir.slots.length > 0) {
-    lines.push('## Slots');
+    lines.push('### Events');
     lines.push('');
-    lines.push('| Slot | Params |');
+    lines.push('| Event | Description |');
     lines.push('| --- | --- |');
-    for (const s of ir.slots) lines.push('| ' + renderSlotName(s.name) + ' | ' + slotParams(s) + ' |');
+    for (const ev of ir.emits) {
+      const desc = evManifest[ev];
+      if (!desc) {
+        throw new Error(
+          'renderReadme: event "' + ev + '" of ' + comp.name + ' missing from event-manifest',
+        );
+      }
+      lines.push('| ' + c(ev) + ' | ' + desc + ' |');
+    }
     lines.push('');
+
+    if (ir.expose && ir.expose.length > 0) {
+      const handleUsage = (HANDLE_USAGE_BY_COMPONENT[comp.name] ?? {})[target];
+      if (!handleUsage) {
+        throw new Error(
+          'renderReadme: no handle-usage snippet for component "' + comp.name + '" target "' + target + '"',
+        );
+      }
+      lines.push('### Imperative handle');
+      lines.push('');
+      lines.push(
+        'This component exposes imperative methods (declared once in the Rozie source via ' +
+          c('$expose') +
+          '). Grab a handle with the native ref mechanism and call them directly:',
+      );
+      lines.push('');
+      lines.push(fence(handleUsage.lang));
+      lines.push(handleUsage.code);
+      lines.push(close);
+      lines.push('');
+      lines.push('| Method | Description |');
+      lines.push('| --- | --- |');
+      for (const m of ir.expose) {
+        const desc = hManifest[m.name];
+        if (!desc) {
+          throw new Error(
+            'renderReadme: exposed method "' + m.name + '" of ' + comp.name + ' missing from handle-manifest',
+          );
+        }
+        lines.push('| ' + c(m.name) + ' | ' + desc + ' |');
+      }
+      lines.push('');
+    }
+
+    if (ir.slots && ir.slots.length > 0) {
+      lines.push('### Slots');
+      lines.push('');
+      lines.push('| Slot | Params |');
+      lines.push('| --- | --- |');
+      for (const s of ir.slots) lines.push('| ' + renderSlotName(s.name) + ' | ' + slotParams(s) + ' |');
+      lines.push('');
+    }
   }
 
   return lines.join('\n');

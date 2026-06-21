@@ -37,8 +37,8 @@
       "default": "./dist/fesm2022/rozie-ui-captcha-angular.mjs"
     },
     "./source": {
-      "types": "./src/Captcha.ts",
-      "default": "./src/Captcha.ts"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "files": [
