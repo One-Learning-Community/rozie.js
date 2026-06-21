@@ -32,6 +32,7 @@ interface SortableListProps {
   group?: (string) | null;
   animation?: number;
   disabled?: boolean;
+  disableKeyboard?: boolean;
   options?: Record<string, any>;
   labelFor?: ((...args: unknown[]) => unknown) | null;
   ghostClass?: (string) | null;
@@ -66,8 +67,8 @@ export interface SortableListHandle {
 }
 
 export default function SortableList(_props: SortableListProps): JSX.Element {
-  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'itemStyle', 'children', 'ref']);
+  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'disableKeyboard', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'itemStyle', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
@@ -230,7 +231,19 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
   // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
   // call site — no runtime callable-type coercion needed in user source.
+  // Keyboard reordering is available only when the list is not disabled AND the
+  // `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+  // focusable only when reorderable) and the onRowKeyDown guard below. Reads
+  // straight off $props so the tabindex binding re-evaluates reactively when
+  // `disabled`/`disableKeyboard` toggle at runtime.
+  function keyboardEnabled() {
+    return !local.disabled && !local.disableKeyboard;
+  }
   function onRowKeyDown($event: any, index: any) {
+    // Defense-in-depth: when keyboard reordering is off the rows carry no
+    // tabindex and can't receive focus, but a consumer-focused row (or a
+    // programmatic .focus()) must still no-op here rather than reorder.
+    if (!keyboardEnabled()) return;
     const key = $event.key;
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -322,7 +335,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
       <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), { 'rozie-sortable-item-lifted': liftedIndex() === index() }])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), { 'rozie-sortable-item-lifted': liftedIndex() === index() }])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(keyboardEnabled() ? 0 : null)} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>
         {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}

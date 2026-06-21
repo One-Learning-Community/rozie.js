@@ -40,6 +40,12 @@
   group:          { type: String,   default: null },
   animation:      { type: Number,   default: 150 },
   disabled:       { type: Boolean,  default: false },
+  // Keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) is
+  // on by default. Set `disableKeyboard: true` to remove it entirely — rows lose
+  // their tabindex (so they drop out of the tab order) and onRowKeyDown no-ops.
+  // `disabled` ALSO suppresses keyboard reordering: a disabled list is not
+  // sortable by ANY input, so keyboard access is gated on `!disabled && !disableKeyboard`.
+  disableKeyboard: { type: Boolean, default: false },
   options:        { type: Object,   default: () => ({}) },
   labelFor:       { type: Function, default: null },
   // Runtime-updatable SortableJS pass-through props (forwarded via the
@@ -171,7 +177,18 @@ const getLabel = (idx) => {
 // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
 // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
 // call site — no runtime callable-type coercion needed in user source.
+// Keyboard reordering is available only when the list is not disabled AND the
+// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+// focusable only when reorderable) and the onRowKeyDown guard below. Reads
+// straight off $props so the tabindex binding re-evaluates reactively when
+// `disabled`/`disableKeyboard` toggle at runtime.
+const keyboardEnabled = () => !$props.disabled && !$props.disableKeyboard
+
 const onRowKeyDown = ($event, index) => {
+  // Defense-in-depth: when keyboard reordering is off the rows carry no
+  // tabindex and can't receive focus, but a consumer-focused row (or a
+  // programmatic .focus()) must still no-op here rather than reorder.
+  if (!keyboardEnabled()) return
   const key = $event.key
   // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -328,7 +345,7 @@ $expose({ getInstance, toArray, sort, option })
       :style="itemStyleFor(item, index)"
       :data-id="keyFor(item, index)"
       role="listitem"
-      tabindex="0"
+      :tabindex="keyboardEnabled() ? 0 : null"
       @keydown="onRowKeyDown($event, index)"
     >
       <slot :item="item" :index="index" />

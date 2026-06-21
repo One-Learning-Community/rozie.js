@@ -11,6 +11,7 @@ export interface SortableListProps {
   group?: (string) | null;
   animation?: number;
   disabled?: boolean;
+  disableKeyboard?: boolean;
   options?: Record<string, unknown>;
   labelFor?: ((...args: unknown[]) => unknown) | null;
   ghostClass?: (string) | null;

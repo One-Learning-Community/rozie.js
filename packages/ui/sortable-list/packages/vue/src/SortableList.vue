@@ -3,7 +3,7 @@
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
   <div :class="['rozie-sortable-list', props.listClass]" ref="listElRef" part="list">
     <slot name="header"></slot>
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }]" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
+    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }]" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="keyboardEnabled() ? 0 : undefined" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>
     <slot name="footer"></slot>
@@ -17,8 +17,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ itemKey?: string | ((...args: any[]) => any) | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean; listClass?: string | any[] | Record<string, any>; itemClass?: string | any[] | Record<string, any> | ((...args: any[]) => any) | null; itemStyle?: string | Record<string, any> | ((...args: any[]) => any) | null }>(),
-  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }
+  defineProps<{ itemKey?: string | ((...args: any[]) => any) | null; handle?: string | null; group?: string | null; animation?: number; disabled?: boolean; disableKeyboard?: boolean; options?: Record<string, any>; labelFor?: ((...args: any[]) => any) | null; ghostClass?: string | null; chosenClass?: string | null; dragClass?: string | null; filter?: string | null; easing?: string | null; forceFallback?: boolean; swapThreshold?: number; cloneable?: boolean; listClass?: string | any[] | Record<string, any>; itemClass?: string | any[] | Record<string, any> | ((...args: any[]) => any) | null; itemStyle?: string | Record<string, any> | ((...args: any[]) => any) | null }>(),
+  { itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }
 );
 
 const items = defineModel<any[]>('items', { default: () => [] });
@@ -141,6 +141,11 @@ const getLabel = (idx: any) => {
 // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
 // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
 // call site — no runtime callable-type coercion needed in user source.
+// Keyboard reordering is available only when the list is not disabled AND the
+// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+// focusable only when reorderable) and the onRowKeyDown guard below. Reads
+// straight off $props so the tabindex binding re-evaluates reactively when
+// `disabled`/`disableKeyboard` toggle at runtime.
 // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
 // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
 // any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
@@ -151,7 +156,17 @@ const getLabel = (idx: any) => {
 // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
 // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
 // call site — no runtime callable-type coercion needed in user source.
+// Keyboard reordering is available only when the list is not disabled AND the
+// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+// focusable only when reorderable) and the onRowKeyDown guard below. Reads
+// straight off $props so the tabindex binding re-evaluates reactively when
+// `disabled`/`disableKeyboard` toggle at runtime.
+const keyboardEnabled = () => !props.disabled && !props.disableKeyboard;
 const onRowKeyDown = ($event: any, index: any) => {
+  // Defense-in-depth: when keyboard reordering is off the rows carry no
+  // tabindex and can't receive focus, but a consumer-focused row (or a
+  // programmatic .focus()) must still no-op here rather than reorder.
+  if (!keyboardEnabled()) return;
   const key = $event.key;
   // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {

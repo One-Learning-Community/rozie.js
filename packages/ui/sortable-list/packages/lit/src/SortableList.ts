@@ -42,6 +42,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) group: string = null;
   @property({ type: Number, reflect: true }) animation: number = 150;
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  @property({ type: Boolean, reflect: true }) disableKeyboard: boolean = false;
   @property({ type: Object }) options: any = {};
   @property({ type: Function }) labelFor: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: String, reflect: true }) ghostClass: string = null;
@@ -241,7 +242,7 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" key=${rozieAttr(this.keyFor(item, index))} style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" key=${rozieAttr(this.keyFor(item, index))} style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.keyboardEnabled() ? 0 : null)} @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>
@@ -294,7 +295,13 @@ private __rozieFirstUpdateDone = false;
   return String(item);
 };
 
+  keyboardEnabled = () => !this.disabled && !this.disableKeyboard;
+
   onRowKeyDown = ($event: any, index: any) => {
+  // Defense-in-depth: when keyboard reordering is off the rows carry no
+  // tabindex and can't receive focus, but a consumer-focused row (or a
+  // programmatic .focus()) must still no-op here rather than reorder.
+  if (!this.keyboardEnabled()) return;
   const key = $event.key;
   // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -384,7 +391,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass', 'item-style', 'itemstyle']);
+    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'disable-keyboard', 'disablekeyboard', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass', 'item-style', 'itemstyle']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

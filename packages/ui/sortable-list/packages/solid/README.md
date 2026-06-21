@@ -39,6 +39,7 @@ export function Demo() {
 | `group` | `String` | `null` |  |  |
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
+| `disableKeyboard` | `Boolean` | `false` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |

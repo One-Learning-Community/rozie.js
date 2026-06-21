@@ -15,6 +15,7 @@ interface SortableListProps {
   group?: (string) | null;
   animation?: number;
   disabled?: boolean;
+  disableKeyboard?: boolean;
   options?: Record<string, any>;
   labelFor?: ((...args: any[]) => any) | null;
   ghostClass?: (string) | null;
@@ -48,13 +49,14 @@ export interface SortableListHandle {
 
 const SortableList = forwardRef<SortableListHandle, SortableListProps>(function SortableList(_props: SortableListProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
+  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; disableKeyboard: boolean; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
     ..._props,
     itemKey: _props.itemKey ?? null,
     handle: _props.handle ?? null,
     group: _props.group ?? null,
     animation: _props.animation ?? 150,
     disabled: _props.disabled ?? false,
+    disableKeyboard: _props.disableKeyboard ?? false,
     options: _props.options ?? __defaultOptions,
     labelFor: _props.labelFor ?? null,
     ghostClass: _props.ghostClass ?? null,
@@ -70,8 +72,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     itemStyle: _props.itemStyle ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, itemKey, handle, group, animation, disabled, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, itemStyle, defaultValue, onItemsChange, defaultItems, ...rest } = _props as SortableListProps & Record<string, unknown>;
-    void items; void itemKey; void handle; void group; void animation; void disabled; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void itemStyle; void defaultValue; void onItemsChange; void defaultItems;
+    const { items, itemKey, handle, group, animation, disabled, disableKeyboard, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, itemStyle, defaultValue, onItemsChange, defaultItems, ...rest } = _props as SortableListProps & Record<string, unknown>;
+    void items; void itemKey; void handle; void group; void animation; void disabled; void disableKeyboard; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void itemStyle; void defaultValue; void onItemsChange; void defaultItems;
     return rest;
   })();
   const instance = useRef<any>(null);
@@ -149,8 +151,15 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
     return String(item);
   }
+  function keyboardEnabled() {
+    return !props.disabled && !props.disableKeyboard;
+  }
   const { onChange: _rozieProp_onChange } = props;
     const onRowKeyDown = useCallback(($event: any, index: any) => {
+    // Defense-in-depth: when keyboard reordering is off the rows carry no
+    // tabindex and can't receive focus, but a consumer-focused row (or a
+    // programmatic .focus()) must still no-op here rather than reorder.
+    if (!keyboardEnabled()) return;
     const key = $event.key;
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -199,7 +208,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         item: moved
       });
     }
-  }, [_rozieProp_onChange, getLabel, items, liftedIndex, setItems]);
+  }, [_rozieProp_onChange, getLabel, items, keyboardEnabled, liftedIndex, setItems]);
   // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets.
   // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
@@ -346,7 +355,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
       <div className={clsx(['rozie-sortable-list', props.listClass])} ref={listEl} part="list" data-rozie-s-0af24eae="">
         {(props.renderHeader ?? props.slots?.['header'])?.()}
-        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={parseInlineStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
+        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={parseInlineStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={(keyboardEnabled() ? 0 : undefined) ?? undefined} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}
         {(props.renderFooter ?? props.slots?.['footer'])?.()}

@@ -11,6 +11,7 @@ interface Props {
   group?: (string) | null;
   animation?: number;
   disabled?: boolean;
+  disableKeyboard?: boolean;
   options?: any;
   labelFor?: ((...args: any[]) => any) | null;
   ghostClass?: (string) | null;
@@ -45,6 +46,7 @@ let {
   group = null,
   animation = 150,
   disabled = false,
+  disableKeyboard = false,
   options = __defaultOptions,
   labelFor = null,
   ghostClass = null,
@@ -178,6 +180,11 @@ const getLabel = (idx: any) => {
 // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
 // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
 // call site — no runtime callable-type coercion needed in user source.
+// Keyboard reordering is available only when the list is not disabled AND the
+// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+// focusable only when reorderable) and the onRowKeyDown guard below. Reads
+// straight off $props so the tabindex binding re-evaluates reactively when
+// `disabled`/`disableKeyboard` toggle at runtime.
 // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
 // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
 // any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
@@ -188,7 +195,17 @@ const getLabel = (idx: any) => {
 // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
 // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
 // call site — no runtime callable-type coercion needed in user source.
+// Keyboard reordering is available only when the list is not disabled AND the
+// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
+// focusable only when reorderable) and the onRowKeyDown guard below. Reads
+// straight off $props so the tabindex binding re-evaluates reactively when
+// `disabled`/`disableKeyboard` toggle at runtime.
+const keyboardEnabled = () => !disabled && !disableKeyboard;
 const onRowKeyDown = ($event: any, index: any) => {
+  // Defense-in-depth: when keyboard reordering is off the rows carry no
+  // tabindex and can't receive focus, but a consumer-focused row (or a
+  // programmatic .focus()) must still no-op here rather than reorder.
+  if (!keyboardEnabled()) return;
   const key = $event.key;
   // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -363,7 +380,7 @@ let __rozieWatchInitial_7 = true;
 $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex={rozieAttr(keyboardEnabled() ? 0 : null)} onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
 
 <style>
 :global {

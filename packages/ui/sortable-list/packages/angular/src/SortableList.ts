@@ -44,7 +44,7 @@ function __rozieAttr(v: unknown): string | null {
       <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list">
         <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div [class]="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(keyboardEnabled() ? 0 : null)" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
@@ -91,6 +91,7 @@ export class SortableList {
   group = input<(string) | null>(null);
   animation = input<number>(150);
   disabled = input<boolean>(false);
+  disableKeyboard = input<boolean>(false);
   options = input<Record<string, any>>((() => ({}))());
   labelFor = input<((...args: unknown[]) => unknown) | null>(null);
   ghostClass = input<(string) | null>(null);
@@ -245,7 +246,12 @@ export class SortableList {
     if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
     return String(item);
   };
+  keyboardEnabled = () => !(this.disabled() || this.__rozieCvaDisabled()) && !this.disableKeyboard();
   onRowKeyDown = ($event: any, index: any) => {
+    // Defense-in-depth: when keyboard reordering is off the rows carry no
+    // tabindex and can't receive focus, but a consumer-focused row (or a
+    // programmatic .focus()) must still no-op here rather than reorder.
+    if (!this.keyboardEnabled()) return;
     const key = $event.key;
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {

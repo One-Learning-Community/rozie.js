@@ -81,6 +81,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `group` | `String` | `null` |  |  |
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
+| `disableKeyboard` | `Boolean` | `false` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |
