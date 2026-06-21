@@ -137,22 +137,32 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
   for (let i = 1; i < stmts.length; i++) {
     const cur = stmts[i]!;
     const prev = stmts[i - 1]!;
-    const lead = cur.leadingComments;
-    if (!lead || lead.length === 0) continue;
     const curExtra = cur.extra as Record<string, unknown> | undefined;
     const prevExtra = prev.extra as Record<string, unknown> | undefined;
     const curSpliced = curExtra?.__roziePartialOrigin !== undefined;
     const prevSpliced = prevExtra?.__roziePartialOrigin !== undefined;
-    // Fire at a genuine splice boundary, in EITHER direction:
-    //   • CUR is the spliced node (Phase 55 within-partial / leading seam — the
-    //     spliced decl carries the leading comment); or
-    //   • PREV is the spliced node and CUR is an inline host successor carrying the
-    //     leading comment (Phase 56 R1 TRAILING seam — the mirror-image case).
-    // Both restore the per-statement doubling the inline oracle produces by copying
-    // CUR's leading comments onto PREV's trailing comments. Host-only pairs (neither
-    // node spliced) are left exactly as authored.
+    // Fire ONLY at a genuine splice boundary, in EITHER direction. Host-only pairs
+    // (neither node spliced) are left exactly as authored.
     if (!curSpliced && !prevSpliced) continue;
+    const lead = cur.leadingComments;
     const prevTrail = prev.trailingComments;
+    // AFTER-side seam (Phase 56 shape-5): CUR is the spliced node with NO leading
+    // comment of its own, but PREV (a HOST node) carries a trailing boundary comment.
+    // Inline, that comment is ONE @babel object shared as prev.trailing + cur.leading,
+    // so per-statement generation prints it TWICE; the splice severed the shared
+    // object, leaving it only on prev.trailing → ONE copy. Mirror prev.trailing onto
+    // CUR's (empty) leadingComments to restore the inline doubling. Gated to
+    // prev-NOT-spliced so the mirrored comment is a HOST-authored boundary comment
+    // (within-partial pairs already share their objects and are handled below). A
+    // LEADING CommentLine renders own-line with no same-line collision (unlike the
+    // TRAILING-seam clone below), so the shared comment objects can be reused as-is.
+    if (curSpliced && !prevSpliced && (!lead || lead.length === 0) && prevTrail && prevTrail.length > 0) {
+      cur.leadingComments = [...prevTrail];
+      continue;
+    }
+    // The remaining (LEADING / TRAILING) seams require CUR to carry the boundary
+    // comment; with none there is nothing further to mirror.
+    if (!lead || lead.length === 0) continue;
     const lastLead = lead[lead.length - 1];
     // Identity guard (Pitfall 2 / A4): a node can be simultaneously the spliced
     // successor of one seam and the spliced predecessor of the next. If the comment
