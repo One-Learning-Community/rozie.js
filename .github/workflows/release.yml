@@ -7,11 +7,17 @@ name: Release (early subset)
 #     fullcalendar / pdf / captcha (the `-vue` packages). captcha-vue was added
 #     to dogfood it; like the others it is self-contained (zero @rozie/* deps,
 #     dist externalizes only vue), so it publishes standalone.
+#   - 5 non-vue @rozie-ui captcha leaves: captcha-{react,solid,lit,svelte,angular}.
+#     These are now IN scope: they depend on @rozie/runtime-* (react/solid/lit/svelte),
+#     and that prerequisite is satisfied — @rozie/runtime-* is live on npm at 0.1.1,
+#     which pnpm rewrites the leaves' `workspace:` deps to at publish. angular carries
+#     no @rozie dep (tslib only). This is the FIRST all-targets captcha release line
+#     (all 6 leaves aligned at 0.1.3).
 #
-# Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit
-# leaves depend on @rozie/runtime-* (only installable once the toolchain is on
-# npm), and data-table is not release-verified. Do NOT widen the --filter lists
-# below without updating the release runbook.
+# Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit/angular
+# leaves of OTHER families (flatpickr, sortable-list, cropper, fullcalendar, pdf) are
+# not release-verified, and data-table is not release-verified. Do NOT widen the
+# --filter lists below to other families without updating the release runbook.
 #
 # Prerequisites:
 #   - Repo is PUBLIC (npm provenance requires a public source repo) — verified.
@@ -132,6 +138,21 @@ jobs:
           --filter=@rozie-ui/captcha-vue
           build
 
+      # Build the 5 non-vue captcha leaves into their compiled dist/ drop-in. Each
+      # leaf's `build` script encodes its per-target idiom (tsdown for
+      # react/solid/lit, svelte-package for svelte, ng-packagr for angular). This
+      # step sits AFTER the toolchain build so the local @rozie/runtime-* dist exists
+      # for type resolution during the leaf builds.
+      - name: Build non-vue captcha leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/captcha-react
+          --filter=@rozie-ui/captcha-solid
+          --filter=@rozie-ui/captcha-lit
+          --filter=@rozie-ui/captcha-svelte
+          --filter=@rozie-ui/captcha-angular
+          build
+
       # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
       - name: Publish Vue leaves (@rozie-ui/*-vue)
@@ -143,6 +164,24 @@ jobs:
           --filter=@rozie-ui/fullcalendar-vue
           --filter=@rozie-ui/pdf-vue
           --filter=@rozie-ui/captcha-vue
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The 5 non-vue captcha leaves. pnpm rewrites their `workspace:` deps to the
+      # concrete @rozie/runtime-* versions (live on npm at 0.1.1) in the tarball;
+      # angular carries no @rozie dep. Inherits dry_run (default TRUE) via
+      # steps.flags.outputs.extra and the skip-if-already-published behavior (no
+      # --force).
+      - name: Publish non-vue captcha leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/captcha-react
+          --filter=@rozie-ui/captcha-solid
+          --filter=@rozie-ui/captcha-lit
+          --filter=@rozie-ui/captcha-svelte
+          --filter=@rozie-ui/captcha-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
