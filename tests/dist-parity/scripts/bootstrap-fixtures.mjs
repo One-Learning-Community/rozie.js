@@ -478,6 +478,15 @@ const EXAMPLES = [
   // inline — not an EXAMPLES entry.
   'PartialInlineHostM',
   'InlineEquivHostM',
+  // Phase 57 — param-vs-bare-ref collision guard. A closure param shadowing a
+  // Vue same-named generated bare ref (a `model:true` prop, a `$data` key, or a
+  // `$computed` name) is renamed `<name>$local` by the Vue deconflict pass so the
+  // generated ref is written via the renamed param (`token.value = token$local`,
+  // `status.value = status$local`), not the param. The other five targets carry
+  // NO `$local` rename (no same-named ref to shadow — byte-identity guarded by
+  // Plan 57-02). Single-file; no sibling .rozie producers — stays OUT of
+  // RESOLVER_ROOT (and NOT in FIXTURE_ANGULAR_CVA_OFF).
+  'ModelParamShadow',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

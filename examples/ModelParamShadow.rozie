@@ -1,0 +1,72 @@
+<!--
+  ModelParamShadow.rozie
+
+  PERMANENT param-vs-bare-ref collision guard (Phase 57).
+
+  A closure/callback param that shares the name of a Vue same-named GENERATED
+  bare ref — a `model: true` prop (`defineModel('token')` → `const token = ...`),
+  a `$data` key (`$data.status` → `const status = ref(...)`), or a `$computed`
+  name (`const label = computed(...)`) — silently SHADOWS the generated ref. Pre-
+  fix Vue lowering emits `token.value = token` / `status.value = status` (writes
+  the PARAM, not the ref → `v-model:token` never updates, the `$data` binding
+  never refreshes). The Phase-57 Vue deconflict pass renames each shadowing param
+  to `<name>$local`, so the post-fix Vue output writes each generated ref via the
+  renamed param: `token.value = token$local`, `status.value = status$local`, and
+  the bare `label` read in `logLabel` targets the param (`label$local`), not the
+  computed ref.
+
+  The OTHER five targets lower `$model`/`$data`/`$computed` to a `setX(...)` call
+  / signal / bare write with NO same-named ref, so a `<name>` param cannot shadow
+  anything — their emit carries NO `$local` rename (byte-identity guarded by Plan
+  57-02).
+-->
+
+<rozie name="ModelParamShadow">
+
+<props>
+{
+  token: { type: String, default: '', model: true },
+}
+</props>
+
+<data>
+{
+  status: '',
+}
+</data>
+
+<script>
+// label: a $computed whose name a closure param (logLabel) shadows — exercises
+// the additive `bare-read` deconflict trigger (computeds read as bare idents).
+const label = $computed(() => $data.status + '!')
+
+// solve(token): param == the model prop name. `$model.token = token` lowers on
+// Vue to `token.value = token` (param shadows the defineModel ref) pre-fix.
+const solve = (token) => {
+  $model.token = token
+  $emit('verify', { token })
+}
+
+// setStatus(status): param == the $data key. `$data.status = status` lowers on
+// Vue to `status.value = status` (param shadows the state ref) pre-fix.
+const setStatus = (status) => {
+  $data.status = status
+}
+
+// logLabel(label): param == the $computed name. The bare `label` read lowers on
+// Vue to `label.value` (reads the computed ref, not the param) pre-fix.
+const logLabel = (label) => {
+  $emit('verify', { token: label })
+}
+</script>
+
+<template>
+<div class="model-param-shadow">
+  <button @click="solve('demo-token')">solve</button>
+  <button @click="setStatus('ready')">status</button>
+  <button @click="logLabel('hi')">label</button>
+  <span class="status">{{ $data.status }}</span>
+</div>
+</template>
+
+</rozie>

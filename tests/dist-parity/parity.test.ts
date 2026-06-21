@@ -197,6 +197,14 @@ const EXAMPLES = [
   // a LEAF single-rozie producer.
   'BareAttrChild',
   'BareAttrComponent',
+  // Phase 57 — param-vs-bare-ref collision guard. A closure param shadowing a Vue
+  // same-named generated bare ref (a `model:true` prop, a `$data` key, or a
+  // `$computed` name) is renamed `<name>$local` so the Vue output writes the
+  // generated ref via the renamed param (`token.value = token$local`,
+  // `status.value = status$local`). The committed bytes pin that the Vue leg
+  // carries the renamed-param writes AND the other five targets carry NO `$local`
+  // rename, across all four entrypoints. Single-file — stays OUT of RESOLVER_ROOT.
+  'ModelParamShadow',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
