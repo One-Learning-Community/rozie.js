@@ -438,3 +438,40 @@ describe('Phase 56-R8 — gap-1 trailing-seam literal byte-identity (after-side 
     });
   });
 });
+
+/**
+ * Phase 56-R9 — GAP-0 LEADING-seam literal byte-identity (before-side host gap).
+ *
+ * The LEADING sibling of the R8 gap-1 trailing seam, surfaced by the 56-07 DataTable
+ * Wave-2 `columnChrome` extraction: when a spliced (extracted) partial run sits DIRECTLY
+ * below a host arrow-const (`const tick = () => rowModelVer`) with ZERO blank lines and
+ * the run's FIRST emitted token is a pure run-LEADING comment, a spurious BLANK line is
+ * INJECTED between the host decl and the comment on vue/svelte/solid (react/angular/lit
+ * byte-identical — they reconstruct/strip the comment so the blank is invisible).
+ *
+ *   • examples/PartialInlineHostK.rozie — a host arrow-const `const tickK`, then DIRECTLY
+ *     BELOW it (zero blanks) imports `{ ariaSortK, sortIndicatorK }` from the sibling
+ *     ./partialLogicK.rzts (BARE const-arrow decls + terminal `export { … }`, the real
+ *     columnChrome shape; the first surviving decl carries a pure run-leading comment and
+ *     the partial hoists NO import — the arrow bodies close over the host `tickK`).
+ *   • examples/InlineEquivHostK.rozie — the SAME logic + comment written inline (oracle).
+ *
+ * Because the partial has NO same-file predecessor, core's measureOriginalGap falls back
+ * to 2, anchoring the spliced run's leading comment ONE line too low → the injected blank.
+ * The fix uses the HOST-side beforeGap (gap-0 → 1) when a spliced block immediately follows
+ * a host statement and the partial-local fallback overestimated, anchoring the run
+ * host-contiguous. RED on vue/svelte/solid before the fix; GREEN ×6 after. Reuses
+ * `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_K = 'PartialInlineHostK';
+const INLINE_HOST_K = 'InlineEquivHostK';
+
+describe('Phase 56-R9 — gap-0 leading-seam literal byte-identity (before-side host gap)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('gap-0 leading-seam partial-inlined host === inline-equivalent host (literal, no injected blank)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_K, target), PARTIAL_HOST_K);
+      const inline = normalizeName(loadFixture(INLINE_HOST_K, target), INLINE_HOST_K);
+      expect(partial).toBe(inline);
+    });
+  });
+});

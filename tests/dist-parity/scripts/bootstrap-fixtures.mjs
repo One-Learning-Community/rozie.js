@@ -419,6 +419,25 @@ const EXAMPLES = [
   // inline — not an EXAMPLES entry.
   'PartialInlineHostJ',
   'InlineEquivHostJ',
+  // Phase 56-R9 (script-partial-cross-target-comment-placement-parity) — the GAP-0
+  // LEADING-SEAM red→green guard surfaced by the 56-07 DataTable Wave-2 columnChrome
+  // extraction. partialLogicK.rzts uses the REAL columnChrome shape: BARE const-arrow
+  // decls + a terminal `export { … }`, whose FIRST surviving decl carries a pure
+  // run-LEADING comment and hoists NO import (the arrow bodies close over the host
+  // `tickK`). The host import sits ZERO blanks below the host arrow-const `const tickK`
+  // (the `const tick = () => rowModelVer` shape). Because the partial has NO same-file
+  // predecessor, core's measureOriginalGap falls back to 2, so the spliced run's leading
+  // comment is anchored ONE line too low → a spurious blank is INJECTED between `const
+  // tickK` and the comment on vue/svelte/solid (the comment is preserved + the blank
+  // shows); react/angular/lit reconstruct/strip the comment so the blank is invisible →
+  // byte-identical. This is the LEADING sibling of the R8 gap-1 TRAILING seam. The core
+  // fix uses the HOST-side beforeGap (gap-0 → 1) when a spliced block immediately follows
+  // a host statement and the partial-local fallback overestimated. PartialInlineHostK
+  // references a sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below;
+  // InlineEquivHostK is single-file and stays OUT. The .rzts partial is a LEAF source
+  // consumed only via inline — not an EXAMPLES entry.
+  'PartialInlineHostK',
+  'InlineEquivHostK',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -513,6 +532,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostJ oracle also stays OUT.
   'PartialInlineHostJ',
+  // Phase 56-R9 — references ./partialLogicK.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling gap-0 leading-seam partial at compile/inline
+  // time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF source
+  // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostK oracle also stays OUT.
+  'PartialInlineHostK',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

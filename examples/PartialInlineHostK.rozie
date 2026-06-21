@@ -1,0 +1,50 @@
+<!--
+  PartialInlineHostK.rozie — Phase 56-R9 GAP-0 LEADING-seam red→green guard host.
+
+  The <script lang="ts"> declares a host arrow-const `const tickK = () => $props.base
+  * 2` (mirroring DataTable's `const tick = () => rowModelVer`), then DIRECTLY BELOW it
+  (ZERO blank lines) imports `{ ariaSortK, sortIndicatorK }` from ./partialLogicK.rzts.
+  The compiler inlines those exported arrow consts into THIS component's script BELOW
+  `tickK`, before lowering; the unused `neverUsedK` export is tree-shaken.
+
+  This is the GAP-0 LEADING seam: the spliced run's FIRST emitted token is a pure
+  run-LEADING comment (`// the live sort direction …`) and the run flows ZERO blanks
+  below the host `const tickK` arrow const. The inline oracle (InlineEquivHostK.rozie)
+  places that comment own-line directly below `tickK` with NO blank between them.
+
+  Before the R9 fix, the vue/svelte/solid inliner mirrors INJECT a spurious blank line
+  between the host `tickK` and the spliced run's leading comment (the core
+  `originalGap=0` suppression landed only in the CORE inliner, so react/angular/lit are
+  byte-identical, but the vue/svelte/solid emitScript mirror paths do NOT honor the
+  gap-0 leading seam and still inject the blank) → byte diff (RED on exactly
+  vue/svelte/solid). This is the LEADING sibling of the R8 gap-1 TRAILING-seam fix.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute the
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostK. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicK.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostK">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const tickK = () => $props.base * 2;
+import { ariaSortK, sortIndicatorK } from './partialLogicK.rzts';
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ ariaSortK(1) }}</span>
+  <span class="echo">{{ sortIndicatorK(1) }}</span>
+</div>
+</template>
+
+</rozie>
