@@ -595,9 +595,15 @@ describe('rewriteRozieIdentifiers — bare computed-name parent-position skip la
     expect(rewrite('function total() {}', ir).code).toContain('function total()');
   });
 
-  it('computed name in a function-parameter position is NOT rewritten', () => {
+  it('computed name in a function-parameter position is param-renamed by the deconflict pass, never `.value`-wrapped', () => {
     const ir = buildIR({ computed: [mkComputed('total')] });
-    expect(rewrite('const f = (total) => total;', ir).code).toContain('total =>');
+    // Phase 57: a param named after a `$computed` whose body reads it bare
+    // (`(total) => total`) IS a genuine bare-ref shadow — the deconflict pass
+    // renames the PARAM to `total$local`. The skip ladder's invariant is
+    // preserved: the param identifier is NEVER `.value`-wrapped.
+    const { code } = rewrite('const f = (total) => total;', ir);
+    expect(code).toContain('total$local =>');
+    expect(code).not.toContain('total.value');
   });
 
   it('computed name in an import specifier is NOT rewritten', () => {
