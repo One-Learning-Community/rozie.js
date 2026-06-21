@@ -679,6 +679,8 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
   let prevBlockAnchorLine = 0;
   let hostRunOffset = 0;
   let seamAfterGap: number | undefined;
+  let prevWasHostStmt = false;
+  let prevHostOrigEnd = 0;
   for (const stmt of body) {
     const block = nodeToBlock.get(stmt);
     if (block) {
@@ -695,7 +697,37 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       // preceding emitted statement instead of a hardcoded one-blank `+2`, so a
       // zero-blank source adjacency stays zero-blank (gap 1) and an intentional
       // 2+-blank gap is reproduced faithfully (no clamp).
-      const gap = isImportBlock && prevWasImport ? 1 : block.originalGap;
+      let gap = isImportBlock && prevWasImport ? 1 : block.originalGap;
+      // Phase 56-R9 (gap-0 LEADING seam) — the BEFORE-side sibling of the R8 gap-1
+      // trailing seam. `measureOriginalGap` measures the run's gap PARTIAL-LOCALLY (from
+      // its first emit token to its nearest same-file predecessor). When the run's first
+      // decl has NO same-file predecessor (a partial that hoists NO import, e.g. the real
+      // DataTable `columnChrome` whose arrow bodies close over host scope), that measure
+      // FALLS BACK to the legacy `2` — injecting one spurious blank. But when this block
+      // immediately FOLLOWS a HOST statement, the AUTHORITATIVE gap is the HOST-side
+      // `beforeGap` (the original source distance from the replaced import — `block.anchorLine`
+      // — down from the preceding host statement's end), exactly as the extraction rule
+      // promises (the host import sits at the run's first source line). Use it when it is
+      // SMALLER than the partial-local fallback AND the run's first emit token is a LEADING
+      // COMMENT (`blockFirstEmitLine < firstNode.loc.start.line`). The leading-comment gate
+      // is what makes this SURGICAL: it matches ONLY the gap-0 leading-comment seam (the
+      // spliced run's banner injected one line too low → a spurious blank on vue/svelte/solid;
+      // react/angular/lit reconstruct/strip the comment so the blank is invisible). It
+      // EXCLUDES every existing fixture and the live data-table baseline: HostE/HostG's
+      // spliced runs carry NO leading comment (their authored oracles bake in the blank),
+      // and data-table's host-following commented runs (groupingActiveDefault / focusCell /
+      // onSortingChangeCb) all have `beforeGap === originalGap === 2` (a genuine intended
+      // blank). Correcting the loc here fixes ALL THREE comment-preserving targets uniformly
+      // (svelte/vue read the shifted loc via the mirror; solid via whole-program generation)
+      // with NO per-target mirror change.
+      if (!isImportBlock && prevWasHostStmt) {
+        const beforeGap = block.anchorLine - prevHostOrigEnd;
+        const firstTokenIsLeadingComment =
+          blockFirstEmitLine(firstNode) < firstNode.loc.start.line;
+        if (firstTokenIsLeadingComment && beforeGap >= 1 && beforeGap < gap) {
+          gap = beforeGap;
+        }
+      }
       const anchorLine = prevEnd > 0 ? prevEnd + gap : block.anchorLine;
       const offset = anchorLine - blockFirstEmitLine(firstNode);
       let maxEnd = 0;
@@ -703,6 +735,7 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       prevEnd = maxEnd + offset;
       prevWasImport = isImportBlock;
       prevWasBlock = true;
+      prevWasHostStmt = false;
       prevBlockAnchorLine = block.anchorLine;
       plan.push({ block, offset });
       continue;
@@ -745,6 +778,8 @@ function normalizeSplicedEmitLines(body: Statement[], blocks: SplicedEmitBlock[]
       seamAfterGap = undefined;
       prevWasImport = t.isImportDeclaration(stmt);
       prevWasBlock = false;
+      prevWasHostStmt = true;
+      prevHostOrigEnd = stmt.loc.end.line;
     }
   }
 
