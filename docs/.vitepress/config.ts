@@ -191,6 +191,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/captcha',
+          collapsed: true,
+          items: [
+            { text: 'Captcha — showcase & API', link: '/components/captcha' },
+            { text: 'Usage examples', link: '/components/captcha-usage' },
+            { text: 'Captcha libraries comparison', link: '/components/captcha-comparison' },
+            { text: 'Captcha — live demo', link: '/components/captcha-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/pdf',
           collapsed: true,
           items: [

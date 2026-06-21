@@ -1,0 +1,83 @@
+{
+  "name": "@rozie-ui/captcha-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular Captcha — one Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "captcha",
+    "recaptcha",
+    "hcaptcha",
+    "turnstile",
+    "bot-protection",
+    "verification",
+    "spam",
+    "headless",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/captcha/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "module": "./dist/fesm2022/rozie-ui-captcha-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-captcha-angular.mjs"
+    },
+    "./source": {
+      "types": "./src/Captcha.ts",
+      "default": "./src/Captcha.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "tslib": "^2"
+  },
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@angular/forms": "^19"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/forms": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

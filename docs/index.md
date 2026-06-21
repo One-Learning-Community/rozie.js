@@ -51,4 +51,8 @@ The clearest proof that one source can ship six idiomatic targets is a shelf of 
 
 [Listbox & Combobox](/components/listbox) · [Slider & Range](/components/slider)
 
+**Hosted widgets** — a third-party SaaS widget loaded at runtime (no npm engine), unified across providers *and* frameworks:
+
+[Captcha](/components/captcha)
+
 Every family ships six packages, a showcase-and-API page, a libraries-comparison page, and a live demo. **[Browse all components →](/components/)**

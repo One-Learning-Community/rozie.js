@@ -1,0 +1,47 @@
+# Captcha libraries comparison
+
+How `@rozie-ui/captcha` compares to the existing CAPTCHA wrappers. Every provider — Google reCAPTCHA, hCaptcha, Cloudflare Turnstile — ships a framework-agnostic vanilla-JS widget; each wrapper exists only to inject the provider script, render the widget into an element, surface its config as props, and forward the `verify`/`expire`/`error` callbacks. Because that glue is rewritten **per provider × per framework**, the ecosystem is a sprawl of small, independently-versioned packages — and crucially, **almost none is multi-provider**: switching from reCAPTCHA to Turnstile means swapping libraries, not flipping a prop.
+
+> Research snapshot: 2026-06. Versions and the wrapper landscape move; treat them as of that date.
+
+## The wrappers at a glance
+
+| Framework | reCAPTCHA | hCaptcha | Turnstile | Multi-provider? |
+| --- | --- | --- | --- | :---: |
+| **React** | `react-google-recaptcha` | `@hcaptcha/react-hcaptcha` | `react-turnstile` / `@marsidev/react-turnstile` | ❌ separate libs |
+| **Vue** | `vue-recaptcha` / `vue3-recaptcha2` | `@hcaptcha/vue3-hcaptcha` | `vue-turnstile` | ❌ separate libs |
+| **Svelte** | `svelte-recaptcha-v2` | *(thin / community)* | `svelte-turnstile` | ❌ separate libs |
+| **Angular** | `ngx-captcha` / `ng-recaptcha` | *(community)* | `ngx-turnstile` | ⚠️ partial (`ngx-captcha`) |
+| **Solid** | *(community / hand-roll)* | *(none)* | `solid-turnstile` | ❌ mostly absent |
+| **Lit** | *(none)* | *(none)* | *(none)* | ❌ nothing |
+| **Rozie** | ✅ | ✅ | ✅ | ✅ **one `provider` prop** |
+
+The pattern: React, Vue, Svelte, and Angular each have *reasonable* single-provider wrappers, but a developer who wants to **let their app switch providers** — or who simply wants the *same* component API regardless of provider — has to maintain three different dependencies with three different prop shapes and event names. **Solid is sparsely served and Lit has nothing.** Rozie ships one source to all six frameworks, with a single API across all three providers.
+
+## Feature matrix
+
+Cell legend: **✅** = documented out-of-the-box · **❌** = not supported · **⚠️** = partial / consumer-glue-required.
+
+| Capability | Per-framework reCAPTCHA wrappers | Per-framework hCaptcha/Turnstile wrappers | **`@rozie-ui/captcha`** |
+| --- | :---: | :---: | :---: |
+| Inject provider script (singleton) | ✅ | ✅ | ✅ shared `globalThis` loader |
+| Render widget into element | ✅ | ✅ | ✅ |
+| **Provider-switchable (one component)** | ❌ | ❌ | ✅ `provider` prop |
+| Two-way token binding | ⚠️ via `onChange` | ⚠️ via callback | ✅ `token` model |
+| `verify` / `expire` / `error` events | ✅ | ✅ | ✅ unified `{ token, provider }` |
+| Imperative `reset` / `execute` / `getResponse` | ⚠️ via ref, names vary | ⚠️ via ref, names vary | ✅ uniform handle, all 6 targets |
+| Invisible / programmatic challenge | ⚠️ provider-specific | ⚠️ provider-specific | ✅ `size="invisible"` + `execute()` |
+| Angular `ControlValueAccessor` | ⚠️ some | ⚠️ some | ✅ automatic (single model) |
+| Same API across **all 6 frameworks** | ❌ | ❌ | ✅ one `.rozie` source |
+| Same API across **all 3 providers** | ❌ | ❌ | ✅ |
+
+## What Rozie does *not* do
+
+- **It is not a CAPTCHA itself** — it wraps the providers' own widgets, which still do the bot-detection in their iframes. You still need a site key, and you still **verify the token server-side** against the provider's `siteverify` endpoint.
+- **reCAPTCHA v3** (scoreless risk-scoring, no widget) is a different integration shape and is a [tracked follow-on](/components/captcha#why-no-v3), not part of this first cut.
+- **ALTCHA and Friendly Captcha** — the privacy-first, self-hostable alternatives — use a web-component and an npm-SDK shape respectively, and are a planned provider-adapter rather than shipped here yet.
+
+## Cross-references
+
+- [Captcha — showcase & API](/components/captcha) — props, events, the imperative handle, and gotchas.
+- [Features](/guide/features) — the full Rozie author-side API that makes one source compile to six.

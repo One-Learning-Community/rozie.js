@@ -472,6 +472,7 @@
 @rolldown/binding-win32-arm64-msvc
 @rolldown/binding-win32-x64-msvc
 @rolldown/pluginutils
+@rollup/plugin-json
 @rollup/pluginutils
 @rollup/rollup-android-arm-eabi
 @rollup/rollup-android-arm64
@@ -498,6 +499,7 @@
 @rollup/rollup-win32-ia32-msvc
 @rollup/rollup-win32-x64-gnu
 @rollup/rollup-win32-x64-msvc
+@rollup/wasm-node
 @sec-ant/readable-stream
 @shikijs/core
 @shikijs/engine-javascript
@@ -510,6 +512,7 @@
 @sindresorhus/merge-streams
 @standard-schema/spec
 @sveltejs/acorn-typescript
+@sveltejs/package
 @sveltejs/vite-plugin-svelte
 @sveltejs/vite-plugin-svelte-inspector
 @swc/core
@@ -529,6 +532,7 @@
 @swc/helpers
 @swc/types
 @tanstack/table-core
+@tanstack/virtual-core
 @testing-library/dom
 @testing-library/jest-dom
 @testing-library/react
@@ -788,6 +792,7 @@ comma-separated-tokens
 commander
 common-ancestor-path
 common-path-prefix
+commondir
 compressible
 compression
 concat-map
@@ -832,6 +837,7 @@ define-lazy-prop
 defu
 delayed-stream
 depd
+dependency-graph
 dequal
 destr
 destroy
@@ -1006,6 +1012,7 @@ imurmurhash
 indent-string
 inherits
 ini
+injection-js
 inline-style-parser
 ipaddr.js
 iron-webcrypto
@@ -1195,6 +1202,7 @@ negotiator
 neo-async
 neotraverse
 next
+ng-packagr
 nlcst-to-string
 node-addon-api
 node-fetch-native
@@ -1525,6 +1533,7 @@ vfile-location
 vfile-message
 vite
 vite-hot-client
+vite-plugin-css-injected-by-js
 vite-plugin-inspect
 vite-plugin-solid
 vite-plugin-vue-devtools

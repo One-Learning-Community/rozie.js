@@ -47,6 +47,12 @@ Grouped by what they do. Most wrap a vanilla-JS engine; the **headless** group a
 | **PdfViewer** | [pdf.js](https://mozilla.github.io/pdf.js/) PDF rendering | [/components/pdf](/components/pdf) |
 | **Carousel** | [Embla Carousel](https://www.embla-carousel.com) carousel engine | [/components/embla](/components/embla) |
 
+### Security & forms
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
+| **Captcha** | [reCAPTCHA](https://www.google.com/recaptcha/) / [hCaptcha](https://www.hcaptcha.com/) / [Turnstile](https://www.cloudflare.com/products/turnstile/) bot protection | [/components/captcha](/components/captcha) |
+
 ### Headless primitives (no engine)
 
 Authored from scratch in a single `.rozie` file — no third-party engine, fully accessible.

@@ -3,8 +3,10 @@ name: Release (early subset)
 # Manual, provenance-backed npm publish for the FIRST release wave ONLY:
 #   - 9 @rozie/* toolchain packages (core, cli, unplugin, babel-plugin,
 #     runtime-{react,vue,svelte,solid,lit})
-#   - 5 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
-#     fullcalendar / pdf (the `-vue` packages)
+#   - 6 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
+#     fullcalendar / pdf / captcha (the `-vue` packages). captcha-vue was added
+#     to dogfood it; like the others it is self-contained (zero @rozie/* deps,
+#     dist externalizes only vue), so it publishes standalone.
 #
 # Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit
 # leaves depend on @rozie/runtime-* (only installable once the toolchain is on
@@ -113,11 +115,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # Build the 5 Vue leaves into their compiled dist/ drop-in (Vite lib mode +
+      # Build the 6 Vue leaves into their compiled dist/ drop-in (Vite lib mode +
       # vue-tsc declaration emit). Each leaf's `build` script needs only its own
       # devDeps (already installed by the frozen install above); it does NOT run
       # codegen and does NOT depend on @rozie/core, so running it after the
-      # toolchain build is fine.
+      # toolchain build is fine. (captcha-vue likewise carries zero @rozie/* deps —
+      # its dist bundles the vendored internal/ loader, externalizing only vue.)
       - name: Build Vue leaves
         run: >
           pnpm
@@ -126,9 +129,10 @@ jobs:
           --filter=@rozie-ui/cropper-vue
           --filter=@rozie-ui/fullcalendar-vue
           --filter=@rozie-ui/pdf-vue
+          --filter=@rozie-ui/captcha-vue
           build
 
-      # Then the 5 Vue leaves. They carry zero @rozie/* deps so they don't
+      # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
       - name: Publish Vue leaves (@rozie-ui/*-vue)
         run: >
@@ -138,6 +142,7 @@ jobs:
           --filter=@rozie-ui/cropper-vue
           --filter=@rozie-ui/fullcalendar-vue
           --filter=@rozie-ui/pdf-vue
+          --filter=@rozie-ui/captcha-vue
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

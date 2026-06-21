@@ -1,0 +1,159 @@
+<!--
+  Captcha.rozie — one cross-framework CAPTCHA / bot-protection widget.
+
+  Replaces the per-framework-per-provider wrapper sprawl (react-google-recaptcha,
+  vue-recaptcha, svelte-recaptcha-v2, ngx-captcha, @hcaptcha/react-hcaptcha, the
+  separate Vue/Svelte hCaptcha wrappers, react-turnstile, …) — N providers × M
+  frameworks of independently-maintained glue — with ONE Rozie source.
+
+  PROVIDERS (one `provider` prop). reCAPTCHA v2, hCaptcha, and Cloudflare
+  Turnstile share a near-identical explicit-render API — `api.render(el, cfg)`
+  returning a widget id, `api.reset(id)`, `api.execute(id)`, `api.getResponse(id)`,
+  and the `sitekey` / `theme` / `size` config keys plus `callback` /
+  `expired-callback` / `error-callback`. A `{ src, global }` map per provider is
+  the ONLY divergence, so one component covers all three. ALTCHA (a web component)
+  and Friendly Captcha (an npm SDK) are different integration shapes and are a
+  separate follow-on, not bent into this surface.
+
+  VALUE CONTRACT (mirrors Flatpickr's model-string + rich-event pattern):
+    • `token` is `model: true` — written on success, cleared on expire/reset, so
+      `r-model="token"` reflects the live response token out for form submission.
+    • `@verify` fires `{ token, provider }` on success (the richer event surface);
+      `@expire` and `@error` fire `{ provider }` (+ `error` on a load failure).
+
+  SCRIPT LOADING: the provider api.js is injected ONCE per provider via a real
+  cross-instance singleton on `globalThis` (a per-instance top-level const would
+  not dedupe across multiple <Captcha> on a page). We poll for the global to
+  appear, then `api.render($refs.widgetEl, cfg)` in $onMount.
+
+  IMPERATIVE HANDLE ($expose): { reset, execute, getResponse }.
+    • NO `render` verb — `render()` is a LitElement lifecycle method; exposing it
+      would clobber Lit's renderer (worse than Embla's scrollTo→scrollToIndex
+      inherited-method shadow). Keep render internal.
+    • `execute()` drives invisible / programmatic challenges (size="invisible").
+    • `getResponse()` reads the current token on demand.
+
+  CONSTRUCTION-TIME CONFIG: these widgets cannot live-mutate sitekey/theme/size
+  (there is no `set()` path) — to retune live, re-key the component
+  (`<Captcha :key="…">`), the same documented idiom as Flatpickr's
+  construction-time options. Hence no $watch reconcilers.
+
+  reCAPTCHA v3 (scoreless, no widget, `execute(sitekey, { action })`) is a
+  genuinely different integration and is a documented follow-on; size="invisible"
+  + the execute() handle already cover the invisible/programmatic case here.
+-->
+
+<rozie name="Captcha">
+
+<props>
+{
+  // 'recaptcha' (Google reCAPTCHA v2) | 'hcaptcha' | 'turnstile' (Cloudflare).
+  provider: { type: String, default: 'recaptcha' },
+
+  // The public site key from your provider dashboard. Required.
+  sitekey:  { type: String, required: true },
+
+  // The verified response token. Two-way: written by the widget on success,
+  // cleared on expire/reset. Read it for form submission via r-model="token".
+  token:    { type: String, default: '', model: true },
+
+  // 'light' | 'dark' (all three) | 'auto' (Turnstile only). Construction-time.
+  theme:    { type: String, default: 'light' },
+
+  // reCAPTCHA/hCaptcha: 'normal' | 'compact' | 'invisible'.
+  // Turnstile: 'normal' | 'compact' | 'flexible'. Construction-time.
+  size:     { type: String, default: 'normal' },
+
+  // Optional tabindex forwarded to the widget (omitted when null).
+  tabindex: { type: Number, default: null },
+
+  // Escape hatch — provider-specific render options merged last (e.g. Turnstile
+  // `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`). Lets consumers
+  // reach keys this component does not promote to first-class props.
+  options:  { type: Object, default: () => ({}) },
+}
+</props>
+
+<script>
+// The provider api.js loader (inject-once singleton + poll/timeout/error) lives
+// in a vendored internal module so its branchy logic is unit-tested independent
+// of any framework (see internal/loadCaptchaApi.test.ts). codegen copies
+// src/internal/ into every leaf, so this relative import resolves verbatim ×6.
+import { loadCaptchaApi } from './internal/loadCaptchaApi'
+
+// Live widget handle. Top-level lets → React hoists to useRef (setup-once).
+// `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
+// extracts the teardown into a separate onCleanup() whose scope can't see a
+// mount-body local, so a `let disposed` inside $onMount is out of scope in the
+// teardown (TS2304). Top-level — like api/widgetId — is visible to both.
+let api = null
+let widgetId = null
+let disposed = false
+
+// The render config shared across all three providers. The hyphenated
+// `expired-callback` / `error-callback` keys are the common option names each
+// provider's render() accepts. `tabindex` is omitted unless set; `options`
+// (the escape hatch) is merged last so a consumer can override any key.
+const buildConfig = () => ({
+  sitekey: $props.sitekey,
+  theme: $props.theme,
+  size: $props.size,
+  ...($props.tabindex != null ? { tabindex: $props.tabindex } : {}),
+  callback: (token) => {
+    $model.token = token
+    $emit('verify', { token, provider: $props.provider })
+  },
+  'expired-callback': () => {
+    $model.token = ''
+    $emit('expire', { provider: $props.provider })
+  },
+  'error-callback': () => {
+    $model.token = ''
+    $emit('error', { provider: $props.provider })
+  },
+  ...$props.options,
+})
+
+$onMount(() => {
+  disposed = false
+  loadCaptchaApi($props.provider)
+    .then((a) => {
+      if (disposed) return
+      api = a
+      widgetId = api.render($refs.widgetEl, buildConfig())
+    })
+    .catch((err) => {
+      $emit('error', { provider: $props.provider, error: err })
+    })
+  return () => {
+    disposed = true
+    if (widgetId == null || !api) return
+    // Turnstile fully removes a widget; reCAPTCHA/hCaptcha only reset.
+    if (typeof api.remove === 'function') api.remove(widgetId)
+    else if (typeof api.reset === 'function') api.reset(widgetId)
+  }
+})
+
+// Imperative handle. Each guards on a live widget (null before render / after
+// teardown). reset clears the two-way token to match the cleared widget.
+function reset() {
+  if (widgetId != null && api && typeof api.reset === 'function') api.reset(widgetId)
+  $model.token = ''
+}
+// Invisible / programmatic challenge (size="invisible"). No-op until rendered.
+function execute() {
+  if (widgetId != null && api && typeof api.execute === 'function') api.execute(widgetId)
+}
+// Read the current response token on demand (e.g. just before form submit).
+function getResponse() {
+  return (widgetId != null && api && typeof api.getResponse === 'function') ? api.getResponse(widgetId) : ''
+}
+
+$expose({ reset, execute, getResponse })
+</script>
+
+<template>
+<div ref="widgetEl" class="rozie-captcha"></div>
+</template>
+
+</rozie>

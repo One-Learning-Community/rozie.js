@@ -1,0 +1,34 @@
+// strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the emitted
+// Lit output is bundler-built (tsdown/oxc), not strict-tsc-authored.
+// This gate typechecks GENERATED code, so it opts out of the author-strictness flags
+// the codegen does not satisfy while keeping the rest of strict mode.
+{
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "noImplicitOverride": false,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ]
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
+}
