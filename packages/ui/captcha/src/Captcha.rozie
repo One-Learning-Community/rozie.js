@@ -11,9 +11,13 @@
   returning a widget id, `api.reset(id)`, `api.execute(id)`, `api.getResponse(id)`,
   and the `sitekey` / `theme` / `size` config keys plus `callback` /
   `expired-callback` / `error-callback`. A `{ src, global }` map per provider is
-  the ONLY divergence, so one component covers all three. ALTCHA (a web component)
-  and Friendly Captcha (an npm SDK) are different integration shapes and are a
-  separate follow-on, not bent into this surface.
+  the ONLY divergence, so one component covers those three. Friendly Captcha
+  (`provider="friendly"`) is a 4th provider: its SDK exposes a different shape
+  (`createWidget` returning an event-emitter handle), so its provider entry adds
+  an optional `adapt()` bridge that maps `createWidget` onto the same CaptchaApi
+  surface. It is loaded from the CDN compat build — NO `@friendlycaptcha/sdk`
+  npm peer dependency (the family's zero-peer-dep design). ALTCHA (a web
+  component) is a different integration shape and remains a separate follow-on.
 
   VALUE CONTRACT (mirrors Flatpickr's model-string + rich-event pattern):
     • `token` is `model: true` — written on success, cleared on expire/reset, so
@@ -47,7 +51,8 @@
 
 <props>
 {
-  // 'recaptcha' (Google reCAPTCHA v2) | 'hcaptcha' | 'turnstile' (Cloudflare).
+  // 'recaptcha' (Google reCAPTCHA v2) | 'hcaptcha' | 'turnstile' (Cloudflare)
+  // | 'friendly' (Friendly Captcha).
   provider: { type: String, default: 'recaptcha' },
 
   // The public site key from your provider dashboard. Required.
@@ -62,6 +67,8 @@
 
   // reCAPTCHA/hCaptcha: 'normal' | 'compact' | 'invisible'.
   // Turnstile: 'normal' | 'compact' | 'flexible'. Construction-time.
+  // No-op for Friendly Captcha (FC has no `size` concept — its `startMode`
+  // analog rides through the `options` escape hatch instead).
   size:     { type: String, default: 'normal' },
 
   // Optional tabindex forwarded to the widget (omitted when null).
