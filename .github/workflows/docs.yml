@@ -67,6 +67,15 @@ jobs:
       - name: Build @rozie/runtime-vue
         run: pnpm --filter @rozie/runtime-vue run build
 
+      # The `@rozie-ui/*-vue` leaves now export compiled dist/ (Vite-lib drop-ins)
+      # as their main entry, and the demo pages import them. `pnpm --filter
+      # @rozie/docs build` does NOT go through turbo, so the dependsOn ^build that
+      # would compile those dists never runs — build them explicitly here or the
+      # demos fail to resolve ("Failed to resolve entry for @rozie-ui/<x>-vue").
+      # The glob also covers the source-only leaves (their build is a no-op echo).
+      - name: Build @rozie-ui Vue leaves
+        run: pnpm --filter "@rozie-ui/*-vue" run build
+
       - name: Build docs
         run: pnpm --filter @rozie/docs build
 
