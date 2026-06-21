@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
   "type": "module",
   "sideEffects": false,

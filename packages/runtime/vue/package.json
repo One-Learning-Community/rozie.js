@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-vue",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vue runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
   "type": "module",
   "sideEffects": false,
