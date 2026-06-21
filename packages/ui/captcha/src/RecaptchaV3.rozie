@@ -1,0 +1,116 @@
+<!--
+  RecaptchaV3.rozie — Google reCAPTCHA v3, the scoreless / widget-less variant.
+
+  SEPARATE from <Captcha>. reCAPTCHA v3 is a fundamentally different integration
+  shape: there is NO checkbox/challenge widget and NO DOM element — it scores
+  every interaction invisibly and yields a fresh verification token on demand via
+  `grecaptcha.execute(sitekey, { action })`. Bending that into the explicit-render
+  `<Captcha>` surface (which is built around `render(el, cfg)` + a widget id)
+  would distort both, so v3 is its own imperative-first component.
+
+  IMPERATIVE-FIRST. The primary use is "right before you submit a form, get a
+  fresh token for THIS action": call the exposed `execute(action?)` handle, await
+  the token, attach it to the request. Load-time auto-execution is OPT-IN
+  (`executeOnMount`, default false) because a v3 token is short-lived (~2 min) —
+  fetching one at mount is usually wasted; fetch it at the moment of submission.
+
+  VALUE CONTRACT (mirrors Captcha's model-string + rich-event pattern):
+    • `token` is `model: true` — written with the latest token on each successful
+      execute, so `r-model="token"` reflects the most recent token for binding.
+    • `@verify` fires `{ token, action }` on success; `@error` fires `{ error }`
+      on failure (load timeout, script error, or a rejected execute()).
+
+  SCRIPT LOADING: the v3 api.js (sitekey IN the url) is injected ONCE PER SITEKEY
+  via a cross-instance `globalThis` singleton (see internal/loadRecaptchaV3.ts).
+  Keying on the sitekey (not a provider name) keeps a v2 <Captcha> and a v3
+  <RecaptchaV3> on the same page from colliding on one `grecaptcha` global.
+
+  IMPERATIVE HANDLE ($expose): { execute }.
+    • `execute(action?)` → Promise<token>; the optional arg overrides the `action`
+      prop default for that one call. NO `render` verb (v3 has nothing to render;
+      also `render` is a LitElement lifecycle method — exposing it clobbers Lit).
+-->
+
+<rozie name="RecaptchaV3">
+
+<props>
+{
+  // The public reCAPTCHA v3 site key from your Google admin console. Required.
+  sitekey:        { type: String, required: true },
+
+  // The default action label reported to reCAPTCHA's risk analysis (e.g.
+  // 'submit', 'login'). Overridable per-call via execute(action).
+  action:         { type: String, default: 'submit' },
+
+  // The latest verification token. Two-way: written on each successful execute.
+  // Read it for the request via r-model="token".
+  token:          { type: String, default: '', model: true },
+
+  // Opt-in: run one execute() at mount and emit @verify with the initial token.
+  // Default false — v3 is imperative-first (tokens are short-lived; fetch one at
+  // the moment of submission, not eagerly at mount).
+  executeOnMount: { type: Boolean, default: false },
+}
+</props>
+
+<script>
+// The v3 api.js loader (inject-once-per-sitekey singleton + ready-gate + token
+// execute) lives in a vendored internal module so its branchy logic is
+// unit-tested independent of any framework (see internal/loadRecaptchaV3.test.ts).
+// codegen copies src/internal/ into every leaf, so this import resolves ×6.
+import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV3'
+
+// `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
+// extracts the teardown into a separate onCleanup() whose scope can't see a
+// mount-body local, so a `let disposed` inside $onMount is out of scope in the
+// teardown. Top-level — visible to both the mount body and the teardown. It also
+// guards a late execute() resolve that fires after the component unmounts.
+let disposed = false
+
+$onMount(() => {
+  disposed = false
+  // Warm the script once for this sitekey. If opted in, run an initial execute.
+  loadRecaptchaV3($props.sitekey)
+    .then(() => {
+      if (disposed || !$props.executeOnMount) return
+      execute()
+    })
+    .catch((err) => {
+      if (disposed) return
+      $emit('error', { error: err })
+    })
+  return () => {
+    disposed = true
+  }
+})
+
+// Run a v3 challenge and return a fresh token. The optional `action` arg
+// overrides the prop default for this one call. On success writes the two-way
+// token + emits @verify; on failure emits @error. NB: the resolved param must
+// NOT be named `token` — on Vue, $model.token lowers to a `defineModel('token')`
+// ref named `token`, and a same-named param shadows it (`token.value = token`
+// would write the param). Use `tok` (mirrors Captcha.rozie's `response`).
+function execute(action) {
+  const a = action != null ? action : $props.action
+  return loadRecaptchaV3($props.sitekey)
+    .then(() => v3Execute($props.sitekey, { action: a }))
+    .then((tok) => {
+      if (disposed) return tok
+      $model.token = tok
+      $emit('verify', { token: tok, action: a })
+      return tok
+    })
+    .catch((err) => {
+      if (!disposed) $emit('error', { error: err })
+      throw err
+    })
+}
+
+$expose({ execute })
+</script>
+
+<template>
+<div class="rozie-recaptcha-v3" style="display:none"></div>
+</template>
+
+</rozie>
