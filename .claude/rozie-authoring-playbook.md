@@ -46,6 +46,17 @@ Sources of truth:
 
 ---
 
+## 1b. Script partials (`.rzts` / `.rzjs`)
+
+Decompose a large `<script>` into standalone files. A partial is **plain TS/JS source** (no block tags) — a verbatim run of declarations + a trailing `export { … }`; the host imports it from `<script>` via `import { x } from './partial.rzts'`. Sigils (`$data`, `$computed`, `$expose`, …) work identically inside a partial; it is conceptually a region of the host script in another file.
+
+- **Hard guarantee: extraction is a byte-identical no-op ×6.** Moving code into a partial does NOT change emitted output for any target — enforced by the strict cross-target dist-parity suite. This is what makes decomposition safe to ship (zero diff in the generated leaves). The compiler binding gate is `A==B`: regenerate and diff vs the pre-extraction baseline → must be EMPTY across all 6 targets. (Phase 56 generalized this to ARBITRARY partial boundaries; `@rozie-ui/data-table` = 20 partials, `<script>` ~3100→570 lines.)
+- **Inlining (`packages/core/src/ir/inlineScriptPartials.ts`, threaded from `compile.ts`):** tree-shakes the imported closure only; hoists + dedupes the partial's own imports into the host import region; inlines recursively with diamond dedup; spliced decls keep partial-local `loc` so errors/source-maps frame to the `.rzts`. Canonical ext: `PARTIAL_EXT = /\.(rzts|rzjs)$/`. unplugin/babel **negative-route** these (never make a virtual ID — let the compiler inline).
+- **ROZ139** name collision (partial decl vs host binding / earlier-inlined partial); **ROZ140** import cycle between partials.
+- **Authoring conventions for clean A==B:** module-level reassigned `let`s + all sigils stay in the HOST; partials hold pure decls/functions closing over them. Extract contiguous runs in source order — never reorder (forward-refs across partials resolve fine inside event/lifecycle closures, but the run order must match inline). Multi-line leading-comment banners after a react-reassigned `let` are the one shape that still drops on react — keep such a banner in host (the P10/P12 convention), not inside the partial (deferred R4-followup).
+
+---
+
 ## 2. Sigils (the `$` author-side magic)
 
 | Sigil | Read/Write | Meaning | Gotchas |
@@ -194,6 +205,7 @@ When the engine owns a GRAPH (nodes + edges) the consumer should NOT hand-reconc
 - **Core inlines target `src`** — after editing `packages/targets/*/src`, run `turbo run build --force` (turbo doesn't hash inlined target src into core's cache) ([[feedback_turbo_stale_core_on_target_edit]]).
 - **`compile()` vs `lowerToIR`**: some shared passes (e.g. `typeNeutralizeScript`, slot-collision validation) live in `lowerToIR`; unplugin bypasses `compile()` → keep validation in the shared lower path + mirror in `compile()` where noted.
 - A new emitter shape ⇒ a matching unplugin `resolveId` rewrite (byte-equal-across-entrypoints is an implicit contract; the consumer-demo build is the only true gate) ([[feedback_unplugin_resolveid_mediation]]).
+- **Script-partial SEAM handling (comment/blank-line placement at splice boundaries) is where cross-target byte-identity breaks.** Core line/gap logic: `inlineScriptPartials.ts` → `normalizeSplicedEmitLines` + `measureOriginalGap` (8 accreted seam handlers, 12 stateful vars — fragile; a 9th seam type should trigger a state-machine refactor). Per-target comment mirroring: `mirrorSpliceBoundaryComments` duplicated across `packages/targets/{vue,svelte,solid}/src/emit/emitScript.ts` (the three copies intentionally diverge — solid lacks the R10 stripped-predecessor guard; extract a shared helper if you touch it). Known seam families that each needed a gated fix: trailing-seam (R1), gap-0 leading (R9), gap-1 trailing (R8), gap-0 trailing, before-side shared-`let` (R3), after-side import-float (R4/Shape-3), stripped-predecessor leading-comment double (R10), after-side inter-comment-block blank (R11). Real-component decomposition flushes out seam variants synthetic fixtures miss — **build the failing fixture FIRST, confirm it lands red on exactly the expected targets, THEN fix**; gate each fix to its shape (zero drift on HostC..HostM + the data-table baseline). Many "this fix is needed" research premises turn out empirically FALSE on contact — verify the red before fixing.
 
 ---
 

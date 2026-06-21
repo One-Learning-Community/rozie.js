@@ -88,6 +88,7 @@ export default defineConfig({
             { text: 'Install', link: '/guide/install' },
             { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Features & design choices', link: '/guide/features' },
+            { text: 'Script partials (.rzts / .rzjs)', link: '/guide/script-partials' },
             { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
             { text: 'Security & supply chain', link: '/guide/security' },
