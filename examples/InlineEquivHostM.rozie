@@ -1,0 +1,58 @@
+<!--
+  InlineEquivHostM.rozie — Phase 56-R11 AFTER-SIDE INTER-COMMENT-BLOCK byte-identity ORACLE.
+
+  Carries the EXACT surviving logic that PartialInlineHostM.rozie inlines from
+  ./partialLogicM.rzts, written inline in this component's own <script lang="ts">:
+  the host body decl `headM`, the MULTI-LINE `gridKeydownHandlersM` arrow const (the
+  partial's last surviving decl), and the host successor `let refreshRowModelM`
+  (reassigned inside `$onMount`) — WITH the identical TWO consecutive comment blocks
+  (block A, a BLANK line, block B) ONE BLANK LINE below `gridKeydownHandlersM` (the
+  after-side inter-comment-block seam), in the identical relative position. The unused
+  `neverUsedM` export does NOT appear here (it is tree-shaken from the partial path too).
+
+  The <template> is byte-identical to PartialInlineHostM.rozie. The emitted output of
+  the two hosts MUST match — LITERALLY, comments and blank lines included — on all six
+  targets after normalizing only the component identifier token (PartialInlineHostM ↔
+  InlineEquivHostM) once the vue/svelte trailing-seam clone preserves the inter-comment-block
+  blank below the spliced run (so BOTH blanks — spliced-tail→A and A→B — are preserved on
+  vue/svelte, matching this inline oracle and the already-correct react/angular/solid/lit).
+  This is the literal byte-identity oracle the after-side inter-comment-block fix is gated by.
+
+  No <style> block — see the PartialInlineHostM.rozie header for why.
+-->
+
+<rozie name="InlineEquivHostM">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headM = (n: number): number => n + 1;
+
+const gridKeydownHandlersM = (rIdx: number, cIdx: number): number => {
+  const active = rIdx + cIdx;
+  return active;
+};
+
+// the row-selection slice tracks which rows are checked
+// across header-group and body rows alike
+
+// inRange(rIdx, cIdx) gates the active cell within the
+// current 2-D selection range before a keydown commits
+let refreshRowModelM = 0;
+$onMount(() => {
+  refreshRowModelM = gridKeydownHandlersM(1, headM(2));
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ gridKeydownHandlersM(1, 2) }}</span>
+  <span class="echo">{{ refreshRowModelM }}</span>
+</div>
+</template>
+
+</rozie>

@@ -517,3 +517,43 @@ describe('Phase 56-R10 — blank-separated leading-seam literal byte-identity (c
     });
   });
 });
+
+/**
+ * Phase 56-R11 — AFTER-SIDE INTER-COMMENT-BLOCK literal byte-identity (second blank
+ * between two consecutive host comment-blocks downstream of a spliced run).
+ *
+ * The after-side sibling of the R8 gap-1 trailing seam, surfaced by the 56-09 DataTable
+ * Wave-9 decomposition (the P9 `gridKeydownHandlers` / P12 `fillDrag` after-sides): when a
+ * spliced (extracted) partial decl is succeeded in the HOST source by
+ * `[blank][host comment block A][blank][host comment block B][host decl]` — TWO consecutive
+ * host comment-blocks separated by a blank line — the FIRST blank (spliced tail → block A)
+ * is preserved by the R8 after-side fix, but the SECOND blank (between block A and block B)
+ * is DROPPED on vue/svelte ONLY.
+ *
+ *   • examples/PartialInlineHostM.rozie — a host body decl `headM`, then imports
+ *     `{ gridKeydownHandlersM }` (a MULTI-LINE block arrow const) from ./partialLogicM.rzts,
+ *     succeeded by a BLANK line, comment block A, a BLANK line, comment block B, and the host
+ *     `let refreshRowModelM` (reassigned in `$onMount` → react useRef + body.filter removal).
+ *   • examples/InlineEquivHostM.rozie — the SAME logic + both comment blocks + both blanks inline.
+ *
+ * The vue/svelte after-side trailing-seam mirror clones the host successor's leading comments
+ * onto the spliced predecessor's trailing comments but FLATTENS every cloned comment onto ONE
+ * anchor line (`prev.end + afterGap`), collapsing the inter-comment-block blank. react/angular/
+ * solid/lit preserve both blanks (solid reads the core loc deltas via whole-program generation;
+ * react reconstructs the body; angular/lit strip comments) → byte-identical throughout. RED on
+ * exactly vue/svelte before the fix; GREEN ×6 after. The R11 fix preserves the cloned comments'
+ * relative line deltas (anchoring the first at `prev.end + afterGap`, the rest offset by their
+ * original source deltas) instead of flattening them. Reuses `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_M = 'PartialInlineHostM';
+const INLINE_HOST_M = 'InlineEquivHostM';
+
+describe('Phase 56-R11 — after-side inter-comment-block literal byte-identity (second blank preserved)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('after-side inter-comment-block partial-inlined host === inline-equivalent host (literal, inter-comment blank preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_M, target), PARTIAL_HOST_M);
+      const inline = normalizeName(loadFixture(INLINE_HOST_M, target), INLINE_HOST_M);
+      expect(partial).toBe(inline);
+    });
+  });
+});

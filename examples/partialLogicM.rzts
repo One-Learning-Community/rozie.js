@@ -1,0 +1,31 @@
+// partialLogicM.rzts — Phase 56-R11 AFTER-SIDE INTER-COMMENT-BLOCK guard partial.
+//
+// Models the REAL DataTable after-side shape surfaced by the 56-09 Wave-9
+// decomposition (the P9 `gridKeydownHandlers` / P12 `fillDrag` after-sides): the
+// partial's LAST surviving declaration (`gridKeydownHandlersM`, a MULTI-LINE
+// block-body arrow const) is spliced into the host and is succeeded in the HOST
+// source by `[blank][host comment block A][blank][host comment block B][host decl]`
+// — TWO consecutive host comment-blocks downstream of the spliced run, separated by
+// a blank line. The host comment blocks + `let refreshRowModelM` STAY in the host
+// <script>; they are NOT part of this partial.
+//
+// The bug (after-side inter-comment-block blank, R11): the FIRST blank (spliced tail
+// → comment block A) is correctly preserved by the R8 after-side fix; but the SECOND
+// blank — the one BETWEEN the two consecutive host comment-blocks — is DROPPED on
+// vue/svelte ONLY (react/angular/solid/lit preserve both). The vue/svelte after-side
+// trailing-seam mirror clones the host successor's leading comments onto the spliced
+// predecessor's trailing comments but FLATTENS every cloned comment onto ONE anchor
+// line, collapsing the inter-comment-block blank. Solid (whole-program generation)
+// reads the core loc deltas directly and preserves both blanks, isolating the drift
+// to the per-statement vue/svelte clone.
+//
+// `neverUsedM` is tree-shaken (unused by the host). No hoisted import is needed — the
+// arrow body is self-contained — which keeps the spliced run a pure body run and
+// isolates the after-side inter-comment-block drift from any import-region arithmetic.
+
+export const gridKeydownHandlersM = (rIdx: number, cIdx: number): number => {
+  const active = rIdx + cIdx;
+  return active;
+};
+
+export const neverUsedM = (k: number): number => k * 999;

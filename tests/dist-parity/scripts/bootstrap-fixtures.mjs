@@ -458,6 +458,26 @@ const EXAMPLES = [
   // not an EXAMPLES entry.
   'PartialInlineHostL',
   'InlineEquivHostL',
+  // Phase 56-R11 (script-partial-cross-target-comment-placement-parity) — the
+  // AFTER-SIDE INTER-COMMENT-BLOCK red→green guard surfaced by the 56-09 DataTable
+  // Wave-9 decomposition (the P9 gridKeydownHandlers / P12 fillDrag after-sides).
+  // partialLogicM.rzts's last surviving decl (`gridKeydownHandlersM`, a MULTI-LINE block
+  // arrow const) is spliced into the host and is succeeded by `[blank][host comment block
+  // A][blank][host comment block B][host let]` — TWO consecutive host comment-blocks
+  // downstream of the spliced run, separated by a blank line. The FIRST blank (spliced
+  // tail → block A) is preserved by the R8 after-side fix; the SECOND blank (between block
+  // A and block B) is DROPPED on vue/svelte ONLY: the per-statement trailing-seam mirror
+  // clones the host successor's leading comments onto the spliced predecessor's trailing
+  // comments but FLATTENS every cloned comment onto ONE anchor line, collapsing the
+  // inter-comment-block blank. react/angular/solid/lit preserve both blanks (solid via
+  // whole-program loc-delta generation; react reconstructs the body; angular/lit strip
+  // comments) → byte-identical throughout. The R11 fix preserves the cloned comments'
+  // relative line deltas instead of flattening them. PartialInlineHostM references a
+  // sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostM
+  // is single-file and stays OUT. The .rzts partial is a LEAF source consumed only via
+  // inline — not an EXAMPLES entry.
+  'PartialInlineHostM',
+  'InlineEquivHostM',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -564,6 +584,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // source consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostL oracle also stays OUT.
   'PartialInlineHostL',
+  // Phase 56-R11 — references ./partialLogicM.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling after-side inter-comment-block partial at
+  // compile/inline time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF
+  // source consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostM oracle also stays OUT.
+  'PartialInlineHostM',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

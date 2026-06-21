@@ -1,0 +1,67 @@
+<!--
+  PartialInlineHostM.rozie — Phase 56-R11 AFTER-SIDE INTER-COMMENT-BLOCK red→green guard host.
+
+  The <script lang="ts"> keeps a host body decl `headM` ABOVE the import (so the
+  spliced run lands mid-body, mirroring the real DataTable seams), imports
+  `{ gridKeydownHandlersM }` from ./partialLogicM.rzts, and is succeeded by
+  `[blank line][host comment block A][blank line][host comment block B][host decl]`:
+  a BLANK line, a leading comment block A, ANOTHER BLANK line, a second leading
+  comment block B, then a host `let refreshRowModelM` that is REASSIGNED inside
+  `$onMount` (so react hoists it to `useRef` and removes the `let` from the body via
+  `body.filter`) — exactly the real 56-09 Wave-9 after-side shape (the P9
+  `gridKeydownHandlers` / P12 `fillDrag` after-sides: two consecutive host
+  comment-blocks downstream of the spliced run). The compiler inlines the MULTI-LINE
+  `gridKeydownHandlersM` into THIS component's script before lowering; the unused
+  `neverUsedM` export is tree-shaken.
+
+  This is the AFTER-SIDE INTER-COMMENT-BLOCK seam: the FIRST blank (spliced tail →
+  comment block A) is preserved by the R8 after-side fix; the SECOND blank (between
+  comment block A and comment block B) is DROPPED on vue/svelte ONLY (the per-statement
+  trailing-seam mirror FLATTENS every cloned host-successor leading comment onto ONE
+  anchor line, collapsing the inter-comment-block blank). react/angular/solid/lit
+  preserve both blanks (solid via whole-program loc-delta generation; react reconstructs
+  the body; angular/lit strip comments). Paired with InlineEquivHostM.rozie (the same
+  logic + both comment blocks + both blanks written inline); their emitted output MUST be
+  LITERAL byte-identical on all six targets once the vue/svelte clone preserves the
+  inter-comment-block blank.
+
+  No <style> block: the scoped-CSS hash is component-name + filename derived
+  (computeScopeHash), so a style block would inject a name-divergent attribute that the
+  byte-identity oracle (which normalizes ONLY the component name) could not reconcile
+  against InlineEquivHostM. This fixture proves SCRIPT inline parity.
+
+  References ./partialLogicM.rzts — registered in EXAMPLES_NEEDING_RESOLVER_ROOT.
+-->
+
+<rozie name="PartialInlineHostM">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headM = (n: number): number => n + 1;
+
+import { gridKeydownHandlersM } from './partialLogicM.rzts';
+
+// the row-selection slice tracks which rows are checked
+// across header-group and body rows alike
+
+// inRange(rIdx, cIdx) gates the active cell within the
+// current 2-D selection range before a keydown commits
+let refreshRowModelM = 0;
+$onMount(() => {
+  refreshRowModelM = gridKeydownHandlersM(1, headM(2));
+});
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ gridKeydownHandlersM(1, 2) }}</span>
+  <span class="echo">{{ refreshRowModelM }}</span>
+</div>
+</template>
+
+</rozie>
