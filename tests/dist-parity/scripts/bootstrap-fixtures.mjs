@@ -353,6 +353,21 @@ const EXAMPLES = [
   // The .rzts partials are LEAF sources consumed only via inline — not EXAMPLES entries.
   'PartialInlineHostG',
   'InlineEquivHostG',
+  // Phase 56 (script-partial-cross-target-comment-placement-parity) — the shape-5
+  // AFTER-side host-`let`-trailing comment red→green guard (the REAL isolated R3 bug).
+  // partialLogicI.rzts's afterDeclI splices DIRECTLY below a host `let`
+  // (rangeTransitionI) whose authored comment TRAILS it (after-side) and leads the
+  // spliced decl. Inline, that comment is one @babel object shared as hostLet.trailing +
+  // splicedDecl.leading; svelte/vue per-statement generation prints it TWICE. After
+  // extraction the splice severs the shared object — the comment survives only on the
+  // host `let`'s trailingComments (cur's leadingComments is empty) — so svelte/vue print
+  // it ONCE → byte diff (RED on svelte/vue) until the after-side mirror extension lands.
+  // solid/react/angular/lit are byte-identical throughout (whole-block/program dedup
+  // prints one copy in BOTH forms; angular/lit strip it in both). PartialInlineHostI
+  // references a sibling .rzts and is added to EXAMPLES_NEEDING_RESOLVER_ROOT below;
+  // InlineEquivHostI is single-file and stays OUT.
+  'PartialInlineHostI',
+  'InlineEquivHostI',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -421,6 +436,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostG oracle also stays OUT.
   'PartialInlineHostG',
+  // Phase 56 — references ./partialLogicI.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling shape-5 after-side partial at compile/inline
+  // time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF source
+  // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostI oracle also stays OUT.
+  'PartialInlineHostI',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

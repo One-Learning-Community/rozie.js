@@ -1,0 +1,10 @@
+// partialLogicI.rzts — Phase 56 shape-5 AFTER-side host-let-trailing comment guard partial.
+// The extracted decl is spliced DIRECTLY below a host `let` whose authored comment
+// trails it (after-side). In the inline oracle that comment is shared
+// (hostLet.trailing + splicedDecl.leading) and svelte/vue per-statement generation
+// prints it TWICE; in the decomposed form the splice severs the shared object so it
+// must be re-mirrored, else svelte/vue print it ONCE → byte diff.
+
+export const afterDeclI = (k: number): number => k * 2;
+
+export const neverUsedI = (k: number): number => k * 999;

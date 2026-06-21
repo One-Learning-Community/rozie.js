@@ -288,3 +288,37 @@ describe('Phase 56 — shared module-let before-side literal byte-identity', () 
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — shape-5
+ * AFTER-side host-`let`-trailing comment literal byte-identity gate. The REAL
+ * isolated bug the Plan 03 investigation surfaced (R3's after-side variant): an
+ * extracted `const` is spliced DIRECTLY below a host `let` whose authored comment
+ * TRAILS it (after-side) and leads the spliced decl.
+ *
+ *   • examples/PartialInlineHostI.rozie — declares the host `let` rangeTransitionI,
+ *     then an authored comment trailing it, then imports `{ afterDeclI }` from
+ *     ./partialLogicI.rzts (the spliced decl that lands directly below the comment).
+ *   • examples/InlineEquivHostI.rozie — the SAME logic + comment written inline.
+ *
+ * Inline, that comment is one @babel object shared as rangeTransitionI.trailing +
+ * afterDeclI.leading; svelte/vue per-statement generation prints it TWICE. After
+ * extraction the splice severs the shared object — the comment survives only on the
+ * host `let`'s trailingComments (cur's leadingComments is empty), so svelte/vue print
+ * it ONCE → byte diff (RED on svelte/vue) before the after-side mirror extension;
+ * GREEN ×6 after. react/solid/angular/lit are byte-identical throughout (whole-block/
+ * program dedup; angular/lit strip the comment in both forms). Reuses `normalizeName`
+ * VERBATIM.
+ */
+const PARTIAL_HOST_I = 'PartialInlineHostI';
+const INLINE_HOST_I = 'InlineEquivHostI';
+
+describe('Phase 56 — shared module-let after-side literal byte-identity (svelte/vue mirror)', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('shared-let after-side partial-inlined host === inline-equivalent host (literal, host-let-trailing comment preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_I, target), PARTIAL_HOST_I);
+      const inline = normalizeName(loadFixture(INLINE_HOST_I, target), INLINE_HOST_I);
+      expect(partial).toBe(inline);
+    });
+  });
+});
