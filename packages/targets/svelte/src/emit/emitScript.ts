@@ -176,13 +176,15 @@ function arrowBody(body: t.Expression | t.BlockStatement): string {
  * brace. Re-mirroring the spliced node's leading comments back onto the preceding
  * statement's trailing comments restores that byte-for-byte.
  *
- * Fires ONLY at a genuine splice boundary: the current statement carries
- * `extra.__roziePartialOrigin` AND its leading comments are not ALREADY shared as
- * the previous statement's trailing comments (within-partial statement pairs
- * already share the same comment objects; host-only pairs are left exactly as
- * authored). `normalizeSplicedEmitLines` (core) has already anchored the spliced
- * leading comments one blank line below the preceding statement, so the mirrored
- * trailing copy spaces correctly.
+ * Fires at a genuine splice boundary in EITHER direction (Phase 56 R1 broadened
+ * the trigger): the CURRENT statement is spliced (`cur.extra.__roziePartialOrigin`
+ * — the Phase 55 leading seam) OR the PREVIOUS statement is spliced and CUR is an
+ * inline host successor carrying the leading comment (the R1 TRAILING seam). In
+ * both cases CUR's leading comments are mirrored onto PREV's trailing comments
+ * UNLESS already shared (within-partial statement pairs share the same comment
+ * objects; host-only pairs — neither node spliced — are left exactly as authored).
+ * `normalizeSplicedEmitLines` (core) has already anchored the seam spacing, so the
+ * mirrored trailing copy spaces correctly.
  */
 function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
   for (let i = 1; i < stmts.length; i++) {
@@ -190,14 +192,46 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     const prev = stmts[i - 1]!;
     const lead = cur.leadingComments;
     if (!lead || lead.length === 0) continue;
-    const extra = cur.extra as Record<string, unknown> | undefined;
-    if (!extra || extra.__roziePartialOrigin === undefined) continue;
+    const curExtra = cur.extra as Record<string, unknown> | undefined;
+    const prevExtra = prev.extra as Record<string, unknown> | undefined;
+    const curSpliced = curExtra?.__roziePartialOrigin !== undefined;
+    const prevSpliced = prevExtra?.__roziePartialOrigin !== undefined;
+    // Fire at a genuine splice boundary, in EITHER direction:
+    //   • CUR is the spliced node (Phase 55 within-partial / leading seam — the
+    //     spliced decl carries the leading comment); or
+    //   • PREV is the spliced node and CUR is an inline host successor carrying the
+    //     leading comment (Phase 56 R1 TRAILING seam — the mirror-image case).
+    // Both restore the per-statement doubling the inline oracle produces by copying
+    // CUR's leading comments onto PREV's trailing comments. Host-only pairs (neither
+    // node spliced) are left exactly as authored.
+    if (!curSpliced && !prevSpliced) continue;
     const prevTrail = prev.trailingComments;
     const lastLead = lead[lead.length - 1];
+    // Identity guard (Pitfall 2 / A4): a node can be simultaneously the spliced
+    // successor of one seam and the spliced predecessor of the next. If the comment
+    // is already shared as prev's trailing (within-partial pairs share the same
+    // objects), leave it — never double-apply.
     if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {
       continue;
     }
-    prev.trailingComments = [...(prevTrail ?? []), ...lead];
+    let toAppend = lead;
+    if (prevSpliced && !curSpliced) {
+      // R1 TRAILING seam: CUR is an inline HOST successor whose leading comments
+      // carry HOST `loc`s that can collide with the SPLICED predecessor's shifted
+      // `loc`, making @babel/generator print a `CommentLine` trailing comment on the
+      // SAME line as PREV (`const x = …; // c`). The inline oracle prints both copies
+      // on their OWN lines. Clone the comments with a `loc` one line past PREV so the
+      // trailing copy renders own-line, reproducing the oracle byte-for-byte. Cloning
+      // leaves CUR's leadingComments (the shared host objects) untouched.
+      const anchorLine = (prev.loc?.end.line ?? 0) + 1;
+      toAppend = lead.map((c) => ({
+        ...c,
+        loc: c.loc
+          ? { ...c.loc, start: { ...c.loc.start, line: anchorLine }, end: { ...c.loc.end, line: anchorLine } }
+          : c.loc,
+      }));
+    }
+    prev.trailingComments = [...(prevTrail ?? []), ...toAppend];
   }
 }
 
