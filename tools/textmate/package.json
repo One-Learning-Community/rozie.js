@@ -2,7 +2,7 @@
   "name": "rozie-textmate",
   "displayName": "Rozie",
   "description": "Syntax highlighting for .rozie Single-File Component files",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "onelearningcommunity",
   "license": "MIT",
   "repository": {
@@ -64,6 +64,18 @@
         "aliases": ["Rozie", "rozie"],
         "extensions": [".rozie"],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "rozie-ts",
+        "aliases": ["Rozie Script Partial (TypeScript)", "rzts"],
+        "extensions": [".rzts"],
+        "configuration": "./language-configuration.partial.json"
+      },
+      {
+        "id": "rozie-js",
+        "aliases": ["Rozie Script Partial (JavaScript)", "rzjs"],
+        "extensions": [".rzjs"],
+        "configuration": "./language-configuration.partial.json"
       }
     ],
     "grammars": [
@@ -78,6 +90,26 @@
           "meta.embedded.block.style.scss.rozie": "scss",
           "meta.embedded.expression.rozie": "javascript"
         }
+      },
+      {
+        "language": "rozie-ts",
+        "scopeName": "source.rozie.ts",
+        "path": "./syntaxes/rozie-ts.tmLanguage.json"
+      },
+      {
+        "language": "rozie-js",
+        "scopeName": "source.rozie.js",
+        "path": "./syntaxes/rozie-js.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.rozie.ts.injection",
+        "path": "./syntaxes/rozie-ts-sigils.injection.json",
+        "injectTo": ["source.rozie.ts"]
+      },
+      {
+        "scopeName": "source.rozie.js.injection",
+        "path": "./syntaxes/rozie-js-sigils.injection.json",
+        "injectTo": ["source.rozie.js"]
       }
     ]
   }

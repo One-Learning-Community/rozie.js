@@ -35,6 +35,17 @@ import onigWasmUrl from 'vscode-oniguruma/release/onig.wasm?url';
 // Canonical Rozie grammar from the workspace tree.
 import rozieGrammarJson from '../../../tools/textmate/syntaxes/rozie.tmLanguage.json?raw';
 
+// Script-partial grammars (`.rzts` / `.rzjs`) — plain TS/JS + Rozie $sigils.
+// The top-level grammar just embeds source.ts / source.js; the distinct $sigil
+// coloring comes from a companion INJECTION grammar (so sigils win at every
+// nesting depth, not just the root context). The injections are wired into the
+// Registry below via `getInjections` — vscode-textmate does NOT auto-discover
+// `injectionSelector`; it must be told which injection scopes apply per host.
+import rozieTsGrammarJson from '../../../tools/textmate/syntaxes/rozie-ts.tmLanguage.json?raw';
+import rozieJsGrammarJson from '../../../tools/textmate/syntaxes/rozie-js.tmLanguage.json?raw';
+import rozieTsSigilsJson from '../../../tools/textmate/syntaxes/rozie-ts-sigils.injection.json?raw';
+import rozieJsSigilsJson from '../../../tools/textmate/syntaxes/rozie-js-sigils.injection.json?raw';
+
 // Embedded-language grammars from tm-grammars.
 import tsGrammarJson from 'tm-grammars/grammars/typescript.json?raw';
 import jsGrammarJson from 'tm-grammars/grammars/javascript.json?raw';
@@ -46,6 +57,14 @@ import tsxGrammarJson from 'tm-grammars/grammars/tsx.json?raw';
 // scopeName → raw JSON. Keys MUST match the `scopeName` field in each grammar.
 const GRAMMAR_JSON_BY_SCOPE: Record<string, string> = {
   'source.rozie': rozieGrammarJson,
+  // Script-partial scopes. Their grammars `include` source.ts / source.js,
+  // which the Registry resolves lazily from the entries already present here.
+  'source.rozie.ts': rozieTsGrammarJson,
+  'source.rozie.js': rozieJsGrammarJson,
+  // Sigil-injection grammars — loaded as external grammars so the engine can
+  // resolve them when `getInjections` (below) names them for a host scope.
+  'source.rozie.ts.injection': rozieTsSigilsJson,
+  'source.rozie.js.injection': rozieJsSigilsJson,
   'source.ts': tsGrammarJson,
   'source.js': jsGrammarJson,
   'source.css': cssGrammarJson,
@@ -58,12 +77,23 @@ const GRAMMAR_JSON_BY_SCOPE: Record<string, string> = {
   'source.tsx': tsxGrammarJson,
 };
 
+// Host scope → injection grammar scope names. Consulted by the Registry's
+// `getInjections` callback. The named grammars must also be present in
+// GRAMMAR_JSON_BY_SCOPE so the engine can resolve them as external grammars.
+const INJECTIONS_BY_SCOPE: Record<string, string[] | undefined> = {
+  'source.rozie.ts': ['source.rozie.ts.injection'],
+  'source.rozie.js': ['source.rozie.js.injection'],
+};
+
 // Monaco language ID → top-level scope. These are the languages we install
 // TextMate tokenizers for. The right pane sets `language: 'typescript'` /
 // `'html'` etc., so wiring the TextMate tokenizer means BOTH panes use
 // VS-Code-quality grammars instead of Monaco's built-in Monarch tokenizers.
 const LANGUAGE_SCOPES: Array<{ id: string; scope: string; extensions?: string[] }> = [
   { id: 'rozie', scope: 'source.rozie', extensions: ['.rozie'] },
+  // Script partials: `.rzts` tokenizes as TS + sigils, `.rzjs` as JS + sigils.
+  { id: 'rzts', scope: 'source.rozie.ts', extensions: ['.rzts'] },
+  { id: 'rzjs', scope: 'source.rozie.js', extensions: ['.rzjs'] },
   { id: 'typescript', scope: 'source.ts' },
   { id: 'javascript', scope: 'source.js' },
   { id: 'css', scope: 'source.css' },
@@ -196,6 +226,11 @@ export function setupTextmate(): Promise<void> {
         if (!raw) return null;
         return parseRawGrammar(raw, `${scopeName}.json`) as IRawGrammar;
       },
+      // Map a host scope → the injection grammar scopes that apply to it. This
+      // is how the `.rzts`/`.rzjs` sigil injections get attached (mirrors the
+      // VS Code grammar `injectTo` contributions). vscode-textmate does not
+      // scan `injectionSelector` on its own — it consults this callback.
+      getInjections: (scopeName: string) => INJECTIONS_BY_SCOPE[scopeName],
     });
 
     // Load each top-level grammar; embedded scopes are resolved lazily by

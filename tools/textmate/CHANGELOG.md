@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-21
+
 ### Added
+
+- **Script-partial highlighting (`.rzts` / `.rzjs`).** Registers Rozie's script-partial extensions as first-class languages: `.rzts` tokenizes as TypeScript, `.rzjs` as JavaScript, both with the Rozie `$sigils` painted distinctly. A script partial is plain TS/JS (no SFC blocks) that uses the sigils — a slice of a component's `<script>` body lifted into its own file (`PARTIAL_EXT = /\.(rzts|rzjs)$/`, Phase 56). New languages `rozie-ts` / `rozie-js` with thin grammars (`source.rozie.ts` / `source.rozie.js`) that embed `source.ts` / `source.js`, plus companion **injection** grammars (`source.rozie.ts.injection` / `source.rozie.js.injection`, wired via `injectTo`) that paint the sigils at every nesting depth — not just the root context an `include` reaches. A TS/JS-flavored `language-configuration.partial.json` (line/block comments, bracket + auto-close pairs) replaces the HTML-comment config the `.rozie` files use. The injection's `injectionSelector` is confined to the `source.rozie.{ts,js}` scope, so it can never leak into ordinary `.ts` / `.js` files. Existing `.rozie` highlighting is unchanged.
 
 - `$expose` magic identifier (Phase 21, 2026-06-01) — the imperative-handle sigil. `$expose({ reset, focus })` exposes consumer-callable methods on all 6 targets (React `forwardRef`/`useImperativeHandle`, Vue `defineExpose`, Svelte exported consts, Solid callback-ref prop, Angular/Lit public class/element methods). Added 2026-06-02.
 - `$reconcileAfterDomMutation` magic identifier — the Lit-only `r-external` re-key escape hatch for third-party-engine DOM mutations (no-op on the other 5 targets). Shipped in the compiler 2026-05-24; added to highlighting 2026-06-02.

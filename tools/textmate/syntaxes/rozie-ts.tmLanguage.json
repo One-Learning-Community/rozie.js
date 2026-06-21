@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Rozie Script Partial (TypeScript)",
+  "scopeName": "source.rozie.ts",
+  "fileTypes": ["rzts"],
+  "comment": "A `.rzts` script partial is plain TypeScript (NO SFC blocks) that uses Rozie $sigils — a slice of a component's <script> body lifted into its own file (PARTIAL_EXT = /\\.(rzts|rzjs)$/ in packages/core/src/ir/inlineScriptPartials.ts). This top-level grammar does nothing but embed source.ts; the distinct $sigil coloring is added by the companion INJECTION grammar source.rozie.ts.injection (rozie-ts-sigils.injection.json), which applies at every nesting depth — an `include` here would only color sigils at the root context (the limitation the SFC <script> block has).",
+  "patterns": [
+    { "include": "source.ts" }
+  ],
+  "repository": {}
+}

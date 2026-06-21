@@ -1,0 +1,37 @@
+// A Rozie script partial (`.rzts`) — plain TypeScript that uses Rozie $sigils.
+// Lifted out of a component's <script> body; the host imports it with
+//   import { onSortingChangeCb } from './StateChangeCallbacks.rzts'
+// and the compiler inlines it before any target-specific lowering. No <script>
+// tags, no SFC blocks — just a verbatim run of declarations + a trailing export.
+
+import { applyUpdater } from './applyUpdater.rzts'
+
+type SortDir = 'asc' | 'desc' | false
+
+interface SortingState {
+  id: string
+  desc: boolean
+}
+
+// Reads/writes flow through the Rozie sigils ($data, $props, $emit, $computed,
+// $onMount) exactly as they do inline.
+const currentState = $computed(() => ({ sorting: $data.sorting as SortingState[] }))
+
+const onSortingChangeCb = (updater: unknown): void => {
+  const next = applyUpdater(updater, currentState().sorting)
+  $data.sorting = next
+  $emit('sortingChange', next)
+}
+
+const onColumnSizingInfoChangeCb = (updater: unknown): void => {
+  const next = applyUpdater(updater, $data.columnSizingInfo)
+  $data.columnSizingInfo = next != null ? next : $data.columnSizingInfo
+}
+
+$onMount(() => {
+  // $props is read-only here; two-way writes go through $model.
+  if ($props.autoSort) $data.sorting = []
+})
+
+export { onSortingChangeCb, onColumnSizingInfoChangeCb }
+export type { SortDir, SortingState }

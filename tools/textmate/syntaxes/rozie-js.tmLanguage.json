@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Rozie Script Partial (JavaScript)",
+  "scopeName": "source.rozie.js",
+  "fileTypes": ["rzjs"],
+  "comment": "A `.rzjs` script partial is plain JavaScript (NO SFC blocks) that uses Rozie $sigils — a slice of a component's <script> body lifted into its own file (PARTIAL_EXT = /\\.(rzts|rzjs)$/ in packages/core/src/ir/inlineScriptPartials.ts). JS sibling of source.rozie.ts: embeds source.js; distinct $sigil coloring comes from the companion INJECTION grammar source.rozie.js.injection (rozie-js-sigils.injection.json).",
+  "patterns": [
+    { "include": "source.js" }
+  ],
+  "repository": {}
+}
