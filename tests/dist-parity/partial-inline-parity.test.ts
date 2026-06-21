@@ -253,3 +253,38 @@ describe('Phase 56 — trailing-seam literal byte-identity (svelte/vue mirror)',
     });
   });
 });
+
+/**
+ * Phase 56 (script-partial-cross-target-comment-placement-parity) — SHARED
+ * MODULE-`let` (R3) BEFORE-side literal byte-identity gate. A sandwiched host `let`
+ * that STAYS in the host has its authored leading comment shared with the EXTRACTED
+ * neighbor `const` spliced directly above it.
+ *
+ *   • examples/PartialInlineHostG.rozie — imports `{ afterDeclG, midDeclG }` from
+ *     ./partialLogicG.rzts and `{ beforeDeclG }` from ./partialLogicG2.rzts, with the
+ *     host `let`s rangeTransitionG / fillDragUpG sandwiched BELOW each spliced run and
+ *     carrying a leading comment (the before-side seam: prev is spliced, cur is the
+ *     commented host `let` — the Plan 02 prev-spliced trailing-seam mirror restores the
+ *     doubling on svelte/vue).
+ *   • examples/InlineEquivHostG.rozie — the SAME logic + comments written inline.
+ *
+ * GREEN-×6 GUARD (not red→green): research assumption A3 (a solid/react "spurious
+ * SECOND copy" of the shared comment at the sandwiched-let seam) was empirically
+ * FALSIFIED — solid/react never double a shared comment here (whole-program dedup +
+ * arrow→function conversion structurally collapse any duplicate), and the svelte/vue
+ * before-side seam was already closed by Plan 02. This pins the before-side seam as
+ * byte-neutral ×6. The REAL isolated drop (after-side host-`let`-trailing comment on
+ * svelte/vue) is guarded by HostI below. Reuses `normalizeName` VERBATIM.
+ */
+const PARTIAL_HOST_G = 'PartialInlineHostG';
+const INLINE_HOST_G = 'InlineEquivHostG';
+
+describe('Phase 56 — shared module-let before-side literal byte-identity', () => {
+  describe.each(TARGETS)('%s target', (target) => {
+    it('shared-let before-side partial-inlined host === inline-equivalent host (literal, sandwiched-let comment preserved)', () => {
+      const partial = normalizeName(loadFixture(PARTIAL_HOST_G, target), PARTIAL_HOST_G);
+      const inline = normalizeName(loadFixture(INLINE_HOST_G, target), INLINE_HOST_G);
+      expect(partial).toBe(inline);
+    });
+  });
+});

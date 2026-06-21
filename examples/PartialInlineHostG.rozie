@@ -1,0 +1,30 @@
+<rozie name="PartialInlineHostG">
+
+<props>
+{
+  base: { type: Number, default: 1 },
+}
+</props>
+
+<script lang="ts">
+const headG = (n: number): number => n + 1;
+let selectAllBoxG = headG(1);
+import { afterDeclG, midDeclG } from './partialLogicG.rzts';
+// before-side: the sandwiched host let trails the spliced midDeclG above
+let rangeTransitionG = midDeclG(1);
+import { beforeDeclG } from './partialLogicG2.rzts';
+// before-side: the sandwiched host let trails the spliced beforeDeclG above
+let fillDragUpG = beforeDeclG(1);
+</script>
+
+<template>
+<div class="partial-inline-host">
+  <span class="echo">{{ selectAllBoxG }}</span>
+  <span class="echo">{{ afterDeclG(1) }}</span>
+  <span class="echo">{{ rangeTransitionG }}</span>
+  <span class="echo">{{ beforeDeclG(1) }}</span>
+  <span class="echo">{{ fillDragUpG }}</span>
+</div>
+</template>
+
+</rozie>

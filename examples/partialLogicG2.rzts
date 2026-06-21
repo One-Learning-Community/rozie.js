@@ -1,0 +1,5 @@
+// partialLogicG2.rzts — Phase 56 SHARED MODULE-LET (R3) guard partial (before-side run).
+
+export const beforeDeclG = (k: number): number => k * 5;
+
+export const neverUsedG2 = (k: number): number => k * 777;

@@ -1,0 +1,8 @@
+// partialLogicG.rzts — Phase 56 SHARED MODULE-LET (R3) guard partial.
+// (DRAFT — shaped empirically against the bootstrap diff.)
+
+export const afterDeclG = (k: number): number => k * 2;
+
+export const midDeclG = (k: number): number => k + 3;
+
+export const neverUsedG = (k: number): number => k * 999;

@@ -333,6 +333,26 @@ const EXAMPLES = [
   // source consumed only via inline — not an EXAMPLES entry.
   'PartialInlineHostE',
   'InlineEquivHostE',
+  // Phase 56 (script-partial-cross-target-comment-placement-parity) — the SHARED
+  // MODULE-`let` (R3) BEFORE-side GREEN-×6 regression guard. partialLogicG.rzts /
+  // partialLogicG2.rzts export comment-bearing arrow consts that splice as contiguous
+  // runs DIRECTLY ABOVE sandwiched host `let`s that STAY in the host (rangeTransitionG
+  // trails the spliced midDeclG; fillDragUpG trails the spliced beforeDeclG). The
+  // authored comment LEADS each host `let` (before-side): prev is the spliced decl,
+  // cur is the commented host `let` — the Plan 02 prev-spliced TRAILING-seam mirror
+  // already restores the per-statement doubling on svelte/vue, so all six targets are
+  // byte-identical here. NOTE: research assumption A3 (a solid/react "spurious SECOND
+  // copy" at this seam) was empirically FALSIFIED — across five fixture shapes
+  // solid/react NEVER double a shared comment at a sandwiched-let seam (whole-program
+  // dedup + arrow→function conversion structurally collapse any duplicate), so there is
+  // no solid/react break to suppress here. HostG ships as a permanent GREEN-×6 guard
+  // that the before-side seam stays byte-neutral; the REAL isolated bug (after-side
+  // host-`let`-trailing comment drop on svelte/vue) is guarded by HostI below.
+  // PartialInlineHostG references a sibling .rzts and is added to
+  // EXAMPLES_NEEDING_RESOLVER_ROOT below; InlineEquivHostG is single-file and stays OUT.
+  // The .rzts partials are LEAF sources consumed only via inline — not EXAMPLES entries.
+  'PartialInlineHostG',
+  'InlineEquivHostG',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -395,6 +415,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT.
   // The single-file InlineEquivHostE oracle also stays OUT.
   'PartialInlineHostE',
+  // Phase 56 — references ./partialLogicG.rzts; needs resolver root so the
+  // ProducerResolver locates the sibling shared-module-`let` partial at compile/inline
+  // time (same pattern as PartialInlineHostC). The .rzts partial is a LEAF source
+  // consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
+  // single-file InlineEquivHostG oracle also stays OUT.
+  'PartialInlineHostG',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
