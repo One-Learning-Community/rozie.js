@@ -1,0 +1,195 @@
+// the live sort direction off the table-core column (string-safe — never a bound
+// boolean, the listbox aria lesson).
+const ariaSortFor = (colId) => {
+  if (tick() < 0 || !table) return 'none'
+  const col = table.getColumn(colId)
+  if (!col) return 'none'
+  const dir = col.getIsSorted()
+  if (dir === 'asc') return 'ascending'
+  if (dir === 'desc') return 'descending'
+  return 'none'
+}
+
+// A small sort-direction glyph for the header (▲/▼/empty). Decorative — aria-hidden.
+const sortIndicator = (colId) => {
+  if (tick() < 0 || !table) return ''
+  const col = table.getColumn(colId)
+  if (!col) return ''
+  const dir = col.getIsSorted()
+  if (dir === 'asc') return '▲'
+  if (dir === 'desc') return '▼'
+  return ''
+}
+
+// Template helpers reading the resolved column-def metadata by id (plain fns — used
+// in template predicates + interpolation; uniform on all 6, no $computed alias trap).
+const defFor = (colId) => {
+  const defs = columnDefs()
+  for (const d of defs) if (d.id === colId) return d
+  return null
+}
+// Per-row visible cells for the body loop. table-core memoizes row objects by id,
+// so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
+// registry on first mount) returns the SAME row references with a different cell
+// set. Solid's reference-keyed <For> keeps the existing <tr> and will NOT re-run a
+// child loop whose `each` reads no signal — so a bare `row.getVisibleCells()` goes
+// stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
+// refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
+// re-derives the cells on every row-model change. No-op on the coarse-render targets.
+const visibleCellsFor = (row) => ($data.rowModelVer >= 0 ? row.getVisibleCells() : [])
+
+// ── Editable-cell column-meta accessors (phase 51 req-1/2/5) ───────────────────────
+// editMetaOf: the resolved ColumnDef.meta for a column id (the editable config carried
+// from <Column>/`:columns` via columnDefs). Null-safe — an unknown/non-editable column
+// returns null and every predicate below short-circuits to the read-only path.
+const editMetaOf = (colId) => {
+  const d = defFor(colId)
+  return d && d.meta ? d.meta : null
+}
+// columnEditable: whether this column opted into editing (req-1). Drives every editor
+// gate; false → the cell stays the read-only #cell display (byte-identical-off).
+const columnEditable = (colId) => {
+  const m = editMetaOf(colId)
+  return !!(m && m.editable === true)
+}
+// editorTypeOf: the built-in editor kind ('text'|'number'|'select'|'checkbox') OR
+// 'custom' (the #editor scoped-slot escape hatch, req-2). Defaults to 'text'.
+const editorTypeOf = (colId) => {
+  const m = editMetaOf(colId)
+  return m && m.editor != null ? m.editor : 'text'
+}
+// editorOptionsOf: the select-editor options ([{ value, label }]) for editor='select'.
+const editorOptionsOf = (colId) => {
+  const m = editMetaOf(colId)
+  return m && m.editorOptions != null ? m.editorOptions : []
+}
+// hasEditorSlot: this column routes through the consumer's #editor scoped slot (req-2)
+// — true only when the column declared editor='custom' AND the consumer actually
+// provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
+// column marked 'custom' with no slot supplied degrades to the text editor, never blank).
+const hasEditorSlot = (colId) => editorTypeOf(colId) === 'custom' && !!$slots.editor
+
+const columnIsFilterable = (colId) => {
+  const d = defFor(colId)
+  return !!(d && d.filterable)
+}
+const headerLabel = (colId) => {
+  const d = defFor(colId)
+  return d ? d.header : colId
+}
+
+// ── Column-management chrome (req-8/9/10/11) ────────────────────────────────────────
+// Live header width (px) for a column — drives the <th> :style width binding. Reads the
+// table-core column size (post-mount) with a fallback to undefined (auto width).
+const headerWidth = (colId) => {
+  if (tick() < 0 || !table) return null
+  const col = table.getColumn(colId)
+  if (!col) return null
+  const w = col.getSize()
+  return w != null && w > 0 ? w + 'px' : null
+}
+
+// Pointer-drag resize handler for a resizable header — table-core's getResizeHandler()
+// returns a function bound to a pointerdown/touchstart event that drives the column
+// size through onColumnSizingChange (our writeColumnSizing funnel) under
+// columnResizeMode:'onChange'. Pure delegation; no scratch gesture state held in a
+// top-level const (the React fragile-binding rule — table-core owns the gesture state).
+const onResizeStart = (colId, evt) => {
+  // stop here (NOT a `.stop` modifier) — the Angular `.stop`-in-@for hoist is broken (F5).
+  if (evt && evt.stopPropagation) evt.stopPropagation()
+  if (!table) return
+  const header = findHeader(colId)
+  if (!header || !header.getResizeHandler) return
+  const handler = header.getResizeHandler()
+  if (handler) handler(evt)
+}
+// Find the live header object for a column id across the rendered header groups.
+const findHeader = (colId) => {
+  const groups = $data.headerGroups || []
+  for (const hg of groups) {
+    const hs = hg.headers || []
+    for (const h of hs) if (h && h.column && h.column.id === colId) return h
+  }
+  return null
+}
+const columnIsResizing = (colId) => {
+  if (tick() < 0 || !table) return false
+  const header = findHeader(colId)
+  return !!(header && header.column && header.column.getIsResizing && header.column.getIsResizing())
+}
+
+// Visibility toggle (req-8) — drive table-core's column.toggleVisibility so the
+// onColumnVisibilityChange funnel emits the fresh state.
+const columnIsVisible = (colId) => {
+  if (tick() < 0 || !table) return true
+  const col = table.getColumn(colId)
+  return !!(col && (col.getIsVisible ? col.getIsVisible() : true))
+}
+const onToggleVisibility = (colId) => {
+  if (!table) return
+  const col = table.getColumn(colId)
+  if (col && col.toggleVisibility) col.toggleVisibility()
+}
+// The full set of leaf columns (for the visibility-toggle menu) — id + header label +
+// current visibility. Excludes the auto-injected select column (always present).
+const allLeafColumns = () => {
+  if (tick() < 0 || !table) return []
+  const cols = table.getAllLeafColumns ? table.getAllLeafColumns() : []
+  const out = []
+  for (const c of cols) {
+    if (!c || c.id === SELECT_COL_ID) continue
+    out.push({ id: c.id, label: headerLabel(c.id), visible: !!(c.getIsVisible && c.getIsVisible()) })
+  }
+  return out
+}
+
+// Pinning (req-11) — drive table-core's column.pin('left'|'right'|false) so the
+// onColumnPinningChange funnel emits a fresh state. Sticky offsets read the live column
+// start/after positions (table-core computes them from the pinned column sizes).
+const columnPinSide = (colId) => {
+  if (tick() < 0 || !table) return false
+  const col = table.getColumn(colId)
+  if (!col || !col.getIsPinned) return false
+  return col.getIsPinned()
+}
+// NOTE: the event is stopped HERE (evt.stopPropagation()) rather than via a `.stop`
+// template modifier. The Angular emitter, hoisting a `.stop`-modified handler that
+// lives INSIDE an `@for` loop into a class-field wrapper, drops the component `this.`
+// qualifier (→ `onPinColumn(...)` bare ReferenceError) and fails to capture the loop
+// var — so a `@click.stop="onPinColumn(...)"` inside the header `@for` breaks on
+// Angular (F5). Stopping inside the handler sidesteps the broken hoist on all six.
+const onPinColumn = (colId, side, evt) => {
+  if (evt && evt.stopPropagation) evt.stopPropagation()
+  if (!table) return
+  const col = table.getColumn(colId)
+  if (col && col.pin) col.pin(side)
+}
+// Sticky inline style for a pinned header/cell — position:sticky + the computed left or
+// right offset. Returns '' (no sticky) for unpinned columns. Returned as a STRING (the
+// :style binding is value-driven — never an eval'd attr).
+const pinStyle = (colId) => {
+  if (tick() < 0 || !table) return ''
+  const col = table.getColumn(colId)
+  if (!col || !col.getIsPinned) return ''
+  const side = col.getIsPinned()
+  if (side === 'left') {
+    const left = col.getStart ? col.getStart('left') : 0
+    return 'position:sticky;left:' + left + 'px;z-index:1;'
+  }
+  if (side === 'right') {
+    const right = col.getAfter ? col.getAfter('right') : 0
+    return 'position:sticky;right:' + right + 'px;z-index:1;'
+  }
+  return ''
+}
+// Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
+// uniform on all 6, no bound-object trap.
+const thStyle = (colId) => {
+  let s = ''
+  const w = headerWidth(colId)
+  if (w) s += 'width:' + w + ';'
+  s += pinStyle(colId)
+  return s
+}
+
+export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }

@@ -1,0 +1,173 @@
+// ── Filter chrome handlers ─────────────────────────────────────────────────────────
+// Global search input → funnel through table-core's setGlobalFilter so the
+// onGlobalFilterChange callback fires the echo-guarded writer. Capture the fresh local
+// value (never re-read a just-written $data key — React stale-read).
+const onGlobalFilterInput = (evt) => {
+  const value = evt && evt.target ? evt.target.value : ''
+  if (table) { table.setGlobalFilter(value); return }
+  writeGlobalFilter(value)
+}
+// Per-column filter input → setColumnFilter (fresh-array funnel).
+const onColumnFilterInput = (colId, evt) => {
+  const value = evt && evt.target ? evt.target.value : ''
+  setColumnFilter(colId, value)
+}
+// The live global filter value (bound to the search <input>, value-driven NOT eval'd).
+const globalFilterValue = () => {
+  const v = currentState().globalFilter
+  return v != null ? v : ''
+}
+
+// ── Pagination chrome ────────────────────────────────────────────────────────────
+// Read the live pagination state off table-core (post-mount) with a currentState()
+// fallback (pre-mount / SSR). All string-safe (no bound booleans).
+const pageIndex = () => {
+  if (tick() >= 0 && table) return table.getState().pagination.pageIndex
+  const p = currentState().pagination
+  return p && p.pageIndex != null ? p.pageIndex : 0
+}
+const pageSize = () => {
+  if (tick() >= 0 && table) return table.getState().pagination.pageSize
+  const p = currentState().pagination
+  return p && p.pageSize != null ? p.pageSize : 10
+}
+const pageCount = () => {
+  if (tick() < 0 || !table) return 1
+  const c = table.getPageCount()
+  return c != null && c > 0 ? c : 1
+}
+const canPrevPage = () => !!(tick() >= 0 && table && table.getCanPreviousPage())
+const canNextPage = () => !!(tick() >= 0 && table && table.getCanNextPage())
+const onPrevPage = () => { if (table) table.previousPage() }
+const onNextPage = () => { if (table) table.nextPage() }
+const onPageSizeChange = (evt) => {
+  if (!table) return
+  const v = evt && evt.target ? evt.target.value : ''
+  const n = parseInt(v, 10)
+  table.setPageSize(Number.isFinite(n) && n > 0 ? n : 10)
+}
+
+// ── Row-selection chrome (req-7) ───────────────────────────────────────────────────
+// Detect the auto-injected leading checkbox column by its constant id (template uses
+// this to render checkbox chrome instead of an accessor value).
+const isSelectColumn = (colId) => colId === SELECT_COL_ID
+// ── Expandable-rows template helpers (phase 50, D-04) ──────────────────────────────
+// isExpanderColumn: the auto-injected leading chevron column predicate (mirrors
+// isSelectColumn). rowIsExpanded / rowCanExpand read table-core row handles THROUGH the
+// reactive tick (rowModelVer) so the chevron glyph + aria-expanded + the #detail r-if
+// re-derive on a re-pull on the fine-grained targets (Solid/Lit) — same discipline as
+// visibleCellsFor. `!!`-coerced so a bound aria-expanded emits an UNWRAPPED boolean (the
+// listbox aria lesson — never a rozieAttr string → TS2322 on React/Solid).
+const isExpanderColumn = (colId) => colId === EXPANDER_COL_ID
+const rowCanExpand = (row) => !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand())
+const rowIsExpanded = (row) => !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded())
+// rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
+// row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
+// $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+const rowShowsDetail = (row) => ($props.getSubRows == null && rowIsExpanded(row))
+// Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
+// fires exactly one expanded-change. Used by the chevron @click (native <button> handles
+// Enter/Space → click, so NO explicit @keydown.enter/.space — that would DOUBLE-toggle on
+// a real button; the grid @keydown is inert in 'table' mode, isGrid()-gated).
+const onToggleExpand = (row, evt) => {
+  if (!row || !row.toggleExpanded) return
+  // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
+  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
+  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
+  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
+  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
+  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
+  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
+  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
+  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null
+  row.toggleExpanded()
+  if (ownerRow && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      const btn = ownerRow.querySelector('[data-expander]')
+      if (btn) btn.focus()
+    })
+  }
+}
+// bodyCellStyle: the non-virtual <td> inline style — pinStyle PLUS a depth-proportional
+// left pad on the EXPANDER cell so nested getSubRows children visibly indent (row.depth).
+// Only the expander column indents (the tree affordance lives in its dedicated column);
+// data columns stay grid-aligned. depth 0 → unchanged (byte-identical-off).
+const bodyCellStyle = (row, colId) => {
+  const base = pinStyle(colId)
+  if (isExpanderColumn(colId) && row && row.depth) {
+    const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem'
+    return base ? (base + ';' + pad) : pad
+  }
+  return base
+}
+// ── Grouping template helpers (phase 50 reqs 4-7, D-04/D-05) ───────────────────────────
+// Group-header rows ARE expandable rows: table-core's getGroupedRowModel FLATTENS them into
+// $data.rows carrying getIsGrouped()/subRows, so they ride the SAME D-04 <template r-for> seam
+// (no parallel render path, no nested r-for). These predicates read through the reactive tick
+// (rowModelVer) so the group chrome + collapse state re-derive on a re-pull on the fine-grained
+// targets (Solid/Lit) — same discipline as rowIsExpanded/visibleCellsFor. `!!`-coerced (the
+// listbox aria lesson — a bound boolean must be UNWRAPPED, never a rozieAttr string → TS2322).
+// rowIsGrouped: this flattened row is a group-header row.
+const rowIsGrouped = (row) => !!(tick() >= 0 && row && row.getIsGrouped && row.getIsGrouped())
+// groupingActive: grouping is currently engaged (a non-empty ordered key list). Drives the
+// data-group-leaf marker so it is ABSENT when ungrouped (byte-identical-off, req-10).
+const groupingActive = () => (tick() >= 0 && ((currentState().grouping || []).length > 0))
+// cellIsGrouped / cellIsAggregated: per-CELL roles on a group-header row. The grouped cell shows
+// the group key + toggle + count; an aggregated cell shows the rolled-up value through the
+// EXISTING #cell slot (cell.getValue()) — NO new aggregatedCell template (RESEARCH State of the
+// Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
+const cellIsGrouped = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped())
+const cellIsAggregated = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated())
+// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
+// the header, e.g. "North (3)").
+const groupSubRowCount = (row) => (row && row.subRows ? row.subRows.length : 0)
+// groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
+// default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
+// both reactive sources, so the bar re-renders on a grouping change across all six targets.
+const groupingKeys = () => (currentState().grouping || [])
+// groupableColumns: the data columns OFFERED to the headless #groupBar (those whose Column/config
+// `groupable` is not false) — `[{ id, label }]`. Excludes the chrome columns (select/expander are
+// not in columnDefs()). The consumer builds any bar/drag UI from this; the component ships none.
+const groupableColumns = () => {
+  const out = []
+  const defs = columnDefs()
+  for (const d of defs) {
+    if (!d || d.groupable === false) continue
+    out.push({ id: d.id, label: d.header != null ? d.header : d.id })
+  }
+  return out
+}
+// Plain stop-propagation handler (used in place of the `@click.stop` bare modifier —
+// a bare `.stop` with no handler hoists to `_guardedUndefined` → `this.undefined($event)`
+// on Angular inside an `@for`, F5). Calling an explicit handler is uniform on all six.
+const stopEvent = (evt) => { if (evt && evt.stopPropagation) evt.stopPropagation() }
+// select-all header state (D-06: scopes to all filtered rows = TanStack default).
+// `!!`-coerced booleans (the listbox aria lesson — never a bound rozieAttr string).
+const isAllRowsSelected = () => !!(tick() >= 0 && table && table.getIsAllRowsSelected())
+const isSomeRowsSelected = () => !!(tick() >= 0 && table && table.getIsSomeRowsSelected())
+const onToggleAllRows = (evt) => {
+  if (!table) return
+  table.toggleAllRowsSelected(!!(evt && evt.target && evt.target.checked))
+}
+// per-row checkbox state + toggle (checkbox-only, D-05 — row body does NOT select).
+// Read selection from the LIVE controlled state (currentState().rowSelection keyed by
+// row.id) — NOT row.getIsSelected(). The latter reads table-core's row model, which
+// only reflects a selection AFTER the re-feed watch pushes the new `state` + re-pulls
+// (two reactive cycles on React). The controlled-state read updates in the SAME cycle
+// as the write funnel, so the controlled <input :checked> reflects the toggle without
+// the row-model-re-pull latency — the React controlled-checkbox revert that left
+// `.check()` seeing no state change (F6). row.getIsSelected() is the fallback.
+const rowIsSelected = (row) => {
+  if (!row) return false
+  const id = row.id
+  const sel = currentState().rowSelection || {}
+  if (id != null && Object.prototype.hasOwnProperty.call(sel, id)) return !!sel[id]
+  return !!(row.getIsSelected && row.getIsSelected())
+}
+const onToggleRow = (row, evt) => {
+  if (!row || !row.toggleSelected) return
+  row.toggleSelected(!!(evt && evt.target && evt.target.checked))
+}
+
+export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow }
