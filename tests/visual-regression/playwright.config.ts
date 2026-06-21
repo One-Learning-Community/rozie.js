@@ -44,7 +44,15 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'pnpm build && pnpm preview',
+    // Serve the already-built `dist/` rather than rebuilding it here. In CI the
+    // "Build all packages" step (`turbo run build`) materializes this package's
+    // `dist/**` output before `test:visual` runs, so the six per-target Vite
+    // sub-builds are already on disk — rebuilding them a second time inside the
+    // webServer is pure waste and overran the 240s `timeout` (the VR red streak).
+    // The `[ -d dist ]` guard keeps standalone local runs working: if no build
+    // exists yet (cold checkout), it builds once; otherwise it goes straight to
+    // preview. Run `pnpm build` first to refresh a stale local `dist/`.
+    command: '[ -d dist ] || pnpm build; pnpm preview',
     port: 4180,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
