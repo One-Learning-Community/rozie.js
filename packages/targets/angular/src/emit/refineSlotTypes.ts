@@ -99,7 +99,17 @@ export function buildNgTemplateContextGuard(
   slots: SlotDecl[],
 ): string | null {
   if (slots.length === 0) return null;
-  const ctxNames = slots.map((s) => slotCtxName(s.name));
+  // Dedupe by distinct slot name — a slot referenced in multiple template
+  // locations appears multiple times in `slots`, but each distinct name has a
+  // single ctx type. Without this the union repeats members (`FooCtx | FooCtx`).
+  const seenCtxNames = new Set<string>();
+  const ctxNames: string[] = [];
+  for (const s of slots) {
+    const ctxName = slotCtxName(s.name);
+    if (seenCtxNames.has(ctxName)) continue;
+    seenCtxNames.add(ctxName);
+    ctxNames.push(ctxName);
+  }
   const unionType = ctxNames.join(' | ');
   return [
     `static ngTemplateContextGuard(`,

@@ -58,13 +58,6 @@ interface ColHeaderCtx {
   label: any;
 }
 
-interface ColHeaderCtx {
-  $implicit: { columnId: any; column: any; label: any };
-  columnId: any;
-  column: any;
-  label: any;
-}
-
 interface FilterCtx {
   $implicit: { columnId: any; uniqueValues: any; minMax: any };
   columnId: any;
@@ -77,67 +70,6 @@ interface SelectCellCtx {
   row: any;
   checked: any;
   toggle: any;
-}
-
-interface EditorCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
-  commit: any;
-  cancel: any;
-}
-
-interface CellCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
-}
-
-interface SelectAllCtx {
-  $implicit: { checked: any; indeterminate: any; toggle: any };
-  checked: any;
-  indeterminate: any;
-  toggle: any;
-}
-
-interface ColHeaderCtx {
-  $implicit: { columnId: any; column: any; label: any };
-  columnId: any;
-  column: any;
-  label: any;
-}
-
-interface ColHeaderCtx {
-  $implicit: { columnId: any; column: any; label: any };
-  columnId: any;
-  column: any;
-  label: any;
-}
-
-interface FilterCtx {
-  $implicit: { columnId: any; uniqueValues: any; minMax: any };
-  columnId: any;
-  uniqueValues: any;
-  minMax: any;
-}
-
-interface SelectCellCtx {
-  $implicit: { row: any; checked: any; toggle: any };
-  row: any;
-  checked: any;
-  toggle: any;
-}
-
-interface CellCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
 }
 
 interface EditorCtx {
@@ -894,17 +826,8 @@ export class DataTable {
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
-  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
-  @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
-  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
-  @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
-  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
-  @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
-  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
-  @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
-  @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
@@ -3363,7 +3286,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | EditorCtx | CellCtx | SelectAllCtx | ColHeaderCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | CellCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | EditorCtx | CellCtx | DetailCtx {
     return true;
   }
 

@@ -176,6 +176,56 @@ describe('emitScript — TodoList slot context interfaces', () => {
   });
 });
 
+describe('emitScript — repeated named-slot dedup (regression)', () => {
+  // A template may reference the same named slot in multiple locations (e.g.
+  // DataTable's `colHeader`, Slider's `bubble`). Each distinct name backs
+  // exactly one @ContentChild field + one ctx interface; emitting one per
+  // reference produced "Duplicate member" (esbuild) and TS2300 (duplicate
+  // identifier), crashing the Angular build. Regression guard for that fix.
+  function loadInlineIR(src: string): IRComponent {
+    const result = parse(src, { filename: 'RepeatedSlot.rozie' });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  const SRC = `<rozie name="RepeatedSlot">
+<template>
+  <div>
+    <slot name="bubble" :value="1" />
+    <slot name="bubble" :value="2" />
+  </div>
+</template>
+</rozie>`;
+
+  it('emits exactly one @ContentChild for a slot referenced twice', () => {
+    const ir = loadInlineIR(SRC);
+    const { classBody } = emitScript(ir);
+    const occurrences = classBody.match(/@ContentChild\('bubble'/g) ?? [];
+    expect(occurrences).toHaveLength(1);
+  });
+
+  it('emits exactly one ctx interface for a repeated slot', () => {
+    const ir = loadInlineIR(SRC);
+    const { interfaceDecls } = emitScript(ir);
+    const joined = interfaceDecls.join('\n');
+    const occurrences = joined.match(/interface BubbleCtx\b/g) ?? [];
+    expect(occurrences).toHaveLength(1);
+  });
+
+  it('ngTemplateContextGuard union has no repeated members', () => {
+    const ir = loadInlineIR(SRC);
+    const { classBody } = emitScript(ir);
+    const occurrences = classBody.match(/\bBubbleCtx\b/g) ?? [];
+    // BubbleCtx appears once in the @ContentChild field type and once in the
+    // guard union — never twice in either site.
+    expect(occurrences).toHaveLength(2);
+  });
+});
+
 describe('emitScript — per-block snapshot fixtures', () => {
   it('Counter.script.snap', async () => {
     const ir = loadIR('Counter');

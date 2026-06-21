@@ -14,16 +14,6 @@ interface BubbleCtx {
   value: any;
 }
 
-interface BubbleCtx {
-  $implicit: { value: any };
-  value: any;
-}
-
-interface BubbleCtx {
-  $implicit: { value: any };
-  value: any;
-}
-
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v;
@@ -293,8 +283,6 @@ export class Slider {
   change = output<unknown>();
   @ContentChild('mark', { read: TemplateRef }) markTpl?: TemplateRef<MarkCtx>;
   @ContentChild('bubble', { read: TemplateRef }) bubbleTpl?: TemplateRef<BubbleCtx>;
-  @ContentChild('bubble', { read: TemplateRef }) bubbleTpl?: TemplateRef<BubbleCtx>;
-  @ContentChild('bubble', { read: TemplateRef }) bubbleTpl?: TemplateRef<BubbleCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   fillStyle = computed(() => {
@@ -461,7 +449,7 @@ export class Slider {
   static ngTemplateContextGuard(
     _dir: Slider,
     _ctx: unknown,
-  ): _ctx is MarkCtx | BubbleCtx | BubbleCtx | BubbleCtx {
+  ): _ctx is MarkCtx | BubbleCtx {
     return true;
   }
 

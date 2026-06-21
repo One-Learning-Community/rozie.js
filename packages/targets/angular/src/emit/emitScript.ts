@@ -869,7 +869,17 @@ export function emitScript(
     interfaceDecls.push(genCode(typeDecl));
   }
   const slotFieldDecls: string[] = [];
+  // Dedupe by DISTINCT slot name — a template may reference the same named
+  // slot in multiple locations (e.g. DataTable's `colHeader`, Slider's
+  // `bubble`), but each distinct name backs exactly one `@ContentChild` field
+  // and one ctx interface. Without this, repeated references emit duplicate
+  // class members ("Duplicate member" esbuild error) and duplicate interface
+  // identifiers (TS2300), breaking the Angular build. Mirrors the per-target
+  // `seenSlotNames` dedup in Lit/Solid/Svelte/React emitSlotDecl.ts (47-03).
+  const seenSlotNames = new Set<string>();
   for (const slot of ir.slots) {
+    if (seenSlotNames.has(slot.name)) continue;
+    seenSlotNames.add(slot.name);
     const ctx = buildSlotCtx(slot);
     interfaceDecls.push(ctx.interfaceDecl);
     slotFieldDecls.push(ctx.fieldDecl);
