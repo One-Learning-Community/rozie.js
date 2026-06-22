@@ -27,17 +27,21 @@
   },
   "exports": {
     ".": {
+      "svelte": "./dist/Flatpickr.svelte",
+      "types": "./dist/Flatpickr.svelte.d.ts",
+      "default": "./dist/Flatpickr.svelte"
+    },
+    "./source": {
       "svelte": "./src/Flatpickr.svelte",
-      "types": "./src/Flatpickr.svelte",
-      "import": "./src/Flatpickr.svelte",
       "default": "./src/Flatpickr.svelte"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -52,10 +56,17 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
   }
 }
