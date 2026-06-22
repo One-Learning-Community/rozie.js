@@ -40,6 +40,26 @@
       "dependsOn": ["^build", "sync"],
       "outputs": []
     },
+    "react-vite-demo#typecheck": {
+      "dependsOn": ["build", "^build", "sync"],
+      "outputs": []
+    },
+    "solid-vite-demo#typecheck": {
+      "dependsOn": ["build", "^build", "sync"],
+      "outputs": []
+    },
+    "svelte-vite-demo#typecheck": {
+      "dependsOn": ["build", "^build", "sync"],
+      "outputs": []
+    },
+    "vue-vite-demo#typecheck": {
+      "dependsOn": ["build", "^build", "sync"],
+      "outputs": []
+    },
+    "lit-vanilla-demo#typecheck": {
+      "dependsOn": ["build", "^build", "sync"],
+      "outputs": []
+    },
     "dev": {
       "dependsOn": ["^build", "sync"],
       "cache": false,
