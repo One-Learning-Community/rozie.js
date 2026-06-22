@@ -289,11 +289,13 @@ function main() {
     // (SCOPE FENCE). As the sanctioned in-scope per-leaf type aid, widen the
     // generated options literal to `Record<string, any>` here in codegen GLUE
     // — durable across regeneration, scoped to the single line, and a pure
-    // type annotation (zero runtime/behavioral change; the source-only
-    // svelte/angular leaves are never type-checked at build and don't need it).
-    // Tracked as a RISK / emitter follow-up.
+    // type annotation (zero runtime/behavioral change). The svelte leaf
+    // (svelte-package) still never strict-body-checks at build and doesn't
+    // need it; the ANGULAR leaf, however, now compiles via ng-packagr (real
+    // ngc/tsc) under the dist+source standard, so it DOES — hence `angular`
+    // joins the type-checked set below. Tracked as a RISK / emitter follow-up.
     let code = r.code;
-    if (cfg.build === 'tsdown' || target === 'vue') {
+    if (cfg.build === 'tsdown' || target === 'vue' || target === 'angular') {
       const before = code;
       code = code.replace('const opts = {', 'const opts: Record<string, any> = {');
       if (code === before) {

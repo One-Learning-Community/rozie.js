@@ -331,7 +331,7 @@ export class FullCalendar {
       },
     };
     const __options = this.options();
-    const opts = {
+    const opts: Record<string, any> = {
       // :options passthrough spread FIRST — the curated keys below + the portal
       // *Content handlers added after this object override any colliding key, so
       // an explicitly-bound prop (e.g. :height) wins over options.height.
