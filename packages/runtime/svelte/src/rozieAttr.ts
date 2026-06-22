@@ -17,10 +17,20 @@
  *
  * On Svelte 5, an attribute bound to `undefined` is omitted from the element.
  *
+ * Generic, input-type-preserving signature: `rozieAttr<T>(v: T)` returns
+ * `Exclude<T, null | undefined> | undefined`. The non-nullish input type is
+ * preserved (not widened to `string`) so a dynamic NUMERIC attribute like
+ * `tabindex={rozieAttr(keyboardEnabled() ? 0 : null)}` stays assignable to
+ * Svelte's DOM typing `tabindex: number | null | undefined`. (Widening to
+ * `string` — the Solid `T extends string ? T : string` form — would reject
+ * numeric attrs under svelte-check.) The RUNTIME still stringifies every
+ * non-nullish value via `rozieDisplay`; only the static type is preserved, so
+ * the `as` cast bridges the compile-time type to the stringified runtime value.
+ *
  * @public — runtime API consumed by emitted .svelte files.
  */
 import { rozieDisplay } from './rozieDisplay.js';
 
-export function rozieAttr(v: unknown): string | undefined {
-  return v == null ? undefined : rozieDisplay(v);
+export function rozieAttr<T>(v: T): Exclude<T, null | undefined> | undefined {
+  return (v == null ? undefined : rozieDisplay(v)) as Exclude<T, null | undefined> | undefined;
 }
