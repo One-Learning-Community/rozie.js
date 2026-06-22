@@ -1,0 +1,86 @@
+<!--
+  EditorDate.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made NATIVE <input type="date"> cell-editor (ZERO new dependencies — no
+  flatpickr/engine) matching the headless built-in editor chrome
+  (class="rdt-cell-editor" + bare data-editing-cell). The native date input's value
+  is already an ISO `YYYY-MM-DD` string, so the draft IS the ISO string committed.
+
+  Behavior: local draft seeded from $props.value (setup-once); @change/@input
+  update the draft; Enter / blur / change commit the ISO string; Escape cancels.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
+  EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
+-->
+<rozie name="EditorDate" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId: { type: String,   default: '' },
+  column:   { type: null,     default: null },
+  row:      { type: null,     default: null },
+  value:    { type: null,     default: null },
+  commit:   { type: Function, default: null },
+  cancel:   { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  // Local draft — the native date value is an ISO `YYYY-MM-DD` string.
+  draft: '',
+}
+</data>
+
+<script lang="ts">
+// Seed the draft once from the incoming value (setup-once). A native date input
+// only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
+$data.draft = $props.value != null ? String($props.value) : ''
+
+const onInput = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+const doCommit = () => {
+  // commit the ISO date string the native control already produced.
+  $props.commit && $props.commit($data.draft)
+}
+const doCancel = () => {
+  $props.cancel && $props.cancel()
+}
+
+const onChange = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+  doCommit()
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Enter') {
+    e.preventDefault()
+    doCommit()
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault()
+    doCancel()
+  }
+}
+
+const onBlur = () => {
+  doCommit()
+}
+</script>
+
+<template>
+<input
+  class="rdt-cell-editor"
+  type="date"
+  data-editing-cell
+  :aria-label="$props.columnId"
+  :value="$data.draft"
+  @input="onInput($event)"
+  @change="onChange($event)"
+  @keydown="onKeydown($event)"
+  @blur="onBlur()"
+/>
+</template>
+
+</rozie>

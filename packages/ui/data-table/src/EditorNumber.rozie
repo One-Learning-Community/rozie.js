@@ -1,0 +1,84 @@
+<!--
+  EditorNumber.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made numeric cell-editor matching the headless built-in number editor
+  (class="rdt-cell-editor" + bare data-editing-cell). Same draft/keymap as
+  EditorText, but commits a coerced Number($data.draft) — numeric coercion at
+  COMMIT time only; the input `value` stays bound to the draft STRING.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
+  EditorText.rozie for the slot-wiring + styling rationale. NO <style> block.
+-->
+<rozie name="EditorNumber" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId: { type: String,   default: '' },
+  column:   { type: null,     default: null },
+  row:      { type: null,     default: null },
+  value:    { type: null,     default: null },
+  commit:   { type: Function, default: null },
+  cancel:   { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  draft: '',
+}
+</data>
+
+<script lang="ts">
+// Seed the draft string once from the incoming value (setup-once).
+$data.draft = $props.value != null ? String($props.value) : ''
+
+const onInput = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+// Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
+// commits null rather than NaN (Number('') === 0 is a silent footgun); a
+// non-numeric draft also commits null. Otherwise commit the coerced number.
+const doCommit = () => {
+  if (!$props.commit) return
+  const raw = $data.draft
+  if (raw == null || String(raw).trim() === '') {
+    $props.commit(null)
+    return
+  }
+  const n = Number(raw)
+  $props.commit(Number.isNaN(n) ? null : n)
+}
+const doCancel = () => {
+  $props.cancel && $props.cancel()
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Enter') {
+    e.preventDefault()
+    doCommit()
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault()
+    doCancel()
+  }
+}
+
+const onBlur = () => {
+  doCommit()
+}
+</script>
+
+<template>
+<input
+  class="rdt-cell-editor"
+  type="number"
+  data-editing-cell
+  :aria-label="$props.columnId"
+  :value="$data.draft"
+  @input="onInput($event)"
+  @keydown="onKeydown($event)"
+  @blur="onBlur()"
+/>
+</template>
+
+</rozie>

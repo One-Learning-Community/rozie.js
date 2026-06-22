@@ -1,0 +1,58 @@
+<!--
+  EditorSelect.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made <select> cell-editor matching the headless built-in select editor
+  (class="rdt-cell-editor" + bare data-editing-cell). Immediate-commit-on-change:
+  no local draft — @change commits the selected value right away; Escape cancels.
+
+  Consumers pass an `options` array of `[{ value, label }]` (the same shape as a
+  <Column editor="select" :editorOptions="…">). The <select> value binds to the
+  incoming $props.value directly.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
+  EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
+-->
+<rozie name="EditorSelect" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId: { type: String,   default: '' },
+  column:   { type: null,     default: null },
+  row:      { type: null,     default: null },
+  value:    { type: null,     default: null },
+  commit:   { type: Function, default: null },
+  cancel:   { type: Function, default: null },
+  // The select options — `[{ value, label }]`. Mirrors <Column editorOptions>.
+  options:  { type: Array,    default: () => [] },
+}
+</props>
+
+<script lang="ts">
+// Immediate-commit-on-change: read the selected value the global-filter way and
+// commit it directly (no draft needed for a single-gesture select).
+const onChange = (e) => {
+  $props.commit && $props.commit(e && e.target ? e.target.value : '')
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Escape') {
+    e.preventDefault()
+    $props.cancel && $props.cancel()
+  }
+}
+</script>
+
+<template>
+<select
+  class="rdt-cell-editor"
+  data-editing-cell
+  :aria-label="$props.columnId"
+  :value="$props.value"
+  @change="onChange($event)"
+  @keydown="onKeydown($event)"
+>
+  <option r-for="opt in $props.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+</select>
+</template>
+
+</rozie>

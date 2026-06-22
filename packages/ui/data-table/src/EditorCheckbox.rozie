@@ -1,0 +1,54 @@
+<!--
+  EditorCheckbox.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made checkbox cell-editor matching the headless built-in checkbox editor
+  (class="rdt-cell-editor" + bare data-editing-cell). Immediate-commit-on-change:
+  no draft — @change commits the boolean checked state; Escape cancels.
+
+  The `checked` binding is `!!$props.value` so any truthy/falsy incoming value maps
+  to a real boolean (never author a bare `<input checked>` — bind :checked).
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
+  EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
+-->
+<rozie name="EditorCheckbox" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId: { type: String,   default: '' },
+  column:   { type: null,     default: null },
+  row:      { type: null,     default: null },
+  value:    { type: null,     default: null },
+  commit:   { type: Function, default: null },
+  cancel:   { type: Function, default: null },
+}
+</props>
+
+<script lang="ts">
+// Immediate-commit-on-change: read .checked the global-filter way, coerce to a
+// real boolean, and commit it directly.
+const onChange = (e) => {
+  $props.commit && $props.commit(!!(e && e.target ? e.target.checked : false))
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Escape') {
+    e.preventDefault()
+    $props.cancel && $props.cancel()
+  }
+}
+</script>
+
+<template>
+<input
+  class="rdt-cell-editor"
+  type="checkbox"
+  data-editing-cell
+  :aria-label="$props.columnId"
+  :checked="!!$props.value"
+  @change="onChange($event)"
+  @keydown="onKeydown($event)"
+/>
+</template>
+
+</rozie>

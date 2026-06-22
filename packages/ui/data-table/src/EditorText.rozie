@@ -1,0 +1,103 @@
+<!--
+  EditorText.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made text cell-editor that visually matches the headless built-in text
+  editor (class="rdt-cell-editor" + the load-bearing bare data-editing-cell attr).
+  Consumers fill the parent's #editor scoped slot with it:
+
+    <DataTable …>
+      <template #editor="{ value, commit, cancel, column, row, columnId }">
+        <EditorText :value="value" :commit="commit" :cancel="cancel"
+                    :column="column" :row="row" :columnId="columnId" />
+      </template>
+    </DataTable>
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. It receives
+  the slot scope props (value + the commit/cancel function props) and calls them.
+  Because the drop-in lives in the consumer's slot OUTSIDE the parent's
+  onEditorKeyDown path, it owns its OWN Enter/Escape keymap.
+
+  Behavior: local draft in $data, seeded from $props.value in setup-once <script>;
+  @input updates the draft; Enter → commit(draft); blur → commit(draft);
+  Escape → cancel(). preventDefault on Enter/Escape.
+
+  Styling: ZERO CSS of its own. `.rdt-cell-editor` is the descendant selector
+  `.rozie-data-table .rdt-cell-editor` defined ONLY in DataTable.rozie's <style>;
+  a slotted <EditorText> renders INSIDE the .rozie-data-table subtree so DOM
+  nesting reaches that selector. NO <style> block here.
+-->
+<rozie name="EditorText" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The column id (mirrors the #editor slot scope). Optional — used for an
+  // aria-label fallback if a consumer doesn't override.
+  columnId: { type: String,   default: '' },
+  // The table-core column object (opaque passthrough).
+  column:   { type: null,     default: null },
+  // The consumer's row data object (opaque passthrough).
+  row:      { type: null,     default: null },
+  // The current draft value the editor seeds from.
+  value:    { type: null,     default: null },
+  // (value) => void — commit the cell. Null-guarded at call sites.
+  commit:   { type: Function, default: null },
+  // () => void — revert the cell. Null-guarded at call sites.
+  cancel:   { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  // Local editing draft so the user can type before committing.
+  draft: '',
+}
+</data>
+
+<script lang="ts">
+// Seed the draft once at setup from the incoming value (setup-once, NOT in the
+// template). Normalize null/undefined to '' so the input value binds to a string.
+$data.draft = $props.value != null ? String($props.value) : ''
+
+// Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+// ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
+const onInput = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+// commit/cancel are Function props (default null) — guard before calling.
+const doCommit = () => {
+  $props.commit && $props.commit($data.draft)
+}
+const doCancel = () => {
+  $props.cancel && $props.cancel()
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Enter') {
+    e.preventDefault()
+    doCommit()
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault()
+    doCancel()
+  }
+}
+
+const onBlur = () => {
+  doCommit()
+}
+</script>
+
+<template>
+<input
+  class="rdt-cell-editor"
+  type="text"
+  data-editing-cell
+  :aria-label="$props.columnId"
+  :value="$data.draft"
+  @input="onInput($event)"
+  @keydown="onKeydown($event)"
+  @blur="onBlur()"
+/>
+</template>
+
+</rozie>
