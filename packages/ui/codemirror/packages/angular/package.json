@@ -31,6 +31,7 @@
     },
     "./languages": {
       "types": "./src/languages.ts",
+      "import": "./src/languages.ts",
       "default": "./src/languages.ts"
     },
     "./source": {
