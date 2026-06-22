@@ -48,7 +48,7 @@ export class WrapperModal {
 
   private __rozieCvaOnChange: (v: boolean) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: boolean | null): void {
     this.open.set(v ?? false);

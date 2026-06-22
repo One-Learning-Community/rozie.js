@@ -268,7 +268,7 @@ export class Cropper {
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: unknown | null): void {
     this.data.set(v ?? undefined);

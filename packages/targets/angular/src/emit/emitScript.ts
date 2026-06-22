@@ -297,7 +297,12 @@ function buildCvaClassShape(prop: PropDecl): string {
   return [
     `private __rozieCvaOnChange: (v: ${tsType}) => void = () => {};`,
     `private __rozieCvaOnTouchedFn: () => void = () => {};`,
-    `private __rozieCvaDisabled = signal(false);`,
+    // `protected`, not `private`: the disabled state is OR-merged into template
+    // `disabled` bindings as `this.__rozieCvaDisabled()`, and Angular's template
+    // type-checker (TCB) cannot access `private` component members — emitting it
+    // `private` makes ng-packagr/strict-tsc fail TS2341 (the two sibling members
+    // above are script-only, so they stay `private`).
+    `protected __rozieCvaDisabled = signal(false);`,
     ``,
     `writeValue(v: ${tsType} | null): void {`,
     writeValueBody,

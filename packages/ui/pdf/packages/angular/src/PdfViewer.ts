@@ -417,7 +417,7 @@ export class PdfViewer {
 
   private __rozieCvaOnChange: (v: number) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: number | null): void {
     this.page.set(v ?? 1);

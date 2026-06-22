@@ -421,7 +421,7 @@ export class Carousel {
 
   private __rozieCvaOnChange: (v: number) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: number | null): void {
     this.selectedIndex.set(v ?? 0);

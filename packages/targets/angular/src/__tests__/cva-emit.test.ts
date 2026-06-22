@@ -84,10 +84,14 @@ describe('emitAngular CVA — Task 2: methods + members (single-model)', () => {
     }
   });
 
-  it('emits the three private members', () => {
-    expect(code).toContain('__rozieCvaOnChange');
-    expect(code).toContain('__rozieCvaOnTouchedFn');
-    expect(code).toContain('__rozieCvaDisabled = signal(false)');
+  it('emits the CVA backing members (two private, one protected)', () => {
+    expect(code).toContain('private __rozieCvaOnChange');
+    expect(code).toContain('private __rozieCvaOnTouchedFn');
+    // `protected`, not `private`: it is read from the template `disabled` binding
+    // (`this.__rozieCvaDisabled()`), which Angular's TCB cannot do for a `private`
+    // member — a `private` here regresses ng-packagr/strict-tsc to TS2341.
+    expect(code).toContain('protected __rozieCvaDisabled = signal(false)');
+    expect(code).not.toContain('private __rozieCvaDisabled');
   });
 
   it('writeValue coerces null to the declared default ("")', () => {

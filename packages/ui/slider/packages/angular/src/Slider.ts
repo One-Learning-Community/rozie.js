@@ -428,7 +428,7 @@ export class Slider {
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: unknown | null): void {
     this.value.set(v ?? null);

@@ -261,7 +261,7 @@ export class Flatpickr {
 
   private __rozieCvaOnChange: (v: string) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: string | null): void {
     this.date.set(v ?? '');
