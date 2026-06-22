@@ -322,7 +322,7 @@ export class SortableList {
 
   private __rozieCvaOnChange: (v: any[]) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: any[] | null): void {
     this.items.set(v ?? (() => [])());
