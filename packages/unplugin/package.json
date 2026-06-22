@@ -1,6 +1,6 @@
 {
   "name": "@rozie/unplugin",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Universal build-tool plugin for Rozie.js — compile .rozie files in Vite, Rollup, Webpack, esbuild, Rolldown, and Rspack from one factory.",
   "type": "module",
   "private": false,
