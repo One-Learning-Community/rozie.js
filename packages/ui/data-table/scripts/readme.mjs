@@ -93,6 +93,7 @@ const SET_D_TITLE = 'Editable cells (inline edit + validation)';
 const SET_E_TITLE = 'Expandable rows (`#detail` slot + nested sub-rows)';
 const SET_F_TITLE = 'Grouping + aggregation (headless `#groupBar`)';
 const SET_G_TITLE = 'Faceted filtering exposure (headless `#filter`)';
+const SET_H_TITLE = 'Drop-in editor components (`#editor`)';
 
 // Editing example dataset — one field per built-in editor type (text/number/select/
 // checkbox) + the `score` field routed through the custom `#editor` scoped slot. The
@@ -365,6 +366,50 @@ export function Demo() {
   );
 }`,
     },
+    {
+      title: SET_H_TITLE,
+      lang: 'tsx',
+      code: `import { useState } from 'react';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
+  // DEFAULT; the editors are additive named exports. Mark each column editor="custom"
+  // (the drop-in owns rendering) and dispatch by columnId. Each editor takes the slot
+  // scope as props ({ columnId, column, row, value, commit, cancel }); EditorSelect
+  // also takes \`options\`. Use them as-is, or fork one as a template.
+  const [rows, setRows] = useState(${EDIT_ROWS});
+  const statusOptions = ${STATUS_OPTIONS};
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      // The #editor scoped slot is a render prop on React (the documented edge).
+      renderEditor={(scope) => {
+        switch (scope.columnId) {
+          case 'name':   return <EditorText {...scope} />;
+          case 'qty':    return <EditorNumber {...scope} />;
+          case 'status': return <EditorSelect {...scope} options={statusOptions} />;
+          case 'active': return <EditorCheckbox {...scope} />;
+          case 'score':  return <EditorDate {...scope} />;
+          default:       return null;
+        }
+      }}
+    >
+      <Column field="name" header="Name" editable editor="custom" />
+      <Column field="qty" header="Qty" editable editor="custom" />
+      <Column field="status" header="Status" editable editor="custom" />
+      <Column field="active" header="Active" editable editor="custom" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   vue: [
     {
@@ -566,6 +611,46 @@ const columnFilters = ref<{ id: string; value: unknown }[]>([]);
   </DataTable>
 </template>`,
     },
+    {
+      title: SET_H_TITLE,
+      lang: 'vue',
+      code: `<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless DEFAULT
+// export; the editors are additive named exports. v-bind the whole slot scope through
+// to each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+// takes :options. Use them as-is, or fork one as a template.
+const rows = ref(${EDIT_ROWS});
+const statusOptions = ${STATUS_OPTIONS};
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="custom" />
+    <Column field="qty" header="Qty" :editable="true" editor="custom" />
+    <Column field="status" header="Status" :editable="true" editor="custom" />
+    <Column field="active" header="Active" :editable="true" editor="custom" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- One #editor slot, dispatched by columnId, wiring the drop-in editors. -->
+    <template #editor="scope">
+      <EditorText v-if="scope.columnId === 'name'" v-bind="scope" />
+      <EditorNumber v-else-if="scope.columnId === 'qty'" v-bind="scope" />
+      <EditorSelect v-else-if="scope.columnId === 'status'" v-bind="scope" :options="statusOptions" />
+      <EditorCheckbox v-else-if="scope.columnId === 'active'" v-bind="scope" />
+      <EditorDate v-else-if="scope.columnId === 'score'" v-bind="scope" />
+    </template>
+  </DataTable>
+</template>`,
+    },
   ],
   svelte: [
     {
@@ -740,6 +825,49 @@ const columnFilters = ref<{ id: string; value: unknown }[]>([]);
       </fieldset>
     {:else}
       <input type="range" min={minMax[0]} max={minMax[1]} />
+    {/if}
+  {/snippet}
+</DataTable>`,
+    },
+    {
+      title: SET_H_TITLE,
+      lang: 'svelte',
+      code: `<script lang="ts">
+  import DataTable, {
+    Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-in editors fill the #editor snippet — DataTable stays the headless
+  // DEFAULT export; the editors are additive named exports. Spread the snippet scope
+  // through to each drop-in ({ columnId, column, row, value, commit, cancel });
+  // EditorSelect also takes \`options\`. Use them as-is, or fork one as a template.
+  let rows = $state(${EDIT_ROWS});
+  const statusOptions = ${STATUS_OPTIONS};
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+>
+  <Column field="name" header="Name" editable editor="custom" />
+  <Column field="qty" header="Qty" editable editor="custom" />
+  <Column field="status" header="Status" editable editor="custom" />
+  <Column field="active" header="Active" editable editor="custom" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- One #editor snippet, dispatched by columnId, wiring the drop-in editors. -->
+  {#snippet editor(scope)}
+    {#if scope.columnId === 'name'}
+      <EditorText {...scope} />
+    {:else if scope.columnId === 'qty'}
+      <EditorNumber {...scope} />
+    {:else if scope.columnId === 'status'}
+      <EditorSelect {...scope} options={statusOptions} />
+    {:else if scope.columnId === 'active'}
+      <EditorCheckbox {...scope} />
+    {:else if scope.columnId === 'score'}
+      <EditorDate {...scope} />
     {/if}
   {/snippet}
 </DataTable>`,
@@ -983,6 +1111,63 @@ export class DemoComponent {
   columnFilters: { id: string; value: unknown }[] = [];
 }`,
     },
+    {
+      title: SET_H_TITLE,
+      lang: 'ts',
+      code: `import { Component } from '@angular/core';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate],
+  template: \`
+    <!-- OPT-IN drop-in editors fill the #editor template — DataTable stays the headless
+         default; the editors are additive named exports. Each takes the slot scope as
+         inputs ([columnId] [column] [row] [value] [commit] [cancel]); EditorSelect also
+         takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="custom" />
+      <Column field="qty" header="Qty" [editable]="true" editor="custom" />
+      <Column field="status" header="Status" [editable]="true" editor="custom" />
+      <Column field="active" header="Active" [editable]="true" editor="custom" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel">
+        @switch (columnId) {
+          @case ('name') {
+            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('qty') {
+            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('status') {
+            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [options]="statusOptions" />
+          }
+          @case ('active') {
+            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('score') {
+            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+        }
+      </ng-template>
+    </DataTable>
+  \`,
+})
+export class DemoComponent {
+  rows = ${EDIT_ROWS};
+  statusOptions = ${STATUS_OPTIONS};
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+}`,
+    },
   ],
   solid: [
     {
@@ -1186,6 +1371,48 @@ export function Demo() {
   );
 }`,
     },
+    {
+      title: SET_H_TITLE,
+      lang: 'tsx',
+      code: `import { createSignal, Switch, Match } from 'solid-js';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
+  // default; the editors are additive named exports. Spread the slot scope through to
+  // each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+  // takes \`options\`. Use them as-is, or fork one as a template.
+  const [rows, setRows] = createSignal(${EDIT_ROWS});
+  const statusOptions = ${STATUS_OPTIONS};
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={(scope) => (
+        <Switch>
+          <Match when={scope.columnId === 'name'}><EditorText {...scope} /></Match>
+          <Match when={scope.columnId === 'qty'}><EditorNumber {...scope} /></Match>
+          <Match when={scope.columnId === 'status'}><EditorSelect {...scope} options={statusOptions} /></Match>
+          <Match when={scope.columnId === 'active'}><EditorCheckbox {...scope} /></Match>
+          <Match when={scope.columnId === 'score'}><EditorDate {...scope} /></Match>
+        </Switch>
+      )}
+    >
+      <Column field="name" header="Name" editable editor="custom" />
+      <Column field="qty" header="Qty" editable editor="custom" />
+      <Column field="status" header="Status" editable editor="custom" />
+      <Column field="active" header="Active" editable editor="custom" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}`,
+    },
   ],
   lit: [
     {
@@ -1360,6 +1587,48 @@ render(html\`
     <rozie-column field="name" header="Name"></rozie-column>
     <rozie-column field="category" header="Category" filterable></rozie-column>
     <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+\`, document.body);`,
+    },
+    {
+      title: SET_H_TITLE,
+      lang: 'ts',
+      code: `import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in editor
+// custom elements (<rozie-editor-text>, <rozie-editor-number>, <rozie-editor-select>,
+// <rozie-editor-checkbox>, <rozie-editor-date>). DataTable stays the headless default;
+// the editors are additive.
+import '@rozie-ui/data-table-lit';
+
+let rows = ${EDIT_ROWS};
+const statusOptions = ${STATUS_OPTIONS};
+
+// The #editor slot is the \`.editor\` property — a function returning a Lit template,
+// dispatched by columnId. Pass the slot scope ({ columnId, column, row, value, commit,
+// cancel }) as element properties; <rozie-editor-select> also takes \`.options\`.
+render(html\`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=\${rows}
+    @data-change=\${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=\${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    .editor=\${({ columnId, column, row, value, commit, cancel }) => {
+      const p = { columnId, column, row, value, commit, cancel };
+      switch (columnId) {
+        case 'name':   return html\`<rozie-editor-text .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-text>\`;
+        case 'qty':    return html\`<rozie-editor-number .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-number>\`;
+        case 'status': return html\`<rozie-editor-select .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel} .options=\${statusOptions}></rozie-editor-select>\`;
+        case 'active': return html\`<rozie-editor-checkbox .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-checkbox>\`;
+        case 'score':  return html\`<rozie-editor-date .columnId=\${p.columnId} .column=\${p.column} .row=\${p.row} .value=\${p.value} .commit=\${p.commit} .cancel=\${p.cancel}></rozie-editor-date>\`;
+        default:       return null;
+      }
+    }}
+  >
+    <rozie-column field="name" header="Name" editable editor="custom"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="custom"></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="custom"></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="custom"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
   </rozie-data-table>
 \`, document.body);`,
     },
