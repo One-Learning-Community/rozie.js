@@ -1673,15 +1673,34 @@ importers:
 
   packages/ui/chartjs/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19
-        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19
-        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       chart.js:
         specifier: ^4
         version: 4.5.1
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/chartjs/packages/lit:
     dependencies:
@@ -1735,14 +1754,27 @@ importers:
   packages/ui/chartjs/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       chart.js:
         specifier: ^4
         version: 4.5.1
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/chartjs/packages/vue:
     dependencies:
@@ -1815,12 +1847,6 @@ importers:
 
   packages/ui/codemirror/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19
-        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19
-        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       '@codemirror/commands':
         specifier: ^6
         version: 6.10.3
@@ -1869,6 +1895,31 @@ importers:
       codemirror:
         specifier: ^6
         version: 6.0.2
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/codemirror/packages/lit:
     dependencies:
@@ -2105,14 +2156,27 @@ importers:
         specifier: ^6
         version: 6.43.0
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       codemirror:
         specifier: ^6
         version: 6.0.2
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/codemirror/packages/vue:
     dependencies:
@@ -2185,15 +2249,34 @@ importers:
 
   packages/ui/cropper/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
       cropperjs:
         specifier: ^1
         version: 1.6.2
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/cropper/packages/lit:
     dependencies:
@@ -2250,14 +2333,27 @@ importers:
   packages/ui/cropper/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       cropperjs:
         specifier: ^1
         version: 1.6.2
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/cropper/packages/vue:
     devDependencies:
@@ -2297,21 +2393,37 @@ importers:
 
   packages/ui/data-table/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
-      '@angular/forms':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@21.2.13(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
       '@tanstack/table-core':
         specifier: ^8.21
         version: 8.21.3
       '@tanstack/virtual-core':
         specifier: ^3
         version: 3.17.1
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/data-table/packages/lit:
     dependencies:
@@ -2380,7 +2492,7 @@ importers:
   packages/ui/data-table/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       '@tanstack/table-core':
         specifier: ^8.21
@@ -2388,9 +2500,22 @@ importers:
       '@tanstack/virtual-core':
         specifier: ^3
         version: 3.17.1
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/data-table/packages/vue:
     dependencies:
@@ -2427,18 +2552,37 @@ importers:
 
   packages/ui/embla/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
       embla-carousel:
         specifier: ^8.6
         version: 8.6.0
       embla-carousel-autoplay:
         specifier: ^8.6
         version: 8.6.0(embla-carousel@8.6.0)
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/embla/packages/lit:
     dependencies:
@@ -2504,7 +2648,7 @@ importers:
   packages/ui/embla/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       embla-carousel:
         specifier: ^8.6
@@ -2512,9 +2656,22 @@ importers:
       embla-carousel-autoplay:
         specifier: ^8.6
         version: 8.6.0(embla-carousel@8.6.0)
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/embla/packages/vue:
     dependencies:
@@ -2545,15 +2702,34 @@ importers:
 
   packages/ui/flatpickr/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19
-        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19
-        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       flatpickr:
         specifier: ^4.6
         version: 4.6.13
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/flatpickr/packages/lit:
     dependencies:
@@ -2610,14 +2786,27 @@ importers:
   packages/ui/flatpickr/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       flatpickr:
         specifier: ^4.6
         version: 4.6.13
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/flatpickr/packages/vue:
     devDependencies:
@@ -2666,12 +2855,6 @@ importers:
 
   packages/ui/fullcalendar/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19
-        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19
-        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       '@fullcalendar/core':
         specifier: ^6.1
         version: 6.1.20
@@ -2684,6 +2867,31 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1
         version: 6.1.20(@fullcalendar/core@6.1.20)
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/fullcalendar/packages/lit:
     dependencies:
@@ -2779,11 +2987,24 @@ importers:
         specifier: ^6.1
         version: 6.1.20(@fullcalendar/core@6.1.20)
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/fullcalendar/packages/vue:
     devDependencies:
@@ -2826,15 +3047,31 @@ importers:
 
   packages/ui/listbox/packages/angular:
     dependencies:
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
       '@angular/common':
         specifier: ^19
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
       '@angular/core':
         specifier: ^19
         version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       '@angular/forms':
         specifier: ^19
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/listbox/packages/lit:
     dependencies:
@@ -2882,11 +3119,24 @@ importers:
   packages/ui/listbox/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/listbox/packages/vue:
     dependencies:
@@ -2914,15 +3164,34 @@ importers:
 
   packages/ui/maplibre/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
       maplibre-gl:
         specifier: ^5
         version: 5.24.0
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/maplibre/packages/lit:
     dependencies:
@@ -2982,14 +3251,27 @@ importers:
   packages/ui/maplibre/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       maplibre-gl:
         specifier: ^5
         version: 5.24.0
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/maplibre/packages/vue:
     dependencies:
@@ -3017,15 +3299,34 @@ importers:
 
   packages/ui/pdf/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
       pdfjs-dist:
         specifier: ^6
         version: 6.0.227
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/pdf/packages/lit:
     dependencies:
@@ -3082,14 +3383,27 @@ importers:
   packages/ui/pdf/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       pdfjs-dist:
         specifier: ^6
         version: 6.0.227
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/pdf/packages/vue:
     devDependencies:
@@ -3147,12 +3461,6 @@ importers:
 
   packages/ui/rete/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19 || ^20 || ^21
-        version: 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1)
       elkjs:
         specifier: ^0.8.2
         version: 0.8.2
@@ -3171,9 +3479,34 @@ importers:
       rete-render-utils:
         specifier: ^2
         version: 2.0.3(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
+      tslib:
+        specifier: ^2
+        version: 2.8.1
       web-worker:
         specifier: ^1.2.0
         version: 1.5.0
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/rete/packages/lit:
     dependencies:
@@ -3287,7 +3620,7 @@ importers:
   packages/ui/rete/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       elkjs:
         specifier: ^0.8.2
@@ -3307,12 +3640,25 @@ importers:
       rete-render-utils:
         specifier: ^2
         version: 2.0.3(rete-area-plugin@2.1.5(rete@2.0.6))(rete@2.0.6)
-      svelte:
-        specifier: ^5
-        version: 5.55.5(@typescript-eslint/types@8.59.2)
       web-worker:
         specifier: ^1.2.0
         version: 1.5.0
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+      svelte:
+        specifier: ^5
+        version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/rete/packages/vue:
     dependencies:
@@ -3355,15 +3701,31 @@ importers:
 
   packages/ui/slider/packages/angular:
     dependencies:
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
       '@angular/common':
         specifier: ^19
         version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
       '@angular/core':
         specifier: ^19
         version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
       '@angular/forms':
         specifier: ^19
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/slider/packages/lit:
     dependencies:
@@ -3411,11 +3773,24 @@ importers:
   packages/ui/slider/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/slider/packages/vue:
     dependencies:
@@ -3611,15 +3986,6 @@ importers:
 
   packages/ui/tiptap/packages/angular:
     dependencies:
-      '@angular/common':
-        specifier: ^19
-        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      '@angular/core':
-        specifier: ^19
-        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
-      '@angular/forms':
-        specifier: ^19
-        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
@@ -3635,6 +4001,31 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
+      tslib:
+        specifier: ^2
+        version: 2.8.1
+    devDependencies:
+      '@angular/common':
+        specifier: ^19
+        version: 19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@angular/compiler':
+        specifier: ^19
+        version: 19.2.22
+      '@angular/compiler-cli':
+        specifier: ^19
+        version: 19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3)
+      '@angular/core':
+        specifier: ^19
+        version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      '@angular/forms':
+        specifier: ^19
+        version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      ng-packagr:
+        specifier: ^19
+        version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/tiptap/packages/lit:
     dependencies:
@@ -3727,7 +4118,7 @@ importers:
   packages/ui/tiptap/packages/svelte:
     dependencies:
       '@rozie/runtime-svelte':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../../runtime/svelte
       '@tiptap/core':
         specifier: ^3
@@ -3744,9 +4135,22 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
+    devDependencies:
+      '@sveltejs/package':
+        specifier: ^2
+        version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5
+        version: 5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
+      svelte2tsx:
+        specifier: ^0.7
+        version: 0.7.56(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
 
   packages/ui/tiptap/packages/vue:
     dependencies:
@@ -19725,7 +20129,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:
