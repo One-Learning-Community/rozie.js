@@ -27,23 +27,26 @@
   },
   "exports": {
     ".": {
-      "svelte": "./src/index.ts",
-      "types": "./src/index.ts",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "svelte": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./auto": {
-      "svelte": "./src/auto.ts",
-      "types": "./src/auto.ts",
-      "import": "./src/auto.ts",
-      "default": "./src/auto.ts"
+      "svelte": "./dist/auto.js",
+      "types": "./dist/auto.d.ts",
+      "default": "./dist/auto.js"
+    },
+    "./source": {
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -58,10 +61,17 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
   }
 }
