@@ -31,7 +31,7 @@ export class CheckboxRModel {
 
   private __rozieCvaOnChange: (v: boolean) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
+  protected __rozieCvaDisabled = signal(false);
 
   writeValue(v: boolean | null): void {
     this.checked.set(v ?? false);
