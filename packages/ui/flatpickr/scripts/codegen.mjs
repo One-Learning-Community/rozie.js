@@ -258,7 +258,10 @@ function main() {
     // change; the internal `instance` binding is not part of the emitted .d.ts
     // surface). NOT an emitter edit (SCOPE FENCE): a durable, token-anchored,
     // fail-loud codegen aid, mirroring the cropper imageEl / fullcalendar `opts`
-    // aids. The source-only svelte/angular leaves are never build-type-checked.
+    // aids. The svelte leaf (svelte-package) still never strict-body-checks at
+    // build; the ANGULAR leaf, however, now compiles via ng-packagr (real
+    // ngc/tsc) under the dist+source standard, so it hits the same TS2769 and
+    // gets the same cast (its call site uses the Angular signal/ElementRef form).
     let code = r.code;
     if (target === 'vue') {
       const NEEDLE = 'instance = flatpickr(inputElRef.value!, {';
@@ -270,6 +273,17 @@ function main() {
         );
       }
       code = code.replace(NEEDLE, 'instance = (flatpickr as any)(inputElRef.value!, {');
+    }
+    if (target === 'angular') {
+      const NEEDLE = 'this.instance = flatpickr(this.inputEl()!.nativeElement, {';
+      if (!code.includes(NEEDLE)) {
+        throw new Error(
+          'codegen angular: flatpickr engine-call type-aid anchor not found — the Angular emit ' +
+            `shape changed. Expected to cast:\n  ${NEEDLE}\n` +
+            'Re-confirm the emitted flatpickr() call and update (or remove) this aid.',
+        );
+      }
+      code = code.replace(NEEDLE, 'this.instance = (flatpickr as any)(this.inputEl()!.nativeElement, {');
     }
     writeFileSync(resolve(leafSrc, cfg.file), code);
 

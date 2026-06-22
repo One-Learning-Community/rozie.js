@@ -128,7 +128,7 @@ export class Flatpickr {
     const __plugins = this.plugins();
     const __locale = this.locale();
     const __firstDayOfWeek = this.firstDayOfWeek();
-    this.instance = flatpickr(this.inputEl()!.nativeElement, {
+    this.instance = (flatpickr as any)(this.inputEl()!.nativeElement, {
       mode: this.mode(),
       dateFormat: this.dateFormat(),
       altInput: this.altInput(),
