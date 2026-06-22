@@ -4,7 +4,7 @@
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Idiomatic Angular rich-text editor \u2014 one Rozie source compiled to Angular wrapping TipTap.",
+  "description": "Idiomatic Angular rich-text editor — one Rozie source compiled to Angular wrapping TipTap.",
   "keywords": [
     "rozie",
     "rozie-ui",
@@ -28,12 +28,16 @@
   },
   "exports": {
     ".": {
-      "types": "./src/TipTap.ts",
-      "import": "./src/TipTap.ts",
-      "default": "./src/TipTap.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-tiptap-angular.mjs"
+    },
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "peerDependencies": {
@@ -73,10 +77,24 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "module": "./dist/fesm2022/rozie-ui-tiptap-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "tslib": "^2"
+  },
+  "devDependencies": {
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/forms": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
   }
 }
