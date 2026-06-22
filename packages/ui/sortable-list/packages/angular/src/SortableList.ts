@@ -233,7 +233,10 @@ export class SortableList {
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
   };
-  itemClassFor = (item: any, index: any) => typeof this.itemClass() === 'function' ? this.itemClass()(item, index) : this.itemClass();
+  itemClassFor = (item: any, index: any) => {
+    const v = this.itemClass();
+    return typeof v === 'function' ? v(item, index) : v;
+  };
   itemStyleFor = (item: any, index: any) => {
     const __itemStyle = this.itemStyle();
     const s = typeof __itemStyle === 'function' ? __itemStyle(item, index) : __itemStyle;

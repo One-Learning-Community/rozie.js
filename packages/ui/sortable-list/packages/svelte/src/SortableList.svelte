@@ -142,7 +142,10 @@ const keyFor = (item: any, index: any) => {
 // Resolve itemClass for a row: a static value (string | array | object) OR a
 // per-row (item, index) => class function. The result is fed into the :class
 // array and normalized by each target's class path (rozieClass / clsx / native).
-const itemClassFor = (item: any, index: any) => typeof itemClass === 'function' ? itemClass(item, index) : itemClass;
+const itemClassFor = (item: any, index: any) => {
+  const v = itemClass;
+  return typeof v === 'function' ? v(item, index) : v;
+};
 
 // Resolve itemStyle for a row: a static value (string | object) OR a per-row
 // (item, index) => style function. Returns string | object | null; the dynamic

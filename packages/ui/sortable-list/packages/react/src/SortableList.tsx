@@ -139,7 +139,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     return index;
   }
   function itemClassFor(item: any, index: any) {
-    return typeof props.itemClass === 'function' ? props.itemClass(item, index) : props.itemClass;
+    const v = props.itemClass;
+    return typeof v === 'function' ? v(item, index) : v;
   }
   function itemStyleFor(item: any, index: any) {
     const s = typeof props.itemStyle === 'function' ? props.itemStyle(item, index) : props.itemStyle;

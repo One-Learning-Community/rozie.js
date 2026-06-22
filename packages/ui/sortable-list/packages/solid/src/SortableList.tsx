@@ -199,7 +199,8 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // per-row (item, index) => class function. The result is fed into the :class
   // array and normalized by each target's class path (rozieClass / clsx / native).
   function itemClassFor(item: any, index: any) {
-    return typeof local.itemClass === 'function' ? local.itemClass(item, index) : local.itemClass;
+    const v = local.itemClass;
+    return typeof v === 'function' ? v(item, index) : v;
   }
 
   // Resolve itemStyle for a row: a static value (string | object) OR a per-row
