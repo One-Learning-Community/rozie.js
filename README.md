@@ -148,6 +148,8 @@ For lightweight color-only support (no JS plugin required), the [TextMate gramma
 
 This is a planned, phase-driven build under the [GSD workflow](https://github.com/anthropics/gsd) (`/gsd-execute-phase`, `/gsd-plan-phase`, etc.). Phase artifacts live in `.planning/phases/` (gitignored). Read [`CLAUDE.md`](CLAUDE.md) and `.planning/PROJECT.md` before opening a substantive PR.
 
+Releasing packages to npm? See [`RELEASING.md`](RELEASING.md) — the release runbook, plus `pnpm release:precheck` to catch the mechanical footguns automatically.
+
 ## License
 
 [MIT](LICENSE) © 2026 Dan Krieger and Rozie.js contributors.

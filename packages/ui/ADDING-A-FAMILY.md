@@ -84,3 +84,7 @@ VR: a family whose widget renders a third-party iframe / canvas / WebGL surface 
 - **Surface gate** — promote `scripts/compile-<slug>-check.mjs` into `tests/surface.test.ts` (vitest, node/happy-dom) so `pnpm test` re-asserts the IR surface + `compile()×6` zero-error under `turbo run test`. Cheap; do it for every family.
 - **Unit-test branchy engine glue** — if the wrapper has real logic beyond config passthrough (a script-loader singleton, a key/id scheme, a reconcile guard), extract it to `src/internal/<helper>.ts` (codegen vendors `src/internal/` into every leaf via `copyInternal`, excluding `*.test.ts`) and unit-test it with vitest + fake timers. This is the `sortable-list useSortableJS` / `captcha loadCaptchaApi` pattern. **happy-dom gotcha:** it auto-*fetches* any non-empty `<script src>` (async unhandled rejection) and synthesizes an `error` event when file-loading is disabled — so in tests inject a providers/config map with an **empty `src`** (inert) and assert the real URLs separately as pure data.
 - Config-passthrough-only wrappers don't need runtime tests beyond the surface gate — typecheck ×4 + build ×6 cover them.
+
+## When the family is ready to publish
+
+Follow [`../../RELEASING.md`](../../RELEASING.md): widen the `release.yml` `--filter` lists (Build + Publish steps for each new leaf) **and** the advisory precheck step's filter, then run `pnpm release:precheck --gate` locally first as the real pre-publish guard.
