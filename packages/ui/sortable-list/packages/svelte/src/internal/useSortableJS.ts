@@ -175,9 +175,19 @@ export function useSortableJS<T>(
    * it on the destination side. */
   const handleStart = (e: SortableEvent): void => {
     const current = opts.items();
-    // `e.oldIndex` is the source index in the source list (this list,
-    // since onStart fires from the source).
-    const fromIdx = typeof e.oldIndex === 'number' ? e.oldIndex : -1;
+    // The source index in this list (onStart fires from the source). Prefer the
+    // DRAGGABLE-relative index: with non-draggable element children present
+    // (Lit shadow-DOM `#header`/`#footer` `<slot>`s), plain `e.oldIndex` counts
+    // all children and is offset — stashing `current[oldIndex]` would capture
+    // the WRONG item (the row after the one actually grabbed), and the
+    // identity-based commit lookup would then faithfully move that wrong item.
+    // `oldDraggableIndex` counts only the `.rozie-sortable-item` rows.
+    const fromIdx =
+      typeof e.oldDraggableIndex === 'number'
+        ? e.oldDraggableIndex
+        : typeof e.oldIndex === 'number'
+          ? e.oldIndex
+          : -1;
     if (fromIdx >= 0 && fromIdx < current.length) {
       const item = e.item as unknown as Record<string, unknown> | null;
       if (item !== null && typeof item === 'object') {
@@ -225,10 +235,31 @@ export function useSortableJS<T>(
       // physically moves the same node between lists).
       const stashedItem = readStash<T>(e.item);
 
+      // Prefer the DRAGGABLE-relative indices. SortableJS computes plain
+      // `oldIndex`/`newIndex` via `index(dragEl)` — counting ALL element
+      // siblings — while `oldDraggableIndex`/`newDraggableIndex` use
+      // `index(dragEl, options.draggable)`, counting only the
+      // `.rozie-sortable-item` rows. When the list container also holds
+      // non-draggable element children, the plain indices are offset. This bites
+      // ONLY on Lit: the `#header` / `#footer` named slots render as real
+      // `<slot>` ELEMENTS inside the shadow-DOM list container (the 5 light-DOM
+      // targets render nothing for an empty named slot), so the leading
+      // `<slot name="header">` shifts every plain `newIndex` by +1 and the
+      // writeback dropped items one slot too far. The draggable indices stay
+      // item-relative everywhere; when no non-draggable children exist the two
+      // coincide, so the 5 light-DOM targets are unchanged.
       const oldIndexHint =
-        typeof e.oldIndex === 'number' ? e.oldIndex : -1;
+        typeof e.oldDraggableIndex === 'number'
+          ? e.oldDraggableIndex
+          : typeof e.oldIndex === 'number'
+            ? e.oldIndex
+            : -1;
       const newIndexHint =
-        typeof e.newIndex === 'number' ? e.newIndex : -1;
+        typeof e.newDraggableIndex === 'number'
+          ? e.newDraggableIndex
+          : typeof e.newIndex === 'number'
+            ? e.newIndex
+            : -1;
 
       let next: T[];
       let oldIndex: number;
