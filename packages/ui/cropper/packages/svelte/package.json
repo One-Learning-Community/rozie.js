@@ -28,17 +28,21 @@
   },
   "exports": {
     ".": {
+      "svelte": "./dist/Cropper.svelte",
+      "types": "./dist/Cropper.svelte.d.ts",
+      "default": "./dist/Cropper.svelte"
+    },
+    "./source": {
       "svelte": "./src/Cropper.svelte",
-      "types": "./src/Cropper.svelte",
-      "import": "./src/Cropper.svelte",
       "default": "./src/Cropper.svelte"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -53,11 +57,18 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
 }
