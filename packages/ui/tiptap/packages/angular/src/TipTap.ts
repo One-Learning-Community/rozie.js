@@ -216,7 +216,7 @@ export class TipTap {
         container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -231,7 +231,7 @@ export class TipTap {
         container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -246,7 +246,7 @@ export class TipTap {
         container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -261,7 +261,7 @@ export class TipTap {
         container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return {
           update: (s: unknown): void => {

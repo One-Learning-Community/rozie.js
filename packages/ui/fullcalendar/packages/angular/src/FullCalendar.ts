@@ -187,7 +187,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-event', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -202,7 +202,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-dayCell', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -217,7 +217,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -232,7 +232,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -247,7 +247,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -262,7 +262,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -277,7 +277,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-moreLink', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -292,7 +292,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -307,7 +307,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();
@@ -322,7 +322,7 @@ export class FullCalendar {
         container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();

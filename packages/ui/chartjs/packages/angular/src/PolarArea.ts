@@ -168,7 +168,7 @@ export class PolarArea {
         container.setAttribute('data-rozie-portal-tooltip', '52afe0aa');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();

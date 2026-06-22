@@ -294,7 +294,7 @@ export class MapLibre {
         container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return {
           update: (s: unknown): void => {
@@ -315,7 +315,7 @@ export class MapLibre {
         container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return {
           update: (s: unknown): void => {
@@ -336,7 +336,7 @@ export class MapLibre {
         container.setAttribute('data-rozie-portal-control', 'f1ee1082');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
-        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
         this._portalViews.add(view as EmbeddedViewRef<unknown>);
         return () => {
           view.destroy();

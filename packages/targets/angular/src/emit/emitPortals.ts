@@ -90,7 +90,11 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
     setAttrLine(slotName, scopeHash) +
     `    const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);\n` +
     `    view.detectChanges();\n` +
-    `    for (const node of view.rootNodes as Node[]) container.appendChild(node);\n` +
+    // `globalThis.Node`, not bare `Node`: a component whose <script> does
+    // `import { Node } from '@tiptap/core'` (or any engine exporting a `Node`)
+    // shadows the global DOM `Node` in module scope, retyping `rootNodes` to the
+    // engine's `Node` and breaking `container.appendChild(node)` under strict tsc.
+    `    for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);\n` +
     `    this._portalViews.add(view as EmbeddedViewRef<unknown>);\n` +
     `    return () => {\n` +
     `      view.destroy();\n` +
@@ -127,7 +131,11 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
     setAttrLine(slotName, scopeHash) +
     `    const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);\n` +
     `    view.detectChanges();\n` +
-    `    for (const node of view.rootNodes as Node[]) container.appendChild(node);\n` +
+    // `globalThis.Node`, not bare `Node`: a component whose <script> does
+    // `import { Node } from '@tiptap/core'` (or any engine exporting a `Node`)
+    // shadows the global DOM `Node` in module scope, retyping `rootNodes` to the
+    // engine's `Node` and breaking `container.appendChild(node)` under strict tsc.
+    `    for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);\n` +
     `    this._portalViews.add(view as EmbeddedViewRef<unknown>);\n` +
     `    return {\n` +
     `      update: (s: unknown): void => {\n` +
