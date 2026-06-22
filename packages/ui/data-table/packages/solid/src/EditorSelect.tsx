@@ -16,6 +16,15 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
   const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() }, _props);
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options']);
 
+  // The <select> value binding coerced to a string. $props.value is typed `unknown`
+  // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the
+  // native select `value` type (string | number | string[]) on React/Solid — the
+  // .rozie-native fix is a plain function returning a string (uniform ×6, NOT a
+  // $computed which can't be aliased; the listbox value-vs-accessor lesson).
+  function selectValue() {
+    return local.value != null ? String(local.value) : '';
+  }
+
   // Immediate-commit-on-change: read the selected value the global-filter way and
   // commit it directly (no draft needed for a single-gesture select).
   function onChange(e: any) {
@@ -30,7 +39,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   return (
     <>
-    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={local.value} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={selectValue()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
       <For each={local.options}>{(opt) => <option value={rozieAttr(opt.value)} data-rozie-s-117f1a16="">{rozieDisplay(opt.label)}</option>}</For>
     </select>
     </>

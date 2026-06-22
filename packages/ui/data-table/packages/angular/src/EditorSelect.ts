@@ -25,7 +25,7 @@ function __rozieAttr(v: unknown): string | null {
   standalone: true,
   template: `
 
-    <select class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="columnId()" [value]="value()" (change)="onChange($event)" (keydown)="onKeydown($event)">
+    <select class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="columnId()" [value]="selectValue()" (change)="onChange($event)" (keydown)="onKeydown($event)">
       @for (opt of options(); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
@@ -42,6 +42,7 @@ export class EditorSelect {
   cancel = input<((...args: unknown[]) => unknown) | null>(null);
   options = input<any[]>((() => [])());
 
+  selectValue = () => this.value() != null ? String(this.value()) : '';
   onChange = (e: any) => {
     const __commit = this.commit();
     __commit && __commit(e && e.target ? e.target.value : '');

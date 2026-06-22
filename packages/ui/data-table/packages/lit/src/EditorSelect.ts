@@ -31,11 +31,13 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this.value} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-117f1a16>
+<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this.selectValue()} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-117f1a16>
   ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
 </select>
 `;
   }
+
+  selectValue = () => this.value != null ? String(this.value) : '';
 
   onChange = (e: any) => {
   this.commit && this.commit(e && e.target ? e.target.value : '');

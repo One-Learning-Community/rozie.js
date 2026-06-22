@@ -24,6 +24,9 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
     options: _props.options ?? __defaultOptions,
   };
 
+  function selectValue() {
+    return props.value != null ? String(props.value) : '';
+  }
   const { commit: _rozieProp_commit } = props;
     const onChange = useCallback((e: any) => {
     _rozieProp_commit && _rozieProp_commit(e && e.target ? e.target.value : '');
@@ -38,7 +41,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   return (
     <>
-    <select className={"rdt-cell-editor"} data-editing-cell="" aria-label={props.columnId} value={props.value} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
+    <select className={"rdt-cell-editor"} data-editing-cell="" aria-label={props.columnId} value={selectValue()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
       {props.options.map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-117f1a16="">{rozieDisplay(opt.label)}</option>)}
     </select>
     </>
