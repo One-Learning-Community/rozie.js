@@ -825,27 +825,21 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../core
-      '@rozie/target-angular':
+      '@rozie/runtime-lit':
         specifier: workspace:*
-        version: link:../targets/angular
-      '@rozie/target-lit':
+        version: link:../runtime/lit
+      '@rozie/runtime-react':
         specifier: workspace:*
-        version: link:../targets/lit
-      '@rozie/target-react':
+        version: link:../runtime/react
+      '@rozie/runtime-solid':
         specifier: workspace:*
-        version: link:../targets/react
-      '@rozie/target-solid':
+        version: link:../runtime/solid
+      '@rozie/runtime-svelte':
         specifier: workspace:*
-        version: link:../targets/solid
-      '@rozie/target-svelte':
+        version: link:../runtime/svelte
+      '@rozie/runtime-vue':
         specifier: workspace:*
-        version: link:../targets/svelte
-      '@rozie/target-vue':
-        specifier: workspace:*
-        version: link:../targets/vue
-      '@rozie/unplugin':
-        specifier: workspace:*
-        version: link:../unplugin
+        version: link:../runtime/vue
       '@vue/compiler-sfc':
         specifier: ^3.5.33
         version: 3.5.33
@@ -877,6 +871,27 @@ importers:
         specifier: ^1.97.3
         version: 1.97.3
     devDependencies:
+      '@rozie/target-angular':
+        specifier: workspace:*
+        version: link:../targets/angular
+      '@rozie/target-lit':
+        specifier: workspace:*
+        version: link:../targets/lit
+      '@rozie/target-react':
+        specifier: workspace:*
+        version: link:../targets/react
+      '@rozie/target-solid':
+        specifier: workspace:*
+        version: link:../targets/solid
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../targets/svelte
+      '@rozie/target-vue':
+        specifier: workspace:*
+        version: link:../targets/vue
+      '@rozie/unplugin':
+        specifier: workspace:*
+        version: link:../unplugin
       prettier-plugin-svelte:
         specifier: ^3.4.0
         version: 3.5.2(prettier@3.8.3)(svelte@5.55.5(@typescript-eslint/types@8.59.2))
@@ -19678,7 +19693,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:
