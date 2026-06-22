@@ -28,17 +28,21 @@
   },
   "exports": {
     ".": {
+      "svelte": "./dist/Carousel.svelte",
+      "types": "./dist/Carousel.svelte.d.ts",
+      "default": "./dist/Carousel.svelte"
+    },
+    "./source": {
       "svelte": "./src/Carousel.svelte",
-      "types": "./src/Carousel.svelte",
-      "import": "./src/Carousel.svelte",
       "default": "./src/Carousel.svelte"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -57,11 +61,18 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
 }
