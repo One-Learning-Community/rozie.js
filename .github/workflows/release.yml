@@ -153,6 +153,50 @@ jobs:
           --filter=@rozie-ui/captcha-angular
           build
 
+      # ADVISORY structural pre-check. Runs AFTER every leaf dist exists (the
+      # toolchain already published at the earlier "Publish toolchain" step; the
+      # Vue + non-vue leaves were just built above) and BEFORE the first leaf
+      # publish, so it sees real artifacts. It is deliberately:
+      #   * AUDIT mode (NOT --gate): already-published is the EXPECTED steady
+      #     state, not a failure.
+      #   * --skip-npm: network-free + timing-independent — only the deterministic
+      #     structural checks run (description quality, repository url/directory
+      #     accuracy, files + exports resolving on disk).
+      #   * continue-on-error: true: it NEVER blocks a publish; it only surfaces
+      #     structural problems in the run log.
+      # It CANNOT be a hard gate here because (1) the toolchain already published
+      # earlier in THIS run — there is no "all built, nothing published" moment —
+      # and (2) in a combined toolchain+leaf release the freshly-bumped
+      # @rozie/runtime-* is not on npm yet when the leaves build, so a version/dep
+      # check would false-fail. Those TIMING-SENSITIVE checks (version-vs-npm,
+      # workspace-dep-on-npm) live in the releaser's LOCAL pre-flight
+      # `pnpm release:precheck --gate` (run before dispatching). See RELEASING.md.
+      # Scope mirrors the publish steps' --filter set exactly.
+      - name: Release precheck (advisory)
+        continue-on-error: true
+        run: >
+          node scripts/release-precheck.mjs --skip-npm
+          --filter @rozie/core
+          --filter @rozie/cli
+          --filter @rozie/unplugin
+          --filter @rozie/babel-plugin
+          --filter @rozie/runtime-react
+          --filter @rozie/runtime-vue
+          --filter @rozie/runtime-svelte
+          --filter @rozie/runtime-solid
+          --filter @rozie/runtime-lit
+          --filter @rozie-ui/flatpickr-vue
+          --filter @rozie-ui/sortable-list-vue
+          --filter @rozie-ui/cropper-vue
+          --filter @rozie-ui/fullcalendar-vue
+          --filter @rozie-ui/pdf-vue
+          --filter @rozie-ui/captcha-vue
+          --filter @rozie-ui/captcha-react
+          --filter @rozie-ui/captcha-solid
+          --filter @rozie-ui/captcha-lit
+          --filter @rozie-ui/captcha-svelte
+          --filter @rozie-ui/captcha-angular
+
       # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
       - name: Publish Vue leaves (@rozie-ui/*-vue)
