@@ -1,3 +1,8 @@
 export { default as DataTable } from './DataTable';
 export { default } from './DataTable';
 export { default as Column } from './Column';
+export { default as EditorText } from './EditorText';
+export { default as EditorNumber } from './EditorNumber';
+export { default as EditorSelect } from './EditorSelect';
+export { default as EditorCheckbox } from './EditorCheckbox';
+export { default as EditorDate } from './EditorDate';

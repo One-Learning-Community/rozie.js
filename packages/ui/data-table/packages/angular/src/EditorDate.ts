@@ -1,0 +1,57 @@
+import { Component, ViewEncapsulation, input, signal } from '@angular/core';
+
+@Component({
+  selector: 'rozie-editor-date',
+  standalone: true,
+  template: `
+
+    <input class="rdt-cell-editor" type="date" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (input)="onInput($event)" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
+
+  `,
+})
+export class EditorDate {
+  columnId = input<string>('');
+  column = input<(unknown) | null>(null);
+  row = input<(unknown) | null>(null);
+  value = input<(unknown) | null>(null);
+  commit = input<((...args: unknown[]) => unknown) | null>(null);
+  cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  draft = signal('');
+
+  constructor() {
+    // Seed the draft once from the incoming value (setup-once). A native date input
+    // only accepts `YYYY-MM-DD`; normalize null/undefined to ''.
+    this.draft.set(this.value() != null ? String(this.value()) : '');
+  }
+
+  onInput = (e: any) => {
+    this.draft.set(e && e.target ? e.target.value : '');
+  };
+  doCommit = () => {
+    const __commit = this.commit();
+    // commit the ISO date string the native control already produced.
+    __commit && __commit(this.draft());
+  };
+  doCancel = () => {
+    const __cancel = this.cancel();
+    __cancel && __cancel();
+  };
+  onChange = (e: any) => {
+    this.draft.set(e && e.target ? e.target.value : '');
+    this.doCommit();
+  };
+  onKeydown = (e: any) => {
+    if (e && e.key === 'Enter') {
+      e.preventDefault();
+      this.doCommit();
+    } else if (e && e.key === 'Escape') {
+      e.preventDefault();
+      this.doCancel();
+    }
+  };
+  onBlur = () => {
+    this.doCommit();
+  };
+}
+
+export default EditorDate;

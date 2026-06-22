@@ -1,0 +1,61 @@
+<script lang="ts">
+interface Props {
+  columnId?: string;
+  column?: (unknown) | null;
+  row?: (unknown) | null;
+  value?: (unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
+  cancel?: ((...args: any[]) => any) | null;
+}
+
+let {
+  columnId = '',
+  column = null,
+  row = null,
+  value = null,
+  commit = null,
+  cancel = null
+}: Props = $props();
+
+let draft = $state('');
+
+// Seed the draft string once from the incoming value (setup-once).
+draft = value != null ? String(value) : '';
+const onInput = (e: any) => {
+  draft = e && e.target ? e.target.value : '';
+};
+
+// Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
+// commits null rather than NaN (Number('') === 0 is a silent footgun); a
+// non-numeric draft also commits null. Otherwise commit the coerced number.
+// Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
+// commits null rather than NaN (Number('') === 0 is a silent footgun); a
+// non-numeric draft also commits null. Otherwise commit the coerced number.
+const doCommit = () => {
+  if (!commit) return;
+  const raw = draft;
+  if (raw == null || String(raw).trim() === '') {
+    commit(null);
+    return;
+  }
+  const n = Number(raw);
+  commit(Number.isNaN(n) ? null : n);
+};
+const doCancel = () => {
+  cancel && cancel();
+};
+const onKeydown = (e: any) => {
+  if (e && e.key === 'Enter') {
+    e.preventDefault();
+    doCommit();
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault();
+    doCancel();
+  }
+};
+const onBlur = () => {
+  doCommit();
+};
+</script>
+
+<input class="rdt-cell-editor" type="number" data-editing-cell="" aria-label={columnId} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-b2792b32 />

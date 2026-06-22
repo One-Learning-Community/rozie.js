@@ -60,7 +60,12 @@ const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
 // DataTable FIRST (owns the handle-manifest + docs-table gates); Column is the
 // renderless declarative child (no $expose, no docs page — a pure addition).
 const PARENT = 'DataTable';
-const COMPONENTS = [PARENT, 'Column'];
+// DataTable FIRST (owns the default export + handle-manifest/docs-table gates).
+// Column is the renderless declarative child. The five Editor* drop-ins are
+// presentational #editor-slot fills (no $emit/$expose → no manifest entries; the
+// manifest-completeness loops key off the PARENT-only IR below, not per-component).
+// Each becomes a NAMED re-export via childExports; DataTable stays the default.
+const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate'];
 
 /**
  * Per-target leaf dir + emitted file extension (`build` mode is informational).
