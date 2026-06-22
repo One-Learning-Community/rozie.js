@@ -26,22 +26,26 @@
   },
   "exports": {
     ".": {
-      "svelte": "./src/CodeMirror.svelte",
-      "types": "./src/CodeMirror.svelte",
-      "import": "./src/CodeMirror.svelte",
-      "default": "./src/CodeMirror.svelte"
+      "svelte": "./dist/CodeMirror.svelte",
+      "types": "./dist/CodeMirror.svelte.d.ts",
+      "default": "./dist/CodeMirror.svelte"
     },
     "./languages": {
-      "types": "./src/languages.ts",
-      "import": "./src/languages.ts",
-      "default": "./src/languages.ts"
+      "svelte": "./dist/languages.js",
+      "types": "./dist/languages.d.ts",
+      "default": "./dist/languages.js"
+    },
+    "./source": {
+      "svelte": "./src/CodeMirror.svelte",
+      "default": "./src/CodeMirror.svelte"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -116,11 +120,18 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
 }
