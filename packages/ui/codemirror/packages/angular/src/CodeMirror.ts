@@ -582,7 +582,7 @@ export class CodeMirror {
       // Recompute the marker RangeSet from `gutterLines` against the live doc —
       // one marker at the START of each in-range line. RangeSet.of REQUIRES the
       // ranges sorted by `from`, so sort the resolved positions.
-      const buildMarkers = (mView: any) => {
+      const buildMarkers = (mView: any): any => {
         const doc = mView.state.doc;
         const ranges = [];
         for (const n of this.gutterLines() as any) {
@@ -734,8 +734,8 @@ export class CodeMirror {
   decorationCompartment = new Compartment();
   rebuildGutterExt: any = null;
   rebuildDecorationExt: any = null;
-  langExt = () => this.language() === 'javascript' ? javascript() : [];
-  themeExt = () => {
+  langExt = (): any => this.language() === 'javascript' ? javascript() : [];
+  themeExt = (): any => {
     const t = this.theme();
     if (t === 'dark') return oneDark;
     if (t === 'light' || t === '' || t == null) return [];
@@ -745,7 +745,7 @@ export class CodeMirror {
     // accept it; the type-neutral targets strip types entirely.
     return t;
   };
-  phExt = () => this.placeholder() ? placeholderExt(this.placeholder()) : [];
+  phExt = (): any => this.placeholder() ? placeholderExt(this.placeholder()) : [];
   baselineExt = () => this.basicSetup() ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
   writeDoc = (v: any) => {
     if (!this.view) return;

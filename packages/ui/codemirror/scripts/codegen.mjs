@@ -359,11 +359,15 @@ function main() {
     // SCOPE (SCOPE FENCE). As the sanctioned in-scope per-leaf type aid (the CM
     // analog of FullCalendar's `const opts` widening), annotate the three helper
     // arrows with an explicit `: any` return here in codegen GLUE — durable
-    // across regeneration, a pure type annotation (zero runtime change), and
-    // scoped to the Lit leaf (react/solid emit these helpers in a form that does
-    // not trip TS2742; vue/svelte/angular are type-neutral and never see it).
+    // across regeneration, a pure type annotation (zero runtime change). Applies
+    // to Lit AND Angular: both emit these helpers as `name = () =>` class fields
+    // (react/solid use a different form that doesn't trip TS2742, and have their
+    // own themeExt aid below). Angular's leaf now compiles via ng-packagr (real
+    // ngc/tsc) under the dist+source standard, so it sees these the same way Lit
+    // does — TS2742 on langExt (not nameable without @codemirror/language) and
+    // TS2345 on themeExt's `unknown` return. svelte stays type-neutral at build.
     // Tracked as an emitter follow-up (annotate hoisted engine-typed helpers).
-    if (cfg.dir === 'lit') {
+    if (cfg.dir === 'lit' || cfg.dir === 'angular') {
       let aided = 0;
       for (const name of ['langExt', 'themeExt', 'phExt']) {
         const token = `${name} = () =>`;
@@ -422,10 +426,12 @@ function main() {
     // (OUT OF SCOPE — SCOPE FENCE); as the sanctioned in-scope per-leaf aid (the
     // analog of the `themeExt`/`*Ext` annotations above), annotate `buildMarkers`'s
     // return `: any` here — a pure type annotation, zero runtime change. The emit
-    // shape is identical across the three bundled leaves; vue/svelte/angular are
-    // type-neutral and never see it. Only present when the `gutter` slot wires the
-    // marker builder, so this aid is gated on the token's presence.
-    if (cfg.dir === 'react' || cfg.dir === 'solid' || cfg.dir === 'lit') {
+    // shape (`const buildMarkers = (mView: any) =>`) is identical across the three
+    // bundled leaves AND the Angular leaf (now ngc/tsc-compiled under the
+    // dist+source standard, so it trips the same TS2322); vue/svelte stay
+    // type-neutral at build. Only present when the `gutter` slot wires the marker
+    // builder, so this aid is gated on the token's presence.
+    if (cfg.dir === 'react' || cfg.dir === 'solid' || cfg.dir === 'lit' || cfg.dir === 'angular') {
       const markersToken = 'const buildMarkers = (mView: any) =>';
       const markersAnnotated = 'const buildMarkers = (mView: any): any =>';
       if (!code.includes(markersToken)) {
