@@ -27,17 +27,21 @@
   },
   "exports": {
     ".": {
+      "svelte": "./dist/SortableList.svelte",
+      "types": "./dist/SortableList.svelte.d.ts",
+      "default": "./dist/SortableList.svelte"
+    },
+    "./source": {
       "svelte": "./src/SortableList.svelte",
-      "types": "./src/SortableList.svelte",
-      "import": "./src/SortableList.svelte",
       "default": "./src/SortableList.svelte"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
     "svelte": "^5",
@@ -51,9 +55,16 @@
       "optional": false
     }
   },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
   },
   "publishConfig": {
     "access": "public"
