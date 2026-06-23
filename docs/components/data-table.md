@@ -1,6 +1,21 @@
 # DataTable — overview & install
 
-`DataTable` is Rozie's **headless, fully-accessible** data table / data grid — the `@rozie-ui` component that fills a real cross-framework toolchain gap. Sorting, global + per-column filtering, pagination, row selection, full column management (visibility, resize, reorder, pinning), **editable cells + full-row edit**, **multi-column grouping + aggregation**, **headless faceted filtering**, **expandable rows**, an opt-in WAI-ARIA **grid interaction mode**, and a sticky header are all authored once in `DataTable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`DataTable` is Rozie's **headless, fully-accessible** data table / data grid — the `@rozie-ui` component that fills a real cross-framework toolchain gap, authored once in `DataTable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+
+## What you get
+
+- **Sorting** — single & multi-column (shift-click)
+- **Filtering** — global + per-column, plus headless **faceted filters**
+- **Pagination** — client-side, or server-side via `manual` mode
+- **Row selection** — single or multiple, with select-all
+- **Column management** — visibility, resize, reorder, pinning
+- **Sticky header**
+- **Row virtualization** — windowed rendering, tested to 100,000 rows
+- **Expandable rows & master-detail**
+- **Grouping & aggregation** — multi-column, collapsible group rows
+- **Inline editing** — single cell or full row, with validation
+- **WAI-ARIA grid mode** — 2-D keyboard nav + cell range selection
+- **Themeable** — CSS-variable tokens; shadcn/ui, Material 3, Bootstrap 5 bridges
 
 Under the hood the "engine" is **`@tanstack/table-core`** — the *same* framework-agnostic state machine that powers TanStack Table — wired to each framework's reactivity **with no per-framework adapter**. `table-core` owns no DOM (it is a pure `createTable → setOptions → getRowModel` pull-based state machine), so `DataTable` is the controlled-state half of an engine wrapper with none of the DOM-mutation half: Rozie owns the author-side API (the twelve two-way `r-model` slices, the `<Column>` declarative children, the per-column `#cell` / `#header` reactive templates, and the accessible chrome), table-core owns the row model, and the consumer just binds state.
 
