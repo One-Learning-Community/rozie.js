@@ -18,14 +18,9 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
     setFilter: _props.setFilter ?? null,
     minMax: _props.minMax ?? null,
   };
-  const [minDraft, setMinDraft] = useState('');
-  const [maxDraft, setMaxDraft] = useState('');
+  const [minDraft, setMinDraft] = useState(() => Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '');
+  const [maxDraft, setMaxDraft] = useState(() => Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '');
 
-  // Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
-  setMinDraft(Array.isArray(props.value) && props.value[0] != null ? String(props.value[0]) : '');
-  setMaxDraft(Array.isArray(props.value) && props.value[1] != null ? String(props.value[1]) : '');
-
-  // Untyped handler params neutralize to `any` (the global-filter idiom).
   const onMinInput = useCallback((e: any) => {
     setMinDraft(e && e.target ? e.target.value : '');
   }, []);

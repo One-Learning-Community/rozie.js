@@ -19,10 +19,8 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
     commit: _props.commit ?? null,
     cancel: _props.cancel ?? null,
   };
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
-  // Seed the draft string once from the incoming value (setup-once).
-  setDraft(props.value != null ? String(props.value) : '');
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);

@@ -19,14 +19,8 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
     commit: _props.commit ?? null,
     cancel: _props.cancel ?? null,
   };
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
-  // Seed the draft once at setup from the incoming value (setup-once, NOT in the
-  // template). Normalize null/undefined to '' so the input value binds to a string.
-  setDraft(props.value != null ? String(props.value) : '');
-
-  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
-  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
   const onInput = useCallback((e: any) => {
     setDraft(e && e.target ? e.target.value : '');
   }, []);
