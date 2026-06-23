@@ -298,6 +298,71 @@ export class DemoComponent {
 }
 ```
 
+### Drop-in editor components (`#editor`)
+
+```ts
+import { Component } from '@angular/core';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate],
+  template: `
+    <!-- OPT-IN drop-in editors fill the #editor template — DataTable stays the headless
+         default; the editors are additive named exports. Each takes the slot scope as
+         inputs ([columnId] [column] [row] [value] [commit] [cancel]); EditorSelect also
+         takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="custom" />
+      <Column field="qty" header="Qty" [editable]="true" editor="custom" />
+      <Column field="status" header="Status" [editable]="true" editor="custom" />
+      <Column field="active" header="Active" [editable]="true" editor="custom" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel">
+        @switch (columnId) {
+          @case ('name') {
+            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('qty') {
+            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('status') {
+            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [options]="statusOptions" />
+          }
+          @case ('active') {
+            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('score') {
+            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+  statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

@@ -260,6 +260,54 @@ const columnFilters = ref<{ id: string; value: unknown }[]>([]);
 </template>
 ```
 
+### Drop-in editor components (`#editor`)
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless DEFAULT
+// export; the editors are additive named exports. v-bind the whole slot scope through
+// to each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+// takes :options. Use them as-is, or fork one as a template.
+const rows = ref([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="custom" />
+    <Column field="qty" header="Qty" :editable="true" editor="custom" />
+    <Column field="status" header="Status" :editable="true" editor="custom" />
+    <Column field="active" header="Active" :editable="true" editor="custom" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- One #editor slot, dispatched by columnId, wiring the drop-in editors. -->
+    <template #editor="scope">
+      <EditorText v-if="scope.columnId === 'name'" v-bind="scope" />
+      <EditorNumber v-else-if="scope.columnId === 'qty'" v-bind="scope" />
+      <EditorSelect v-else-if="scope.columnId === 'status'" v-bind="scope" :options="statusOptions" />
+      <EditorCheckbox v-else-if="scope.columnId === 'active'" v-bind="scope" />
+      <EditorDate v-else-if="scope.columnId === 'score'" v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

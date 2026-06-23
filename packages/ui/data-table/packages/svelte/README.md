@@ -237,6 +237,57 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Drop-in editor components (`#editor`)
+
+```svelte
+<script lang="ts">
+  import DataTable, {
+    Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-in editors fill the #editor snippet — DataTable stays the headless
+  // DEFAULT export; the editors are additive named exports. Spread the snippet scope
+  // through to each drop-in ({ columnId, column, row, value, commit, cancel });
+  // EditorSelect also takes `options`. Use them as-is, or fork one as a template.
+  let rows = $state([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+>
+  <Column field="name" header="Name" editable editor="custom" />
+  <Column field="qty" header="Qty" editable editor="custom" />
+  <Column field="status" header="Status" editable editor="custom" />
+  <Column field="active" header="Active" editable editor="custom" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- One #editor snippet, dispatched by columnId, wiring the drop-in editors. -->
+  {#snippet editor(scope)}
+    {#if scope.columnId === 'name'}
+      <EditorText {...scope} />
+    {:else if scope.columnId === 'qty'}
+      <EditorNumber {...scope} />
+    {:else if scope.columnId === 'status'}
+      <EditorSelect {...scope} options={statusOptions} />
+    {:else if scope.columnId === 'active'}
+      <EditorCheckbox {...scope} />
+    {:else if scope.columnId === 'score'}
+      <EditorDate {...scope} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

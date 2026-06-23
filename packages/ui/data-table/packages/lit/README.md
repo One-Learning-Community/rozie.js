@@ -236,6 +236,56 @@ render(html`
 `, document.body);
 ```
 
+### Drop-in editor components (`#editor`)
+
+```ts
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in editor
+// custom elements (<rozie-editor-text>, <rozie-editor-number>, <rozie-editor-select>,
+// <rozie-editor-checkbox>, <rozie-editor-date>). DataTable stays the headless default;
+// the editors are additive.
+import '@rozie-ui/data-table-lit';
+
+let rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+
+// The #editor slot is the `.editor` property — a function returning a Lit template,
+// dispatched by columnId. Pass the slot scope ({ columnId, column, row, value, commit,
+// cancel }) as element properties; <rozie-editor-select> also takes `.options`.
+render(html`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=${rows}
+    @data-change=${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    .editor=${({ columnId, column, row, value, commit, cancel }) => {
+      const p = { columnId, column, row, value, commit, cancel };
+      switch (columnId) {
+        case 'name':   return html`<rozie-editor-text .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-text>`;
+        case 'qty':    return html`<rozie-editor-number .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-number>`;
+        case 'status': return html`<rozie-editor-select .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .options=${statusOptions}></rozie-editor-select>`;
+        case 'active': return html`<rozie-editor-checkbox .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-checkbox>`;
+        case 'score':  return html`<rozie-editor-date .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-date>`;
+        default:       return null;
+      }
+    }}
+  >
+    <rozie-column field="name" header="Name" editable editor="custom"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="custom"></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="custom"></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="custom"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

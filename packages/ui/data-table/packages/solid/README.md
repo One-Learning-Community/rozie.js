@@ -262,6 +262,56 @@ export function Demo() {
 }
 ```
 
+### Drop-in editor components (`#editor`)
+
+```tsx
+import { createSignal, Switch, Match } from 'solid-js';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
+  // default; the editors are additive named exports. Spread the slot scope through to
+  // each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+  // takes `options`. Use them as-is, or fork one as a template.
+  const [rows, setRows] = createSignal([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={(scope) => (
+        <Switch>
+          <Match when={scope.columnId === 'name'}><EditorText {...scope} /></Match>
+          <Match when={scope.columnId === 'qty'}><EditorNumber {...scope} /></Match>
+          <Match when={scope.columnId === 'status'}><EditorSelect {...scope} options={statusOptions} /></Match>
+          <Match when={scope.columnId === 'active'}><EditorCheckbox {...scope} /></Match>
+          <Match when={scope.columnId === 'score'}><EditorDate {...scope} /></Match>
+        </Switch>
+      )}
+    >
+      <Column field="name" header="Name" editable editor="custom" />
+      <Column field="qty" header="Qty" editable editor="custom" />
+      <Column field="status" header="Status" editable editor="custom" />
+      <Column field="active" header="Active" editable editor="custom" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

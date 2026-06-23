@@ -523,6 +523,1247 @@ render(html`
 
 :::
 
+### Editable cells (inline edit + validation)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = useState([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows}
+      onDataChange={setRows}
+      onCellEditCommit={({ rowId, columnId, oldValue, newValue }) =>
+        console.log('cell commit', rowId, columnId, oldValue, '→', newValue)
+      }
+      onRowEditCommit={({ rowId, changes }) => console.log('row commit', rowId, changes)}
+      // The #editor scoped slot is a render prop on React (the documented edge).
+      renderEditor={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={cancel}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={[
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ]} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+// The component OWNS edit state — bind ONE model (v-model:data) + listen for commits.
+const rows = ref([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+    @row-edit-commit="(p) => console.log('row commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="text" />
+    <Column field="qty" header="Qty" :editable="true" editor="number" :validate="validateQty" />
+    <Column field="status" header="Status" :editable="true" editor="select" :editorOptions="statusOptions" />
+    <Column field="active" header="Active" :editable="true" editor="checkbox" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- The #editor scoped slot replaces the built-in editor for one column. -->
+    <template #editor="{ columnId, value, commit, cancel }">
+      <span v-if="columnId === 'score'">
+        <button type="button" @click="commit(Number(value) - 1)">−</button>
+        <button type="button" @click="commit(Number(value) + 1)">+</button>
+        <button type="button" @click="cancel()">esc</button>
+      </span>
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // The component OWNS edit state — bind ONE model (bind:data) + listen for commits.
+  let rows = $state([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+  onroweditcommit={(p) => console.log('row commit', p)}
+>
+  <Column field="name" header="Name" editable editor="text" />
+  <Column field="qty" header="Qty" editable editor="number" validate={validateQty} />
+  <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+  <Column field="active" header="Active" editable editor="checkbox" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- The #editor scoped slot is a snippet on Svelte; it replaces the built-in editor. -->
+  {#snippet editor({ columnId, value, commit, cancel })}
+    {#if columnId === 'score'}
+      <span>
+        <button type="button" onclick={() => commit(Number(value) - 1)}>−</button>
+        <button type="button" onclick={() => commit(Number(value) + 1)}>+</button>
+        <button type="button" onclick={() => cancel()}>esc</button>
+      </span>
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- The component OWNS edit state — bind ONE model [(data)] + listen for commits. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+      (row-edit-commit)="onRowCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="text" />
+      <Column field="qty" header="Qty" [editable]="true" editor="number" [validate]="validateQty" />
+      <Column field="status" header="Status" [editable]="true" editor="select" [editorOptions]="statusOptions" />
+      <Column field="active" header="Active" [editable]="true" editor="checkbox" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <!-- The #editor scoped slot is an ng-template; it replaces the built-in editor. -->
+      <ng-template #editor let-columnId="columnId" let-value="value" let-commit="commit" let-cancel="cancel">
+        @if (columnId === 'score') {
+          <span>
+            <button type="button" (click)="commit(+value - 1)">−</button>
+            <button type="button" (click)="commit(+value + 1)">+</button>
+            <button type="button" (click)="cancel()">esc</button>
+          </span>
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+  statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+  onRowCommit(p: unknown) { console.log('row commit', p); }
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // The component OWNS edit state — bind ONE model ('data') + listen for commits.
+  const [rows, setRows] = createSignal([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      onRowEditCommit={(p) => console.log('row commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={({ columnId, value, commit, cancel }) =>
+        columnId === 'score' ? (
+          <span>
+            <button onClick={() => commit(Number(value) - 1)}>−</button>
+            <button onClick={() => commit(Number(value) + 1)}>+</button>
+            <button onClick={() => cancel()}>esc</button>
+          </span>
+        ) : null
+      }
+    >
+      <Column field="name" header="Name" editable editor="text" />
+      <Column field="qty" header="Qty" editable editor="number"
+        validate={(value) => Number(value) >= 0 || 'must be >= 0'} />
+      <Column field="status" header="Status" editable editor="select" editorOptions={statusOptions} />
+      <Column field="active" header="Active" editable editor="checkbox" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+// The component OWNS edit state — set the `data` property + listen for commits.
+let rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+const validateQty = (value: unknown) => Number(value) >= 0 || 'must be >= 0';
+
+render(html`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=${rows}
+    @data-change=${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    @row-edit-commit=${(e: CustomEvent) => console.log('row commit', e.detail)}
+    .editor=${({ columnId, value, commit, cancel }) =>
+      columnId === 'score'
+        ? html`<span>
+            <button @click=${() => commit(Number(value) - 1)}>−</button>
+            <button @click=${() => commit(Number(value) + 1)}>+</button>
+            <button @click=${() => cancel()}>esc</button>
+          </span>`
+        : null}
+  >
+    <rozie-column field="name" header="Name" editable editor="text"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="number" .validate=${validateQty}></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="select" .editorOptions=${statusOptions}></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="checkbox"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
+### Expandable rows (`#detail` slot + nested sub-rows)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // `expandable` opts the table into getExpandedRowModel + the auto-injected chevron
+  // column. `getSubRows` yields depth-indented child rows; the #detail slot renders an
+  // arbitrary panel under any open row. The two-way `expanded` set keeps MULTIPLE rows open.
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded}
+      onExpandChange={setExpanded}             // the event is `expand-change` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows (pattern b)
+      // The #detail scoped slot is a render prop on React (the documented edge).
+      renderDetail={({ row }) => <aside className="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+const expanded = ref<Record<string, boolean>>({});
+const getSubRows = (row: { children?: unknown[] }) => row.children;
+</script>
+
+<template>
+  <!-- expandable opts in; v-model:expanded keeps MULTIPLE rows open; getSubRows yields
+       depth-indented child rows; the #detail scoped slot renders a panel under each open row. -->
+  <DataTable :data="rows" :expandable="true" v-model:expanded="expanded" :getSubRows="getSubRows">
+    <Column field="name" header="Name" />
+    <Column field="headcount" header="Headcount" />
+
+    <template #detail="{ row }">
+      <aside class="detail">More about {{ row.name }}</aside>
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  // bind:expanded keeps MULTIPLE rows open; getSubRows yields depth-indented child rows.
+  let expanded = $state<Record<string, boolean>>({});
+  const getSubRows = (row: { children?: unknown[] }) => row.children;
+</script>
+
+<DataTable data={rows} expandable bind:expanded {getSubRows}>
+  <Column field="name" header="Name" />
+  <Column field="headcount" header="Headcount" />
+
+  <!-- The #detail scoped slot is a snippet on Svelte; it renders under each open row. -->
+  {#snippet detail({ row })}
+    <aside class="detail">More about {row.name}</aside>
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- expandable opts in; [(expanded)] keeps MULTIPLE rows open; getSubRows yields nested rows. -->
+    <DataTable [data]="rows" [expandable]="true" [(expanded)]="expanded" [getSubRows]="getSubRows">
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+
+      <!-- The #detail scoped slot is an ng-template receiving { row }. -->
+      <ng-template #detail let-row="row">
+        <aside class="detail">More about {{ row.name }}</aside>
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  expanded: Record<string, boolean> = {};
+  getSubRows = (row: { children?: unknown[] }) => row.children;
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // expandable opts in; the two-way `expanded` set keeps MULTIPLE rows open; getSubRows
+  // yields depth-indented child rows; the #detail slot renders a panel under any open row.
+  const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      expandable
+      expanded={expanded()}
+      onExpandChange={setExpanded}             // the event is `expand-change` → onExpandChange
+      getSubRows={(row) => row.children}       // depth-indented nested rows
+      // The #detail scoped slot is a render prop on Solid (the documented edge).
+      detailSlot={({ row }) => <aside class="detail">More about {row.name}</aside>}
+    >
+      <Column field="name" header="Name" />
+      <Column field="headcount" header="Headcount" />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Engineering', headcount: 12, children: [
+      { id: 11, name: 'Frontend', headcount: 5 },
+      { id: 12, name: 'Backend',  headcount: 7 },
+    ] },
+    { id: 2, name: 'Sales', headcount: 8 },
+  ];
+
+// expandable opts in; listen for `expand-change`; getSubRows yields depth-indented nested
+// rows; the #detail scoped slot is the `.detail` property (a function returning a template).
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    expandable
+    .getSubRows=${(row: { children?: unknown[] }) => row.children}
+    .detail=${({ row }) => html`<aside class="detail">More about ${row.name}</aside>`}
+    @expand-change=${(e: CustomEvent) => console.log('expanded', e.detail)}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="headcount" header="Headcount"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
+### Grouping + aggregation (headless `#groupBar`)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import { DataTable, Column } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // `groupable` enables getGroupedRowModel. The `grouping` model is an ORDERED column-id
+  // list (multi-column → nested groups). Per-column `aggregationFn` rolls leaf values up
+  // into the group-header row (a built-in name OR a custom fn). #groupBar is HEADLESS —
+  // you build the bar from its props; the component ships NO drag UI (D-02 retired).
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = useState<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping}
+      onGroupChange={setGrouping}              // the event is `group-change` → onGroupChange
+      // The #groupBar scoped slot is a render prop on React (the documented edge).
+      renderGroupBar={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+const grouping = ref<string[]>([]);
+// A custom per-column aggregation (range = max − min) over the group's leaf rows.
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+  const v = leafRows.map((r) => Number(r.getValue(columnId)));
+  return v.length ? Math.max(...v) - Math.min(...v) : 0;
+};
+</script>
+
+<template>
+  <!-- groupable enables grouping; the model is an ORDERED column-id list; aggregationFn
+       rolls leaf values into the group header. The event is `group-change`. -->
+  <DataTable :data="rows" :groupable="true" v-model:grouping="grouping" @group-change="(g) => console.log('grouping', g)">
+    <Column field="region" header="Region" />
+    <Column field="category" header="Category" />
+    <Column field="units" header="Units" aggregationFn="sum" />
+    <Column field="score" header="Score" :aggregationFn="scoreRange" />
+
+    <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+    <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+      <div class="group-bar">
+        <button type="button" @click="applyGrouping(['region', 'category'])">Group region → category</button>
+        <button type="button" @click="clearGrouping()">Clear</button>
+        <span>{{ grouping.join(' → ') || 'ungrouped' }} ({{ groupableColumns.length }} groupable)</span>
+      </div>
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  let grouping = $state<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+</script>
+
+<!-- groupable enables grouping; the model is an ORDERED column-id list; the event is
+     `group-change` → ongroupchange. aggregationFn rolls leaf values into the group header. -->
+<DataTable data={rows} groupable bind:grouping ongroupchange={(g) => console.log('grouping', g)}>
+  <Column field="region" header="Region" />
+  <Column field="category" header="Category" />
+  <Column field="units" header="Units" aggregationFn="sum" />
+  <Column field="score" header="Score" aggregationFn={scoreRange} />
+
+  <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+  {#snippet groupBar({ grouping, groupableColumns, applyGrouping, clearGrouping })}
+    <div class="group-bar">
+      <button type="button" onclick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+      <button type="button" onclick={() => clearGrouping()}>Clear</button>
+      <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+    </div>
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- groupable enables grouping; [(grouping)] is an ORDERED column-id list; the event
+         is `group-change`. aggregationFn rolls leaf values into the group header. -->
+    <DataTable [data]="rows" [groupable]="true" [(grouping)]="grouping" (group-change)="onGroupChange($event)">
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" [aggregationFn]="scoreRange" />
+
+      <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
+      <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
+        <div class="group-bar">
+          <button type="button" (click)="applyGrouping(['region', 'category'])">Group region → category</button>
+          <button type="button" (click)="clearGrouping()">Clear</button>
+          <span>{{ grouping.join(' → ') || 'ungrouped' }} ({{ groupableColumns.length }} groupable)</span>
+        </div>
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  grouping: string[] = [];
+  scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  onGroupChange(g: string[]) { console.log('grouping', g); }
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // groupable enables grouping; the `grouping` model is an ORDERED column-id list;
+  // aggregationFn rolls leaf values into the group header. #groupBar is HEADLESS (no drag).
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = createSignal<string[]>([]);
+  const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+    const v = leafRows.map((r) => Number(r.getValue(columnId)));
+    return v.length ? Math.max(...v) - Math.min(...v) : 0;
+  };
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      grouping={grouping()}
+      onGroupChange={setGrouping}              // the event is `group-change` → onGroupChange
+      // The #groupBar scoped slot is a render prop on Solid (the documented edge).
+      groupBarSlot={({ grouping, groupableColumns, applyGrouping, clearGrouping }) => (
+        <div>
+          <button onClick={() => applyGrouping(['region', 'category'])}>Group region → category</button>
+          <button onClick={() => clearGrouping()}>Clear</button>
+          <span>{grouping.join(' → ') || 'ungrouped'} ({groupableColumns.length} groupable)</span>
+        </div>
+      )}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+      <Column field="score" header="Score" aggregationFn={scoreRange} />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+const scoreRange = (columnId: string, leafRows: { getValue: (id: string) => number }[]) => {
+  const v = leafRows.map((r) => Number(r.getValue(columnId)));
+  return v.length ? Math.max(...v) - Math.min(...v) : 0;
+};
+
+// groupable enables grouping; listen for `group-change`; #groupBar is the headless
+// `.groupBar` property (NO built-in drag UI) — build the bar from its props.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    groupable
+    @group-change=${(e: CustomEvent) => console.log('grouping', e.detail)}
+    .groupBar=${({ grouping, groupableColumns, applyGrouping, clearGrouping }) => html`
+      <div>
+        <button @click=${() => applyGrouping(['region', 'category'])}>Group region → category</button>
+        <button @click=${() => clearGrouping()}>Clear</button>
+        <span>${grouping.join(' → ') || 'ungrouped'} (${groupableColumns.length} groupable)</span>
+      </div>`}
+  >
+    <rozie-column field="region" header="Region"></rozie-column>
+    <rozie-column field="category" header="Category"></rozie-column>
+    <rozie-column field="units" header="Units" .aggregationFn=${'sum'}></rozie-column>
+    <rozie-column field="score" header="Score" .aggregationFn=${scoreRange}></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
+### Faceted filtering exposure (headless `#filter`)
+
+::: code-group
+
+```tsx [React]
+import { useRef, useState } from 'react';
+import { DataTable, Column, type DataTableHandle } from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only: NO event, NO built-in facet control. The #filter
+  // scoped slot hands you the cross-filtered `uniqueValues` (keys only) + numeric `minMax`;
+  // you build the checkbox list / range slider and drive `columnFilters`. The
+  // getFacetedUniqueValues / getFacetedMinMaxValues handle verbs read the same data back.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = useState<{ id: string; value: unknown }[]>([]);
+  const tbl = useRef<DataTableHandle>(null);
+  return (
+    <DataTable
+      ref={tbl}
+      data={rows}
+      columnFilters={columnFilters}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on React (the documented edge).
+      renderFilter={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => (
+              <label key={String(v)}><input type="checkbox" /> {String(v)}</label>
+            ))}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, { Column } from '@rozie-ui/data-table-vue';
+
+const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+const columnFilters = ref<{ id: string; value: unknown }[]>([]);
+</script>
+
+<template>
+  <!-- Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+       hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`; build the UI and
+       drive v-model:columnFilters. -->
+  <DataTable :data="rows" v-model:columnFilters="columnFilters">
+    <Column field="name" header="Name" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" :filterable="true" />
+
+    <template #filter="{ columnId, uniqueValues, minMax }">
+      <fieldset v-if="columnId === 'category'">
+        <label v-for="v in uniqueValues" :key="v"><input type="checkbox" /> {{ v }}</label>
+      </fieldset>
+      <input v-else type="range" :min="minMax[0]" :max="minMax[1]" />
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, { Column } from '@rozie-ui/data-table-svelte';
+
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  let columnFilters = $state<{ id: string; value: unknown }[]>([]);
+</script>
+
+<DataTable data={rows} bind:columnFilters>
+  <Column field="name" header="Name" />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  {#snippet filter({ columnId, uniqueValues, minMax })}
+    {#if columnId === 'category'}
+      <fieldset>
+        {#each uniqueValues as v}<label><input type="checkbox" /> {v}</label>{/each}
+      </fieldset>
+    {:else}
+      <input type="range" min={minMax[0]} max={minMax[1]} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import { DataTable, Column } from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column],
+  template: `
+    <!-- Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+         hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`. -->
+    <DataTable [data]="rows" [(columnFilters)]="columnFilters">
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" [filterable]="true" />
+
+      <ng-template #filter let-columnId="columnId" let-uniqueValues="uniqueValues" let-minMax="minMax">
+        @if (columnId === 'category') {
+          <fieldset>
+            @for (v of uniqueValues; track v) { <label><input type="checkbox" /> {{ v }}</label> }
+          </fieldset>
+        } @else {
+          <input type="range" [min]="minMax[0]" [max]="minMax[1]" />
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  columnFilters: { id: string; value: unknown }[] = [];
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import { DataTable, Column } from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
+  // hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters()}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on Solid (the documented edge).
+      filterSlot={({ columnId, uniqueValues, minMax }) =>
+        columnId === 'category' ? (
+          <fieldset>
+            {uniqueValues.map((v) => <label><input type="checkbox" /> {String(v)}</label>)}
+          </fieldset>
+        ) : (
+          <input type="range" min={minMax?.[0]} max={minMax?.[1]} />
+        )
+      }
+    >
+      <Column field="name" header="Name" />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+
+// Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot is the
+// `.filter` property; it receives `uniqueValues` (keys, cross-filtered) + numeric `minMax`.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    .filter=${({ columnId, uniqueValues, minMax }) =>
+      columnId === 'category'
+        ? html`<fieldset>${uniqueValues.map((v) => html`<label><input type="checkbox" /> ${v}</label>`)}</fieldset>`
+        : html`<input type="range" min=${minMax?.[0]} max=${minMax?.[1]} />`}
+  >
+    <rozie-column field="name" header="Name"></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
+### Drop-in editor components (`#editor`)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
+  // DEFAULT; the editors are additive named exports. Mark each column editor="custom"
+  // (the drop-in owns rendering) and dispatch by columnId. Each editor takes the slot
+  // scope as props ({ columnId, column, row, value, commit, cancel }); EditorSelect
+  // also takes `options`. Use them as-is, or fork one as a template.
+  const [rows, setRows] = useState([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      // The #editor scoped slot is a render prop on React (the documented edge).
+      renderEditor={(scope) => {
+        switch (scope.columnId) {
+          case 'name':   return <EditorText {...scope} />;
+          case 'qty':    return <EditorNumber {...scope} />;
+          case 'status': return <EditorSelect {...scope} options={statusOptions} />;
+          case 'active': return <EditorCheckbox {...scope} />;
+          case 'score':  return <EditorDate {...scope} />;
+          default:       return null;
+        }
+      }}
+    >
+      <Column field="name" header="Name" editable editor="custom" />
+      <Column field="qty" header="Qty" editable editor="custom" />
+      <Column field="status" header="Status" editable editor="custom" />
+      <Column field="active" header="Active" editable editor="custom" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless DEFAULT
+// export; the editors are additive named exports. v-bind the whole slot scope through
+// to each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+// takes :options. Use them as-is, or fork one as a template.
+const rows = ref([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+</script>
+
+<template>
+  <DataTable
+    interaction-mode="grid"
+    v-model:data="rows"
+    @cell-edit-commit="(p) => console.log('cell commit', p)"
+  >
+    <Column field="name" header="Name" :editable="true" editor="custom" />
+    <Column field="qty" header="Qty" :editable="true" editor="custom" />
+    <Column field="status" header="Status" :editable="true" editor="custom" />
+    <Column field="active" header="Active" :editable="true" editor="custom" />
+    <Column field="score" header="Score" :editable="true" editor="custom" />
+
+    <!-- One #editor slot, dispatched by columnId, wiring the drop-in editors. -->
+    <template #editor="scope">
+      <EditorText v-if="scope.columnId === 'name'" v-bind="scope" />
+      <EditorNumber v-else-if="scope.columnId === 'qty'" v-bind="scope" />
+      <EditorSelect v-else-if="scope.columnId === 'status'" v-bind="scope" :options="statusOptions" />
+      <EditorCheckbox v-else-if="scope.columnId === 'active'" v-bind="scope" />
+      <EditorDate v-else-if="scope.columnId === 'score'" v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, {
+    Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-in editors fill the #editor snippet — DataTable stays the headless
+  // DEFAULT export; the editors are additive named exports. Spread the snippet scope
+  // through to each drop-in ({ columnId, column, row, value, commit, cancel });
+  // EditorSelect also takes `options`. Use them as-is, or fork one as a template.
+  let rows = $state([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+</script>
+
+<DataTable
+  interactionMode="grid"
+  bind:data={rows}
+  oncelleditcommit={(p) => console.log('cell commit', p)}
+>
+  <Column field="name" header="Name" editable editor="custom" />
+  <Column field="qty" header="Qty" editable editor="custom" />
+  <Column field="status" header="Status" editable editor="custom" />
+  <Column field="active" header="Active" editable editor="custom" />
+  <Column field="score" header="Score" editable editor="custom" />
+
+  <!-- One #editor snippet, dispatched by columnId, wiring the drop-in editors. -->
+  {#snippet editor(scope)}
+    {#if scope.columnId === 'name'}
+      <EditorText {...scope} />
+    {:else if scope.columnId === 'qty'}
+      <EditorNumber {...scope} />
+    {:else if scope.columnId === 'status'}
+      <EditorSelect {...scope} options={statusOptions} />
+    {:else if scope.columnId === 'active'}
+      <EditorCheckbox {...scope} />
+    {:else if scope.columnId === 'score'}
+      <EditorDate {...scope} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate],
+  template: `
+    <!-- OPT-IN drop-in editors fill the #editor template — DataTable stays the headless
+         default; the editors are additive named exports. Each takes the slot scope as
+         inputs ([columnId] [column] [row] [value] [commit] [cancel]); EditorSelect also
+         takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
+    <DataTable
+      interactionMode="grid"
+      [(data)]="rows"
+      (cell-edit-commit)="onCellCommit($event)"
+    >
+      <Column field="name" header="Name" [editable]="true" editor="custom" />
+      <Column field="qty" header="Qty" [editable]="true" editor="custom" />
+      <Column field="status" header="Status" [editable]="true" editor="custom" />
+      <Column field="active" header="Active" [editable]="true" editor="custom" />
+      <Column field="score" header="Score" [editable]="true" editor="custom" />
+
+      <ng-template #editor let-columnId="columnId" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel">
+        @switch (columnId) {
+          @case ('name') {
+            <rozie-editor-text [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('qty') {
+            <rozie-editor-number [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('status') {
+            <rozie-editor-select [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" [options]="statusOptions" />
+          }
+          @case ('active') {
+            <rozie-editor-checkbox [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+          @case ('score') {
+            <rozie-editor-date [columnId]="columnId" [column]="column" [row]="row" [value]="value" [commit]="commit" [cancel]="cancel" />
+          }
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+  statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  onCellCommit(p: unknown) { console.log('cell commit', p); }
+}
+```
+
+```tsx [Solid]
+import { createSignal, Switch, Match } from 'solid-js';
+import {
+  DataTable, Column,
+  EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-in editors fill the #editor slot — DataTable stays the headless
+  // default; the editors are additive named exports. Spread the slot scope through to
+  // each drop-in ({ columnId, column, row, value, commit, cancel }); EditorSelect also
+  // takes `options`. Use them as-is, or fork one as a template.
+  const [rows, setRows] = createSignal([
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ]);
+  const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+  return (
+    <DataTable
+      interactionMode="grid"
+      data={rows()}
+      onDataChange={setRows}
+      onCellEditCommit={(p) => console.log('cell commit', p)}
+      // The #editor scoped slot is a render prop on Solid (the documented edge).
+      editorSlot={(scope) => (
+        <Switch>
+          <Match when={scope.columnId === 'name'}><EditorText {...scope} /></Match>
+          <Match when={scope.columnId === 'qty'}><EditorNumber {...scope} /></Match>
+          <Match when={scope.columnId === 'status'}><EditorSelect {...scope} options={statusOptions} /></Match>
+          <Match when={scope.columnId === 'active'}><EditorCheckbox {...scope} /></Match>
+          <Match when={scope.columnId === 'score'}><EditorDate {...scope} /></Match>
+        </Switch>
+      )}
+    >
+      <Column field="name" header="Name" editable editor="custom" />
+      <Column field="qty" header="Qty" editable editor="custom" />
+      <Column field="status" header="Status" editable editor="custom" />
+      <Column field="active" header="Active" editable editor="custom" />
+      <Column field="score" header="Score" editable editor="custom" />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in editor
+// custom elements (<rozie-editor-text>, <rozie-editor-number>, <rozie-editor-select>,
+// <rozie-editor-checkbox>, <rozie-editor-date>). DataTable stays the headless default;
+// the editors are additive.
+import '@rozie-ui/data-table-lit';
+
+let rows = [
+    { id: 1, name: 'Alpha', qty: 3, status: 'active',   active: true,  score: 41 },
+    { id: 2, name: 'Beta',  qty: 7, status: 'archived', active: false, score: 92 },
+  ];
+const statusOptions = [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ];
+
+// The #editor slot is the `.editor` property — a function returning a Lit template,
+// dispatched by columnId. Pass the slot scope ({ columnId, column, row, value, commit,
+// cancel }) as element properties; <rozie-editor-select> also takes `.options`.
+render(html`
+  <rozie-data-table
+    interaction-mode="grid"
+    .data=${rows}
+    @data-change=${(e: CustomEvent) => { rows = e.detail; }}
+    @cell-edit-commit=${(e: CustomEvent) => console.log('cell commit', e.detail)}
+    .editor=${({ columnId, column, row, value, commit, cancel }) => {
+      const p = { columnId, column, row, value, commit, cancel };
+      switch (columnId) {
+        case 'name':   return html`<rozie-editor-text .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-text>`;
+        case 'qty':    return html`<rozie-editor-number .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-number>`;
+        case 'status': return html`<rozie-editor-select .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel} .options=${statusOptions}></rozie-editor-select>`;
+        case 'active': return html`<rozie-editor-checkbox .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-checkbox>`;
+        case 'score':  return html`<rozie-editor-date .columnId=${p.columnId} .column=${p.column} .row=${p.row} .value=${p.value} .commit=${p.commit} .cancel=${p.cancel}></rozie-editor-date>`;
+        default:       return null;
+      }
+    }}
+  >
+    <rozie-column field="name" header="Name" editable editor="custom"></rozie-column>
+    <rozie-column field="qty" header="Qty" editable editor="custom"></rozie-column>
+    <rozie-column field="status" header="Status" editable editor="custom"></rozie-column>
+    <rozie-column field="active" header="Active" editable editor="custom"></rozie-column>
+    <rozie-column field="score" header="Score" editable editor="custom"></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
 ## Imperative handle
 
 Beyond props and events, `DataTable` exposes imperative methods (declared once in the `.rozie` source via `$expose`). Grab a handle through your framework's native ref mechanism and call them directly:
@@ -537,6 +1778,11 @@ const tbl = useRef<DataTableHandle>(null);
 // <DataTable ref={tbl} ... />
 tbl.current?.toggleAllRows(true);
 const selected = tbl.current?.getSelectedRows();
+tbl.current?.editRow(0);                       // full-row edit on row 0
+const range = tbl.current?.getSelectedRange(); // the active cell-range rectangle
+tbl.current?.expandAll();                      // open every expandable row (collapseAll / toggleRowExpanded / getExpandedRows)
+tbl.current?.applyGrouping(['region']);        // set grouping (clearGrouping to reset)
+const cats = tbl.current?.getFacetedUniqueValues('category'); // cross-filtered facet keys (getFacetedMinMaxValues too)
 ```
 
 ```vue [Vue]
@@ -548,6 +1794,11 @@ const tbl = ref();          // template ref
 <template>
   <DataTable ref="tbl" :data="rows" />
   <button @click="tbl.clearSelection()">Clear</button>
+  <button @click="tbl.editRow(0)">Edit row 0</button>
+  <button @click="console.log(tbl.getSelectedRange())">Read range</button>
+  <button @click="tbl.expandAll()">Expand all</button>
+  <button @click="tbl.applyGrouping(['region'])">Group by region</button>
+  <button @click="console.log(tbl.getFacetedUniqueValues('category'))">Facet keys</button>
 </template>
 ```
 
@@ -558,6 +1809,11 @@ const tbl = ref();          // template ref
 
 <DataTable bind:this={tbl} data={rows} />
 <button onclick={() => tbl.clearSelection()}>Clear</button>
+<button onclick={() => tbl.editRow(0)}>Edit row 0</button>
+<button onclick={() => console.log(tbl.getSelectedRange())}>Read range</button>
+<button onclick={() => tbl.expandAll()}>Expand all</button>
+<button onclick={() => tbl.applyGrouping(['region'])}>Group by region</button>
+<button onclick={() => console.log(tbl.getFacetedUniqueValues('category'))}>Facet keys</button>
 ```
 
 ```ts [Angular]
@@ -566,6 +1822,11 @@ export class DemoComponent {
   @ViewChild(DataTable) tbl!: DataTable;   // or the viewChild() signal
   selectAll() { this.tbl.toggleAllRows(true); }
   read() { return this.tbl.getSelectedRows(); }
+  editFirstRow() { this.tbl.editRow(0); }            // full-row edit on row 0
+  readRange() { return this.tbl.getSelectedRange(); } // the active cell-range rectangle
+  expandEverything() { this.tbl.expandAll(); }       // collapseAll / toggleRowExpanded / getExpandedRows
+  groupByRegion() { this.tbl.applyGrouping(['region']); } // clearGrouping to reset
+  facetKeys() { return this.tbl.getFacetedUniqueValues('category'); } // getFacetedMinMaxValues too
 }
 ```
 
@@ -576,6 +1837,11 @@ let handle: DataTableHandle | undefined;
 // The ref callback receives the HANDLE object (not the DOM node).
 <DataTable ref={(h) => (handle = h)} data={rows} />;
 handle?.toggleAllRows(true);
+handle?.editRow(0);                       // full-row edit on row 0
+const range = handle?.getSelectedRange(); // the active cell-range rectangle
+handle?.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+handle?.applyGrouping(['region']);        // clearGrouping to reset
+const cats = handle?.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too
 ```
 
 ```ts [Lit]
@@ -584,6 +1850,11 @@ handle?.toggleAllRows(true);
 const el = document.querySelector('rozie-data-table');
 el.toggleAllRows(true);
 const selected = el.getSelectedRows();
+el.editRow(0);                       // full-row edit on row 0
+const range = el.getSelectedRange();  // the active cell-range rectangle
+el.expandAll();                      // collapseAll / toggleRowExpanded / getExpandedRows
+el.applyGrouping(['region']);        // clearGrouping to reset
+const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues too
 ```
 
 :::
