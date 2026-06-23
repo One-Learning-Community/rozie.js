@@ -2017,6 +2017,251 @@ render(html`
 
 :::
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import {
+  DataTable, Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // OPT-IN drop-ins: GroupBar fills the #groupBar slot (drag the column chips into the
+  // zone to group; remove tokens; clear) and DetailPanel fills the #detail slot (the
+  // open row as a key/value list). Both are additive named exports — DataTable stays the
+  // headless DEFAULT. Forward the slot scope to each; fork either as a starter.
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      expandable
+      grouping={grouping}
+      onGroupChange={setGrouping}
+      expanded={expanded}
+      onExpandChange={setExpanded}
+      // The #groupBar / #detail scoped slots are render props on React (the documented edge).
+      renderGroupBar={(scope) => <GroupBar {...scope} />}
+      renderDetail={(scope) => <DetailPanel {...scope} />}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-ins fill the #groupBar + #detail slots — DataTable stays the headless
+// DEFAULT export; both are additive named exports. v-bind the whole slot scope through
+// to each (GroupBar gets { grouping, groupableColumns, applyGrouping, clearGrouping };
+// DetailPanel gets { row }). Use them as-is, or fork either as a starter.
+const rows = ref([
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ]);
+const grouping = ref<string[]>([]);
+const expanded = ref<Record<string, boolean>>({});
+</script>
+
+<template>
+  <DataTable
+    :data="rows"
+    :groupable="true"
+    :expandable="true"
+    v-model:grouping="grouping"
+    v-model:expanded="expanded"
+  >
+    <Column field="region" header="Region" />
+    <Column field="category" header="Category" />
+    <Column field="units" header="Units" aggregationFn="sum" />
+
+    <!-- GroupBar fills #groupBar; DetailPanel fills #detail. -->
+    <template #groupBar="scope">
+      <GroupBar v-bind="scope" />
+    </template>
+    <template #detail="scope">
+      <DetailPanel v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, {
+    Column, GroupBar, DetailPanel,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-ins fill the #groupBar + #detail snippets — DataTable stays the headless
+  // DEFAULT export; both are additive named exports. Spread the snippet scope through to
+  // each (GroupBar gets { grouping, groupableColumns, applyGrouping, clearGrouping };
+  // DetailPanel gets { row }). Use them as-is, or fork either as a starter.
+  let rows = $state([
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ]);
+  let grouping = $state<string[]>([]);
+  let expanded = $state<Record<string, boolean>>({});
+</script>
+
+<DataTable data={rows} groupable expandable bind:grouping bind:expanded>
+  <Column field="region" header="Region" />
+  <Column field="category" header="Category" />
+  <Column field="units" header="Units" aggregationFn="sum" />
+
+  <!-- GroupBar fills #groupBar; DetailPanel fills #detail. -->
+  {#snippet groupBar(scope)}
+    <GroupBar {...scope} />
+  {/snippet}
+  {#snippet detail(scope)}
+    <DetailPanel {...scope} />
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import {
+  DataTable, Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, GroupBar, DetailPanel],
+  template: `
+    <!-- OPT-IN drop-ins fill the #groupBar + #detail templates — DataTable stays the
+         headless default; both are additive named exports. GroupBar takes the group-bar
+         scope as inputs ([grouping] [groupableColumns] [applyGrouping] [clearGrouping]);
+         DetailPanel takes [row]. Use them as-is, or fork either as a starter. -->
+    <DataTable
+      [data]="rows"
+      [groupable]="true"
+      [expandable]="true"
+      [(grouping)]="grouping"
+      [(expanded)]="expanded"
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+
+      <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
+        <rozie-group-bar [grouping]="grouping" [groupableColumns]="groupableColumns" [applyGrouping]="applyGrouping" [clearGrouping]="clearGrouping" />
+      </ng-template>
+      <ng-template #detail let-row="row">
+        <rozie-detail-panel [row]="row" />
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  grouping: string[] = [];
+  expanded: Record<string, boolean> = {};
+}
+```
+
+```tsx [Solid]
+import { createSignal } from 'solid-js';
+import {
+  DataTable, Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-ins fill the #groupBar + #detail slots — DataTable stays the headless
+  // default; both are additive named exports. Spread the slot scope through to each
+  // (GroupBar gets { grouping, groupableColumns, applyGrouping, clearGrouping };
+  // DetailPanel gets { row }). Use them as-is, or fork either as a starter.
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = createSignal<string[]>([]);
+  const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      expandable
+      grouping={grouping()}
+      onGroupChange={setGrouping}
+      expanded={expanded()}
+      onExpandChange={setExpanded}
+      // The #groupBar / #detail scoped slots are render props on Solid (the documented edge).
+      groupBarSlot={(scope) => <GroupBar {...scope} />}
+      detailSlot={(scope) => <DetailPanel {...scope} />}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in
+// <rozie-group-bar> + <rozie-detail-panel> custom elements. DataTable stays the headless
+// default; both are additive.
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+
+// #groupBar is the `.groupBar` property; #detail is the `.detail` property — each a
+// function returning a Lit template, dispatched at render time. Pass the slot scope
+// through as element properties (GroupBar: the group-bar scope; DetailPanel: { row }).
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    groupable
+    expandable
+    .groupBar=${({ grouping, groupableColumns, applyGrouping, clearGrouping }) =>
+      html`<rozie-group-bar .grouping=${grouping} .groupableColumns=${groupableColumns} .applyGrouping=${applyGrouping} .clearGrouping=${clearGrouping}></rozie-group-bar>`}
+    .detail=${({ row }) => html`<rozie-detail-panel .row=${row}></rozie-detail-panel>`}
+  >
+    <rozie-column field="region" header="Region"></rozie-column>
+    <rozie-column field="category" header="Category"></rozie-column>
+    <rozie-column field="units" header="Units" .aggregationFn=${'sum'}></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
 ## Imperative handle
 
 Beyond props and events, `DataTable` exposes imperative methods (declared once in the `.rozie` source via `$expose`). Grab a handle through your framework's native ref mechanism and call them directly:

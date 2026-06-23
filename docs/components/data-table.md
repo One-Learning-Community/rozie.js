@@ -392,6 +392,24 @@ Set `expandable` to opt into expandable rows: a leading chevron expander column 
 
 Drive expansion imperatively with [`toggleRowExpanded`](#imperative-handle) / `expandAll` / `collapseAll` / `getExpandedRows`, and observe it via the [`expand-change`](#events) event. When grouping is active and `expanded` is untouched, group subtrees auto-expand.
 
+## Drop-in group bar + detail panel
+
+The `#groupBar` and `#detail` slots are fully headless — you can render any group-bar UI or any detail panel. For the common cases the package also ships two **opt-in drop-in components** so you don't have to hand-roll the wiring: `GroupBar` and `DetailPanel`. Like the [editor](#drop-in-editor-components) / [filter](#drop-in-filter-components) drop-ins they are **additive named exports** alongside `DataTable` (which stays the headless **default** export — importing them is byte-identical-off if you never use them):
+
+```ts
+import { DataTable, Column, GroupBar, DetailPanel }
+  from '@rozie-ui/data-table-<target>';
+// (Vue: `import DataTable, { Column, GroupBar, DetailPanel }` — DataTable is the default.
+//  Lit: the single side-effect import registers the <rozie-group-bar> / <rozie-detail-panel> custom elements.)
+```
+
+`GroupBar` fills the `#groupBar` slot with a working **drag-to-group** bar (native HTML5 drag-and-drop, zero extra deps): drag a column chip into the drop zone to add it to the grouping, click a token's × to remove it, and a "Clear" affordance resets. It holds **no** grouping source of truth — it always reads the `grouping` array and routes every change through `applyGrouping` / `clearGrouping`, exactly the headless `#groupBar` contract. `DetailPanel` fills the `#detail` slot with a forkable starter that renders the open row's own fields as a key/value definition list. Mark the table `groupable` (for the bar) and `expandable` (for the panel), then forward the slot scope to each drop-in. Use them **as-is**, or fork either as a template. The full per-framework wiring is the [drop-in group bar + detail panel example](/components/data-table-usage) on the usage page.
+
+| Component | Renders | Slot | Scope read |
+| --- | --- | --- | --- |
+| `GroupBar` | draggable column chips + removable grouping tokens + clear | `#groupBar` | `grouping`, `groupableColumns`, `applyGrouping`, `clearGrouping` |
+| `DetailPanel` | the row's fields as a `<dl>` key/value list | `#detail` | `row` |
+
 ## Accessibility
 
 - Semantic ARIA table roles throughout: `role="table"` / `role="rowgroup"` / `role="row"` / `role="columnheader"` / `role="cell"`, with `aria-sort` (the string-safe `'ascending'` \| `'descending'` \| `'none'`) on sortable headers.

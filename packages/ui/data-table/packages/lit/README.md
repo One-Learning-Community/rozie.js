@@ -328,6 +328,41 @@ render(html`
 `, document.body);
 ```
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+```ts
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in
+// <rozie-group-bar> + <rozie-detail-panel> custom elements. DataTable stays the headless
+// default; both are additive.
+import '@rozie-ui/data-table-lit';
+
+const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+
+// #groupBar is the `.groupBar` property; #detail is the `.detail` property — each a
+// function returning a Lit template, dispatched at render time. Pass the slot scope
+// through as element properties (GroupBar: the group-bar scope; DetailPanel: { row }).
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    groupable
+    expandable
+    .groupBar=${({ grouping, groupableColumns, applyGrouping, clearGrouping }) =>
+      html`<rozie-group-bar .grouping=${grouping} .groupableColumns=${groupableColumns} .applyGrouping=${applyGrouping} .clearGrouping=${clearGrouping}></rozie-group-bar>`}
+    .detail=${({ row }) => html`<rozie-detail-panel .row=${row}></rozie-detail-panel>`}
+  >
+    <rozie-column field="region" header="Region"></rozie-column>
+    <rozie-column field="category" header="Category"></rozie-column>
+    <rozie-column field="units" header="Units" .aggregationFn=${'sum'}></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

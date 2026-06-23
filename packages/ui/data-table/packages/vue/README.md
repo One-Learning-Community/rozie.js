@@ -346,6 +346,52 @@ const columnFilters = ref<{ id: string; value: unknown }[]>([]);
 </template>
 ```
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-ins fill the #groupBar + #detail slots — DataTable stays the headless
+// DEFAULT export; both are additive named exports. v-bind the whole slot scope through
+// to each (GroupBar gets { grouping, groupableColumns, applyGrouping, clearGrouping };
+// DetailPanel gets { row }). Use them as-is, or fork either as a starter.
+const rows = ref([
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ]);
+const grouping = ref<string[]>([]);
+const expanded = ref<Record<string, boolean>>({});
+</script>
+
+<template>
+  <DataTable
+    :data="rows"
+    :groupable="true"
+    :expandable="true"
+    v-model:grouping="grouping"
+    v-model:expanded="expanded"
+  >
+    <Column field="region" header="Region" />
+    <Column field="category" header="Category" />
+    <Column field="units" header="Units" aggregationFn="sum" />
+
+    <!-- GroupBar fills #groupBar; DetailPanel fills #detail. -->
+    <template #groupBar="scope">
+      <GroupBar v-bind="scope" />
+    </template>
+    <template #detail="scope">
+      <DetailPanel v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

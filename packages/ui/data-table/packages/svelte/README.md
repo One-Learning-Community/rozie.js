@@ -327,6 +327,43 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+```svelte
+<script lang="ts">
+  import DataTable, {
+    Column, GroupBar, DetailPanel,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-ins fill the #groupBar + #detail snippets — DataTable stays the headless
+  // DEFAULT export; both are additive named exports. Spread the snippet scope through to
+  // each (GroupBar gets { grouping, groupableColumns, applyGrouping, clearGrouping };
+  // DetailPanel gets { row }). Use them as-is, or fork either as a starter.
+  let rows = $state([
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ]);
+  let grouping = $state<string[]>([]);
+  let expanded = $state<Record<string, boolean>>({});
+</script>
+
+<DataTable data={rows} groupable expandable bind:grouping bind:expanded>
+  <Column field="region" header="Region" />
+  <Column field="category" header="Category" />
+  <Column field="units" header="Units" aggregationFn="sum" />
+
+  <!-- GroupBar fills #groupBar; DetailPanel fills #detail. -->
+  {#snippet groupBar(scope)}
+    <GroupBar {...scope} />
+  {/snippet}
+  {#snippet detail(scope)}
+    <DetailPanel {...scope} />
+  {/snippet}
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

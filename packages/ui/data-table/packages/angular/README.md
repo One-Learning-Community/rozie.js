@@ -414,6 +414,55 @@ export class DemoComponent {
 }
 ```
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+```ts
+import { Component } from '@angular/core';
+import {
+  DataTable, Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, GroupBar, DetailPanel],
+  template: `
+    <!-- OPT-IN drop-ins fill the #groupBar + #detail templates — DataTable stays the
+         headless default; both are additive named exports. GroupBar takes the group-bar
+         scope as inputs ([grouping] [groupableColumns] [applyGrouping] [clearGrouping]);
+         DetailPanel takes [row]. Use them as-is, or fork either as a starter. -->
+    <DataTable
+      [data]="rows"
+      [groupable]="true"
+      [expandable]="true"
+      [(grouping)]="grouping"
+      [(expanded)]="expanded"
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+
+      <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
+        <rozie-group-bar [grouping]="grouping" [groupableColumns]="groupableColumns" [applyGrouping]="applyGrouping" [clearGrouping]="clearGrouping" />
+      </ng-template>
+      <ng-template #detail let-row="row">
+        <rozie-detail-panel [row]="row" />
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  grouping: string[] = [];
+  expanded: Record<string, boolean> = {};
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

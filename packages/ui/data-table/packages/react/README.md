@@ -375,6 +375,48 @@ export function Demo() {
 }
 ```
 
+### Drop-in group bar + detail panel (`#groupBar` / `#detail`)
+
+```tsx
+import { useState } from 'react';
+import {
+  DataTable, Column, GroupBar, DetailPanel,
+} from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // OPT-IN drop-ins: GroupBar fills the #groupBar slot (drag the column chips into the
+  // zone to group; remove tokens; clear) and DetailPanel fills the #detail slot (the
+  // open row as a key/value list). Both are additive named exports — DataTable stays the
+  // headless DEFAULT. Forward the slot scope to each; fork either as a starter.
+  const rows = [
+    { id: 1, region: 'North', category: 'Hardware', units: 3, score: 41 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5, score: 67 },
+    { id: 3, region: 'North', category: 'Software', units: 2, score: 90 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7, score: 60 },
+  ];
+  const [grouping, setGrouping] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  return (
+    <DataTable
+      data={rows}
+      groupable
+      expandable
+      grouping={grouping}
+      onGroupChange={setGrouping}
+      expanded={expanded}
+      onExpandChange={setExpanded}
+      // The #groupBar / #detail scoped slots are render props on React (the documented edge).
+      renderGroupBar={(scope) => <GroupBar {...scope} />}
+      renderDetail={(scope) => <DetailPanel {...scope} />}
+    >
+      <Column field="region" header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
