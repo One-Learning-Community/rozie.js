@@ -323,9 +323,25 @@ function hasExplicitNullDefault(prop: PropDecl): boolean {
  * `| null` to avoid a double suffix.
  */
 function renderPropField(p: PropDecl): string {
-  const baseType = renderType(p.typeAnnotation);
+  let baseType = renderType(p.typeAnnotation);
   const needsNull =
     hasExplicitNullDefault(p) && !/\|\s*null$/.test(baseType.trimEnd());
+  // Quick task 260623-kks — `{ type: null, default: null }` (an untyped
+  // object-passthrough prop) lowers to `{ kind: 'identifier', name: 'unknown' }`,
+  // so `renderType` returns the literal string `'unknown'`. Widening that to
+  // `unknown | null` is a TRAP: TS collapses `unknown | null` → `unknown`, and
+  // Vue's `withDefaults` `InferDefault<P, unknown>` then resolves the default
+  // slot to `((props) => {}) | undefined`, which REJECTS the `null` default in
+  // the generated `withDefaults(..., { obj: null })` object → TS2322 (29× in the
+  // data-table Vue leaf dogfood). Substitute a NON-collapsing object-ish base
+  // (`Record<string, any>` — the same type `renderType` already emits for
+  // `Object`/`'object'`): `Record<string, any> | null` keeps both union
+  // branches, is opaque-passthrough-ergonomic, and parallels the working
+  // Function case `((...args: any[]) => any) | null`. Type-only fix; gated to
+  // the collapsing case so every other field stays byte-identical.
+  if (needsNull && baseType === 'unknown') {
+    baseType = 'Record<string, any>';
+  }
   const finalType = needsNull ? `${baseType} | null` : baseType;
   // 260521-oao — `p.required` is the SOLE optionality determinant: a
   // `required: true` prop drops the `?` and emits a non-optional field.
