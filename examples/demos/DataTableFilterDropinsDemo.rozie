@@ -6,8 +6,9 @@
   r-model:columnFilters controlled write-back, the #filter scoped slot dispatched by
   columnId) but SWAPS the hand-rolled checkbox/range facet content for the real drop-in
   components imported cross-tree from packages/ui/data-table/src. The drop-ins receive the
-  verified #filter slot scope ({ columnId, column, value, uniqueValues, minMax, setFilter })
-  as props and call setFilter(columnId, value) to drive the columnFilters model.
+  declared #filter slot scope ({ columnId, uniqueValues, minMax, setFilter } — the producer
+  declares no column/value; those are optional drop-in props defaulting to null) as props
+  and call setFilter(columnId, value) to drive the columnFilters model.
 
   Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot named
   `cell`; the #cell display slot binds `value`. Static dataset (no clock/random) for
@@ -62,30 +63,25 @@
         <span data-testid="cell-display">{{ value }}</span>
       </template>
 
-      <!-- The #filter scoped slot, dispatched by columnId to the real drop-ins. Each
-           receives the verified slot scope ({ columnId, column, value, uniqueValues,
-           minMax, setFilter }) and calls setFilter(columnId, value). -->
-      <template #filter="{ columnId, column, value, uniqueValues, minMax, setFilter }">
+      <!-- The #filter scoped slot, dispatched by columnId to the real drop-ins. The
+           PRODUCER declares only { columnId, uniqueValues, minMax, setFilter } (NO
+           column/value — those are optional drop-in props that default to null), so we
+           forward exactly the declared scope. The drop-ins call setFilter(columnId, value). -->
+      <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
         <FilterText
           r-if="columnId === 'name'"
           :columnId="columnId"
-          :column="column"
-          :value="value"
           :setFilter="setFilter"
         />
         <FilterSelect
           r-else-if="columnId === 'category'"
           :columnId="columnId"
-          :column="column"
-          :value="value"
           :setFilter="setFilter"
           :uniqueValues="uniqueValues"
         />
         <FilterNumberRange
           r-else-if="columnId === 'price'"
           :columnId="columnId"
-          :column="column"
-          :value="value"
           :setFilter="setFilter"
           :minMax="minMax"
         />
