@@ -44,18 +44,11 @@ type Target = (typeof TARGETS)[number];
 // leg surfaces as a build-gated `runnerFor` placeholder, NOT a permanent fixme.
 const EMPTY: ReadonlySet<Target> = new Set<Target>([]);
 
-// REACT DRAFT-SEED INFINITE-RENDER BUG (pre-existing, packages/ui/data-table/src — OUT OF
-// SCOPE for this consume-only run). FilterText / FilterNumberRange / EditorText seed a local
-// draft from $props in the setup-once <script> body (`$data.draft = $props.value != null ?
-// String($props.value) : ''`). The React emitter lowers that seed to an UNCONDITIONAL
-// setState call DURING render (compiled: `const [r,c]=useState(""); c(e.value!=null?String(
-// e.value):"")`) → React error #301 ("too many re-renders") crashes the subtree. The fix
-// belongs in the drop-in (seed via the useState INITIALIZER) or the React emitter, neither of
-// which this run may touch. The demo itself has NO render-time writes; the other five targets
-// run the seed once at setup and pass. Gated ONLY for the two demos whose drop-in seeds a
-// draft — filter (FilterText/FilterNumberRange) + editor (EditorText). GroupBar / DetailPanel
-// seed no draft from props and pass on react. Tracked for a follow-up emitter/drop-in fix run.
-const REACT_DRAFT_SEED_BUG: ReadonlySet<Target> = new Set<Target>(['react']);
+// REACT DRAFT-SEED INFINITE-RENDER BUG — FIXED (quick 260622-siv). The React emitter now folds
+// a setup-once `$data.draft = $props.value …` seed into a lazy `useState(() => …)` initializer
+// instead of `useState(lit)` + an unconditional render-body setState (which crashed the subtree
+// with React #301). The filter (FilterText/FilterNumberRange) + editor (EditorText) React legs
+// are therefore no longer gated; all six targets run the seed once and pass.
 
 function runnerFor(target: Target, known: ReadonlySet<Target> = EMPTY) {
   const built = existsSync(
@@ -137,7 +130,7 @@ async function focusBodyCell(page: Page, row: number, col: number): Promise<void
 //   FilterNumberRange drives the columnFilters model.
 // ═══════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target, REACT_DRAFT_SEED_BUG)(`data-table-dropins filter [${target}]: FilterText type+Enter narrows / Escape clears; FilterSelect picks category; FilterNumberRange best-effort`, async ({
+  runnerFor(target)(`data-table-dropins filter [${target}]: FilterText type+Enter narrows / Escape clears; FilterSelect picks category; FilterNumberRange best-effort`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableFilterDropins&target=${target}`);
@@ -293,7 +286,7 @@ for (const target of TARGETS) {
 //   (status). F2 on an editor='custom' cell routes to the slot; committing updates the cell.
 // ═══════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target, REACT_DRAFT_SEED_BUG)(`data-table-dropins editor [${target}]: F2 → EditorText type+Enter commits name; EditorSelect pick commits status; cell + readout update`, async ({
+  runnerFor(target)(`data-table-dropins editor [${target}]: F2 → EditorText type+Enter commits name; EditorSelect pick commits status; cell + readout update`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
