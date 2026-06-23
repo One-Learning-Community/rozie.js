@@ -1,0 +1,24 @@
+{
+  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the SFC is
+  // deliberately `any`-typed (type-only <script setup> macros). This tsconfig drives
+  // vue-tsc DECLARATION EMIT (not noEmit typecheck) to produce dist/index.d.ts.
+  //
+  // No `types: ["react"]` (Vue leaf) so vue-tsc resolves vue's own types.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}
