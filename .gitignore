@@ -98,6 +98,15 @@ packages/ui/flatpickr/src/Flatpickr.ts
 packages/ui/maplibre/src/*.ts
 packages/ui/rete/src/*.ts
 
+# Phase 48 — @rozie-ui/data-table (DataTable + Column compound family): same
+# cross-rozie-shim story as maplibre/rete above. The Angular prebuild emits a
+# transient `// @rozie-cross-rozie-shim` `Column.ts` (and any future child) next
+# to the .rozie source, and the VR `build-cells.mjs` sweep deletes it — so a
+# committed copy just churns. Only `.rozie` sources are legit-tracked here (leaf
+# `.ts` outputs live under packages/<target>/src/); dir-wide `*.ts` ignores only
+# the regenerated shims.
+packages/ui/data-table/src/*.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/
