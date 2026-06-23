@@ -256,6 +256,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/otp',
+          collapsed: true,
+          items: [
+            { text: 'Otp — headless one-time-code input', link: '/components/otp' },
+            { text: 'Usage examples', link: '/components/otp-usage' },
+            { text: 'Headless one-time-code input comparison', link: '/components/otp-comparison' },
+            { text: 'Otp — live demo', link: '/components/otp-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/data-table',
           collapsed: true,
           items: [

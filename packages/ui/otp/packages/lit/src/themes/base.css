@@ -1,0 +1,50 @@
+/*
+ * @rozie-ui/otp — base token reference.
+ *
+ * Every COSMETIC value the OTP input renders is a `--rozie-otp-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * The structural rules (the inline-flex cell row, the per-cell box model, the
+ * focus-ring, and the masked-cell behaviour) live in the component's scoped
+ * `<style>` (per-leaf, NOT consumer-overridable). Only the values below flow
+ * through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-otp` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-otp {
+  /* layout / typography */
+  --rozie-otp-gap: 0.5rem;
+  --rozie-otp-font: inherit;
+
+  /* accent — the single color most consumers will set; caret + focus + filled
+     border derive from it */
+  --rozie-otp-accent: #0066cc;
+
+  /* per-cell box model */
+  --rozie-otp-cell-size: 2.75rem;
+  --rozie-otp-font-size: 1.25rem;
+  --rozie-otp-font-weight: 600;
+  --rozie-otp-color: inherit;
+  --rozie-otp-bg: #fff;
+  --rozie-otp-border-width: 1px;
+  --rozie-otp-border-color: rgba(0, 0, 0, 0.25);
+  --rozie-otp-radius: 0.5rem;
+
+  /* filled cell (a cell that already holds a character) */
+  --rozie-otp-filled-border-color: var(--rozie-otp-accent);
+
+  /* focus ring */
+  --rozie-otp-focus-ring-width: 3px;
+  --rozie-otp-focus-ring-color: rgba(0, 102, 204, 0.25);
+
+  /* placeholder character color */
+  --rozie-otp-placeholder-color: rgba(0, 0, 0, 0.3);
+
+  /* disabled */
+  --rozie-otp-disabled-opacity: 0.55;
+  --rozie-otp-disabled-bg: rgba(0, 0, 0, 0.04);
+}

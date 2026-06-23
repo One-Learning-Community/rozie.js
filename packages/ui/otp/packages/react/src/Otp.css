@@ -1,0 +1,36 @@
+.rozie-otp[data-rozie-s-8267d52a] {
+  display: inline-flex;
+  gap: var(--rozie-otp-gap, 0.5rem);
+  font: var(--rozie-otp-font, inherit);
+}
+.rozie-otp-cell[data-rozie-s-8267d52a] {
+  box-sizing: border-box;
+  width: var(--rozie-otp-cell-size, 2.75rem);
+  height: var(--rozie-otp-cell-size, 2.75rem);
+  padding: 0;
+  text-align: center;
+  font-size: var(--rozie-otp-font-size, 1.25rem);
+  font-weight: var(--rozie-otp-font-weight, 600);
+  color: var(--rozie-otp-color, inherit);
+  background: var(--rozie-otp-bg, #fff);
+  border: var(--rozie-otp-border-width, 1px) solid var(--rozie-otp-border-color, rgba(0, 0, 0, 0.25));
+  border-radius: var(--rozie-otp-radius, 0.5rem);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  caret-color: var(--rozie-otp-accent, #0066cc);
+}
+.rozie-otp-cell[data-rozie-s-8267d52a]::placeholder {
+  color: var(--rozie-otp-placeholder-color, rgba(0, 0, 0, 0.3));
+}
+.rozie-otp-cell[data-filled='true'][data-rozie-s-8267d52a] {
+  border-color: var(--rozie-otp-filled-border-color, var(--rozie-otp-accent, #0066cc));
+}
+.rozie-otp-cell[data-rozie-s-8267d52a]:focus {
+  border-color: var(--rozie-otp-accent, #0066cc);
+  box-shadow: 0 0 0 var(--rozie-otp-focus-ring-width, 3px) var(--rozie-otp-focus-ring-color, rgba(0, 102, 204, 0.25));
+}
+.rozie-otp--disabled[data-rozie-s-8267d52a] .rozie-otp-cell[data-rozie-s-8267d52a] {
+  cursor: not-allowed;
+  opacity: var(--rozie-otp-disabled-opacity, 0.55);
+  background: var(--rozie-otp-disabled-bg, rgba(0, 0, 0, 0.04));
+}

@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/otp — shadcn/ui (Radix) bridge.
+ *
+ * Maps the OTP tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * input automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/otp-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-otp {
+  --rozie-otp-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-otp-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-otp-color: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-otp-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-otp-radius: var(--radius, 0.5rem);
+
+  --rozie-otp-filled-border-color: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-otp-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.35);
+
+  --rozie-otp-placeholder-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+
+  --rozie-otp-disabled-bg: hsl(var(--muted, 210 40% 96.1%));
+}

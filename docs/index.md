@@ -49,7 +49,7 @@ The clearest proof that one source can ship six idiomatic targets is a shelf of 
 
 **No-engine, pure Rozie** — headless, fully accessible interaction authored from scratch in a single `.rozie` file, proving Rozie carries rich behavior on its own:
 
-[Listbox & Combobox](/components/listbox) · [Slider & Range](/components/slider)
+[Listbox & Combobox](/components/listbox) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp)
 
 **Hosted widgets** — a third-party SaaS widget loaded at runtime (no npm engine), unified across providers *and* frameworks:
 

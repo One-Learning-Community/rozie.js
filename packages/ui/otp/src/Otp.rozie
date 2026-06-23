@@ -1,0 +1,311 @@
+<!--
+  Otp.rozie — a headless, WAI-ARIA accessible one-time-code / PIN input.
+
+  A pure-Rozie family (NO third-party engine) in the spirit of captcha: it fills
+  a real cross-framework need (every auth UI re-implements a segmented code input)
+  with zero engine dependency. The platform IS the engine: N native <input>
+  cells, browser focus, keyboard, paste, and `autocomplete="one-time-code"` SMS
+  autofill come for free. Rozie owns the author-side API, the two-way binding, the
+  sanitize/distribute logic, focus choreography, and the token-themed skin.
+
+  CONTROLLED, NO LOCAL STATE: the assembled code string IS `value` (the sole
+  model:true prop → Angular ControlValueAccessor; an OTP IS a form control). Each
+  cell's displayed char is derived from `value` (`cells()`), so there is no draft
+  to keep in <data> and no value↔cells echo guard to maintain. Entry is
+  sequential (left→right); `value` is always a contiguous string — the standard
+  OTP UX, and what lets us stay fully controlled (a middle-gap state, which no
+  real verification flow produces, is intentionally not modeled).
+
+  FOCUS without per-cell refs: focus choreography reads `$refs.root` (ONE
+  container ref) and walks `root.querySelectorAll('input')` — read only in
+  $onMount / event handlers / $expose verbs (all post-mount → ROZ123-safe), and
+  it works inside Lit's shadow root because the container lives there too. No
+  attempt to ref each r-for cell (which has no clean cross-target story).
+
+  Authoring notes (collision classes — see the authoring playbook):
+    - The focus verb is `focus` — a DELIBERATE override of the inherited
+      HTMLElement.focus on the Lit custom element (ROZ137 WARNS, accepted; the
+      public focus() handle is intended). Same choice slider made; listbox took
+      the other branch (`focusControl`). The accepted warn is documented in every
+      leaf README. `clear` is collision-safe (not a host-element member).
+    - Every write funnels through ONE `commitValue(next)` so its `$emit` prop-
+      destructure hoists exactly once on React (Phase 46 also dedups, but the
+      single-funnel pattern is kept for clarity — the slider precedent).
+    - Handler params are LEFT UNTYPED so they neutralize to `any`; reading
+      `e.target.value` / `e.clipboardData` then typechecks across all six strict
+      leaves (the global-filter idiom). Never annotate them.
+    - `cells()` is a PLAIN function (not `$computed`): it is called from the
+      r-for AND read inside handlers, and a $computed is a value on React but an
+      accessor on Solid — aliasing/calling it diverges. Keep derived collections
+      that script logic touches as plain functions called `()` uniformly.
+
+  Consumer example:
+
+    <Otp r-model:value="$data.code" :length="6" type="numeric"
+         ariaLabel="Verification code" @complete="onComplete" />
+-->
+
+<rozie name="Otp">
+
+<props>
+{
+  // The assembled code (two-way). As the sole model:true prop it drives the
+  // Angular ControlValueAccessor — an Otp IS a form control. Always a contiguous
+  // string of 0..length chars.
+  value:       { type: String,   default: '', model: true },
+
+  // Number of cells.
+  length:      { type: Number,   default: 6 },
+
+  // Allowed-character class + mobile keyboard hint:
+  //   'numeric'      → digits only,  inputmode="numeric"
+  //   'alphanumeric' → [A-Za-z0-9],  inputmode="text"
+  //   'text'         → any non-space, inputmode="text"
+  type:        { type: String,   default: 'numeric' },
+
+  // Render cells as masked dots (password) — for sensitive codes.
+  mask:        { type: Boolean,  default: false },
+
+  // Focus the first empty cell on mount.
+  autoFocus:   { type: Boolean,  default: false },
+
+  // Disable every cell.
+  disabled:    { type: Boolean,  default: false },
+
+  // Per-cell placeholder character (e.g. '•' or '0').
+  placeholder: { type: String,   default: '' },
+
+  // Accessible name for the whole group (role="group"). Each cell also gets an
+  // ordinal aria-label ("Digit 1 of 6").
+  ariaLabel:   { type: String,   default: null },
+}
+</props>
+
+<script lang="ts">
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The current code, normalized to a string.
+const code = () => (typeof $props.value === 'string' ? $props.value : '')
+
+// The cells to render: one { i, ch } per position, ch derived from `value`.
+// A plain function (called in the r-for and from handlers) — never $computed.
+const cells = () => {
+  const v = code()
+  const out = []
+  for (let i = 0; i < $props.length; i++) out.push({ i, ch: v[i] || '' })
+  return out
+}
+
+// Allowed-character test for the configured `type`.
+const allowChar = (ch) => {
+  if (!ch) return false
+  if ($props.type === 'numeric') return /[0-9]/.test(ch)
+  if ($props.type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch)
+  return /\S/.test(ch)
+}
+
+// The cell that should receive focus for new input: the first empty position
+// (clamped to the last cell when full).
+const firstEmptyIndex = () => {
+  const len = code().length
+  return len >= $props.length ? $props.length - 1 : len
+}
+
+// ---- focus choreography (container ref, post-mount only) ----------------
+// Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
+// ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
+const focusIndex = (idx) => {
+  let i = idx
+  if (i < 0) i = 0
+  if (i >= $props.length) i = $props.length - 1
+  const root = $refs.root
+  if (!root) return
+  const inputs = root.querySelectorAll('input')
+  const el = inputs[i]
+  if (el) {
+    el.focus()
+    if (el.select) el.select()
+  }
+}
+
+// ---- write funnel (single $emit site) ----------------------------------
+// Clamp to length, write the model, emit change, and emit complete when every
+// cell is filled (a contiguous full string has length === $props.length).
+const commitValue = (raw) => {
+  const next = String(raw).slice(0, $props.length)
+  $model.value = next
+  $emit('change', { value: next })
+  if (next.length === $props.length) $emit('complete', { value: next })
+}
+
+// ---- input handler -----------------------------------------------------
+// Take the LAST char typed (handles overwriting a filled cell), sanitize, splice
+// it into the contiguous string at this position, advance focus. An invalid char
+// is rejected by restoring the cell's DOM value directly (a no-op model write may
+// not re-render on React, so reset the element instead).
+const onInput = (i, e) => {
+  const raw = e && e.target ? e.target.value : ''
+  if (raw === '') {
+    const cur = code()
+    commitValue(cur.slice(0, i) + cur.slice(i + 1))
+    return
+  }
+  const ch = raw.slice(-1)
+  if (!allowChar(ch)) {
+    if (e && e.target) e.target.value = code()[i] || ''
+    return
+  }
+  const cur = code()
+  commitValue(cur.slice(0, i) + ch + cur.slice(i + 1))
+  focusIndex(i + 1)
+}
+
+// ---- keyboard ----------------------------------------------------------
+// Backspace deletes the current char (or the previous one when the cell is
+// already empty) and moves focus accordingly; arrows / Home / End navigate.
+const onKeydown = (i, e) => {
+  const key = e ? e.key : ''
+  const cur = code()
+  if (key === 'Backspace') {
+    if (e) e.preventDefault()
+    if (cur[i]) {
+      commitValue(cur.slice(0, i) + cur.slice(i + 1))
+    } else if (i > 0) {
+      commitValue(cur.slice(0, i - 1) + cur.slice(i))
+      focusIndex(i - 1)
+    }
+  } else if (key === 'ArrowLeft') {
+    if (e) e.preventDefault()
+    focusIndex(i - 1)
+  } else if (key === 'ArrowRight') {
+    if (e) e.preventDefault()
+    focusIndex(i + 1)
+  } else if (key === 'Home') {
+    if (e) e.preventDefault()
+    focusIndex(0)
+  } else if (key === 'End') {
+    if (e) e.preventDefault()
+    focusIndex($props.length - 1)
+  }
+}
+
+// ---- paste (distribute across cells from this position) ----------------
+const onPaste = (i, e) => {
+  if (e) e.preventDefault()
+  const text = (e && e.clipboardData && e.clipboardData.getData('text')) || ''
+  const chars = text.split('').filter(allowChar)
+  if (!chars.length) return
+  const arr = code().split('')
+  for (let k = 0; k < chars.length && i + k < $props.length; k++) arr[i + k] = chars[k]
+  commitValue(arr.join(''))
+  const landed = i + chars.length
+  focusIndex(landed >= $props.length ? $props.length - 1 : landed)
+}
+
+// Select the cell's content on focus so a keystroke overwrites it.
+const onFocus = (e) => {
+  if (e && e.target && e.target.select) e.target.select()
+}
+
+// ---- per-cell attribute helpers ----------------------------------------
+const cellType = () => ($props.mask ? 'password' : 'text')
+// NOTE: named `cellInputMode`, NOT `inputMode` — a bare `inputMode` member
+// collides with the inherited `HTMLElement.inputMode: string` on the Lit custom
+// element (a hard TS2416/TS1238, unlike the warn-only `focus` override). The
+// `cell`-prefix keeps it collision-safe across all six strict-typecheck leaves.
+const cellInputMode = () => ($props.type === 'numeric' ? 'numeric' : 'text')
+const cellAriaLabel = (i) => 'Digit ' + (i + 1) + ' of ' + $props.length
+const cellAutocomplete = (i) => (i === 0 ? 'one-time-code' : 'off')
+
+// ---- lifecycle + imperative handle -------------------------------------
+$onMount(() => {
+  if ($props.autoFocus) focusIndex(firstEmptyIndex())
+})
+
+// focus() — focus the first empty cell. DELIBERATELY overrides HTMLElement.focus
+// on Lit (ROZ137 warn, accepted). clear() — reset the code and focus the first
+// cell. Both read $refs in a post-mount handle call (ROZ123-safe).
+const focus = () => focusIndex(firstEmptyIndex())
+const clear = () => {
+  commitValue('')
+  focusIndex(0)
+}
+
+$expose({ focus, clear })
+</script>
+
+<template>
+<div
+  class="rozie-otp"
+  ref="root"
+  role="group"
+  :aria-label="$props.ariaLabel"
+  :class="{ 'rozie-otp--disabled': $props.disabled }"
+>
+  <input
+    r-for="cell in cells()"
+    :key="cell.i"
+    class="rozie-otp-cell"
+    :type="cellType()"
+    :inputmode="cellInputMode()"
+    maxlength="1"
+    autocapitalize="off"
+    :autocomplete="cellAutocomplete(cell.i)"
+    :value="cell.ch"
+    :placeholder="$props.placeholder"
+    :disabled="!!$props.disabled"
+    :aria-label="cellAriaLabel(cell.i)"
+    :data-filled="cell.ch ? 'true' : null"
+    @input="onInput(cell.i, $event)"
+    @keydown="onKeydown(cell.i, $event)"
+    @paste="onPaste(cell.i, $event)"
+    @focus="onFocus($event)"
+  />
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven (mirrors slider/themes): EVERY visual value is a
+  `var(--rozie-otp-*, <fallback>)`, so the component renders with zero config yet
+  is completely re-skinnable by setting tokens at any ancestor scope. The shipped
+  themes/*.css presets map these tokens onto shadcn/Radix, Material 3, Bootstrap 5.
+*/
+.rozie-otp {
+  display: inline-flex;
+  gap: var(--rozie-otp-gap, 0.5rem);
+  font: var(--rozie-otp-font, inherit);
+}
+.rozie-otp-cell {
+  box-sizing: border-box;
+  width: var(--rozie-otp-cell-size, 2.75rem);
+  height: var(--rozie-otp-cell-size, 2.75rem);
+  padding: 0;
+  text-align: center;
+  font-size: var(--rozie-otp-font-size, 1.25rem);
+  font-weight: var(--rozie-otp-font-weight, 600);
+  color: var(--rozie-otp-color, inherit);
+  background: var(--rozie-otp-bg, #fff);
+  border: var(--rozie-otp-border-width, 1px) solid var(--rozie-otp-border-color, rgba(0, 0, 0, 0.25));
+  border-radius: var(--rozie-otp-radius, 0.5rem);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  caret-color: var(--rozie-otp-accent, #0066cc);
+}
+.rozie-otp-cell::placeholder {
+  color: var(--rozie-otp-placeholder-color, rgba(0, 0, 0, 0.3));
+}
+.rozie-otp-cell[data-filled='true'] {
+  border-color: var(--rozie-otp-filled-border-color, var(--rozie-otp-accent, #0066cc));
+}
+.rozie-otp-cell:focus {
+  border-color: var(--rozie-otp-accent, #0066cc);
+  box-shadow: 0 0 0 var(--rozie-otp-focus-ring-width, 3px) var(--rozie-otp-focus-ring-color, rgba(0, 102, 204, 0.25));
+}
+.rozie-otp--disabled .rozie-otp-cell {
+  cursor: not-allowed;
+  opacity: var(--rozie-otp-disabled-opacity, 0.55);
+  background: var(--rozie-otp-disabled-bg, rgba(0, 0, 0, 0.04));
+}
+</style>
+
+</rozie>

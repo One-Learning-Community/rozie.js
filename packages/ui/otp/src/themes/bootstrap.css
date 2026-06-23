@@ -1,0 +1,27 @@
+/*
+ * @rozie-ui/otp — Bootstrap 5 bridge.
+ *
+ * Maps the OTP tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the input follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/otp-react/themes/bootstrap.css';
+ */
+.rozie-otp {
+  --rozie-otp-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-otp-bg: var(--bs-body-bg, #fff);
+  --rozie-otp-color: var(--bs-body-color, #212529);
+  --rozie-otp-border-color: var(--bs-border-color, #dee2e6);
+  --rozie-otp-radius: var(--bs-border-radius, 0.375rem);
+
+  --rozie-otp-filled-border-color: var(--bs-primary, #0d6efd);
+
+  --rozie-otp-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
+
+  --rozie-otp-placeholder-color: var(--bs-secondary-color, #6c757d);
+
+  --rozie-otp-disabled-opacity: 0.5;
+  --rozie-otp-disabled-bg: var(--bs-tertiary-bg, #e9ecef);
+}
