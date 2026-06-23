@@ -1,0 +1,65 @@
+<!--
+  DialogScreenshotDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/dialog family (pure-Rozie, native <dialog> + showModal()).
+
+  Where DialogBehaviorDemo.rozie is the BEHAVIORAL cell (open via model, Escape →
+  cancel, programmatic hide(), consumer close), THIS demo is the SEPARATE
+  deterministic SCREENSHOT cell — never extend it for behavior.
+
+  Made deterministic by seeding `open: true` in <data> bound `r-model:open`: the
+  component's $onMount calls `el.showModal()`, so the modal renders in the TOP
+  LAYER with its native ::backdrop on first paint — a fixed title + body, no
+  controls, no caret, nothing to drift.
+
+  TOP-LAYER NOTE: a showModal()'d <dialog> + ::backdrop escape the
+  `[data-testid="rozie-mount"]` clip used by the standard matrix, so this cell is
+  captured PAGE-LEVEL (viewport) by specs/overlay-screenshot.spec.ts, NOT
+  matrix.spec.ts. The body carries `data-testid="screenshot-dialog-body"` so the
+  spec can assert visibility (piercing the top layer) before the clip.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here —
+  feedback_vr_linux_baselines). Until it lands the cell auto-fixmes on
+  `baselineExists()`.
+-->
+
+<rozie name="DialogScreenshotDemo">
+
+<components>
+{
+  Dialog: '../../packages/ui/dialog/src/Dialog.rozie',
+}
+</components>
+
+<data>
+{
+  open: true,
+}
+</data>
+
+<template>
+<div class="dialog-screenshot-demo">
+  <Dialog r-model:open="$data.open" ariaLabel="Confirm dialog">
+    <h2>Confirm</h2>
+    <p data-testid="screenshot-dialog-body">Dialog content is visible in the top layer.</p>
+  </Dialog>
+</div>
+</template>
+
+<style>
+.dialog-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.dialog-screenshot-demo h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+.dialog-screenshot-demo p {
+  margin: 0;
+}
+</style>
+
+</rozie>

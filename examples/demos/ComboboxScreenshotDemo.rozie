@@ -1,0 +1,69 @@
+<!--
+  ComboboxScreenshotDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/combobox family (pure-Rozie, no engine).
+
+  Where ComboboxBehaviorDemo.rozie is the BEHAVIORAL cell (focus opens, type
+  filters, arrow+Enter commits, set-value direct write), THIS demo is the SEPARATE
+  deterministic SCREENSHOT cell — never extend it for behavior, and never bolt
+  pixels onto the behavioral one.
+
+  Made fully deterministic by:
+    1. A FIXED seeded selection ('cherry') bound `r-model:value="$data.value"` with
+       the same apple/banana/cherry/date OPTIONS. `syncQueryToValue()` runs in the
+       component's $onMount, so the input TEXT settles to "Cherry".
+    2. The popup is CLOSED at rest (isOpen defaults false; nothing focuses the
+       input), so the capture is the closed-input resting state — no popup list, no
+       active-descendant highlight, no caret.
+    3. A DISTINCT idBase so the aria ids never collide with the behavioral cell.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here —
+  feedback_vr_linux_baselines). Until it lands the matrix cell auto-fixmes on
+  `baselineExists()`. INLINE-rendering family → standard mount-clipped matrix cell.
+-->
+
+<rozie name="ComboboxScreenshotDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: 'cherry',
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+]
+</script>
+
+<template>
+<div class="combobox-screenshot-demo">
+  <Combobox
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    placeholder="Search fruit…"
+    ariaLabel="Fruit"
+    idBase="screenshot-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>

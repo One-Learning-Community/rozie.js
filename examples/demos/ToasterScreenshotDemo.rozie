@@ -1,0 +1,55 @@
+<!--
+  ToasterScreenshotDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/toast family (pure-Rozie, no engine).
+
+  Where ToasterBehaviorDemo.rozie is the BEHAVIORAL cell (show() handle enqueues,
+  fresh-array reconcile, per-toast dismiss), THIS demo is the SEPARATE
+  deterministic SCREENSHOT cell — never extend it for behavior.
+
+  Made deterministic by `$onMount` enqueuing ONE sticky toast via the imperative
+  `$refs.toaster.show()` handle with `:duration="0"` (sticky → never auto-dismisses,
+  no timer-driven inter-run drift). One success toast pinned at top-right on first
+  paint — a fixed frame.
+
+  FIXED-POSITION NOTE: the toaster region is `position: fixed` (top-right corner),
+  so the rendered toast escapes the `[data-testid="rozie-mount"]` clip used by the
+  standard matrix. This cell is therefore captured PAGE-LEVEL (viewport) by
+  specs/overlay-screenshot.spec.ts, NOT matrix.spec.ts. The spec waits for the one
+  `[role="status"]` toast before the clip.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here —
+  feedback_vr_linux_baselines). Until it lands the cell auto-fixmes on
+  `baselineExists()`.
+-->
+
+<rozie name="ToasterScreenshotDemo">
+
+<components>
+{
+  Toaster: '../../packages/ui/toast/src/Toaster.rozie',
+}
+</components>
+
+<script>
+$onMount(() => {
+  $refs.toaster.show({ message: 'Saved', type: 'success' })
+})
+</script>
+
+<template>
+<div class="toast-screenshot-demo">
+  <Toaster ref="toaster" position="top-right" :duration="0" ariaLabel="Notifications" />
+</div>
+</template>
+
+<style>
+.toast-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>

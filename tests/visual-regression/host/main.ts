@@ -499,6 +499,20 @@ export const EXAMPLES = [
   'DialogBehavior',
   'ComboboxBehavior',
   'ToasterBehavior',
+  // @rozie-ui otp/dialog/combobox/toast — the four content-STABLE SCREENSHOT cells
+  // (loaders → examples/demos/{Otp,Combobox,Dialog,Toaster}ScreenshotDemo.rozie,
+  // each importing packages/ui/<family>/src/<Component>.rozie). Two render
+  // mechanisms (an architectural constraint): OtpScreenshot + ComboboxScreenshot
+  // render INLINE → standard mount-clipped matrix cells (matrix.spec.ts);
+  // DialogScreenshot (native <dialog> showModal → top layer + ::backdrop) +
+  // ToasterScreenshot (position:fixed corner) ESCAPE the rozie-mount clip → a
+  // dedicated FULL-PAGE spec (overlay-screenshot.spec.ts). All four seed a FIXED
+  // deterministic frame and auto-fixme on baselineExists() until the Linux-Docker
+  // PNGs land (feedback_vr_linux_baselines). Distinct from the *Behavior cells.
+  'OtpScreenshot',
+  'ComboboxScreenshot',
+  'DialogScreenshot',
+  'ToasterScreenshot',
   // @rozie-ui/data-table (headless, accessible, cross-framework data table on a
   // single inline @tanstack/table-core bridge — NO per-framework adapter) — the
   // six BEHAVIORAL cells (loaders → examples/demos/DataTable{Columns,Sort,
@@ -856,6 +870,13 @@ export const LIT_TAGS: Record<Example, string> = {
   DialogBehavior: 'rozie-dialog-behavior',
   ComboboxBehavior: 'rozie-combobox-behavior',
   ToasterBehavior: 'rozie-toaster-behavior',
+  // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — '-demo' appended on Lit
+  // → tags 'rozie-otp-screenshot-demo' etc. = kebab of the full *ScreenshotDemo
+  // name (mirrors CodeMirrorScreenshot / ChartScreenshot).
+  OtpScreenshot: 'rozie-otp-screenshot',
+  ComboboxScreenshot: 'rozie-combobox-screenshot',
+  DialogScreenshot: 'rozie-dialog-screenshot',
+  ToasterScreenshot: 'rozie-toaster-screenshot',
   // @rozie-ui/data-table — '-demo' appended on Lit → tags
   // 'rozie-data-table-columns-demo' etc. = kebab of DataTable*Demo (the wrapper
   // components are name="DataTable{Columns,...}Demo"). Behavioral-only, no
@@ -1143,6 +1164,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DialogBehavior: {},
   ComboboxBehavior: {},
   ToasterBehavior: {},
+  // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — every *ScreenshotDemo is
+  // self-contained: it seeds its own FIXED state in <data>/<script> and binds
+  // r-model / drives the $expose handle internally (not parent-supplied), so no
+  // MODEL_PROPS entry. No parent props.
+  OtpScreenshot: {},
+  ComboboxScreenshot: {},
+  DialogScreenshot: {},
+  ToasterScreenshot: {},
   // @rozie-ui/data-table — every DataTable*Demo is self-contained: it seeds its
   // own rows + column-declaration in <data>/<components> and binds the state
   // slices via r-model internally (not parent-supplied), so no MODEL_PROPS entry.

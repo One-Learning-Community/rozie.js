@@ -348,6 +348,19 @@ const EXAMPLES = [
   // rest (snap 0, no loop) the prev arrow is disabled, dot 0 + thumb 0 active —
   // a deterministic frame. Same Embla-transform settle as CarouselScreenshot.
   'CarouselNavScreenshot',
+  // @rozie-ui otp/combobox INLINE screenshot cells — the two pure-Rozie families
+  // that render in normal flow (no top-layer/fixed escape), so they go in this
+  // standard mount-clipped matrix. OtpScreenshot seeds a FIXED '123' code in a
+  // 6-cell numeric Otp (3 filled + 3 empty, no autoFocus → no caret); it is
+  // deterministic at rest. ComboboxScreenshot seeds 'cherry' so the input settles
+  // to "Cherry" via the component's $onMount syncQueryToValue with the popup CLOSED
+  // (nothing focuses the input). Per D-10 all 6 targets diff against the SAME shared
+  // `${name}.png`. Baseline-gates to test.fixme via baselineExists() until the
+  // Linux-Docker PNGs land (feedback_vr_linux_baselines). The top-layer DialogScreenshot
+  // + fixed ToasterScreenshot cells live in overlay-screenshot.spec.ts (they escape
+  // the rozie-mount clip). The *Behavior cells are behavioral-only (no pixel baseline).
+  'OtpScreenshot',
+  'ComboboxScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -805,6 +818,27 @@ async function settleExample(
       )
       .toBe(true);
     await page.waitForTimeout(300);
+  }
+  // OtpScreenshot (@rozie-ui/otp): the Otp renders one native `<input>` per cell.
+  // The seeded '123' code in a `:length="6"` Otp produces exactly 6 cells. Wait for
+  // all 6 before clipping so the capture is deterministic (no autoFocus → no caret
+  // to wait out). A bare `input` locator pierces Lit's open shadow root.
+  if (example === 'OtpScreenshot') {
+    await expect(page.locator('input')).toHaveCount(6, { timeout: 10_000 });
+  }
+  // ComboboxScreenshot (@rozie-ui/combobox): the input TEXT settles to "Cherry"
+  // only after the component's $onMount runs syncQueryToValue() (which maps the
+  // seeded 'cherry' value to its label). Poll the input's value so the clip waits
+  // for that async reflect; the popup is CLOSED at rest (nothing focuses the input),
+  // so once the value lands the frame is final. `role="combobox"` pierces Lit's shadow.
+  if (example === 'ComboboxScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          page.locator('input[role="combobox"]').first().inputValue(),
+        { timeout: 5_000, intervals: [100, 200, 400, 800] },
+      )
+      .toBe('Cherry');
   }
 }
 

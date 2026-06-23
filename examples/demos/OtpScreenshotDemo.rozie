@@ -1,0 +1,56 @@
+<!--
+  OtpScreenshotDemo.rozie — content-STABLE screenshot consumer for the @rozie-ui/otp
+  family (pure-Rozie, no engine).
+
+  Where OtpBehaviorDemo.rozie is the BEHAVIORAL cell (typing into cells, @complete,
+  set-code direct write), THIS demo is the SEPARATE deterministic SCREENSHOT cell —
+  never extend it for behavior, and never bolt pixels onto the behavioral one.
+
+  Made fully deterministic by:
+    1. A FIXED seeded value ('123') bound `r-model:value="$data.code"` with
+       `:length="6"` type numeric → 3 filled + 3 empty cells, a stable frame.
+    2. autoFocus left OFF (default) and NO interactive controls — an unfocused OTP
+       has no caret/focus-ring to drift run-to-run.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here — macOS
+  baselines are forbidden, feedback_vr_linux_baselines). Until it lands the matrix
+  cell auto-fixmes on `baselineExists()`. INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="OtpScreenshotDemo">
+
+<components>
+{
+  Otp: '../../packages/ui/otp/src/Otp.rozie',
+}
+</components>
+
+<data>
+{
+  code: '123',
+}
+</data>
+
+<template>
+<div class="otp-screenshot-demo">
+  <Otp
+    r-model:value="$data.code"
+    :length="6"
+    type="numeric"
+    ariaLabel="Verification code"
+  />
+</div>
+</template>
+
+<style>
+.otp-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>
