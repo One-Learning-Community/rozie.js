@@ -2343,11 +2343,15 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
 export function validateDocsPropsTable(ir, docsMarkdown) {
   const errors = [];
 
-  const propsHeadingIdx = docsMarkdown.indexOf('### Props');
-  if (propsHeadingIdx === -1) {
-    return { ok: false, errors: ['docs: "### Props" heading not found'], checkedRows: 0 };
+  // The props table is a `## Props` (H2) section on the API reference page
+  // (docs/components/data-table-api.md since the 260623-dt8 docs restructure);
+  // it was a `### Props` (H3) on the old single-page guide. Accept either heading
+  // level so the validator follows the canonical table wherever the IA puts it.
+  const headingMatch = docsMarkdown.match(/(?:^|\n)#{2,3} Props(?=\s|$)/);
+  if (!headingMatch) {
+    return { ok: false, errors: ['docs: "## Props" heading not found'], checkedRows: 0 };
   }
-  const afterHeading = docsMarkdown.slice(propsHeadingIdx + '### Props'.length);
+  const afterHeading = docsMarkdown.slice(headingMatch.index + headingMatch[0].length);
   const nextHeadingIdx = afterHeading.search(/\n#{1,3}\s/);
   const section = nextHeadingIdx === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIdx);
 

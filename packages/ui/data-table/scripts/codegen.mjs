@@ -257,12 +257,14 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`);
   }
 
-  // (7) ENFORCE docs props-table validation against docs/components/data-table.md
-  // (the single-source-of-truth surface for the structural columns).
+  // (7) ENFORCE docs props-table validation against docs/components/data-table-api.md
+  // (the single-source-of-truth surface for the structural columns since the
+  // 260623-dt8 docs restructure moved the dense API tables off the overview page
+  // onto the dedicated API reference page).
   // VALIDATE-NOT-OVERWRITE: throws on drift of name/type/default, never rewrites
   // prose. Until the guide is authored (a later wave), ROZIE_DATA_TABLE_SKIP_GUIDE=1
   // relaxes the absent-guide throw to a skip.
-  const guideRelPath = 'docs/components/data-table.md';
+  const guideRelPath = 'docs/components/data-table-api.md';
   const guidePath = resolve(REPO_ROOT, guideRelPath);
   const guideExists = existsSync(guidePath);
   const skipGuide = process.env.ROZIE_DATA_TABLE_SKIP_GUIDE === '1';
