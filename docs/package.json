@@ -34,6 +34,7 @@
     "@rozie-ui/codemirror-vue": "workspace:*",
     "@rozie-ui/cropper-vue": "workspace:*",
     "@rozie-ui/data-table-vue": "workspace:*",
+    "@rozie-ui/dialog-vue": "workspace:*",
     "@rozie-ui/embla-vue": "workspace:*",
     "@rozie-ui/flatpickr-vue": "workspace:*",
     "@rozie-ui/fullcalendar-vue": "workspace:*",

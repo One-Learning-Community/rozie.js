@@ -1,0 +1,72 @@
+{
+  "name": "@rozie-ui/dialog-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless WAI-ARIA modal dialog on the native <dialog> element (top-layer, ::backdrop scrim, focus trap, Esc-to-dismiss, scroll-lock) — one accessible Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "dialog",
+    "modal",
+    "popup",
+    "overlay",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/dialog/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/Dialog.svelte",
+      "types": "./dist/Dialog.svelte.d.ts",
+      "default": "./dist/Dialog.svelte"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "svelte": "./src/Dialog.svelte",
+      "default": "./src/Dialog.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}

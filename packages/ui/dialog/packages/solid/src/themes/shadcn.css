@@ -1,0 +1,23 @@
+/*
+ * @rozie-ui/dialog — shadcn/ui (Radix) bridge.
+ *
+ * Maps the dialog tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * dialog automatically follows light/dark theme switches.
+ *
+ *   import '@rozie-ui/dialog-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-dialog {
+  --rozie-dialog-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-dialog-color: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-dialog-border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-dialog-radius: var(--radius, 0.5rem);
+
+  /* shadcn dialogs use a soft, low scrim */
+  --rozie-dialog-backdrop-bg: hsl(var(--background, 0 0% 0%) / 0.8);
+  --rozie-dialog-shadow: 0 10px 38px hsl(var(--foreground, 222.2 84% 4.9%) / 0.18);
+}

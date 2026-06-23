@@ -1,0 +1,44 @@
+.rozie-dialog[data-rozie-s-2a679072] {
+  margin: auto; /* centers in the top layer */
+  padding: 0;
+  width: var(--rozie-dialog-width, auto);
+  max-width: var(--rozie-dialog-max-width, min(32rem, calc(100vw - 2rem)));
+  max-height: var(--rozie-dialog-max-height, calc(100vh - 2rem));
+  border: var(--rozie-dialog-border, none);
+  border-radius: var(--rozie-dialog-radius, 0.75rem);
+  background: var(--rozie-dialog-bg, #fff);
+  color: var(--rozie-dialog-color, inherit);
+  box-shadow: var(--rozie-dialog-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  overflow: auto;
+}
+.rozie-dialog[data-rozie-s-2a679072]::backdrop {
+  background: var(--rozie-dialog-backdrop-bg, rgba(0, 0, 0, 0.5));
+  backdrop-filter: var(--rozie-dialog-backdrop-filter, none);
+}
+.rozie-dialog-panel[data-rozie-s-2a679072] {
+  padding: var(--rozie-dialog-padding, 1.5rem);
+  font: var(--rozie-dialog-font, inherit);
+}
+.rozie-dialog[data-rozie-s-2a679072] {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+.rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072]) {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+.rozie-dialog[open][data-rozie-s-2a679072] {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+.rozie-dialog[data-rozie-s-2a679072]::backdrop {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+  }
+.rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072])::backdrop {
+    opacity: 0;
+  }
+.rozie-dialog[open][data-rozie-s-2a679072]::backdrop {
+      opacity: 0;
+    }

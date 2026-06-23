@@ -1,0 +1,41 @@
+/*
+ * @rozie-ui/dialog — base token reference.
+ *
+ * Every COSMETIC value the dialog box + scrim render is a `--rozie-dialog-*`
+ * custom property. The component ships with inline `var(token, fallback)`
+ * defaults, so importing this file is OPTIONAL — it simply makes the full token
+ * surface explicit in one place so you can copy/override exactly what you need.
+ *
+ * The STRUCTURAL behaviour — top-layer rendering, the native `::backdrop`
+ * pseudo-element, UA centering, the focus trap, Esc-to-dismiss, and focus
+ * restoration — all come from the native `<dialog>` + `showModal()` and are NOT
+ * tokenized. Only the values below flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-dialog` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-dialog {
+  /* box geometry */
+  --rozie-dialog-width: auto;
+  --rozie-dialog-max-width: min(32rem, calc(100vw - 2rem));
+  --rozie-dialog-max-height: calc(100vh - 2rem);
+
+  /* box chrome */
+  --rozie-dialog-border: none;
+  --rozie-dialog-radius: 0.75rem;
+  --rozie-dialog-bg: #fff;
+  --rozie-dialog-color: inherit;
+  --rozie-dialog-shadow: 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25);
+
+  /* scrim (the native ::backdrop) */
+  --rozie-dialog-backdrop-bg: rgba(0, 0, 0, 0.5);
+  --rozie-dialog-backdrop-filter: none;
+
+  /* content panel */
+  --rozie-dialog-padding: 1.5rem;
+  --rozie-dialog-font: inherit;
+
+  /* enter/leave transition duration */
+  --rozie-dialog-transition: 0.15s ease;
+}

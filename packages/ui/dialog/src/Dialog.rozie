@@ -1,0 +1,244 @@
+<!--
+  Dialog.rozie — a headless, accessible modal dialog built on the NATIVE
+  <dialog> element + showModal().
+
+  A pure-Rozie family (NO third-party engine), in the spirit of slider/captcha:
+  the PLATFORM is the engine. `showModal()` gives, for free and on every target,
+  what hand-rolled modals re-implement badly:
+    - TOP-LAYER rendering — escapes z-index / overflow / transform ancestors with
+      NO portal/teleport (better than a portal),
+    - a native ::backdrop pseudo-element for the scrim,
+    - a real FOCUS TRAP inside the dialog,
+    - Esc-to-dismiss (the native `cancel` event),
+    - focus RESTORATION to the previously-focused element on close.
+  Rozie owns the author-side API: the two-way `open` binding, the open↔native
+  reconcile, backdrop/escape close policy, optional scroll-lock, and the skin.
+
+  CONTROLLED via the `open` model. The component reconciles the native dialog to
+  `$props.open` from $onMount (initial) + a lazy `$watch` (transitions) — the
+  engine-wrapper recipe (onMount + lazy watch, never `immediate`). Every close
+  path funnels through `closeWith(reason)` → writes `$model.open = false` + emits
+  `close`; the watch then runs `el.close()`.
+
+  Authoring notes (collision classes — see the authoring playbook):
+    - `open` is BOTH the model prop name and a tempting event/verb name. The
+      imperative verbs are therefore `show` / `hide` (NOT `open`/`close`): an
+      `open` expose verb would collide with the `open` model (the data/model-key
+      ==expose-verb class, listbox), and a `close` expose verb would collide with
+      the `@close` EVENT (ROZ121 expose==event, TipTap). `show`/`hide` are clear,
+      collision-free, and not inherited HTMLElement members (no ROZ137).
+    - $refs.panelEl is read ONLY in $onMount / the $watch CALLBACK / event
+      handlers — all post-mount (ROZ123-safe; the watch GETTER is
+      `() => $props.open`, which touches no ref). The ref is on the inner panel
+      <div> (not the <dialog>) to dodge an emitter ref-type-map gap; the <dialog>
+      is reached via `panelEl.parentElement` cast to HTMLDialogElement.
+    - Handler params are left UNTYPED (neutralize to `any`) so reading
+      `e.target` / `e.preventDefault()` typechecks across all six strict leaves.
+    - `showModal()` throws if already open and `close()` is a no-op when closed,
+      so `sync()` guards on the native `el.open` flag before calling either.
+
+  Consumer example:
+
+    <Dialog r-model:open="$data.confirmOpen" ariaLabelledby="confirm-title" @close="onClose">
+      <h2 id="confirm-title">Delete file?</h2>
+      <p>This cannot be undone.</p>
+      <button @click="$data.confirmOpen = false">Cancel</button>
+      <button @click="remove()">Delete</button>
+    </Dialog>
+-->
+
+<rozie name="Dialog">
+
+<props>
+{
+  // Visibility (two-way). The sole model:true prop. Read $props.open; write
+  // $model.open. `r-model:open` / `v-model:open` / `[(open)]` outside.
+  open:                 { type: Boolean, default: false, model: true },
+
+  // Opt OUT of backdrop-click-to-dismiss (default: a backdrop click closes).
+  disableBackdropClose: { type: Boolean, default: false },
+
+  // Opt OUT of Escape-to-dismiss (default: Esc closes; native `cancel`).
+  disableEscapeClose:   { type: Boolean, default: false },
+
+  // Opt OUT of locking <html> scroll while open (default: scroll is locked).
+  disableScrollLock:    { type: Boolean, default: false },
+
+  // Accessible name when the dialog has no visible title to point at.
+  ariaLabel:            { type: String,  default: null },
+
+  // id of the element that titles the dialog (preferred over ariaLabel when a
+  // visible heading exists).
+  ariaLabelledby:       { type: String,  default: null },
+}
+</props>
+
+<script lang="ts">
+// ---- native reconcile ---------------------------------------------------
+// Lock/unlock <html> scroll (no-op when disabled or pre-DOM).
+const applyScrollLock = (lock) => {
+  if ($props.disableScrollLock) return
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  if (root) root.style.overflow = lock ? 'hidden' : ''
+}
+
+// Reconcile the native <dialog> to the desired open state. Guarded on the
+// native `el.open` flag (showModal throws if already open; close is a no-op when
+// closed). Reads $refs in a post-mount callback (ROZ123-safe).
+//
+// The ref lives on the inner panel <div> (which the emitter types as
+// HTMLDivElement), and we reach the <dialog> via `panel.parentElement` cast to
+// HTMLDialogElement. This sidesteps an emitter gap: the per-target ref-type map
+// has no `dialog` case, so a ref placed directly on <dialog> would be typed the
+// generic HTMLElement (no `.open`/`.showModal()`/`.close()`), failing strict
+// leaf typecheck. Fixing it here keeps the change source-only (no emitter edit).
+const sync = (isOpen) => {
+  const panel = $refs.panelEl
+  const el = (panel && panel.parentElement) as HTMLDialogElement | null
+  if (!el) return
+  if (isOpen) {
+    if (!el.open) el.showModal()
+    applyScrollLock(true)
+  } else {
+    if (el.open) el.close()
+    applyScrollLock(false)
+  }
+}
+
+// ---- close funnel (single $emit site) ----------------------------------
+const closeWith = (reason) => {
+  $model.open = false
+  $emit('close', { reason })
+}
+
+// ---- handlers ----------------------------------------------------------
+// Native Esc fires `cancel` on the <dialog>. preventDefault so WE drive the
+// close through the model (keeping `open` in sync); honor the opt-out.
+const onCancel = (e) => {
+  if (e) e.preventDefault()
+  if ($props.disableEscapeClose) return
+  closeWith('escape')
+}
+
+// A click whose target IS the <dialog> element (not its panel/children) is a
+// backdrop click — the ::backdrop is part of the dialog box. We compare the
+// real `e.target` (reliable even under Solid's event delegation) to the dialog
+// element resolved via the panel ref's parent.
+const onClick = (e) => {
+  if ($props.disableBackdropClose) return
+  const panel = $refs.panelEl
+  const el = panel && panel.parentElement
+  if (e && el && e.target === el) closeWith('backdrop')
+}
+
+// ---- lifecycle ---------------------------------------------------------
+$onMount(() => {
+  sync($props.open)
+})
+
+// Lazy watch (never `immediate` — the engine must exist; onMount seeds initial).
+$watch(() => $props.open, (isOpen) => {
+  sync(isOpen)
+})
+
+// ---- imperative handle -------------------------------------------------
+// show()/hide() — named to avoid the `open` model + `@close` event collisions.
+const show = () => {
+  $model.open = true
+}
+const hide = () => {
+  closeWith('programmatic')
+}
+
+$expose({ show, hide })
+</script>
+
+<template>
+<dialog
+  class="rozie-dialog"
+  :aria-label="$props.ariaLabel"
+  :aria-labelledby="$props.ariaLabelledby"
+  @cancel="onCancel($event)"
+  @click="onClick($event)"
+>
+  <!-- The panel holds the consumer content and carries the ref (typed
+       HTMLDivElement); the <dialog> is reached via panel.parentElement. Backdrop
+       clicks land on the <dialog> itself (target check in onClick); clicks
+       inside the panel do not, so no stopPropagation gymnastics are needed. -->
+  <div class="rozie-dialog-panel" ref="panelEl">
+    <slot />
+  </div>
+</dialog>
+</template>
+
+<style>
+/*
+  Token-driven (mirrors slider/themes): every visual value is a
+  `var(--rozie-dialog-*, <fallback>)`. The shipped themes/*.css presets map these
+  onto shadcn/Radix, Material 3, Bootstrap 5. STRUCTURAL behavior (top-layer,
+  ::backdrop, centering) comes from the native <dialog> and is not tokenized.
+*/
+
+/* The native dialog box. `<dialog>:not([open])` is display:none natively. When
+   shown via showModal() it renders in the top layer, centered by the UA; we only
+   restyle the box chrome. */
+.rozie-dialog {
+  margin: auto; /* centers in the top layer */
+  padding: 0;
+  width: var(--rozie-dialog-width, auto);
+  max-width: var(--rozie-dialog-max-width, min(32rem, calc(100vw - 2rem)));
+  max-height: var(--rozie-dialog-max-height, calc(100vh - 2rem));
+  border: var(--rozie-dialog-border, none);
+  border-radius: var(--rozie-dialog-radius, 0.75rem);
+  background: var(--rozie-dialog-bg, #fff);
+  color: var(--rozie-dialog-color, inherit);
+  box-shadow: var(--rozie-dialog-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  overflow: auto;
+}
+
+/* The scrim. Only painted for showModal()'d dialogs. */
+.rozie-dialog::backdrop {
+  background: var(--rozie-dialog-backdrop-bg, rgba(0, 0, 0, 0.5));
+  backdrop-filter: var(--rozie-dialog-backdrop-filter, none);
+}
+
+.rozie-dialog-panel {
+  padding: var(--rozie-dialog-padding, 1.5rem);
+  font: var(--rozie-dialog-font, inherit);
+}
+
+/* Progressive enter animation (no-op where @starting-style/allow-discrete are
+   unsupported — the dialog simply appears). */
+@media (prefers-reduced-motion: no-preference) {
+  .rozie-dialog {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .rozie-dialog:not([open]) {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  @starting-style {
+    .rozie-dialog[open] {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+  }
+  .rozie-dialog::backdrop {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+  }
+  .rozie-dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .rozie-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+</style>
+
+</rozie>

@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/dialog — Material Design 3 bridge.
+ *
+ * Maps the dialog tokens onto the MD3 system color roles (`--md-sys-color-*`)
+ * emitted by material-web / @material/material-color-utilities theme builders.
+ * Falls back to the baseline M3 light palette when those vars are absent, so it
+ * renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/dialog-react/themes/material.css';
+ *
+ * M3 dialogs are heavily rounded (28dp), use the surface-container-high color,
+ * and a scrim at ~32% of the scrim color role.
+ */
+.rozie-dialog {
+  --rozie-dialog-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+  --rozie-dialog-color: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-dialog-border: none;
+  --rozie-dialog-radius: 1.75rem;
+
+  --rozie-dialog-backdrop-bg: color-mix(in srgb, var(--md-sys-color-scrim, #000) 32%, transparent);
+  --rozie-dialog-shadow: 0 8px 12px 6px rgba(0, 0, 0, 0.15), 0 4px 4px rgba(0, 0, 0, 0.3);
+}

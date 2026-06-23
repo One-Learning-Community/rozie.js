@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/dialog — Bootstrap 5 bridge.
+ *
+ * Maps the dialog tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the dialog follows `data-bs-theme="dark"` and
+ * any custom build automatically. Falls back to Bootstrap's default light
+ * palette when the vars are absent.
+ *
+ *   import '@rozie-ui/dialog-react/themes/bootstrap.css';
+ *
+ * Bootstrap modals use a 0.5rem radius, a 1px border, and a 0.5-opacity black
+ * backdrop (`$modal-backdrop-bg` / `$modal-backdrop-opacity`).
+ */
+.rozie-dialog {
+  --rozie-dialog-bg: var(--bs-body-bg, #fff);
+  --rozie-dialog-color: var(--bs-body-color, #212529);
+  --rozie-dialog-border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.175));
+  --rozie-dialog-radius: var(--bs-border-radius-lg, 0.5rem);
+
+  --rozie-dialog-backdrop-bg: rgba(0, 0, 0, 0.5);
+  --rozie-dialog-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}

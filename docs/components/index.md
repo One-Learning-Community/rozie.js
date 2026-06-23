@@ -62,6 +62,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Listbox** | *(no engine)* headless WAI-ARIA listbox / combobox | [/components/listbox](/components/listbox) |
 | **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 | **Otp** | *(no engine)* headless accessible one-time-code / PIN input | [/components/otp](/components/otp) |
+| **Dialog** | *(native `<dialog>`)* headless accessible modal dialog | [/components/dialog](/components/dialog) |
 
 ## Why these exist
 

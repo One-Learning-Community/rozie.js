@@ -266,6 +266,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/dialog',
+          collapsed: true,
+          items: [
+            { text: 'Dialog — headless modal dialog', link: '/components/dialog' },
+            { text: 'Usage examples', link: '/components/dialog-usage' },
+            { text: 'Headless modal dialog comparison', link: '/components/dialog-comparison' },
+            { text: 'Dialog — live demo', link: '/components/dialog-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/data-table',
           collapsed: true,
           items: [
