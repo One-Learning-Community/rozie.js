@@ -3,9 +3,9 @@
 The recipe for standing up a new family (one `.rozie` source → six published per-framework leaves) on the **compiled `dist` + `./source` standard**. Copy from a proven family and find-replace the name:
 
 - **Engine wrapper** (wraps a vanilla-JS engine, or a script-injected widget): copy **`captcha/`** (script-injected, no npm engine) or **`cropper/`** (npm engine peer).
-- **Pure component** (no third-party engine, token-themed): copy **`slider/`** (ships the 4-file `themes/` token system).
+- **Pure component** (no third-party engine, token-themed): copy **`otp/`** (or any of `dialog/`, `combobox/`, `toast/`) — these ship the 4-file `themes/` token system **and** the `compile-<slug>-check.mjs` + `tests/surface.test.ts` gate. Prefer them over `slider/`/`listbox/`, which predate the surface-gate convention and stub out `test`/`typecheck` (grandfathered — do NOT copy their echo-stub scripts into a new family).
 
-`captcha/` is the reference for the current six-toolchain `dist`+`source` standard.
+`captcha/` is the reference for the current six-toolchain `dist`+`source` standard; `otp/` is the reference for a pure (no-engine) family on that standard.
 
 ---
 
@@ -13,17 +13,25 @@ The recipe for standing up a new family (one `.rozie` source → six published p
 
 ```
 packages/ui/<slug>/
-  package.json            # root: build = "node scripts/codegen.mjs"
+  package.json            # root: build = "node scripts/codegen.mjs"; test = vitest (surface gate)
   tsconfig.json           # noEmit typecheck of the .rozie-adjacent sources
+  vitest.config.ts        # runs tests/surface.test.ts (node/happy-dom)
   src/<Name>.rozie        # THE source (author-owned)
+  src/themes/             # PURE components: base/shadcn/material/bootstrap.css token presets
+    {base,shadcn,material,bootstrap}.css   # codegen's copyThemes() THROWS if base.css is missing
   scripts/
-    codegen.mjs           # parse-once → compile()×6 → write leaves + render READMEs + validate docs
+    codegen.mjs           # parse-once → compile()×6 → write leaves + vendor themes + render READMEs + validate docs
     readme.mjs            # USAGE / HANDLE_USAGE snippets + README renderer + validateDocsPropsTable
-    event-manifest.mjs    # one line per emit
+    event-manifest.mjs    # one line per emit (empty `{}` for a zero-emit family; gate the README Events section on ir.emits.length)
     handle-manifest.mjs   # one line per $expose verb
-    compile-<slug>-check.mjs   # surface + collision gate (run FIRST)
+    compile-<slug>-check.mjs   # surface + collision gate (run FIRST) — standard for EVERY new family
+  tests/
+    surface.test.ts       # re-asserts compile()×6 zero-error + the IR surface under `turbo run test`
   packages/{react,solid,lit,vue,svelte,angular}/   # the six leaves
 ```
+
+> Component name ≠ slug is fine: e.g. component `Toaster` in slug `toast` (mirrors `DataTable` in `data-table`). Keep `FILENAME`/emitted-file/barrel-export/Lit-tag on the **component name**, and pkg names/docs path/`docsPath` on the **slug**.
+> New leaves auto-register: `pnpm-workspace.yaml` already globs `packages/ui/*/packages/*`, so a `pnpm install` picks them up — no workspace-config edit needed.
 
 ## Step 0 — author + validate the `.rozie` FIRST
 
@@ -55,9 +63,9 @@ Copy `codegen.mjs` + `readme.mjs` + manifests from `captcha/scripts/` (or `cropp
 
 - **`<slug>.md`** (hand-written): showcase + an IR-exact `### Props` table (validated by codegen — name/type/default must match the IR; string defaults carry quotes, e.g. `"recaptcha"`; required/null props show `—`/`null`).
 - **`<slug>-comparison.md`** (hand-written): vs the per-framework libraries it replaces.
-- **`<slug>-demo.md`** (hand-written): `<ClientOnly>` live demo importing the `-vue` package.
+- **`<slug>-demo.md`** (hand-written): `<ClientOnly>` live demo importing the `-vue` package. **This requires `@rozie-ui/<slug>-vue` in `docs/package.json` devDeps (`workspace:*`)** — the demo imports the leaf SOURCE (the vue leaf's `.` export resolves to `./src/index.ts`), so VitePress/Vite compiles the `.vue` on the fly; NO leaf dist build is needed for the docs build.
 - **`<slug>-usage.md`**: **auto-generated** from `readme.mjs` `USAGE` — do not hand-write.
-- Add a nav block to `docs/.vitepress/config.ts`.
+- Add a nav block to `docs/.vitepress/config.ts`, plus the page to `docs/components/index.md` and `docs/index.md` (the four registration points).
 
 ## Per-target gotchas (learned standing up captcha)
 
@@ -81,7 +89,7 @@ VR: a family whose widget renders a third-party iframe / canvas / WebGL surface 
 
 ### Tests (proportionate)
 
-- **Surface gate** — promote `scripts/compile-<slug>-check.mjs` into `tests/surface.test.ts` (vitest, node/happy-dom) so `pnpm test` re-asserts the IR surface + `compile()×6` zero-error under `turbo run test`. Cheap; do it for every family.
+- **Surface gate** — promote `scripts/compile-<slug>-check.mjs` into `tests/surface.test.ts` (vitest, node/happy-dom) so `pnpm test` re-asserts the IR surface + `compile()×6` zero-error under `turbo run test`. Cheap; do it for **every** family — including pure no-engine ones (`otp`/`dialog`/`combobox`/`toast` all carry it; only the older `slider`/`listbox` predate this and stub `test`). **The surface gate is necessary but NOT sufficient**: name collisions with inherited Lit DOM properties (e.g. a helper/prop named `inputMode`/`id`) and with the generated Angular CVA methods (`writeValue`/…) pass `compile()×6` clean and only fail at the per-leaf `typecheck`/`ng-packagr` build — so gates 3 (typecheck ×4) and 4 (build ×6) below are the real collision catch. See the authoring playbook §6 collision catalogue.
 - **Unit-test branchy engine glue** — if the wrapper has real logic beyond config passthrough (a script-loader singleton, a key/id scheme, a reconcile guard), extract it to `src/internal/<helper>.ts` (codegen vendors `src/internal/` into every leaf via `copyInternal`, excluding `*.test.ts`) and unit-test it with vitest + fake timers. This is the `sortable-list useSortableJS` / `captcha loadCaptchaApi` pattern. **happy-dom gotcha:** it auto-*fetches* any non-empty `<script src>` (async unhandled rejection) and synthesizes an `error` event when file-loading is disabled — so in tests inject a providers/config map with an **empty `src`** (inert) and assert the real URLs separately as pure data.
 - Config-passthrough-only wrappers don't need runtime tests beyond the surface gate — typecheck ×4 + build ×6 cover them.
 
