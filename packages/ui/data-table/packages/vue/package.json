@@ -31,13 +31,18 @@
   },
   "exports": {
     ".": {
-      "import": "./src/index.ts",
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./themes/*": "./src/themes/*"
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
@@ -60,8 +65,8 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
@@ -69,5 +74,14 @@
   "sideEffects": [
     "*.css",
     "**/*.css"
-  ]
+  ],
+  "devDependencies": {
+    "@tanstack/table-core": "^8.21",
+    "@tanstack/virtual-core": "^3",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  }
 }
