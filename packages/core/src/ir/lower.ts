@@ -47,7 +47,6 @@ import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
-import { validateRForSlotNameCollision } from './validateRForSlotNameCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateClone } from './validateClone.js';
@@ -316,12 +315,13 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // collected-not-thrown (D-08): pushes ROZ979; never mutates `ir`.
   validateDefaultPortalCollision(ir, diagnostics);
 
-  // r-for loop var shadows a slot rendered inside the loop (ROZ980, warning).
-  // Svelte-5-only footgun (loop var shadows the snippet → `{@render name()}`
-  // renders a non-function); silent at compile/typecheck/build, recurring across
-  // families. Same chokepoint so it fires for BOTH compile() AND @rozie/unplugin.
-  // Collected-not-thrown (D-08); never mutates `ir`.
-  validateRForSlotNameCollision(ir, diagnostics);
+  // r-for loop var shadows a slot rendered inside the loop — previously the
+  // ROZ980 warning (asking the author to rename the loop var). Now AUTO-FIXED in
+  // the Svelte emitter (the only target with the footgun): the emitter-generated
+  // snippet binding is renamed to `<name>$$slot` via the pure detector
+  // findRForSlotNameCollisions(ir), so the component Just Works on all six
+  // targets with NO author action and the warning is superseded. No lowerToIR
+  // wiring is needed — the detector is consulted directly by @rozie/target-svelte.
 
   // Phase 26 (D-06/D-07) — resolve the wrap/raw `rozieDisplay` gate ONCE per
   // interpolation + attribute/class binding. Runs HERE in lowerToIR (not

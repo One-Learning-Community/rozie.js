@@ -44,6 +44,7 @@ import type {
   SlotDecl,
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -69,6 +70,17 @@ export function emitSlotInvocation(
   // `$portals.<name>(...)`.
   if (node.isPortal) return '';
   const slotKey = node.slotName === '' ? 'children' : node.slotName;
+
+  // r-for-loop-var == slot-name collision auto-fix (lockstep with emitScript's
+  // emitSlotDerivedMerges binding rename): when this slot's name is shadowed by
+  // an enclosing `r-for` loop var, render the safe suffixed snippet binding
+  // (`X$$slot`) instead of the bare `X` — inside the compiled `{#each … as X}`
+  // the bare `X` resolves to the loop ITEM (a non-function) → runtime crash on
+  // Svelte only. Conditional: only colliding slots are renamed, so non-colliding
+  // components emit byte-identical Svelte (supersedes the retired ROZ980 warning).
+  const renderName = findRForSlotNameCollisions(ctx.ir).has(node.slotName)
+    ? `${node.slotName}$$slot`
+    : slotKey;
 
   // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's
   // snippet invocation is positional in syntax but Rozie's cross-target
@@ -105,15 +117,15 @@ export function emitSlotInvocation(
   if (!hasFallback && presence === 'always') {
     // Bare shorthand. The `?.` makes it safe when the consumer didn't provide
     // a snippet for this slot.
-    return `{@render ${slotKey}?.(${argList})}`;
+    return `{@render ${renderName}?.(${argList})}`;
   }
 
   if (!hasFallback && presence === 'conditional') {
     // Conditional wrap (no fallback to render).
-    return `{#if ${slotKey}}{@render ${slotKey}(${argList})}{/if}`;
+    return `{#if ${renderName}}{@render ${renderName}(${argList})}{/if}`;
   }
 
   // Has fallback — A1 RESOLVED verbose form.
   const fallbackMarkup = ctx.emitChildren(fallbackChildren);
-  return `{#if ${slotKey}}{@render ${slotKey}(${argList})}{:else}${fallbackMarkup}{/if}`;
+  return `{#if ${renderName}}{@render ${renderName}(${argList})}{:else}${fallbackMarkup}{/if}`;
 }

@@ -48,6 +48,7 @@ import { buildSlotTypeFields, distinctSlotsByName } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
+import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -583,6 +584,16 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
 function emitSlotDerivedMerges(ir: IRComponent): string[] {
   if (ir.slots.length === 0) return [];
   const lines: string[] = [];
+  // r-for-loop-var == slot-name collision auto-fix: when a `<slot name="X">` is
+  // rendered inside an `r-for` whose loop var is also `X`, the compiled
+  // `{#each … as X}` shadows the bare `X` snippet binding within the loop body
+  // (`{@render X()}` → loop item, a non-function → runtime crash on Svelte
+  // only). Rename ONLY the emitter-generated binding to the safe suffixed
+  // `X$$slot` (lockstep with emitSlotInvocation's render-site rename); the
+  // author's loop var `X` and the slot-arg VALUES stay untouched. Conditional —
+  // only collides → non-colliding components stay byte-identical (supersedes the
+  // retired ROZ980 warning).
+  const loopCollisions = findRForSlotNameCollisions(ir);
   // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
   // exactly ONE `$derived` merge declaration (see distinctSlotsByName).
   for (const s of distinctSlotsByName(ir.slots)) {
@@ -595,7 +606,7 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
     // bare — only the lvalue is disambiguated. Non-colliding slots are
     // byte-identical. Lockstep with portalSlotMergeName usages in emitPortals /
     // rewriteScript / rewriteTemplateExpression.
-    const ident = portalSlotMergeName(key, ir);
+    const ident = loopCollisions.has(key) ? `${key}$$slot` : portalSlotMergeName(key, ir);
     lines.push(`const ${ident} = $derived(__${key}Prop ?? snippets?.${key});`);
   }
   return lines;
