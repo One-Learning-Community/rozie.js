@@ -114,8 +114,9 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   return (
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
-      {toasts.map((toast) => <div key={toast.id} className={clsx("rozie-toast", 'rozie-toast--' + toast.type)} role="status" aria-live={rozieAttr(liveFor(toast.type))} data-rozie-s-12d4265c="">
-        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast, dismiss }) : <><span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(toast.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismiss(toast.id); }} data-rozie-s-12d4265c="">×</button></>}
+      
+      {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type)} role="status" aria-live={rozieAttr(liveFor(t.type))} data-rozie-s-12d4265c="">
+        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <><span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismiss(t.id); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>
     </>

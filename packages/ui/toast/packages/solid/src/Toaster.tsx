@@ -172,8 +172,9 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   return (
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event) => { onMouseEnter(); }, onMouseLeave: ($event) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
-      <For each={toasts()}>{(toast) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + toast.type)} role="status" aria-live={rozieAttr(liveFor(toast.type))} data-rozie-s-12d4265c="">
-        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast, dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(toast.message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event) => { dismiss(toast.id); }} data-rozie-s-12d4265c="">×</button></>}
+      
+      <For each={toasts()}>{(t) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t.type)} role="status" aria-live={rozieAttr(liveFor(t.type))} data-rozie-s-12d4265c="">
+        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t, dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event) => { dismiss(t.id); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</For>
     </div>
     </>

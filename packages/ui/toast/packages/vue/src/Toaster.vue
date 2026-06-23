@@ -1,10 +1,11 @@
 <template>
 
 <div :class="['rozie-toaster', 'rozie-toaster--' + props.position]" role="region" :aria-label="regionLabel()" v-bind="$attrs" @mouseenter="onMouseEnter()" @mouseleave="onMouseLeave()">
-  <div v-for="toast in toasts" :key="toast.id" :class="['rozie-toast', 'rozie-toast--' + toast.type]" role="status" :aria-live="liveFor(toast.type)">
-    <slot name="toast" :toast="toast" :dismiss="dismiss">
-      <span class="rozie-toast-message">{{ toast.message }}</span>
-      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(toast.id)">×</button>
+  
+  <div v-for="t in toasts" :key="t.id" :class="['rozie-toast', 'rozie-toast--' + t.type]" role="status" :aria-live="liveFor(t.type)">
+    <slot name="toast" :toast="t" :dismiss="dismiss">
+      <span class="rozie-toast-message">{{ t.message }}</span>
+      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(t.id)">×</button>
     </slot>
   </div>
 </div>

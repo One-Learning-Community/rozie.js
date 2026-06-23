@@ -112,7 +112,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as toast (toast.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + toast.type)]} role="status" aria-live={rozieAttr(liveFor(toast.type))} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast, dismiss })}{:else}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(toast.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismiss(toast.id); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type)]} role="status" aria-live={rozieAttr(liveFor(t.type))} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismiss(t.id); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {

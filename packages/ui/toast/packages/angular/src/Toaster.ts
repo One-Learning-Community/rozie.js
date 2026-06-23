@@ -34,14 +34,15 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position()" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
-      @for (toast of toasts(); track toast.id) {
-    <div class="rozie-toast" [ngClass]="'rozie-toast--' + toast.type" role="status" [attr.aria-live]="rozieAttr(liveFor(toast.type))">
+      
+      @for (t of toasts(); track t.id) {
+    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))">
         @if ((toastTpl ?? templates()?.['toast'])) {
-    <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: toast, dismiss: dismiss }, toast: toast, dismiss: dismiss }" />
+    <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
 
-          <span class="rozie-toast-message">{{ rozieDisplay(toast.message) }}</span>
-          <button type="button" class="rozie-toast-close" aria-label="Dismiss" (click)="dismiss(toast.id)">×</button>
+          <span class="rozie-toast-message">{{ rozieDisplay(t.message) }}</span>
+          <button type="button" class="rozie-toast-close" aria-label="Dismiss" (click)="dismiss(t.id)">×</button>
         
     }
       </div>

@@ -159,17 +159,22 @@ $expose({ show, dismiss, clear })
   @mouseenter="onMouseEnter()"
   @mouseleave="onMouseLeave()"
 >
+  <!-- Loop var is `t`, NOT `toast`: a loop var named `toast` shadows the `#toast`
+       slot snippet on Svelte (`{#each … as toast}` collides with the `toast`
+       snippet → `{@render toast()}` renders a non-function → Svelte-only throw).
+       Same collision class as slider's mark→tick / embla's slide→item. The slot
+       PROP stays `:toast` (consumers still get `{ toast, dismiss }`). -->
   <div
-    r-for="toast in $data.toasts"
-    :key="toast.id"
+    r-for="t in $data.toasts"
+    :key="t.id"
     class="rozie-toast"
-    :class="'rozie-toast--' + toast.type"
+    :class="'rozie-toast--' + t.type"
     role="status"
-    :aria-live="liveFor(toast.type)"
+    :aria-live="liveFor(t.type)"
   >
-    <slot name="toast" :toast="toast" :dismiss="dismiss">
-      <span class="rozie-toast-message">{{ toast.message }}</span>
-      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(toast.id)">×</button>
+    <slot name="toast" :toast="t" :dismiss="dismiss">
+      <span class="rozie-toast-message">{{ t.message }}</span>
+      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(t.id)">×</button>
     </slot>
   </div>
 </div>
