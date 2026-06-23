@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{ columnId?: string; column?: unknown | null; row?: unknown | null; value?: unknown | null; commit?: ((...args: any[]) => any) | null; cancel?: ((...args: any[]) => any) | null }>(),
+  defineProps<{ columnId?: string; column?: Record<string, any> | null; row?: Record<string, any> | null; value?: Record<string, any> | null; commit?: ((...args: any[]) => any) | null; cancel?: ((...args: any[]) => any) | null }>(),
   { columnId: '', column: null, row: null, value: null, commit: null, cancel: null }
 );
 

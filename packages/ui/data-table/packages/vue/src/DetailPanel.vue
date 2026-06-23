@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{ row?: unknown | null }>(),
+  defineProps<{ row?: Record<string, any> | null }>(),
   { row: null }
 );
 

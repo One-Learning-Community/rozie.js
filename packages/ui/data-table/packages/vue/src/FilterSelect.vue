@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{ columnId?: string; column?: unknown | null; value?: unknown | null; setFilter?: ((...args: any[]) => any) | null; uniqueValues?: any[] }>(),
+  defineProps<{ columnId?: string; column?: Record<string, any> | null; value?: Record<string, any> | null; setFilter?: ((...args: any[]) => any) | null; uniqueValues?: any[] }>(),
   { columnId: '', column: null, value: null, setFilter: null, uniqueValues: () => [] }
 );
 
