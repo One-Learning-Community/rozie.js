@@ -428,7 +428,7 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
 | colHeader | columnId, column, label |
-| filter | columnId, uniqueValues, minMax |
+| filter | columnId, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
 | editor | columnId, column, row, value, commit, cancel |
 | cell | columnId, column, row, value |

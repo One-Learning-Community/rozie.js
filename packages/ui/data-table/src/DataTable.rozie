@@ -1191,6 +1191,7 @@ $expose({
               :columnId="header.column.id"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
+              :setFilter="setColumnFilter"
             />
           </span>
           <span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
@@ -1485,6 +1486,7 @@ $expose({
               :columnId="header.column.id"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
+              :setFilter="setColumnFilter"
             />
           </span>
           <!-- Pin control (req-11) — three native buttons (left / unpin / right), each
