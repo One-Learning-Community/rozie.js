@@ -1,0 +1,71 @@
+<!--
+  DialogBehaviorDemo — VR behavioral cell for @rozie-ui/dialog (pure-Rozie, native
+  <dialog> + showModal()). Drives the two-way r-model:open (open button → modal
+  shows in the top layer), the @close reason readout, and a consumer-driven close
+  (the Close button writes open=false directly). The spec opens it, asserts the
+  dialog + body are visible, presses Escape (→ reason 'escape'), and closes via the
+  button — see dialog.spec.ts. Behavioral-only (no pixel baseline).
+-->
+<rozie name="DialogBehaviorDemo">
+
+<components>
+{
+  Dialog: '../../packages/ui/dialog/src/Dialog.rozie',
+}
+</components>
+
+<data>
+{
+  open: false,
+  lastReason: '',
+}
+</data>
+
+<script>
+const openIt = () => {
+  $data.open = true
+}
+const closeIt = () => {
+  $data.open = false
+}
+const onClose = (e) => {
+  $data.lastReason = e && e.reason != null ? e.reason : ''
+}
+</script>
+
+<template>
+<div class="dialog-demo">
+  <h3>Dialog — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="open-dialog" @click="openIt()">Open</button>
+    <span class="readout" data-testid="readout-open">{{ String($data.open) }}</span>
+    <span class="readout" data-testid="readout-reason">{{ $data.lastReason }}</span>
+  </div>
+
+  <Dialog r-model:open="$data.open" ariaLabel="Demo dialog" @close="onClose($event)">
+    <h2>Confirm</h2>
+    <p data-testid="dialog-body">Dialog content is visible.</p>
+    <button type="button" data-testid="close-dialog" @click="closeIt()">Close</button>
+  </Dialog>
+</div>
+</template>
+
+<style>
+.dialog-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.dialog-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dialog-demo .readout {
+  min-width: 4ch;
+}
+</style>
+
+</rozie>

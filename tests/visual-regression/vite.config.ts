@@ -356,6 +356,62 @@ export default defineConfig(async () => {
     'data-table',
     'src',
   );
+  // Same move for @rozie-ui/otp: Otp.rozie lives in the package src, so the Angular
+  // sub-build must walk it too (the OtpBehaviorDemo's `imports: [Otp]` would
+  // otherwise collapse to `any[]` → empty mount + "JIT compiler unavailable").
+  // Lockstep with build-cells.mjs `OTP_SRC` sweep + tsconfig.app.json `include`.
+  // NO ESM-interop alias needed — otp is pure-Rozie with no third-party engine deps.
+  const otpSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'otp',
+    'src',
+  );
+  // Same move for @rozie-ui/dialog: Dialog.rozie lives in the package src, so the
+  // Angular sub-build must walk it too (DialogBehaviorDemo's `imports: [Dialog]`
+  // would otherwise collapse to `any[]` → empty mount). Lockstep with
+  // build-cells.mjs `DIALOG_SRC` sweep + tsconfig.app.json `include`. NO ESM-interop
+  // alias needed — dialog is pure-Rozie with no third-party engine deps.
+  const dialogSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'dialog',
+    'src',
+  );
+  // Same move for @rozie-ui/combobox: Combobox.rozie lives in the package src, so
+  // the Angular sub-build must walk it too (ComboboxBehaviorDemo's
+  // `imports: [Combobox]` would otherwise collapse to `any[]` → empty mount).
+  // Lockstep with build-cells.mjs `COMBOBOX_SRC` sweep + tsconfig.app.json
+  // `include`. NO ESM-interop alias needed — pure-Rozie, no engine deps.
+  const comboboxSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'combobox',
+    'src',
+  );
+  // Same move for @rozie-ui/toast: Toaster.rozie lives in the package src, so the
+  // Angular sub-build must walk it too (ToasterBehaviorDemo's `imports: [Toaster]`
+  // would otherwise collapse to `any[]` → empty mount). Lockstep with
+  // build-cells.mjs `TOAST_SRC` sweep + tsconfig.app.json `include`. NO ESM-interop
+  // alias needed — toast is pure-Rozie with no third-party engine deps.
+  const toastSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'toast',
+    'src',
+  );
   // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
   // package's CJS build does `exports["default"] = plugin` without
   // `__esModule`, so a default ES import bundled through the CJS-interop path
@@ -412,10 +468,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

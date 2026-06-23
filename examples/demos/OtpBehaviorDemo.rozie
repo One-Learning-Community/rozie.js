@@ -1,0 +1,71 @@
+<!--
+  OtpBehaviorDemo — VR behavioral cell for @rozie-ui/otp (pure-Rozie, no engine).
+  Drives the native segmented one-time-code input: a two-way r-model:value (live
+  readout), a `set-code` direct-model-write button, and a @complete readout. The
+  spec types into the cells, checks the assembled value + complete event, and the
+  direct-write reflection — see otp.spec.ts. Behavioral-only (no pixel baseline).
+-->
+<rozie name="OtpBehaviorDemo">
+
+<components>
+{
+  Otp: '../../packages/ui/otp/src/Otp.rozie',
+}
+</components>
+
+<data>
+{
+  code: '',
+  lastComplete: '',
+}
+</data>
+
+<script>
+const onComplete = (e) => {
+  $data.lastComplete = e && e.value != null ? e.value : ''
+}
+const setCode = (v) => {
+  $data.code = v
+}
+</script>
+
+<template>
+<div class="otp-demo">
+  <h3>OTP — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-code" @click="setCode('123')">Set 123</button>
+    <span class="readout" data-testid="readout-code">{{ $data.code }}</span>
+    <span class="readout" data-testid="readout-complete">{{ $data.lastComplete }}</span>
+  </div>
+
+  <Otp
+    r-model:value="$data.code"
+    :length="6"
+    type="numeric"
+    ariaLabel="Verification code"
+    @complete="onComplete($event)"
+  />
+</div>
+</template>
+
+<style>
+.otp-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.otp-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.otp-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+</style>
+
+</rozie>

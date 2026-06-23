@@ -186,6 +186,50 @@ const DATA_TABLE_SRC = resolve(
   'data-table',
   'src',
 );
+// Same packaging move for @rozie-ui/otp: Otp.rozie lives in the package src; the
+// Angular sub-build walks it via `prebuildExtraRoots` and drops the same cross-tree
+// `.rozie.ts` + `Otp.ts` shim artefacts that must be swept after the Angular build
+// (see cleanupCrossTreeAngularArtifacts).
+const OTP_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'otp',
+  'src',
+);
+// Same packaging move for @rozie-ui/dialog: Dialog.rozie lives in the package src;
+// the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Dialog.ts` shim artefacts that must be swept after the
+// Angular build (see cleanupCrossTreeAngularArtifacts).
+const DIALOG_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'dialog',
+  'src',
+);
+// Same packaging move for @rozie-ui/combobox: Combobox.rozie lives in the package
+// src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Combobox.ts` shim artefacts that must be swept after
+// the Angular build (see cleanupCrossTreeAngularArtifacts).
+const COMBOBOX_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'combobox',
+  'src',
+);
+// Same packaging move for @rozie-ui/toast: Toaster.rozie lives in the package src;
+// the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
+// cross-tree `.rozie.ts` + `Toaster.ts` shim artefacts that must be swept after the
+// Angular build (see cleanupCrossTreeAngularArtifacts).
+const TOAST_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'toast',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -488,6 +532,59 @@ function cleanupCrossTreeAngularArtifacts() {
   }
   rmSync(resolve(DATA_TABLE_SRC, 'DataTable.ts'), { force: true });
   rmSync(resolve(DATA_TABLE_SRC, 'Column.ts'), { force: true });
+  // Same sweep for @rozie-ui/otp's package src (OtpBehaviorDemo composes Otp via
+  // <components>, so the Angular sub-build emits Otp.rozie.ts + the Otp.ts shim
+  // here). Leftovers (the emitted .rozie.ts imports @angular/core) poison the later
+  // solid/lit builds.
+  try {
+    for (const entry of readdirSync(OTP_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(OTP_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // otp src always exists post-port — defensive only
+  }
+  rmSync(resolve(OTP_SRC, 'Otp.ts'), { force: true });
+  // Same sweep for @rozie-ui/dialog's package src (DialogBehaviorDemo composes
+  // Dialog via <components>, so the Angular sub-build emits Dialog.rozie.ts + the
+  // Dialog.ts shim here). Leftovers poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(DIALOG_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(DIALOG_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // dialog src always exists post-port — defensive only
+  }
+  rmSync(resolve(DIALOG_SRC, 'Dialog.ts'), { force: true });
+  // Same sweep for @rozie-ui/combobox's package src (ComboboxBehaviorDemo composes
+  // Combobox via <components>, so the Angular sub-build emits Combobox.rozie.ts +
+  // the Combobox.ts shim here). Leftovers poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(COMBOBOX_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(COMBOBOX_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // combobox src always exists post-port — defensive only
+  }
+  rmSync(resolve(COMBOBOX_SRC, 'Combobox.ts'), { force: true });
+  // Same sweep for @rozie-ui/toast's package src (ToasterBehaviorDemo composes
+  // Toaster via <components>, so the Angular sub-build emits Toaster.rozie.ts + the
+  // Toaster.ts shim here). Leftovers poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(TOAST_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(TOAST_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // toast src always exists post-port — defensive only
+  }
+  rmSync(resolve(TOAST_SRC, 'Toaster.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

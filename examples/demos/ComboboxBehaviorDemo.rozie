@@ -1,0 +1,73 @@
+<!--
+  ComboboxBehaviorDemo — VR behavioral cell for @rozie-ui/combobox (pure-Rozie, no
+  engine). Drives the input + popup listbox: focus opens it, typing filters, arrow
+  + Enter commits a two-way r-model:value (live readout), and a `set-value`
+  direct-model-write button reflects selection. The spec opens via focus, filters,
+  selects via keyboard, and checks the round-trip — see combobox.spec.ts.
+  Behavioral-only (no pixel baseline).
+-->
+<rozie name="ComboboxBehaviorDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'date', label: 'Date' },
+]
+
+const setValue = (v) => {
+  $data.value = v
+}
+</script>
+
+<template>
+<div class="combobox-demo">
+  <h3>Combobox — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-value" @click="setValue('cherry')">Set cherry</button>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Combobox
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    placeholder="Search fruit…"
+    ariaLabel="Fruit"
+    idBase="demo-combobox"
+  />
+</div>
+</template>
+
+<style>
+.combobox-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.combobox-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.combobox-demo .readout {
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

@@ -1,0 +1,62 @@
+<!--
+  ToasterBehaviorDemo — VR behavioral cell for @rozie-ui/toast (pure-Rozie, no
+  engine). Drives the imperative handle: a `show-toast` button calls
+  $refs.toaster.show({...}) (the $expose handle resolves on all 6 targets) and
+  bumps a count readout; toasts are sticky (:duration="0") so the spec can assert
+  the rendered toast + its close button, then dismiss it. See toaster.spec.ts.
+  Behavioral-only (no pixel baseline).
+-->
+<rozie name="ToasterBehaviorDemo">
+
+<components>
+{
+  Toaster: '../../packages/ui/toast/src/Toaster.rozie',
+}
+</components>
+
+<data>
+{
+  count: 0,
+}
+</data>
+
+<script>
+const showToast = () => {
+  const n = $data.count + 1
+  $data.count = n
+  $refs.toaster.show({ message: 'Saved ' + n, type: 'success' })
+}
+</script>
+
+<template>
+<div class="toast-demo">
+  <h3>Toast — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="show-toast" @click="showToast()">Show toast</button>
+    <span class="readout" data-testid="readout-count">{{ $data.count }}</span>
+  </div>
+
+  <Toaster ref="toaster" position="top-right" :duration="0" ariaLabel="Notifications" />
+</div>
+</template>
+
+<style>
+.toast-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.toast-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.toast-demo .readout {
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+}
+</style>
+
+</rozie>

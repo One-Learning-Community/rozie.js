@@ -484,6 +484,21 @@ export const EXAMPLES = [
   'SliderRange',
   'SliderVertical',
   'SliderMarks',
+  // @rozie-ui pure-Rozie families (NO engine) — otp/dialog/combobox/toast. The
+  // four BEHAVIORAL cells (loaders → examples/demos/{Otp,Dialog,Combobox,Toaster}-
+  // BehaviorDemo.rozie, each importing packages/ui/<family>/src/<Component>.rozie).
+  // OtpBehavior drives the segmented native-<input> one-time-code (two-way
+  // r-model:value + @complete + set-code direct write); DialogBehavior drives the
+  // native <dialog> showModal() two-way r-model:open + Escape `cancel` + consumer
+  // close; ComboboxBehavior drives the WAI-ARIA input+listbox filter/keyboard-select
+  // two-way r-model:value + set-value direct write; ToasterBehavior drives the
+  // imperative $refs.toaster.show() handle + per-toast dismiss. See
+  // otp/dialog/combobox/toaster.spec.ts. Behavioral-only; NOT in matrix.spec.ts
+  // EXAMPLES (no pixel baseline).
+  'OtpBehavior',
+  'DialogBehavior',
+  'ComboboxBehavior',
+  'ToasterBehavior',
   // @rozie-ui/data-table (headless, accessible, cross-framework data table on a
   // single inline @tanstack/table-core bridge — NO per-framework adapter) — the
   // six BEHAVIORAL cells (loaders → examples/demos/DataTable{Columns,Sort,
@@ -833,6 +848,14 @@ export const LIT_TAGS: Record<Example, string> = {
   SliderRange: 'rozie-slider-range',
   SliderVertical: 'rozie-slider-vertical',
   SliderMarks: 'rozie-slider-marks',
+  // @rozie-ui otp/dialog/combobox/toast — '-demo' appended on Lit → tags
+  // 'rozie-otp-behavior-demo' etc. The wrapper components are name="Otp"/"Dialog"/
+  // "Combobox"/"Toaster" → kebab bases 'rozie-otp'/'rozie-dialog'/'rozie-combobox'/
+  // 'rozie-toaster' (toast's component is Toaster). Behavioral-only, no screenshot.
+  OtpBehavior: 'rozie-otp-behavior',
+  DialogBehavior: 'rozie-dialog-behavior',
+  ComboboxBehavior: 'rozie-combobox-behavior',
+  ToasterBehavior: 'rozie-toaster-behavior',
   // @rozie-ui/data-table — '-demo' appended on Lit → tags
   // 'rozie-data-table-columns-demo' etc. = kebab of DataTable*Demo (the wrapper
   // components are name="DataTable{Columns,...}Demo"). Behavioral-only, no
@@ -1113,6 +1136,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SliderRange: {},
   SliderVertical: {},
   SliderMarks: {},
+  // @rozie-ui otp/dialog/combobox/toast — every *BehaviorDemo is self-contained: it
+  // seeds its own state in <data> and binds r-model / drives the $expose handle
+  // internally (not parent-supplied), so no MODEL_PROPS entry. No parent props.
+  OtpBehavior: {},
+  DialogBehavior: {},
+  ComboboxBehavior: {},
+  ToasterBehavior: {},
   // @rozie-ui/data-table — every DataTable*Demo is self-contained: it seeds its
   // own rows + column-declaration in <data>/<components> and binds the state
   // slices via r-model internally (not parent-supplied), so no MODEL_PROPS entry.
