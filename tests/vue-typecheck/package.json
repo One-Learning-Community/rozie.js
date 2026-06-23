@@ -12,6 +12,13 @@
     "@rozie/target-vue": "workspace:*"
   },
   "devDependencies": {
+    "@rozie-ui/data-table-vue": "workspace:*",
+    "@rozie-ui/listbox-vue": "workspace:*",
+    "@rozie-ui/sortable-list-vue": "workspace:*",
+    "@tanstack/table-core": "^8.21",
+    "@tanstack/virtual-core": "^3",
+    "@types/sortablejs": "^1.15",
+    "sortablejs": "^1.15",
     "typescript": "~5.6.0",
     "vitest": "^4",
     "vue": "^3.5.33",

@@ -1,0 +1,21 @@
+{
+  "//": "STRICT consumer tsconfig (quick task 260623-jwh, Layer 2). Unlike the relaxed",
+  "//noImplicitAny": "tsconfig.json (noImplicitAny:false), this sets noImplicitAny:true to apply the",
+  "//rigor": "full typed-consumer rigor the leaf's relaxed tsconfig hides. A type-broken leaf",
+  "//catches": "dist .d.ts (the 49-error regression class) fails vue-tsc under this config.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["vue"]
+  },
+  "include": ["**/*.vue", "**/*.ts"]
+}
