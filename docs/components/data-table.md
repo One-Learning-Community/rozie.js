@@ -1,8 +1,8 @@
 # DataTable — the cross-framework headless data table
 
-`DataTable` is Rozie's **headless, fully-accessible** data table / data grid — the `@rozie-ui` component that fills a real cross-framework toolchain gap. Sorting, global + per-column filtering, pagination, row selection, and full column management (visibility, resize, reorder, pinning) plus a sticky header are authored once in `DataTable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`DataTable` is Rozie's **headless, fully-accessible** data table / data grid — the `@rozie-ui` component that fills a real cross-framework toolchain gap. Sorting, global + per-column filtering, pagination, row selection, full column management (visibility, resize, reorder, pinning), **editable cells + full-row edit**, **multi-column grouping + aggregation**, **headless faceted filtering**, **expandable rows**, an opt-in WAI-ARIA **grid interaction mode**, and a sticky header are all authored once in `DataTable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is **`@tanstack/table-core`** — the *same* framework-agnostic state machine that powers TanStack Table — wired to each framework's reactivity **with no per-framework adapter**. `table-core` owns no DOM (it is a pure `createTable → setOptions → getRowModel` pull-based state machine), so `DataTable` is the controlled-state half of an engine wrapper with none of the DOM-mutation half: Rozie owns the author-side API (the nine two-way `r-model` slices, the `<Column>` declarative children, the per-column `#cell` / `#header` reactive templates, and the accessible chrome), table-core owns the row model, and the consumer just binds state.
+Under the hood the "engine" is **`@tanstack/table-core`** — the *same* framework-agnostic state machine that powers TanStack Table — wired to each framework's reactivity **with no per-framework adapter**. `table-core` owns no DOM (it is a pure `createTable → setOptions → getRowModel` pull-based state machine), so `DataTable` is the controlled-state half of an engine wrapper with none of the DOM-mutation half: Rozie owns the author-side API (the twelve two-way `r-model` slices, the `<Column>` declarative children, the per-column `#cell` / `#header` reactive templates, and the accessible chrome), table-core owns the row model, and the consumer just binds state.
 
 And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
@@ -76,6 +76,10 @@ A `<Column>` declares one column of the table. It is **renderless** — it draws
 | `width` | `String \| Number` | `''` | Optional fixed/initial column width (CSS length or px number). |
 | `groupable` | `Boolean` | `true` | Whether this column is offered to the headless `#groupBar` as a grouping target (opt-out via `:groupable="false"`). Grouping is engaged via the parent's `grouping` model, not this flag. |
 | `aggregationFn` | `String \| Function` | `null` | The aggregation for this column's group-header value: a built-in name (`'sum'` \| `'min'` \| `'max'` \| `'extent'` \| `'mean'` \| `'median'` \| `'unique'` \| `'uniqueCount'` \| `'count'`) or a custom `(columnId, leafRows, childRows) => any`. A custom fn is defensively wrapped (a throw cannot crash the table). Null → no aggregation (placeholder cell). |
+| `editable` | `Boolean` | `false` | Whether this column's cells can be edited (and their committed values written back through the `data` model). See [Editable cells and full-row edit](#editable-cells-and-full-row-edit). Bare `<Column editable />` only coerces to `true` on Vue + Lit; bind `:editable="true"` elsewhere. |
+| `editor` | `String` | `'text'` | The built-in editor when `editable`: `'text'` \| `'number'` \| `'select'` \| `'checkbox'` \| `'custom'`. `'custom'` ships no built-in editor — the `#editor` scoped slot (or a [drop-in editor component](#drop-in-editor-components)) renders it. |
+| `editorOptions` | `Array` | `[]` | For `editor="select"`: the `[{ value, label }]` dropdown options. Ignored for the other editor types. |
+| `validate` | `Function` | `null` | A synchronous per-column validator `(value, row) => true \| string`: return `true`/falsy to accept, a string to reject with that message (the editor stays open and the error is announced via aria-live). Defensively wrapped — a thrown error coerces to a generic message. |
 
 Because a bare boolean attribute on a child component (`<Column sortable />`) only coerces to `true` on Vue + Lit, **bind it** in the other targets — `:sortable="true"` (React/Solid/Angular/Svelte) — or rely on each consumer framework's own boolean-attribute convention.
 
@@ -116,11 +120,11 @@ A `<Column>` is **renderless** and carries **metadata only** — it never render
 
 ### Props
 
-The full prop surface. The nine `model: true` slices (the **Two-way** column) are each an independent, optional two-way `r-model` with an uncontrolled fallback; with multiple model props the Angular output emits **no** `ControlValueAccessor` (the multi-model condition disables it — the per-prop `valueChange` outputs still drive each two-way binding).
+The full prop surface. The twelve `model: true` slices (the **Two-way** column — `data` plus the eleven state slices) are each an independent, optional two-way `r-model` with an uncontrolled fallback; with multiple model props the Angular output emits **no** `ControlValueAccessor` (the multi-model condition disables it — the per-prop `valueChange` outputs still drive each two-way binding).
 
 | Name | Type | Default | Two-way (model) | Required | Description |
 | --- | --- | --- | :---: | :---: | --- |
-| `data` | `Array` | `—` | | ✓ | The row data. A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher). |
+| `data` | `Array` | `—` | ✓ | ✓ | The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher). |
 | `columns` | `Array` | `[]` | | | Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. |
 | `selectionMode` | `String` | `"none"` | | | Row-selection mode: `'none'` \| `'single'` \| `'multiple'`. `'multiple'` auto-injects a leading checkbox column with a select-all header. |
 | `sorting` | `Array` | `[]` | ✓ | | `SortingState` — `[{ id, desc }]`. Uncontrolled fallback when unbound. |
@@ -144,12 +148,13 @@ The full prop surface. The nine `model: true` slices (the **Two-way** column) ar
 | `estimateRowHeight` | `Number` | `40` | | | Estimated row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | | | A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback. |
 
-### Models (the nine two-way slices)
+### Models (the twelve two-way slices)
 
-Each slice is an independent, optional two-way `r-model` with its own uncontrolled fallback and its own change event (which fires **regardless** of whether the slice is bound). All nine state transitions are funneled through table-core; the table always writes a **fresh** value (never an in-place mutation, which would be silently dropped on React/Solid/Angular/Lit).
+Each slice is an independent, optional two-way `r-model` with its own uncontrolled fallback and its own change event (which fires **regardless** of whether the slice is bound). All twelve state transitions are funneled through table-core; the table always writes a **fresh** value (never an in-place mutation, which would be silently dropped on React/Solid/Angular/Lit). The first slice is `data` itself — a committed cell or row edit writes a fresh `data` array back; the remaining eleven are the table-state slices.
 
 | Model (`r-model:`) | Shape | Change event | Description |
 | --- | --- | --- | --- |
+| `data` | `TData[]` | `data-change` | The row data. Two-way so committed cell/row edits flow back (uncontrolled fallback `dataDefault`). Always written as a fresh array, never mutated in place. |
 | `sorting` | `[{ id, desc }]` | `sort-change` | The sort state (header click; shift-click adds a secondary sort). |
 | `globalFilter` | `string` | `filter-change` | The global search string — narrows all columns. |
 | `columnFilters` | `[{ id, value }]` | `filter-change` | Per-column filter values (gated by each column's `filterable`). |
@@ -179,6 +184,9 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `reorder-change` | Fired when the column order changes (an `applyColumnOrder` call or a header reorder). Payload: the fresh `ColumnOrderState`. |
 | `pin-change` | Fired when a column is pinned/unpinned (the per-header pin buttons or a `pinColumn` call). Payload: the fresh `ColumnPinningState`. |
 | `activecell-change` | **Grid mode only.** Fired when the active cell moves (arrow-key navigation, a click-to-activate, or a `focusCell` call) — but **not** on a clamped no-op edge move. Payload: `{ rowIndex, colIndex }` (integer position over the visible model). See [Grid interaction mode](#grid-interaction-mode). |
+| `cell-edit-commit` | Fired when an editable cell commits a new, **validated** value (Enter, a blur-commit, or a `commitEditing` call). Payload: `{ rowId, columnId, oldValue, newValue }`. **Not** fired on cancel (`Escape`) or a validation failure. See [Editable cells and full-row edit](#editable-cells-and-full-row-edit). |
+| `row-edit-commit` | Fired when a full-row edit commits all its changes at once (Enter in row-edit mode or an `editRow` save). Payload: `{ rowId, changes }` where `changes` is `[{ columnId, oldValue, newValue }]` for the columns whose value actually changed. **Not** fired on `Escape` or a validation failure. |
+| `range-change` | **Grid mode only.** Fired when the rectangular cell-range selection changes (extended via `Shift+Arrow` / `Shift+Click`). Payload: `{ anchor, focus }` — each corner a `{ rowIndex, colIndex }` index pair over the visible model, or `{ anchor: null, focus: null }` when no range is set. One-way (this event + the `getSelectedRange` verb), never a `model:true` slice. |
 
 ### Imperative handle
 
@@ -204,6 +212,12 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`, to avoid colliding with React's auto-generated `columnOrder` model setter — ROZ524.) |
 | `resetColumnSizing` | Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`. |
 | `pinColumn` | Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` \| `'right'` \| `false`. Fires `pin-change`. |
+| `getFacetedUniqueValues` | Return a column's **cross-filtered** distinct values — `getFacetedUniqueValues(colId)` → `unknown[]` (keys only; occurrence counts are not exposed). Reflects rows passing all *other* active column filters. Empty array when unavailable. Inert (the faceted models stay off-path) until this verb or the `#filter` slot reads a facet. See [Faceted filtering](#faceted-filtering). |
+| `getFacetedMinMaxValues` | Return a numeric column's **cross-filtered** `[min, max]` range — `getFacetedMinMaxValues(colId)` → `[number, number] \| null`. `null` when unavailable or non-numeric. The read twin handed to the `#filter` slot for a numeric range slider. |
+| `editCell` | **Editing.** Open the editor on a cell — `editCell(rowIndex, colIndex)` (index-addressed over the visible model; args coerced to integers + clamped). No-op on a non-editable cell. |
+| `commitEditing` | **Editing.** Commit the open editor — `commitEditing()`. Runs the column validator; on success writes `r-model:data` and fires one `cell-edit-commit`; on a validation failure keeps the editor open. No-op when no cell is editing. |
+| `editRow` | **Editing.** Enter full-row edit on a body row — `editRow(rowIndex)` (the API twin of `Shift+F2`): every editable cell in the row opens at once; a later save commits the whole row in one `r-model:data` write + one `row-edit-commit`. No-op on a row with no editable columns. |
+| `getSelectedRange` | Return the current rectangular cell-range selection — `getSelectedRange()` → `{ anchor, focus }` (each corner a `{ rowIndex, colIndex }` index pair, or `{ anchor: null, focus: null }`). One-way (this verb + `range-change`), never a `model:true` slice. |
 | `focusCell` | **Grid mode.** Move + DOM-focus the active cell by index — `focusCell(rowIndex, colIndex)` (coerced to integers and clamped to the visible model). Fires `activecell-change`. |
 | `getActiveCell` | **Grid mode.** Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex }` (integers only; never a row object or DOM node). |
 | `clearActiveCell` | **Grid mode.** Reset the roving position to the entry cell (`0,0`) and exit interaction mode — `clearActiveCell()`. Does not emit (a reset, not a navigation). |
@@ -220,6 +234,8 @@ All slots live on the parent `<DataTable>` (a `<Column>` carries metadata only).
 | `selectCell` | `row, checked, toggle` | Override the per-row select checkbox (only when `selectionMode="multiple"`). |
 | `detail` | `row` | Custom expanded-row content rendered under an expanded row (only when `expandable` and no `getSubRows`). The React render-prop edge (documented divergence). |
 | `groupBar` | `grouping, groupableColumns, applyGrouping, clearGrouping` | **Headless** group-bar (only when `groupable`). Receives the ordered `grouping` array, the `groupableColumns` (`[{ id, label }]`), and the `applyGrouping`/`clearGrouping` helpers so a consumer builds any bar/drag UI. The default render is a non-interactive styled-token reflection (empty when ungrouped); the component ships **no** drag affordance. The React render-prop edge (documented divergence). |
+| `filter` | `columnId, uniqueValues, minMax` | **Headless** faceted-filter UI (only when a column is `filterable`). `uniqueValues` is the cross-filtered distinct values (`unknown[]`, keys only); `minMax` is the cross-filtered numeric `[min, max]` (or `null`). Build a checkbox list / range slider and drive `columnFilters` yourself — the slot fires no event. See [Faceted filtering](#faceted-filtering). The React render-prop edge (documented divergence). |
+| `editor` | `columnId, column, row, value, commit, cancel` | Custom cell editor (a column with `editor="custom"`, or to override the built-in editor). `value` is the current draft; `commit(newValue)` validates + commits (fires `cell-edit-commit`); `cancel()` closes without saving; `column`/`row` are opaque passthroughs. Pair it with the [drop-in editor components](#drop-in-editor-components). The React render-prop edge (documented divergence). |
 
 ## Theming
 
@@ -269,6 +285,93 @@ What flips on:
 - **Index-addressed, sort/filter-stable.** The active cell is tracked as a `{ rowIndex, colIndex }` pair over the *visible* model — never a stored DOM node — so it survives a re-sort, filter, page change, or column hide/reorder/pin (it clamps to the new bounds rather than getting lost). Hidden columns are simply absent from the navigable order.
 
 Drive and observe it imperatively via the [`focusCell`](#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](#events) event. The exact behavioral contract is locked by a cross-framework VR matrix (`tests/visual-regression/specs/data-table-grid.spec.ts`) proving REQ-1..7 identically on all six targets.
+
+## Editable cells and full-row edit
+
+By default every cell is read-only. Mark a `<Column editable>` (and bind `r-model:data` to receive the writes) to make that column's cells editable — **the component owns the edit state**: the consumer binds the single `data` model and listens for the commit events, with no manual re-sync. A committed edit writes a **fresh** `data` array back (never an in-place mutation).
+
+```rozie
+<DataTable :data="$data.rows" r-model:data="$data.rows" interactionMode="grid"
+  @cell-edit-commit="onCommit($event)">
+  <Column field="name" header="Name" editable editor="text" />
+  <Column field="qty" header="Qty" editable editor="number" :validate="(v) => Number(v) >= 0 || 'must be >= 0'" />
+  <Column field="status" header="Status" editable editor="select" :editorOptions="$data.statusOptions" />
+  <Column field="active" header="Active" editable editor="checkbox" />
+</DataTable>
+```
+
+A cell enters edit mode on click, on a printable keypress (which seeds the editor with that character), on `F2`/`Enter` (seeds the current value), or via the [`editCell(rowIndex, colIndex)`](#imperative-handle) verb. `Enter` commits; `Escape` cancels.
+
+**Built-in editor types** (the `editor` Column prop): `'text'` (default `<input type="text">`), `'number'`, `'select'` (populate `editorOptions` with `[{ value, label }]`), `'checkbox'`, and `'custom'` (no built-in editor — the `#editor` slot drives it).
+
+**Validation.** The `validate` Column prop runs synchronously on commit: return `true`/falsy to accept, or a string to reject — the editor stays open and the message is announced via an aria-live region, and `cell-edit-commit` does **not** fire. Validators are defensively wrapped (a thrown error coerces to a generic message).
+
+**Full-row edit.** `Shift+F2` on a row (or the [`editRow(rowIndex)`](#imperative-handle) verb) opens every editable cell in the row at once; `Tab`/`Shift+Tab` move between editors. `Enter` commits the whole row in one `r-model:data` write + one `row-edit-commit` (validated together — one failure blocks the commit); `Escape` reverts the row as a unit.
+
+**The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving. On React/Solid it is the `renderEditor` / `editorSlot` render prop and on Lit the `.editor` property (the documented divergence). See the [`#editor` usage examples](/components/data-table-usage).
+
+## Drop-in editor components
+
+The `#editor` slot is fully headless — you can render any control. For the common cases the package also ships **opt-in drop-in editor components** so you don't have to hand-roll the input wiring: `EditorText`, `EditorNumber`, `EditorSelect`, `EditorCheckbox`, and `EditorDate`. They are **additive named exports** alongside `DataTable` (which stays the headless **default** export — importing the editors is byte-identical-off if you never use them):
+
+```ts
+import { DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate }
+  from '@rozie-ui/data-table-<target>';
+// (Vue: `import DataTable, { Column, EditorText, … }` — DataTable is the default.
+//  Lit: the single side-effect import registers the <rozie-editor-*> custom elements.)
+```
+
+Each drop-in takes the `#editor` slot scope as its props — `{ columnId, column, row, value, commit, cancel }` — and `EditorSelect` additionally takes `options: [{ value, label }]` (the same shape as `<Column editorOptions>`). Mark the column `editor="custom"` so the slot drives rendering, then dispatch by `columnId` inside `#editor` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke editor. The full per-framework wiring is the [drop-in editor example](/components/data-table-usage) on the usage page.
+
+| Component | Renders | Extra props |
+| --- | --- | --- |
+| `EditorText` | `<input type="text">` | — |
+| `EditorNumber` | `<input type="number">` | — |
+| `EditorSelect` | `<select>` | `options: [{ value, label }]` |
+| `EditorCheckbox` | `<input type="checkbox">` | — |
+| `EditorDate` | `<input type="date">` | — |
+
+## Faceted filtering
+
+Per-column **faceted** filtering is **headless and read-only**: the component exposes the cross-filtered distinct values and numeric ranges for each `filterable` column, but ships **no** built-in facet UI. You build the checkbox list / range slider in the `#filter` slot and drive the `columnFilters` model yourself.
+
+```rozie
+<DataTable :data="$data.rows" r-model:columnFilters="$data.columnFilters">
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  <template #filter="{ columnId, uniqueValues, minMax }">
+    <fieldset r-if="columnId === 'category'">
+      <label r-for="v in uniqueValues" :key="v"><input type="checkbox" /> {{ v }}</label>
+    </fieldset>
+    <input r-else type="range" :min="minMax[0]" :max="minMax[1]" />
+  </template>
+</DataTable>
+```
+
+The `#filter` scope is `{ columnId, uniqueValues, minMax }`: `uniqueValues` is the **cross-filtered** distinct values (`unknown[]`, keys only — occurrence counts are deliberately not exposed) and `minMax` is the cross-filtered numeric `[min, max]` (or `null`). "Cross-filtered" means each facet reflects the rows passing all *other* active column filters. The slot fires no event — update `columnFilters` (shape `[{ id: columnId, value }]`) from your own UI. The same data is readable imperatively via [`getFacetedUniqueValues`](#imperative-handle) / `getFacetedMinMaxValues`. Faceting stays off-path (byte-identical-off) until the `#filter` slot or a faceted verb reads it.
+
+## Expandable rows
+
+Set `expandable` to opt into expandable rows: a leading chevron expander column auto-injects and `getExpandedRowModel` activates. The two-way `expanded` slice is **multi-expand** (`{ [rowId]: true }`, or the `true` literal after `expandAll`), so several rows stay open at once. There are two expand modes:
+
+- **Detail panel** — with no `getSubRows`, an open row reveals a full-width `#detail` panel (scope `{ row }`) below it; render arbitrary content.
+- **Nested sub-rows** — supply `getSubRows(originalRow, index) => TData[]` and table-core flattens the hierarchy into depth-indented child rows.
+
+```rozie
+<DataTable :data="$data.rows" expandable r-model:expanded="$data.expanded"
+  :getSubRows="(row) => row.children">
+  <Column field="name" header="Name" />
+  <Column field="headcount" header="Headcount" />
+
+  <!-- #detail is used only when getSubRows is absent -->
+  <template #detail="{ row }">
+    <aside class="detail">More about {{ row.name }}</aside>
+  </template>
+</DataTable>
+```
+
+Drive expansion imperatively with [`toggleRowExpanded`](#imperative-handle) / `expandAll` / `collapseAll` / `getExpandedRows`, and observe it via the [`expand-change`](#events) event. When grouping is active and `expanded` is untouched, group subtrees auto-expand.
 
 ## Accessibility
 
