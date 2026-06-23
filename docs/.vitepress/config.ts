@@ -266,6 +266,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/toast',
+          collapsed: true,
+          items: [
+            { text: 'Toaster — headless toast / notification host', link: '/components/toast' },
+            { text: 'Usage examples', link: '/components/toast-usage' },
+            { text: 'Headless toast / notification comparison', link: '/components/toast-comparison' },
+            { text: 'Toaster — live demo', link: '/components/toast-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/combobox',
           collapsed: true,
           items: [

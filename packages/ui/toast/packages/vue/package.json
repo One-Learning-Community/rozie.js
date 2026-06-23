@@ -1,0 +1,73 @@
+{
+  "name": "@rozie-ui/toast-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue headless, accessible toast / notification host (queue, auto-dismiss, hover-pause, positioning, imperative show/dismiss/clear handle) — one accessible Rozie source compiled to Vue.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "toast",
+    "toaster",
+    "notification",
+    "snackbar",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/toast/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "vue": "./src/Toaster.vue",
+      "default": "./src/Toaster.vue"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@rozie/runtime-vue": "workspace:^"
+  },
+  "peerDependencies": {
+    "vue": "^3.4"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  }
+}

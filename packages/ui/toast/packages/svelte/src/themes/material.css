@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/toast — Material Design 3 bridge.
+ *
+ * Maps the toast tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme. The default
+ * (info) toast uses the M3 "inverse surface" snackbar convention.
+ *
+ *   import '@rozie-ui/toast-react/themes/material.css';
+ */
+.rozie-toaster {
+  --rozie-toast-color: var(--md-sys-color-inverse-on-surface, #f5eff7);
+  --rozie-toast-bg: var(--md-sys-color-inverse-surface, #322f35);
+  --rozie-toast-radius: 0.25rem;
+  --rozie-toast-shadow: 0 3px 5px rgba(0, 0, 0, 0.2), 0 6px 10px rgba(0, 0, 0, 0.14);
+
+  --rozie-toast-success-bg: #2e7d32;
+  --rozie-toast-error-bg: var(--md-sys-color-error, #b3261e);
+  --rozie-toast-warning-bg: #f9a825;
+  --rozie-toast-info-bg: var(--md-sys-color-inverse-surface, #322f35);
+}

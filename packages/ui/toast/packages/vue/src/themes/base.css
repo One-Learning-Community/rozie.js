@@ -1,0 +1,45 @@
+/*
+ * @rozie-ui/toast — base token reference.
+ *
+ * Every COSMETIC value the toast host renders is a `--rozie-toast-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * The structural rules (the fixed-corner region, the flex stack, the per-toast
+ * box model, the close button) live in the component's scoped `<style>` (per-leaf,
+ * NOT consumer-overridable). Only the values below flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-toaster` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-toaster {
+  /* region layout */
+  --rozie-toast-z: 9999;
+  --rozie-toast-gap: 0.5rem;
+  --rozie-toast-region-padding: 1rem;
+  --rozie-toast-max-width: calc(100vw - 2rem);
+  --rozie-toast-font: inherit;
+
+  /* per-toast box model */
+  --rozie-toast-content-gap: 0.75rem;
+  --rozie-toast-min-width: 16rem;
+  --rozie-toast-toast-max-width: 24rem;
+  --rozie-toast-padding: 0.75rem 1rem;
+  --rozie-toast-color: #fff;
+  --rozie-toast-bg: #333;
+  --rozie-toast-radius: 0.5rem;
+  --rozie-toast-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+
+  /* per-type accents */
+  --rozie-toast-success-bg: #16a34a;
+  --rozie-toast-error-bg: #dc2626;
+  --rozie-toast-warning-bg: #ca8a04;
+  --rozie-toast-info-bg: var(--rozie-toast-bg, #333);
+
+  /* message + close button */
+  --rozie-toast-font-size: 0.9rem;
+  --rozie-toast-close-size: 1.25rem;
+  --rozie-toast-close-opacity: 0.75;
+}

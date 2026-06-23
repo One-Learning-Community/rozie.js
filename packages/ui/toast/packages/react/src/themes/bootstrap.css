@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/toast — Bootstrap 5 bridge.
+ *
+ * Maps the toast tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the toast host follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default palette when the vars are absent. Mirrors Bootstrap's own toast /
+ * alert contextual colors.
+ *
+ *   import '@rozie-ui/toast-react/themes/bootstrap.css';
+ */
+.rozie-toaster {
+  --rozie-toast-color: #fff;
+  --rozie-toast-bg: var(--bs-dark, #212529);
+  --rozie-toast-radius: var(--bs-border-radius, 0.375rem);
+  --rozie-toast-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+
+  --rozie-toast-success-bg: var(--bs-success, #198754);
+  --rozie-toast-error-bg: var(--bs-danger, #dc3545);
+  --rozie-toast-warning-bg: var(--bs-warning, #ffc107);
+  --rozie-toast-info-bg: var(--bs-info, #0dcaf0);
+}

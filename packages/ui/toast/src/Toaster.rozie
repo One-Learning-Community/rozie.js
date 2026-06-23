@@ -1,0 +1,235 @@
+<!--
+  Toaster.rozie — a headless, accessible toast / notification host.
+
+  A pure-Rozie family (NO third-party engine). Cross-framework toast systems are
+  re-implemented everywhere; Rozie ships ONE self-contained host. Deliberately
+  NOT a global singleton + context system (the heavyweight shape): the <Toaster>
+  owns the queue + auto-dismiss timers as internal state and exposes an imperative
+  `show / dismiss / clear` handle the consumer drives via `ref`. "Call from
+  anywhere" is then the consumer's app-wiring concern (stash the ref) — Rozie owns
+  the component, not the app's global plumbing. This keeps it captcha-simple and
+  side-steps the "$provide/$inject doesn't cross a portal" limitation.
+
+  Timers: each non-sticky toast schedules a window.setTimeout to auto-dismiss;
+  hovering the stack pauses them (full restart on leave — remaining-time tracking
+  is intentionally out of v1 scope), and $onUnmount clears them all. `timers` and
+  `nextId` are top-level `let`s (mutable cross-render scratch → React hoists them
+  to useRef; the engine-wrapper persistence guarantee).
+
+  Authoring notes (collision classes — see the authoring playbook):
+    - Imperative verbs `show` / `dismiss` / `clear` are NOT inherited HTMLElement
+      members (no ROZ137) and there are no emits (so no expose==event ROZ121). A
+      per-toast close button calls the internal `dismiss`; consumers wanting an
+      action button / custom chrome use the #toast scoped slot.
+    - Handler params left UNTYPED (neutralize to `any`). All window.* calls are
+      typeof-guarded for SSR.
+    - $data.toasts is written via fresh arrays (concat/filter) — never in-place
+      mutation (dropped on React/Solid/Lit/Angular change detection).
+
+  Consumer example:
+
+    <Toaster ref="toaster" position="top-right" :duration="4000" />
+    // elsewhere: $refs.toaster.show({ message: 'Saved', type: 'success' })
+-->
+
+<rozie name="Toaster">
+
+<props>
+{
+  // Stack corner: 'top-left' | 'top-right' | 'top-center' | 'bottom-left' |
+  // 'bottom-right' | 'bottom-center'.
+  position:             { type: String,  default: 'bottom-right' },
+
+  // Default auto-dismiss in ms. 0 (or a per-toast duration of 0) = sticky.
+  duration:             { type: Number,  default: 4000 },
+
+  // Max visible toasts (0 = unlimited); when exceeded, the oldest drop.
+  max:                  { type: Number,  default: 0 },
+
+  // Opt OUT of pausing auto-dismiss timers while the pointer is over the stack
+  // (default: hovering pauses).
+  disablePauseOnHover:  { type: Boolean, default: false },
+
+  // Accessible name for the live region (default 'Notifications').
+  ariaLabel:            { type: String,  default: null },
+}
+</props>
+
+<data>
+{
+  // The live toast queue: [{ id, message, type, duration }].
+  toasts: [],
+}
+</data>
+
+<script lang="ts">
+// Mutable cross-render scratch (NOT reactive): the per-id timeout handles and the
+// id counter. Top-level lets → React useRef (setup-once persistence).
+let timers = {}
+let nextId = 0
+
+// ---- timers ------------------------------------------------------------
+const startTimer = (toast) => {
+  if (!toast || !toast.duration || toast.duration <= 0) return
+  if (typeof window === 'undefined') return
+  timers[toast.id] = window.setTimeout(() => dismiss(toast.id), toast.duration)
+}
+
+const clearTimer = (id) => {
+  if (timers[id] && typeof window !== 'undefined') window.clearTimeout(timers[id])
+  delete timers[id]
+}
+
+const pauseTimers = () => {
+  if (typeof window === 'undefined') return
+  for (const k in timers) window.clearTimeout(timers[k])
+  timers = {}
+}
+
+// ---- queue (imperative handle implementations) -------------------------
+const show = (input) => {
+  const t = input || {}
+  const id = t.id != null ? t.id : 't' + nextId++
+  const toast = {
+    id,
+    message: t.message != null ? t.message : '',
+    type: t.type || 'info',
+    duration: t.duration != null ? t.duration : $props.duration,
+  }
+  const next = $data.toasts.concat([toast])
+  const max = $props.max
+  $data.toasts = max > 0 && next.length > max ? next.slice(next.length - max) : next
+  startTimer(toast)
+  return id
+}
+
+const dismiss = (id) => {
+  clearTimer(id)
+  $data.toasts = $data.toasts.filter((t) => t.id !== id)
+}
+
+const clear = () => {
+  pauseTimers()
+  $data.toasts = []
+}
+
+// ---- hover pause -------------------------------------------------------
+const onMouseEnter = () => {
+  if ($props.disablePauseOnHover) return
+  pauseTimers()
+}
+const onMouseLeave = () => {
+  if ($props.disablePauseOnHover) return
+  for (const t of $data.toasts) startTimer(t)
+}
+
+// ---- helpers -----------------------------------------------------------
+const regionLabel = () => ($props.ariaLabel != null ? $props.ariaLabel : 'Notifications')
+const liveFor = (type) => (type === 'error' || type === 'warning' ? 'assertive' : 'polite')
+
+// ---- lifecycle + handle ------------------------------------------------
+$onUnmount(() => {
+  pauseTimers()
+})
+
+$expose({ show, dismiss, clear })
+</script>
+
+<template>
+<div
+  class="rozie-toaster"
+  :class="'rozie-toaster--' + $props.position"
+  role="region"
+  :aria-label="regionLabel()"
+  @mouseenter="onMouseEnter()"
+  @mouseleave="onMouseLeave()"
+>
+  <div
+    r-for="toast in $data.toasts"
+    :key="toast.id"
+    class="rozie-toast"
+    :class="'rozie-toast--' + toast.type"
+    role="status"
+    :aria-live="liveFor(toast.type)"
+  >
+    <slot name="toast" :toast="toast" :dismiss="dismiss">
+      <span class="rozie-toast-message">{{ toast.message }}</span>
+      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(toast.id)">×</button>
+    </slot>
+  </div>
+</div>
+</template>
+
+<style>
+/*
+  Token-driven (mirrors slider/otp themes): every visual value is a
+  `var(--rozie-toast-*, <fallback>)`. The shipped themes/*.css presets map these
+  onto shadcn/Radix, Material 3, Bootstrap 5.
+*/
+.rozie-toaster {
+  position: fixed;
+  z-index: var(--rozie-toast-z, 9999);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rozie-toast-gap, 0.5rem);
+  padding: var(--rozie-toast-region-padding, 1rem);
+  max-width: var(--rozie-toast-max-width, calc(100vw - 2rem));
+  pointer-events: none;
+  font: var(--rozie-toast-font, inherit);
+}
+.rozie-toaster > * {
+  pointer-events: auto;
+}
+
+/* corners */
+.rozie-toaster--top-left { top: 0; left: 0; align-items: flex-start; }
+.rozie-toaster--top-right { top: 0; right: 0; align-items: flex-end; }
+.rozie-toaster--top-center { top: 0; left: 50%; transform: translateX(-50%); align-items: center; }
+.rozie-toaster--bottom-left { bottom: 0; left: 0; align-items: flex-start; flex-direction: column-reverse; }
+.rozie-toaster--bottom-right { bottom: 0; right: 0; align-items: flex-end; flex-direction: column-reverse; }
+.rozie-toaster--bottom-center { bottom: 0; left: 50%; transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
+
+.rozie-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-toast-content-gap, 0.75rem);
+  min-width: var(--rozie-toast-min-width, 16rem);
+  max-width: var(--rozie-toast-toast-max-width, 24rem);
+  padding: var(--rozie-toast-padding, 0.75rem 1rem);
+  color: var(--rozie-toast-color, #fff);
+  background: var(--rozie-toast-bg, #333);
+  border-radius: var(--rozie-toast-radius, 0.5rem);
+  box-shadow: var(--rozie-toast-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+}
+.rozie-toast--success { background: var(--rozie-toast-success-bg, #16a34a); }
+.rozie-toast--error { background: var(--rozie-toast-error-bg, #dc2626); }
+.rozie-toast--warning { background: var(--rozie-toast-warning-bg, #ca8a04); }
+.rozie-toast--info { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+
+.rozie-toast-message {
+  flex: 1 1 auto;
+  font-size: var(--rozie-toast-font-size, 0.9rem);
+}
+.rozie-toast-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rozie-toast-close-size, 1.25rem);
+  height: var(--rozie-toast-close-size, 1.25rem);
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  opacity: var(--rozie-toast-close-opacity, 0.75);
+  cursor: pointer;
+}
+.rozie-toast-close:hover {
+  opacity: 1;
+}
+</style>
+
+</rozie>

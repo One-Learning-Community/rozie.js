@@ -1,0 +1,72 @@
+{
+  "name": "@rozie-ui/toast-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless, accessible toast / notification host (queue, auto-dismiss, hover-pause, positioning, imperative show/dismiss/clear handle) — one accessible Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "toast",
+    "toaster",
+    "notification",
+    "snackbar",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/toast/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/Toaster.svelte",
+      "types": "./dist/Toaster.svelte.d.ts",
+      "default": "./dist/Toaster.svelte"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "svelte": "./src/Toaster.svelte",
+      "default": "./src/Toaster.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}

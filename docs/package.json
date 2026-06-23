@@ -47,6 +47,7 @@
     "@rozie-ui/slider-vue": "workspace:*",
     "@rozie-ui/sortable-list-vue": "workspace:*",
     "@rozie-ui/tiptap-vue": "workspace:*",
+    "@rozie-ui/toast-vue": "workspace:*",
     "@rozie/core": "workspace:*",
     "@rozie/runtime-vue": "workspace:*",
     "@rozie/unplugin": "workspace:*",

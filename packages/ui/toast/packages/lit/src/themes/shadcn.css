@@ -1,0 +1,24 @@
+/*
+ * @rozie-ui/toast — shadcn/ui (Radix) bridge.
+ *
+ * Maps the toast tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * toast host automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/toast-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-toaster {
+  --rozie-toast-color: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-toast-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-toast-radius: var(--radius, 0.5rem);
+  --rozie-toast-shadow: 0 10px 38px -10px hsl(var(--foreground, 222.2 84% 4.9%) / 0.35), 0 10px 20px -15px hsl(var(--foreground, 222.2 84% 4.9%) / 0.2);
+
+  --rozie-toast-success-bg: hsl(142.1 76.2% 36.3%);
+  --rozie-toast-error-bg: hsl(var(--destructive, 0 84.2% 60.2%));
+  --rozie-toast-warning-bg: hsl(38 92% 50%);
+  --rozie-toast-info-bg: hsl(var(--muted, 210 40% 96.1%));
+}

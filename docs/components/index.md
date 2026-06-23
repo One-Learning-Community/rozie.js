@@ -63,6 +63,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 | **Otp** | *(no engine)* headless accessible one-time-code / PIN input | [/components/otp](/components/otp) |
 | **Combobox** | *(no engine)* headless WAI-ARIA combobox / autocomplete | [/components/combobox](/components/combobox) |
+| **Toaster** | *(no engine)* headless accessible toast / notification host | [/components/toast](/components/toast) |
 | **Dialog** | *(native `<dialog>`)* headless accessible modal dialog | [/components/dialog](/components/dialog) |
 
 ## Why these exist
