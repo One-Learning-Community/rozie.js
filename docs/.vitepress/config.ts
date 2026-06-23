@@ -266,6 +266,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/combobox',
+          collapsed: true,
+          items: [
+            { text: 'Combobox — headless combobox / autocomplete', link: '/components/combobox' },
+            { text: 'Usage examples', link: '/components/combobox-usage' },
+            { text: 'Headless combobox / autocomplete comparison', link: '/components/combobox-comparison' },
+            { text: 'Combobox — live demo', link: '/components/combobox-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/dialog',
           collapsed: true,
           items: [

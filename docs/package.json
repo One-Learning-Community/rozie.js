@@ -32,6 +32,7 @@
     "@rozie-ui/captcha-vue": "workspace:*",
     "@rozie-ui/chartjs-vue": "workspace:*",
     "@rozie-ui/codemirror-vue": "workspace:*",
+    "@rozie-ui/combobox-vue": "workspace:*",
     "@rozie-ui/cropper-vue": "workspace:*",
     "@rozie-ui/data-table-vue": "workspace:*",
     "@rozie-ui/dialog-vue": "workspace:*",

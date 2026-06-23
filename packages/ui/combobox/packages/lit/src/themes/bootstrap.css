@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/combobox — Bootstrap 5 bridge.
+ *
+ * Maps the combobox tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the combobox follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/combobox-react/themes/bootstrap.css';
+ */
+.rozie-combobox {
+  --rozie-combobox-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-combobox-bg: var(--bs-body-bg, #fff);
+  --rozie-combobox-color: var(--bs-body-color, #212529);
+  --rozie-combobox-border-color: var(--bs-border-color, #dee2e6);
+  --rozie-combobox-radius: var(--bs-border-radius, 0.375rem);
+
+  --rozie-combobox-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
+
+  --rozie-combobox-disabled-opacity: 0.5;
+  --rozie-combobox-disabled-bg: var(--bs-tertiary-bg, #e9ecef);
+
+  --rozie-combobox-list-bg: var(--bs-body-bg, #fff);
+  --rozie-combobox-list-border-color: var(--bs-border-color, #dee2e6);
+
+  --rozie-combobox-option-active-bg: var(--bs-tertiary-bg, #e9ecef);
+  --rozie-combobox-option-selected-color: var(--bs-primary, #0d6efd);
+}
