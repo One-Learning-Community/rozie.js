@@ -32,8 +32,17 @@
 </components>
 
 <script>
+// Defer the imperative show() to a macrotask: calling a CHILD component's
+// $expose handle from the PARENT's $onMount runs before the child's handle is
+// registered on Solid (children-before-parent mount + ref-readiness timing), so
+// a synchronous call no-ops there and the toast never renders. setTimeout(0)
+// lets the child finish mounting on all six. ($refs in the deferred callback is
+// post-mount → ROZIE_123-safe.) The behavioral cell avoids this by show()-ing on
+// a user click; a screenshot can't click, so it must enqueue on mount.
 $onMount(() => {
-  $refs.toaster.show({ message: 'Saved', type: 'success' })
+  setTimeout(() => {
+    $refs.toaster.show({ message: 'Saved', type: 'success' })
+  }, 0)
 })
 </script>
 

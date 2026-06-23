@@ -24,6 +24,13 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './specs',
   timeout: 30_000,
+  // Retry under CI (incl. the pinned Docker container, which exports CI=true):
+  // headless Chromium occasionally SIGSEGVs at browser launch under Docker
+  // (swiftshader software-GL + dbus-less sandbox), an environmental crash — not a
+  // render diff — that intermittently kills an individual cell (seen on the
+  // heavier full-page overlay-screenshot captures). A retry self-heals it; a true
+  // pixel divergence still fails on every attempt. Local (non-CI) runs keep 0.
+  retries: process.env.CI ? 2 : 0,
   // Baseline filename keyed by example ONLY ({arg} is the toHaveScreenshot
   // name arg, e.g. `Counter.png`) — deliberately NOT suffixed with
   // {projectName}/{testFilePath} so all 6 targets diff against the same Vue
