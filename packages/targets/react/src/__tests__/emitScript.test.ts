@@ -748,3 +748,82 @@ describe('emitReactTypes — $expose .d.ts handle interface (Phase 21 Plan 02, R
     expect(dts.split('\n')[0]).toBe("import type { ReactNode } from 'react';");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quick 260622-siv — setup-once props-seed fold.
+//
+// A top-level `$data.x = <props expr>` seed is rewritten (rewriteScript.ts)
+// into a render-body `setX(expr)` call. Combined with section 5c's
+// `useState(<lit>)` from the `<data>` literal default, that yields
+// `useState(lit)` PLUS an unconditional render-body `setX(expr)` — which
+// re-runs on every render → React error #301 (infinite re-render). The seed
+// pre-pass folds the qualifying seed into a lazy `useState(() => expr)`
+// initializer and drops the redundant `setX`. Four gates keep it surgical;
+// the GUARDs below assert in-handler resets and multi-seeds stay as `setX`.
+// ---------------------------------------------------------------------------
+describe('emitScript — setup-once props-seed fold (quick 260622-siv)', () => {
+  function emit(ir: IRComponent) {
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    return emitScript(ir, collectors);
+  }
+
+  it('Seed: a top-level `$data.x = <props expr>` seed folds into useState(() => expr) with no render-body setX', () => {
+    const src = `<rozie name="Seed">
+<props>{ value: { type: null, default: null } }</props>
+<data>{ draft: '' }</data>
+<script lang="ts">
+$data.draft = $props.value != null ? String($props.value) : ''
+</script>
+<template><input :value="$data.draft" /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'Seed');
+    const { hookSection, userArrowsSection } = emit(ir);
+    // Folded into the lazy initializer (props.value reads are render-safe).
+    expect(hookSection).toContain(
+      "useState(() => props.value != null ? String(props.value) : '')",
+    );
+    // The redundant render-body setter is dropped.
+    expect(userArrowsSection).not.toContain('setDraft(');
+  });
+
+  it('GUARD 1 — handler not folded: top-level seed folds but an in-handler `$data.draft = ""` reset stays as setDraft', () => {
+    const src = `<rozie name="SeedHandler">
+<props>{ value: { type: null, default: null } }</props>
+<data>{ draft: '' }</data>
+<script lang="ts">
+$data.draft = $props.value != null ? String($props.value) : ''
+const clearDraft = () => {
+  $data.draft = ''
+}
+</script>
+<template><input :value="$data.draft" @blur="clearDraft()" /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'SeedHandler');
+    const { hookSection, userArrowsSection } = emit(ir);
+    expect(hookSection).toContain(
+      "useState(() => props.value != null ? String(props.value) : '')",
+    );
+    // The in-handler reset survives — only the top-level seed folds.
+    expect(userArrowsSection).toContain("setDraft('')");
+  });
+
+  it('GUARD 2 — multi-seed not folded: two top-level `$data.draft = …` assignments stay as setDraft (no lazy useState)', () => {
+    const src = `<rozie name="SeedMulti">
+<props>{ value: { type: null, default: null } }</props>
+<data>{ draft: '' }</data>
+<script lang="ts">
+$data.draft = $props.value != null ? String($props.value) : ''
+$data.draft = 'fallback'
+</script>
+<template><input :value="$data.draft" /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'SeedMulti');
+    const { hookSection, userArrowsSection } = emit(ir);
+    // Two top-level seeds for the same key → fold neither.
+    expect(hookSection).not.toContain('useState(() =>');
+    expect(userArrowsSection).toContain('setDraft(');
+  });
+});

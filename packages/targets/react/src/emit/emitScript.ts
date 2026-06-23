@@ -966,6 +966,38 @@ function capitalize(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+/**
+ * Quick 260622-siv — GATE 4 for the setup-once seed fold. Returns true when
+ * `arg` contains a REFERENCED bare identifier whose name is a render-time
+ * `useState` local (`ir.state` name). Section 5c declares states in `ir.state`
+ * order, so folding a seed that reads ANOTHER state local into that state's
+ * `useState(() => …)` initializer would hit a render-time TDZ (`setA(b + 1)`
+ * where `b`'s `useState` is declared later). `props.X` member reads are NOT
+ * referenced identifiers for `X` and are always safe.
+ */
+function argReadsStateLocal(arg: t.Expression, stateLocalNames: Set<string>): boolean {
+  if (stateLocalNames.size === 0) return false;
+  let reads = false;
+  const wrapped = t.file(
+    t.program([
+      t.functionDeclaration(
+        t.identifier('__seedProbe'),
+        [],
+        t.blockStatement([t.returnStatement(arg)]),
+        false,
+        false,
+      ),
+    ]),
+  );
+  traverse(wrapped, {
+    Identifier(path) {
+      if (!path.isReferencedIdentifier()) return;
+      if (stateLocalNames.has(path.node.name)) reads = true;
+    },
+  });
+  return reads;
+}
+
 /** Render a PropTypeAnnotation as a TS type string. Mirrors emitPropsInterface. */
 function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -1535,6 +1567,77 @@ export function emitScript(
   // useEffect with the REWRITTEN callback body and consume the source-level
   // statements so they don't appear in userArrowsSection.
   const watcherPairing = pairClonedWatchers(cloned, ir);
+
+  // 4a. Quick 260622-siv — setup-once props-seed fold.
+  //
+  // rewriteScript.ts turns a top-level `$data.x = <expr>` seed into a
+  // render-body `setX(<expr>)` call on `cloned.program.body`. Section 5c
+  // independently lowers the `<data>` literal default into `useState(<lit>)`.
+  // Together that yields `useState(lit)` PLUS an UNCONDITIONAL render-body
+  // `setX(expr)` — a state write on every render → React error #301 (infinite
+  // re-render). The fix folds the qualifying seed into a lazy
+  // `useState(() => expr)` initializer (APPLY (a), section 5c) and drops the
+  // now-redundant setter call (APPLY (b), residual-body loop).
+  //
+  // React-only: rewriteScript.ts (untouched) is the only producer of `setX`;
+  // Vue/Svelte/Angular have no setX/useState lowering, and Solid's setup body
+  // runs once so its signal seed is already correct.
+  //
+  // Four gates — ALL must hold for a seed to fold:
+  //   GATE 1 (top-level only): the index is not consumed by a lifecycle/watcher
+  //          pairing. A `setX` nested in a handler arrow or useEffect is never a
+  //          direct body element, so it is auto-excluded.
+  //   GATE 2 (single unconditional seed): EXACTLY ONE top-level `setX(...)`
+  //          exists for that state key. 2+ → fold neither (a conditional seed
+  //          lives inside an `if` block → not a direct body element → not
+  //          counted; FilterNumberRange's minDraft/maxDraft are DISTINCT keys
+  //          and each fold independently via this per-key gate).
+  //   GATE 3 (plain arg): the single argument is a plain Expression, NOT an
+  //          arrow/function expression — buildSetterCall emits `prev => …` only
+  //          for compound ops / self-reads, which need prior state.
+  //   GATE 4 (no cross-state TDZ): the arg reads no OTHER `useState` local
+  //          (argReadsStateLocal); `props.X` reads are always safe.
+  const seedInitByState = new Map<string, t.Expression>();
+  const seedConsumedIndices = new Set<number>();
+  {
+    const setterToState = new Map<string, (typeof ir.state)[number]>();
+    for (const s of ir.state) {
+      setterToState.set('set' + capitalize(s.name), s);
+    }
+    const stateLocalNames = new Set(ir.state.map((s) => s.name));
+    // First pass: collect candidate top-level `setX(arg)` calls per state key.
+    const candidatesByState = new Map<
+      string,
+      { index: number; arg: t.Expression }[]
+    >();
+    for (let i = 0; i < cloned.program.body.length; i++) {
+      if (lifecyclePairing.consumedIndices.has(i)) continue; // GATE 1
+      if (watcherPairing.consumedIndices.has(i)) continue; // GATE 1
+      const stmt = cloned.program.body[i]!;
+      if (!t.isExpressionStatement(stmt)) continue;
+      const expr = stmt.expression;
+      if (!t.isCallExpression(expr)) continue;
+      if (!t.isIdentifier(expr.callee)) continue;
+      const state = setterToState.get(expr.callee.name);
+      if (!state) continue;
+      if (expr.arguments.length !== 1) continue;
+      const arg = expr.arguments[0]!;
+      if (!t.isExpression(arg)) continue; // exclude SpreadElement / etc.
+      const list = candidatesByState.get(state.name) ?? [];
+      list.push({ index: i, arg });
+      candidatesByState.set(state.name, list);
+    }
+    for (const [stateName, list] of candidatesByState) {
+      if (list.length !== 1) continue; // GATE 2 (per state key)
+      const { index, arg } = list[0]!;
+      if (t.isArrowFunctionExpression(arg) || t.isFunctionExpression(arg)) {
+        continue; // GATE 3
+      }
+      if (argReadsStateLocal(arg, stateLocalNames)) continue; // GATE 4
+      seedInitByState.set(stateName, arg);
+      seedConsumedIndices.add(index);
+    }
+  }
 
   // Portal-slot primitive (Spike 003) — synthesize per-target portal
   // scaffolding when ir.slots has any portal entries. Three artefacts
@@ -2203,8 +2306,18 @@ export function emitScript(
     } else if (t.isNullLiteral(s.initializer)) {
       stateTypeArg = '<any>';
     }
+    // Quick 260622-siv — APPLY (a): when a top-level props-seed folded for this
+    // state (all 4 gates held in the pre-pass), emit the lazy initializer
+    // `useState(() => <seed expr>)` instead of `useState(<lit>)`. The literal
+    // `<data>` default is correctly discarded — the seed always overwrote it on
+    // first render. `arrowBody` wraps the expression as `() => …` (and parens an
+    // object-literal body). The redundant render-body `setX` is dropped in the
+    // residual-body loop via `seedConsumedIndices`.
+    const seedInit = seedInitByState.get(s.name);
     hookLines.push(
-      `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
+      seedInit
+        ? `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${arrowBody(seedInit)});`
+        : `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
     );
   }
 
@@ -2810,6 +2923,9 @@ export function emitScript(
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
     if (watcherPairing.consumedIndices.has(i)) continue;
+    // Quick 260622-siv — APPLY (b): drop the redundant render-body `setX` seed
+    // that was folded into a lazy `useState(() => …)` initializer (section 5c).
+    if (seedConsumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
     if (t.isVariableDeclaration(stmt)) {
       const allComputed =
