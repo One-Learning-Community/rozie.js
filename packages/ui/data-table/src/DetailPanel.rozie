@@ -1,0 +1,52 @@
+<!--
+  DetailPanel.rozie — presentational #detail slot DROP-IN for @rozie-ui/data-table.
+
+  A forkable starter panel filling the `#detail` slot (expandable rows). It renders
+  the open row's own fields as a key/value definition list:
+
+    <DataTable … expandable>
+      <template #detail="{ row }">
+        <DetailPanel :row="row" />
+      </template>
+    </DataTable>
+
+  The `#detail` scope is `{ row }` where `row` is the consumer's RAW row object. This
+  drop-in just walks its own enumerable keys and String-coerces each value for display
+  — a genuine working starter a consumer forks into a bespoke panel.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. The host
+  `.rdt-detail-row` / `.rdt-detail-cell` classes live on the parent's wrapper; the
+  inner class names here are consumer-themeable. NO <style> block.
+-->
+<rozie name="DetailPanel" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The RAW row object (the #detail slot scope `row` = row.original). Opaque passthrough.
+  row: { type: null, default: null },
+}
+</props>
+
+<script lang="ts">
+// Plain setup-once helper (NOT $computed — a $computed can't be aliased; the
+// EditorSelect plain-function lesson). Build `[{ key, value }]` from the row's own
+// enumerable keys, String-coercing each value. A null row yields an empty list.
+const entries = () => {
+  const r = $props.row
+  if (!r) return []
+  return Object.keys(r).map((key) => ({ key, value: r[key] == null ? '' : String(r[key]) }))
+}
+</script>
+
+<template>
+<dl class="rdt-detail-panel">
+  <!-- One keyed root element per iteration (a multi-root dt+dd fragment under r-for is
+       rejected by several targets) — wrap each pair in a <div>. -->
+  <div class="rdt-detail-entry" r-for="pair in entries()" :key="pair.key">
+    <dt class="rdt-detail-key">{{ pair.key }}</dt>
+    <dd class="rdt-detail-value">{{ pair.value }}</dd>
+  </div>
+</dl>
+</template>
+
+</rozie>

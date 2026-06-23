@@ -9,3 +9,5 @@ export { default as EditorDate } from './EditorDate.svelte';
 export { default as FilterText } from './FilterText.svelte';
 export { default as FilterNumberRange } from './FilterNumberRange.svelte';
 export { default as FilterSelect } from './FilterSelect.svelte';
+export { default as GroupBar } from './GroupBar.svelte';
+export { default as DetailPanel } from './DetailPanel.svelte';

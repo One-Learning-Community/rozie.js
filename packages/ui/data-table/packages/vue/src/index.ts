@@ -9,3 +9,5 @@ export { default as EditorDate } from './EditorDate.vue';
 export { default as FilterText } from './FilterText.vue';
 export { default as FilterNumberRange } from './FilterNumberRange.vue';
 export { default as FilterSelect } from './FilterSelect.vue';
+export { default as GroupBar } from './GroupBar.vue';
+export { default as DetailPanel } from './DetailPanel.vue';

@@ -9,3 +9,5 @@ export { EditorDate } from './EditorDate';
 export { FilterText } from './FilterText';
 export { FilterNumberRange } from './FilterNumberRange';
 export { FilterSelect } from './FilterSelect';
+export { GroupBar } from './GroupBar';
+export { DetailPanel } from './DetailPanel';

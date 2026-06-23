@@ -1,0 +1,117 @@
+<!--
+  GroupBar.rozie — presentational #groupBar slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made drag-to-group bar filling the headless `#groupBar` slot. Consumers
+  forward the slot scope and get a working bar with ZERO extra deps (native HTML5
+  drag-and-drop):
+
+    <DataTable … groupable>
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <GroupBar :grouping="grouping" :groupableColumns="groupableColumns"
+                  :applyGrouping="applyGrouping" :clearGrouping="clearGrouping" />
+      </template>
+    </DataTable>
+
+  CONTRACT: the grouping order is the parent's source of truth. This drop-in NEVER
+  keeps its own copy of the grouping order — it ALWAYS reads `$props.grouping` and
+  writes ONLY through `$props.applyGrouping` / `$props.clearGrouping`. The only local
+  state is ephemeral drag bookkeeping (`$data.draggingId`).
+
+  Drag a column chip into the drop zone to add it to the grouping; click a token's ×
+  to remove it; "Clear" resets. Native DnD requires the drop zone to preventDefault on
+  dragover or @drop never fires — onDragOver handles that uniformly across all 6 targets.
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. Styling: ZERO
+  CSS of its own — `.rdt-group-bar-host` / `.rdt-group-token` are descendant selectors
+  defined in DataTable.rozie's <style>; a slotted <GroupBar> renders inside that subtree
+  so the DOM nesting reaches them. NO <style> block here.
+-->
+<rozie name="GroupBar" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The ORDERED active grouping key array (READ-ONLY source of truth).
+  grouping:         { type: Array,    default: () => [] },
+  // The columns offered as grouping targets — `[{ id, label }]`.
+  groupableColumns: { type: Array,    default: () => [] },
+  // (cols: string[]) => void — the ONLY add/reorder writer. Null-guarded at call sites.
+  applyGrouping:    { type: Function, default: null },
+  // () => void — the ONLY clear writer. Null-guarded at call sites.
+  clearGrouping:    { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  // Ephemeral drag bookkeeping ONLY — which column id is mid-drag. NEVER a copy of
+  // the grouping order (that lives in $props.grouping).
+  draggingId: '',
+}
+</data>
+
+<script lang="ts">
+// Untyped handler params neutralize to `any` so the native drag-event shapes
+// (dataTransfer / preventDefault) typecheck across all six strict leaves — the
+// global-filter idiom (see FilterText.rozie). NEVER annotate these params.
+
+const onDragStart = (e, id) => {
+  $data.draggingId = id
+  if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id)
+}
+
+// MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
+// cancel the dragover default.
+const onDragOver = (e) => {
+  if (e) e.preventDefault()
+}
+
+const onDrop = (e) => {
+  const id = (e && e.dataTransfer && e.dataTransfer.getData('text/plain')) || $data.draggingId
+  $data.draggingId = ''
+  if (!id) return
+  // Append the dragged column id IF not already in the grouping — read the order
+  // from $props.grouping, write the NEW order through applyGrouping.
+  if ($props.grouping.indexOf(id) !== -1) return
+  const next = $props.grouping.concat([id])
+  $props.applyGrouping && $props.applyGrouping(next)
+}
+
+const removeKey = (key) => {
+  $props.applyGrouping && $props.applyGrouping($props.grouping.filter((k) => k !== key))
+}
+
+const clearAll = () => {
+  $props.clearGrouping && $props.clearGrouping()
+}
+</script>
+
+<template>
+<div class="rdt-group-bar">
+  <!-- (a) draggable column chips -->
+  <span
+    class="rdt-group-token"
+    r-for="col in $props.groupableColumns"
+    :key="col.id"
+    draggable="true"
+    @dragstart="onDragStart($event, col.id)"
+  >{{ col.label }}</span>
+
+  <!-- (b) drop zone listing the ACTIVE grouping as removable tokens -->
+  <span
+    class="rdt-group-drop-zone"
+    data-group-drop-zone
+    @dragover="onDragOver($event)"
+    @drop="onDrop($event)"
+  >
+    <span class="rdt-group-token" data-group-token r-for="gk in $props.grouping" :key="gk">
+      {{ gk }}
+      <button type="button" class="rdt-group-token-remove" :aria-label="gk" @click="removeKey(gk)">×</button>
+    </span>
+  </span>
+
+  <!-- (c) clear affordance, shown only when grouping is non-empty -->
+  <button type="button" class="rdt-group-clear" r-if="$props.grouping.length" @click="clearAll()">Clear</button>
+</div>
+</template>
+
+</rozie>
