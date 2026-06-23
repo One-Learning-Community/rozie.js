@@ -180,7 +180,7 @@ The table below is **one `<DataTable>`** on a small team dataset with every drop
 </div>
 </ClientOnly>
 
-Every widget above is a named export you opt into — bind a slice, drop the component into its slot, done. They're starters, not a wall: fork `DetailPanel` into a bespoke panel, swap `FilterSelect` for your own faceted control, keep the headless built-ins where you want them. See the [full API](/components/data-table) for every slot scope, prop, and the `<Column>` reference.
+Every widget above is a named export you opt into — bind a slice, drop the component into its slot, done. They're starters, not a wall: fork `DetailPanel` into a bespoke panel, swap `FilterSelect` for your own faceted control, keep the headless built-ins where you want them. See the [API reference](/components/data-table-api) for every slot scope and prop, and the [`<Column>` reference](/components/data-table-columns).
 
 ## Headless by default — the raw building blocks
 
@@ -227,7 +227,7 @@ The same package, now with **no drop-ins** — just the headless `<DataTable>` a
 </div>
 </ClientOnly>
 
-Each `v-model:<slice>` is a two-way bind — the readout updates the instant you change the state, and a consumer write flows back in. The four slices bound here (`sorting`, `globalFilter`, `rowSelection`, `pagination`) are four of the [twelve independent state slices](/components/data-table#models-the-twelve-two-way-slices); bind a slice only when you want to own it. The header buttons drive the imperative handle (`toggleAllRows`, `clearSelection`, `clearSorting`) grabbed through Vue's `ref`. A single `#cell` slot on `<DataTable>`, dispatched by `columnId`, renders the **Status** badge; every other column falls through to the plain accessor value (the fast path). See the [full API](/components/data-table) for every prop, slice, event, slot, and handle verb, plus the `<Column>` API, theming, and accessibility reference.
+Each `v-model:<slice>` is a two-way bind — the readout updates the instant you change the state, and a consumer write flows back in. The four slices bound here (`sorting`, `globalFilter`, `rowSelection`, `pagination`) are four of the [twelve independent state slices](/components/data-table-api#models-the-twelve-two-way-slices); bind a slice only when you want to own it. The header buttons drive the imperative handle (`toggleAllRows`, `clearSelection`, `clearSorting`) grabbed through Vue's `ref`. A single `#cell` slot on `<DataTable>`, dispatched by `columnId`, renders the **Status** badge; every other column falls through to the plain accessor value (the fast path). See the [API reference](/components/data-table-api) for every prop, slice, event, slot, and handle verb, plus the [`<Column>` API](/components/data-table-columns), [theming](/components/data-table-theming), and [accessibility](/components/data-table-grid-mode#accessibility) reference.
 
 ## Row windowing (virtualization)
 
@@ -270,7 +270,7 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
 
 ## See also
 
-- [DataTable — showcase & API](/components/data-table) — install, quick start, the `<Column>` API, theming, and the full reference.
+- [DataTable — overview & install](/components/data-table) — the package install table and the section index linking quick start, the `<Column>` API, theming, and the full [API reference](/components/data-table-api).
 - [Data table comparison](/components/data-table-comparison) — how `@rozie-ui/data-table` stacks up against TanStack Table, AG Grid, PrimeVue, Material, and the per-framework grids.
 
 <style scoped>
