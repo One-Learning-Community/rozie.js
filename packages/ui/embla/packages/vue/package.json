@@ -28,12 +28,17 @@
   },
   "exports": {
     ".": {
-      "import": "./src/Carousel.vue",
-      "types": "./src/Carousel.vue",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/Carousel.vue",
       "default": "./src/Carousel.vue"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "peerDependencies": {
@@ -53,11 +58,20 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "embla-carousel": "^8.6",
+    "embla-carousel-autoplay": "^8.6",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  }
 }
