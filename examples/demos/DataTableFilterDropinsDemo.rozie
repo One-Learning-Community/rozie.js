@@ -1,0 +1,108 @@
+<!--
+  DataTableFilterDropinsDemo.rozie — runtime behavioral cell for the @rozie-ui/data-table
+  #filter slot DROP-INS (FilterText / FilterSelect / FilterNumberRange).
+
+  Mirrors DataTableFacetDemo.rozie's structure (static dataset in <data>, the
+  r-model:columnFilters controlled write-back, the #filter scoped slot dispatched by
+  columnId) but SWAPS the hand-rolled checkbox/range facet content for the real drop-in
+  components imported cross-tree from packages/ui/data-table/src. The drop-ins receive the
+  verified #filter slot scope ({ columnId, column, value, uniqueValues, minMax, setFilter })
+  as props and call setFilter(columnId, value) to drive the columnFilters model.
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot named
+  `cell`; the #cell display slot binds `value`. Static dataset (no clock/random) for
+  determinism. NO <data> field collides with a slot let-var (row/value/columnId/grouping).
+-->
+
+<rozie name="DataTableFilterDropinsDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  FilterText: '../../packages/ui/data-table/src/FilterText.rozie',
+  FilterSelect: '../../packages/ui/data-table/src/FilterSelect.rozie',
+  FilterNumberRange: '../../packages/ui/data-table/src/FilterNumberRange.rozie',
+}
+</components>
+
+<data>
+{
+  // A static dataset with a text column (name), a categorical column (category: distinct
+  // Hardware/Software/Service), and a numeric column (price, 10..90). VR-deterministic.
+  // Hardware rows = Alpha + Gamma (2 of 5); price range 10..90.
+  rows: [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+    { id: 5, name: 'Epsilon', category: 'Software', price: 70 },
+  ],
+  // The controlled columnFilters model (Phase 48) the drop-ins drive via setFilter — an
+  // array of { id, value }. model:true two-way.
+  columnFilters: [],
+}
+</data>
+
+<template>
+<div class="dt-filter-demo">
+  <h3>DataTable — #filter slot drop-ins</h3>
+
+  <div data-testid="filter-table">
+    <DataTable
+      :data="$data.rows"
+      r-model:columnFilters="$data.columnFilters"
+    >
+      <Column field="name"     header="Name"     :filterable="true" />
+      <Column field="category" header="Category" :filterable="true" />
+      <Column field="price"    header="Price"    :filterable="true" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The #filter scoped slot, dispatched by columnId to the real drop-ins. Each
+           receives the verified slot scope ({ columnId, column, value, uniqueValues,
+           minMax, setFilter }) and calls setFilter(columnId, value). -->
+      <template #filter="{ columnId, column, value, uniqueValues, minMax, setFilter }">
+        <FilterText
+          r-if="columnId === 'name'"
+          :columnId="columnId"
+          :column="column"
+          :value="value"
+          :setFilter="setFilter"
+        />
+        <FilterSelect
+          r-else-if="columnId === 'category'"
+          :columnId="columnId"
+          :column="column"
+          :value="value"
+          :setFilter="setFilter"
+          :uniqueValues="uniqueValues"
+        />
+        <FilterNumberRange
+          r-else-if="columnId === 'price'"
+          :columnId="columnId"
+          :column="column"
+          :value="value"
+          :setFilter="setFilter"
+          :minMax="minMax"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-filter-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-filter-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+</style>
+
+</rozie>

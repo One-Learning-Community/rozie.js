@@ -1,0 +1,142 @@
+<!--
+  DataTableGroupBarDemo.rozie — runtime behavioral cell for the @rozie-ui/data-table
+  #groupBar slot DROP-IN (GroupBar).
+
+  Mirrors DataTableGroupDemo.rozie's structure (static dataset, :groupable, the
+  r-model:grouping controlled write-back, the #groupBar scoped slot, a @group-change
+  readout + counter, $refs.dt apply/clear seed buttons) but SWAPS the hand-rolled bar for
+  the real GroupBar drop-in imported cross-tree from packages/ui/data-table/src. The
+  drop-in receives the verified #groupBar slot scope ({ grouping, groupableColumns,
+  applyGrouping, clearGrouping }) as props.
+
+  ANGULAR slot-var/signal SHADOW: the <data> field is named `groupingModel` (NOT `grouping`)
+  — the #groupBar slot exposes a `grouping` let-var that an Angular `grouping` signal would
+  shadow ("grouping_r7 is not a function", whole table hidden). Loop-var/slot discipline: NO
+  loop var or slot named `cell`. VR-deterministic static dataset.
+
+  The applyGrouping/clearGrouping $refs.dt call buttons give the spec a NON-DRAG affordance
+  to seed grouping state; the GroupBar drop-in's clickable remove-× + Clear paths are the
+  HARD assertions. GroupBar's native HTML5 DnD-add is BEST-EFFORT / non-gating in the spec.
+-->
+
+<rozie name="DataTableGroupBarDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  GroupBar: '../../packages/ui/data-table/src/GroupBar.rozie',
+}
+</components>
+
+<data>
+{
+  // Two groupable string columns (region, category) + a numeric column (units).
+  // VR-deterministic.
+  rows: [
+    { id: 1, region: 'North', category: 'Hardware', units: 3 },
+    { id: 2, region: 'North', category: 'Hardware', units: 5 },
+    { id: 3, region: 'North', category: 'Software', units: 2 },
+    { id: 4, region: 'South', category: 'Hardware', units: 7 },
+    { id: 5, region: 'South', category: 'Software', units: 1 },
+    { id: 6, region: 'South', category: 'Software', units: 4 },
+  ],
+  // Controlled grouping state — ordered array of column keys. model:true. NAMED
+  // groupingModel (NOT `grouping`) to avoid the Angular slot-var/signal shadow.
+  groupingModel: [],
+  // Last grouping-change payload as a comma-joined ordered key list.
+  lastGrouping: '',
+  // Count of grouping-change emits.
+  groupingChangeCount: 0,
+}
+</data>
+
+<script lang="ts">
+// grouping-change payload → ordered comma-joined key readout + a counter. Payload arrives
+// as arg0 directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onGroupingChange = (payload: string[]): void => {
+  $data.lastGrouping = Array.isArray(payload) ? payload.join(',') : ''
+  $data.groupingChangeCount = $data.groupingChangeCount + 1
+}
+
+// Seed Region → Category grouping via the applyGrouping $expose verb — the NON-DRAG
+// affordance the spec uses to populate the GroupBar's removable tokens. Resolve the handle
+// at CALL time (never cache — the GridNavDemo lesson).
+const callApplyGrouping = (): void => {
+  const api = $refs.dt
+  if (api && api.applyGrouping) api.applyGrouping(['region', 'category'])
+}
+
+const callClearGrouping = (): void => {
+  const api = $refs.dt
+  if (api && api.clearGrouping) api.clearGrouping()
+}
+</script>
+
+<template>
+<div class="dt-group-bar-demo">
+  <h3>DataTable — #groupBar slot drop-in</h3>
+
+  <div class="controls">
+    <span class="label">grouping:</span>
+    <span class="readout" data-testid="grouping-readout">{{ $data.lastGrouping }}</span>
+    <span class="label">change-count:</span>
+    <span class="readout" data-testid="grouping-change-count">{{ $data.groupingChangeCount }}</span>
+    <button type="button" data-testid="call-apply-grouping" @click="callApplyGrouping">applyGrouping(region,category)</button>
+    <button type="button" data-testid="call-clear-grouping" @click="callClearGrouping">clearGrouping</button>
+  </div>
+
+  <div data-testid="group-bar-table">
+    <DataTable
+      ref="dt"
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      @group-change="onGroupingChange($event)"
+    >
+      <Column field="region"   header="Region" />
+      <Column field="category" header="Category" />
+      <Column field="units"    header="Units" aggregationFn="sum" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The #groupBar scoped slot filled with the real GroupBar drop-in. The drop-in
+           renders draggable column chips + removable active-grouping tokens + a Clear
+           button, driving the grouping model through applyGrouping / clearGrouping. -->
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <GroupBar
+          :grouping="grouping"
+          :groupableColumns="groupableColumns"
+          :applyGrouping="applyGrouping"
+          :clearGrouping="clearGrouping"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-group-bar-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-group-bar-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+</style>
+
+</rozie>

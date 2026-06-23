@@ -1,0 +1,118 @@
+<!--
+  DataTableDetailPanelDemo.rozie — runtime behavioral cell for the @rozie-ui/data-table
+  #detail slot DROP-IN (DetailPanel).
+
+  Mirrors DataTableExpandDemo.rozie's #detail-slot region (the flat-rows / r-model:expanded
+  / @expand-change region only — the getSubRows region is dropped) but SWAPS the hand-rolled
+  detail markup for the real DetailPanel drop-in imported cross-tree from
+  packages/ui/data-table/src. The drop-in receives the verified #detail slot scope ({ row })
+  and renders the open row's fields as a key/value definition list (dl.rdt-detail-panel >
+  div.rdt-detail-entry > dt.rdt-detail-key + dd.rdt-detail-value).
+
+  Loop-var / slot discipline: NO loop var or slot named `cell`; the #cell display slot binds
+  `value`. NO <data> field collides with a slot let-var (row/value/columnId). VR-deterministic.
+-->
+
+<rozie name="DataTableDetailPanelDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  DetailPanel: '../../packages/ui/data-table/src/DetailPanel.rozie',
+}
+</components>
+
+<data>
+{
+  // Flat dataset for the #detail-slot region. VR-deterministic. Row 0 = Alpha.
+  rows: [
+    { id: 1, name: 'Alpha', region: 'North', score: 41 },
+    { id: 2, name: 'Beta',  region: 'South', score: 92 },
+    { id: 3, name: 'Gamma', region: 'North', score: 67 },
+    { id: 4, name: 'Delta', region: 'West',  score: 50 },
+  ],
+  // Controlled expanded-row set (ExpandedState). model:true two-way.
+  expanded: {},
+  // Last expanded-change payload as a sorted comma-joined key list.
+  lastExpanded: '',
+  // Count of expanded-change emits.
+  expandedChangeCount: 0,
+}
+</data>
+
+<script lang="ts">
+// expanded-change payload → a sorted comma-joined key readout + a counter. Payload arrives
+// as arg0 directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onExpandedChange = (payload: Record<string, boolean> | boolean): void => {
+  if (payload === true) {
+    $data.lastExpanded = 'ALL'
+  } else if (payload && typeof payload === 'object') {
+    const keys = Object.keys(payload).filter((k) => payload[k])
+    keys.sort()
+    $data.lastExpanded = keys.join(',')
+  } else {
+    $data.lastExpanded = ''
+  }
+  $data.expandedChangeCount = $data.expandedChangeCount + 1
+}
+</script>
+
+<template>
+<div class="dt-detail-demo">
+  <h3>DataTable — #detail slot drop-in</h3>
+
+  <div class="controls">
+    <span class="label">expanded:</span>
+    <span class="readout" data-testid="expanded-readout">{{ $data.lastExpanded }}</span>
+    <span class="label">change-count:</span>
+    <span class="readout" data-testid="expanded-change-count">{{ $data.expandedChangeCount }}</span>
+  </div>
+
+  <div data-testid="detail-table">
+    <DataTable
+      :expandable="true"
+      :data="$data.rows"
+      r-model:expanded="$data.expanded"
+      @expand-change="onExpandedChange($event)"
+    >
+      <Column field="name"   header="Name" />
+      <Column field="region" header="Region" />
+      <Column field="score"  header="Score" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The #detail scoped slot filled with the real DetailPanel drop-in, receiving
+           { row } — the React render-prop edge (documented divergence). -->
+      <template #detail="{ row }">
+        <DetailPanel :row="row" />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-detail-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-detail-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+</style>
+
+</rozie>

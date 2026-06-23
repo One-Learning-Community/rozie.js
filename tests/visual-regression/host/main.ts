@@ -632,6 +632,19 @@ export const EXAMPLES = [
   'DataTableExpand',
   'DataTableGroup',
   'DataTableFacet',
+  // Quick 260622-qpw — the four data-table slot DROP-IN behavioral cells. Each demo
+  // imports the real Filter*/GroupBar/DetailPanel/Editor* drop-ins from
+  // packages/ui/data-table/src and forwards the verified slot scope as props, proving the
+  // drop-ins drive the parent's #filter / #groupBar / #detail / #editor slots at runtime
+  // (not just compile) on all six targets. Behavioral-only (DOM assertions in
+  // data-table-dropins.spec.ts); NOT in matrix.spec.ts EXAMPLES (no pixel baseline). They
+  // live under examples/demos/ so the existing data-table/src cross-tree prebuild root +
+  // the examples tsconfig include + the glob-driven demos sweep already cover them (no new
+  // Angular 3-file registration needed).
+  'DataTableFilterDropins',
+  'DataTableGroupBar',
+  'DataTableDetailPanel',
+  'DataTableEditorDropins',
   // Phase 36 (cross-component-context-primitive, $provide / $inject) — the
   // context-primitive behavioral cells. ThemeContext is the minimal-trio cell
   // (loader → examples/demos/ThemeContextDemo.rozie, which composes three
@@ -861,6 +874,12 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableExpand: 'rozie-data-table-expand',
   DataTableGroup: 'rozie-data-table-group',
   DataTableFacet: 'rozie-data-table-facet',
+  // Quick 260622-qpw drop-in cells — Lit appends '-demo' → tags
+  // 'rozie-data-table-filter-dropins-demo' etc. = kebab of the full Demo name.
+  DataTableFilterDropins: 'rozie-data-table-filter-dropins',
+  DataTableGroupBar: 'rozie-data-table-group-bar',
+  DataTableDetailPanel: 'rozie-data-table-detail-panel',
+  DataTableEditorDropins: 'rozie-data-table-editor-dropins',
   // Phase 36 ($provide / $inject) — the lit entry appends '-demo' → tags
   // 'rozie-theme-context-demo' / 'rozie-tabs-demo' = kebab of ThemeContextDemo /
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
@@ -1128,6 +1147,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableExpand: {},
   DataTableGroup: {},
   DataTableFacet: {},
+  // Quick 260622-qpw drop-in cells — each demo seeds its own rows + readouts in <data> and
+  // mounts the DataTable inline with its props. No parent-supplied props.
+  DataTableFilterDropins: {},
+  DataTableGroupBar: {},
+  DataTableDetailPanel: {},
+  DataTableEditorDropins: {},
   // Phase 36 ($provide / $inject) — both context demos are self-contained:
   // ThemeContextDemo composes ThemeProvider/ThemePassthrough/ThemeButton (state
   // lives in ThemeProvider's $data.color); TabsDemo composes Tabs/Tab (state

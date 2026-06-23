@@ -1,0 +1,135 @@
+<!--
+  DataTableEditorDropinsDemo.rozie — runtime behavioral cell for the @rozie-ui/data-table
+  #editor slot DROP-INS (EditorText / EditorSelect).
+
+  Mirrors DataTableEditDemo.rozie's structure (grid interactionMode, r-model:data write-back,
+  @cell-edit-commit readout + counter, the #editor scoped slot dispatched by columnId) but
+  routes BOTH editable columns through the #editor slot via editor='custom' and SWAPS the
+  hand-rolled stepped control for the real EditorText / EditorSelect drop-ins imported
+  cross-tree from packages/ui/data-table/src. Each receives the verified #editor slot scope
+  ({ columnId, column, row, value, commit, cancel }); EditorText commits a typed draft on
+  Enter/blur, EditorSelect commits the picked option on change.
+
+  Loop-var / slot discipline: NO loop var or slot named `cell`; the #cell display slot binds
+  `value`. NO <data> field collides with a slot let-var (row/value/columnId). VR-deterministic.
+-->
+
+<rozie name="DataTableEditorDropinsDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+  EditorSelect: '../../packages/ui/data-table/src/EditorSelect.rozie',
+}
+</components>
+
+<data>
+{
+  // A static dataset with an editable text field (name) + a categorical field (status).
+  // VR-deterministic. Row 0 = Alpha / active.
+  rows: [
+    { id: 1, name: 'Alpha', status: 'active' },
+    { id: 2, name: 'Beta',  status: 'archived' },
+    { id: 3, name: 'Gamma', status: 'active' },
+    { id: 4, name: 'Delta', status: 'pending' },
+  ],
+  // Select-editor options for the `status` column.
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ],
+  // Last cell-edit-commit payload, surfaced as "columnId=newValue".
+  lastCommit: '',
+  // Count of cell-edit-commit emits.
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// cell-edit-commit payload → "columnId=newValue" readout + a commit counter. Payload arrives
+// as arg0 directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+</script>
+
+<template>
+<div class="dt-editor-demo">
+  <h3>DataTable — #editor slot drop-ins</h3>
+
+  <div class="controls">
+    <span class="label">last commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <div data-testid="edit-table">
+    <DataTable
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <!-- editor='custom' routes BOTH columns through the #editor scoped slot. -->
+      <Column field="name"   header="Name"   :editable="true" editor="custom" />
+      <Column field="status" header="Status" :editable="true" editor="custom" />
+
+      <!-- The default #cell display slot (read-only display path). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- The #editor scoped slot, dispatched by columnId to the real drop-ins. Each
+           receives the verified slot scope ({ columnId, column, row, value, commit,
+           cancel }) and calls commit(value) / cancel(). -->
+      <template #editor="{ columnId, column, row, value, commit, cancel }">
+        <EditorText
+          r-if="columnId === 'name'"
+          :columnId="columnId"
+          :column="column"
+          :row="row"
+          :value="value"
+          :commit="commit"
+          :cancel="cancel"
+        />
+        <EditorSelect
+          r-else-if="columnId === 'status'"
+          :columnId="columnId"
+          :column="column"
+          :row="row"
+          :value="value"
+          :commit="commit"
+          :cancel="cancel"
+          :options="$data.statusOptions"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-editor-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-editor-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+</style>
+
+</rozie>
