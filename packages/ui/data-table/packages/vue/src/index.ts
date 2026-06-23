@@ -6,3 +6,6 @@ export { default as EditorNumber } from './EditorNumber.vue';
 export { default as EditorSelect } from './EditorSelect.vue';
 export { default as EditorCheckbox } from './EditorCheckbox.vue';
 export { default as EditorDate } from './EditorDate.vue';
+export { default as FilterText } from './FilterText.vue';
+export { default as FilterNumberRange } from './FilterNumberRange.vue';
+export { default as FilterSelect } from './FilterSelect.vue';

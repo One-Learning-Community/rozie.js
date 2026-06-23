@@ -1,0 +1,104 @@
+<!--
+  FilterNumberRange.rozie — presentational #filter slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made [min, max] numeric range COLUMN-filter (two <input type="number">)
+  that matches table-core's `inNumberRange` filterFn shape. Consumers fill the
+  parent's #filter scoped slot with it for a numeric column:
+
+    <DataTable …>
+      <template #filter="{ columnId, column, value, setFilter, minMax }">
+        <FilterNumberRange :columnId="columnId" :column="column" :value="value"
+                           :setFilter="setFilter" :minMax="minMax" />
+      </template>
+    </DataTable>
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. It receives
+  the slot scope props (columnId + setFilter + the faceted [min,max] bounds) and
+  calls them. The `minMax` slot prop ([min,max]|null) drives the placeholder bounds.
+
+  Behavior: two local drafts in $data, seeded once from $props.value when it is a
+  2-tuple; on either change → setFilter(columnId, [minNum, maxNum]) with each side
+  coerced to a Number or undefined (so a one-sided range like [10, undefined]
+  works); both empty → setFilter(columnId, '') (clears the filter).
+
+  Styling: ZERO CSS of its own — see FilterText.rozie for the descendant-selector
+  rationale (.rdt-col-filter lives in DataTable.rozie). NO <style> block here.
+-->
+<rozie name="FilterNumberRange" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId:  { type: String,   default: '' },
+  column:    { type: null,     default: null },
+  // The current column filter value ([min,max]|null) the inputs seed from.
+  value:     { type: null,     default: null },
+  setFilter: { type: Function, default: null },
+  // The faceted [min,max] bounds for this column ([number,number]|null) — used for
+  // the input placeholders only.
+  minMax:    { type: null,     default: null },
+}
+</props>
+
+<data>
+{
+  // Local drafts so the user can type both bounds before applying.
+  minDraft: '',
+  maxDraft: '',
+}
+</data>
+
+<script lang="ts">
+// Seed both drafts once at setup from the incoming [min,max] tuple (setup-once).
+$data.minDraft = Array.isArray($props.value) && $props.value[0] != null ? String($props.value[0]) : ''
+$data.maxDraft = Array.isArray($props.value) && $props.value[1] != null ? String($props.value[1]) : ''
+
+// Untyped handler params neutralize to `any` (the global-filter idiom).
+const onMinInput = (e) => {
+  $data.minDraft = e && e.target ? e.target.value : ''
+}
+const onMaxInput = (e) => {
+  $data.maxDraft = e && e.target ? e.target.value : ''
+}
+
+// Plain string-coercion functions for the placeholders (NOT $computed — the
+// EditorSelect/listbox lesson; opaque slot-scope props rejected by strict leaf tsc).
+const minPlaceholder = () => (Array.isArray($props.minMax) && $props.minMax[0] != null ? String($props.minMax[0]) : '')
+const maxPlaceholder = () => (Array.isArray($props.minMax) && $props.minMax[1] != null ? String($props.minMax[1]) : '')
+
+// Convert a draft to a Number or undefined (empty string → undefined so a
+// one-sided range works). Both undefined → clear the filter.
+const applyRange = () => {
+  const minNum = $data.minDraft === '' ? undefined : Number($data.minDraft)
+  const maxNum = $data.maxDraft === '' ? undefined : Number($data.maxDraft)
+  if (minNum === undefined && maxNum === undefined) {
+    $props.setFilter && $props.setFilter($props.columnId, '')
+  } else {
+    $props.setFilter && $props.setFilter($props.columnId, [minNum, maxNum])
+  }
+}
+</script>
+
+<template>
+<span style="display:contents">
+  <input
+    class="rdt-col-filter"
+    type="number"
+    :aria-label="$props.columnId + ' min'"
+    :placeholder="minPlaceholder()"
+    :value="$data.minDraft"
+    @input="onMinInput($event)"
+    @change="applyRange()"
+  />
+  <input
+    class="rdt-col-filter"
+    type="number"
+    :aria-label="$props.columnId + ' max'"
+    :placeholder="maxPlaceholder()"
+    :value="$data.maxDraft"
+    @input="onMaxInput($event)"
+    @change="applyRange()"
+  />
+</span>
+</template>
+
+</rozie>

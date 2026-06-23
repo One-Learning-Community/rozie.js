@@ -1,0 +1,53 @@
+import type { JSX } from 'solid-js';
+import { createSignal, mergeProps, splitProps } from 'solid-js';
+
+interface FilterTextProps {
+  columnId?: string;
+  column?: (unknown) | null;
+  value?: (unknown) | null;
+  setFilter?: ((...args: unknown[]) => unknown) | null;
+}
+
+export default function FilterText(_props: FilterTextProps): JSX.Element {
+  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter']);
+
+  const [draft, setDraft] = createSignal('');
+
+  // Seed the draft once at setup from the incoming value (setup-once, NOT in the
+  // template). Normalize null/undefined to '' so the input value binds to a string.
+  setDraft(local.value != null ? String(local.value) : '');
+
+  // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+  // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
+  function onInput(e: any) {
+    setDraft(e && e.target ? e.target.value : '');
+  }
+
+  // setFilter is a Function prop (default null) — guard before calling.
+  function applyFilter() {
+    local.setFilter && local.setFilter(local.columnId, draft());
+  }
+  function clearFilter() {
+    setDraft('');
+    local.setFilter && local.setFilter(local.columnId, '');
+  }
+  function onKeydown(e: any) {
+    if (e && e.key === 'Enter') {
+      e.preventDefault();
+      applyFilter();
+    } else if (e && e.key === 'Escape') {
+      e.preventDefault();
+      clearFilter();
+    }
+  }
+  function onBlur() {
+    applyFilter();
+  }
+
+  return (
+    <>
+    <input type="text" aria-label={local.columnId} class={"rdt-col-filter"} value={draft()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    </>
+  );
+}

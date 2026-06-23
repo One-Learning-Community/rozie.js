@@ -65,7 +65,7 @@ const PARENT = 'DataTable';
 // presentational #editor-slot fills (no $emit/$expose → no manifest entries; the
 // manifest-completeness loops key off the PARENT-only IR below, not per-component).
 // Each becomes a NAMED re-export via childExports; DataTable stays the default.
-const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate'];
+const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate', 'FilterText', 'FilterNumberRange', 'FilterSelect'];
 
 /**
  * Per-target leaf dir + emitted file extension (`build` mode is informational).

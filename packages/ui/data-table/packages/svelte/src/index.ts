@@ -6,3 +6,6 @@ export { default as EditorNumber } from './EditorNumber.svelte';
 export { default as EditorSelect } from './EditorSelect.svelte';
 export { default as EditorCheckbox } from './EditorCheckbox.svelte';
 export { default as EditorDate } from './EditorDate.svelte';
+export { default as FilterText } from './FilterText.svelte';
+export { default as FilterNumberRange } from './FilterNumberRange.svelte';
+export { default as FilterSelect } from './FilterSelect.svelte';

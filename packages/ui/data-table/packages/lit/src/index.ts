@@ -6,3 +6,6 @@ export { default as EditorNumber } from './EditorNumber';
 export { default as EditorSelect } from './EditorSelect';
 export { default as EditorCheckbox } from './EditorCheckbox';
 export { default as EditorDate } from './EditorDate';
+export { default as FilterText } from './FilterText';
+export { default as FilterNumberRange } from './FilterNumberRange';
+export { default as FilterSelect } from './FilterSelect';

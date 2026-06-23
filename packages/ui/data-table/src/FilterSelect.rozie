@@ -1,0 +1,67 @@
+<!--
+  FilterSelect.rozie — presentational #filter slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made faceted <select> COLUMN-filter whose options are built from the
+  cross-filtered `uniqueValues` slot prop (distinct KEYS, D-03). Consumers fill the
+  parent's #filter scoped slot with it for a categorical column:
+
+    <DataTable …>
+      <template #filter="{ columnId, column, value, setFilter, uniqueValues }">
+        <FilterSelect :columnId="columnId" :column="column" :value="value"
+                      :setFilter="setFilter" :uniqueValues="uniqueValues" />
+      </template>
+    </DataTable>
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. It receives
+  the slot scope props (columnId + setFilter + the faceted uniqueValues) and calls
+  them. Immediate-apply-on-change: a leading empty "All" option clears the filter.
+
+  Styling: ZERO CSS of its own — see FilterText.rozie for the descendant-selector
+  rationale (.rdt-col-filter lives in DataTable.rozie). NO <style> block here.
+-->
+<rozie name="FilterSelect" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  columnId:     { type: String,   default: '' },
+  column:       { type: null,     default: null },
+  // The current column filter value the select seeds from.
+  value:        { type: null,     default: null },
+  setFilter:    { type: Function, default: null },
+  // The faceted distinct KEYS for this column (D-03 — keys only, no counts).
+  uniqueValues: { type: Array,    default: () => [] },
+}
+</props>
+
+<script lang="ts">
+// The <select> value binding coerced to a string. $props.value is typed `unknown`
+// (opaque slot-scope), which the strict bundled-leaf tsc rejects against the native
+// select `value` type on React/Solid — the fix is a plain function returning a
+// string (uniform ×6, NOT a $computed; the EditorSelect/listbox value lesson).
+const selectValue = () => ($props.value != null ? String($props.value) : '')
+
+// Immediate-apply-on-change: read the selected value the global-filter way. An
+// empty value (the leading "All" option) clears the column filter.
+const onChange = (e) => {
+  const v = e && e.target ? e.target.value : ''
+  if (v === '') {
+    $props.setFilter && $props.setFilter($props.columnId, '')
+  } else {
+    $props.setFilter && $props.setFilter($props.columnId, v)
+  }
+}
+</script>
+
+<template>
+<select
+  class="rdt-col-filter"
+  :aria-label="$props.columnId"
+  :value="selectValue()"
+  @change="onChange($event)"
+>
+  <option value="">All</option>
+  <option r-for="opt in $props.uniqueValues" :key="opt" :value="opt">{{ opt }}</option>
+</select>
+</template>
+
+</rozie>

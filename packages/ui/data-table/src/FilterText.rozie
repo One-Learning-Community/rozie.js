@@ -1,0 +1,99 @@
+<!--
+  FilterText.rozie — presentational #filter slot DROP-IN for @rozie-ui/data-table.
+
+  A ready-made text COLUMN-filter input that visually matches the headless built-in
+  per-column filter (class="rdt-col-filter"). Consumers fill the parent's #filter
+  scoped slot with it:
+
+    <DataTable …>
+      <template #filter="{ columnId, column, value, setFilter }">
+        <FilterText :columnId="columnId" :column="column"
+                    :value="value" :setFilter="setFilter" />
+      </template>
+    </DataTable>
+
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. It receives
+  the slot scope props (columnId + the setFilter function prop) and calls them.
+  Because the drop-in lives in the consumer's slot, it owns its OWN Enter/Escape
+  keymap: Enter / blur applies the filter, Escape clears it.
+
+  Behavior: local draft in $data, seeded once from $props.value in setup-once
+  <script>; @input updates the draft; Enter → setFilter(columnId, draft);
+  blur → setFilter(columnId, draft); Escape → setFilter(columnId, '') (clears).
+
+  Styling: ZERO CSS of its own. `.rdt-col-filter` is the descendant selector
+  `.rozie-data-table-wrap .rdt-col-filter` defined ONLY in DataTable.rozie's
+  <style>; a slotted <FilterText> renders INSIDE that subtree so DOM nesting
+  reaches that selector. NO <style> block here.
+-->
+<rozie name="FilterText" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  // The column id (mirrors the #filter slot scope) — used as the filter key + an
+  // aria-label fallback.
+  columnId:  { type: String,   default: '' },
+  // The table-core column object (opaque passthrough).
+  column:    { type: null,     default: null },
+  // The current column filter value the input seeds from.
+  value:     { type: null,     default: null },
+  // (columnId, value) => void — apply the column filter. Null-guarded at call sites.
+  setFilter: { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  // Local editing draft so the user can type before applying the filter.
+  draft: '',
+}
+</data>
+
+<script lang="ts">
+// Seed the draft once at setup from the incoming value (setup-once, NOT in the
+// template). Normalize null/undefined to '' so the input value binds to a string.
+$data.draft = $props.value != null ? String($props.value) : ''
+
+// Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
+// ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
+const onInput = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+// setFilter is a Function prop (default null) — guard before calling.
+const applyFilter = () => {
+  $props.setFilter && $props.setFilter($props.columnId, $data.draft)
+}
+const clearFilter = () => {
+  $data.draft = ''
+  $props.setFilter && $props.setFilter($props.columnId, '')
+}
+
+const onKeydown = (e) => {
+  if (e && e.key === 'Enter') {
+    e.preventDefault()
+    applyFilter()
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault()
+    clearFilter()
+  }
+}
+
+const onBlur = () => {
+  applyFilter()
+}
+</script>
+
+<template>
+<input
+  class="rdt-col-filter"
+  type="text"
+  :aria-label="$props.columnId"
+  :value="$data.draft"
+  @input="onInput($event)"
+  @keydown="onKeydown($event)"
+  @blur="onBlur()"
+/>
+</template>
+
+</rozie>
