@@ -28,12 +28,17 @@
   },
   "exports": {
     ".": {
-      "import": "./src/TipTap.vue",
-      "types": "./src/TipTap.vue",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/TipTap.vue",
       "default": "./src/TipTap.vue"
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "peerDependencies": {
@@ -65,10 +70,22 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@tiptap/core": "^3",
+    "@tiptap/extensions": "^3",
+    "@tiptap/extension-bubble-menu": "^3",
+    "@tiptap/extension-floating-menu": "^3",
+    "@tiptap/starter-kit": "^3",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
   }
 }
