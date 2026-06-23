@@ -30,13 +30,18 @@
   },
   "exports": {
     ".": {
-      "import": "./src/Listbox.vue",
-      "types": "./src/Listbox.vue",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/Listbox.vue",
       "default": "./src/Listbox.vue"
     },
     "./themes/*": "./src/themes/*"
   },
   "files": [
+    "dist",
     "src"
   ],
   "dependencies": {
@@ -51,10 +56,17 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
   }
 }
