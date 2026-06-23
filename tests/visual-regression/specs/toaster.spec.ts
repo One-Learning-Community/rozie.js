@@ -42,7 +42,7 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 //  now gets a distinct id and dismiss removes exactly one. react now drives clean.)
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['svelte']);
+>([]);
 
 for (const target of TARGETS) {
   const built = existsSync(

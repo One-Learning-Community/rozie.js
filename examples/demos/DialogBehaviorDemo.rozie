@@ -28,6 +28,12 @@ const openIt = () => {
 const closeIt = () => {
   $data.open = false
 }
+// Close via the component's imperative hide() handle ($expose → closeWith
+// 'programmatic') — a deterministic JS path used to assert the @close reason emit
+// without the native-<dialog> Escape/cancel timing flake.
+const hideViaHandle = () => {
+  $refs.dlg.hide()
+}
 const onClose = (e) => {
   $data.lastReason = e && e.reason != null ? e.reason : ''
 }
@@ -43,9 +49,14 @@ const onClose = (e) => {
     <span class="readout" data-testid="readout-reason">{{ $data.lastReason }}</span>
   </div>
 
-  <Dialog r-model:open="$data.open" ariaLabel="Demo dialog" @close="onClose($event)">
+  <Dialog ref="dlg" r-model:open="$data.open" ariaLabel="Demo dialog" @close="onClose($event)">
     <h2>Confirm</h2>
     <p data-testid="dialog-body">Dialog content is visible.</p>
+    <!-- Both buttons live INSIDE the dialog: a modal <dialog> makes the rest of
+         the page inert, so controls outside it can't be clicked while open.
+         close-dialog = consumer model-write close (no emit); hide-dialog = the
+         $expose hide() handle (emits @close reason 'programmatic'). -->
+    <button type="button" data-testid="hide-dialog" @click="hideViaHandle()">Hide</button>
     <button type="button" data-testid="close-dialog" @click="closeIt()">Close</button>
   </Dialog>
 </div>
