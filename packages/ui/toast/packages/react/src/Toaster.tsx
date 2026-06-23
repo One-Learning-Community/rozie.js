@@ -37,10 +37,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   })();
   const timers = useRef({});
   const [toasts, setToasts] = useState<any[]>([]);
+  const [seq, setSeq] = useState(0);
 
-  let nextId = 0;
-
-  // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -57,7 +55,17 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   }, []);
   function show(input: any) {
     const t = input || {};
-    const id = t.id != null ? t.id : 't' + nextId++;
+    // Derive the id from the reactive $data.seq counter (persists on React, unlike
+    // a module-let referenced only here). Read seq into a local BEFORE writing it
+    // back (no read-after-write of the same key in one fn → ROZ138-safe).
+    let id;
+    if (t.id != null) {
+      id = t.id;
+    } else {
+      const s = seq;
+      id = 't' + s;
+      setSeq(s + 1);
+    }
     const toast = {
       id,
       message: t.message != null ? t.message : '',

@@ -88,14 +88,15 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   onMount(() => { local.ref?.({ show, dismiss, clear }); });
 
   const [toasts, setToasts] = createSignal([]);
+  const [seq, setSeq] = createSignal(0);
   onCleanup(() => {
     pauseTimers();
   });
 
-  // Mutable cross-render scratch (NOT reactive): the per-id timeout handles and the
-  // id counter. Top-level lets → React useRef (setup-once persistence).
+  // Mutable cross-render scratch (NOT reactive): the per-id timeout handles. A
+  // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
+  // emitter hoists it). The id counter lives in $data.seq instead (see <data>).
   let timers = {};
-  let nextId = 0;
 
   // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
@@ -116,7 +117,17 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // ---- queue (imperative handle implementations) -------------------------
   function show(input: any) {
     const t = input || {};
-    const id = t.id != null ? t.id : 't' + nextId++;
+    // Derive the id from the reactive $data.seq counter (persists on React, unlike
+    // a module-let referenced only here). Read seq into a local BEFORE writing it
+    // back (no read-after-write of the same key in one fn → ROZ138-safe).
+    let id;
+    if (t.id != null) {
+      id = t.id;
+    } else {
+      const s = seq();
+      id = 't' + s;
+      setSeq(s + 1);
+    }
     const toast = {
       id,
       message: t.message != null ? t.message : '',

@@ -80,6 +80,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) disablePauseOnHover: boolean = false;
   @property({ type: String, reflect: true }) ariaLabel: string = null;
   private _toasts = signal([]);
+  private _seq = signal(0);
 
   @state() private _hasSlotToast = false;
   @queryAssignedElements({ slot: 'toast', flatten: true }) private _slotToastElements!: Element[];
@@ -142,8 +143,6 @@ export default class Toaster extends SignalWatcher(LitElement) {
 
   timers = {};
 
-  nextId = 0;
-
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
@@ -163,7 +162,17 @@ export default class Toaster extends SignalWatcher(LitElement) {
 
   show = (input: any) => {
   const t = input || {};
-  const id = t.id != null ? t.id : 't' + this.nextId++;
+  // Derive the id from the reactive $data.seq counter (persists on React, unlike
+  // a module-let referenced only here). Read seq into a local BEFORE writing it
+  // back (no read-after-write of the same key in one fn → ROZ138-safe).
+  let id;
+  if (t.id != null) {
+    id = t.id;
+  } else {
+    const s = this._seq.value;
+    id = 't' + s;
+    this._seq.value = s + 1;
+  }
   const toast = {
     id,
     message: t.message != null ? t.message : '',

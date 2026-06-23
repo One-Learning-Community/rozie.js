@@ -119,6 +119,7 @@ export class Toaster {
   disablePauseOnHover = input<boolean>(false);
   ariaLabel = input<(string) | null>(null);
   toasts = signal<any[]>([]);
+  seq = signal(0);
   @ContentChild('toast', { read: TemplateRef }) toastTpl?: TemplateRef<ToastCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
@@ -129,7 +130,6 @@ export class Toaster {
   }
 
   timers = {};
-  nextId = 0;
   startTimer = (toast: any) => {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -146,7 +146,17 @@ export class Toaster {
   };
   show = (input: any) => {
     const t = input || {};
-    const id = t.id != null ? t.id : 't' + this.nextId++;
+    // Derive the id from the reactive $data.seq counter (persists on React, unlike
+    // a module-let referenced only here). Read seq into a local BEFORE writing it
+    // back (no read-after-write of the same key in one fn → ROZ138-safe).
+    let id;
+    if (t.id != null) {
+      id = t.id;
+    } else {
+      const s = this.seq();
+      id = 't' + s;
+      this.seq.set(s + 1);
+    }
     const toast = {
       id,
       message: t.message != null ? t.message : '',

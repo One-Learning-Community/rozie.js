@@ -27,22 +27,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Two target-specific bugs in this brand-new family, surfaced (as intended) by
-// wiring the VR cell. Gated per-target with documented root causes — NOT a broad
-// skip — and tracked for an emitter follow-up. The other 4 targets drive cleanly.
+// One target-specific bug in this brand-new family, surfaced (as intended) by
+// wiring the VR cell. Gated with a documented root cause — NOT a broad skip — and
+// tracked for an emitter follow-up. The other 5 targets drive cleanly.
 //   - svelte: `$refs.toaster.show()` (calling a CHILD component's `$expose` handle
 //     from the parent template script via a component `ref`) throws "a is not a
 //     function" at runtime — the parent `$refs.<childRef>` does not resolve to the
 //     exposed handle on Svelte (it works on vue/react/angular/solid/lit). No toast
 //     is ever enqueued (readout-count stays 0).
-//   - react: a single show() works, but the component's module-scope `let nextId`
-//     (incremented in the `show` $expose verb as `nextId++`) is NOT persisted across
-//     renders, so the 2nd toast reuses id 't0'. With two identical ids, dismissing
-//     ONE toast (`dismiss(id)` filters by id) removes BOTH — the count drops to 0
-//     instead of 1. (Verified: messages 'Saved 1'/'Saved 2' render, dismiss-first → 0.)
+// (FIXED — react: the id counter was a module-scope `let nextId` referenced only
+//  inside the `show` $expose verb, which the React emitter's hoistModuleLet does
+//  NOT persist to useRef → it reset to 0 every render → duplicate ids. Moved the
+//  counter to reactive $data.seq (real useState that persists), so the 2nd toast
+//  now gets a distinct id and dismiss removes exactly one. react now drives clean.)
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['react', 'svelte']);
+>(['svelte']);
 
 for (const target of TARGETS) {
   const built = existsSync(
