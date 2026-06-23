@@ -738,6 +738,23 @@ export const RozieErrorCode = {
   // `name="default"` slot. Mirrors ROZ127 (validateSlotPropCollision). ROZ979 is
   // the next free code after ROZ978.
   DEFAULT_PORTAL_NAME_RESERVED: 'ROZ979', // error — a default portal slot (`<slot portal />`) and a slot `name="default"` both key `$portals.default`; "default" is the reserved default-portal key.
+
+  // ---- r-for loop var shadows a slot name — ROZ980 ----
+  // An `r-for` loop variable (`item`/`index` alias) whose name equals a
+  // `<slot name="X">` RENDERED INSIDE that loop's body. On Svelte 5 the slot
+  // lowers to a snippet prop `X` in the `$props()` namespace; the `{#each … as X}`
+  // loop variable shadows it within the loop body, so `{@render X(...)}` renders
+  // the loop ITEM (a non-function) → runtime "X is not a function" — Svelte only;
+  // the other five targets keep loop scope and slot invocation separate and are
+  // immune. A silent cross-target divergence invisible to compile/typecheck/build
+  // (it only detonates at Svelte runtime), recurring across families (embla
+  // slide→item, slider mark→tick, toast toast→t). WARNING (not error): the loop
+  // var is legitimate and 5/6 targets work; renaming the loop var is the fix.
+  // Detected by validateRForSlotNameCollision (collected-not-thrown, D-08), wired
+  // into lowerToIR so it fires for BOTH compile() AND @rozie/unplugin. Dual
+  // code-frame: primary at the r-for element, related[] at the shadowed slot.
+  // ROZ980 is the next free code after ROZ979.
+  RFOR_SLOT_NAME_COLLISION: 'ROZ980', // warning — an `r-for` loop variable shadows a `<slot name>` rendered inside the loop; `{@render name()}` returns a non-function on Svelte only. Rename the loop variable.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

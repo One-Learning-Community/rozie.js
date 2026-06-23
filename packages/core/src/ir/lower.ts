@@ -47,6 +47,7 @@ import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
+import { validateRForSlotNameCollision } from './validateRForSlotNameCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateClone } from './validateClone.js';
@@ -314,6 +315,13 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // so it fires for BOTH compile() AND @rozie/unplugin. Local-IR-only (ir.slots);
   // collected-not-thrown (D-08): pushes ROZ979; never mutates `ir`.
   validateDefaultPortalCollision(ir, diagnostics);
+
+  // r-for loop var shadows a slot rendered inside the loop (ROZ980, warning).
+  // Svelte-5-only footgun (loop var shadows the snippet → `{@render name()}`
+  // renders a non-function); silent at compile/typecheck/build, recurring across
+  // families. Same chokepoint so it fires for BOTH compile() AND @rozie/unplugin.
+  // Collected-not-thrown (D-08); never mutates `ir`.
+  validateRForSlotNameCollision(ir, diagnostics);
 
   // Phase 26 (D-06/D-07) — resolve the wrap/raw `rozieDisplay` gate ONCE per
   // interpolation + attribute/class binding. Runs HERE in lowerToIR (not
