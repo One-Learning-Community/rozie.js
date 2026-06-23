@@ -17,12 +17,12 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-const item = $derived(__itemProp ?? snippets?.item);
+const item$$slot = $derived(__itemProp ?? snippets?.item);
 
 const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
-<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-5e6c469d>{#each items as item (item.id)}<li data-rozie-s-5e6c469d>{#if item}{@render item({ item, remaining })}{:else}{rozieDisplay(item.label)}{/if}</li>{/each}</ul>
+<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-5e6c469d>{#each items as item (item.id)}<li data-rozie-s-5e6c469d>{#if item$$slot}{@render item$$slot({ item, remaining })}{:else}{rozieDisplay(item.label)}{/if}</li>{/each}</ul>
 
 <style>
 :global {
