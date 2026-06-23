@@ -415,6 +415,44 @@ function main() {
       code = code.replace(themeToken, themeAnnotated);
     }
 
+    // ─── Vue-only type aid: themeExt return + withDefaults theme default ─────
+    // The Vue leaf now compiles via vue-tsc declaration emit (the dist+source
+    // packaging standard) rather than shipping raw source, so it sees the same
+    // G3 widened-theme `unknown` issues the strict-tsc react/solid/lit leaves do.
+    // (1) `themeExt`'s passthrough branch (`return t`) returns `unknown`, which
+    // `Compartment.of`/`reconfigure` reject (TS2345). (2) The `theme` prop's
+    // emitted type is `unknown` (the permissive `<props>` form), so its
+    // non-undefined primitive default in `withDefaults` is type-checked against
+    // the object/array FACTORY signature Vue requires for unknown-typed props
+    // (TS2322 at the default literal). Both are pure type annotations (zero
+    // runtime change); the proper fix is an emitter-level annotation (OUT OF
+    // SCOPE — SCOPE FENCE). `buildMarkers` is covered by the shared bundled-leaf
+    // aid below (vue is added to its condition).
+    if (cfg.dir === 'vue') {
+      const themeToken = 'const themeExt = () =>';
+      const themeAnnotated = 'const themeExt = (): any =>';
+      if (!code.includes(themeToken)) {
+        throw new Error(
+          `codegen vue: expected to annotate \`themeExt\`'s return \`: any\` (G3 widened-theme ` +
+            `passthrough returns \`unknown\` under vue-tsc) but the token \`${themeToken}\` was not found ` +
+            `— the vue emit shape changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+      code = code.replace(themeToken, themeAnnotated);
+
+      const defaultToken = `theme: 'light', readOnly: false`;
+      const defaultAnnotated = `theme: 'light' as any, readOnly: false`;
+      if (!code.includes(defaultToken)) {
+        throw new Error(
+          `codegen vue: expected to annotate the \`theme\` withDefaults default \`as any\` (the ` +
+            `\`unknown\`-typed theme prop's primitive default is checked against Vue's factory-default ` +
+            `signature, TS2322) but the token \`${defaultToken}\` was not found — the vue emit shape ` +
+            `changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+      code = code.replace(defaultToken, defaultAnnotated);
+    }
+
     // ─── Bundled-leaf type aid (react/solid/lit): annotate `buildMarkers`'s ──
     // return `: any` for the `gutter` slot (G5 wave 2). The custom-gutter
     // `markers` callback must return `RangeSet<GutterMarker>`, but `buildMarkers`
@@ -431,7 +469,13 @@ function main() {
     // dist+source standard, so it trips the same TS2322); vue/svelte stay
     // type-neutral at build. Only present when the `gutter` slot wires the marker
     // builder, so this aid is gated on the token's presence.
-    if (cfg.dir === 'react' || cfg.dir === 'solid' || cfg.dir === 'lit' || cfg.dir === 'angular') {
+    if (
+      cfg.dir === 'react' ||
+      cfg.dir === 'solid' ||
+      cfg.dir === 'lit' ||
+      cfg.dir === 'angular' ||
+      cfg.dir === 'vue'
+    ) {
       const markersToken = 'const buildMarkers = (mView: any) =>';
       const markersAnnotated = 'const buildMarkers = (mView: any): any =>';
       if (!code.includes(markersToken)) {

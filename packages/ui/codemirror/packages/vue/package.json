@@ -26,8 +26,12 @@
   },
   "exports": {
     ".": {
-      "import": "./src/CodeMirror.vue",
-      "types": "./src/CodeMirror.vue",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/CodeMirror.vue",
       "default": "./src/CodeMirror.vue"
     },
     "./languages": {
@@ -37,6 +41,7 @@
     }
   },
   "files": [
+    "dist",
     "src"
   ],
   "peerDependencies": {
@@ -112,11 +117,34 @@
     }
   },
   "scripts": {
-    "build": "echo 'ships source; no build'",
-    "typecheck": "echo 'source-only, no typecheck'"
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "codemirror": "^6",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-javascript": "^6",
+    "@codemirror/lang-html": "^6",
+    "@codemirror/lang-css": "^6",
+    "@codemirror/lang-sass": "^6",
+    "@codemirror/lang-vue": "^0.1.3",
+    "@codemirror/lang-json": "^6",
+    "@codemirror/lang-markdown": "^6",
+    "@codemirror/lang-yaml": "^6",
+    "@codemirror/lang-xml": "^6",
+    "@codemirror/lang-python": "^6",
+    "@codemirror/lang-sql": "^6",
+    "@codemirror/theme-one-dark": "^6",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  }
 }

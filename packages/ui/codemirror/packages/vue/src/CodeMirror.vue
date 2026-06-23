@@ -21,7 +21,7 @@ import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch }
 
 const props = withDefaults(
   defineProps<{ language?: string; theme?: unknown; readOnly?: boolean; height?: number; placeholder?: string; extensions?: any[]; basicSetup?: boolean; gutterLines?: any[]; decorations?: any[] }>(),
-  { language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: () => [], basicSetup: false, gutterLines: () => [], decorations: () => [] }
+  { language: 'javascript', theme: 'light' as any, readOnly: false, height: 240, placeholder: '', extensions: () => [], basicSetup: false, gutterLines: () => [], decorations: () => [] }
 );
 
 const value = defineModel<string>('value', { default: '' });
@@ -184,7 +184,7 @@ const langExt = () => props.language === 'javascript' ? javascript() : [];
 // anything else is treated as a CM Extension (or Extension[]) and passed
 // straight through the themeCompartment. The $watch(theme) reconfigure below
 // covers extension themes live, identical to the string forms.
-const themeExt = () => {
+const themeExt = (): any => {
   const t = props.theme;
   if (t === 'dark') return oneDark;
   if (t === 'light' || t === '' || t == null) return [];
@@ -644,7 +644,7 @@ onMounted(() => {
     // Recompute the marker RangeSet from `gutterLines` against the live doc —
     // one marker at the START of each in-range line. RangeSet.of REQUIRES the
     // ranges sorted by `from`, so sort the resolved positions.
-    const buildMarkers = (mView: any) => {
+    const buildMarkers = (mView: any): any => {
       const doc = mView.state.doc;
       const ranges = [];
       for (const n of props.gutterLines as any) {
