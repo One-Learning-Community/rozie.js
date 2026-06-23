@@ -234,7 +234,7 @@ All slots live on the parent `<DataTable>` (a `<Column>` carries metadata only).
 | `selectCell` | `row, checked, toggle` | Override the per-row select checkbox (only when `selectionMode="multiple"`). |
 | `detail` | `row` | Custom expanded-row content rendered under an expanded row (only when `expandable` and no `getSubRows`). The React render-prop edge (documented divergence). |
 | `groupBar` | `grouping, groupableColumns, applyGrouping, clearGrouping` | **Headless** group-bar (only when `groupable`). Receives the ordered `grouping` array, the `groupableColumns` (`[{ id, label }]`), and the `applyGrouping`/`clearGrouping` helpers so a consumer builds any bar/drag UI. The default render is a non-interactive styled-token reflection (empty when ungrouped); the component ships **no** drag affordance. The React render-prop edge (documented divergence). |
-| `filter` | `columnId, uniqueValues, minMax` | **Headless** faceted-filter UI (only when a column is `filterable`). `uniqueValues` is the cross-filtered distinct values (`unknown[]`, keys only); `minMax` is the cross-filtered numeric `[min, max]` (or `null`). Build a checkbox list / range slider and drive `columnFilters` yourself — the slot fires no event. See [Faceted filtering](#faceted-filtering). The React render-prop edge (documented divergence). |
+| `filter` | `columnId, uniqueValues, minMax, setFilter` | **Headless** faceted-filter UI (only when a column is `filterable`). `uniqueValues` is the cross-filtered distinct values (`unknown[]`, keys only); `minMax` is the cross-filtered numeric `[min, max]` (or `null`); `setFilter(columnId, value)` applies a column filter through the same funnel the built-in input uses (`value` of `null`/`''` clears it). Build a checkbox list / range slider and call `setFilter` (or drive `columnFilters` directly) — the slot fires no event. See [Faceted filtering](#faceted-filtering). The React render-prop edge (documented divergence). Pair it with the [drop-in filter components](#drop-in-filter-components). |
 | `editor` | `columnId, column, row, value, commit, cancel` | Custom cell editor (a column with `editor="custom"`, or to override the built-in editor). `value` is the current draft; `commit(newValue)` validates + commits (fires `cell-edit-commit`); `cancel()` closes without saving; `column`/`row` are opaque passthroughs. Pair it with the [drop-in editor components](#drop-in-editor-components). The React render-prop edge (documented divergence). |
 
 ## Theming
@@ -349,7 +349,26 @@ Per-column **faceted** filtering is **headless and read-only**: the component ex
 </DataTable>
 ```
 
-The `#filter` scope is `{ columnId, uniqueValues, minMax }`: `uniqueValues` is the **cross-filtered** distinct values (`unknown[]`, keys only — occurrence counts are deliberately not exposed) and `minMax` is the cross-filtered numeric `[min, max]` (or `null`). "Cross-filtered" means each facet reflects the rows passing all *other* active column filters. The slot fires no event — update `columnFilters` (shape `[{ id: columnId, value }]`) from your own UI. The same data is readable imperatively via [`getFacetedUniqueValues`](#imperative-handle) / `getFacetedMinMaxValues`. Faceting stays off-path (byte-identical-off) until the `#filter` slot or a faceted verb reads it.
+The `#filter` scope is `{ columnId, uniqueValues, minMax, setFilter }`: `uniqueValues` is the **cross-filtered** distinct values (`unknown[]`, keys only — occurrence counts are deliberately not exposed), `minMax` is the cross-filtered numeric `[min, max]` (or `null`), and `setFilter(columnId, value)` applies a column filter through the same funnel the built-in per-column input uses (passing `null`/`''` clears that column's filter). "Cross-filtered" means each facet reflects the rows passing all *other* active column filters. The slot fires no event — call `setFilter` (or update `columnFilters` directly, shape `[{ id: columnId, value }]`) from your own UI. The same data is readable imperatively via [`getFacetedUniqueValues`](#imperative-handle) / `getFacetedMinMaxValues`. Faceting stays off-path (byte-identical-off) until the `#filter` slot or a faceted verb reads it.
+
+## Drop-in filter components
+
+The `#filter` slot is fully headless — you can render any facet UI. For the common cases the package also ships **opt-in drop-in filter components** so you don't have to hand-roll the input wiring: `FilterText`, `FilterNumberRange`, and `FilterSelect`. Like the [editor drop-ins](#drop-in-editor-components) they are **additive named exports** alongside `DataTable` (which stays the headless **default** export — importing the filters is byte-identical-off if you never use them):
+
+```ts
+import { DataTable, Column, FilterText, FilterNumberRange, FilterSelect }
+  from '@rozie-ui/data-table-<target>';
+// (Vue: `import DataTable, { Column, FilterText, … }` — DataTable is the default.
+//  Lit: the single side-effect import registers the <rozie-filter-*> custom elements.)
+```
+
+Each drop-in takes the `#filter` slot scope as its props — `{ columnId, column, value, setFilter }` — and writes the column filter by calling `setFilter(columnId, value)`; `FilterSelect` additionally reads `uniqueValues` (the faceted keys) and `FilterNumberRange` additionally reads `minMax` (the faceted bounds), both of which already arrive in the slot scope. Mark the column `filterable` so the `#filter` slot renders, then dispatch by `columnId` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke filter. The full per-framework wiring is the [drop-in filter example](/components/data-table-usage) on the usage page.
+
+| Component | Renders | Writes | Extra scope read |
+| --- | --- | --- | --- |
+| `FilterText` | `<input type="text">` | `setFilter(columnId, draft)` (Enter / blur; Escape clears) | — |
+| `FilterNumberRange` | two `<input type="number">` | `setFilter(columnId, [min, max])` (`inNumberRange` shape; both empty clears) | `minMax` |
+| `FilterSelect` | `<select>` | `setFilter(columnId, value)` (leading "All" option clears) | `uniqueValues` |
 
 ## Expandable rows
 

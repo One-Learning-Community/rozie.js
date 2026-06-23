@@ -363,6 +363,57 @@ export class DemoComponent {
 }
 ```
 
+### Drop-in filter components (`#filter`)
+
+```ts
+import { Component } from '@angular/core';
+import {
+  DataTable, Column,
+  FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, FilterText, FilterNumberRange, FilterSelect],
+  template: `
+    <!-- OPT-IN drop-in filters fill the #filter template — DataTable stays the headless
+         default; the filters are additive named exports. Each takes the slot scope as
+         inputs ([columnId] [column] [value] [setFilter]); FilterSelect also takes
+         [uniqueValues], FilterNumberRange also takes [minMax]. Mark each column
+         filterable so the #filter slot renders. -->
+    <DataTable [(data)]="rows" [(columnFilters)]="columnFilters">
+      <Column field="name" header="Name" [filterable]="true" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" [filterable]="true" />
+
+      <ng-template #filter let-columnId="columnId" let-column="column" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
+        @switch (columnId) {
+          @case ('name') {
+            <rozie-filter-text [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" />
+          }
+          @case ('category') {
+            <rozie-filter-select [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
+          }
+          @case ('price') {
+            <rozie-filter-number-range [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
+          }
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  columnFilters: { id: string; value: unknown }[] = [];
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

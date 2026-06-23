@@ -286,6 +286,48 @@ render(html`
 `, document.body);
 ```
 
+### Drop-in filter components (`#filter`)
+
+```ts
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in filter
+// custom elements (<rozie-filter-text>, <rozie-filter-number-range>,
+// <rozie-filter-select>). DataTable stays the headless default; the filters are additive.
+import '@rozie-ui/data-table-lit';
+
+let rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+let columnFilters: { id: string; value: unknown }[] = [];
+
+// The #filter slot is the `.filter` property — a function returning a Lit template,
+// dispatched by columnId. Pass the slot scope ({ columnId, column, value, setFilter,
+// uniqueValues, minMax }) as element properties.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    .columnFilters=${columnFilters}
+    @filter-change=${(e: CustomEvent) => { columnFilters = e.detail.columnFilters; }}
+    .filter=${({ columnId, column, value, setFilter, uniqueValues, minMax }) => {
+      const p = { columnId, column, value, setFilter, uniqueValues, minMax };
+      switch (columnId) {
+        case 'name':     return html`<rozie-filter-text .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter}></rozie-filter-text>`;
+        case 'category': return html`<rozie-filter-select .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter} .uniqueValues=${p.uniqueValues}></rozie-filter-select>`;
+        case 'price':    return html`<rozie-filter-number-range .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter} .minMax=${p.minMax}></rozie-filter-number-range>`;
+        default:         return null;
+      }
+    }}
+  >
+    <rozie-column field="name" header="Name" filterable></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

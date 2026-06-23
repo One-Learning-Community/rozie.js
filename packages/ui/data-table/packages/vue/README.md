@@ -308,6 +308,44 @@ const statusOptions = [
 </template>
 ```
 
+### Drop-in filter components (`#filter`)
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless DEFAULT
+// export; the filters are additive named exports. Mark each column :filterable (the
+// #filter slot only renders for filterable columns) and v-bind the whole slot scope
+// through to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+const rows = ref([
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ]);
+const columnFilters = ref<{ id: string; value: unknown }[]>([]);
+</script>
+
+<template>
+  <DataTable v-model:data="rows" v-model:column-filters="columnFilters">
+    <Column field="name" header="Name" :filterable="true" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" :filterable="true" />
+
+    <!-- One #filter slot, dispatched by columnId, wiring the drop-in filters. -->
+    <template #filter="scope">
+      <FilterText v-if="scope.columnId === 'name'" v-bind="scope" />
+      <FilterSelect v-else-if="scope.columnId === 'category'" v-bind="scope" />
+      <FilterNumberRange v-else-if="scope.columnId === 'price'" v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

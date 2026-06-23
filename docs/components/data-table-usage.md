@@ -1764,6 +1764,259 @@ render(html`
 
 :::
 
+### Drop-in filter components (`#filter`)
+
+::: code-group
+
+```tsx [React]
+import { useState } from 'react';
+import {
+  DataTable, Column,
+  FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-react';
+
+export function Demo() {
+  // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
+  // DEFAULT; the filters are additive named exports. Mark each column `filterable`
+  // (the #filter slot only renders for filterable columns) and dispatch by columnId.
+  // Each filter takes the slot scope as props ({ columnId, column, value, setFilter });
+  // FilterSelect also reads `uniqueValues`, FilterNumberRange also reads `minMax` —
+  // both arrive in the slot scope, so spreading it through wires them up.
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = useState<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on React (the documented edge).
+      renderFilter={(scope) => {
+        switch (scope.columnId) {
+          case 'name':     return <FilterText {...scope} />;
+          case 'category': return <FilterSelect {...scope} />;
+          case 'price':    return <FilterNumberRange {...scope} />;
+          default:         return null;
+        }
+      }}
+    >
+      <Column field="name" header="Name" filterable />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
+```vue [Vue]
+<script setup lang="ts">
+import { ref } from 'vue';
+import DataTable, {
+  Column, FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-vue';
+
+// OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless DEFAULT
+// export; the filters are additive named exports. Mark each column :filterable (the
+// #filter slot only renders for filterable columns) and v-bind the whole slot scope
+// through to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+const rows = ref([
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ]);
+const columnFilters = ref<{ id: string; value: unknown }[]>([]);
+</script>
+
+<template>
+  <DataTable v-model:data="rows" v-model:column-filters="columnFilters">
+    <Column field="name" header="Name" :filterable="true" />
+    <Column field="category" header="Category" :filterable="true" />
+    <Column field="price" header="Price" :filterable="true" />
+
+    <!-- One #filter slot, dispatched by columnId, wiring the drop-in filters. -->
+    <template #filter="scope">
+      <FilterText v-if="scope.columnId === 'name'" v-bind="scope" />
+      <FilterSelect v-else-if="scope.columnId === 'category'" v-bind="scope" />
+      <FilterNumberRange v-else-if="scope.columnId === 'price'" v-bind="scope" />
+    </template>
+  </DataTable>
+</template>
+```
+
+```svelte [Svelte]
+<script lang="ts">
+  import DataTable, {
+    Column, FilterText, FilterNumberRange, FilterSelect,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-in filters fill the #filter snippet — DataTable stays the headless
+  // DEFAULT export; the filters are additive named exports. Mark each column filterable
+  // (the #filter snippet only renders for filterable columns) and spread the snippet
+  // scope ({ columnId, column, value, setFilter, uniqueValues, minMax }) through.
+  let rows = $state([
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ]);
+  let columnFilters = $state<{ id: string; value: unknown }[]>([]);
+</script>
+
+<DataTable bind:data={rows} bind:columnFilters>
+  <Column field="name" header="Name" filterable />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  <!-- One #filter snippet, dispatched by columnId, wiring the drop-in filters. -->
+  {#snippet filter(scope)}
+    {#if scope.columnId === 'name'}
+      <FilterText {...scope} />
+    {:else if scope.columnId === 'category'}
+      <FilterSelect {...scope} />
+    {:else if scope.columnId === 'price'}
+      <FilterNumberRange {...scope} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
+```ts [Angular]
+import { Component } from '@angular/core';
+import {
+  DataTable, Column,
+  FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-angular';
+
+@Component({
+  selector: 'app-demo',
+  standalone: true,
+  imports: [DataTable, Column, FilterText, FilterNumberRange, FilterSelect],
+  template: `
+    <!-- OPT-IN drop-in filters fill the #filter template — DataTable stays the headless
+         default; the filters are additive named exports. Each takes the slot scope as
+         inputs ([columnId] [column] [value] [setFilter]); FilterSelect also takes
+         [uniqueValues], FilterNumberRange also takes [minMax]. Mark each column
+         filterable so the #filter slot renders. -->
+    <DataTable [(data)]="rows" [(columnFilters)]="columnFilters">
+      <Column field="name" header="Name" [filterable]="true" />
+      <Column field="category" header="Category" [filterable]="true" />
+      <Column field="price" header="Price" [filterable]="true" />
+
+      <ng-template #filter let-columnId="columnId" let-column="column" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
+        @switch (columnId) {
+          @case ('name') {
+            <rozie-filter-text [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" />
+          }
+          @case ('category') {
+            <rozie-filter-select [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [uniqueValues]="uniqueValues" />
+          }
+          @case ('price') {
+            <rozie-filter-number-range [columnId]="columnId" [column]="column" [value]="value" [setFilter]="setFilter" [minMax]="minMax" />
+          }
+        }
+      </ng-template>
+    </DataTable>
+  `,
+})
+export class DemoComponent {
+  rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  columnFilters: { id: string; value: unknown }[] = [];
+}
+```
+
+```tsx [Solid]
+import { createSignal, Switch, Match } from 'solid-js';
+import {
+  DataTable, Column,
+  FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
+  // default; the filters are additive named exports. Mark each column filterable (the
+  // #filter slot only renders for filterable columns) and spread the slot scope through
+  // to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters()}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on Solid (the documented edge).
+      filterSlot={(scope) => (
+        <Switch>
+          <Match when={scope.columnId === 'name'}><FilterText {...scope} /></Match>
+          <Match when={scope.columnId === 'category'}><FilterSelect {...scope} /></Match>
+          <Match when={scope.columnId === 'price'}><FilterNumberRange {...scope} /></Match>
+        </Switch>
+      )}
+    >
+      <Column field="name" header="Name" filterable />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
+```ts [Lit]
+import { html, render } from 'lit';
+// The single side-effect import registers <rozie-data-table> AND the drop-in filter
+// custom elements (<rozie-filter-text>, <rozie-filter-number-range>,
+// <rozie-filter-select>). DataTable stays the headless default; the filters are additive.
+import '@rozie-ui/data-table-lit';
+
+let rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+let columnFilters: { id: string; value: unknown }[] = [];
+
+// The #filter slot is the `.filter` property — a function returning a Lit template,
+// dispatched by columnId. Pass the slot scope ({ columnId, column, value, setFilter,
+// uniqueValues, minMax }) as element properties.
+render(html`
+  <rozie-data-table
+    .data=${rows}
+    .columnFilters=${columnFilters}
+    @filter-change=${(e: CustomEvent) => { columnFilters = e.detail.columnFilters; }}
+    .filter=${({ columnId, column, value, setFilter, uniqueValues, minMax }) => {
+      const p = { columnId, column, value, setFilter, uniqueValues, minMax };
+      switch (columnId) {
+        case 'name':     return html`<rozie-filter-text .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter}></rozie-filter-text>`;
+        case 'category': return html`<rozie-filter-select .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter} .uniqueValues=${p.uniqueValues}></rozie-filter-select>`;
+        case 'price':    return html`<rozie-filter-number-range .columnId=${p.columnId} .column=${p.column} .value=${p.value} .setFilter=${p.setFilter} .minMax=${p.minMax}></rozie-filter-number-range>`;
+        default:         return null;
+      }
+    }}
+  >
+    <rozie-column field="name" header="Name" filterable></rozie-column>
+    <rozie-column field="category" header="Category" filterable></rozie-column>
+    <rozie-column field="price" header="Price" filterable></rozie-column>
+  </rozie-data-table>
+`, document.body);
+```
+
+:::
+
 ## Imperative handle
 
 Beyond props and events, `DataTable` exposes imperative methods (declared once in the `.rozie` source via `$expose`). Grab a handle through your framework's native ref mechanism and call them directly:

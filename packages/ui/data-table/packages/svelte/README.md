@@ -288,6 +288,45 @@ Columns may be declared as a `:columns` config array **or** as `<Column>` childr
 </DataTable>
 ```
 
+### Drop-in filter components (`#filter`)
+
+```svelte
+<script lang="ts">
+  import DataTable, {
+    Column, FilterText, FilterNumberRange, FilterSelect,
+  } from '@rozie-ui/data-table-svelte';
+
+  // OPT-IN drop-in filters fill the #filter snippet — DataTable stays the headless
+  // DEFAULT export; the filters are additive named exports. Mark each column filterable
+  // (the #filter snippet only renders for filterable columns) and spread the snippet
+  // scope ({ columnId, column, value, setFilter, uniqueValues, minMax }) through.
+  let rows = $state([
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ]);
+  let columnFilters = $state<{ id: string; value: unknown }[]>([]);
+</script>
+
+<DataTable bind:data={rows} bind:columnFilters>
+  <Column field="name" header="Name" filterable />
+  <Column field="category" header="Category" filterable />
+  <Column field="price" header="Price" filterable />
+
+  <!-- One #filter snippet, dispatched by columnId, wiring the drop-in filters. -->
+  {#snippet filter(scope)}
+    {#if scope.columnId === 'name'}
+      <FilterText {...scope} />
+    {:else if scope.columnId === 'category'}
+      <FilterSelect {...scope} />
+    {:else if scope.columnId === 'price'}
+      <FilterNumberRange {...scope} />
+    {/if}
+  {/snippet}
+</DataTable>
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):

@@ -312,6 +312,49 @@ export function Demo() {
 }
 ```
 
+### Drop-in filter components (`#filter`)
+
+```tsx
+import { createSignal, Switch, Match } from 'solid-js';
+import {
+  DataTable, Column,
+  FilterText, FilterNumberRange, FilterSelect,
+} from '@rozie-ui/data-table-solid';
+
+export function Demo() {
+  // OPT-IN drop-in filters fill the #filter slot — DataTable stays the headless
+  // default; the filters are additive named exports. Mark each column filterable (the
+  // #filter slot only renders for filterable columns) and spread the slot scope through
+  // to each drop-in ({ columnId, column, value, setFilter, uniqueValues, minMax }).
+  const rows = [
+    { id: 1, name: 'Alpha',   category: 'Hardware', price: 30 },
+    { id: 2, name: 'Beta',    category: 'Software', price: 90 },
+    { id: 3, name: 'Gamma',   category: 'Hardware', price: 10 },
+    { id: 4, name: 'Delta',   category: 'Service',  price: 50 },
+  ];
+  const [columnFilters, setColumnFilters] = createSignal<{ id: string; value: unknown }[]>([]);
+  return (
+    <DataTable
+      data={rows}
+      columnFilters={columnFilters()}
+      onFilterChange={(p) => p.columnFilters && setColumnFilters(p.columnFilters)}
+      // The #filter scoped slot is a render prop on Solid (the documented edge).
+      filterSlot={(scope) => (
+        <Switch>
+          <Match when={scope.columnId === 'name'}><FilterText {...scope} /></Match>
+          <Match when={scope.columnId === 'category'}><FilterSelect {...scope} /></Match>
+          <Match when={scope.columnId === 'price'}><FilterNumberRange {...scope} /></Match>
+        </Switch>
+      )}
+    >
+      <Column field="name" header="Name" filterable />
+      <Column field="category" header="Category" filterable />
+      <Column field="price" header="Price" filterable />
+    </DataTable>
+  );
+}
+```
+
 ## Theming
 
 Every visual value is a `--rozie-data-table-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package (import `base.css` first, then a bridge):
