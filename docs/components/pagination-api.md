@@ -34,7 +34,7 @@ All slots are optional — omit them to get the default token-themed buttons.
 | `prevControl` | `{ disabled, goto, page }` | Render the "previous page" control. `disabled` is `true` at the first page, `goto` steps back, `page` is the target. |
 | `nextControl` | `{ disabled, goto, page }` | Render the "next page" control. `disabled` is `true` at the last page, `goto` steps forward, `page` is the target. |
 
-> React consumers receive the scoped slots as a render-prop bag (`children={{ item: (ctx) => … }}`) — the one documented cross-framework slot divergence.
+> On React the scoped slots are render-prop callbacks (e.g. an `item` render-prop) — the one documented cross-framework slot divergence.
 
 ## Imperative handle
 
