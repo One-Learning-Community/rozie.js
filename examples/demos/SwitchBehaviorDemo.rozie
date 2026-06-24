@@ -1,0 +1,87 @@
+<!--
+  SwitchBehaviorDemo — VR behavioral cell for @rozie-ui/switch (pure-Rozie, no
+  engine). Drives the WAI-ARIA toggle: a two-way r-model:modelValue (live value +
+  @change readouts), click + keyboard (Space/Enter) toggling, a `set-on`
+  direct-model-write button, and a sibling DISABLED switch that must stay inert.
+  The spec clicks the control, presses Space, and checks aria-checked + clamp on
+  the disabled instance — see switch.spec.ts. Behavioral-only.
+-->
+<rozie name="SwitchBehaviorDemo">
+
+<components>
+{
+  Switch: '../../packages/ui/switch/src/Switch.rozie',
+}
+</components>
+
+<data>
+{
+  on: false,
+  lastChange: '',
+}
+</data>
+
+<script>
+const onChange = (e) => {
+  // Lit delivers a child's @emit as a CustomEvent → payload lives in e.detail;
+  // the other 5 targets pass the payload object as arg0 directly (documented
+  // cross-target consumer edge — see authoring playbook §5). `checked` is the
+  // switch's @emit payload key; the unwrap guard reads `e.checked == null`
+  // (false != null, so a genuine `{ checked: false }` arg0 is NOT unwrapped).
+  const p = e && e.checked == null && e.detail ? e.detail : e
+  $data.lastChange = p && p.checked != null ? String(p.checked) : 'null'
+}
+const applyOn = () => {
+  $data.on = true
+}
+const valueText = () => ($data.on ? 'on' : 'off')
+</script>
+
+<template>
+<div class="switch-demo">
+  <h3>Switch — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-on" @click="applyOn()">Set on</button>
+    <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
+    <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
+  </div>
+
+  <Switch
+    r-model:modelValue="$data.on"
+    ariaLabel="Wi-Fi"
+    @change="onChange($event)"
+  />
+
+  <!-- A disabled switch the spec proves is inert (no toggle on click). -->
+  <Switch
+    :modelValue="false"
+    :disabled="true"
+    ariaLabel="Airplane mode"
+  />
+</div>
+</template>
+
+<style>
+.switch-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.switch-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.switch-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+</style>
+
+</rozie>

@@ -1,0 +1,98 @@
+<!--
+  PopoverBehaviorDemo — VR behavioral cell for @rozie-ui/popover (wraps
+  @floating-ui/dom). Drives the click-trigger floating primitive: a two-way
+  r-model:open (live open + @change readouts), the anchor-click open gesture,
+  Escape + click-outside dismissal, and a `set-closed` direct-model-write button
+  (programmatic CLOSE). The floating panel is r-if="open" so the spec asserts
+  presence/absence via role="dialog". See popover.spec.ts. Behavioral-only.
+
+  WHY THE DIRECT-MODEL-WRITE IS A *CLOSE*, NOT AN OPEN: a programmatic OPEN from
+  an external button races with the click-outside dismissal on Svelte — the
+  opening click keeps bubbling to `document`, where the just-attached outside
+  listener (Svelte attaches it synchronously on the same tick; the other 5 targets
+  defer it) sees the click target is outside the popover and immediately dismisses.
+  Closing has no such race, so it is the cross-target-robust direct-write
+  assertion. The surfaced Svelte race is tracked in
+  project_vr_direct_model_write_null_react_solid_lit.
+
+  The @change payload is a BARE boolean (not an object), so its Lit-consumer
+  unwrap differs from the object-payload families (number-field/switch): the
+  CustomEvent carries the boolean in e.detail; the typeof guard keeps the boolean
+  primitive path on the other 5 targets from throwing on `'detail' in e`.
+-->
+<rozie name="PopoverBehaviorDemo">
+
+<components>
+{
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
+}
+</components>
+
+<data>
+{
+  panelOpen: false,
+  lastChange: '',
+}
+</data>
+
+<script>
+const onChange = (e) => {
+  const v = e && typeof e === 'object' && 'detail' in e ? e.detail : e
+  $data.lastChange = String(v)
+}
+const applyClose = () => {
+  $data.panelOpen = false
+}
+const valueText = () => ($data.panelOpen ? 'open' : 'closed')
+</script>
+
+<template>
+<div class="popover-demo">
+  <h3>Popover — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-closed" @click="applyClose()">Set closed</button>
+    <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
+    <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
+  </div>
+
+  <Popover
+    r-model:open="$data.panelOpen"
+    trigger="click"
+    placement="bottom"
+    :offset="8"
+    @change="onChange($event)"
+  >
+    <template #anchor>
+      <button type="button" data-testid="popover-anchor">Menu</button>
+    </template>
+    <div class="popover-body" data-testid="popover-content">
+      <p>Floating content</p>
+    </div>
+  </Popover>
+</div>
+</template>
+
+<style>
+.popover-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.popover-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.popover-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+}
+.popover-body {
+  font-size: 0.9rem;
+}
+</style>
+
+</rozie>

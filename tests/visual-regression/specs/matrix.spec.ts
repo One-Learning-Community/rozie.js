@@ -374,6 +374,16 @@ const EXAMPLES = [
   'TagsScreenshot',
   'NumberFieldScreenshot',
   'PaginationScreenshot',
+  // @rozie-ui/switch INLINE screenshot cell — the pure-Rozie toggle renders in
+  // normal flow, so it goes in this standard mount-clipped matrix.
+  // SwitchScreenshot seeds three fixed states (on / off / disabled), unfocused
+  // (no focus-visible ring). Per D-10 all 6 targets diff against the SAME shared
+  // `SwitchScreenshot.png`. Baseline-gates to test.fixme via baselineExists()
+  // until the Linux-Docker PNG lands (feedback_vr_linux_baselines). The
+  // PopoverScreenshot cell lives in overlay-screenshot.spec.ts (its floating
+  // panel is position:absolute and escapes the rozie-mount clip). The *Behavior
+  // cells are behavioral-only (no pixel baseline).
+  'SwitchScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -885,6 +895,12 @@ async function settleExample(
     await expect(page.locator('[class*="rozie-pagination-page"]')).toHaveCount(5, {
       timeout: 10_000,
     });
+  }
+  // SwitchScreenshot (@rozie-ui/switch): three fixed switches (on / off /
+  // disabled). `role="switch"` pierces Lit's shadow; nothing is focused (no
+  // focus-visible ring), so once all 3 paint the frame is final.
+  if (example === 'SwitchScreenshot') {
+    await expect(page.getByRole('switch')).toHaveCount(3, { timeout: 10_000 });
   }
 }
 

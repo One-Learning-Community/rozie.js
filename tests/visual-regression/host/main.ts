@@ -715,6 +715,27 @@ export const EXAMPLES = [
   'TagsScreenshot',
   'NumberFieldScreenshot',
   'PaginationScreenshot',
+  // @rozie-ui/switch + popover headless families — the BEHAVIORAL cells (loaders →
+  // examples/demos/{Switch,Popover}BehaviorDemo.rozie, each importing
+  // packages/ui/<family>/src/<Component>.rozie). SwitchBehavior drives the
+  // pure-Rozie WAI-ARIA toggle (two-way r-model:modelValue + @change +
+  // click/Space + a sibling DISABLED switch that stays inert); PopoverBehavior
+  // drives the @floating-ui/dom click popover (two-way r-model:open + @change +
+  // anchor-click open / Escape + outside-click dismissal). See switch/popover.spec.ts.
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). Both
+  // families register their src root for the Angular cross-tree AOT prebuild
+  // (vite.config.ts + tsconfig.app.json + build-cells.mjs).
+  'SwitchBehavior',
+  'PopoverBehavior',
+  // @rozie-ui/switch + popover SCREENSHOT cells (loaders →
+  // examples/demos/{Switch,Popover}ScreenshotDemo.rozie). SwitchScreenshot renders
+  // INLINE (3 fixed states: on/off/disabled) → standard mount-clipped matrix cell
+  // (matrix.spec.ts). PopoverScreenshot renders the popover OPEN; its floating
+  // content is position:absolute and ESCAPES the mount clip → captured PAGE-LEVEL
+  // by overlay-screenshot.spec.ts (the Dialog/Toaster precedent). Both auto-fixme
+  // on baselineExists() until the Linux-Docker PNGs land (feedback_vr_linux_baselines).
+  'SwitchScreenshot',
+  'PopoverScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -959,6 +980,13 @@ export const LIT_TAGS: Record<Example, string> = {
   TagsScreenshot: 'rozie-tags-screenshot',
   NumberFieldScreenshot: 'rozie-number-field-screenshot',
   PaginationScreenshot: 'rozie-pagination-screenshot',
+  // @rozie-ui/switch + popover — '-demo' appended on Lit → tags
+  // 'rozie-switch-behavior-demo' etc. = kebab of {Switch,Popover}{Behavior,Screenshot}Demo
+  // (the wrapper components are name="<Name>Demo").
+  SwitchBehavior: 'rozie-switch-behavior',
+  PopoverBehavior: 'rozie-popover-behavior',
+  SwitchScreenshot: 'rozie-switch-screenshot',
+  PopoverScreenshot: 'rozie-popover-screenshot',
 };
 
 export interface HostQuery {
@@ -1257,6 +1285,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TagsScreenshot: {},
   NumberFieldScreenshot: {},
   PaginationScreenshot: {},
+  // @rozie-ui/switch + popover — all four demos are self-contained wrappers (each
+  // seeds its own state in <data> and binds the inner component via r-model). No
+  // parent-supplied props; no MODEL_PROPS entry (the model is bound internally —
+  // the FlowCanvas/MapLibre self-binding precedent).
+  SwitchBehavior: {},
+  PopoverBehavior: {},
+  SwitchScreenshot: {},
+  PopoverScreenshot: {},
 };
 
 /**

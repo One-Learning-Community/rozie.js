@@ -250,6 +250,8 @@ const PAGINATION_SRC = resolve(
   'pagination',
   'src',
 );
+const SWITCH_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'switch', 'src');
+const POPOVER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'popover', 'src');
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -609,10 +611,16 @@ function cleanupCrossTreeAngularArtifacts() {
   // *BehaviorDemo / *ScreenshotDemo cells compose each family via <components>, so
   // the Angular sub-build emits <Name>.rozie.ts + the <Name>.ts shim here).
   // Leftovers poison the later solid/lit builds.
+  // @rozie-ui/switch + popover join the same sweep ({Switch,Popover}{Behavior,
+  // Screenshot}Demo compose each family via <components>, so the Angular sub-build
+  // emits <Name>.rozie.ts + the <Name>.ts shim here). popover also has a plain
+  // ./internal/*.ts helper tree but emits no .rozie.ts there (no nested .rozie).
   for (const [src, shim] of [
     [TAGS_SRC, 'Tags.ts'],
     [NUMBER_FIELD_SRC, 'NumberField.ts'],
     [PAGINATION_SRC, 'Pagination.ts'],
+    [SWITCH_SRC, 'Switch.ts'],
+    [POPOVER_SRC, 'Popover.ts'],
   ]) {
     try {
       for (const entry of readdirSync(src)) {

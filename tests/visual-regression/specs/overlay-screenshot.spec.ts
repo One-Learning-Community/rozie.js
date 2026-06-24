@@ -41,7 +41,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
-const EXAMPLES = ['DialogScreenshot', 'ToasterScreenshot'] as const;
+const EXAMPLES = [
+  'DialogScreenshot',
+  'ToasterScreenshot',
+  // @rozie-ui/popover — the floating panel is `position: absolute` (laid out by
+  // Floating UI relative to the anchor, not the rozie-mount wrapper), so it
+  // escapes the matrix mount clip and is captured PAGE-LEVEL here. The demo seeds
+  // open=true so the panel + arrow paint on mount; Floating UI computes identical
+  // x/y from the same anchor/viewport across all six targets (the engine-computed
+  // byte-identity premise), so a single shared baseline holds.
+  'PopoverScreenshot',
+] as const;
 
 // Baseline-availability gate (per-example), copied from matrix.spec.ts. When
 // __screenshots__/<Name>.png is missing the cells for that example downgrade to
@@ -90,6 +100,13 @@ for (const example of EXAMPLES) {
         // the $refs.toaster.show() handle; each toast carries role="status". Wait
         // for the single fixed-corner toast before the clip. role= pierces Lit's shadow.
         await expect(page.locator('[role="status"]')).toHaveCount(1, {
+          timeout: 15_000,
+        });
+      } else if (example === 'PopoverScreenshot') {
+        // The demo seeds open=true; the floating panel is r-if="open" with
+        // role="dialog" (click trigger). Its visibility proves the panel mounted
+        // AND Floating UI applied left/top before the clip. role= pierces Lit's shadow.
+        await expect(page.locator('[role="dialog"]')).toBeVisible({
           timeout: 15_000,
         });
       }

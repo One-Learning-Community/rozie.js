@@ -1,0 +1,71 @@
+<!--
+  PopoverScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  @rozie-ui/popover.
+
+  Where PopoverBehaviorDemo.rozie is the BEHAVIORAL cell (open gesture / Escape /
+  outside-click), THIS is the SEPARATE deterministic SCREENSHOT cell — never
+  extend it for behavior. Made deterministic by a FIXED open=true seed (the
+  floating panel + arrow are shown), a fixed placement (bottom), :offset, NO
+  interaction, and a fixed frame. Floating UI computes identical x/y from the same
+  anchor/viewport across all six targets (the engine-computed-byte-identity
+  premise), so a single shared baseline holds.
+
+  ESCAPES THE MOUNT CLIP: the floating content is `position: absolute` (laid out
+  by Floating UI relative to the anchor, not the rozie-mount wrapper), so this
+  cell is captured PAGE-LEVEL by overlay-screenshot.spec.ts (the Dialog/Toaster
+  precedent), NOT the mount-clipped matrix.spec.ts. The Linux PNG baseline is
+  generated separately in pinned Linux Docker (NOT here — macOS baselines are
+  forbidden, feedback_vr_linux_baselines); until it lands the cell auto-fixmes on
+  baselineExists().
+-->
+<rozie name="PopoverScreenshotDemo">
+
+<components>
+{
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
+}
+</components>
+
+<data>
+{
+  open: true,
+}
+</data>
+
+<template>
+<div class="popover-screenshot-demo">
+  <Popover
+    r-model:open="$data.open"
+    trigger="click"
+    placement="bottom"
+    :offset="8"
+    arrow
+  >
+    <template #anchor>
+      <button type="button" class="popover-screenshot-anchor">Menu</button>
+    </template>
+    <div class="popover-screenshot-body">
+      <p>Floating content</p>
+    </div>
+  </Popover>
+</div>
+</template>
+
+<style>
+.popover-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 2rem;
+  width: 240px;
+  height: 160px;
+}
+.popover-screenshot-anchor {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+}
+.popover-screenshot-body {
+  font-size: 0.9rem;
+}
+</style>
+
+</rozie>
