@@ -65,6 +65,9 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Combobox** | *(no engine)* headless WAI-ARIA combobox / autocomplete | [/components/combobox](/components/combobox) |
 | **Toaster** | *(no engine)* headless accessible toast / notification host | [/components/toast](/components/toast) |
 | **Dialog** | *(native `<dialog>`)* headless accessible modal dialog | [/components/dialog](/components/dialog) |
+| **Tags** | *(no engine)* headless accessible token / tags input | [/components/tags](/components/tags) |
+| **NumberField** | *(no engine)* headless accessible number field / stepper | [/components/number-field](/components/number-field) |
+| **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
 
 ## Why these exist
 

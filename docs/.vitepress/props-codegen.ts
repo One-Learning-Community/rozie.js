@@ -55,6 +55,9 @@ export function propsCodegen(
   const resolveExample = (name: string): string => {
     for (const product of [
       'data-table',
+      'tags',
+      'number-field',
+      'pagination',
       'sortable-list',
       'flatpickr',
       'fullcalendar',

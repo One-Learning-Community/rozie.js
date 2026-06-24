@@ -319,6 +319,39 @@ export default defineConfig({
             { text: 'Live demo', link: '/components/data-table-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/tags',
+          collapsed: true,
+          items: [
+            { text: 'Tags — headless token / tags input', link: '/components/tags' },
+            { text: 'API reference', link: '/components/tags-api' },
+            { text: 'Usage examples', link: '/components/tags-usage' },
+            { text: 'Token / tags input comparison', link: '/components/tags-comparison' },
+            { text: 'Tags — live demo', link: '/components/tags-demo' },
+          ],
+        },
+        {
+          text: '@rozie-ui/number-field',
+          collapsed: true,
+          items: [
+            { text: 'NumberField — headless number / stepper input', link: '/components/number-field' },
+            { text: 'API reference', link: '/components/number-field-api' },
+            { text: 'Usage examples', link: '/components/number-field-usage' },
+            { text: 'Number / stepper input comparison', link: '/components/number-field-comparison' },
+            { text: 'NumberField — live demo', link: '/components/number-field-demo' },
+          ],
+        },
+        {
+          text: '@rozie-ui/pagination',
+          collapsed: true,
+          items: [
+            { text: 'Pagination — headless pagination', link: '/components/pagination' },
+            { text: 'API reference', link: '/components/pagination-api' },
+            { text: 'Usage examples', link: '/components/pagination-usage' },
+            { text: 'Pagination comparison', link: '/components/pagination-comparison' },
+            { text: 'Pagination — live demo', link: '/components/pagination-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {
