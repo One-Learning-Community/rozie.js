@@ -24,7 +24,7 @@
 const onChange = (e) => {
   $data.lastChange = e && e.value != null ? String(e.value) : 'null'
 }
-const setQty = () => {
+const applyQty = () => {
   $data.qty = 8
 }
 const valueText = () => ($data.qty == null ? 'null' : String($data.qty))
@@ -35,7 +35,7 @@ const valueText = () => ($data.qty == null ? 'null' : String($data.qty))
   <h3>NumberField — behavioral</h3>
 
   <div class="controls">
-    <button type="button" data-testid="set-qty" @click="setQty()">Set 8</button>
+    <button type="button" data-testid="set-qty" @click="applyQty()">Set 8</button>
     <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
     <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
   </div>

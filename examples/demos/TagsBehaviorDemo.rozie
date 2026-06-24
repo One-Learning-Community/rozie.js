@@ -28,7 +28,7 @@ const onAdd = (e) => {
 const onRemove = (e) => {
   $data.lastRemove = e && e.value != null ? e.value : ''
 }
-const setTags = () => {
+const applyTags = () => {
   $data.tags = ['one', 'two']
 }
 const valueText = () => (Array.isArray($data.tags) ? $data.tags.join(',') : '')
@@ -40,7 +40,7 @@ const countText = () => String(Array.isArray($data.tags) ? $data.tags.length : 0
   <h3>Tags — behavioral</h3>
 
   <div class="controls">
-    <button type="button" data-testid="set-tags" @click="setTags()">Set one,two</button>
+    <button type="button" data-testid="set-tags" @click="applyTags()">Set one,two</button>
     <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
     <span class="readout" data-testid="readout-count">{{ countText() }}</span>
     <span class="readout" data-testid="readout-add">{{ $data.lastAdd }}</span>

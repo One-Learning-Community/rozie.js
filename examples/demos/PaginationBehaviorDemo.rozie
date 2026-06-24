@@ -24,7 +24,7 @@
 const onChange = (e) => {
   $data.lastChange = e && e.page != null ? String(e.page) : ''
 }
-const setPage = () => {
+const applyPage = () => {
   $data.page = 10
 }
 const pageText = () => String($data.page)
@@ -35,7 +35,7 @@ const pageText = () => String($data.page)
   <h3>Pagination — behavioral</h3>
 
   <div class="controls">
-    <button type="button" data-testid="set-page" @click="setPage()">Set 10</button>
+    <button type="button" data-testid="set-page" @click="applyPage()">Set 10</button>
     <span class="readout" data-testid="readout-page">{{ pageText() }}</span>
     <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
   </div>
