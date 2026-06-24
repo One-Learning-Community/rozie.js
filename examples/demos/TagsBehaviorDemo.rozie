@@ -1,0 +1,80 @@
+<!--
+  TagsBehaviorDemo — VR behavioral cell for @rozie-ui/tags (pure-Rozie, no engine).
+  Drives the token input: a two-way r-model:modelValue (live value + count
+  readouts), @add / @remove readouts, and a `set-tags` direct-model-write button.
+  The spec types + commits tokens (Enter / comma), checks dedup, backspace-deletes-
+  previous, and chip removal — see tags.spec.ts. Behavioral-only (no pixel baseline).
+-->
+<rozie name="TagsBehaviorDemo">
+
+<components>
+{
+  Tags: '../../packages/ui/tags/src/Tags.rozie',
+}
+</components>
+
+<data>
+{
+  tags: ['alpha'],
+  lastAdd: '',
+  lastRemove: '',
+}
+</data>
+
+<script>
+const onAdd = (e) => {
+  $data.lastAdd = e && e.value != null ? e.value : ''
+}
+const onRemove = (e) => {
+  $data.lastRemove = e && e.value != null ? e.value : ''
+}
+const setTags = () => {
+  $data.tags = ['one', 'two']
+}
+const valueText = () => (Array.isArray($data.tags) ? $data.tags.join(',') : '')
+const countText = () => String(Array.isArray($data.tags) ? $data.tags.length : 0)
+</script>
+
+<template>
+<div class="tags-demo">
+  <h3>Tags — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-tags" @click="setTags()">Set one,two</button>
+    <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
+    <span class="readout" data-testid="readout-count">{{ countText() }}</span>
+    <span class="readout" data-testid="readout-add">{{ $data.lastAdd }}</span>
+    <span class="readout" data-testid="readout-remove">{{ $data.lastRemove }}</span>
+  </div>
+
+  <Tags
+    r-model:modelValue="$data.tags"
+    placeholder="Add a tag…"
+    ariaLabel="Tags"
+    @add="onAdd($event)"
+    @remove="onRemove($event)"
+  />
+</div>
+</template>
+
+<style>
+.tags-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.tags-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.tags-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+}
+</style>
+
+</rozie>

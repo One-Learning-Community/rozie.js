@@ -1,0 +1,73 @@
+<!--
+  PaginationBehaviorDemo — VR behavioral cell for @rozie-ui/pagination (pure-Rozie,
+  no engine). Drives the windowed pager: a two-way r-model:modelValue (live page +
+  change readouts), prev/next + page buttons, and a `set-page` direct-model-write
+  button. The spec clicks next/prev, jumps to a page, and checks aria-current +
+  the ellipsis window — see pagination.spec.ts. Behavioral-only (no pixel baseline).
+-->
+<rozie name="PaginationBehaviorDemo">
+
+<components>
+{
+  Pagination: '../../packages/ui/pagination/src/Pagination.rozie',
+}
+</components>
+
+<data>
+{
+  page: 5,
+  lastChange: '',
+}
+</data>
+
+<script>
+const onChange = (e) => {
+  $data.lastChange = e && e.page != null ? String(e.page) : ''
+}
+const setPage = () => {
+  $data.page = 10
+}
+const pageText = () => String($data.page)
+</script>
+
+<template>
+<div class="pagination-demo">
+  <h3>Pagination — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-page" @click="setPage()">Set 10</button>
+    <span class="readout" data-testid="readout-page">{{ pageText() }}</span>
+    <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
+  </div>
+
+  <Pagination
+    r-model:modelValue="$data.page"
+    :totalPages="20"
+    :siblingCount="1"
+    :boundaryCount="1"
+    ariaLabel="Pages"
+    @change="onChange($event)"
+  />
+</div>
+</template>
+
+<style>
+.pagination-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.pagination-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.pagination-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+}
+</style>
+
+</rozie>

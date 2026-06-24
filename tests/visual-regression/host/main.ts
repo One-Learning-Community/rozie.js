@@ -694,6 +694,27 @@ export const EXAMPLES = [
   // presence.
   'ThemeContext',
   'Tabs',
+  // Phase 60 @rozie-ui pure-Rozie headless families (NO engine) — tags /
+  // number-field / pagination. The three BEHAVIORAL cells (loaders →
+  // examples/demos/{Tags,NumberField,Pagination}BehaviorDemo.rozie, each importing
+  // packages/ui/<family>/src/<Component>.rozie). TagsBehavior drives the token
+  // input (two-way r-model:modelValue + @add/@remove + commit/dedup/backspace);
+  // NumberFieldBehavior drives the spinbutton (steppers + keyboard + clamp);
+  // PaginationBehavior drives the windowed pager (next/prev/goto + aria-current +
+  // ellipsis window). See tags/number-field/pagination.spec.ts. Behavioral-only;
+  // NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  'TagsBehavior',
+  'NumberFieldBehavior',
+  'PaginationBehavior',
+  // Phase 60 — the three content-STABLE SCREENSHOT cells (loaders →
+  // examples/demos/{Tags,NumberField,Pagination}ScreenshotDemo.rozie). All render
+  // INLINE → standard mount-clipped matrix cells (matrix.spec.ts). Each seeds a
+  // FIXED deterministic frame (Tags: 3 chips; NumberField: 42; Pagination: page 5
+  // of 20 → both ellipses) and auto-fixmes on baselineExists() until the
+  // Linux-Docker PNGs land (feedback_vr_linux_baselines). Distinct from *Behavior.
+  'TagsScreenshot',
+  'NumberFieldScreenshot',
+  'PaginationScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -929,6 +950,15 @@ export const LIT_TAGS: Record<Example, string> = {
   // TabsDemo (the demo wrappers are name="ThemeContextDemo" / "TabsDemo").
   ThemeContext: 'rozie-theme-context',
   Tabs: 'rozie-tabs',
+  // Phase 60 pure-Rozie families — '-demo' appended on Lit → tags
+  // 'rozie-tags-behavior-demo' etc. = kebab of {Tags,NumberField,Pagination}-
+  // {Behavior,Screenshot}Demo. The wrapper components are name="<Name>Demo".
+  TagsBehavior: 'rozie-tags-behavior',
+  NumberFieldBehavior: 'rozie-number-field-behavior',
+  PaginationBehavior: 'rozie-pagination-behavior',
+  TagsScreenshot: 'rozie-tags-screenshot',
+  NumberFieldScreenshot: 'rozie-number-field-screenshot',
+  PaginationScreenshot: 'rozie-pagination-screenshot',
 };
 
 export interface HostQuery {
@@ -1218,6 +1248,15 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // lives in Tabs' $data.active). No parent-supplied props.
   ThemeContext: {},
   Tabs: {},
+  // Phase 60 pure-Rozie families — all six demos are self-contained wrappers
+  // (each seeds its own state in <data> and binds the inner component via
+  // r-model:modelValue). No parent-supplied props.
+  TagsBehavior: {},
+  NumberFieldBehavior: {},
+  PaginationBehavior: {},
+  TagsScreenshot: {},
+  NumberFieldScreenshot: {},
+  PaginationScreenshot: {},
 };
 
 /**
