@@ -117,21 +117,11 @@ const ALLOWED_DOCS_KEYS = new Set(['description', 'deprecated', 'example']);
  * an empty/all-malformed docs lowers to `PropDecl.docs === undefined`.
  */
 function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs | null {
-  const decl = entry.decl;
-  if (!t.isObjectExpression(decl.value)) return null;
-
-  let docsValue: t.Node | null = null;
-  for (const prop of decl.value.properties) {
-    if (!t.isObjectProperty(prop) || prop.computed) continue;
-    const key = prop.key;
-    const keyName =
-      t.isIdentifier(key) ? key.name :
-      t.isStringLiteral(key) ? key.value :
-      null;
-    if (keyName !== 'docs') continue;
-    docsValue = prop.value;
-    break;
-  }
+  // Use the carrier `collectPropDecls` already extracted (mirrors how
+  // `defaultExpression` is consumed) instead of re-walking `decl.value` — one
+  // traversal per prop, and the carrier is the documented lookup path (WR-01 /
+  // IN-02). `docsExpression` is null exactly when no `docs:` key is present.
+  const docsValue = entry.docsExpression;
   if (docsValue === null) return null; // no docs key — the inert control path (Test D)
 
   if (!t.isObjectExpression(docsValue)) {

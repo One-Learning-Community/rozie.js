@@ -50,6 +50,23 @@ function escapeCommentClose(s: string): string {
 }
 
 /**
+ * Whether a prop would produce a non-empty JSDoc block — true iff it carries a
+ * `docs` object with at least one usable sub-key. This is the single source of
+ * truth for the SC-5 "is this prop documented?" gate: `buildPropJsdoc` returns
+ * `''` exactly when this returns `false`, so callers that need only the
+ * empty/non-empty decision (e.g. Vue's multi-line-vs-compact `renderPropsTypeBody`
+ * gate) MUST consult this predicate rather than calling `buildPropJsdoc` with a
+ * throwaway indent — that keeps the gate decoupled from the builder's output
+ * format and immune to any future indent-dependent change to the block (WR-02).
+ *
+ * @public — consumed by `buildPropJsdoc` itself and by per-target emit gates.
+ */
+export function hasPropJsdoc(prop: PropDecl): boolean {
+  const d = prop.docs;
+  return !!d && (!!d.description || d.deprecated !== undefined || !!d.example);
+}
+
+/**
  * Render a leading JSDoc block (including its trailing newline) for a prop, or
  * `''` when the prop carries no docs (or only an empty docs object).
  *
@@ -62,10 +79,10 @@ function escapeCommentClose(s: string): string {
  * @public — consumed by `renderPropsInterface` and the five in-source targets.
  */
 export function buildPropJsdoc(prop: PropDecl, indent = '  '): string {
-  const d = prop.docs;
-  if (!d || (!d.description && d.deprecated === undefined && !d.example)) {
+  if (!hasPropJsdoc(prop)) {
     return '';
   }
+  const d = prop.docs!;
 
   const body: string[] = [];
   if (d.description) body.push(escapeCommentClose(d.description));

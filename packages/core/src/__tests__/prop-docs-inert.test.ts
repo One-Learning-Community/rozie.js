@@ -28,7 +28,7 @@
 // A FAILURE here means a docs string leaked into runtime-EXECUTABLE output —
 // the SC-6 inert guarantee is broken. Do NOT "fix" it by widening the strip to
 // swallow non-comment code; fix the emitter that serialized the raw options.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -57,7 +57,13 @@ function stripBlockComments(code: string): string {
 }
 
 describe('prop docs are inert [Phase 58] — SC-6 (metadata-only, never in runtime)', () => {
-  const source = fs.readFileSync(FIXTURE, 'utf8');
+  // Read inside beforeAll (not at module load) so an absent fixture surfaces as a
+  // clear suite failure rather than an ENOENT that crashes the module and
+  // silently skips every test (IN-01).
+  let source: string;
+  beforeAll(() => {
+    source = fs.readFileSync(FIXTURE, 'utf8');
+  });
 
   for (const target of TARGETS) {
     it(`${target}: docs strings never appear in the runtime-executable body (result.code minus JSDoc)`, () => {

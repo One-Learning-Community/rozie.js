@@ -68,11 +68,23 @@ export function renderPropDefault(defaultValue) {
 // break the Markdown table row — escape pipes (`\|`) and collapse newlines to a
 // single space so the cell stays a single well-formed table cell.
 function escapeTableCell(text) {
-  return String(text)
+  const escaped = String(text)
     .replace(/\r\n?|\n/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\|/g, '\\|')
     .trim();
+  // WR-03: an UNMATCHED backtick (an unclosed inline-code span) breaks code-span
+  // rendering for the rest of the Description column in some Markdown parsers.
+  // We don't rewrite author intent — surface it loudly at codegen time so the
+  // author can close the span in the .rozie source.
+  const backtickCount = (escaped.match(/`/g) || []).length;
+  if (backtickCount % 2 !== 0) {
+    process.stderr.write(
+      `readme.mjs: WARNING: unmatched backtick in a prop description — the unclosed ` +
+        `code span may break Markdown table rendering: ${JSON.stringify(escaped)}\n`,
+    );
+  }
+  return escaped;
 }
 
 function renderPropDescription(prop) {

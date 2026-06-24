@@ -45,7 +45,7 @@ import type {
   ComputedDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import { buildPropJsdoc, hasPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
@@ -400,7 +400,11 @@ function renderPropsTypeBody(
   fields: readonly string[],
   closeIndent: string,
 ): string {
-  const hasDocs = nonModel.some((p) => buildPropJsdoc(p) !== '');
+  // Gate on the presence predicate, NOT on `buildPropJsdoc(p) !== ''` with a
+  // throwaway indent — the empty/non-empty decision is indent-independent and
+  // must stay decoupled from the builder's output format (WR-02). `hasPropJsdoc`
+  // is the single source of truth shared with `buildPropJsdoc` itself.
+  const hasDocs = nonModel.some((p) => hasPropJsdoc(p));
   if (!hasDocs) {
     // Byte-identical compact one-line form for fully-docless prop sets.
     return `{ ${fields.join('; ')} }`;

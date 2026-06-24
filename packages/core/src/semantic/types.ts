@@ -42,8 +42,9 @@ export interface PropDeclEntry {
   /**
    * Phase 58 (SC-1) convenience carrier: the raw Babel node for the prop's
    * `docs:` field — null if absent. Mirrors `defaultExpression`/`typeIdentifier`.
-   * lowerProps reads this (or re-walks `decl.value`) to build the typed
-   * PropDecl.docs; the raw node never escapes the IR-lowering seam (SC-6).
+   * lowerProps's `findPropDocs` reads this carrier directly (validating the shape
+   * and emitting ROZ018 on a malformed one) to build the typed `PropDecl.docs`;
+   * the raw node never escapes the IR-lowering seam (SC-6).
    */
   docsExpression: Expression | null;
   /**

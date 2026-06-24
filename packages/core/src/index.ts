@@ -168,7 +168,7 @@ export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface
 // .d.ts surface ×6) AND the five trivial in-source targets (React/Solid/Svelte/
 // Angular/Lit). Returns '' for a docless prop (SC-5 byte-identity gate).
 // @experimental — shape may change before v1.0
-export { buildPropJsdoc } from './codegen/buildPropJsdoc.js';
+export { buildPropJsdoc, hasPropJsdoc } from './codegen/buildPropJsdoc.js';
 
 // Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
 // resolves the optional `sass` peer dependency for the `<style lang="scss">`
