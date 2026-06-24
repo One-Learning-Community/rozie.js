@@ -1,0 +1,24 @@
+/*
+ * @rozie-ui/number-field — Bootstrap 5 bridge.
+ *
+ * Maps the NumberField tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the field follows `data-bs-theme="dark"` and any
+ * custom `$primary` build automatically. Falls back to Bootstrap's default light
+ * palette when the vars are absent.
+ *
+ *   import '@rozie-ui/number-field-react/themes/bootstrap.css';
+ */
+.rozie-number-field {
+  --rozie-number-field-bg: var(--bs-body-bg, #fff);
+  --rozie-number-field-color: var(--bs-body-color, #212529);
+  --rozie-number-field-border-color: var(--bs-border-color, #dee2e6);
+  --rozie-number-field-radius: var(--bs-border-radius, 0.375rem);
+
+  --rozie-number-field-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
+
+  --rozie-number-field-btn-color: var(--bs-body-color, #212529);
+  --rozie-number-field-btn-bg: var(--bs-tertiary-bg, #f8f9fa);
+  --rozie-number-field-btn-hover-bg: var(--bs-secondary-bg, #e9ecef);
+
+  --rozie-number-field-disabled-opacity: 0.5;
+}

@@ -1,0 +1,561 @@
+<!--
+  NumberField.rozie — a headless, WAI-ARIA accessible numeric stepper / spinbutton.
+
+  A pure-Rozie family (NO third-party engine) in the spirit of otp / slider /
+  listbox: it fills a real cross-framework need (every form UI re-implements a
+  clamped, step-snapped, locale-formatted number input with +/- controls,
+  keyboard, and press-and-hold acceleration) with zero engine dependency. The
+  platform IS the engine: a native <input> for text entry, browser focus, and
+  `Intl.NumberFormat` for locale-aware parse/format. Rozie owns the author-side
+  API: the two-way binding, clamp/snap math, keyboard choreography, the
+  press-hold ramp, and the token-themed skin.
+
+  CONTROLLED, NO DRAFT NUMERIC STATE: the numeric value IS `modelValue` (the sole
+  model:true prop → Angular ControlValueAccessor; a number field IS a form
+  control). `modelValue` is `number | null` — null is the empty field. We DO keep
+  ONE piece of local <data> — `text`, the raw string the user is typing — because
+  a half-typed entry ("1.", "-", "") is not yet a valid number; it is parsed and
+  committed back to `modelValue` on blur / Enter. (`text` is the editing buffer,
+  not a second source of truth: it is re-seeded from `modelValue` whenever the
+  field is not focused, via `displayText()`.)
+
+  PRESS-HOLD ACCELERATION uses a top-level mutable handle (`holdTimer`) declared
+  as a TOP-LEVEL `let` so the React emitter hoists it to a `useRef` and the Solid
+  `$onMount`/`onCleanup` split can still see it in teardown (the cross-phase-
+  state-in-$onMount-must-be-top-level gotcha). Every started repeat is torn down
+  on pointerup / pointerleave / unmount.
+
+  FOCUS without per-cell refs: $refs.input (ONE input ref) is read only in
+  $onMount / event handlers / $expose verbs (all post-mount → ROZ123-safe), and
+  it works inside Lit's shadow root because the input lives there too.
+
+  Authoring notes (collision classes — see the authoring playbook §6):
+    - The focus verb is `focus` — a DELIBERATE override of the inherited
+      HTMLElement.focus on the Lit custom element (ROZ137 WARNS, accepted; the
+      public focus() handle is intended). Same choice slider/otp made.
+    - NO helper/const is named `value` / `min` / `max` / `step` / `inputMode` /
+      `id` / `title` / `tabIndex`: any of those as a top-level binding becomes a
+      Lit class field and collides with an inherited DOM property (hard TS2416).
+      The numeric helpers are `clampValue` / `snapValue` / `readValue` — never a
+      bare `value`/`valueOf`. (`valueOf` would cascade TS1240/1271 across the Lit
+      class via Object.prototype; we use `readValue`.)
+    - NO plain helper is named `writeValue`/`registerOnChange`/`registerOnTouched`/
+      `setDisabledState`: with a single model:true prop those collide with the
+      generated Angular ControlValueAccessor (TS2300). The write funnel is
+      `commitValue` (the otp precedent).
+    - The editing-buffer <data> key is `text`, NOT a name shared with any
+      $expose verb (a $data key == $expose verb collapses on React useState).
+    - Handler params are LEFT UNTYPED so they neutralize to `any`; reading
+      `e.target.value` / `e.key` then typechecks across all six strict leaves.
+    - Derived strings (`displayText`, `formatted`, `ariaText`) are PLAIN functions
+      called `()` — never `$computed` — because they are read both in the template
+      AND inside handlers, and a $computed is a value on React but an accessor on
+      Solid (aliasing/calling diverges).
+    - aria booleans are bound with `!!` (the rozieAttr→Booleanish JSX edge); the
+      numeric aria-value* are bound from plain helpers returning number/string.
+
+  Consumer example:
+
+    <NumberField r-model:modelValue="$data.qty" :min="0" :max="10" :step="1"
+                 :formatOptions="{ style: 'decimal' }" @change="onChange" />
+-->
+
+<rozie name="NumberField">
+
+<props>
+{
+  // The numeric value (two-way). `null` is the empty field. As the sole
+  // model:true prop it drives the Angular ControlValueAccessor — a number field
+  // IS a form control. Read via `$props.modelValue`; written via `$model`.
+  modelValue: {
+    type: Number,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'The numeric value of the field (two-way `r-model`). `null` means the field is empty. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a number field **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). The value is clamped to `[min, max]` and snapped to `step` on every commit.',
+      example: '<NumberField r-model:modelValue="qty" :min="0" :max="10" />',
+    },
+  },
+
+  // Lower bound (inclusive). The value is clamped to >= min on every commit; Home
+  // jumps the value to min. NOTE: a prop named `min` is safe on the Lit class —
+  // `min` is an inherited DOM property of <input>, not of HTMLElement / LitElement.
+  min: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Inclusive lower bound. Every commit clamps the value to `>= min`, and the **Home** key jumps to `min`. `null` (the default) means no lower bound. Also emitted as `aria-valuemin`.',
+    },
+  },
+
+  // Upper bound (inclusive). The value is clamped to <= max on every commit; End
+  // jumps the value to max.
+  max: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Inclusive upper bound. Every commit clamps the value to `<= max`, and the **End** key jumps to `max`. `null` (the default) means no upper bound. Also emitted as `aria-valuemax`.',
+    },
+  },
+
+  // The increment/decrement granularity. ArrowUp/Down step by this; the value is
+  // snapped to the nearest multiple of `step` measured from `min` (or 0).
+  step: {
+    type: Number,
+    default: 1,
+    docs: {
+      description:
+        'The increment/decrement granularity. **ArrowUp** / **ArrowDown** and the +/- buttons change the value by `step`, and every commit snaps the value to the nearest multiple of `step` measured from `min` (or `0` when `min` is `null`).',
+    },
+  },
+
+  // The coarse step for PageUp / PageDown.
+  largeStep: {
+    type: Number,
+    default: 10,
+    docs: {
+      description:
+        'The coarse step applied by **PageUp** / **PageDown**, for fast traversal of a wide range.',
+    },
+  },
+
+  // Options passed to `Intl.NumberFormat` for locale-aware display formatting
+  // (style, currency, minimumFractionDigits, …). Parsing strips the formatting
+  // back off on commit.
+  formatOptions: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Options forwarded to `Intl.NumberFormat` for locale-aware **display** formatting (e.g. `{ style: "currency", currency: "USD" }` or `{ minimumFractionDigits: 2 }`). The displayed text is formatted while the field is unfocused; on commit the formatting is stripped back off and the raw number is parsed.',
+      example: ":formatOptions=\"{ style: 'currency', currency: 'USD' }\"",
+    },
+  },
+
+  // Opt-in: drag horizontally on the field to scrub the value (±step per few px).
+  // Boolean props default FALSE (the negative-opt-in convention).
+  allowScrub: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt in to **scrub-on-drag**: press and drag horizontally on the field to change the value by `step` per few pixels (a power-user affordance). Off by default.',
+    },
+  },
+
+  // Disable the whole control (also sets the Angular CVA disabled state).
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable the whole control — the input, both steppers, the keyboard, and scrubbing. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
+
+  // Read-only: the value is shown and focusable but cannot be edited.
+  readonly: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Make the field read-only — the value is shown and focusable but cannot be changed by typing, the steppers, the keyboard, or scrubbing.',
+    },
+  },
+
+  // Accessible name for the spinbutton (role="spinbutton").
+  ariaLabel: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name applied to the `role="spinbutton"` input (`aria-label`). Provide this (or an external `<label>`) so the control is announced.',
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // The raw text in the <input> while the user is editing (a half-typed entry
+  // like "1." or "-" is not yet a valid number). Parsed + committed on blur /
+  // Enter; re-seeded from modelValue via displayText() whenever NOT focused.
+  // Named `text` (not shared with any $expose verb) → safe on React useState.
+  text: '',
+  // Whether the input currently has focus (drives raw-vs-formatted display).
+  focused: false,
+}
+</data>
+
+<script lang="ts">
+// ---- top-level mutable handles (hook-referenced → React useRef hoist) -------
+// The press-hold repeat timer + its current interval (the ramp). Declared at the
+// top level so React hoists them to useRef and the Solid onMount/onCleanup split
+// sees them in teardown. `null`/0 when no repeat is running.
+let holdTimer: any = null
+let holdInterval = 0
+
+// Scrub-on-drag state (also top-level so teardown sees it).
+let scrubbing = false
+let scrubStartX = 0
+let scrubStartValue = 0
+
+// ---- numeric helpers (plain functions, uniform ×6) -------------------------
+// The current value as a real number, or null when empty. Named readValue, NOT
+// valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
+// Object.prototype.
+const readValue = () => {
+  const v = $props.modelValue
+  return typeof v === 'number' && !Number.isNaN(v) ? v : null
+}
+
+const hasMin = () => typeof $props.min === 'number' && !Number.isNaN($props.min)
+const hasMax = () => typeof $props.max === 'number' && !Number.isNaN($props.max)
+
+// Clamp n to [min, max] (whichever bounds are set).
+const clampValue = (n) => {
+  let out = n
+  if (hasMin() && out < $props.min) out = $props.min
+  if (hasMax() && out > $props.max) out = $props.max
+  return out
+}
+
+// Snap n to the nearest multiple of `step` measured from `min` (or 0).
+const snapValue = (n) => {
+  const stepSize = typeof $props.step === 'number' && $props.step > 0 ? $props.step : 1
+  const base = hasMin() ? $props.min : 0
+  const snapped = base + Math.round((n - base) / stepSize) * stepSize
+  // Avoid binary-float drift (e.g. 0.1 + 0.2) by rounding to step precision.
+  const decimals = (String(stepSize).split('.')[1] || '').length
+  return decimals > 0 ? Number(snapped.toFixed(decimals)) : snapped
+}
+
+// ---- locale formatting (plain functions, uniform ×6) -----------------------
+const formatter = () => {
+  try {
+    return new Intl.NumberFormat(undefined, $props.formatOptions || {})
+  } catch {
+    return new Intl.NumberFormat()
+  }
+}
+
+// The value formatted for display (empty string when null).
+const formatted = () => {
+  const n = readValue()
+  return n === null ? '' : formatter().format(n)
+}
+
+// Parse a user-typed string back to a number, or null when it is not a number.
+// Strips grouping separators + any non-numeric currency/percent chrome, keeping
+// digits, a sign, a decimal point, and an exponent.
+const parseText = (raw) => {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  if (s === '') return null
+  const cleaned = s.replace(/[^0-9eE+\-.,]/g, '').replace(/,/g, '')
+  const n = Number.parseFloat(cleaned)
+  return Number.isNaN(n) ? null : n
+}
+
+// What the <input> should show: the live edit buffer while focused, otherwise
+// the locale-formatted value. A plain function (read in the template + handlers).
+const displayText = () => ($data.focused ? $data.text : formatted())
+
+// ---- aria helpers (numbers/strings bound cleanly) --------------------------
+const ariaText = () => {
+  const n = readValue()
+  return n === null ? '' : formatted()
+}
+
+// ---- write funnel (single $emit site) --------------------------------------
+// Clamp + snap, write the model, mirror into the edit buffer, emit change. Named
+// commitValue (NOT writeValue) so it does not collide with the generated Angular
+// ControlValueAccessor.writeValue (TS2300).
+const commitValue = (n) => {
+  let next = n
+  if (next !== null) {
+    next = snapValue(next)
+    next = clampValue(next)
+  }
+  $model.modelValue = next
+  // Keep the edit buffer in sync so a focused field reflects a programmatic step.
+  $data.text = next === null ? '' : String(next)
+  $emit('change', { value: next })
+}
+
+// Step by a signed multiple of `step` (used by buttons + arrows). A null value
+// seeds from min (or 0) so the first step lands on a sensible number.
+const stepBy = (dir, size) => {
+  if ($props.disabled || $props.readonly) return
+  const cur = readValue()
+  const stepSize = typeof size === 'number' ? size : (typeof $props.step === 'number' ? $props.step : 1)
+  const base = cur === null ? (hasMin() ? $props.min : 0) : cur
+  commitValue(base + dir * stepSize)
+}
+
+// ---- press-hold acceleration ----------------------------------------------
+// Stop any running repeat (pointerup / pointerleave / unmount).
+const stopHold = () => {
+  if (holdTimer !== null) {
+    clearTimeout(holdTimer)
+    holdTimer = null
+  }
+  holdInterval = 0
+}
+
+// Start a repeating step that ramps from slow to fast while the button is held.
+const startHold = (dir) => {
+  if ($props.disabled || $props.readonly) return
+  stopHold()
+  stepBy(dir, $props.step)
+  holdInterval = 300
+  const tick = () => {
+    stepBy(dir, $props.step)
+    // Ramp: shorten the interval down to a floor for accelerating repeats.
+    holdInterval = Math.max(40, Math.round(holdInterval * 0.8))
+    holdTimer = setTimeout(tick, holdInterval)
+  }
+  holdTimer = setTimeout(tick, holdInterval)
+}
+
+// ---- input + keyboard handlers ---------------------------------------------
+const onInput = (e) => {
+  if ($props.readonly) return
+  const raw = e && e.target ? e.target.value : ''
+  $data.text = raw
+}
+
+// Commit the edit buffer on blur: parse → commit (or clear to null when empty).
+const onBlur = () => {
+  $data.focused = false
+  const parsed = parseText($data.text)
+  commitValue(parsed)
+}
+
+const onFocus = (e) => {
+  $data.focused = true
+  // Seed the edit buffer with the raw (unformatted) number so editing is clean.
+  const n = readValue()
+  $data.text = n === null ? '' : String(n)
+  if (e && e.target && e.target.select) e.target.select()
+}
+
+const onKeydown = (e) => {
+  if ($props.disabled || $props.readonly) return
+  const key = e ? e.key : ''
+  if (key === 'ArrowUp') {
+    if (e) e.preventDefault()
+    stepBy(1, $props.step)
+  } else if (key === 'ArrowDown') {
+    if (e) e.preventDefault()
+    stepBy(-1, $props.step)
+  } else if (key === 'PageUp') {
+    if (e) e.preventDefault()
+    stepBy(1, $props.largeStep)
+  } else if (key === 'PageDown') {
+    if (e) e.preventDefault()
+    stepBy(-1, $props.largeStep)
+  } else if (key === 'Home') {
+    if (hasMin()) {
+      if (e) e.preventDefault()
+      commitValue($props.min)
+    }
+  } else if (key === 'End') {
+    if (hasMax()) {
+      if (e) e.preventDefault()
+      commitValue($props.max)
+    }
+  } else if (key === 'Enter') {
+    // Commit the buffer without losing focus.
+    const parsed = parseText($data.text)
+    commitValue(parsed)
+  }
+}
+
+// ---- scrub-on-drag (opt-in) ------------------------------------------------
+// Uses POINTER CAPTURE on the input element itself (set on pointerdown) so the
+// pointermove/pointerup keep firing on the same element through the whole drag,
+// even when the pointer leaves the element — no document-level <listeners> (which
+// would also avoid the React-effect `$event`-in-deps emitter edge). The handlers
+// are bound directly on the <input> in the template, where `@event` passes a
+// properly-typed `$event`.
+const onScrubDown = (e) => {
+  if (!$props.allowScrub || $props.disabled || $props.readonly) return
+  scrubbing = true
+  scrubStartX = e && typeof e.clientX === 'number' ? e.clientX : 0
+  const cur = readValue()
+  scrubStartValue = cur === null ? (hasMin() ? $props.min : 0) : cur
+  // Capture the pointer so move/up stay on this element for the whole drag.
+  if (e && e.target && e.target.setPointerCapture && typeof e.pointerId === 'number') {
+    try { e.target.setPointerCapture(e.pointerId) } catch {}
+  }
+}
+
+const onScrubMove = (e) => {
+  if (!scrubbing) return
+  const x = e && typeof e.clientX === 'number' ? e.clientX : 0
+  const dx = x - scrubStartX
+  const stepSize = typeof $props.step === 'number' && $props.step > 0 ? $props.step : 1
+  // One step per 8px of horizontal travel.
+  const delta = Math.round(dx / 8) * stepSize
+  commitValue(scrubStartValue + delta)
+}
+
+const onScrubUp = () => {
+  scrubbing = false
+}
+
+// ---- lifecycle + imperative handle -----------------------------------------
+$onMount(() => {
+  // Seed the edit buffer so a programmatic focus shows the right text.
+  const n = readValue()
+  $data.text = n === null ? '' : String(n)
+  // Tear down any running repeat / scrub on unmount.
+  return () => {
+    stopHold()
+    scrubbing = false
+  }
+})
+
+// focus() — move DOM focus to the input. DELIBERATELY overrides
+// HTMLElement.focus on Lit (ROZ137 warn, accepted). increment()/decrement() —
+// step once by `step`. clear() — set the value to null and clear the buffer.
+const focus = () => {
+  const el = $refs.input
+  // NOTE: $refs.input types to the generic HTMLElement on the tsdown/vue leaves
+  // (the emitter ref-type map has no `input` → HTMLInputElement entry), so we
+  // only touch HTMLElement members here (`focus`). Text selection happens in the
+  // onFocus handler, where `e.target` is `any` and `.select()` typechecks.
+  if (el && el.focus) el.focus()
+}
+const increment = () => stepBy(1, $props.step)
+const decrement = () => stepBy(-1, $props.step)
+const clear = () => {
+  commitValue(null)
+  $data.text = ''
+}
+
+$expose({ focus, increment, decrement, clear })
+</script>
+
+<template>
+<div
+  class="rozie-number-field"
+  :class="{ 'rozie-number-field--disabled': $props.disabled }"
+>
+  <button
+    type="button"
+    class="rozie-number-field-btn rozie-number-field-btn--dec"
+    tabindex="-1"
+    aria-label="Decrement"
+    :disabled="!!$props.disabled || !!$props.readonly"
+    @pointerdown="startHold(-1)"
+    @pointerup="stopHold()"
+    @pointerleave="stopHold()"
+  >−</button>
+
+  <input
+    ref="input"
+    class="rozie-number-field-input"
+    type="text"
+    inputmode="decimal"
+    autocomplete="off"
+    role="spinbutton"
+    :value="displayText()"
+    :disabled="!!$props.disabled"
+    :readonly="!!$props.readonly"
+    :aria-label="$props.ariaLabel"
+    :aria-valuemin="$props.min"
+    :aria-valuemax="$props.max"
+    :aria-valuenow="$props.modelValue"
+    :aria-valuetext="ariaText()"
+    :aria-disabled="!!$props.disabled"
+    @input="onInput($event)"
+    @focus="onFocus($event)"
+    @blur="onBlur()"
+    @keydown="onKeydown($event)"
+    @pointerdown="onScrubDown($event)"
+    @pointermove="onScrubMove($event)"
+    @pointerup="onScrubUp()"
+  />
+
+  <button
+    type="button"
+    class="rozie-number-field-btn rozie-number-field-btn--inc"
+    tabindex="-1"
+    aria-label="Increment"
+    :disabled="!!$props.disabled || !!$props.readonly"
+    @pointerdown="startHold(1)"
+    @pointerup="stopHold()"
+    @pointerleave="stopHold()"
+  >+</button>
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven (mirrors otp/slider/themes): EVERY visual value is a
+  `var(--rozie-number-field-*, <fallback>)`, so the component renders with zero
+  config yet is completely re-skinnable by setting tokens at any ancestor scope.
+  The shipped themes/*.css presets map these tokens onto shadcn/Radix, Material
+  3, Bootstrap 5.
+*/
+.rozie-number-field {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--rozie-number-field-gap, 0);
+  font: var(--rozie-number-field-font, inherit);
+  border: var(--rozie-number-field-border-width, 1px) solid var(--rozie-number-field-border-color, rgba(0, 0, 0, 0.25));
+  border-radius: var(--rozie-number-field-radius, 0.5rem);
+  background: var(--rozie-number-field-bg, #fff);
+  overflow: hidden;
+}
+.rozie-number-field-input {
+  box-sizing: border-box;
+  width: var(--rozie-number-field-width, 4.5rem);
+  min-width: 0;
+  padding: var(--rozie-number-field-padding, 0.375rem 0.5rem);
+  text-align: var(--rozie-number-field-text-align, right);
+  font: inherit;
+  font-size: var(--rozie-number-field-font-size, 1rem);
+  color: var(--rozie-number-field-color, inherit);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.rozie-number-field-input:focus {
+  box-shadow: inset 0 0 0 var(--rozie-number-field-focus-ring-width, 2px) var(--rozie-number-field-focus-ring-color, rgba(0, 102, 204, 0.35));
+}
+.rozie-number-field-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rozie-number-field-btn-size, 2rem);
+  padding: 0;
+  font-size: var(--rozie-number-field-btn-font-size, 1.1rem);
+  line-height: 1;
+  color: var(--rozie-number-field-btn-color, inherit);
+  background: var(--rozie-number-field-btn-bg, rgba(0, 0, 0, 0.04));
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+.rozie-number-field-btn:hover {
+  background: var(--rozie-number-field-btn-hover-bg, rgba(0, 0, 0, 0.08));
+}
+.rozie-number-field-btn:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-number-field-disabled-opacity, 0.55);
+}
+.rozie-number-field--disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-number-field-disabled-opacity, 0.55);
+}
+</style>
+
+</rozie>

@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/number-field — Material Design 3 bridge.
+ *
+ * Maps the NumberField tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/number-field-react/themes/material.css';
+ */
+.rozie-number-field {
+  --rozie-number-field-bg: var(--md-sys-color-surface, #fef7ff);
+  --rozie-number-field-color: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-number-field-border-color: var(--md-sys-color-outline, #79747e);
+  --rozie-number-field-radius: 0.5rem;
+
+  --rozie-number-field-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent);
+
+  --rozie-number-field-btn-color: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-number-field-btn-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-number-field-btn-hover-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+}
