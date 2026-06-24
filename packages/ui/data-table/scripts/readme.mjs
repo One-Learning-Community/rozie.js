@@ -2364,6 +2364,15 @@ export function validateDocsPropsTable(ir, docsMarkdown) {
   const nextHeadingIdx = afterHeading.search(/\n#{1,3}\s/);
   const section = nextHeadingIdx === -1 ? afterHeading : afterHeading.slice(0, nextHeadingIdx);
 
+  // D-05: when the `## Props` section is a build-time `rozie-props` fence, the docs
+  // table IS regenerated from the SAME `ir` at vitepress build, so the IR-vs-docs
+  // structural drift check is moot — short-circuit to a pass. This relaxation is
+  // SCOPED to the fence path; the legacy hand-authored-row throw-on-drift path below
+  // is untouched, so other families still get the full structural check.
+  if (/\n```\s*rozie-props\b/.test(section)) {
+    return { ok: true, errors: [], checkedRows: 0 };
+  }
+
   const docRows = new Map();
   for (const rawLine of section.split('\n')) {
     const line = rawLine.trim();
