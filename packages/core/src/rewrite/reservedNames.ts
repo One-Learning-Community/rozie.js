@@ -15,12 +15,28 @@
 // (collision-solid §4, collision-react §3.G). Only Lit + Angular get the
 // class-field tables.
 
-// Re-export the runtime-derived `Object.prototype` member set from deconflict.ts
-// so a consumer can import ALL reserved data from this one module. (Direction:
-// deconflict.ts OWNS the runtime-derived sets — OBJECT_PROTOTYPE_MEMBERS and the
-// Lit DOM walk — because they require live JS-engine globals; reservedNames.ts
-// owns the HARDCODED paste-ready tables and re-exports the runtime ones.)
-export { OBJECT_PROTOTYPE_MEMBERS } from './deconflict.js';
+// DIRECTION (locked, documented per Plan 61-01): reservedNames.ts is a PURE LEAF
+// — it imports NOTHING from deconflict.ts. deconflict.ts imports its reserved
+// tables FROM here. This one direction avoids the module-init cycle that the
+// reverse (re-exporting deconflict's runtime sets here) caused: deconflict.ts
+// runs `deriveLitDomMembers()` at module-load and reads `LIT_DOM_MEMBERS`, so it
+// must be able to load reservedNames.ts FIRST without re-entering deconflict.
+//
+// `OBJECT_PROTOTYPE_MEMBERS` lives HERE (not in deconflict.ts) so all reserved
+// data is importable from this single module. It is pure data — the id-shaped
+// own members of `Object.prototype` — with no traverse/AST dependency, so it
+// belongs in the leaf. deconflict.ts re-exports it for back-compat with existing
+// importers. Reserved on BOTH class targets (Angular + Lit): a user LOCAL that
+// becomes a class field with one of these names overrides the inherited member;
+// on Lit the legacy `@property` decorator's `Object`-assignability check then
+// cascades TS1240/TS1271 to EVERY decorator on the class (the listbox `valueOf`
+// finding — 38 errors from one name). The symbol-keyed `__proto__` accessor pair
+// is excluded by the id-shape filter (cannot collide with a JS identifier).
+export const OBJECT_PROTOTYPE_MEMBERS: ReadonlySet<string> = new Set(
+  Object.getOwnPropertyNames(Object.prototype).filter(
+    (n) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n),
+  ),
+);
 
 // ============================================================================
 // LIT (collision-lit.md §2)

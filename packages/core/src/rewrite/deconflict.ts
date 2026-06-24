@@ -45,6 +45,7 @@ import _traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import type { File } from '@babel/types';
 import {
+  OBJECT_PROTOTYPE_MEMBERS,
   LIT_DOM_MEMBERS,
   LIT_LIFECYCLE_MEMBERS,
   LIT_EMITTER_MEMBERS,
@@ -52,6 +53,13 @@ import {
   ANGULAR_LIFECYCLE_MEMBERS,
   ANGULAR_EMITTER_MEMBERS,
 } from './reservedNames.js';
+
+// Re-export for back-compat with existing importers (deconflict-unified.test.ts
+// and any other consumer that imported OBJECT_PROTOTYPE_MEMBERS from here). The
+// canonical definition now lives in reservedNames.ts (the single source of
+// truth); reservedNames.ts is a pure leaf and deconflict.ts is the consumer —
+// one direction, no module-init cycle (see reservedNames.ts header).
+export { OBJECT_PROTOTYPE_MEMBERS };
 
 // CJS interop normalization (matches every target's rewriteScript.ts).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -607,25 +615,6 @@ export function deconflictReservedClassFields(
     },
   });
 }
-
-/**
- * `Object.prototype` member names — reserved on BOTH class targets (Angular +
- * Lit) because every emitted component class inherits them. A user LOCAL that
- * becomes a class field with one of these names overrides the inherited member;
- * on Lit the legacy `@property` decorator's `Object`-assignability check then
- * cascades TS1240/TS1271 to EVERY decorator on the class (the listbox `valueOf`
- * finding — 38 errors from one name).
- *
- * Derived from `Object.getOwnPropertyNames(Object.prototype)` (the enumerable +
- * non-enumerable own members of `Object.prototype`), filtered to the
- * identifier-shaped members (excludes the symbol-keyed `__proto__` accessor
- * pair, which cannot collide with a JS identifier binding).
- */
-export const OBJECT_PROTOTYPE_MEMBERS: ReadonlySet<string> = new Set(
-  Object.getOwnPropertyNames(Object.prototype).filter(
-    (n) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n),
-  ),
-);
 
 /**
  * Inherited `HTMLElement` / `Element` / `Node` instance members — reserved on

@@ -434,6 +434,23 @@ export const RozieErrorCode = {
   // (`import { foo } from './partial.rzts'`). ROZ141 is the next free code after
   // ROZ140 in the 100 authoring cluster.
   PARTIAL_UNSUPPORTED_IMPORT_FORM: 'ROZ141', // error — a .rzts/.rzjs partial imported via a default or namespace import; only named imports have an inlinable surface. Use `import { foo } from './partial.rzts'`.
+  // Phase 61 (Half B, SC-1) — a PUBLIC-CONTRACT author identifier (a `<props>`
+  // key, slot name, emit/event name, `$expose` verb, or `$provide`/`$inject`
+  // key) collides with a per-target RESERVED name and therefore CANNOT be
+  // auto-renamed (renaming a public name would break the consumer's binding
+  // surface). The reserved tables come from the single source of truth
+  // `rewrite/reservedNames.ts` (transcribed from the per-target collision
+  // research): Vue reserved props (`key`/`ref`/`is`, silently stripped — no TS
+  // error), React SILENT-tier props (`key`/`ref`/`children`/
+  // `dangerouslySetInnerHTML`), Lit Groups A+B+C inherited/lifecycle members,
+  // Angular Object.prototype ∪ lifecycle ∪ CVA-quartet (single-model-gated),
+  // Svelte runes + reserved words, and the shared JS reserved words. Error
+  // severity with a did-you-mean rename hint (e.g. `id`→`idBase`,
+  // `key`→`itemKey`). This is the linter complement to the Half A auto-rename
+  // (deconflict.ts): auto-fix handles the INTERNAL kinds silently, this fires
+  // for the PUBLIC kinds that must surface as an actionable author diagnostic.
+  // ROZ142 is the next free code after ROZ141 in the 100 authoring cluster.
+  PUBLIC_CONTRACT_NAME_COLLISION: 'ROZ142', // error — a public-contract identifier (prop/slot/emit/$expose verb/provide-inject key) collides with a per-target reserved name; it cannot be auto-renamed. Rename it (did-you-mean provided).
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
@@ -758,6 +775,20 @@ export const RozieErrorCode = {
   // see packages/core/src/ir/findRForSlotNameCollisions.ts (the pure detector)
   // and @rozie/target-svelte (emitScript/emitSlotInvocation). ROZ980 is BURNED
   // and never reused (codes never renumber); the next free code is ROZ981.
+
+  // Phase 61 (Half B, SC-1) — a RUNTIME-ONLY public-contract collision in the
+  // 970 r-for/slot family: a Svelte case where a public identifier collapses at
+  // runtime with NO typecheck net (svelte-check + the leaf dts-emit both pass).
+  // The two shapes: (a) a `<template #X>` slot-PARAM that shadows an enclosing
+  // `{#each … as X}` loop var (the `#body` slot-param variant that
+  // `findRForSlotNameCollisions` does NOT auto-fix), and (b) an emit-name
+  // NORMALIZATION collapse — two emits differing only by case/hyphens
+  // (`fooBar` + `foo-bar`) both lower to the same `on`-prefixed callback prop in
+  // the unified Svelte 5 `$props()` destructure. Both reach production because
+  // no Svelte gate body-typechecks. Error severity, did-you-mean. Lives in the
+  // 970-cluster (r-for/slot family) alongside the retired ROZ980. ROZ981 is the
+  // next free code after the BURNED ROZ980.
+  RUNTIME_ONLY_NAME_COLLISION: 'ROZ981', // error — a runtime-only public-contract collision with no typecheck net (Svelte slot-param shadows an r-for loop var, or two emits normalize to one callback prop). Rename one.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
