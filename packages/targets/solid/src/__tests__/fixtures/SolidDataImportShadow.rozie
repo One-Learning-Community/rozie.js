@@ -1,0 +1,14 @@
+<rozie name="SolidDataImportShadow">
+<data>
+{ children: 0 }
+</data>
+<script>
+const bump = () => { $data.children += 1 }
+</script>
+<template>
+  <div>
+    <button @click="bump">bumped {{ $data.children }}</button>
+    <slot />
+  </div>
+</template>
+</rozie>
