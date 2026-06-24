@@ -1,0 +1,42 @@
+<!--
+  ReactExposeModuleLet.rozie — Phase 61 Plan 05 risk B fixture.
+
+  Risk B (collision-react §3): a module-`let` mutated ONLY inside an exposed
+  verb resets to its init every render on React, because `hoistModuleLet`'s
+  reachability walk scans `ir.lifecycle` + `ir.watchers` but NEVER the
+  `$expose` verb bodies. `let nextId = 0` is only ever read/written inside
+  `show()`, which is exposed — so it falls through to case (c) "no reachable
+  reference" and stays a per-render `let nextId = 0`. Each render reseeds it to
+  0 → duplicate ids handed to consumers across renders.
+
+  FIX: hoistModuleLet's reachability walk reaches the expose-verb helper bodies
+  → `nextId` hoists to a `useRef`. Scope-completeness fix, NO rename.
+-->
+<rozie name="ReactExposeModuleLet">
+
+<data>
+{
+  lastId: 0,
+}
+</data>
+
+<script>
+// Mutated ONLY inside the exposed `show` verb — never in a lifecycle hook or a
+// watcher. The hoist reachability walk must reach the expose body to persist
+// this counter per-instance.
+let nextId = 0
+
+const show = () => {
+  nextId = nextId + 1
+  $data.lastId = nextId
+  return nextId
+}
+
+$expose({ show })
+</script>
+
+<template>
+  <div>last id: {{ $data.lastId }}</div>
+</template>
+
+</rozie>

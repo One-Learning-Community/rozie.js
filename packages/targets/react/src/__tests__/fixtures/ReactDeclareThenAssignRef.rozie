@@ -1,0 +1,41 @@
+<!--
+  ReactDeclareThenAssignRef.rozie — Phase 61 Plan 05 risk A fixture.
+
+  Risk A (collision-react §3): a module-`let` declared and LATER assigned from
+  `$refs.anchorEl` (the declare-then-assign ref form, as opposed to the
+  `const anchorEl = $refs.anchorEl` INIT form) collides with the ref-const the
+  React emitter mints for `ref="anchorEl"`. The module-let is hoisted (it is
+  referenced from the `$onMount` body) AND a `const anchorEl = useRef(...)` is
+  generated → two `anchorEl` bindings → TS2451 redeclare.
+
+  FIX: the colliding module-let renames to `anchorEl$local` before both
+  generators run.
+-->
+<rozie name="ReactDeclareThenAssignRef">
+
+<data>
+{
+  measuredTop: 0,
+}
+</data>
+
+<script>
+// Declare-then-assign: NOT `const anchorEl = $refs.anchorEl`. The let is
+// initialised to null, then populated from the ref inside $onMount. Both the
+// hoist (module-let referenced in a lifecycle body) and the ref-const
+// generation target the bare name `anchorEl`.
+let anchorEl = null
+
+$onMount(() => {
+  anchorEl = $refs.anchorEl
+  $data.measuredTop = anchorEl.getBoundingClientRect().top
+})
+</script>
+
+<template>
+  <div ref="anchorEl">
+    top: {{ $data.measuredTop }}
+  </div>
+</template>
+
+</rozie>
