@@ -48,6 +48,10 @@ export type {
 export type {
   IRComponent,
   PropDecl,
+  // Phase 58 (SC-1) — structured prop documentation lowered onto PropDecl.docs;
+  // re-exported so the shared buildPropJsdoc helper + per-family README codegen
+  // consume it via the package specifier, not a relative ../../core/src path.
+  PropDocs,
   PropTypeAnnotation,
   StateDecl,
   ComputedDecl,
@@ -158,6 +162,13 @@ export {
   inferParamType,
 } from './codegen/renderPropsInterface.js';
 export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface.js';
+
+// Phase 58 (SC-2/SC-3) — the shared, deterministic per-prop JSDoc-block
+// builder. The single anti-drift source consumed by renderPropsInterface (the
+// .d.ts surface ×6) AND the five trivial in-source targets (React/Solid/Svelte/
+// Angular/Lit). Returns '' for a docless prop (SC-5 byte-identity gate).
+// @experimental — shape may change before v1.0
+export { buildPropJsdoc } from './codegen/buildPropJsdoc.js';
 
 // Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
 // resolves the optional `sass` peer dependency for the `<style lang="scss">`

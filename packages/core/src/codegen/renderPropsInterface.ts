@@ -30,6 +30,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, ParamDecl } from '../ir/types.js';
+import { buildPropJsdoc } from './buildPropJsdoc.js';
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -74,6 +75,13 @@ export function renderPropsInterface(
   lines.push(`export interface ${ir.name}Props${generics} {`);
 
   for (const prop of ir.props) {
+    // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc block from the shared
+    // deterministic builder, gated on `prop.docs` (the builder returns '' for a
+    // docless prop, so a prop WITHOUT docs takes the exact existing path and
+    // stays byte-identical — SC-5). `buildPropJsdoc` returns a trailing newline
+    // for direct text splicing; here we strip it because the block is pushed as
+    // a single entry into the `\n`-joined `lines` array.
+    const jsdoc = buildPropJsdoc(prop, '  ');
     let tsType = renderPropType(prop.typeAnnotation);
     // Phase 16 R1 — widen the prop type with `| null` when `default: null`
     // is declared, so the published `.d.ts` matches the inline Props
@@ -88,6 +96,7 @@ export function renderPropsInterface(
       // D-84 model:true triplet, named after the actual prop identifier.
       const baseName = prop.name;
       const Pascal = capitalize(baseName);
+      if (jsdoc) lines.push(jsdoc.replace(/\n$/, ''));
       lines.push(`  ${baseName}?: ${tsType};`);
       lines.push(`  default${Pascal}?: ${tsType};`);
       lines.push(`  on${Pascal}Change?: (next: ${tsType}) => void;`);
@@ -101,6 +110,7 @@ export function renderPropsInterface(
       const hasDefault =
         prop.defaultValue !== null && prop.defaultValue !== undefined;
       const optional = hasDefault ? '?' : '';
+      if (jsdoc) lines.push(jsdoc.replace(/\n$/, ''));
       lines.push(`  ${prop.name}${optional}: ${tsType};`);
     }
   }
