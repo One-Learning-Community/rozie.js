@@ -714,6 +714,160 @@ export function deconflictReservedComputedInjectNames(
 }
 
 /**
+ * IR-LEVEL reserved-member deconfliction for `<data>` state names + `$refs`
+ * names (Phase 61 Plan 04 — SC-2 Angular leg, risks 1-4 + 6).
+ *
+ * DISTINCT from BOTH `deconflictReservedClassFields` (the per-target cloned-
+ * Program top-level-declarator walk) AND `deconflictReservedComputedInjectNames`
+ * (which renames BARE identifiers): a `<data>` field and a `$refs` name lower on
+ * the class targets via `signal()` / `viewChild()` CODEGEN that reads the name
+ * back from the IR — NOT from the cloned `<script>` declarators (a `<data>` key
+ * has no top-level declarator; a `$refs` name appears only as the
+ * `$refs.<name>` member-PROPERTY, which the bare-identifier pass deliberately
+ * skips). So neither existing pass renames them.
+ *
+ * Both are INTERNAL (template/method-referenced, never consumer-facing public
+ * contract) → safe to auto-rename to `X$local`. This pass renames at the IR
+ * LEVEL — the source-of-truth fields + every reference site:
+ *
+ *   - `ir.state[].name` / `ir.refs[].name` (the codegen reads these directly:
+ *     `<name> = signal(...)` / `<name> = viewChild<...>('<name>')`, so renaming
+ *     the IR field renames BOTH the class field AND the viewChild SELECTOR
+ *     string in lockstep — they are the same `r.name`).
+ *   - every `$data.<name>` / `$refs.<name>` non-computed MemberExpression /
+ *     OptionalMemberExpression property across the ENTIRE IR (the shared
+ *     scriptProgram subtrees AND each template-expression subtree).
+ *   - every SignalRef `{ scope: 'data', path: [name, ...] }` dep (refs are not
+ *     reactive deps, so there is no `scope: 'ref'` to rename).
+ *   - every template `ref="<name>"` STATIC attribute value (a plain string, not
+ *     a Babel node) — the template emitter reads `attr.value` to produce the
+ *     `#<name>` template-ref variable, which must match the renamed
+ *     `viewChild('<name>$local')` selector.
+ *
+ * Mutates `ir` in place. Callers invoke it from their per-target emit
+ * orchestrator (Angular: `emitAngular`) on the target's OWN IR (each `compile()`
+ * call lowers a fresh IR per target — no cross-target leakage). Returns the
+ * rename map (old → new) for diagnostics/tests; empty when nothing collided.
+ * Only-on-collision: a non-reserved state/ref name is byte-identical.
+ *
+ * @param ir         the component IR (state[].name + refs[].name renamed).
+ * @param reserved   the target's reserved class-member set (e.g.
+ *                   `reservedClassMembers('angular', { singleModel })`).
+ * @param protectedNames PUBLIC-CONTRACT names never renamed (prop names + $expose verbs).
+ */
+export function deconflictReservedDataRefNames(
+  ir: {
+    state: { name: string }[];
+    refs: { name: string }[];
+    props?: { name: string }[];
+    expose?: { name: string }[];
+  },
+  reserved: ReadonlySet<string>,
+  protectedNames: ReadonlySet<string> = new Set(),
+): Map<string, string> {
+  const renames = new Map<string, string>();
+  if (reserved.size === 0) return renames;
+
+  // Public-contract names are NEVER renamed (D-02). Fold in IR-level props/expose
+  // the caller may not have passed, so the guard is total.
+  const protectedAll = new Set<string>([
+    ...protectedNames,
+    ...(ir.props ?? []).map((p) => p.name),
+    ...(ir.expose ?? []).map((e) => e.name),
+  ]);
+  const consider = (name: string): void => {
+    if (renames.has(name)) return;
+    if (reserved.has(name) && !protectedAll.has(name)) {
+      renames.set(name, alias(name));
+    }
+  };
+  for (const s of ir.state) consider(s.name);
+  for (const r of ir.refs) consider(r.name);
+  if (renames.size === 0) return renames;
+
+  // 1. Rename the IR declaration fields (codegen source of truth for the
+  //    `signal()` field AND the `viewChild('<name>')` selector string).
+  for (const s of ir.state) {
+    const renamed = renames.get(s.name);
+    if (renamed) s.name = renamed;
+  }
+  for (const r of ir.refs) {
+    const renamed = renames.get(r.name);
+    if (renamed) r.name = renamed;
+  }
+
+  // 2. Deep-walk the ENTIRE IR. For every embedded Babel node, rename a
+  //    non-computed `$data.<old>` / `$refs.<old>` MemberExpression property.
+  //    For every SignalRef `{ scope: 'data', path: [old, ...] }`, rename path[0].
+  //    For every template static `{ kind: 'static', name: 'ref', value: <old> }`
+  //    AttributeBinding, rename `value`. A WeakSet guards shared nodes / cycles.
+  const seen = new WeakSet<object>();
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  const walk = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    // SignalRef data-dep rename: { scope: 'data', path: [key, ...] }. (Refs are
+    // not reactive deps — no scope: 'ref'.)
+    const asDep = value as { scope?: unknown; path?: unknown };
+    if (asDep.scope === 'data' && Array.isArray(asDep.path) && asDep.path.length > 0) {
+      const head = asDep.path[0];
+      const renamed = typeof head === 'string' ? renames.get(head) : undefined;
+      if (renamed) asDep.path[0] = renamed;
+    }
+
+    // Template static `ref="<name>"` attribute value rename. A static
+    // AttributeBinding is a plain object `{ kind:'static', name, value }` — NOT a
+    // Babel node — so it is matched structurally, not via the isNode branch.
+    const asAttr = value as { kind?: unknown; name?: unknown; value?: unknown };
+    if (
+      asAttr.kind === 'static' &&
+      asAttr.name === 'ref' &&
+      typeof asAttr.value === 'string'
+    ) {
+      const renamed = renames.get(asAttr.value);
+      if (renamed) (value as { value: string }).value = renamed;
+    }
+
+    // `$data.<key>` / `$refs.<key>` MemberExpression / OptionalMemberExpression
+    // property rename.
+    if (isNode(value)) {
+      const node = value as {
+        type: string;
+        computed?: boolean;
+        object?: { type?: string; name?: string };
+        property?: { type?: string; name?: string };
+      };
+      if (
+        (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+        node.computed !== true &&
+        node.object?.type === 'Identifier' &&
+        (node.object.name === '$data' || node.object.name === '$refs') &&
+        node.property?.type === 'Identifier' &&
+        typeof node.property.name === 'string'
+      ) {
+        const renamed = renames.get(node.property.name);
+        if (renamed) node.property.name = renamed;
+      }
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    for (const key of Object.keys(value)) {
+      walk((value as Record<string, unknown>)[key]);
+    }
+  };
+  walk(ir);
+
+  return renames;
+}
+
+/**
  * CLASS-TARGET reserved-member deconfliction (Phase 46 ITEM-5 / D-02 — the NEW
  * collision class). DISTINCT from the bare-ident accessor-shadow above: the
  * trigger here is "a USER TOP-LEVEL `<script>` binding becomes a CLASS FIELD
@@ -786,6 +940,80 @@ export function deconflictReservedClassFields(
       path.stop();
     },
   });
+}
+
+/** The import-binding deconfliction suffix (Phase 61). Distinct from `$local`
+ *  so the two collision classes are visually separable in emitted output. */
+export const IMPORT_DECONFLICT_SUFFIX = '$import';
+
+/**
+ * IMPORT-BINDING deconfliction (Phase 61 Plan 04 — SC-2, the floating-ui
+ * `offset`/`arrow` catalogue case).
+ *
+ * A `<script>` value-import LOCAL whose name collides with an author PROP (which
+ * the class targets rewrite to `this.<name>()`) or with a reserved class member
+ * is INTERNAL-ish — the imported binding is the renameable side; the EXPORT name
+ * and the PROP are public contract and untouched. The collision manifests on
+ * Angular as a bare `{ offset }` object-shorthand resolving to `this.offset()`
+ * (the prop signal) instead of the imported value → TS2322 at ng-packagr (gate
+ * 4); the imported `offset` is also tree-shaken because nothing references it.
+ *
+ * The fix AUTO-ALIASES the import binding to `<name>$import` (e.g.
+ * `import { offset as offset$import } from '@floating-ui/dom'`) and rewrites
+ * every reference in the program scope in lockstep, via `scope.rename` (atomic
+ * over the specifier + all references — Babel inserts the `as` alias on a named
+ * specifier automatically and preserves the export name). The author prop
+ * `offset` is never renamed; its `this.offset()` lowering is unaffected.
+ *
+ * Scoped to top-level `ImportDeclaration` specifiers ONLY (default, namespace,
+ * named — value imports; type-only specifiers are skipped because they erase).
+ * Runs on the freshly-cloned, not-yet-mutated Program (scope cache valid),
+ * BEFORE the import-partition + the identifier rewrite. Only-on-collision: an
+ * import whose local name collides with no prop / reserved member is
+ * byte-identical. Mutates `program` in place; returns the rename map for tests.
+ *
+ * @param program     the cloned `<script>` Program (imports still in body).
+ * @param collisionSet author prop names ∪ the target's reserved class-member set.
+ */
+export function deconflictReservedImportBindings(
+  program: File,
+  collisionSet: ReadonlySet<string>,
+): Map<string, string> {
+  const renames = new Map<string, string>();
+  if (collisionSet.size === 0) return renames;
+
+  // Collect colliding VALUE-import local names from top-level ImportDeclarations.
+  const targets = new Set<string>();
+  for (const stmt of program.program.body) {
+    if (!t.isImportDeclaration(stmt)) continue;
+    // A whole `import type … from …` declaration erases — no runtime binding.
+    if (stmt.importKind === 'type') continue;
+    for (const spec of stmt.specifiers) {
+      // `import { type X }` named specifiers are type-only — skip.
+      if (t.isImportSpecifier(spec) && spec.importKind === 'type') continue;
+      const local = spec.local.name;
+      if (collisionSet.has(local)) {
+        targets.add(local);
+        renames.set(local, `${local}${IMPORT_DECONFLICT_SUFFIX}`);
+      }
+    }
+  }
+  if (targets.size === 0) return renames;
+
+  // Rename atomically via the program scope (declaration alias + every reference).
+  traverse(program, {
+    Program(path) {
+      for (const name of targets) {
+        const binding = path.scope.getBinding(name);
+        if (binding && binding.scope === path.scope) {
+          path.scope.rename(name, `${name}${IMPORT_DECONFLICT_SUFFIX}`);
+        }
+      }
+      path.stop();
+    },
+  });
+
+  return renames;
 }
 
 /**

@@ -63,6 +63,10 @@ import {
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
 import {
+  reservedClassMembers,
+  deconflictReservedImportBindings,
+} from '../../../../core/src/rewrite/deconflict.js';
+import {
   AngularImportCollector,
   collectAngularImports,
 } from '../rewrite/collectAngularImports.js';
@@ -780,6 +784,26 @@ export function emitScript(
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+
+  // 1a. Phase 61 Plan 04 — auto-alias a `<script>` value-import binding whose
+  //     LOCAL name collides with an author PROP (rewritten to `this.<name>()`)
+  //     or a reserved class member. The floating-ui `offset`/`arrow` catalogue
+  //     case: a bare `{ offset }` shorthand otherwise resolves to `this.offset()`
+  //     (the prop signal) → TS2322 at ng-packagr (gate 4). Aliasing the import to
+  //     `offset$import` (import binding INTERNAL → renameable; the prop + export
+  //     name are public contract → untouched) routes the reference back to the
+  //     imported value. MUST run on the clone BEFORE partitionUserImports lifts
+  //     the imports out of the body (scope.rename needs the specifier present)
+  //     and BEFORE rewriteRozieIdentifiers turns the bare shorthand into
+  //     `this.offset()`. The collision set = prop names ∪ the single-model-gated
+  //     reserved member set. Only-on-collision: a non-colliding import is
+  //     byte-identical.
+  const importSingleModel = opts.cvaModelProp != null;
+  const importCollisionSet = new Set<string>([
+    ...ir.props.map((p) => p.name),
+    ...reservedClassMembers('angular', { singleModel: importSingleModel }),
+  ]);
+  deconflictReservedImportBindings(cloned, importCollisionSet);
 
   // 1b. Spike 001 B1 + Phase 9 Plan 09-04 — partition user-authored top-level
   //     ImportDeclarations AND statement-position `interface`/`type`

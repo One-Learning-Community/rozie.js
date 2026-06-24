@@ -65,8 +65,10 @@ describe('Angular reserved-member deconfliction (Phase 61 Plan 04, SC-2)', () =>
     expect(out).not.toMatch(/^\s*writeValue = signal\(/m);
     // The generated CVA accessor method keeps the reserved name.
     expect(out).toMatch(/writeValue\([^)]*\)\s*[:{]/);
-    // Template reads the renamed signal.
-    expect(out).toContain('this.writeValue$local()');
+    // Template reads the renamed signal (bare in Angular template context); the
+    // class body writes via `this.writeValue$local.set(...)`.
+    expect(out).toContain('writeValue$local()');
+    expect(out).toContain('this.writeValue$local.set(');
   });
 
   it('renames a <script> helper named a lifecycle hook to X$local', () => {
@@ -79,11 +81,14 @@ describe('Angular reserved-member deconfliction (Phase 61 Plan 04, SC-2)', () =>
 
   it('renames a $computed named an Object.prototype member to X$local (getter + reads)', () => {
     const out = compileAngular(SRC, FILE);
-    expect(out).toContain('hasOwnProperty$local');
-    expect(out).toContain('this.hasOwnProperty$local()');
-    // No bare `get hasOwnProperty()` / `hasOwnProperty = computed(` overriding
-    // the inherited Object.prototype member.
-    expect(out).not.toMatch(/\bget hasOwnProperty\(\)/);
+    expect(out).toContain('hasOwnProperty$local = computed(');
+    // Template reads the renamed computed (bare in Angular template context).
+    expect(out).toContain('hasOwnProperty$local()');
+    // The computed body's `$props.value` lowered to the signal read `this.value()`.
+    expect(out).toContain('hasOwnProperty$local = computed(() => this.value().length > 0)');
+    // No bare `hasOwnProperty = computed(` overriding the inherited
+    // Object.prototype member.
+    expect(out).not.toMatch(/\bhasOwnProperty = computed\(/);
   });
 
   it('renames a $refs field AND its viewChild selector in lockstep', () => {
@@ -115,5 +120,23 @@ describe('Angular reserved-member deconfliction (Phase 61 Plan 04, SC-2)', () =>
     const out = compileAngular(SRC, FILE);
     expect(out).toContain('value = model');
     expect(out).not.toContain('value$local');
+  });
+
+  it('CVA quartet is single-model-GATED: cva:false leaves the writeValue data name unrenamed', () => {
+    // With `cva:false` the component is NOT CVA-receiving (cvaModelProp === null
+    // → singleModel off), so the CVA quartet is NOT in the reserved set and the
+    // `<data> writeValue` (a CVA-only reserved name) must NOT rename. The
+    // Object.prototype `hasOwnProperty` $computed + the import alias still fire
+    // (those collisions are unconditional / prop-driven).
+    const out = compileAngular(SRC, FILE, { cva: false });
+    expect(out).toContain('writeValue = signal(');
+    expect(out).not.toContain('writeValue$local');
+    // The $refs `registerOnChange` is also CVA-only → unrenamed under cva:false.
+    expect(out).toContain("viewChild<ElementRef<HTMLDivElement>>('registerOnChange')");
+    expect(out).not.toContain('registerOnChange$local');
+    // Object.prototype collision is unconditional — hasOwnProperty still renames.
+    expect(out).toContain('hasOwnProperty$local');
+    // The import alias is prop-driven (offset prop) — still fires.
+    expect(out).toContain('offset$import');
   });
 });

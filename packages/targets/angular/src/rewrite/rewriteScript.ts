@@ -650,9 +650,18 @@ export function rewriteRozieIdentifiers(
   // references stay bare and ReferenceError at runtime. Only-on-collision:
   // a non-reserved top-level name is byte-identical. $expose verbs + prop names
   // are NEVER renamed (public contract).
+  //
+  // Phase 61 Plan 04 — single-model gate. The widened `reservedClassMembers`
+  // folds in the Angular ControlValueAccessor quartet (`writeValue`/
+  // `registerOnChange`/…) ONLY when the component is CVA-receiving (exactly one
+  // `model:true` prop, `cva !== false`). `cvaModelProp !== null` IS that gate
+  // (resolved once in emitAngular and threaded here), so a plain `<script>`
+  // helper named a CVA method auto-renames on a single-model component and stays
+  // byte-identical everywhere else.
+  const singleModel = cvaModelProp !== null;
   deconflictReservedClassFields(
     program,
-    reservedClassMembers('angular'),
+    reservedClassMembers('angular', { singleModel }),
     new Set<string>([
       ...(ir.expose ?? []).map((e) => e.name),
       ...(ir.props ?? []).map((p) => p.name),

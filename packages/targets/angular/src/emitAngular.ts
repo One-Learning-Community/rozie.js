@@ -97,6 +97,11 @@ import {
   cvaDiagnostics as computeCvaDiagnostics,
   hasBooleanDisabledProp,
 } from './cvaDiagnostics.js';
+import {
+  reservedClassMembers,
+  deconflictReservedComputedInjectNames,
+  deconflictReservedDataRefNames,
+} from '../../../core/src/rewrite/deconflict.js';
 
 /**
  * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
@@ -428,6 +433,35 @@ export function emitAngular(
   opts: EmitAngularOptions = {},
 ): EmitAngularResult {
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
+
+  // ─── Phase 61 Plan 04 (cross-target-name-collision) — STEP 0: IR-LEVEL
+  //     reserved-member deconfliction for <data> / $refs / $computed / $inject.
+  //
+  //     These four kinds lower via signal()/viewChild()/computed()/get-accessor
+  //     CODEGEN that reads names back from the IR — NOT from the cloned <script>
+  //     declarators — so the per-target clone rename in rewriteScript (which
+  //     covers <script> HELPERS + import bindings) cannot reach them. We rename
+  //     the IR source-of-truth + every reference (script + template subtrees) +
+  //     the viewChild selector + the template `ref=` attribute BEFORE any
+  //     emitter (incl. the previewRewrite below + emitScript) reads them. Each
+  //     compile() lowers a FRESH IR per target, so mutating THIS IR never leaks
+  //     to the other five. Only-on-collision: a non-reserved name is
+  //     byte-identical. The CVA quartet is reserved ONLY on a single-model
+  //     component (cvaModelProp !== null), so the reserved set is gated on the
+  //     same `singleModel` flag the class-field pass uses (resolved here, once).
+  //     Public-contract names (props / $expose verbs) are NEVER renamed (D-02).
+  {
+    const cvaEnabledForGate = opts.cva ?? true;
+    const singleModel =
+      cvaEnabledForGate && ir.props.filter((p) => p.isModel).length === 1;
+    const reserved = reservedClassMembers('angular', { singleModel });
+    const protectedNames = new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...ir.props.map((p) => p.name),
+    ]);
+    deconflictReservedDataRefNames(ir, reserved, protectedNames);
+    deconflictReservedComputedInjectNames(ir, reserved, protectedNames);
+  }
 
   // Pre-compute collisionRenames + classMembers + signalMembers by running a
   // "preview" rewrite — we need them for emitTemplate / emitListeners but
