@@ -37,6 +37,19 @@ function prop(name: string, docs?: PropDocs): PropDecl {
   } as unknown as PropDecl;
 }
 
+/** Build a prop carrying a StringLiteral default — used to exercise WR-01. */
+function propWithStringDefault(name: string, value: string): PropDecl {
+  return {
+    type: 'PropDecl',
+    name,
+    typeAnnotation: { kind: 'identifier', name: 'String' },
+    defaultValue: { type: 'StringLiteral', value },
+    isModel: false,
+    required: false,
+    sourceLoc: { start: 0, end: 0, line: 1, column: 0 },
+  } as unknown as PropDecl;
+}
+
 /** Build a minimal IRComponent carrying just the props under test. */
 function ir(props: PropDecl[]): IRComponent {
   return { type: 'IRComponent', name: 'Slider', props } as unknown as IRComponent;
@@ -96,6 +109,39 @@ describe('renderPropDescription [Phase 59] — Description cell', () => {
       ),
     ).toBe('**(deprecated)** The current value.');
   });
+
+  // WR-03: the unmatched-backtick warning must be evaluated on the FINAL joined
+  // cell, not per-part — a span opened in `deprecated` and closed in
+  // `description` is balanced once joined and must NOT warn (false-positive fix).
+  it('does NOT warn when a backtick span opens in deprecated and closes in description (WR-03)', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const out = renderPropDescription(
+        prop('value', {
+          deprecated: 'use `modelValue',
+          description: 'instead` now.',
+        }),
+      );
+      // Combined cell has two backticks (balanced) → no warning.
+      expect((out.match(/`/g) || []).length).toBe(2);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('warns exactly once on a genuinely unclosed span in the combined cell (WR-03)', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      renderPropDescription(prop('value', { description: 'an `unclosed span' }));
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0]?.[0])).toContain(
+        'readme.mjs: WARNING: unmatched backtick',
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('renderPropsTable [Phase 59] — family-agnostic generator (SC-4 / D-06)', () => {
@@ -140,5 +186,19 @@ describe('renderPropsTable [Phase 59] — family-agnostic generator (SC-4 / D-06
     const row = out.split('\n').find((l) => l.includes('`disabled`'))!;
     // Last cell (Description) is empty: row ends with `| |`.
     expect(row.trimEnd().endsWith('|  |')).toBe(true);
+  });
+
+  // WR-01: a `|` inside a Name/Type/Default code-span value must be escaped so
+  // it cannot break the Markdown row into extra columns.
+  it('escapes a pipe inside a StringLiteral default so the row keeps 6 columns (WR-01)', () => {
+    const out = renderPropsTable(ir([propWithStringDefault('sep', 'a|b')]));
+    const row = out.split('\n').find((l) => l.includes('`sep`'))!;
+    // The pipe in the default value is backslash-escaped...
+    expect(row).toContain('\\|');
+    // ...so splitting on UNescaped pipes yields 8 segments (empty leading + 6
+    // cells + empty trailing). Without the WR-01 escape it would be 9 — the raw
+    // `|` would split the Default cell into two.
+    const segments = row.split(/(?<!\\)\|/);
+    expect(segments.length).toBe(8);
   });
 });
