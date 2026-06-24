@@ -530,28 +530,29 @@ export function rewriteRozieIdentifiers(
     'prev',
   ]);
 
-  // Phase 61 Plan 05 risk E — `$computed` name == helper. A `$computed` name is
-  // the template-ref-side contract: React mints `const <name> = useMemo(...)`
-  // and every read (`{{ X }}` / script) is the BARE identifier `X`. A user
-  // helper/local named the same collides. CRITICAL: the `$computed` const is
-  // ITSELF a program-scope `const <name> = …` declarator — a `{ kind:'binding' }`
-  // trigger would rename THAT (breaking the computed). So we use the SAME
-  // `{ kind: 'bare-read' }` trigger Vue's computed group uses: the
-  // VariableDeclarator visitor SKIPS the program-scope computed const (a top-
-  // level `const <name>` IS the generated symbol — a second top-level
-  // `const <name>` would be a duplicate-binding parse error, never a shadow),
-  // and only a NESTED local/param that BARE-READS the computed name is renamed
-  // (the genuine risk E shape — a function-local helper). Only-on-collision: a
-  // nested local that never reads the computed name stays byte-identical, and
-  // the corpus computed consts are untouched.
-  const computedNames = new Set(ir.computed.map((c) => c.name));
+  // Phase 61 Plan 05 risk E — `$computed` name == helper: NO React group needed.
+  // The plan flagged a `$computed`-name vs helper collision as "rare but
+  // unguarded," but on React it is a NON-ISSUE, proven by the ModelParamShadow
+  // corpus fixture (a closure param `label` shadowing a `$computed label`):
+  //   - A TOP-LEVEL helper named the same as a `$computed` would be a SECOND
+  //     program-scope `const <name>` → a duplicate-declaration parse error; it
+  //     cannot reach the emitter. (Distinct from Vue, where the `bare-read`
+  //     trigger guards a NESTED shadow that would otherwise `.value`-wrap to the
+  //     computed ref.)
+  //   - A NESTED param/local named the same LEXICALLY SHADOWS the React
+  //     `const <name> = useMemo(...)` correctly — `{ token: label }` reads the
+  //     PARAM (React does not `.value`-wrap a computed read), so there is no
+  //     mis-capture to fix. Adding a `bare-read` computed group here WRONGLY
+  //     renames that param to `label$local` → ModelParamShadow react drift (the
+  //     fixture explicitly guarantees the five non-Vue targets carry NO rename).
+  // So the React computed collision is left to natural lexical shadowing; no
+  // group is added. (Risk E is a Vue-only concern — handled in Plan 02.)
 
   const reactGroups: GeneratedSymbolGroup[] = [
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
     { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: setterNames, trigger: { kind: 'binding' } },
     { names: synthesizedInternalNames, trigger: { kind: 'binding' } },
-    { names: computedNames, trigger: { kind: 'bare-read' } },
   ];
   deconflictGeneratedSymbols(program, reactGroups, reactProtected);
 
