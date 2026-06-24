@@ -16,6 +16,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -140,12 +141,17 @@ export function emitPropsInterface(
       tsType = `(${tsType}) | null`;
     }
     const opt = p.required ? '' : '?';
+    // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc from the shared builder,
+    // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
+    const jsdoc = buildPropJsdoc(p, '  ');
     if (p.isModel) {
       // 3-field synthesis per D-135 Solid analog.
+      if (jsdoc) fields.push(jsdoc.replace(/\n$/, ''));
       fields.push(`  ${p.name}${opt}: ${tsType};`);
       fields.push(`  default${capitalize(p.name)}?: ${tsType};`);
       fields.push(`  on${capitalize(p.name)}Change?: (${p.name}: ${tsType}) => void;`);
     } else {
+      if (jsdoc) fields.push(jsdoc.replace(/\n$/, ''));
       fields.push(`  ${p.name}${opt}: ${tsType};`);
     }
   }

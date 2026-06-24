@@ -24,6 +24,7 @@ import type {
   WatchHook,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import type {
   LitImportCollector,
   LitDecoratorImportCollector,
@@ -259,7 +260,12 @@ function emitNonModelProp(prop: PropDecl): string {
   // `fieldSuffix` is either `: <type> = <default>` (real/zero-value default)
   // or `!: <type>` (required custom-typed prop with no synthesizable default).
   const fieldSuffix = renderFieldSuffix(prop);
-  return `  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
+  // Phase 58 (SC-2/SC-3) — leading JSDoc above the @property decorator (valid
+  // TS: JSDoc-above-decorator), gated on `prop.docs` (returns '' for a docless
+  // prop → byte-identical, SC-5). The builder's trailing newline joins the
+  // block directly onto the field line.
+  const jsdoc = buildPropJsdoc(prop, '  ');
+  return `${jsdoc}  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
 }
 
 interface ModelPropEmit {
@@ -290,8 +296,12 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
   // runtime value, not a `!`-form) — for a custom type that is the string
   // `'undefined'`, the pre-existing behavior, out of scope to change here.
   const attrFieldSuffix = renderFieldSuffix(prop);
+  // Phase 58 (SC-2/SC-3) — leading JSDoc above the public @property attr mirror
+  // of a model prop, gated on `prop.docs` (returns '' → byte-identical, SC-5).
+  // The builder's trailing newline joins the block onto the first field line.
+  const jsdoc = buildPropJsdoc(prop, '  ');
   const fieldDecl = [
-    `  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
+    `${jsdoc}  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
     `  private _${prop.name}Controllable = createLitControllableProperty<${tsType}>({ host: this, eventName: '${eventName}', defaultValue: ${defaultStr}, initialControlledValue: undefined });`,
   ].join('\n');
 

@@ -8,14 +8,26 @@
 //
 // This test compiles the PropDocs.rozie fixture (one fully-documented prop +
 // one docless control) to all six targets and asserts the docs strings are
-// absent from every `result.code`. It is forward-compatible with Plans 03/04
-// (JSDoc emission): once JSDoc lands the strings may surface in the `.d.ts`
-// doc surface (`result.types`) and as `/** */` COMMENTS — but never in the
-// runtime module body. The guard deliberately checks `result.code` only.
+// absent from every target's RUNTIME-EXECUTABLE body.
 //
-// A FAILURE here means a docs string leaked into runtime output — the SC-6
-// inert guarantee is broken (T-58-03 Information Disclosure). Do NOT "fix" it
-// by relaxing the assertion; fix the emitter that serialized the raw options.
+// PLAN 03 REFINEMENT (the inert guarantee, made precise): Plan 03 lands JSDoc
+// emission, and the in-source prop type surface (interface members / `@property`
+// + Angular class fields) lives INSIDE `result.code` for five targets — there is
+// no separate `.d.ts` artifact in `compile().code` to hide it in. So once JSDoc
+// lands, the docs prose DOES appear in `result.code` — but ONLY as `/** ... */`
+// JSDoc COMMENTS (which every bundler erases at build) and in TS type-position,
+// NEVER as a runtime value (a string literal, object property, or argument that
+// survives transpilation into the shipped bundle). The original Plan 02 guard
+// asserted `!result.code.includes(...)`, which was correct ONLY while no emitter
+// consumed `docs`; it is incompatible with Plan 03's by-design JSDoc-comment
+// emission. The refined guard strips JSDoc comment blocks from `result.code`,
+// THEN asserts the docs strings are absent from the remaining runtime body —
+// preserving SC-6's real intent (no docs prose in shipped runtime code,
+// T-58-03 Information Disclosure) while accommodating JSDoc-as-comments.
+//
+// A FAILURE here means a docs string leaked into runtime-EXECUTABLE output —
+// the SC-6 inert guarantee is broken. Do NOT "fix" it by widening the strip to
+// swallow non-comment code; fix the emitter that serialized the raw options.
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,16 +41,26 @@ const FIXTURE = resolve(REPO_ROOT, 'examples/PropDocs.rozie');
 const TARGETS: CompileTarget[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
 // The author-supplied docs prose from PropDocs.rozie's `label` prop. These are
-// the strings that MUST stay out of every runtime module body.
+// the strings that MUST stay out of every runtime-executable module body.
 const DOCS_DESCRIPTION = 'The visible text label for the control.';
 const DOCS_DEPRECATED = 'Use `text` instead';
 const DOCS_EXAMPLE_FRAGMENT = '<PropDocs label="Save" />';
+
+/**
+ * Strip every JSDoc / block comment from emitted code, leaving only the
+ * runtime-executable + type-declaration body. The docs prose is permitted to
+ * live inside a `/** ... *​/` comment (erased at build); anything outside a
+ * comment is shipped code and MUST NOT carry the prose (SC-6).
+ */
+function stripBlockComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, '');
+}
 
 describe('prop docs are inert [Phase 58] — SC-6 (metadata-only, never in runtime)', () => {
   const source = fs.readFileSync(FIXTURE, 'utf8');
 
   for (const target of TARGETS) {
-    it(`${target}: docs strings never appear in the runtime module body (result.code)`, () => {
+    it(`${target}: docs strings never appear in the runtime-executable body (result.code minus JSDoc)`, () => {
       const result = compile(source, { target, filename: 'PropDocs.rozie' });
 
       // The fixture is well-formed — compilation must not fatally error.
@@ -47,18 +69,21 @@ describe('prop docs are inert [Phase 58] — SC-6 (metadata-only, never in runti
         [],
       );
 
-      // SC-6: the runtime body carries NONE of the docs prose.
+      // SC-6: the runtime-executable body (code with JSDoc/block comments
+      // stripped) carries NONE of the docs prose. The prose is allowed to
+      // survive ONLY inside the stripped JSDoc comments (build-erased).
+      const runtime = stripBlockComments(result.code);
       expect(
-        result.code.includes(DOCS_DESCRIPTION),
-        `${target}: docs.description leaked into the runtime module body`,
+        runtime.includes(DOCS_DESCRIPTION),
+        `${target}: docs.description leaked into the runtime-executable body`,
       ).toBe(false);
       expect(
-        result.code.includes(DOCS_DEPRECATED),
-        `${target}: docs.deprecated leaked into the runtime module body`,
+        runtime.includes(DOCS_DEPRECATED),
+        `${target}: docs.deprecated leaked into the runtime-executable body`,
       ).toBe(false);
       expect(
-        result.code.includes(DOCS_EXAMPLE_FRAGMENT),
-        `${target}: docs.example leaked into the runtime module body`,
+        runtime.includes(DOCS_EXAMPLE_FRAGMENT),
+        `${target}: docs.example leaked into the runtime-executable body`,
       ).toBe(false);
     });
   }

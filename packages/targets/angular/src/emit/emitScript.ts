@@ -52,6 +52,7 @@ import type {
   StateDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import {
@@ -905,6 +906,15 @@ export function emitScript(
     // would otherwise bind `| null` inside its return type.
     if (hasExplicitNullDefault(p)) {
       tsType = `(${tsType}) | null`;
+    }
+    // Phase 58 (SC-2/SC-3) — class-field JSDoc above each input()/model(),
+    // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
+    // Built at zero indent (shell.ts prepends the 2-space class-body indent) and
+    // pushed line-by-line so `fieldLines.length` (the source-map preamble line
+    // count) stays accurate per emitted line.
+    const jsdoc = buildPropJsdoc(p, '');
+    if (jsdoc) {
+      for (const jl of jsdoc.replace(/\n$/, '').split('\n')) fieldLines.push(jl);
     }
     if (defaultVal) {
       fieldLines.push(`${p.name} = ${fnName}<${tsType}>(${defaultVal});`);

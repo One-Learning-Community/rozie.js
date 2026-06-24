@@ -49,6 +49,7 @@ import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -391,6 +392,10 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
     // `$bindable()` (model) for no-default props, so no destructure change
     // is needed — the interface `?:` removal is the load-bearing change.
     const opt = p.required ? '' : '?';
+    // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc from the shared builder,
+    // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
+    const jsdoc = buildPropJsdoc(p, '  ');
+    if (jsdoc) lines.push(jsdoc.replace(/\n$/, ''));
     lines.push(`  ${p.name}${opt}: ${typeText};`);
   }
 

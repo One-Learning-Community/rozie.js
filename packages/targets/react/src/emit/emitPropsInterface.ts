@@ -22,6 +22,7 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 
 /**
  * Render a PropTypeAnnotation as a TypeScript type string.
@@ -124,14 +125,21 @@ export function emitPropsInterface(
       tsType = `(${tsType}) | null`;
     }
     const opt = p.required ? '' : '?';
+    // Phase 58 (SC-2/SC-3) — leading per-prop JSDoc from the shared builder,
+    // gated on `p.docs` (returns '' for a docless prop → byte-identical, SC-5).
+    // Strip the trailing newline because each member is a separate `fields`
+    // entry joined by '\n'.
+    const jsdoc = buildPropJsdoc(p, '  ');
     if (p.isModel) {
       // 3-field synthesis per D-31/D-56 React analog. All three are keyed to
       // the model name — `default${Pascal}` matches emitTypes.ts's `.d.ts`
       // emission (and Radix's `defaultOpen`/`defaultChecked` convention).
+      if (jsdoc) fields.push(jsdoc.replace(/\n$/, ''));
       fields.push(`  ${p.name}${opt}: ${tsType};`);
       fields.push(`  default${capitalize(p.name)}?: ${tsType};`);
       fields.push(`  on${capitalize(p.name)}Change?: (${p.name}: ${tsType}) => void;`);
     } else {
+      if (jsdoc) fields.push(jsdoc.replace(/\n$/, ''));
       fields.push(`  ${p.name}${opt}: ${tsType};`);
     }
   }
