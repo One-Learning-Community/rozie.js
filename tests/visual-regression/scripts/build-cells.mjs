@@ -230,6 +230,26 @@ const TOAST_SRC = resolve(
   'toast',
   'src',
 );
+// Same packaging move for @rozie-ui/tags / number-field / pagination: each
+// family's <Name>.rozie lives in the package src; the Angular sub-build walks it
+// via `prebuildExtraRoots` and drops the cross-tree `.rozie.ts` + `<Name>.ts`
+// shim artefacts that must be swept after the Angular build (see
+// cleanupCrossTreeAngularArtifacts).
+const TAGS_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'tags', 'src');
+const NUMBER_FIELD_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'number-field',
+  'src',
+);
+const PAGINATION_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'pagination',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -585,6 +605,26 @@ function cleanupCrossTreeAngularArtifacts() {
     // toast src always exists post-port — defensive only
   }
   rmSync(resolve(TOAST_SRC, 'Toaster.ts'), { force: true });
+  // Same sweep for @rozie-ui/tags / number-field / pagination package src (the
+  // *BehaviorDemo / *ScreenshotDemo cells compose each family via <components>, so
+  // the Angular sub-build emits <Name>.rozie.ts + the <Name>.ts shim here).
+  // Leftovers poison the later solid/lit builds.
+  for (const [src, shim] of [
+    [TAGS_SRC, 'Tags.ts'],
+    [NUMBER_FIELD_SRC, 'NumberField.ts'],
+    [PAGINATION_SRC, 'Pagination.ts'],
+  ]) {
+    try {
+      for (const entry of readdirSync(src)) {
+        if (entry.endsWith('.rozie.ts')) {
+          rmSync(resolve(src, entry), { force: true });
+        }
+      }
+    } catch {
+      // family src always exists post-port — defensive only
+    }
+    rmSync(resolve(src, shim), { force: true });
+  }
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
