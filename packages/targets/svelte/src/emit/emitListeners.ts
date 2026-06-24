@@ -330,12 +330,45 @@ function renderListener(
     const optsObj = renderOptionsSuffix(classification.listenerOpts);
     const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
+    // Defer the document/window addEventListener by one macrotask. Svelte
+    // flushes this $effect during the SAME event tick that flipped the gating
+    // condition (e.g. `open`) true. If a click on an element OUTSIDE the
+    // component is what programmatically opened it, that click is still bubbling
+    // to `document` when a synchronously-attached listener would go live —
+    // it would see the click is outside and immediately self-dismiss. The other
+    // five targets attach past the originating event (React useEffect, Solid
+    // onMount, Lit connectedCallback), so they are immune; Svelte's $effect is
+    // the lone same-tick attach.
+    //
+    // A MACROTASK (setTimeout 0), NOT a microtask: a microtask checkpoint runs
+    // between event-listener invocations DURING the same click dispatch (the
+    // HTML "clean up after running script" step drains the microtask queue
+    // whenever the JS stack empties mid-dispatch), so a queueMicrotask-deferred
+    // attach can go live before the opening click reaches `document` and still
+    // self-dismiss. A macrotask defers past the entire dispatch, after which the
+    // originating click is gone. The ~0ms delay is imperceptible and the
+    // already-open outside-dismissal path is unaffected.
+    //
+    // `cancelled` makes the pending attach a no-op if the effect tears down
+    // (gate flips back to false, or unmount) before the timer fires; the timer
+    // handle is cleared in cleanup; `attached` makes the cleanup remove the
+    // listener only if it actually got attached.
     return [
       `$effect(() => {`,
       whenGuard +
         `  const handler = ($event: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n  };`,
-      `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
-      `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
+      `  let attached = false;`,
+      `  let cancelled = false;`,
+      `  const timer = setTimeout(() => {`,
+      `    if (cancelled) return;`,
+      `    ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
+      `    attached = true;`,
+      `  }, 0);`,
+      `  return () => {`,
+      `    cancelled = true;`,
+      `    clearTimeout(timer);`,
+      `    if (attached) ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
+      `  };`,
       `});`,
     ].join('\n');
   }
