@@ -4,6 +4,7 @@ import { defineConfig } from 'vitepress';
 import Rozie from '@rozie/unplugin/vite';
 import { rozieCodegen } from './rozie-codegen';
 import { diagnosticsCodegen } from './diagnostics-codegen';
+import { propsCodegen } from './props-codegen';
 
 const rozieGrammar = JSON.parse(
   readFileSync(
@@ -52,6 +53,7 @@ export default defineConfig({
     config(md) {
       rozieCodegen(md, { examplesDir });
       diagnosticsCodegen(md, { codesPath });
+      propsCodegen(md, { examplesDir });
     },
   },
   // Dogfood the project: compile .rozie files inline through the unplugin so
