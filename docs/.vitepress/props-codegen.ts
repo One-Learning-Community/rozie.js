@@ -83,10 +83,10 @@ export function propsCodegen(
       `[props-codegen] cannot read example source: ${root} (and not found under demos/ or typed/)`,
     );
   };
-  const readExample = (name: string): string => {
+  const readExample = (name: string): { source: string; path: string } => {
     const path = resolveExample(name);
     try {
-      return readFileSync(path, 'utf8');
+      return { source: readFileSync(path, 'utf8'), path };
     } catch {
       throw new Error(`[props-codegen] cannot read example source: ${path}`);
     }
@@ -103,8 +103,14 @@ export function propsCodegen(
         throw new Error('[props-codegen] `rozie-props` needs a component name');
       }
 
-      const source = readExample(name);
-      const filename = `${name}.rozie`;
+      const { source, path } = readExample(name);
+      // Pass the ABSOLUTE host path as `filename` (exactly as
+      // data-table/scripts/codegen.mjs:149-153 does) — not a bare
+      // `${name}.rozie`. The absolute path lets the lower pass resolve the
+      // family's sibling `.rzts`/`.rzjs` script partials and `<components>`
+      // importPaths relative to the source dir; a bare basename makes those
+      // resolutions fail (ROZ118/ROZ945 errors) and would break the build.
+      const filename = path;
 
       // IR-load path (copied from data-table/scripts/codegen.mjs:149-153):
       // CompileResult has no `ir` field, so the IR comes from parse() +
