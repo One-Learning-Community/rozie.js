@@ -1,0 +1,81 @@
+<!--
+  AngularDataReserved.rozie — Phase 61 Plan 04 (cross-target-name-collision) TEST INPUT.
+
+  A SINGLE-MODEL Angular component (exactly one `model:true` prop → CVA-receiving)
+  authored so that several INTERNAL names collide with the widened
+  `reservedClassMembers('angular', { singleModel:true })` set:
+
+    - `<data> writeValue`   — a CVA quartet member. Pre-fix the emitted class had a
+                              `writeValue = signal(...)` field AND the generated CVA
+                              `writeValue(value)` method → TS2300 duplicate identifier
+                              at ng-packagr (gate 4). Post-fix the data field renames
+                              to `writeValue$local`.
+    - `function ngOnInit()` — an Angular lifecycle hook name. A plain helper named a
+                              lifecycle hook becomes a class method shadowing the
+                              framework hook. Post-fix renames to `ngOnInit$local`.
+    - `$refs.registerOnChange` — `registerOnChange` is a CVA quartet member (reserved
+                              only on a single-model component). A
+                              `viewChild('registerOnChange')` field collides with the
+                              generated CVA method. Post-fix the ref field AND its
+                              `viewChild('registerOnChange$local')` selector rename in
+                              lockstep (with the template `ref=` matching).
+    - `$computed hasOwnProperty` — an Object.prototype member. Post-fix the getter +
+                              every read rename to `hasOwnProperty$local`.
+    - import `{ offset }`   — the floating-ui catalogue case: a `<script>` import
+                              binding whose LOCAL name equals an author PROP (`offset`).
+                              Pre-fix the bare `{ offset }` shorthand resolves to
+                              `this.offset()` (the prop) → TS2322 at gate 4. Post-fix
+                              the import auto-aliases (`offset as offset$import`) and
+                              its references rewrite; the PROP `offset` is untouched.
+
+  Test INPUT only — assertions live in angularReservedDeconflict.test.ts.
+-->
+
+<rozie name="AngularDataReserved">
+
+<props>
+{
+  value: { type: String, default: '', model: true },
+  offset: { type: Number, default: 0 },
+}
+</props>
+
+<data>
+{
+  writeValue: 'pending',
+}
+</data>
+
+<script lang="ts">
+import { offset } from '@floating-ui/dom'
+
+// A plain (non-exposed) helper named an Angular lifecycle hook.
+function ngOnInit() {
+  $data.writeValue = 'ready'
+}
+
+// A $computed named an Object.prototype member.
+const hasOwnProperty = $computed(() => $props.value.length > 0)
+
+// An import binding referenced as bare shorthand alongside a prop of the same
+// name — the floating-ui offset/arrow collision shape.
+const middleware = { offset, distance: $props.offset }
+
+$onMount(() => {
+  ngOnInit()
+  const panel = $refs.registerOnChange
+  if (panel) panel.scrollTop = 0
+})
+</script>
+
+<template>
+<div class="angular-data-reserved">
+  <span class="echo">{{ $props.value }}</span>
+  <span class="state">{{ $data.writeValue }}</span>
+  <span class="has">{{ hasOwnProperty }}</span>
+  <span class="mw">{{ middleware.distance }}</span>
+  <div ref="registerOnChange" class="panel"></div>
+</div>
+</template>
+
+</rozie>
