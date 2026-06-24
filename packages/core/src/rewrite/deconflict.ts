@@ -44,6 +44,14 @@
 import _traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import type { File } from '@babel/types';
+import {
+  LIT_DOM_MEMBERS,
+  LIT_LIFECYCLE_MEMBERS,
+  LIT_EMITTER_MEMBERS,
+  ANGULAR_CVA_MEMBERS,
+  ANGULAR_LIFECYCLE_MEMBERS,
+  ANGULAR_EMITTER_MEMBERS,
+} from './reservedNames.js';
 
 // CJS interop normalization (matches every target's rewriteScript.ts).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -655,31 +663,15 @@ function deriveLitDomMembers(): Set<string> {
   collect(g.Node?.prototype);
   collect(g.EventTarget?.prototype);
 
-  // Conservative curated seed (the members the listbox/Embla/rete findings hit
-  // plus the common DOM surface) — guarantees the set is non-empty even in a
-  // bare-Node compiler process with no DOM globals. Superset-safe: extra names
-  // only ever rename a USER local that collides, never a generated symbol.
-  for (const n of [
-    // Node
-    'nodeType', 'nodeName', 'nodeValue', 'parentNode', 'parentElement',
-    'childNodes', 'firstChild', 'lastChild', 'nextSibling', 'previousSibling',
-    'textContent', 'ownerDocument', 'appendChild', 'removeChild', 'replaceChild',
-    'insertBefore', 'cloneNode', 'contains', 'isConnected', 'getRootNode',
-    // EventTarget
-    'addEventListener', 'removeEventListener', 'dispatchEvent',
-    // Element
-    'id', 'className', 'classList', 'tagName', 'attributes', 'innerHTML',
-    'outerHTML', 'getAttribute', 'setAttribute', 'removeAttribute',
-    'hasAttribute', 'querySelector', 'querySelectorAll', 'closest', 'matches',
-    'getBoundingClientRect', 'scrollTo', 'scrollIntoView', 'scrollTop',
-    'scrollLeft', 'scrollWidth', 'scrollHeight', 'clientWidth', 'clientHeight',
-    'part', 'slot', 'shadowRoot', 'attachShadow',
-    // HTMLElement
-    'focus', 'blur', 'click', 'title', 'hidden', 'style', 'dataset', 'tabIndex',
-    'innerText', 'offsetWidth', 'offsetHeight', 'offsetTop', 'offsetLeft',
-    'offsetParent', 'contentEditable', 'isContentEditable', 'lang', 'dir',
-    'draggable', 'accessKey', 'autofocus',
-  ]) {
+  // Conservative curated seed — guarantees the set is COMPLETE (the full Group A
+  // DOM chain) even in a bare-Node compiler process with no DOM globals.
+  // Phase 61-01: seeded from the hardcoded `LIT_DOM_MEMBERS` table
+  // (reservedNames.ts, transcribed verbatim from collision-lit §2 Group A) so a
+  // bare-Node compile still covers `popover`/`inert`/`aria*`/`enterKeyHint`/… —
+  // closes R-NEW-6 (those names previously slipped the auto-rename when no DOM
+  // globals filled the runtime walk). Superset-safe: an extra name only ever
+  // renames a USER local that collides, never a generated symbol.
+  for (const n of LIT_DOM_MEMBERS) {
     out.add(n);
   }
   return out;
@@ -688,12 +680,43 @@ function deriveLitDomMembers(): Set<string> {
 export const LIT_DOM_INHERITED_MEMBERS: ReadonlySet<string> = deriveLitDomMembers();
 
 /**
- * The reserved-class-member name set for a class target. Angular gets the
- * `Object.prototype` members; Lit gets those PLUS the inherited DOM members.
+ * The reserved-class-member name set for a class target.
+ *
+ * Phase 61-01 widened both targets to consume the shared `reservedNames.ts`
+ * tables (the single source of truth — Half B's lint validator reads the same
+ * tables, so the two halves never drift):
+ *
+ *   - Lit: `Object.prototype` ∪ inherited DOM members (full Group A via the
+ *     completed `deriveLitDomMembers()` seed) ∪ Lit lifecycle members (Group C —
+ *     `render`/`requestUpdate`/`updated`/… — closes R-NEW-2) ∪ Lit emitter
+ *     members (Group D unconditional names).
+ *   - Angular: `Object.prototype` ∪ lifecycle hooks + `constructor`
+ *     (`ANGULAR_LIFECYCLE_MEMBERS`) ∪ emitter internals
+ *     (`ANGULAR_EMITTER_MEMBERS`). The CVA quartet
+ *     (`ANGULAR_CVA_MEMBERS`) is folded in ONLY behind the single-model gate —
+ *     pass `{ singleModel: true }` (it is reserved only when the component has
+ *     exactly one `model:true` prop and `cva !== false`). With no opts the
+ *     Angular set is a SUPERSET of the pre-61 set (which was Object.prototype
+ *     only); the only-on-collision discipline (above, lines 27-29) keeps the
+ *     corpus byte-identical for any component whose author names none of the
+ *     newly-added reserved members.
  */
-export function reservedClassMembers(target: 'angular' | 'lit'): ReadonlySet<string> {
-  if (target === 'angular') return OBJECT_PROTOTYPE_MEMBERS;
+export function reservedClassMembers(
+  target: 'angular' | 'lit',
+  opts?: { singleModel?: boolean },
+): ReadonlySet<string> {
+  if (target === 'angular') {
+    const merged = new Set<string>(OBJECT_PROTOTYPE_MEMBERS);
+    for (const n of ANGULAR_LIFECYCLE_MEMBERS) merged.add(n);
+    for (const n of ANGULAR_EMITTER_MEMBERS) merged.add(n);
+    if (opts?.singleModel) {
+      for (const n of ANGULAR_CVA_MEMBERS) merged.add(n);
+    }
+    return merged;
+  }
   const merged = new Set<string>(OBJECT_PROTOTYPE_MEMBERS);
   for (const n of LIT_DOM_INHERITED_MEMBERS) merged.add(n);
+  for (const n of LIT_LIFECYCLE_MEMBERS) merged.add(n);
+  for (const n of LIT_EMITTER_MEMBERS) merged.add(n);
   return merged;
 }
