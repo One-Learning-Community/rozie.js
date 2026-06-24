@@ -352,6 +352,28 @@ export default defineConfig({
             { text: 'Pagination — live demo', link: '/components/pagination-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/switch',
+          collapsed: true,
+          items: [
+            { text: 'Switch — headless toggle', link: '/components/switch' },
+            { text: 'API reference', link: '/components/switch-api' },
+            { text: 'Usage examples', link: '/components/switch-usage' },
+            { text: 'Toggle / switch comparison', link: '/components/switch-comparison' },
+            { text: 'Switch — live demo', link: '/components/switch-demo' },
+          ],
+        },
+        {
+          text: '@rozie-ui/popover',
+          collapsed: true,
+          items: [
+            { text: 'Popover — tooltip & popover (Floating UI)', link: '/components/popover' },
+            { text: 'API reference', link: '/components/popover-api' },
+            { text: 'Usage examples', link: '/components/popover-usage' },
+            { text: 'Popover / tooltip comparison', link: '/components/popover-comparison' },
+            { text: 'Popover — live demo', link: '/components/popover-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

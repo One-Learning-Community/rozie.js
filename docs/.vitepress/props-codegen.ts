@@ -58,6 +58,8 @@ export function propsCodegen(
       'tags',
       'number-field',
       'pagination',
+      'switch',
+      'popover',
       'sortable-list',
       'flatpickr',
       'fullcalendar',

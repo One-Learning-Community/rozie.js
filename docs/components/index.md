@@ -53,6 +53,12 @@ Grouped by what they do. Most wrap a vanilla-JS engine; the **headless** group a
 | --- | --- | --- |
 | **Captcha** | [reCAPTCHA](https://www.google.com/recaptcha/) / [hCaptcha](https://www.hcaptcha.com/) / [Turnstile](https://www.cloudflare.com/products/turnstile/) bot protection | [/components/captcha](/components/captcha) |
 
+### Overlays
+
+| Family | Wraps | Showcase |
+| --- | --- | --- |
+| **Popover** | [Floating UI](https://floating-ui.com/) tooltip + popover positioning | [/components/popover](/components/popover) |
+
 ### Headless primitives (no engine)
 
 Authored from scratch in a single `.rozie` file — no third-party engine, fully accessible.
@@ -68,6 +74,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Tags** | *(no engine)* headless accessible token / tags input | [/components/tags](/components/tags) |
 | **NumberField** | *(no engine)* headless accessible number field / stepper | [/components/number-field](/components/number-field) |
 | **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
+| **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |
 
 ## Why these exist
 

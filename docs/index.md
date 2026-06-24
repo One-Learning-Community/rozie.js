@@ -45,11 +45,11 @@ The clearest proof that one source can ship six idiomatic targets is a shelf of 
 
 **Engine-backed** — a battle-tested vanilla-JS engine wrapped once, where the existing per-framework bindings are uneven, community-maintained, or (for Lit) missing entirely:
 
-[SortableList](/components/sortable-list) · [Flatpickr](/components/flatpickr) · [FullCalendar](/components/fullcalendar) · [CodeMirror](/components/codemirror) · [Chart.js](/components/chartjs) · [TipTap](/components/tiptap) · [MapLibre](/components/maplibre) · [Cropper](/components/cropper) · [PdfViewer](/components/pdf) · [FlowCanvas](/components/rete) · [Carousel](/components/embla)
+[SortableList](/components/sortable-list) · [Flatpickr](/components/flatpickr) · [FullCalendar](/components/fullcalendar) · [CodeMirror](/components/codemirror) · [Chart.js](/components/chartjs) · [TipTap](/components/tiptap) · [MapLibre](/components/maplibre) · [Cropper](/components/cropper) · [PdfViewer](/components/pdf) · [FlowCanvas](/components/rete) · [Carousel](/components/embla) · [Popover & Tooltip](/components/popover)
 
 **No-engine, pure Rozie** — headless, fully accessible interaction authored from scratch in a single `.rozie` file, proving Rozie carries rich behavior on its own:
 
-[Listbox](/components/listbox) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [Pagination](/components/pagination)
+[Listbox](/components/listbox) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [Pagination](/components/pagination) · [Switch & Toggle](/components/switch)
 
 **Hosted widgets** — a third-party SaaS widget loaded at runtime (no npm engine), unified across providers *and* frameworks:
 

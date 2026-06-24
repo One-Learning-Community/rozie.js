@@ -45,6 +45,8 @@
     "@rozie-ui/otp-vue": "workspace:*",
     "@rozie-ui/pagination-vue": "workspace:*",
     "@rozie-ui/pdf-vue": "workspace:*",
+    "@rozie-ui/popover-vue": "workspace:*",
+    "@rozie-ui/switch-vue": "workspace:*",
     "@rozie-ui/tags-vue": "workspace:*",
     "@rozie-ui/rete-vue": "workspace:*",
     "@rozie-ui/slider-vue": "workspace:*",
