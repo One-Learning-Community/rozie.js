@@ -26,20 +26,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// KNOWN-ISSUE (LIT ONLY, 2026-06-24): the `@change` readout renders null on the
-// Lit leaf. A child @emit reaches a Lit consumer as a CustomEvent (payload in
-// `e.detail`), unlike the other 5 targets (payload as arg0); the demo applies the
-// documented `e.detail` unwrap but Lit STILL shows null on a forced-clean build,
-// so the root cause is unconfirmed — either a deeper Lit @emit-consumer payload
-// shape OR a VR build-cache staleness obscuring verification (the rozie/vite
-// transform cache did not invalidate on demo-source edits this session).
-// react/solid/vue/svelte/angular ALL PASS — last round's react/solid/lit marks
-// were a noisy-combined-log + retry mis-attribution. NOT a shipped-component
-// defect (NumberField passes typecheck/build/cold-test + screenshot VR ×6).
+// RESOLVED (2026-06-24): all 6 targets pass. The earlier "Lit `@change` readout
+// renders null" was a VR build-cache staleness artefact — the local rsync mirror
+// (rozie-ci-linux) preserved mtimes + stale compiled leaves, so demo-source edits
+// (the `e.detail` unwrap) never reached the served Lit bundle and every run lied.
+// A clean canonical `tests/visual-regression` build (rm -rf dist/lit node_modules/.vite
+// && ROZIE_TARGET=lit vite build) serves the unwrap and Lit passes; CI's fresh
+// checkout never hits the staleness. The demo's documented `e.detail` unwrap
+// (a child @emit reaches a Lit consumer as a CustomEvent, payload in `e.detail`,
+// vs arg0 on the other 5 targets — playbook §5) is the correct + sufficient fix.
 // Tracked: project_vr_direct_model_write_null_react_solid_lit.
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['lit']);
+>([]);
 
 for (const target of TARGETS) {
   const built = existsSync(
