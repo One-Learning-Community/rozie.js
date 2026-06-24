@@ -6,8 +6,8 @@
  *
  *   ```rozie-props <Name>
  *   ```
- *     → replaced with the 6-column props table (Prop | Type | Default |
- *       Required | Model | Description) rendered by the core
+ *     → replaced with the 6-column props table (Name | Type | Default |
+ *       Two-way (model) | Required | Description) rendered by the core
  *       `renderPropsTable(ir)` generator, from the IR of
  *       `packages/ui/<product>/src/<Name>.rozie` (or `examples/<Name>.rozie`).
  *
@@ -80,15 +80,20 @@ export function propsCodegen(
     const typed = resolve(opts.examplesDir, 'typed', `${name}.rozie`);
     if (existsSync(typed)) return typed;
     throw new Error(
-      `[props-codegen] cannot read example source: ${root} (and not found under demos/ or typed/)`,
+      `[props-codegen] cannot resolve a .rozie source for "${name}" (looked under ` +
+        `packages/ui/<product>/src, ${root}, demos/ and typed/). If this is a new ` +
+        `family, add its product slug to the resolveExample product list in ` +
+        `props-codegen.ts (see ADDING-A-FAMILY.md, "Prop docs" step 3).`,
     );
   };
   const readExample = (name: string): { source: string; path: string } => {
     const path = resolveExample(name);
     try {
       return { source: readFileSync(path, 'utf8'), path };
-    } catch {
-      throw new Error(`[props-codegen] cannot read example source: ${path}`);
+    } catch (err) {
+      throw new Error(`[props-codegen] cannot read example source: ${path}`, {
+        cause: err,
+      });
     }
   };
 
