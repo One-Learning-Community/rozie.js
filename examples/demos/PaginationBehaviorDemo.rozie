@@ -22,7 +22,11 @@
 
 <script>
 const onChange = (e) => {
-  $data.lastChange = e && e.page != null ? String(e.page) : ''
+  // Lit delivers a child's @emit as a CustomEvent → payload lives in e.detail;
+  // the other 5 targets pass the payload object as arg0 directly (documented
+  // cross-target consumer edge — see authoring playbook §5).
+  const p = e && e.page == null && e.detail ? e.detail : e
+  $data.lastChange = p && p.page != null ? String(p.page) : ''
 }
 const applyPage = () => {
   $data.page = 10

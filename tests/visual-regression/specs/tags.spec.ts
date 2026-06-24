@@ -26,16 +26,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// KNOWN-ISSUE (deferred 2026-06-24): the `set-tags` step does a direct
-// `$data.tags = [...]` write to the r-model-bound key; on react/solid the
-// readout renders null (a cross-target direct-write-reflection gap). This is a
-// behavioral DEMO-CELL gap, NOT a shipped-component defect — Tags passes
-// typecheck/build/cold-test and TagsScreenshot is byte-identical ×6. ROZ524 was
-// ruled out (renaming the helper changed nothing). Tracked for a follow-up
-// debug pass; see project_next_headless_families_round memory.
+// All six targets pass behaviorally — verified by the 2026-06-24 clean isolated
+// matrix run. (Last round's react/solid marks were a mis-attribution from noisy
+// combined-log + Playwright-retry parsing; the clean per-target run shows green.)
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['react', 'solid']);
+>();
 
 for (const target of TARGETS) {
   const built = existsSync(

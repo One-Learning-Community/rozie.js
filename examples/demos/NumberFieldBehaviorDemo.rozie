@@ -22,7 +22,11 @@
 
 <script>
 const onChange = (e) => {
-  $data.lastChange = e && e.value != null ? String(e.value) : 'null'
+  // Lit delivers a child's @emit as a CustomEvent → payload lives in e.detail;
+  // the other 5 targets pass the payload object as arg0 directly (documented
+  // cross-target consumer edge — see authoring playbook §5).
+  const p = e && e.value == null && e.detail ? e.detail : e
+  $data.lastChange = p && p.value != null ? String(p.value) : 'null'
 }
 const applyQty = () => {
   $data.qty = 8

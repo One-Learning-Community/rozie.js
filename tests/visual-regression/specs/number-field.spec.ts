@@ -26,16 +26,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// KNOWN-ISSUE (deferred 2026-06-24): the `set-qty` step does a direct
-// `$data.qty = 8` write to the r-model-bound key; on react/solid/lit the readout
-// renders null (a cross-target direct-write-reflection gap). This is a
-// behavioral DEMO-CELL gap, NOT a shipped-component defect — NumberField passes
-// typecheck/build/cold-test and NumberFieldScreenshot is byte-identical ×6.
-// ROZ524 was ruled out (renaming the helper changed nothing). Tracked for a
-// follow-up debug pass; see project_next_headless_families_round memory.
+// KNOWN-ISSUE (LIT ONLY, 2026-06-24): the `@change` readout renders null on the
+// Lit leaf. A child @emit reaches a Lit consumer as a CustomEvent (payload in
+// `e.detail`), unlike the other 5 targets (payload as arg0); the demo applies the
+// documented `e.detail` unwrap but Lit STILL shows null on a forced-clean build,
+// so the root cause is unconfirmed — either a deeper Lit @emit-consumer payload
+// shape OR a VR build-cache staleness obscuring verification (the rozie/vite
+// transform cache did not invalidate on demo-source edits this session).
+// react/solid/vue/svelte/angular ALL PASS — last round's react/solid/lit marks
+// were a noisy-combined-log + retry mis-attribution. NOT a shipped-component
+// defect (NumberField passes typecheck/build/cold-test + screenshot VR ×6).
+// Tracked: project_vr_direct_model_write_null_react_solid_lit.
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['react', 'solid', 'lit']);
+>(['lit']);
 
 for (const target of TARGETS) {
   const built = existsSync(
