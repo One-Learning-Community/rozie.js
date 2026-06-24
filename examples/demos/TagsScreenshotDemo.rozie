@@ -1,0 +1,49 @@
+<!--
+  TagsScreenshotDemo.rozie — content-STABLE screenshot consumer for @rozie-ui/tags.
+
+  Where TagsBehaviorDemo.rozie is the BEHAVIORAL cell (typing/commit/remove), THIS
+  is the SEPARATE deterministic SCREENSHOT cell — never extend it for behavior.
+
+  Made deterministic by: a FIXED seeded token list (3 chips) bound r-model:modelValue,
+  NO autoFocus + NO interaction (an unfocused input has no caret/focus-ring to drift),
+  and a fixed-width frame. One .rozie source → six per-framework screenshot consumers;
+  the Linux PNG baseline is generated separately in pinned Linux Docker (NOT here —
+  macOS baselines are forbidden, feedback_vr_linux_baselines). Until it lands the
+  matrix cell auto-fixmes on baselineExists(). INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="TagsScreenshotDemo">
+
+<components>
+{
+  Tags: '../../packages/ui/tags/src/Tags.rozie',
+}
+</components>
+
+<data>
+{
+  tags: ['design', 'rozie', 'headless'],
+}
+</data>
+
+<template>
+<div class="tags-screenshot-demo">
+  <Tags
+    r-model:modelValue="$data.tags"
+    placeholder="Add a tag…"
+    ariaLabel="Tags"
+  />
+</div>
+</template>
+
+<style>
+.tags-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>

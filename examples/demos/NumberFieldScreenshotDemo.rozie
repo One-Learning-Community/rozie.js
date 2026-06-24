@@ -1,0 +1,51 @@
+<!--
+  NumberFieldScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  @rozie-ui/number-field.
+
+  Where NumberFieldBehaviorDemo.rozie is the BEHAVIORAL cell (steppers/keyboard/
+  clamp), THIS is the SEPARATE deterministic SCREENSHOT cell — never extend it for
+  behavior. Made deterministic by: a FIXED seeded value (42) bound r-model:modelValue,
+  NO autoFocus (unfocused → the input shows the locale-formatted value, no caret) +
+  NO interaction, and a fixed frame. One .rozie source → six per-framework
+  screenshot consumers; the Linux PNG baseline is generated separately in pinned
+  Linux Docker (NOT here — macOS baselines are forbidden, feedback_vr_linux_baselines).
+  Until it lands the matrix cell auto-fixmes on baselineExists(). INLINE-rendering
+  family → standard mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="NumberFieldScreenshotDemo">
+
+<components>
+{
+  NumberField: '../../packages/ui/number-field/src/NumberField.rozie',
+}
+</components>
+
+<data>
+{
+  qty: 42,
+}
+</data>
+
+<template>
+<div class="number-field-screenshot-demo">
+  <NumberField
+    r-model:modelValue="$data.qty"
+    :min="0"
+    :max="100"
+    :step="1"
+    ariaLabel="Quantity"
+  />
+</div>
+</template>
+
+<style>
+.number-field-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>

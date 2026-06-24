@@ -1,0 +1,51 @@
+<!--
+  PaginationScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  @rozie-ui/pagination.
+
+  Where PaginationBehaviorDemo.rozie is the BEHAVIORAL cell (next/prev/goto/keyboard),
+  THIS is the SEPARATE deterministic SCREENSHOT cell — never extend it for behavior.
+  Made deterministic by: a FIXED seeded MIDDLE page (5 of 20) bound r-model:modelValue
+  so BOTH ellipses show ([1 … 4 5 6 … 20]), NO interaction + nothing focused, and a
+  fixed frame. One .rozie source → six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here — macOS
+  baselines are forbidden, feedback_vr_linux_baselines). Until it lands the matrix
+  cell auto-fixmes on baselineExists(). INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="PaginationScreenshotDemo">
+
+<components>
+{
+  Pagination: '../../packages/ui/pagination/src/Pagination.rozie',
+}
+</components>
+
+<data>
+{
+  page: 5,
+}
+</data>
+
+<template>
+<div class="pagination-screenshot-demo">
+  <Pagination
+    r-model:modelValue="$data.page"
+    :totalPages="20"
+    :siblingCount="1"
+    :boundaryCount="1"
+    ariaLabel="Pages"
+  />
+</div>
+</template>
+
+<style>
+.pagination-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+</style>
+
+</rozie>

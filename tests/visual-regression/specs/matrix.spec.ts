@@ -361,6 +361,19 @@ const EXAMPLES = [
   // the rozie-mount clip). The *Behavior cells are behavioral-only (no pixel baseline).
   'OtpScreenshot',
   'ComboboxScreenshot',
+  // Phase 60 @rozie-ui tags/number-field/pagination INLINE screenshot cells — the
+  // three pure-Rozie headless families that render in normal flow, so they go in
+  // this standard mount-clipped matrix. TagsScreenshot seeds 3 fixed chips + an
+  // unfocused input (no caret); NumberFieldScreenshot seeds the value 42 in an
+  // unfocused spinbutton (shows the locale-formatted value, no caret);
+  // PaginationScreenshot seeds page 5 of 20 so BOTH ellipses render
+  // ([1 … 4 5 6 … 20]). All deterministic at rest. Per D-10 all 6 targets diff
+  // against the SAME shared `${name}.png`. Baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNGs land (feedback_vr_linux_baselines).
+  // The *Behavior cells are behavioral-only (no pixel baseline).
+  'TagsScreenshot',
+  'NumberFieldScreenshot',
+  'PaginationScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -839,6 +852,39 @@ async function settleExample(
         { timeout: 5_000, intervals: [100, 200, 400, 800] },
       )
       .toBe('Cherry');
+  }
+  // TagsScreenshot (@rozie-ui/tags): the demo seeds 3 fixed chips. The default
+  // chip fallback renders one `.rozie-tags-chip__label` per token; the
+  // `[class*=...]` substring locator survives React's CSS-Modules class hashing
+  // and pierces Lit's shadow. Wait for all 3 chips before clipping (the unfocused
+  // input has no caret, so once the chips paint the frame is final).
+  if (example === 'TagsScreenshot') {
+    await expect(page.locator('[class*="rozie-tags-chip__label"]')).toHaveCount(3, {
+      timeout: 10_000,
+    });
+  }
+  // NumberFieldScreenshot (@rozie-ui/number-field): the unfocused spinbutton shows
+  // the locale-formatted value (42). Poll the input value so the clip waits for the
+  // formatted text to settle (the field is never focused → no caret). `role="spinbutton"`
+  // pierces Lit's shadow.
+  if (example === 'NumberFieldScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          page.locator('input[role="spinbutton"]').first().inputValue(),
+        { timeout: 5_000, intervals: [100, 200, 400, 800] },
+      )
+      .toBe('42');
+  }
+  // PaginationScreenshot (@rozie-ui/pagination): page 5 of 20 → the window is
+  // [1, …, 4, 5, 6, …, 20] = 5 page buttons + 2 ellipses. Wait for the 5 page
+  // buttons; the `[class*=...]` substring locator survives React CSS-Modules
+  // hashing and pierces Lit's shadow. Nothing is focused, so once they paint the
+  // frame is final.
+  if (example === 'PaginationScreenshot') {
+    await expect(page.locator('[class*="rozie-pagination-page"]')).toHaveCount(5, {
+      timeout: 10_000,
+    });
   }
 }
 
