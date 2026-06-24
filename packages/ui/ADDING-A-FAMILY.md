@@ -67,6 +67,27 @@ Copy `codegen.mjs` + `readme.mjs` + manifests from `captcha/scripts/` (or `cropp
 - **`<slug>-usage.md`**: **auto-generated** from `readme.mjs` `USAGE` — do not hand-write.
 - Add a nav block to `docs/.vitepress/config.ts`, plus the page to `docs/components/index.md` and `docs/index.md` (the four registration points).
 
+### Prop docs (single source of truth)
+
+Every prop's prose lives in **one** place — the `.rozie` `<props>` `docs.description` — and feeds all three surfaces (JSDoc hover, the per-leaf READMEs, and the docs-site `<slug>-api.md` props table). No surface re-authors prop prose; no surface commits a pre-rendered table. The machinery exists after Phase 59 — follow these three steps, no mechanism needs re-deriving:
+
+1. **Author the prose in the `.rozie` `<props>` `docs.description`.** Put each prop's full description in its single `docs.description` field (the Phase 58 `docs: { description?, deprecated?, example? }` shape — there is **no** new schema field, no `details`/`longDescription`). That one string is the sole origin of the prop's prose across every surface. Preserve any existing `deprecated`/`example` sub-keys untouched.
+2. **Wire the shared helper into the family `readme.mjs`.** Delete any local `escapeTableCell`/`renderPropDescription` copy and instead `import { renderPropDescription } from '@rozie/core';`, calling `renderPropDescription(p)` in the `## Props` loop. The reference implementation is `packages/ui/data-table/scripts/readme.mjs` (it imports the helper at the top and keeps `renderPropType`/`renderPropDefault` local). This is what severs README drift from a copy-pasted renderer.
+3. **Enable the docs-site generated table.** In `docs/components/<slug>-api.md`, replace the hand-authored `## Props` table with a `rozie-props <Name>` fence (the fence body is ignored and regenerated on every build):
+
+   <pre>
+   ## Props
+
+   ```rozie-props DataTable
+   ```
+   </pre>
+
+   The `propsCodegen` plugin is **already wired** in `docs/.vitepress/config.ts` (registered alongside `rozieCodegen` + `diagnosticsCodegen`) — there is **no per-family plugin config**. `validateDocsPropsTable` already short-circuits to a pass when the `## Props` section is a `rozie-props` fence, so there are **no per-family validator changes** either.
+
+   **Per-family caveat (the ONLY edit needed):** add the family's `<slug>` to the resolver product list in `docs/.vitepress/props-codegen.ts` (the local `resolveExample` array — `'data-table'` was added there as the pilot), so `<Name>` resolves to `packages/ui/<slug>/src/<Name>.rozie`. Do **not** edit `rozie-codegen.ts` — `props-codegen.ts` owns its own list.
+
+The render path is the SAME core `renderPropsTable(ir)` generator (`@rozie/core`) for both the README and the docs-site table, so the two cannot diverge — and nothing pre-rendered is committed for the table.
+
 ## Per-target gotchas (learned standing up captcha)
 
 - **Svelte needs a *local* `tsconfig.json`.** `svelte2tsx`'s `emitDts` searches upward for `tsconfig.json`/`jsconfig.json`; the repo only carries `tsconfig.base.json`, so without a local one the `.svelte.d.ts` is **silently skipped** (build still exits 0). Add a relaxed `tsconfig.json` (`extends` base, `declaration: true`).
