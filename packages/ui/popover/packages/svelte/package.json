@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/popover-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte popover/tooltip wrapping @floating-ui/dom — one Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "floating-ui",
+    "popover",
+    "tooltip",
+    "dropdown",
+    "positioning",
+    "headless",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/popover/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/Popover.svelte",
+      "types": "./dist/Popover.svelte.d.ts",
+      "default": "./dist/Popover.svelte"
+    },
+    "./source": {
+      "svelte": "./src/Popover.svelte",
+      "default": "./src/Popover.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@floating-ui/dom": "^1.7.2"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.2",
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "@rozie-ui/popover-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular popover/tooltip wrapping @floating-ui/dom — one Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "floating-ui",
+    "popover",
+    "tooltip",
+    "dropdown",
+    "positioning",
+    "headless",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/popover/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-popover-angular.mjs"
+    },
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19 || ^20 || ^21",
+    "@angular/common": "^19 || ^20 || ^21",
+    "@floating-ui/dom": "^1.7.2"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "module": "./dist/fesm2022/rozie-ui-popover-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "tslib": "^2"
+  },
+  "devDependencies": {
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/forms": "^19",
+    "@floating-ui/dom": "^1.7.2",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  }
+}

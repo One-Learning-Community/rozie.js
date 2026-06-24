@@ -1,0 +1,70 @@
+{
+  "name": "@rozie-ui/popover-solid",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Solid popover/tooltip wrapping @floating-ui/dom — one Rozie source compiled to Solid.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "floating-ui",
+    "popover",
+    "tooltip",
+    "dropdown",
+    "positioning",
+    "headless",
+    "component",
+    "solid"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/popover/packages/solid"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.8",
+    "@floating-ui/dom": "^1.7.2"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.2"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

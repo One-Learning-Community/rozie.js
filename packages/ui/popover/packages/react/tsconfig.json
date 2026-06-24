@@ -1,0 +1,25 @@
+{
+  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the emitted
+  // React output is bundler-built (tsdown/oxc), not strict-tsc-authored. This gate
+  // typechecks generated code. No `paths` alias for `@floating-ui/dom`: the
+  // published package ships real types.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noImplicitOverride": false,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["react"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

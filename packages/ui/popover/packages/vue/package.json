@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/popover-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue popover/tooltip wrapping @floating-ui/dom — one Rozie source compiled to Vue.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "floating-ui",
+    "popover",
+    "tooltip",
+    "dropdown",
+    "positioning",
+    "headless",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/popover/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-vue": "workspace:^"
+  },
+  "peerDependencies": {
+    "vue": "^3.4",
+    "@floating-ui/dom": "^1.7.2"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/Popover.vue",
+      "default": "./src/Popover.vue"
+    }
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.2",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  }
+}
