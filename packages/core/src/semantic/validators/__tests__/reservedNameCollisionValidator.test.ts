@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '../../../parse.js';
 import { analyzeAST } from '../../analyze.js';
+import { compile } from '../../../compile.js';
 import { RozieErrorCode } from '../../../diagnostics/codes.js';
 import type { Diagnostic } from '../../../diagnostics/Diagnostic.js';
 import type { RozieAST } from '../../../ast/types.js';
@@ -33,6 +34,13 @@ function parseOrThrow(source: string, filename = 'reserved.rozie'): RozieAST {
 
 function analyzeSource(source: string, filename = 'reserved.rozie'): Diagnostic[] {
   return analyzeAST(parseOrThrow(source, filename)).diagnostics;
+}
+
+// Slot collisions are owned by validateSlotPropCollision (ROZ127), which runs in
+// lowerToIR — NOT in analyzeAST. Slot-name cases must go through compile() to
+// exercise the IR validator chokepoint.
+function compileDiags(source: string, filename = 'reserved.rozie'): Diagnostic[] {
+  return compile(source, { target: 'vue', filename }).diagnostics ?? [];
 }
 
 const roz142 = (diags: Diagnostic[]) =>
@@ -125,9 +133,9 @@ function b() { $emit('foo-bar') }
     const src = `<rozie name="X">
 <template><div><slot name="header-item"></slot></div></template>
 </rozie>`;
-    const diags = analyzeSource(src);
-    // Owned by the IR slot validator (ROZ127) OR the semantic validator
-    // (ROZ142) — accept either, assert exactly one error fires (no double-fire).
+    const diags = compileDiags(src);
+    // Owned by the IR slot validator (ROZ127) — slot-key-shape generalization.
+    // Assert exactly one error fires (no double-fire between IR + semantic).
     const hits = [
       ...roz142(diags),
       ...diags.filter((d) => d.code === RozieErrorCode.SLOT_PROP_NAME_COLLISION),
@@ -149,8 +157,12 @@ function b() { $emit('foo-bar') }
     const src = `<rozie name="X">
 <template><div><slot name="header"></slot></div></template>
 </rozie>`;
-    const diags = analyzeSource(src);
+    const diags = compileDiags(src);
     expect(roz142(diags).length, JSON.stringify(diags)).toBe(0);
+    expect(
+      diags.filter((d) => d.code === RozieErrorCode.SLOT_PROP_NAME_COLLISION).length,
+      JSON.stringify(diags),
+    ).toBe(0);
   });
 
   it('does NOT fire on a benign single emit `change`', () => {
