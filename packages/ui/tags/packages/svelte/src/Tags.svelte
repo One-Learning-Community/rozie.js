@@ -254,11 +254,15 @@ export const clear = () => {
   draft = '';
   focusTheInput();
 };
-// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-// `focus`, which would override the inherited HTMLElement.focus on Lit).
-// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-// `focus`, which would override the inherited HTMLElement.focus on Lit).
-export const focusInput = () => focusTheInput();
+// focus() — move DOM focus to the text input. DELIBERATELY overrides the
+// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+// accepted — the public focus() handle is the intended semantics; otp/slider
+// precedent, consistent with NumberField which also exposes `focus`).
+// focus() — move DOM focus to the text input. DELIBERATELY overrides the
+// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+// accepted — the public focus() handle is the intended semantics; otp/slider
+// precedent, consistent with NumberField which also exposes `focus`).
+export const focus = () => focusTheInput();
 </script>
 
 <div bind:this={root} role="group" aria-label={ariaLabel} {...__rozieAttrs} class={["rozie-tags", { 'rozie-tags--disabled': disabled, 'rozie-tags--readonly': readonly }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-64848f8e><ul class="rozie-tags-list" data-rozie-s-64848f8e>{#each tokens() as t (t + ':' + tokens().indexOf(t))}<li class="rozie-tags-chip" data-rozie-s-64848f8e>{#if tag}{@render tag({ tag: t, index: tokens().indexOf(t), remove: () => removeAt(tokens().indexOf(t)) })}{:else}<span class="rozie-tags-chip__label" data-rozie-s-64848f8e>{rozieDisplay(t)}</span>{#if !readonly}<button type="button" class="rozie-tags-chip__remove" disabled={!!disabled} aria-label={rozieAttr(removeLabel(t))} onclick={($event) => { removeAt(tokens().indexOf(t)); }} data-rozie-s-64848f8e>×</button>{/if}{/if}</li>{/each}</ul>{#if !readonly}<input class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" value={draft} placeholder={placeholder} disabled={!!disabled || !!atMax()} aria-label={ariaLabel} aria-disabled={!!disabled} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onpaste={($event) => { onPaste($event); }} onblur={($event) => { onBlur($event); }} data-rozie-s-64848f8e />{/if}<span class="rozie-tags-count" aria-live="polite" data-rozie-s-64848f8e>{rozieDisplay(countLabel())}</span></div>

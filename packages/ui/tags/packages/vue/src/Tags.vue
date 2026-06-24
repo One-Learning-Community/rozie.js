@@ -254,13 +254,17 @@ const clear = () => {
   draft.value = '';
   focusTheInput();
 };
-// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-// `focus`, which would override the inherited HTMLElement.focus on Lit).
-// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-// `focus`, which would override the inherited HTMLElement.focus on Lit).
-const focusInput = () => focusTheInput();
+// focus() — move DOM focus to the text input. DELIBERATELY overrides the
+// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+// accepted — the public focus() handle is the intended semantics; otp/slider
+// precedent, consistent with NumberField which also exposes `focus`).
+// focus() — move DOM focus to the text input. DELIBERATELY overrides the
+// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+// accepted — the public focus() handle is the intended semantics; otp/slider
+// precedent, consistent with NumberField which also exposes `focus`).
+const focus = () => focusTheInput();
 
-defineExpose({ clear, focusInput });
+defineExpose({ clear, focus });
 </script>
 
 <style scoped>

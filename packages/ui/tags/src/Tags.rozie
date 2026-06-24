@@ -36,10 +36,12 @@
     - No `setModelValue` helper — that would collide with React's generated
       `setModelValue` setter for the `modelValue` model (ROZ524). The funnel is
       `commitTokens`.
-    - The expose verbs are `clear` + `focusInput` (NOT `focus`): a `focus` verb
-      would override the inherited `HTMLElement.focus` on the Lit custom element
-      (warn-only ROZ137). otp/slider accept that warn; here we sidestep it with
-      the collision-safe `focusInput` so codegen stays warning-clean.
+    - The expose verbs are `clear` + `focus`. `focus` DELIBERATELY overrides the
+      inherited `HTMLElement.focus` on the Lit custom element — the public
+      `focus()` handle (focuses the inline text input) is the intended semantics,
+      so the warn-only ROZ137 on the Lit leaf is JUSTIFIED and accepted (the
+      otp/slider precedent; consistent with NumberField, which also exposes
+      `focus`). `clear` is collision-safe.
     - Handler params are LEFT UNTYPED so they neutralize to `any`; reading
       `e.target.value` / `e.key` / `e.clipboardData` then typechecks across all
       six strict leaves (the global-filter idiom). Never annotate them.
@@ -308,11 +310,13 @@ const clear = () => {
   $data.draft = ''
   focusTheInput()
 }
-// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-// `focus`, which would override the inherited HTMLElement.focus on Lit).
-const focusInput = () => focusTheInput()
+// focus() — move DOM focus to the text input. DELIBERATELY overrides the
+// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+// accepted — the public focus() handle is the intended semantics; otp/slider
+// precedent, consistent with NumberField which also exposes `focus`).
+const focus = () => focusTheInput()
 
-$expose({ clear, focusInput })
+$expose({ clear, focus })
 </script>
 
 <template>

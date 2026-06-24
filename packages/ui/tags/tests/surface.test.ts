@@ -39,7 +39,7 @@ const EXPECT = {
   models: ['modelValue'],
   emits: ['add', 'remove', 'change'],
   slots: ['tag'],
-  expose: ['clear', 'focusInput'],
+  expose: ['clear', 'focus'],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
@@ -80,7 +80,7 @@ describe('Tags.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (clear/focusInput)', () => {
+  it('expose surface matches (clear/focus)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

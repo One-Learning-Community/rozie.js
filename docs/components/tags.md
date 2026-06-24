@@ -73,7 +73,7 @@ The full prop / event / handle / slot surface lives on the dedicated **[API refe
 
 - **Props** — `modelValue` (the two-way tokens array), `delimiters` (commit keys, default `[',', 'Enter']`), `allowDuplicates` (default `false`), `max` (cap, default `null`), `disabled` / `readonly` (both default `false`), `validate` (per-token validator/normalizer), `placeholder`, and `ariaLabel`. Boolean props default `false` (negative opt-out).
 - **Events** — `add` (`{ value, tokens }`), `remove` (`{ value, index, tokens }`), `change` (`{ value }` — the full array, on every mutation).
-- **Imperative handle** — `clear()` and `focusInput()`.
+- **Imperative handle** — `clear()` and `focus()` (`focus()` focuses the inline text input; it deliberately overrides `HTMLElement.focus` on the Lit leaf — an accepted, warn-only ROZ137).
 - **Slot** — the scoped `tag` slot (`{ tag, index, remove }`).
 
 ## Behaviour

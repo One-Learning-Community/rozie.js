@@ -322,7 +322,7 @@ export class Tags {
     this.draft.set('');
     this.focusTheInput();
   };
-  focusInput = () => this.focusTheInput();
+  focus = () => this.focusTheInput();
 
   private __rozieCvaOnChange: (v: any[]) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

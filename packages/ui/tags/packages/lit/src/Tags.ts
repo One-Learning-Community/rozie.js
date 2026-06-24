@@ -353,7 +353,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   this.focusTheInput();
 };
 
-  focusInput = () => this.focusTheInput();
+  focus = () => this.focusTheInput();
 
   get modelValue(): any[] { return this._modelValueControllable.read(); }
   set modelValue(v: any[]) { this._modelValueControllable.notifyPropertyWrite(v); }

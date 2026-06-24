@@ -24,7 +24,7 @@ const EXPECT = {
   models: ['modelValue'],
   emits: ['add', 'remove', 'change'],
   slots: ['tag'],
-  expose: ['clear', 'focusInput'],
+  expose: ['clear', 'focus'],
 };
 
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exitCode = 1; };

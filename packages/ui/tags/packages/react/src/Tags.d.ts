@@ -54,7 +54,7 @@ export interface TagsProps {
 
 export interface TagsHandle {
   clear: (...args: any[]) => any;
-  focusInput: (...args: any[]) => any;
+  focus: (...args: any[]) => any;
 }
 
 declare const Tags: React.ForwardRefExoticComponent<TagsProps & React.RefAttributes<TagsHandle>>;

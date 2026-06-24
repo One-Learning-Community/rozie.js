@@ -148,13 +148,13 @@ interface TagsProps {
 
 export interface TagsHandle {
   clear: (...args: any[]) => any;
-  focusInput: (...args: any[]) => any;
+  focus: (...args: any[]) => any;
 }
 
 export default function Tags(_props: TagsProps): JSX.Element {
   const _merged = mergeProps({ delimiters: (() => [',', 'Enter'])(), allowDuplicates: false, max: null, disabled: false, readonly: false, validate: null, placeholder: '', ariaLabel: null }, _props);
   const [local, attrs] = splitProps(_merged, ['modelValue', 'delimiters', 'allowDuplicates', 'max', 'disabled', 'readonly', 'validate', 'placeholder', 'ariaLabel', 'ref']);
-  onMount(() => { local.ref?.({ clear, focusInput }); });
+  onMount(() => { local.ref?.({ clear, focus }); });
 
   const [modelValue, setModelValue] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'modelValue', (() => [])());
   const [draft, setDraft] = createSignal('');
@@ -324,9 +324,11 @@ export default function Tags(_props: TagsProps): JSX.Element {
     setDraft('');
     focusTheInput();
   }
-  // focusInput() — move DOM focus to the text input. Collision-safe name (NOT
-  // `focus`, which would override the inherited HTMLElement.focus on Lit).
-  function focusInput() {
+  // focus() — move DOM focus to the text input. DELIBERATELY overrides the
+  // inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
+  // accepted — the public focus() handle is the intended semantics; otp/slider
+  // precedent, consistent with NumberField which also exposes `focus`).
+  function focus() {
     return focusTheInput();
   }
 

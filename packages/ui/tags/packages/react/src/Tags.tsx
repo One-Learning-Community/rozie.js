@@ -57,7 +57,7 @@ interface TagsProps {
 
 export interface TagsHandle {
   clear: (...args: any[]) => any;
-  focusInput: (...args: any[]) => any;
+  focus: (...args: any[]) => any;
 }
 
 const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, ref): JSX.Element {
@@ -209,13 +209,13 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     setDraft('');
     focusTheInput();
   }
-  function focusInput() {
+  function focus() {
     return focusTheInput();
   }
 
-  const _rozieExposeRef = useRef({ clear, focusInput });
-  _rozieExposeRef.current = { clear, focusInput };
-  useImperativeHandle(ref, () => ({ clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), focusInput: (...args: Parameters<typeof focusInput>): ReturnType<typeof focusInput> => _rozieExposeRef.current.focusInput(...args) }), []);
+  const _rozieExposeRef = useRef({ clear, focus });
+  _rozieExposeRef.current = { clear, focus };
+  useImperativeHandle(ref, () => ({ clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args) }), []);
 
   return (
     <>

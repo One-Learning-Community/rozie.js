@@ -260,7 +260,7 @@ import { Tags, type TagsHandle } from '@rozie-ui/tags-react';
 
 const tags = useRef<TagsHandle>(null);
 // <Tags ref={tags} ... />
-tags.current?.focusInput();
+tags.current?.focus();
 tags.current?.clear();`,
   },
   vue: {
@@ -289,7 +289,7 @@ const tags = ref();          // template ref
     code: `@Component({ /* ... */ })
 export class DemoComponent {
   @ViewChild(Tags) tags!: Tags;   // or the viewChild() signal
-  focusIt() { this.tags.focusInput(); }
+  focusIt() { this.tags.focus(); }
   clearIt() { this.tags.clear(); }
 }`,
   },
@@ -305,9 +305,10 @@ handle?.clear();`,
   lit: {
     lang: 'ts',
     code: `// The custom element IS the handle — exposed methods are public element
-// methods (\`focusInput()\` is named so it does NOT override HTMLElement.focus).
+// methods. \`focus()\` here DELIBERATELY overrides the inherited HTMLElement.focus
+// (it focuses the inline text input).
 const el = document.querySelector('rozie-tags');
-el.focusInput();
+el.focus();
 el.clear();`,
   },
 };

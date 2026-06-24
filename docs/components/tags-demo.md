@@ -35,7 +35,7 @@ This is the **real `@rozie-ui/tags-vue` package** running on this page (VitePres
       <span class="tags-live__muted">— Enter / comma to add, paste to bulk-add, max 8</span>
       <span class="tags-live__sep" />
       <button @click="skillsBox?.clear()">clear()</button>
-      <button @click="skillsBox?.focusInput()">focusInput()</button>
+      <button @click="skillsBox?.focus()">focus()</button>
     </div>
     <Tags
       ref="skillsBox"
@@ -67,7 +67,7 @@ This is the **real `@rozie-ui/tags-vue` package** running on this page (VitePres
 </div>
 </ClientOnly>
 
-`modelValue` is two-way bound with `v-model:modelValue` — the readout updates the instant you add or remove, and a consumer write flows back in. The **Skills** instance caps at `:max="8"` (the input disables once full) and its buttons drive the imperative handle (`clear()`, `focusInput()`) grabbed through Vue's `ref`. The **Emails** instance passes a `:validate` function that rejects non-emails and lower-cases accepted ones — a rejected candidate is silently dropped. See the [full API](/components/tags-api) for every prop, event, handle verb, the scoped `#tag` slot, plus theming and accessibility reference.
+`modelValue` is two-way bound with `v-model:modelValue` — the readout updates the instant you add or remove, and a consumer write flows back in. The **Skills** instance caps at `:max="8"` (the input disables once full) and its buttons drive the imperative handle (`clear()`, `focus()`) grabbed through Vue's `ref`. The **Emails** instance passes a `:validate` function that rejects non-emails and lower-cases accepted ones — a rejected candidate is silently dropped. See the [full API](/components/tags-api) for every prop, event, handle verb, the scoped `#tag` slot, plus theming and accessibility reference.
 
 ## One source, six outputs
 

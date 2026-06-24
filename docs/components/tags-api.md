@@ -26,7 +26,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | Method | Description |
 | --- | --- |
 | `clear` | Remove every token (emits `change` with `{ value: [] }`) and move DOM focus to the text input. Collision-safe — not a host-element member. |
-| `focusInput` | Move DOM focus to the inline text input. Named `focusInput` (not `focus`) so it does not override the inherited `HTMLElement.focus` on the Lit custom element. |
+| `focus` | Move DOM focus to the inline text input. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is the intended semantics (an accepted, warn-only ROZ137 on the Lit leaf). This mirrors the otp/slider precedent and is consistent with `NumberField`. |
 
 ## Slots
 

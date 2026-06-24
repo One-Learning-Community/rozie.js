@@ -83,7 +83,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Method | Description |
 | --- | --- |
 | `clear` | Remove every token (emits `change` with `{ value: [] }`) and move DOM focus to the text input. Collision-safe — not a host-element member. |
-| `focusInput` | Move DOM focus to the inline text input. Named `focusInput` (not `focus`) so it does not override the inherited `HTMLElement.focus` on the Lit custom element. |
+| `focus` | Move DOM focus to the inline text input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is the intended semantics. |
 
 ```tsx
 import { useRef } from 'react';
@@ -91,7 +91,7 @@ import { Tags, type TagsHandle } from '@rozie-ui/tags-react';
 
 const tags = useRef<TagsHandle>(null);
 // <Tags ref={tags} ... />
-tags.current?.focusInput();
+tags.current?.focus();
 tags.current?.clear();
 ```
 
