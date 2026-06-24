@@ -13,6 +13,8 @@
  * templates, and the single `@tanstack/table-core` engine peer dependency.)
  */
 
+import { renderPropDescription } from '@rozie/core';
+
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
 // ---------------------------------------------------------------------------
@@ -57,49 +59,6 @@ export function renderPropDefault(defaultValue) {
     default:
       return String(node.type);
   }
-}
-
-// Render the ## Props Description cell from a prop's first-class `docs` field
-// (PropDecl.docs, lowered by Phase 58 Plan 02). Empty string when the prop carries
-// no docs. A deprecated prop gets a leading **(deprecated)** marker (with the
-// deprecation message appended when `deprecated` is a string).
-//
-// T-58-08 (Tampering): an author description containing `|` or a newline could
-// break the Markdown table row — escape pipes (`\|`) and collapse newlines to a
-// single space so the cell stays a single well-formed table cell.
-function escapeTableCell(text) {
-  const escaped = String(text)
-    .replace(/\r\n?|\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\|/g, '\\|')
-    .trim();
-  // WR-03: an UNMATCHED backtick (an unclosed inline-code span) breaks code-span
-  // rendering for the rest of the Description column in some Markdown parsers.
-  // We don't rewrite author intent — surface it loudly at codegen time so the
-  // author can close the span in the .rozie source.
-  const backtickCount = (escaped.match(/`/g) || []).length;
-  if (backtickCount % 2 !== 0) {
-    process.stderr.write(
-      `readme.mjs: WARNING: unmatched backtick in a prop description — the unclosed ` +
-        `code span may break Markdown table rendering: ${JSON.stringify(escaped)}\n`,
-    );
-  }
-  return escaped;
-}
-
-function renderPropDescription(prop) {
-  const docs = prop.docs;
-  if (!docs) return '';
-  const parts = [];
-  if (docs.deprecated) {
-    parts.push(
-      typeof docs.deprecated === 'string'
-        ? `**(deprecated)** ${escapeTableCell(docs.deprecated)}`
-        : '**(deprecated)**',
-    );
-  }
-  if (docs.description) parts.push(escapeTableCell(docs.description));
-  return parts.join(' ');
 }
 
 function renderSlotName(name) {
