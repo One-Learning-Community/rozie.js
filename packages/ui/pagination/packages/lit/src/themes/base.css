@@ -1,0 +1,57 @@
+/*
+ * @rozie-ui/pagination — base token reference.
+ *
+ * Every COSMETIC value the pagination control renders is a
+ * `--rozie-pagination-*` custom property. The component ships with inline
+ * `var(token, fallback)` defaults, so importing this file is OPTIONAL — it
+ * simply makes the full token surface explicit in one place so you can
+ * copy/override exactly what you need.
+ *
+ * The structural rules (the inline-flex control row, the per-button box model,
+ * the focus-ring, the active page, and the ellipsis cell) live in the
+ * component's scoped `<style>` (per-leaf, NOT consumer-overridable). Only the
+ * values below flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-pagination` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-pagination {
+  /* layout / typography */
+  --rozie-pagination-gap: 0.25rem;
+  --rozie-pagination-font: inherit;
+  --rozie-pagination-font-weight: 500;
+
+  /* accent — the single color most consumers will set; the active page + focus
+     ring derive from it */
+  --rozie-pagination-accent: #0066cc;
+
+  /* per-control box model */
+  --rozie-pagination-size: 2.25rem;
+  --rozie-pagination-padding-x: 0.5rem;
+  --rozie-pagination-fg: #1a1a1a;
+  --rozie-pagination-bg: transparent;
+  --rozie-pagination-border-width: 1px;
+  --rozie-pagination-border: rgba(0, 0, 0, 0.18);
+  --rozie-pagination-radius: 6px;
+
+  /* hover */
+  --rozie-pagination-hover-bg: rgba(0, 0, 0, 0.05);
+  --rozie-pagination-hover-border: rgba(0, 0, 0, 0.28);
+
+  /* active (current) page */
+  --rozie-pagination-active-fg: #fff;
+  --rozie-pagination-active-bg: var(--rozie-pagination-accent);
+  --rozie-pagination-active-border: var(--rozie-pagination-accent);
+
+  /* focus ring */
+  --rozie-pagination-ring-width: 2px;
+  --rozie-pagination-ring: var(--rozie-pagination-accent);
+  --rozie-pagination-ring-offset: 1px;
+
+  /* ellipsis marker */
+  --rozie-pagination-ellipsis-fg: rgba(0, 0, 0, 0.5);
+
+  /* disabled */
+  --rozie-pagination-disabled-opacity: 0.5;
+}

@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/pagination — Material Design 3 bridge.
+ *
+ * Maps the pagination tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/pagination-react/themes/material.css';
+ */
+.rozie-pagination {
+  --rozie-pagination-accent: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-pagination-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-pagination-bg: var(--md-sys-color-surface, #fef7ff);
+  --rozie-pagination-border: var(--md-sys-color-outline, #79747e);
+  --rozie-pagination-radius: 1rem;
+
+  --rozie-pagination-hover-bg: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 8%, transparent);
+  --rozie-pagination-hover-border: var(--md-sys-color-outline, #79747e);
+
+  --rozie-pagination-active-fg: var(--md-sys-color-on-primary, #fff);
+  --rozie-pagination-active-bg: var(--md-sys-color-primary, #6750a4);
+  --rozie-pagination-active-border: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-pagination-ring: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-pagination-ellipsis-fg: var(--md-sys-color-on-surface-variant, #49454f);
+}

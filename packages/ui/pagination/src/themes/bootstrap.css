@@ -1,0 +1,31 @@
+/*
+ * @rozie-ui/pagination — Bootstrap 5 bridge.
+ *
+ * Maps the pagination tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the control follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/pagination-react/themes/bootstrap.css';
+ */
+.rozie-pagination {
+  --rozie-pagination-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-pagination-fg: var(--bs-link-color, #0d6efd);
+  --rozie-pagination-bg: var(--bs-body-bg, #fff);
+  --rozie-pagination-border: var(--bs-border-color, #dee2e6);
+  --rozie-pagination-radius: var(--bs-border-radius, 0.375rem);
+
+  --rozie-pagination-hover-bg: var(--bs-tertiary-bg, #e9ecef);
+  --rozie-pagination-hover-border: var(--bs-border-color, #dee2e6);
+
+  --rozie-pagination-active-fg: #fff;
+  --rozie-pagination-active-bg: var(--bs-primary, #0d6efd);
+  --rozie-pagination-active-border: var(--bs-primary, #0d6efd);
+
+  --rozie-pagination-ring: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.5);
+
+  --rozie-pagination-ellipsis-fg: var(--bs-secondary-color, #6c757d);
+
+  --rozie-pagination-disabled-opacity: 0.5;
+}

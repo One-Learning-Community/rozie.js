@@ -1,0 +1,33 @@
+/*
+ * @rozie-ui/pagination — shadcn/ui (Radix) bridge.
+ *
+ * Maps the pagination tokens onto the shadcn/ui CSS variables defined on
+ * `:root` / `.dark` (the classic HSL-channel convention: `--background: 0 0%
+ * 100%` consumed as `hsl(var(--background))`). Because it reads those vars live,
+ * the control automatically follows light/dark theme switches and accent
+ * changes.
+ *
+ *   import '@rozie-ui/pagination-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-pagination {
+  --rozie-pagination-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-pagination-fg: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-pagination-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-pagination-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-pagination-radius: var(--radius, 0.5rem);
+
+  --rozie-pagination-hover-bg: hsl(var(--accent, 210 40% 96.1%));
+  --rozie-pagination-hover-border: hsl(var(--border, 214.3 31.8% 91.4%));
+
+  --rozie-pagination-active-fg: hsl(var(--primary-foreground, 210 40% 98%));
+  --rozie-pagination-active-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-pagination-active-border: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-pagination-ring: hsl(var(--ring, 222.2 84% 4.9%));
+
+  --rozie-pagination-ellipsis-fg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+}

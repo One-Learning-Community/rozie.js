@@ -1,0 +1,388 @@
+<!--
+  Pagination.rozie — a headless, WAI-ARIA accessible pagination control.
+
+  A pure-Rozie family (NO third-party engine) in the spirit of otp/listbox: it
+  fills a real cross-framework need (every app re-implements a windowed pager)
+  with zero engine dependency. Rozie owns the author-side API, the two-way
+  binding, the page-item windowing algorithm, prev/next bounds, roving keyboard
+  navigation, and the token-themed skin. HEADLESS: the page-item MODEL is
+  exposed (numbers + 'ellipsis' markers); the consumer renders each control via
+  the scoped slots, or accepts the default token-themed buttons.
+
+  CONTROLLED, NO LOCAL PAGE STATE: the current page IS `modelValue` (the sole
+  model:true prop → Angular ControlValueAccessor; a pager IS a form-ish control).
+  Everything visible derives from `modelValue` + the count props through ONE pure
+  function, `model()` (NOT a $computed — a $computed is a value on React but an
+  accessor on Solid, so aliasing it in script logic diverges; a plain function
+  called `()` is uniform on all six).
+
+  THE ALGORITHM lives in ./internal/paginationItems.ts (vendored into every leaf
+  + unit-tested in isolation): windowed pages with ellipses, sibling/boundary
+  counts, MUI usePagination semantics.
+
+  Authoring notes (collision classes — see the authoring playbook §6):
+    - Helpers are named `goToPage` / `goNext` / `goPrev` (NOT `setModelValue`,
+      which would collide with React's generated model setter → ROZ524; NOT bare
+      `id`/`title`/`tabIndex` which collide with inherited Lit DOM properties).
+    - The model prop is `modelValue`; read via `$props.modelValue`, write via
+      `$model.modelValue` (never `$props.x =` → ROZ204).
+    - aria booleans bound from a CALL (`aria-disabled`) use `!!` so the JSX
+      targets emit an unwrapped boolean, not a rozieAttr string (TS2322).
+    - `aria-current` is the literal string `"page"` on the active control,
+      dropped (null) otherwise — never a boolean.
+    - `$refs.nav` (the roving-focus container) is read ONLY inside handlers /
+      post-mount (ROZ123-safe); the per-control focus walk uses
+      querySelectorAll, which reaches into Lit's shadow root too.
+    - The page-item model returns a FRESH array each call — it is read in the
+      template + handlers but NEVER fed to a reference-equality $watch getter.
+    - Slot names (`item`/`ellipsis`/`prevControl`/`nextControl`) are clear of
+      every prop key (ROZ127). Two naming constraints shaped them:
+        * single-word, NO hyphen — a hyphenated slot name (e.g. `page-item`)
+          lowers to an UNQUOTED key in Vue/Solid/Lit's `defineSlots<{ … }>` /
+          slot-type literal, a hard parse error (TS1005). (emitter gap — report)
+        * the prev/next controls are `prevControl`/`nextControl`, NOT `prev`/
+          `next`, because a slot named `next`/`prev` becomes a Lit class field
+          that collides with the SAME-named `next`/`prev` $expose verb (TS2300).
+
+  Consumer example:
+
+    <Pagination r-model:modelValue="$data.page" :total="195" :pageSize="10" @change="onPage" />
+-->
+
+<rozie name="Pagination">
+
+<props>
+{
+  // The 1-based current page (two-way). As the sole model:true prop it drives
+  // the Angular ControlValueAccessor — a pager binds to forms like any control.
+  // Always clamped into [1, effective totalPages].
+  modelValue:   {
+    type: Number,
+    default: 1,
+    model: true,
+    docs: { description: 'The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.' },
+  },
+
+  // Explicit total page count. Takes precedence over `total`/`pageSize` when
+  // provided (> 0). Use this when the server already knows the page count.
+  totalPages:   {
+    type: Number,
+    default: null,
+    docs: { description: 'Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.' },
+  },
+
+  // Total item count — combined with `pageSize` to derive the page count when
+  // `totalPages` is absent (effective pages = ceil(total / pageSize)).
+  total:        {
+    type: Number,
+    default: null,
+    docs: { description: 'Total item count. Combined with `pageSize` to derive the page count (`ceil(total / pageSize)`) when `totalPages` is not given.' },
+  },
+
+  // Items per page — combined with `total` to derive the page count.
+  pageSize:     {
+    type: Number,
+    default: null,
+    docs: { description: 'Items per page. Combined with `total` to derive the page count when `totalPages` is not given.' },
+  },
+
+  // Pages shown on each side of the current page (the sibling window width).
+  siblingCount: {
+    type: Number,
+    default: 1,
+    docs: { description: 'Number of page buttons shown on each side of the current page (the sibling window). Larger values show more context around the current page.' },
+  },
+
+  // Pages always shown at each boundary (start + end), before ellipses collapse
+  // the middle.
+  boundaryCount: {
+    type: Number,
+    default: 1,
+    docs: { description: 'Number of page buttons always shown at each boundary (the first and last `boundaryCount` pages), regardless of the current page.' },
+  },
+
+  // Disable the whole control (every page button + prev/next).
+  disabled:     {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Disable the entire control — every page button and the prev/next controls become non-interactive and are marked `aria-disabled`.' },
+  },
+
+  // Accessible name for the surrounding <nav> landmark.
+  ariaLabel:    {
+    type: String,
+    default: 'Pagination',
+    docs: { description: 'Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.' },
+  },
+}
+</props>
+
+<script lang="ts">
+import { paginationItems } from './internal/paginationItems'
+
+// ---- derived view (ONE plain function, uniform x6) ---------------------
+// The whole render model in a single call: { totalPages, page, pages,
+// hasPrev, hasNext }. A PLAIN function (not $computed) so it reads uniformly
+// on all six targets and can be aliased in handlers without the Solid
+// accessor divergence. Returns a FRESH object each call — never feed it to a
+// reference-equality $watch getter.
+const model = () =>
+  paginationItems({
+    page: $props.modelValue,
+    totalPages: $props.totalPages,
+    total: $props.total,
+    pageSize: $props.pageSize,
+    siblingCount: $props.siblingCount,
+    boundaryCount: $props.boundaryCount,
+  })
+
+// The resolved effective total page count (read in the template + handlers).
+// NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
+// the `totalPages` PROP, which on Lit becomes a class field of type `number`
+// (hard TS2300/TS2717 against a `() => number` helper). The prop-name-collision
+// sibling of the otp `inputMode` gotcha.
+const effectivePages = () => model().totalPages
+// The clamped current page (the raw prop may be out of range).
+const currentPage = () => model().page
+const canPrev = () => model().hasPrev
+const canNext = () => model().hasNext
+const isActive = (page) => page === currentPage()
+
+// Roving-tabindex value for a control: the active page is the single tab stop
+// (0), the rest are -1. The return type is annotated `number | undefined` ON
+// PURPOSE: the React emitter wraps every numeric `:attr` binding in
+// `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
+// `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
+// every tabindex through this nullable-typed helper keeps the `?? undefined`
+// reachable (the data-table cellTabindex precedent).
+const tabIndexFor = (active): number | undefined => (active ? 0 : -1)
+
+// ---- write funnel (single $emit site) ----------------------------------
+// Clamp to [1, totalPages], write the model, and emit `change` with the new
+// page. NOT named `setModelValue` (that collides with React's generated model
+// setter → ROZ524) — `goToPage` is collision-safe across all six leaves.
+const goToPage = (page) => {
+  if ($props.disabled) return
+  const tp = effectivePages()
+  let target = typeof page === 'number' ? Math.floor(page) : 1
+  if (target < 1) target = 1
+  if (target > tp) target = tp
+  if (target === currentPage()) return
+  $model.modelValue = target
+  $emit('change', { page: target })
+}
+
+const goNext = () => { if (canNext()) goToPage(currentPage() + 1) }
+const goPrev = () => { if (canPrev()) goToPage(currentPage() - 1) }
+const goFirst = () => goToPage(1)
+const goLast = () => goToPage(effectivePages())
+
+// ---- roving focus across the page controls -----------------------------
+// Read $refs.nav only here / in handlers (post-mount → ROZ123-safe).
+// querySelectorAll<HTMLElement> reaches the controls inside Lit's shadow root
+// too; the generic gives `.focus()` (Element has no `.focus`, TS2339).
+const controls = () => {
+  const nav = $refs.nav
+  if (!nav) return []
+  return Array.from(nav.querySelectorAll('[data-page-control]')) as HTMLElement[]
+}
+const focusControlAt = (idx) => {
+  const els = controls()
+  if (els.length === 0) return
+  let i = idx
+  if (i < 0) i = 0
+  if (i >= els.length) i = els.length - 1
+  const el = els[i]
+  if (el && el.focus) el.focus()
+}
+const focusedIndex = () => {
+  const els = controls()
+  const nav = $refs.nav
+  const active = nav ? nav.ownerDocument.activeElement : null
+  return els.indexOf(active as HTMLElement)
+}
+
+// Roving keyboard navigation: arrows move focus between controls, Home/End jump
+// to the ends. Each control keeps tabindex via the template (the active page is
+// 0, the rest -1) so the group is a single tab stop.
+const onControlKeydown = ($event) => {
+  if ($props.disabled) return
+  const key = $event.key
+  const cur = focusedIndex()
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    $event.preventDefault()
+    focusControlAt(cur + 1)
+  } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    $event.preventDefault()
+    focusControlAt(cur - 1)
+  } else if (key === 'Home') {
+    $event.preventDefault()
+    focusControlAt(0)
+  } else if (key === 'End') {
+    $event.preventDefault()
+    focusControlAt(controls().length - 1)
+  }
+}
+
+// ---- imperative handle -------------------------------------------------
+// Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
+// bounds-aware steppers. None collide with an emit name (`change`) or the React
+// model setter (`setModelValue`).
+const goto = (page) => goToPage(page)
+const next = () => goNext()
+const prev = () => goPrev()
+const first = () => goFirst()
+const last = () => goLast()
+
+$expose({ goto, next, prev, first, last })
+</script>
+
+<template>
+<nav
+  class="rozie-pagination"
+  ref="nav"
+  :aria-label="$props.ariaLabel"
+  :class="{ 'rozie-pagination--disabled': $props.disabled }"
+  @keydown="onControlKeydown($event)"
+>
+  <!-- Previous control. Scoped #prevControl slot overrides the default button.
+       Named `prevControl` (NOT `prev`) so it does not collide with the `prev`
+       $expose verb, which on Lit becomes a class method of the SAME name as the
+       slot's class field (TS2300). -->
+  <slot name="prevControl" :disabled="!canPrev() || $props.disabled" :goto="goPrev" :page="currentPage() - 1">
+    <button
+      type="button"
+      class="rozie-pagination-control rozie-pagination-prev"
+      data-page-control
+      :tabindex="tabIndexFor(true)"
+      :disabled="!canPrev() || $props.disabled"
+      :aria-disabled="!!(!canPrev() || $props.disabled)"
+      aria-label="Previous page"
+      @click="goPrev"
+    >‹</button>
+  </slot>
+
+  <!-- The windowed page items: numbers interleaved with ellipses. The :key on
+       the <template r-for> satisfies Angular's @for track requirement (ROZ720);
+       it mixes the item value + index so ellipsis markers stay distinct. Two
+       independent r-if branches (NOT r-if/r-else with a <slot> else, which does
+       not lower cleanly when the else is a slot expansion). -->
+  <template r-for="item, index in model().pages" :key="item + '-' + index">
+    <span
+      r-if="item === 'ellipsis'"
+      class="rozie-pagination-ellipsis"
+      aria-hidden="true"
+    >
+      <slot name="ellipsis" :index="index">…</slot>
+    </span>
+    <span r-if="item !== 'ellipsis'" class="rozie-pagination-item">
+      <slot
+        name="item"
+        :page="item"
+        :selected="isActive(item)"
+        :goto="() => goToPage(item)"
+      >
+        <button
+          type="button"
+          class="rozie-pagination-page"
+          :class="{ 'is-active': isActive(item) }"
+          data-page-control
+          :tabindex="tabIndexFor(isActive(item))"
+          :disabled="!!$props.disabled"
+          :aria-disabled="!!$props.disabled"
+          :aria-current="isActive(item) ? 'page' : null"
+          :aria-label="'Go to page ' + item"
+          @click="goToPage(item)"
+        >{{ item }}</button>
+      </slot>
+    </span>
+  </template>
+
+  <!-- Next control. Scoped #nextControl slot overrides the default button.
+       Named `nextControl` (NOT `next`) — see #prevControl above (Lit slot/verb
+       collision). -->
+  <slot name="nextControl" :disabled="!canNext() || $props.disabled" :goto="goNext" :page="currentPage() + 1">
+    <button
+      type="button"
+      class="rozie-pagination-control rozie-pagination-next"
+      data-page-control
+      :tabindex="tabIndexFor(true)"
+      :disabled="!canNext() || $props.disabled"
+      :aria-disabled="!!(!canNext() || $props.disabled)"
+      aria-label="Next page"
+      @click="goNext"
+    >›</button>
+  </slot>
+</nav>
+</template>
+
+<style>
+/*
+  Fully token-driven (mirrors otp/listbox/themes): EVERY visual value is a
+  `var(--rozie-pagination-*, <fallback>)`, so the component renders with zero
+  config yet is completely re-skinnable by setting tokens at any ancestor scope.
+  The shipped themes/*.css presets map these tokens onto shadcn/Radix,
+  Material 3, Bootstrap 5.
+*/
+.rozie-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rozie-pagination-gap, 0.25rem);
+  font: var(--rozie-pagination-font, inherit);
+}
+.rozie-pagination-page,
+.rozie-pagination-control {
+  box-sizing: border-box;
+  min-width: var(--rozie-pagination-size, 2.25rem);
+  height: var(--rozie-pagination-size, 2.25rem);
+  padding: 0 var(--rozie-pagination-padding-x, 0.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-weight: var(--rozie-pagination-font-weight, 500);
+  color: var(--rozie-pagination-fg, #1a1a1a);
+  background: var(--rozie-pagination-bg, transparent);
+  border: var(--rozie-pagination-border-width, 1px) solid var(--rozie-pagination-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-pagination-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-pagination-page:hover,
+.rozie-pagination-control:hover {
+  background: var(--rozie-pagination-hover-bg, rgba(0, 0, 0, 0.05));
+  border-color: var(--rozie-pagination-hover-border, rgba(0, 0, 0, 0.28));
+}
+.rozie-pagination-page:focus-visible,
+.rozie-pagination-control:focus-visible {
+  outline: var(--rozie-pagination-ring-width, 2px) solid var(--rozie-pagination-ring, var(--rozie-pagination-accent, #0066cc));
+  outline-offset: var(--rozie-pagination-ring-offset, 1px);
+}
+.rozie-pagination-page.is-active {
+  color: var(--rozie-pagination-active-fg, #fff);
+  background: var(--rozie-pagination-active-bg, var(--rozie-pagination-accent, #0066cc));
+  border-color: var(--rozie-pagination-active-border, var(--rozie-pagination-accent, #0066cc));
+}
+.rozie-pagination-page:disabled,
+.rozie-pagination-control:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-pagination-disabled-opacity, 0.5);
+  pointer-events: none;
+}
+.rozie-pagination--disabled {
+  opacity: var(--rozie-pagination-disabled-opacity, 0.5);
+  pointer-events: none;
+}
+.rozie-pagination-ellipsis {
+  min-width: var(--rozie-pagination-size, 2.25rem);
+  height: var(--rozie-pagination-size, 2.25rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rozie-pagination-ellipsis-fg, rgba(0, 0, 0, 0.5));
+  user-select: none;
+}
+</style>
+
+</rozie>
