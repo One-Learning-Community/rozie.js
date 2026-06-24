@@ -23,6 +23,13 @@ declare module '@uppy/xhr-upload';
 // leaf strict typecheck over the emitted per-target output.)
 declare module 'maplibre-gl';
 
+// `@floating-ui/dom` — imported by the Phase 61 Plan 04 collision fixture
+// (`AngularDataReserved.rozie`) to exercise the import-binding-vs-prop alias
+// (`import { offset } from '@floating-ui/dom'` colliding with a prop `offset`).
+// The gate verifies the emitted scaffolding type-checks, not floating-ui's
+// types, so the named exports resolve to `any`.
+declare module '@floating-ui/dom';
+
 // `sortablejs` is declared with a minimal REAL shape (not bare `any`) because
 // the typed engine-wrapper fixture `examples/typed/SortableList.rozie` annotates
 // its engine instance `let instance: SortableJS | null = null` and

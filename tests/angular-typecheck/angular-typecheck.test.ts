@@ -189,3 +189,48 @@ describe('ANGULAR-TSC (typed) — tsc --noEmit clean over emitted typed Angular 
     }
   });
 });
+
+describe('ANGULAR-TSC (Phase 61 Plan 04 collision) — gate-4 clean after reserved-member deconfliction', () => {
+  it('AngularDataReserved emitted .ts tsc clean (data/computed/ref/helper → $local, import → $import)', () => {
+    // SC-2 (Angular leg) gate-4 proof. Pre-fix this single-model component
+    // emitted a DUPLICATE `writeValue` member (the `<data>` signal AND the
+    // generated CVA method → TS2300) and a prop-shadowed `this.offset()` import
+    // reference (→ TS2322). The deconfliction (Plan 04) renames the internal
+    // sides so the emitted class strict-typechecks clean — exactly the
+    // ng-packagr gate-4 surface (the class body), here via `tsc --noEmit`.
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-angular-tsc-coll-'));
+    try {
+      const srcPath = resolve(
+        ROOT,
+        'packages/targets/angular/src/__tests__/fixtures/AngularDataReserved.rozie',
+      );
+      const source = readFileSync(srcPath, 'utf8');
+      const result = compile(source, {
+        target: 'angular',
+        filename: 'AngularDataReserved.rozie',
+        sourceMap: false,
+      });
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors).toEqual([]);
+      writeFileSync(join(tmpDir, 'AngularDataReserved.ts'), result.code, 'utf8');
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
