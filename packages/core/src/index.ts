@@ -170,6 +170,19 @@ export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface
 // @experimental — shape may change before v1.0
 export { buildPropJsdoc, hasPropJsdoc } from './codegen/buildPropJsdoc.js';
 
+// Phase 59 (SC-1/SC-4) — the shared per-prop Markdown-table-cell renderer +
+// the family-agnostic props-table generator. The single anti-drift source
+// consumed by every family README props table (readme.mjs) AND the docs-site
+// API props table (props-codegen.ts). renderPropDescription returns '' for a
+// docless prop (inert path); renderPropsTable renders any family's IR with no
+// data-table literals.
+// @experimental — shape may change before v1.0
+export {
+  renderPropDescription,
+  escapeTableCell,
+  renderPropsTable,
+} from './codegen/renderPropDescription.js';
+
 // Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
 // resolves the optional `sass` peer dependency for the `<style lang="scss">`
 // branch of parseStyle (Plan 10-03); returns `null` when `sass` is absent.

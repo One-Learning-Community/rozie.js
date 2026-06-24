@@ -57,7 +57,7 @@ describe('escapeTableCell [Phase 59] — table-cell safety (T-59-01)', () => {
       const out = escapeTableCell('an `unclosed code span');
       expect(out).toBe('an `unclosed code span');
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy.mock.calls[0][0]).toContain(
+      expect(String(spy.mock.calls[0]?.[0])).toContain(
         'readme.mjs: WARNING: unmatched backtick',
       );
     } finally {
