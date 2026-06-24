@@ -38,6 +38,8 @@ import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictGeneratedSymbols,
+  subtreeReads,
+  DECONFLICT_SUFFIX,
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
@@ -331,6 +333,68 @@ function normalizeModelAccessor(program: File): void {
 }
 
 /**
+ * Phase 61 Plan 05 risk A — declare-then-assign ref shadow.
+ *
+ * The accessor-`$refs` deconfliction group (in `rewriteRozieIdentifiers`) only
+ * catches a `const X = $refs.X` INIT-shape self-shadow, AND it runs AFTER
+ * `hoistModuleLet` has already removed/rewritten the declaration. A
+ * declare-then-assign module-let — `let anchorEl = null; … anchorEl = $refs.anchorEl`
+ * (the canonical "populate the ref handle inside `$onMount`" form) — collides
+ * with the ref-const the emitter mints for `ref="anchorEl"` in TWO ways:
+ *   1. `hoistModuleLet` hoists the module-let (it is referenced from the
+ *      `$onMount` body) → `const anchorEl = useRef(null)`.
+ *   2. emitScript generates the ref-const → a SECOND `const anchorEl = useRef(...)`.
+ * Two `anchorEl` bindings → TS2451 redeclare.
+ *
+ * Fix: rename the colliding module-`let` (the renameable side — `refNames` are
+ * the contract) to `<name>$local` on the freshly-cloned Program BEFORE
+ * `hoistModuleLet` and the ref-const generation run. The hoist then lifts
+ * `anchorEl$local` to its own `useRef`, and the ref-const keeps the bare name.
+ *
+ * Gated on an actual `$refs.<name>` read ANYWHERE in the program (not just the
+ * declarator init) so the declare-then-assign form is caught while a non-
+ * colliding module-let stays byte-identical. MUST run on the freshly-cloned,
+ * not-yet-mutated Program (scope cache valid). Mutates `program` in place.
+ */
+export function deconflictDeclareThenAssignRef(
+  program: File,
+  ir: IRComponent,
+): void {
+  const refNames = new Set(ir.refs.map((r) => r.name));
+  if (refNames.size === 0) return;
+
+  // Collect program-scope `let` declarator names that collide with a ref name
+  // AND whose program scope reads `$refs.<name>` somewhere (the declare-then-
+  // assign signal). A `const X = $refs.X` init-shape is already handled by the
+  // accessor group; this catches the `let`-declared, later-assigned form.
+  const targets = new Set<string>();
+  for (const stmt of program.program.body) {
+    if (!t.isVariableDeclaration(stmt) || stmt.kind !== 'let') continue;
+    for (const decl of stmt.declarations) {
+      if (!t.isIdentifier(decl.id)) continue;
+      const name = decl.id.name;
+      if (!refNames.has(name)) continue;
+      // Only-on-collision: require an actual `$refs.<name>` read in the program.
+      if (subtreeReads(program.program, '$refs', name)) targets.add(name);
+    }
+  }
+  if (targets.size === 0) return;
+
+  // Rename atomically via the program scope (declaration + every reference).
+  traverse(program, {
+    Program(path) {
+      for (const name of targets) {
+        const binding = path.scope.getBinding(name);
+        if (binding && binding.scope === path.scope) {
+          path.scope.rename(name, `${name}${DECONFLICT_SUFFIX}`);
+        }
+      }
+      path.stop();
+    },
+  });
+}
+
+/**
  * Detect whether a MemberExpression LHS represents a NESTED write
  * (e.g., `$data.todo.title = X`). Returns the root `$data`/`$props`
  * Identifier name when so; null otherwise.
@@ -437,10 +501,57 @@ export function rewriteRozieIdentifiers(
   // IS the renameable side. (The exposed-function case `const open` is guarded
   // because `open` is an $expose verb.)
   const reactProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
+
+  // Phase 61 Plan 05 risk D — SYNTHESIZED-INTERNAL cross-kind collisions. The
+  // React emitter mints a fixed set of internal bindings the author never sees:
+  //   - `props`              — the component function parameter (non-model props
+  //                            read via `props.X`; also the slot/$emit object).
+  //   - `attrs`              — the inherit-attrs fallthrough spread object.
+  //   - `_props`             — the controllable-state internal props alias.
+  //   - `_rozieExposeRef`    — the `$expose` handle-stash useRef.
+  //   - `portals`            — the portal-slot closure injected in the mount hook.
+  //   - `prev`               — the functional-updater param (`setX(prev => …)`).
+  // A user `<script>` helper/const named one of these shadows the synthesized
+  // binding → broken emit (e.g. a user `const attrs = …` clobbers the
+  // fallthrough spread). The renameable side is the USER binding (the
+  // synthesized name is the contract) → rename to `<name>$local`. A `{ kind:
+  // 'binding' }` trigger: the collision exists as soon as the user binding does
+  // (these symbols are unconditionally minted), so no accessor read gates it.
+  // Only-on-collision: a component with no such helper is byte-identical.
+  // Prefix-pattern internals (`_*Ref`/`__ctx_*`/`__default*`/`_rozieProp_*`) are
+  // lower-risk (collision-react §2) — handle the literal short names first; add
+  // prefix matching only if a corpus fixture needs it.
+  const synthesizedInternalNames = new Set<string>([
+    'props',
+    'attrs',
+    '_props',
+    '_rozieExposeRef',
+    'portals',
+    'prev',
+  ]);
+
+  // Phase 61 Plan 05 risk E — `$computed` name == helper. A `$computed` name is
+  // the template-ref-side contract: React mints `const <name> = useMemo(...)`
+  // and every read (`{{ X }}` / script) is the BARE identifier `X`. A user
+  // helper/local named the same collides. CRITICAL: the `$computed` const is
+  // ITSELF a program-scope `const <name> = …` declarator — a `{ kind:'binding' }`
+  // trigger would rename THAT (breaking the computed). So we use the SAME
+  // `{ kind: 'bare-read' }` trigger Vue's computed group uses: the
+  // VariableDeclarator visitor SKIPS the program-scope computed const (a top-
+  // level `const <name>` IS the generated symbol — a second top-level
+  // `const <name>` would be a duplicate-binding parse error, never a shadow),
+  // and only a NESTED local/param that BARE-READS the computed name is renamed
+  // (the genuine risk E shape — a function-local helper). Only-on-collision: a
+  // nested local that never reads the computed name stays byte-identical, and
+  // the corpus computed consts are untouched.
+  const computedNames = new Set(ir.computed.map((c) => c.name));
+
   const reactGroups: GeneratedSymbolGroup[] = [
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
     { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: setterNames, trigger: { kind: 'binding' } },
+    { names: synthesizedInternalNames, trigger: { kind: 'binding' } },
+    { names: computedNames, trigger: { kind: 'bare-read' } },
   ];
   deconflictGeneratedSymbols(program, reactGroups, reactProtected);
 

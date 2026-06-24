@@ -64,8 +64,20 @@ describe('Phase 61-05 risk A — declare-then-assign ref shadow', () => {
     // The user module-let is renamed; it is NEVER re-declared as a second
     // `anchorEl` (the TS2451 shape). The hoisted let surfaces as `anchorEl$local`.
     expect(code).toContain('anchorEl$local');
-    // No `const anchorEl =` other than the single useRef ref-const above.
-    expect(count(code, 'const anchorEl ')).toBe(1);
+
+    // After stripping comments + the renamed local, exactly one `anchorEl`
+    // BINDING remains (the ref-const). Pre-fix there were two (`const anchorEl =
+    // useRef` + the hoisted module-let `const anchorEl = useRef`) → TS2451.
+    const codeNoComments = code
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '')
+      .replace(/anchorEl\$local/g, 'STRIPPED');
+    // `useRef(` bound to `anchorEl` occurs exactly once.
+    expect(count(codeNoComments, 'anchorEl = useRef')).toBe(1);
+
+    // The $onMount body reads the ref through `.current` and writes the renamed
+    // local — proving the assign-from-ref still resolves to the ref-const.
+    expect(code).toContain('anchorEl$local = anchorEl.current');
   });
 });
 

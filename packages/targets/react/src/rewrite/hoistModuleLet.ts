@@ -297,6 +297,19 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     classifyExpr(wh.getter);
     classifyExpr(wh.callback);
   }
+  // Phase 61 Plan 05 risk B — `$expose` verb bodies are a reachability ROOT too.
+  // An `ExposedMethod` carries only its NAME (the verb is a top-level helper in
+  // the script program); the `useImperativeHandle` closure that emitScript mints
+  // is a hook context NOT otherwise scanned here. So a module-let mutated ONLY
+  // inside an exposed verb (`let nextId = 0; const show = () => { nextId++ }`,
+  // `$expose({ show })`) previously fell through to case (c) and was left a
+  // per-render `let` — reseeded to its init every render → duplicate ids. We
+  // route each expose-verb NAME through `classifyExpr` as an Identifier, which
+  // hits case (b) and pulls in the helper's TRANSITIVE module-lets. This is a
+  // scope-completeness fix — NO rename.
+  for (const ex of ir.expose ?? []) {
+    classifyExpr(t.identifier(ex.name));
+  }
 
   /** Pull every let a body reaches: its DIRECT refs plus the transitive lets
    *  of every helper it calls (at any nesting depth inside the body). */

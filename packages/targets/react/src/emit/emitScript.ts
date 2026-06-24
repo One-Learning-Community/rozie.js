@@ -44,7 +44,10 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import {
+  rewriteRozieIdentifiers,
+  deconflictDeclareThenAssignRef,
+} from '../rewrite/rewriteScript.js';
 import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
 import {
   ReactImportCollector,
@@ -1546,6 +1549,16 @@ export function emitScript(
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
   const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
+
+  // 1c. Phase 61 Plan 05 risk A — declare-then-assign ref shadow. Rename a
+  //     module-`let X` that collides with a `ref="X"` name AND reads
+  //     `$refs.X` somewhere (`let anchorEl = null; anchorEl = $refs.anchorEl`)
+  //     to `X$local`, BEFORE the hoist + ref-const generation both mint an `X`
+  //     → TS2451. Only-on-collision (a non-colliding module-let is untouched);
+  //     MUST run before `hoistModuleLet` (which would otherwise remove/rewrite
+  //     the declaration first, leaving the accessor-group rename nothing to act
+  //     on).
+  deconflictDeclareThenAssignRef(cloned, ir);
 
   // 2. Hoist module-scoped `let X = init` declarations referenced from
   //    lifecycle hooks. ROZ522 advisories collected.
