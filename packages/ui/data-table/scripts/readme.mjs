@@ -59,6 +59,37 @@ export function renderPropDefault(defaultValue) {
   }
 }
 
+// Render the ## Props Description cell from a prop's first-class `docs` field
+// (PropDecl.docs, lowered by Phase 58 Plan 02). Empty string when the prop carries
+// no docs. A deprecated prop gets a leading **(deprecated)** marker (with the
+// deprecation message appended when `deprecated` is a string).
+//
+// T-58-08 (Tampering): an author description containing `|` or a newline could
+// break the Markdown table row — escape pipes (`\|`) and collapse newlines to a
+// single space so the cell stays a single well-formed table cell.
+function escapeTableCell(text) {
+  return String(text)
+    .replace(/\r\n?|\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\|/g, '\\|')
+    .trim();
+}
+
+function renderPropDescription(prop) {
+  const docs = prop.docs;
+  if (!docs) return '';
+  const parts = [];
+  if (docs.deprecated) {
+    parts.push(
+      typeof docs.deprecated === 'string'
+        ? `**(deprecated)** ${escapeTableCell(docs.deprecated)}`
+        : '**(deprecated)**',
+    );
+  }
+  if (docs.description) parts.push(escapeTableCell(docs.description));
+  return parts.join(' ');
+}
+
 function renderSlotName(name) {
   return name === '' ? '(default)' : name;
 }
@@ -2248,14 +2279,21 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   // Props
   lines.push('## Props');
   lines.push('');
-  lines.push('| Name | Type | Default | Two-way (model) | Required |');
-  lines.push('| --- | --- | --- | :---: | :---: |');
+  lines.push('| Name | Type | Default | Two-way (model) | Required | Description |');
+  lines.push('| --- | --- | --- | :---: | :---: | --- |');
   for (const p of ir.props) {
     const type = renderPropType(p.typeAnnotation);
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';
-    lines.push(`| \`${p.name}\` | \`${type}\` | \`${def}\` | ${model} | ${required} |`);
+    // Description is the LAST column on purpose: validateDocsPropsTable reads only
+    // cells[0]/[1]/[2] (name/type/default), so appending here cannot shift the
+    // validated indices. T-58-08: escape pipes + collapse newlines so an author
+    // `docs.description` containing `|` or a line break cannot break the Markdown
+    // table row (mirrors the table-cell safety the Events column relies on).
+    lines.push(
+      `| \`${p.name}\` | \`${type}\` | \`${def}\` | ${model} | ${required} | ${renderPropDescription(p)} |`,
+    );
   }
   lines.push('');
 
