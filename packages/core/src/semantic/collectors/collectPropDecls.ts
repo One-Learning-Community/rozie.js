@@ -54,6 +54,7 @@ export function collectPropDecls(props: PropsAST, bindings: BindingsTable): void
     const value = prop.value;
     let typeIdentifier: string | null = null;
     let defaultExpression: t.Expression | null = null;
+    let docsExpression: t.Expression | null = null;
     let isModel = false;
 
     if (t.isObjectExpression(value)) {
@@ -64,6 +65,13 @@ export function collectPropDecls(props: PropsAST, bindings: BindingsTable): void
       const defaultProp = findInnerProperty(value, 'default');
       if (defaultProp && t.isExpression(defaultProp.value)) {
         defaultExpression = defaultProp.value;
+      }
+      // Phase 58 (SC-1): carry the raw `docs:` node for lowerProps. Collectors
+      // stay silent (D-08) — lowerProps's findPropDocs validates the shape and
+      // emits ROZ018 on a malformed one.
+      const docsProp = findInnerProperty(value, 'docs');
+      if (docsProp && t.isExpression(docsProp.value)) {
+        docsExpression = docsProp.value;
       }
       const modelProp = findInnerProperty(value, 'model');
       if (
@@ -80,6 +88,7 @@ export function collectPropDecls(props: PropsAST, bindings: BindingsTable): void
       decl: prop,
       typeIdentifier,
       defaultExpression,
+      docsExpression,
       isModel,
       sourceLoc: { start: prop.start ?? 0, end: prop.end ?? 0 },
     };

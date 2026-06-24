@@ -18,7 +18,7 @@ import type { PropsAST } from '../../ast/blocks/PropsAST.js';
 import type { BindingsTable, PropDeclEntry } from '../../semantic/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
-import type { PropDecl, PropTypeAnnotation } from '../types.js';
+import type { PropDecl, PropDocs, PropTypeAnnotation } from '../types.js';
 
 /**
  * Build a PropTypeAnnotation from a Babel Expression (the `type:` value).
@@ -95,6 +95,120 @@ function findRequiredFlag(entry: PropDeclEntry): boolean {
   return false;
 }
 
+/** The allowed `docs:` sub-keys. Any other key is malformed (ROZ018). */
+const ALLOWED_DOCS_KEYS = new Set(['description', 'deprecated', 'example']);
+
+/**
+ * Build a typed `PropDocs` from a prop's `docs:` options value (Phase 58 SC-1).
+ *
+ * Modeled on `findRequiredFlag` — walks `entry.decl.value`'s ObjectProperties
+ * for a `docs:` key. The raw options node NEVER escapes this seam: only the
+ * returned typed `PropDocs` reaches `PropDecl.docs`, keeping `docs` inert by
+ * construction (SC-6 — no emitter can serialize the raw options object).
+ *
+ * Shape contract: `docs: { description?: string, deprecated?: true | string,
+ * example?: string }`. A malformed shape degrades gracefully:
+ *   - `docs` not an ObjectExpression  → ROZ018, return null (whole docs dropped)
+ *   - `description`/`example` non-string → ROZ018, drop THAT sub-key
+ *   - `deprecated` neither boolean-`true` nor string → ROZ018, drop THAT sub-key
+ *   - any unknown sub-key             → ROZ018, drop THAT sub-key
+ * Per D-08 the diagnostics are COLLECTED, never thrown — a bad `docs` can never
+ * block the compile (T-58-02). Returns null when no usable sub-key survives, so
+ * an empty/all-malformed docs lowers to `PropDecl.docs === undefined`.
+ */
+function findPropDocs(entry: PropDeclEntry, diagnostics: Diagnostic[]): PropDocs | null {
+  const decl = entry.decl;
+  if (!t.isObjectExpression(decl.value)) return null;
+
+  let docsValue: t.Node | null = null;
+  for (const prop of decl.value.properties) {
+    if (!t.isObjectProperty(prop) || prop.computed) continue;
+    const key = prop.key;
+    const keyName =
+      t.isIdentifier(key) ? key.name :
+      t.isStringLiteral(key) ? key.value :
+      null;
+    if (keyName !== 'docs') continue;
+    docsValue = prop.value;
+    break;
+  }
+  if (docsValue === null) return null; // no docs key — the inert control path (Test D)
+
+  if (!t.isObjectExpression(docsValue)) {
+    // `docs: 42` / `docs: 'x'` etc. — not an object literal (Test C).
+    diagnostics.push({
+      code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+      severity: 'warning',
+      message: `Prop '${entry.name}' has a malformed 'docs:' value — it must be an object literal of the form { description?: string, deprecated?: true | string, example?: string }. The docs have been dropped (no JSDoc will be emitted).`,
+      loc: entry.sourceLoc,
+      hint: "Use docs: { description: '...', deprecated: true | '...', example: '...' }.",
+    });
+    return null;
+  }
+
+  const docs: PropDocs = {};
+  for (const member of docsValue.properties) {
+    if (!t.isObjectProperty(member) || member.computed) {
+      diagnostics.push({
+        code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+        severity: 'warning',
+        message: `Prop '${entry.name}' has a malformed 'docs:' entry (a spread, computed key, or method) — it has been dropped.`,
+        loc: entry.sourceLoc,
+        hint: "Allowed docs sub-keys: description (string), deprecated (true | string), example (string).",
+      });
+      continue;
+    }
+    const key = member.key;
+    const keyName =
+      t.isIdentifier(key) ? key.name :
+      t.isStringLiteral(key) ? key.value :
+      null;
+    if (keyName === null || !ALLOWED_DOCS_KEYS.has(keyName)) {
+      diagnostics.push({
+        code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+        severity: 'warning',
+        message: `Prop '${entry.name}' has an unknown 'docs:' sub-key '${keyName ?? '<computed>'}' — it has been dropped. Allowed sub-keys: description, deprecated, example.`,
+        loc: entry.sourceLoc,
+        hint: "Allowed docs sub-keys: description (string), deprecated (true | string), example (string).",
+      });
+      continue;
+    }
+    const v = member.value;
+    if (keyName === 'description' || keyName === 'example') {
+      if (t.isStringLiteral(v)) {
+        docs[keyName] = v.value;
+      } else {
+        diagnostics.push({
+          code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+          severity: 'warning',
+          message: `Prop '${entry.name}' has a non-string 'docs.${keyName}' — it must be a string literal. The '${keyName}' sub-key has been dropped.`,
+          loc: entry.sourceLoc,
+          hint: `Use docs: { ${keyName}: '...' }.`,
+        });
+      }
+    } else {
+      // keyName === 'deprecated': true → bare @deprecated; string → @deprecated <msg>.
+      if (t.isBooleanLiteral(v) && v.value === true) {
+        docs.deprecated = true;
+      } else if (t.isStringLiteral(v)) {
+        docs.deprecated = v.value;
+      } else {
+        diagnostics.push({
+          code: RozieErrorCode.INVALID_PROP_DOCS_SHAPE,
+          severity: 'warning',
+          message: `Prop '${entry.name}' has a malformed 'docs.deprecated' — it must be the boolean 'true' or a string message. The 'deprecated' sub-key has been dropped.`,
+          loc: entry.sourceLoc,
+          hint: "Use docs: { deprecated: true } or docs: { deprecated: 'Use X instead.' }.",
+        });
+      }
+    }
+  }
+
+  // Attach only when at least one sub-key survived — keeps the typed field
+  // absent (PropDecl.docs === undefined) for an empty / all-malformed docs.
+  return Object.keys(docs).length > 0 ? docs : null;
+}
+
 export function lowerProps(
   _propsAst: PropsAST,
   bindings: BindingsTable,
@@ -118,6 +232,10 @@ export function lowerProps(
       });
       defaultValue = null;
     }
+    // Phase 58 (SC-1): lower the prop's `docs:` to the typed PropDocs field.
+    // null → omit the field entirely (PropDecl.docs === undefined). Malformed
+    // shapes emit ROZ018 (collected) inside findPropDocs and are dropped.
+    const docs = findPropDocs(entry, diagnostics);
     out.push({
       type: 'PropDecl',
       name: entry.name,
@@ -125,6 +243,7 @@ export function lowerProps(
       defaultValue,
       isModel: entry.isModel,
       required,
+      ...(docs !== null ? { docs } : {}),
       sourceLoc: entry.sourceLoc,
     });
   }

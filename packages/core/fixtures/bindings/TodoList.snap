@@ -222,6 +222,7 @@
         }
       },
       "typeIdentifier": "Array",
+      "docsExpression": null,
       "isModel": true,
       "sourceLoc": {
         "start": 539,
@@ -383,6 +384,7 @@
         }
       },
       "typeIdentifier": "String",
+      "docsExpression": null,
       "isModel": false,
       "sourceLoc": {
         "start": 597,

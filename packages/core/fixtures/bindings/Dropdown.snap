@@ -205,6 +205,7 @@
         }
       },
       "typeIdentifier": "Boolean",
+      "docsExpression": null,
       "isModel": true,
       "sourceLoc": {
         "start": 624,
@@ -366,6 +367,7 @@
         }
       },
       "typeIdentifier": "Boolean",
+      "docsExpression": null,
       "isModel": false,
       "sourceLoc": {
         "start": 695,
@@ -527,6 +529,7 @@
         }
       },
       "typeIdentifier": "Boolean",
+      "docsExpression": null,
       "isModel": false,
       "sourceLoc": {
         "start": 752,
