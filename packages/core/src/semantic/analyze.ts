@@ -41,6 +41,7 @@ import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
 import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
 import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
+import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
 import { runReactStaleReadValidator } from './validators/reactStaleReadValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
@@ -85,6 +86,15 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // Element/Node member (Lit) — the exposed method becomes a colliding class
   // member on the class-based targets. Reads bindings.expose.
   runExposeReservedMemberValidator(ast, bindings, diagnostics);
+  // Phase 61 (Half B, SC-3) — ROZ142 (error): a public-contract prop key that
+  // collides with a per-target reserved name (Vue strip / React swallow SILENT
+  // tier handled FIRST, plus Lit DOM-member / Object.prototype / Angular
+  // lifecycle / JS reserved / Svelte rune hard breaks); ROZ981 (error): two
+  // emits that normalize to the same Svelte callback prop collapse at runtime.
+  // A public-contract name cannot be auto-renamed. Reads bindings.props/emits;
+  // slot collisions are owned by validateSlotPropCollision (ROZ127), $expose
+  // verbs by the widened ROZ137 — no double-firing.
+  runReservedNameCollisionValidator(ast, bindings, diagnostics);
   // Phase 46 (ITEM-4, D-03b/A3) — ROZ138 (warning): within one <script> function
   // body, a read of $data/$model/$props.x dominated by an earlier write to the
   // same key (React setState is async → the read binds the pre-write value).

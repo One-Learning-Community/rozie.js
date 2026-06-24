@@ -75,14 +75,29 @@ describe('reservedNameCollisionValidator — ROZ142 public-contract collisions (
     expect(hits[0]!.message).toContain('children');
   });
 
-  // ── Lit DOM-member prop (hard TS2416 at gate 3) — the id→idBase history ──
+  // ── Lit DOM-member prop (hard TS2416 at gate 3) — the inputMode→…Base history ──
+  // NOTE: the WARNING tier is the corpus-ABSENT high-collision subset of the Lit
+  // DOM chain (the shipping corpus byte-verifiably ships `id`/`title`/`draggable`
+  // /`autofocus` cleanly ×6, so flagging THOSE is a false positive — zero-false-
+  // positive must-have). `tabIndex` is a corpus-absent member that actually broke
+  // in the otp/combobox findings (TS1238/TS2416 on the Lit leaf).
 
-  it('fires on a <props> key `id` (Lit DOM member) with an `idBase` did-you-mean', () => {
-    const hits = roz142(analyzeSource(propsComponent('id: { type: String }')));
+  it('fires (warning) on a <props> key `tabIndex` (Lit DOM member) with a `${name}Base` did-you-mean', () => {
+    const hits = roz142(analyzeSource(propsComponent('tabIndex: { type: Number }')));
     expect(hits.length, JSON.stringify(hits)).toBe(1);
-    expect(hits[0]!.message).toContain('id');
-    // The historical fix renamed prop `id` → `idBase`.
+    expect(hits[0]!.message).toContain('tabIndex');
+    // Class-target footgun → warning (not a universal break); ROZ137-style.
+    expect(hits[0]!.severity).toBe('warning');
+    // The historical fix renamed such props with a `Base` suffix (id → idBase).
+    expect(hits[0]!.hint).toContain('tabIndexBase');
     expect(hits[0]!.hint).toContain('idBase');
+  });
+
+  it('does NOT fire on `id`/`title` — corpus byte-ships those cleanly ×6 (zero false positive)', () => {
+    const hits = roz142(
+      analyzeSource(propsComponent('id: { type: String }, title: { type: String }')),
+    );
+    expect(hits.length, JSON.stringify(hits)).toBe(0);
   });
 
   // ── Svelte emit-normalization collapse (runtime-only, ROZ981) ──

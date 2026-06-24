@@ -49,90 +49,54 @@
 import type { RozieAST } from '../../ast/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import {
+  OBJECT_PROTOTYPE_MEMBERS as OBJECT_PROTOTYPE_MEMBERS_SOURCE,
+  LIT_DOM_MEMBERS,
+  LIT_LIFECYCLE_MEMBERS,
+  ANGULAR_LIFECYCLE_MEMBERS,
+  ANGULAR_CVA_MEMBERS,
+} from '../../rewrite/reservedNames.js';
 import type { BindingsTable } from '../types.js';
 
 /**
  * `Object.prototype` members an exposed verb must not shadow on a class-based
- * target (Angular + Lit). `constructor` is documented for rationale but cannot
- * actually be exposed (the collector filters it), so it is omitted from the live
- * match set to avoid implying it could appear. Source: the enumerable +
- * well-known non-enumerable `Object.prototype` members per `lib.es5.d.ts`.
+ * target (Angular + Lit). Sourced from the shared `reservedNames.ts` single-
+ * source-of-truth (Plan 61-01) so ROZ137 and the new ROZ142 validator never
+ * drift. `constructor` cannot actually be exposed (the collector filters it), so
+ * the Object.prototype set is used as-is for the OBJECT-MEMBER class; the
+ * Angular-lifecycle `constructor` is folded into the WIDENED set below for the
+ * class-target lifecycle class.
  */
-const OBJECT_PROTOTYPE_MEMBERS = new Set<string>([
-  'valueOf',
-  'toString',
-  'toLocaleString',
-  'hasOwnProperty',
-  'isPrototypeOf',
-  'propertyIsEnumerable',
+const OBJECT_PROTOTYPE_MEMBERS = OBJECT_PROTOTYPE_MEMBERS_SOURCE;
+
+/**
+ * Phase 61 (Plan 61-02) WIDENING — the class-target lifecycle / framework-
+ * reserved members an exposed verb must not shadow. Previously ROZ137 only
+ * caught Object.prototype + DOM-inherited members; the research widened it to
+ * the FULL Lit Group C (LitElement/ReactiveElement lifecycle) + Angular
+ * lifecycle hooks + `constructor` + the CVA quartet (single-model). Sourced from
+ * `reservedNames.ts` so it shares ONE table with Half A and the ROZ142 lint —
+ * no inline re-listing.
+ *
+ * Treated together with the DOM-inherited members below as the "class-target
+ * inherited/reserved" class: a verb here breaks Lit (lifecycle override silently
+ * disables reactivity, or the CVA quartet duplicate-defines) or Angular (a
+ * same-named member is invoked as a real hook, or the CVA quartet → TS2300).
+ */
+const CLASS_TARGET_RESERVED_MEMBERS = new Set<string>([
+  ...LIT_LIFECYCLE_MEMBERS,
+  ...ANGULAR_LIFECYCLE_MEMBERS, // includes `constructor`
+  ...ANGULAR_CVA_MEMBERS,
 ]);
 
 /**
  * Inherited `HTMLElement` / `Element` / `Node` / `EventTarget` members an
  * exposed verb must not shadow on Lit (the LitElement IS an HTMLElement
- * subclass). Derived from `lib.dom.d.ts` (per A2: the inherited surface a
- * component author is most likely to collide with — methods + a handful of
- * well-known properties). Conservative high-signal subset; a name absent here
- * is simply not flagged (warn-only, no false-positive cost).
+ * subclass). Sourced from the shared `LIT_DOM_MEMBERS` table (Plan 61-01) — the
+ * FULL Group A DOM chain (closes R-NEW-6: `popover`/`inert`/`aria*` no longer
+ * slip), replacing the previous hand-maintained conservative subset.
  */
-const DOM_INHERITED_MEMBERS = new Set<string>([
-  // EventTarget
-  'addEventListener',
-  'removeEventListener',
-  'dispatchEvent',
-  // Node
-  'appendChild',
-  'cloneNode',
-  'contains',
-  'insertBefore',
-  'removeChild',
-  'replaceChild',
-  'normalize',
-  'nodeType',
-  'nodeName',
-  'nodeValue',
-  'textContent',
-  'childNodes',
-  'firstChild',
-  'lastChild',
-  'parentNode',
-  'parentElement',
-  'nextSibling',
-  'previousSibling',
-  // Element
-  'getAttribute',
-  'setAttribute',
-  'removeAttribute',
-  'hasAttribute',
-  'getBoundingClientRect',
-  'closest',
-  'matches',
-  'querySelector',
-  'querySelectorAll',
-  'scrollTo',
-  'scrollBy',
-  'scrollIntoView',
-  'attachShadow',
-  'id',
-  'className',
-  'classList',
-  'innerHTML',
-  'outerHTML',
-  'slot',
-  'attributes',
-  'tagName',
-  // HTMLElement
-  'focus',
-  'blur',
-  'click',
-  'title',
-  'hidden',
-  'style',
-  'dataset',
-  'offsetWidth',
-  'offsetHeight',
-  'offsetParent',
-]);
+const DOM_INHERITED_MEMBERS = LIT_DOM_MEMBERS;
 
 /**
  * Run the `$expose`-verb-shadows-inherited-member validator over the given AST.
@@ -154,25 +118,30 @@ export function runExposeReservedMemberValidator(
     for (const entry of exposed) {
       const name = entry.name;
       const isObjectMember = OBJECT_PROTOTYPE_MEMBERS.has(name);
+      const isClassReserved = CLASS_TARGET_RESERVED_MEMBERS.has(name);
       const isDomMember = DOM_INHERITED_MEMBERS.has(name);
-      if (!isObjectMember && !isDomMember) continue;
+      if (!isObjectMember && !isClassReserved && !isDomMember) continue;
 
-      // Build the target list + rationale. An Object.prototype member breaks
-      // Angular + Lit (both class targets); a DOM-inherited member breaks Lit
-      // only (the HTMLElement subclass). A name that is in BOTH sets (none
-      // currently, but defensively) names the broader Angular+Lit surface.
-      const targets = isObjectMember ? 'Angular + Lit' : 'Lit';
+      // Build the target list + rationale. An Object.prototype member OR a
+      // class-target lifecycle/CVA member breaks Angular + Lit (both class
+      // targets); a DOM-inherited member breaks Lit only (the HTMLElement
+      // subclass). Object.prototype + class-reserved take precedence in the
+      // message (broader Angular+Lit surface) over a DOM-only match.
+      const angularLitClass = isObjectMember || isClassReserved;
+      const targets = angularLitClass ? 'Angular + Lit' : 'Lit';
       const surface = isObjectMember
         ? `inherited Object.prototype member`
-        : `inherited HTMLElement/Element/Node member`;
-      const suggestion = isObjectMember ? 'readValue' : `${name}Index`;
+        : isClassReserved
+          ? `framework-reserved class member (Lit/Angular lifecycle or the Angular ControlValueAccessor quartet)`
+          : `inherited HTMLElement/Element/Node member`;
+      const suggestion = angularLitClass ? 'readValue' : `${name}Index`;
 
       diagnostics.push({
         code: RozieErrorCode.EXPOSE_RESERVED_MEMBER,
         severity: 'warning',
         message: `$expose({ ${name} }) shadows the ${surface} '${name}' on the class-based target(s) ${targets} — the exposed method becomes a class member that collides with the inherited one (TS1240/TS1271 on Lit's @property decorators for Object.prototype names; TS2416 for DOM members). Suffix-rename the verb (e.g. '${suggestion}').`,
         loc: entry.sourceLoc,
-        hint: `Rename the exposed method so its name is not an inherited ${isObjectMember ? 'Object.prototype' : 'HTMLElement/Element/Node'} member (e.g. '${suggestion}'); the rename is internal — the consumer-facing handle name is whatever you choose.`,
+        hint: `Rename the exposed method so its name is not a ${isObjectMember ? 'Object.prototype member' : isClassReserved ? 'framework-reserved class member (lifecycle / CVA)' : 'HTMLElement/Element/Node member'} (e.g. '${suggestion}'); the rename is internal — the consumer-facing handle name is whatever you choose.`,
       });
     }
   } catch {
