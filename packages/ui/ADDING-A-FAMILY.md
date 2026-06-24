@@ -96,6 +96,21 @@ The render path is the SAME core `renderPropsTable(ir)` generator (`@rozie/core`
 - **DOM element typing.** Assign element-specific props to a freshly-`createElement`'d (well-typed) variable, not to a `querySelector` result (typed `Element`) — the latter fails `vue-tsc`/`ngtsc` (TS2339). Keep emitter/codegen casts out of it; fix the `.rozie` source.
 - **`tsc --noEmit` is a required gate for tsdown leaves.** Their build (oxc isolated-decl dts) does **not** body-typecheck — a body type error only surfaces under each leaf's `typecheck` script. Always run it.
 
+### More collision classes + emitter gaps (learned standing up tags / number-field / pagination, 2026-06)
+
+These all passed `compile()×6` clean and only bit at the per-leaf `typecheck`/`ng-packagr` build — gates 3 (typecheck ×4) + 4 (build ×6) are the real catch, the surface gate alone misses them. Worked around in source (no emitter edits; additive scope fence preserved):
+
+- **local-helper-name == author-PROP name, on Lit** — a `const totalPages = …` helper became a Lit class field colliding with the `totalPages` `@property` → `TS2300`/`TS2717`. The *author-prop* sibling of the inherited-DOM-property collision (otp `inputMode`). Rename the helper (`totalPages`→`effectivePages`). (pagination)
+- **slot-name == `$expose`-verb, on Lit** — slots `prev`/`next` and expose verbs `prev`/`next` both became Lit class fields → `TS2300`. ROZ127 only guards slot==prop; slot==expose-verb slips past. Rename the slots (`prev`/`next`→`prevControl`/`nextControl`). (pagination) — NEW variant.
+- **expose verb `focus` is fine and PREFERRED over a renamed `focusInput`** — the Lit `HTMLElement.focus` override is signature-compatible (warn-only ROZ137, no TS error) and semantically correct; keep `focus`. Do NOT rename it just to silence ROZ137. (tags/number-field — Dan's call)
+
+**Emitter gaps surfaced (BACKLOG — proper fixes are non-additive: ref-type-map / emitter change + dist-parity + target-snapshot rebless + VR). All have a source-only workaround:**
+- **`$refs.<input>` types to generic `HTMLElement`** (no `input`→`HTMLInputElement` in the per-target ref-type map; joins the known `ul`/`li`/`dialog` gap) → `.select()`/`.value` are `TS2551`/`TS2339` on Solid/Lit/vue-tsc. Workaround: only touch `HTMLElement` members on the `$refs.<input>` handle; reach input-specific members via `e.target` inside a handler (where it is `any`). (number-field)
+- **`<listeners>` inline handler referencing `$event`** → `$event` leaks into the React `useEffect` deps array → `TS2552: Cannot find name '$event'`. The listener dep-scan doesn't exclude the injected `$event` param the way the template `@event` path does. No corpus family hits this (all 71 `<listener>`s use method-ref + modifier, never name `$event`). Workaround: use element pointer-capture (`@pointermove`/`@pointerup` via template `@event`, where `$event` is typed) instead of a document `<listener>`. (number-field)
+- **hyphenated slot name** (e.g. `page-item`) → unquoted property key in the Vue/Solid/Lit `defineSlots<{…}>` slot-type literal → hard `TS1005` parse error. Workaround: use single-word slot names (`item`). Proper fix = quote non-identifier slot keys in the vue/solid/lit slot-type emitters. (pagination) — NEW gap.
+- **`r-if`/`r-else` with a `<slot>` in the else branch** lowered to an object-literal in JSX-expression position on React. Workaround: two independent `r-if`s instead of `r-if`/`r-else`. (pagination)
+- **numeric `:attr` `?? undefined` → `TS2869`** on React (a provably-non-null tabindex like `0`/`-1` trips "right operand of ?? is unreachable"). Workaround: route tabindex through a `number | undefined`-typed helper (the data-table `cellTabindex` precedent). (pagination)
+
 ## Verification gates (this is purely additive — no emitter change)
 
 A new family touches no `packages/core`/`packages/targets` source, so the heavy emitter-change gates (dist-parity rebless, target-snapshot rebless) do **not** apply. Run:
