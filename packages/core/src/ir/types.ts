@@ -213,7 +213,42 @@ export interface PropDecl {
    * interaction.
    */
   required: boolean;
+  /**
+   * Phase 58 (SC-1) — structured, author-supplied documentation lowered from
+   * the prop's `docs:` options key. The SINGLE SOURCE OF TRUTH every later
+   * plan reads (JSDoc emission ×6 + the README prop-table column). Absent when
+   * the `<props>` entry declared no `docs:` key (or only a malformed one — a
+   * malformed shape degrades to ROZ018 + dropped docs, never a crash).
+   *
+   * SC-6 INERT-BY-CONSTRUCTION: `docs` lives ONLY here, on the typed PropDecl.
+   * No emitter ever reaches back to the raw `<props>` options ObjectExpression,
+   * so `docs` strings cannot leak into any target's runtime module body — they
+   * surface only in the `.d.ts` doc surface once JSDoc emission lands (Plan
+   * 03/04). A guard test asserts this.
+   */
+  docs?: PropDocs;
   sourceLoc: SourceLoc;
+}
+
+/**
+ * PropDocs — structured documentation for one declared `<props>` entry.
+ *
+ * Lowered from the prop's `docs:` options object (Phase 58 SC-1). Every field
+ * is optional; an empty docs object lowers to `undefined` (the field is only
+ * attached when at least one sub-key is present).
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface PropDocs {
+  /** Prose description of the prop (→ the JSDoc summary line / README cell). */
+  description?: string;
+  /**
+   * Deprecation marker. `true` → a bare `@deprecated` tag; a string → an
+   * `@deprecated <msg>` tag carrying the migration message.
+   */
+  deprecated?: true | string;
+  /** Usage example (→ a JSDoc `@example` block). */
+  example?: string;
 }
 
 /**

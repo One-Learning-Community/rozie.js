@@ -40,6 +40,13 @@ export interface PropDeclEntry {
   /** Convenience: the AST node for `default` field — null if absent. */
   defaultExpression: Expression | null;
   /**
+   * Phase 58 (SC-1) convenience carrier: the raw Babel node for the prop's
+   * `docs:` field — null if absent. Mirrors `defaultExpression`/`typeIdentifier`.
+   * lowerProps reads this (or re-walks `decl.value`) to build the typed
+   * PropDecl.docs; the raw node never escapes the IR-lowering seam (SC-6).
+   */
+  docsExpression: Expression | null;
+  /**
    * D-22 (Phase 1) detection: true iff `model: true` literal-property pair
    * appears in the prop's options object. Plan 02 propWriteValidator gates
    * ROZ200 on this flag.

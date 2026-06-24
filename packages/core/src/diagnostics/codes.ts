@@ -60,6 +60,19 @@ export const RozieErrorCode = {
   // no self-closing `/>` and no closing tag. Error severity; the malformed tag
   // produces no listener and parsing recovers at the next element.
   LISTENER_ELEMENT_UNTERMINATED: 'ROZ017',
+  // Phase 58 (SC-1) — a `<props>` entry's `docs:` key carries a malformed
+  // shape: `docs` is not an object literal, or a sub-key is wrongly typed
+  // (`description`/`example` non-string, `deprecated` neither boolean-`true`
+  // nor string), or an UNKNOWN sub-key appears. Documentation is metadata only
+  // — a bad shape must degrade gracefully (emit no JSDoc) and NEVER block the
+  // compile (T-58-02 DoS) — so this is WARNING severity, collected-not-thrown
+  // (D-08). The offending docs (or just the offending sub-key) is dropped; the
+  // rest of the prop lowers normally. The allowed shape is
+  // `docs: { description?: string, deprecated?: true | string, example?: string }`.
+  // Emitted from lowerProps (findPropDocs), mirroring the ROZ014 collected
+  // precedent. ROZ018 is the next free code after ROZ017 in the ROZ010-029
+  // block-parse cluster.
+  INVALID_PROP_DOCS_SHAPE: 'ROZ018', // warning — a <props> `docs:` key is malformed (non-object, wrong-typed description/deprecated/example, or unknown sub-key); the bad docs/sub-key is dropped and no JSDoc is emitted. Shape: docs: { description?: string, deprecated?: true | string, example?: string }.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030',
