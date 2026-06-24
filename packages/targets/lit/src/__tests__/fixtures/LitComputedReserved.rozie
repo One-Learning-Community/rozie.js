@@ -1,0 +1,15 @@
+<rozie name="LitComputedReserved">
+<props>
+{ base: { type: String, default: 'row' } }
+</props>
+<script lang="ts">
+// `id` is a Group A inherited HTMLElement member. On Lit a `$computed` named
+// `id` lowers to a PUBLIC `get id()` getter shadowing HTMLElement.id →
+// gate-3 TS2611/TS2416. The deconfliction must rename it `id$local` and
+// propagate to the template interpolation below.
+const id = $computed(() => `${$props.base}-derived`);
+</script>
+<template>
+<div>{{ id }}</div>
+</template>
+</rozie>
