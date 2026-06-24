@@ -87,16 +87,14 @@ for (const target of TARGETS) {
     await expect(panel).toHaveCount(0, { timeout: 10_000 });
     await expect(value).toHaveText('closed');
 
-    // ---- 6. re-open (gesture), then set-closed direct-model write (→ closed) reflects.
-    //         The direct-model write is a CLOSE, not an open: a programmatic OPEN from
-    //         an external button races the click-outside dismissal on Svelte (the
-    //         opening click reaches `document` where the just-attached, same-tick
-    //         outside listener dismisses it). Closing has no such race → robust ×6.
-    //         See project_vr_direct_model_write_null_react_solid_lit. ----
-    await anchor.click();
+    // ---- 6. from CLOSED, set-open direct-model write (→ open) reflects.
+    //         A programmatic OPEN from an external button (an element OUTSIDE the
+    //         popover) no longer self-dismisses on Svelte: the Svelte listeners
+    //         emitter defers the `.outside` attach by one MACROTASK (setTimeout 0),
+    //         so the outside listener is never live for the opening click and the
+    //         panel stays open on all 6 targets. (Step 5 leaves it closed.) ----
+    await page.getByTestId('set-open').click();
     await expect(panel).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId('set-closed').click();
-    await expect(panel).toHaveCount(0, { timeout: 10_000 });
-    await expect(value).toHaveText('closed');
+    await expect(value).toHaveText('open');
   });
 }

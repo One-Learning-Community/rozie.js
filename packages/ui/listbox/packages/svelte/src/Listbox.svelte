@@ -358,8 +358,18 @@ $effect(() => {
     if (controlEl?.contains(target) || listEl?.contains(target)) return;
     close();
   };
-  document.addEventListener('click', handler);
-  return () => document.removeEventListener('click', handler);
+  let attached = false;
+  let cancelled = false;
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    document.addEventListener('click', handler);
+    attached = true;
+  }, 0);
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+    if (attached) document.removeEventListener('click', handler);
+  };
 });
 </script>
 

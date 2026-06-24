@@ -2,18 +2,15 @@
   PopoverBehaviorDemo — VR behavioral cell for @rozie-ui/popover (wraps
   @floating-ui/dom). Drives the click-trigger floating primitive: a two-way
   r-model:open (live open + @change readouts), the anchor-click open gesture,
-  Escape + click-outside dismissal, and a `set-closed` direct-model-write button
-  (programmatic CLOSE). The floating panel is r-if="open" so the spec asserts
+  Escape + click-outside dismissal, and a `set-open` direct-model-write button
+  (programmatic OPEN). The floating panel is r-if="open" so the spec asserts
   presence/absence via role="dialog". See popover.spec.ts. Behavioral-only.
 
-  WHY THE DIRECT-MODEL-WRITE IS A *CLOSE*, NOT AN OPEN: a programmatic OPEN from
-  an external button races with the click-outside dismissal on Svelte — the
-  opening click keeps bubbling to `document`, where the just-attached outside
-  listener (Svelte attaches it synchronously on the same tick; the other 5 targets
-  defer it) sees the click target is outside the popover and immediately dismisses.
-  Closing has no such race, so it is the cross-target-robust direct-write
-  assertion. The surfaced Svelte race is tracked in
-  project_vr_direct_model_write_null_react_solid_lit.
+  The direct-model-write is a programmatic OPEN from an external button, which
+  proves the Svelte click-outside race is fixed: the Svelte listeners emitter now
+  defers the `.outside` attach by one MACROTASK (setTimeout 0), so the outside
+  listener is never live for the click that opened the popover and the panel
+  stays open on all 6 targets.
 
   The @change payload is a BARE boolean (not an object), so its Lit-consumer
   unwrap differs from the object-payload families (number-field/switch): the
@@ -40,8 +37,8 @@ const onChange = (e) => {
   const v = e && typeof e === 'object' && 'detail' in e ? e.detail : e
   $data.lastChange = String(v)
 }
-const applyClose = () => {
-  $data.panelOpen = false
+const applyOpen = () => {
+  $data.panelOpen = true
 }
 const valueText = () => ($data.panelOpen ? 'open' : 'closed')
 </script>
@@ -51,7 +48,7 @@ const valueText = () => ($data.panelOpen ? 'open' : 'closed')
   <h3>Popover — behavioral</h3>
 
   <div class="controls">
-    <button type="button" data-testid="set-closed" @click="applyClose()">Set closed</button>
+    <button type="button" data-testid="set-open" @click="applyOpen()">Set open</button>
     <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
     <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
   </div>
