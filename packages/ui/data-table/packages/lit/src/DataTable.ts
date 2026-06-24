@@ -346,37 +346,37 @@ export default class DataTable extends SignalWatcher(LitElement) {
 `;
 
   /**
-   * The row data (required). Two-way: a committed cell edit writes a fresh array back through r-model:data. Keep the reference stable — re-feed it directly, never map/clone it in a watcher.
+   * The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through `r-model:data` (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher).
    * @example
    * <DataTable r-model:data="rows" :columns="cols" />
    */
   @property({ type: Array, attribute: 'data' }) _data_attr!: any[];
   private _dataControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'data-change', defaultValue: [], initialControlledValue: undefined });
   /**
-   * Config-array column fallback (lower precedence than <Column> children). Each entry: { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may come from this array, from <Column> children, or both (id-keyed last-write-wins union).
+   * Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union).
    */
   @property({ type: Array }) columns: any[] = [];
   /**
-   * Row-selection mode: 'none' | 'single' | 'multiple'. 'multiple' auto-injects a leading checkbox column with a select-all header.
+   * Row-selection mode: `'none'` | `'single'` | `'multiple'`. `'multiple'` auto-injects a leading checkbox column with a select-all header.
    */
   @property({ type: String, reflect: true }) selectionMode: string = 'none';
   /**
-   * Sorting state (SortingState = [{ id, desc }]). Two-way: writes funnel a fresh value through the sort-change event regardless of binding.
+   * `SortingState` — `[{ id, desc }]`. Uncontrolled fallback when unbound. Two-way: writes funnel a fresh value through the `sort-change` event regardless of binding.
    */
   @property({ type: Array, attribute: 'sorting' }) _sorting_attr: any[] = [];
   private _sortingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'sorting-change', defaultValue: [], initialControlledValue: undefined });
   /**
-   * Global filter string — feeds getFilteredRowModel() and narrows ALL columns. Two-way: fires filter-change regardless of binding.
+   * The global search string — narrows all columns. Feeds `getFilteredRowModel()`. Surfaces through `filter-change`. Two-way: fires `filter-change` regardless of binding.
    */
   @property({ type: String, attribute: 'global-filter' }) _globalFilter_attr: string = '';
   private _globalFilterControllable = createLitControllableProperty<string>({ host: this, eventName: 'global-filter-change', defaultValue: '', initialControlledValue: undefined });
   /**
-   * Per-column filter state (ColumnFiltersState = [{ id, value }]). Each <Column> opts in via its filterable flag. Two-way: whole-array replace on write, fires filter-change.
+   * `ColumnFiltersState` — `[{ id, value }]` per-column narrowing (gated by each column's `filterable`). Two-way: whole-array replace on write, fires `filter-change`.
    */
   @property({ type: Array, attribute: 'column-filters' }) _columnFilters_attr: any[] = [];
   private _columnFiltersControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'column-filters-change', defaultValue: [], initialControlledValue: undefined });
   /**
-   * Pagination state ({ pageIndex, pageSize }) — feeds getPaginationRowModel(). Two-way: funnels a fresh object through page-change.
+   * `{ pageIndex, pageSize }`. Defaults to `{ pageIndex: 0, pageSize: 10 }`; feeds the prev/next + page-size chrome (and `getPaginationRowModel()`). Two-way: funnels a fresh object through `page-change`.
    */
   @property({ type: Object, attribute: 'pagination' }) _pagination_attr: any = {
   pageIndex: 0,
@@ -387,53 +387,53 @@ export default class DataTable extends SignalWatcher(LitElement) {
   pageSize: 10
 }, initialControlledValue: undefined });
   /**
-   * Server-side hook: when true, sets manualPagination/manualFiltering/manualSorting — table-core trusts the consumer-supplied rows verbatim and only emits the change events (the consumer fetches each page).
+   * Server-side hook: sets `manualPagination` / `manualFiltering` / `manualSorting` so table-core trusts the consumer-supplied rows and only emits the change events (the consumer fetches each page).
    */
   @property({ type: Boolean, reflect: true }) manual: boolean = false;
   /**
-   * Opt-in gate for expandable rows. When true a leading chevron expander column auto-injects and every row can expand (the #detail seam) unless getSubRows is supplied. Bind :expandable="true" (a bare attr only coerces on Vue+Lit).
+   * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
    */
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
   /**
-   * Expanded state (ExpandedState = { [rowId]: true } | true). The literal `true` expands ALL rows. Two-way: funnels a fresh value through expanded-change. Defaults to null so the uncontrolled + grouping auto-expand fallbacks stay reachable.
+   * `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback (`$data.expandedDefault`) when unbound — the default is `null` so the uncontrolled fallback AND the grouping auto-expand default are reachable (a non-null default would short-circuit them). When grouping is active and `expanded` is untouched, group subtrees auto-expand.
    */
   @property({ type: Object, attribute: 'expanded' }) _expanded_attr: any | boolean = null;
   private _expandedControllable = createLitControllableProperty<any | boolean>({ host: this, eventName: 'expanded-change', defaultValue: null, initialControlledValue: undefined });
   /**
-   * Table-level accessor (originalRow, index) => TData[] | undefined returning a row's child rows. When supplied (with expandable), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the #detail scoped slot is the expand mode.
+   * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
   @property({ type: Function }) getSubRows: ((...args: unknown[]) => unknown) | null = null;
   /**
-   * Opt-in gate for the HEADLESS #groupBar host region. Grouping itself is driven by the `grouping` model slice; this flag only gates the consumer-facing group-bar surface (no built-in drag UI).
+   * Opt-in gate for the **headless `#groupBar`** host region. Default `false` is byte-identical-off. `getGroupedRowModel` is wired unconditionally (inert when `grouping` is empty), so grouping is driven by the `grouping` model; this flag only gates the consumer-facing group-bar surface (the component ships **no** built-in drag UI).
    */
   @property({ type: Boolean, reflect: true }) groupable: boolean = false;
   /**
-   * Grouping state (GroupingState = string[]) — an ordered list of column ids (multi-column → nested groups). Two-way: funnels a fresh array through group-change. Defaults to null so the uncontrolled fallback + grouping auto-expand stay reachable.
+   * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding `r-model:grouping` (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
    */
   @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] = null;
   private _groupingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'grouping-change', defaultValue: null, initialControlledValue: undefined });
   /**
-   * Row-selection state (RowSelectionState = { [rowId]: true }). Driven by selectionMode chrome. Two-way: fires selection-change regardless of binding. Checkbox-only toggle — the row body does not select.
+   * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
    */
   @property({ type: Object, attribute: 'row-selection' }) _rowSelection_attr: any = {};
   private _rowSelectionControllable = createLitControllableProperty<any>({ host: this, eventName: 'row-selection-change', defaultValue: {}, initialControlledValue: undefined });
   /**
-   * Column visibility state (VisibilityState = { [colId]: boolean }). Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through visibility-change.
+   * `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through `visibility-change`.
    */
   @property({ type: Object, attribute: 'column-visibility' }) _columnVisibility_attr: any = {};
   private _columnVisibilityControllable = createLitControllableProperty<any>({ host: this, eventName: 'column-visibility-change', defaultValue: {}, initialControlledValue: undefined });
   /**
-   * Column sizing state (ColumnSizingState = { [colId]: number }). A pointer-drag resize handle on resizable headers writes a fresh sizing object. Two-way: fires resize-change.
+   * `ColumnSizingState` — `{ [colId]: number }`. Driven live by the pointer-drag resize handle (`columnResizeMode: 'onChange'`). Two-way: fires `resize-change`.
    */
   @property({ type: Object, attribute: 'column-sizing' }) _columnSizing_attr: any = {};
   private _columnSizingControllable = createLitControllableProperty<any>({ host: this, eventName: 'column-sizing-change', defaultValue: {}, initialControlledValue: undefined });
   /**
-   * Column order state (ColumnOrderState = string[]). A header drag writes a fresh order array (immutable — never an in-place splice). Two-way: fires reorder-change.
+   * `ColumnOrderState` — `string[]`. A fresh order array on reorder (never an in-place splice). Two-way: fires `reorder-change`.
    */
   @property({ type: Array, attribute: 'column-order' }) _columnOrder_attr: any[] = [];
   private _columnOrderControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'column-order-change', defaultValue: [], initialControlledValue: undefined });
   /**
-   * Column pinning state (ColumnPinningState = { left: string[], right: string[] }). Pinned columns get position:sticky with computed offsets so they stay during horizontal scroll. Two-way: fires pin-change.
+   * `ColumnPinningState` — `{ left: string[], right: string[] }`. Pinned columns get `position: sticky` + computed offsets. Defaults to `{ left: [], right: [] }`. Two-way: fires `pin-change`.
    */
   @property({ type: Object, attribute: 'column-pinning' }) _columnPinning_attr: any = {
   left: [],
@@ -444,24 +444,24 @@ export default class DataTable extends SignalWatcher(LitElement) {
   right: []
 }, initialControlledValue: undefined });
   /**
-   * Pure-CSS sticky header gate. When true the <thead> sticks to the top of the scroll container.
+   * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   @property({ type: Boolean, reflect: true }) stickyHeader: boolean = false;
   /**
-   * Forward-compat seam: 'table' (default, row-oriented) | 'grid' (cell keyboard navigation). RESERVED only — grid cell-nav is not implemented yet.
+   * `'table'` (default, row-oriented) | `'grid'`. `'grid'` lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)** — `role="grid"`, a roving single tab-stop, and 2-D APG arrow-key cell navigation. `'table'` is byte-behaviorally identical to a plain accessible table.
    * @deprecated Reserved forward-compat seam — grid cell-navigation is not implemented yet; do not rely on the `grid` mode.
    */
   @property({ type: String, reflect: true }) interactionMode: string = 'table';
   /**
-   * Opt-in gate for vertical row windowing. When true the <tbody> renders a virtualized window via virtual-core; when false it is byte-identical to the non-windowed output.
+   * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   @property({ type: Boolean, reflect: true }) virtual: boolean = false;
   /**
-   * Estimated row height in px — seeds virtual-core's estimateSize before measureElement refines actual heights. Only consulted when virtual is on.
+   * Estimated row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
    */
   @property({ type: Number, reflect: true }) estimateRowHeight: number = 40;
   /**
-   * A CSS string (e.g. "480px") bounding the scroll container — applied inline and mirrored to --rozie-data-table-max-height (the prop wins; the token is the fallback). Empty → the container falls back to the token rule.
+   * A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback.
    */
   @property({ type: String, reflect: true }) maxHeight: string = '';
   private _dataDefault = signal([]);
