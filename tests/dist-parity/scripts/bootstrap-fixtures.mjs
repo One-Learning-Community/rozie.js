@@ -142,6 +142,23 @@ const EXAMPLES = [
   // emit-side coercion of `undefined → declaredDefault`. Single-file; no
   // sibling .rozie producers — does NOT go into RESOLVER_ROOT.
   'PropDefaultCoercion',
+  // Phase 58 (first-class-prop-documentation) — the permanent six-target
+  // byte-identity guard for first-class prop docs. PropDocs.rozie carries ONE
+  // prop (`label`) with a full `docs: { description, deprecated: '<msg>',
+  // example }` object and ONE docless control prop (`count`). The committed
+  // per-target bytes are the dist-parity contract that (a) the documented prop
+  // emits a JSDoc block carrying the description + `@deprecated <msg>` +
+  // `@example` on each target's consumer surface (React `.d.ts`, the other five
+  // inline) byte-identically across all four entrypoints, and (b) the docless
+  // `count` prop stays INERT (SC-5 inert-when-absent — no JSDoc, byte-identical
+  // to the shape it would have without the feature). Registering it here is the
+  // blessing step (Plan 06): the bootstrap compile()s it across all six targets
+  // (throwing on any error diagnostic) and writes the committed baselines. Drift
+  // on this rebless is confined to the new PropDocs.* fixtures — every existing
+  // docless fixture stays byte-for-byte unchanged (the JSDoc gate is inert when
+  // no `docs` is present). Single-file; no sibling .rozie producers — stays OUT
+  // of RESOLVER_ROOT.
+  'PropDocs',
   // Phase 17 ::part() cross-shadow-DOM styling proving PAIR (SPEC-R8). PartCard
   // is the LEAF producer (template root tagged `part="body"` — SPEC-R3); on Lit
   // the `part="body"` is emitted into the shadow template, on the other 5
