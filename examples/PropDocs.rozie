@@ -1,0 +1,54 @@
+<!--
+  PropDocs.rozie
+
+  Phase 58 red-first fixture — first-class prop documentation (`docs:` on a
+  <props> entry, surfaced as JSDoc in the emitted output).
+
+  This is a TYPE-SURFACE fixture, not a behavior fixture: no engine, no <script>
+  magic, no lifecycle. It exists to prove (and permanently byte-lock) that the
+  `docs` field on a prop lowers to PropDecl.docs and emits a JSDoc block on the
+  documented prop across all six targets — WHILE a sibling prop carrying no
+  `docs` key stays completely inert (no JSDoc).
+
+  Two props by design:
+    - `label`  — FULL docs: description + deprecated STRING (`@deprecated <msg>`
+      branch) + example. The documented control.
+    - `count`  — NO `docs` key. The inert-when-absent control.
+
+  At the close of Plan 01 this fixture is EXPECTED to be RED: the feature is
+  unimplemented, so compiling it today emits NO `/** */` JSDoc. The gate plan
+  blesses the committed six-target fixtures once Plan 02+ adds extraction +
+  emission.
+-->
+
+<rozie name="PropDocs">
+
+<props>
+{
+  label: {
+    type: String,
+    default: '',
+    docs: {
+      description: 'The visible text label for the control.',
+      deprecated: 'Use `text` instead — `label` is retained only for back-compat.',
+      example: "<PropDocs label=\"Save\" />",
+    },
+  },
+  count: { type: Number, default: 0 },
+}
+</props>
+
+<template>
+<div class="prop-docs">
+  <span class="label">{{ $props.label }}</span>
+  <span class="count">{{ $props.count }}</span>
+</div>
+</template>
+
+<style>
+.prop-docs { display: inline-flex; gap: 0.5rem; align-items: center; }
+.label { font-weight: 600; }
+.count { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>

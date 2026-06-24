@@ -121,6 +121,14 @@ const EXAMPLES = [
   'ThemedButtonConsumer',
   'RBindProbe',
   'PropDefaultCoercion',
+  // Phase 58 (first-class prop documentation) red-first guard. PropDocs carries
+  // one prop with a full `docs` object (description + deprecated-string +
+  // example) plus one prop with NO `docs` key (the inert control). It is the
+  // PERMANENT six-target byte-identity guard that the documented prop emits a
+  // JSDoc block while the docless prop stays inert. Single-file (no siblings).
+  // RED until the gate plan blesses the committed fixtures (feature absent in
+  // Plan 01: no JSDoc emitted yet, no fixtures/PropDocs.* on disk).
+  'PropDocs',
   // Phase 17 — Lit ::part() cross-shadow bridge proving fixtures. PartCard is a
   // single-file producer leaf; PartCardConsumer references it via <components>
   // (sibling staged below). Byte-parity across all 4 entrypoints × 6 targets.
