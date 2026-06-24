@@ -1,0 +1,42 @@
+/*
+ * @rozie-ui/switch — base token reference.
+ *
+ * Every COSMETIC value the switch renders is a `--rozie-switch-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * The structural rules (the focusable button, the track/thumb box model, the
+ * focus ring, and the checked-state transform) live in the component's scoped
+ * `<style>` (per-leaf, NOT consumer-overridable). Only the values below flow
+ * through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-switch` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-switch {
+  /* track box model */
+  --rozie-switch-width: 2.75rem;
+  --rozie-switch-height: 1.5rem;
+  --rozie-switch-track-padding: 0.125rem;
+  --rozie-switch-radius: 999px;
+
+  /* track colors — off vs on (on is the single accent most consumers set) */
+  --rozie-switch-off-bg: rgba(0, 0, 0, 0.25);
+  --rozie-switch-on-bg: #0066cc;
+
+  /* thumb */
+  --rozie-switch-thumb-size: 1.25rem;
+  --rozie-switch-thumb-bg: #fff;
+  --rozie-switch-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --rozie-switch-thumb-travel: calc(2.75rem - 1.5rem);
+
+  /* focus ring */
+  --rozie-switch-focus-ring-width: 2px;
+  --rozie-switch-focus-ring-color: rgba(0, 102, 204, 0.5);
+  --rozie-switch-focus-ring-offset: 2px;
+
+  /* disabled */
+  --rozie-switch-disabled-opacity: 0.55;
+}

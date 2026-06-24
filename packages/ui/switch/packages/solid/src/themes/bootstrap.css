@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/switch — Bootstrap 5 bridge.
+ *
+ * Maps the switch tokens onto Bootstrap 5 CSS variables (`--bs-*`). The on-track
+ * uses the primary color, the off-track uses a tertiary/border tone, and the
+ * focus ring uses the standard Bootstrap focus-ring color. Override the `--bs-*`
+ * tokens (or switch to a `.dark` / `[data-bs-theme="dark"]` scope) and the
+ * switch follows.
+ *
+ *   import '@rozie-ui/switch-react/themes/bootstrap.css';
+ */
+.rozie-switch {
+  --rozie-switch-on-bg: var(--bs-primary, #0d6efd);
+  --rozie-switch-off-bg: var(--bs-border-color, rgba(0, 0, 0, 0.25));
+
+  --rozie-switch-thumb-bg: var(--bs-body-bg, #fff);
+
+  --rozie-switch-radius: 2em;
+
+  --rozie-switch-focus-ring-color: var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25));
+  --rozie-switch-focus-ring-width: var(--bs-focus-ring-width, 0.25rem);
+}

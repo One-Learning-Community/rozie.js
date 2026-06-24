@@ -1,0 +1,23 @@
+/*
+ * @rozie-ui/switch — shadcn/ui (Radix) bridge.
+ *
+ * Maps the switch tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--primary: 222.2 47.4% 11.2%`
+ * consumed as `hsl(var(--primary))`). Because it reads those vars live, the
+ * switch automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/switch-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-switch {
+  --rozie-switch-on-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-switch-off-bg: hsl(var(--input, 214.3 31.8% 91.4%));
+
+  --rozie-switch-thumb-bg: hsl(var(--background, 0 0% 100%));
+
+  --rozie-switch-radius: var(--radius, 999px);
+
+  --rozie-switch-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.5);
+}

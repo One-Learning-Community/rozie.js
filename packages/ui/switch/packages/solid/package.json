@@ -1,0 +1,66 @@
+{
+  "name": "@rozie-ui/switch-solid",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Solid headless WAI-ARIA toggle / switch (role=\"switch\", boolean two-way value, click + Space/Enter keyboard, token theming) — one accessible Rozie source compiled to Solid.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "switch",
+    "toggle",
+    "checkbox",
+    "form-control",
+    "switch-input",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "solid"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/switch/packages/solid"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/Switch.tsx",
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.8"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

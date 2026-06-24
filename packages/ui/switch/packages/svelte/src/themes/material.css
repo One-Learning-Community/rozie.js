@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/switch — Material 3 bridge.
+ *
+ * Maps the switch tokens onto Material 3 (Material You) design tokens
+ * (`--md-sys-color-*`). The on-track uses the primary role, the thumb uses the
+ * on-primary role, and the off-track uses the surface-variant role — the M3
+ * switch palette. Override the M3 tokens at your theme scope and the switch
+ * follows.
+ *
+ *   import '@rozie-ui/switch-react/themes/material.css';
+ */
+.rozie-switch {
+  --rozie-switch-on-bg: var(--md-sys-color-primary, #6750a4);
+  --rozie-switch-off-bg: var(--md-sys-color-surface-variant, #e7e0ec);
+
+  --rozie-switch-thumb-bg: var(--md-sys-color-on-primary, #fff);
+
+  /* M3 switches are fully rounded */
+  --rozie-switch-radius: 999px;
+
+  --rozie-switch-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 45%, transparent);
+}
