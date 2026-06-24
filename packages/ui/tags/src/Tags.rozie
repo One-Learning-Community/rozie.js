@@ -1,0 +1,463 @@
+<!--
+  Tags.rozie — a headless, WAI-ARIA accessible tags / token input.
+
+  A pure-Rozie family (NO third-party engine) in the spirit of otp/slider/listbox:
+  it fills a real cross-framework need (every form UI re-implements a chips/token
+  input) with zero engine dependency. The platform IS the engine: one native
+  <input> for typing + a row of removable chips. Rozie owns the author-side API,
+  the two-way binding, the commit/dedup/validate logic, paste-to-bulk-add, the
+  backspace-deletes-previous behaviour, and the token-themed skin.
+
+  CONTROLLED TOKENS, LOCAL DRAFT: the committed tokens ARE `modelValue` (the sole
+  model:true prop → Angular ControlValueAccessor; a tags input IS a form control).
+  The only local state is `draft` — the in-progress, not-yet-committed input text
+  (a genuine UI buffer, distinct from the committed value, so it lives in <data>).
+  Type + a delimiter key (Enter / comma by default) commits the draft as a token;
+  paste splits on delimiters and bulk-adds; Backspace in an EMPTY input deletes
+  the previous token.
+
+  COMMIT FUNNEL: every mutation of the committed list funnels through ONE
+  `commitTokens(next)` so its $emit prop-destructure hoists exactly once on React
+  (Phase 46 also dedups, but the single-funnel pattern is kept for clarity — the
+  otp/slider precedent). Token additions go through `addToken(raw)` (normalize →
+  validate → dedup → cap) before the funnel.
+
+  FOCUS without per-cell refs: focus choreography reads `$refs.root` (ONE
+  container ref) and walks `root.querySelector('input')` — read only in $onMount /
+  event handlers / $expose verbs (all post-mount → ROZ123-safe), and it works
+  inside Lit's shadow root because the container lives there too.
+
+  Authoring notes (collision classes — see the authoring playbook §6):
+    - Every write funnels through `commitTokens`, NOT a helper named
+      `writeValue`/`registerOnChange`/`registerOnTouched`/`setDisabledState`: a
+      plain helper with one of those names would collide with the generated
+      Angular ControlValueAccessor (single model:true → CVA) and break the
+      ng-packagr build with TS2300. `commitTokens` is collision-safe.
+    - No `setModelValue` helper — that would collide with React's generated
+      `setModelValue` setter for the `modelValue` model (ROZ524). The funnel is
+      `commitTokens`.
+    - The expose verbs are `clear` + `focusInput` (NOT `focus`): a `focus` verb
+      would override the inherited `HTMLElement.focus` on the Lit custom element
+      (warn-only ROZ137). otp/slider accept that warn; here we sidestep it with
+      the collision-safe `focusInput` so codegen stays warning-clean.
+    - Handler params are LEFT UNTYPED so they neutralize to `any`; reading
+      `e.target.value` / `e.key` / `e.clipboardData` then typechecks across all
+      six strict leaves (the global-filter idiom). Never annotate them.
+    - `tokens()` / `commitKeys()` are PLAIN functions (not $computed): they are
+      called from BOTH the template (r-for / bindings) AND from handlers, and a
+      $computed is a value on React but an accessor on Solid — aliasing/calling
+      it diverges. Keep derived collections that script logic touches as plain
+      functions called `()` uniformly.
+    - aria booleans bound from a CALL wrap in rozieAttr→string on JSX, so prefix
+      `!!` (`:aria-disabled="!!$props.disabled"`). NEVER drop the attr on a false
+      value for an a11y attribute.
+
+  Slot: a scoped `#tag` slot (params { tag, index, remove }) lets a consumer fully
+  replace the chip rendering; the default fallback renders the built-in chip. The
+  slot name `tag` does NOT equal any prop key (ROZ127-safe).
+
+  Consumer example:
+
+    <Tags r-model:modelValue="$data.skills" placeholder="Add a skill…"
+          :max="8" ariaLabel="Skills" @add="onAdd" />
+-->
+
+<rozie name="Tags">
+
+<props>
+{
+  // The committed tokens (two-way). As the sole model:true prop it drives the
+  // Angular ControlValueAccessor — a tags input IS a form control. Always a
+  // de-duplicated (unless `allowDuplicates`) string array.
+  modelValue: {
+    type: Array, default: () => [], model: true,
+    docs: {
+      description:
+        'The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).',
+      example: '<Tags r-model:modelValue="skills" placeholder="Add a skill…" />',
+    },
+  },
+
+  // The keys that commit the current draft as a token. Default: comma + Enter.
+  // Pasted text is split on the non-`Enter` entries (treated as separators).
+  delimiters: {
+    type: Array, default: () => [',', 'Enter'],
+    docs: {
+      description:
+        "The keys that commit the current draft as a token (matched against the key event's `key`). Default `[',', 'Enter']`. Non-`'Enter'` entries also act as the split characters when pasting bulk text. Use e.g. `[' ', 'Enter']` for a space-delimited input.",
+    },
+  },
+
+  // Allow the same token more than once. Default false (dedup on commit).
+  allowDuplicates: {
+    type: Boolean, default: false,
+    docs: {
+      description:
+        'Allow the same token value to be added more than once. Defaults to `false` — a candidate equal (case-sensitive) to an existing token is silently rejected on commit. Set `true` to permit duplicates.',
+    },
+  },
+
+  // Maximum number of tokens; no add past the cap. `null` = unlimited.
+  max: {
+    type: Number, default: null,
+    docs: {
+      description:
+        'Maximum number of tokens. Once the list reaches `max`, the input is disabled and further adds (type, paste, programmatic) are rejected. `null` (the default) means unlimited.',
+    },
+  },
+
+  // Disable the whole control (input + remove buttons).
+  disabled: {
+    type: Boolean, default: false,
+    docs: {
+      description:
+        'Disable the whole control — the text input is disabled, every remove button is disabled, and no token can be added or removed. Also sets the Angular CVA disabled state.',
+    },
+  },
+
+  // Read-only: tokens are visible but cannot be added or removed; no input.
+  readonly: {
+    type: Boolean, default: false,
+    docs: {
+      description:
+        'Render the tokens read-only — they remain visible but cannot be added or removed, and the text input is hidden. Unlike `disabled` it carries no disabled styling, so it reads as a display of committed values.',
+    },
+  },
+
+  // Optional per-token validator/normalizer. Receives the candidate string and
+  // the current tokens; return a string to ACCEPT (optionally normalized), or a
+  // falsy value (false / '' / null / undefined) to REJECT the candidate.
+  validate: {
+    type: Function, default: null,
+    docs: {
+      description:
+        'Optional per-token validator / normalizer. Called with `(candidate, tokens)` for each commit; return a (possibly normalized) **string** to accept it, or a falsy value (`false` / `null` / `""`) to reject the candidate. Runs before the dedup + `max` checks. Example: `v => /^\\S+@\\S+$/.test(v) ? v.toLowerCase() : false` for emails.',
+      example: 'validate: (v) => (v.length >= 2 ? v.trim() : false)',
+    },
+  },
+
+  // Placeholder for the text input.
+  placeholder: {
+    type: String, default: '',
+    docs: {
+      description: 'Placeholder text for the inline text input (e.g. `"Add a tag…"`).',
+    },
+  },
+
+  // Accessible name for the whole group (role="group"). The input gets the same
+  // label so a screen reader announces what is being added.
+  ariaLabel: {
+    type: String, default: null,
+    docs: {
+      description:
+        'Accessible name for the whole control (`role="group"`). The inline text input is labelled with the same name so assistive tech announces what is being entered. A visually-hidden live region announces the current token count on change.',
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // The in-progress, not-yet-committed input text. The ONE genuine local UI
+  // buffer (distinct from the committed `modelValue`), so it lives here.
+  draft: '',
+}
+</data>
+
+<script lang="ts">
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The committed tokens, normalized to a string[].
+const tokens = () => (Array.isArray($props.modelValue) ? $props.modelValue : [])
+
+// The configured commit keys, normalized to a string[].
+const commitKeys = () => (Array.isArray($props.delimiters) ? $props.delimiters : [',', 'Enter'])
+
+// The non-Enter delimiters act as split characters for paste.
+const splitChars = () => commitKeys().filter((k) => k !== 'Enter')
+
+// Whether the control has reached its token cap.
+const atMax = () => typeof $props.max === 'number' && tokens().length >= $props.max
+
+// Whether new input is accepted at all.
+const canEdit = () => !$props.disabled && !$props.readonly
+
+// ---- write funnel (single $emit site) ----------------------------------
+// Write the model and emit change. Every committed-list mutation funnels here.
+const commitTokens = (next) => {
+  $model.modelValue = next
+  $emit('change', { value: next })
+}
+
+// ---- add / remove ------------------------------------------------------
+// Normalize → validate → dedup → cap a candidate, then commit + emit add.
+// Returns true if it was added (so the caller can clear the draft).
+const addToken = (raw) => {
+  if (!canEdit()) return false
+  let candidate = String(raw == null ? '' : raw).trim()
+  if (!candidate) return false
+  if (typeof $props.validate === 'function') {
+    const result = $props.validate(candidate, tokens())
+    if (!result) return false
+    candidate = String(result)
+    if (!candidate) return false
+  }
+  const cur = tokens()
+  if (!$props.allowDuplicates && cur.indexOf(candidate) !== -1) return false
+  if (typeof $props.max === 'number' && cur.length >= $props.max) return false
+  const next = cur.concat([candidate])
+  commitTokens(next)
+  $emit('add', { value: candidate, tokens: next })
+  return true
+}
+
+// Remove the token at `idx`, commit, and emit remove.
+const removeAt = (idx) => {
+  if (!canEdit()) return
+  const cur = tokens()
+  if (idx < 0 || idx >= cur.length) return
+  const removed = cur[idx]
+  const next = cur.slice(0, idx).concat(cur.slice(idx + 1))
+  commitTokens(next)
+  $emit('remove', { value: removed, index: idx, tokens: next })
+}
+
+// ---- focus (container ref, post-mount only) ----------------------------
+// Read $refs.root only here / in $onMount / in $expose verbs (post-mount →
+// ROZ123-safe). querySelector reaches the input inside Lit's shadow root too.
+const focusTheInput = () => {
+  const root = $refs.root
+  if (!root) return
+  const el = root.querySelector('input')
+  if (el) el.focus()
+}
+
+// ---- input handlers ----------------------------------------------------
+// Mirror the typed text into the draft buffer. Capture the fresh local value
+// (do NOT re-read $data.draft in the same handler — React setState is async and
+// would read the pre-write value).
+const onInput = (e) => {
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+// A delimiter key commits the current draft; Backspace in an empty input
+// deletes the previous token.
+const onKeydown = (e) => {
+  if (!canEdit()) return
+  const key = e ? e.key : ''
+  const value = e && e.target ? e.target.value : ''
+  if (commitKeys().indexOf(key) !== -1) {
+    if (e) e.preventDefault()
+    if (addToken(value)) $data.draft = ''
+    return
+  }
+  if (key === 'Backspace' && value === '') {
+    const cur = tokens()
+    if (cur.length > 0) {
+      if (e) e.preventDefault()
+      removeAt(cur.length - 1)
+    }
+  }
+}
+
+// Commit any leftover draft when the input loses focus (a common chips UX).
+const onBlur = (e) => {
+  if (!canEdit()) return
+  const value = e && e.target ? e.target.value : ''
+  if (value && addToken(value)) $data.draft = ''
+}
+
+// Paste: split on the configured delimiter characters and bulk-add.
+const onPaste = (e) => {
+  if (!canEdit()) return
+  const text = (e && e.clipboardData && e.clipboardData.getData('text')) || ''
+  const seps = splitChars()
+  let parts = [text]
+  if (seps.length) {
+    // Split on every separator char in turn.
+    for (let s = 0; s < seps.length; s++) {
+      const sep = seps[s]
+      const out = []
+      for (let p = 0; p < parts.length; p++) {
+        const pieces = String(parts[p]).split(sep)
+        for (let q = 0; q < pieces.length; q++) out.push(pieces[q])
+      }
+      parts = out
+    }
+  }
+  const trimmed = parts.map((p) => String(p).trim()).filter((p) => p.length > 0)
+  if (trimmed.length <= 1 && seps.length === 0) return // let the input handle a plain paste
+  if (e) e.preventDefault()
+  let addedAny = false
+  for (let i = 0; i < trimmed.length; i++) {
+    if (addToken(trimmed[i])) addedAny = true
+  }
+  if (addedAny) $data.draft = ''
+}
+
+// ---- per-element attribute helpers -------------------------------------
+const removeLabel = (t) => 'Remove ' + String(t)
+const countLabel = () => {
+  const n = tokens().length
+  return n === 1 ? '1 tag' : n + ' tags'
+}
+
+// ---- lifecycle + imperative handle -------------------------------------
+// clear() — remove every token (emits change with []) and focus the input.
+const clear = () => {
+  commitTokens([])
+  $data.draft = ''
+  focusTheInput()
+}
+// focusInput() — move DOM focus to the text input. Collision-safe name (NOT
+// `focus`, which would override the inherited HTMLElement.focus on Lit).
+const focusInput = () => focusTheInput()
+
+$expose({ clear, focusInput })
+</script>
+
+<template>
+<div
+  class="rozie-tags"
+  ref="root"
+  role="group"
+  :aria-label="$props.ariaLabel"
+  :class="{ 'rozie-tags--disabled': $props.disabled, 'rozie-tags--readonly': $props.readonly }"
+>
+  <ul class="rozie-tags-list">
+    <li r-for="t in tokens()" :key="t + ':' + tokens().indexOf(t)" class="rozie-tags-chip">
+      <slot name="tag" :tag="t" :index="tokens().indexOf(t)" :remove="() => removeAt(tokens().indexOf(t))">
+        <span class="rozie-tags-chip__label">{{ t }}</span>
+        <button
+          r-if="!$props.readonly"
+          type="button"
+          class="rozie-tags-chip__remove"
+          :disabled="!!$props.disabled"
+          :aria-label="removeLabel(t)"
+          @click="removeAt(tokens().indexOf(t))"
+        >×</button>
+      </slot>
+    </li>
+  </ul>
+
+  <input
+    r-if="!$props.readonly"
+    class="rozie-tags-input"
+    type="text"
+    autocomplete="off"
+    autocapitalize="off"
+    :value="$data.draft"
+    :placeholder="$props.placeholder"
+    :disabled="!!$props.disabled || !!atMax()"
+    :aria-label="$props.ariaLabel"
+    :aria-disabled="!!$props.disabled"
+    @input="onInput($event)"
+    @keydown="onKeydown($event)"
+    @paste="onPaste($event)"
+    @blur="onBlur($event)"
+  />
+
+  <span class="rozie-tags-count" aria-live="polite">{{ countLabel() }}</span>
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven (mirrors otp/slider themes): EVERY visual value is a
+  `var(--rozie-tags-*, <fallback>)`, so the component renders with zero config
+  yet is completely re-skinnable by setting tokens at any ancestor scope. The
+  shipped themes/*.css presets map these tokens onto shadcn/Radix, Material 3,
+  Bootstrap 5.
+*/
+.rozie-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rozie-tags-gap, 0.4rem);
+  padding: var(--rozie-tags-padding, 0.35rem 0.45rem);
+  font: var(--rozie-tags-font, inherit);
+  background: var(--rozie-tags-bg, #fff);
+  border: var(--rozie-tags-border-width, 1px) solid var(--rozie-tags-border-color, rgba(0, 0, 0, 0.25));
+  border-radius: var(--rozie-tags-radius, 0.5rem);
+  min-width: var(--rozie-tags-min-width, 12rem);
+}
+.rozie-tags:focus-within {
+  border-color: var(--rozie-tags-accent, #0066cc);
+  box-shadow: 0 0 0 var(--rozie-tags-focus-ring-width, 3px) var(--rozie-tags-focus-ring-color, rgba(0, 102, 204, 0.25));
+}
+.rozie-tags-list {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rozie-tags-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rozie-tags-chip-gap, 0.3rem);
+  padding: var(--rozie-tags-chip-padding, 0.15rem 0.5rem);
+  font-size: var(--rozie-tags-chip-font-size, 0.85rem);
+  color: var(--rozie-tags-chip-color, inherit);
+  background: var(--rozie-tags-chip-bg, rgba(0, 102, 204, 0.12));
+  border-radius: var(--rozie-tags-chip-radius, 0.375rem);
+  white-space: nowrap;
+}
+.rozie-tags-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rozie-tags-remove-size, 1.1rem);
+  height: var(--rozie-tags-remove-size, 1.1rem);
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  color: var(--rozie-tags-remove-color, currentColor);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: var(--rozie-tags-remove-opacity, 0.65);
+  transition: opacity 0.15s, background 0.15s;
+}
+.rozie-tags-chip__remove:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--rozie-tags-remove-hover-bg, rgba(0, 0, 0, 0.1));
+}
+.rozie-tags-chip__remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.rozie-tags-input {
+  flex: 1 1 var(--rozie-tags-input-min, 4rem);
+  min-width: var(--rozie-tags-input-min, 4rem);
+  padding: var(--rozie-tags-input-padding, 0.15rem 0.1rem);
+  font: inherit;
+  color: var(--rozie-tags-color, inherit);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.rozie-tags-input::placeholder {
+  color: var(--rozie-tags-placeholder-color, rgba(0, 0, 0, 0.4));
+}
+.rozie-tags-input:disabled {
+  cursor: not-allowed;
+}
+.rozie-tags-count {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rozie-tags--disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-tags-disabled-opacity, 0.6);
+  background: var(--rozie-tags-disabled-bg, rgba(0, 0, 0, 0.04));
+}
+</style>
+
+</rozie>

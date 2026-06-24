@@ -1,0 +1,31 @@
+/*
+ * @rozie-ui/tags — Bootstrap 5 bridge.
+ *
+ * Maps the tags tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the input follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/tags-react/themes/bootstrap.css';
+ */
+.rozie-tags {
+  --rozie-tags-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-tags-bg: var(--bs-body-bg, #fff);
+  --rozie-tags-color: var(--bs-body-color, #212529);
+  --rozie-tags-border-color: var(--bs-border-color, #dee2e6);
+  --rozie-tags-radius: var(--bs-border-radius, 0.375rem);
+
+  --rozie-tags-chip-bg: var(--bs-secondary-bg, #e9ecef);
+  --rozie-tags-chip-color: var(--bs-body-color, #212529);
+  --rozie-tags-chip-radius: var(--bs-border-radius-sm, 0.25rem);
+
+  --rozie-tags-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
+
+  --rozie-tags-placeholder-color: var(--bs-secondary-color, #6c757d);
+
+  --rozie-tags-remove-hover-bg: var(--bs-tertiary-bg, #f8f9fa);
+
+  --rozie-tags-disabled-opacity: 0.5;
+  --rozie-tags-disabled-bg: var(--bs-tertiary-bg, #e9ecef);
+}

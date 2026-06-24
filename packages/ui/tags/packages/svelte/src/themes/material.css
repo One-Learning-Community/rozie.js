@@ -1,0 +1,30 @@
+/*
+ * @rozie-ui/tags — Material Design 3 bridge.
+ *
+ * Maps the tags tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/tags-react/themes/material.css';
+ */
+.rozie-tags {
+  --rozie-tags-accent: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-tags-bg: var(--md-sys-color-surface, #fef7ff);
+  --rozie-tags-color: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-tags-border-color: var(--md-sys-color-outline, #79747e);
+  --rozie-tags-radius: 0.5rem;
+
+  --rozie-tags-chip-bg: var(--md-sys-color-secondary-container, #e8def8);
+  --rozie-tags-chip-color: var(--md-sys-color-on-secondary-container, #1d192b);
+  --rozie-tags-chip-radius: 0.5rem;
+
+  --rozie-tags-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent);
+
+  --rozie-tags-placeholder-color: var(--md-sys-color-on-surface-variant, #49454f);
+
+  --rozie-tags-remove-hover-bg: color-mix(in srgb, var(--md-sys-color-on-surface, #1d1b20) 10%, transparent);
+
+  --rozie-tags-disabled-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+}

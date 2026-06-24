@@ -1,0 +1,33 @@
+/*
+ * @rozie-ui/tags — shadcn/ui (Radix) bridge.
+ *
+ * Maps the tags tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * input automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/tags-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-tags {
+  --rozie-tags-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-tags-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-tags-color: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-tags-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-tags-radius: var(--radius, 0.5rem);
+
+  --rozie-tags-chip-bg: hsl(var(--secondary, 210 40% 96.1%));
+  --rozie-tags-chip-color: hsl(var(--secondary-foreground, 222.2 47.4% 11.2%));
+  --rozie-tags-chip-radius: var(--radius, 0.5rem);
+
+  --rozie-tags-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.35);
+
+  --rozie-tags-placeholder-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+
+  --rozie-tags-remove-hover-bg: hsl(var(--muted, 210 40% 96.1%));
+
+  --rozie-tags-disabled-bg: hsl(var(--muted, 210 40% 96.1%));
+}
