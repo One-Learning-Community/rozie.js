@@ -52,52 +52,124 @@ interface CellCtx { columnId: any; column: any; row: any; value: any; }
 interface DetailCtx { row: any; }
 
 interface DataTableProps {
+  /**
+   * The row data (required). Two-way: a committed cell edit writes a fresh array back through r-model:data. Keep the reference stable — re-feed it directly, never map/clone it in a watcher.
+   * @example
+   * <DataTable r-model:data="rows" :columns="cols" />
+   */
   data: any[];
   defaultData?: any[];
   onDataChange?: (data: any[]) => void;
+  /**
+   * Config-array column fallback (lower precedence than <Column> children). Each entry: { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may come from this array, from <Column> children, or both (id-keyed last-write-wins union).
+   */
   columns?: any[];
+  /**
+   * Row-selection mode: 'none' | 'single' | 'multiple'. 'multiple' auto-injects a leading checkbox column with a select-all header.
+   */
   selectionMode?: string;
+  /**
+   * Sorting state (SortingState = [{ id, desc }]). Two-way: writes funnel a fresh value through the sort-change event regardless of binding.
+   */
   sorting?: any[];
   defaultSorting?: any[];
   onSortingChange?: (sorting: any[]) => void;
+  /**
+   * Global filter string — feeds getFilteredRowModel() and narrows ALL columns. Two-way: fires filter-change regardless of binding.
+   */
   globalFilter?: string;
   defaultGlobalFilter?: string;
   onGlobalFilterChange?: (globalFilter: string) => void;
+  /**
+   * Per-column filter state (ColumnFiltersState = [{ id, value }]). Each <Column> opts in via its filterable flag. Two-way: whole-array replace on write, fires filter-change.
+   */
   columnFilters?: any[];
   defaultColumnFilters?: any[];
   onColumnFiltersChange?: (columnFilters: any[]) => void;
+  /**
+   * Pagination state ({ pageIndex, pageSize }) — feeds getPaginationRowModel(). Two-way: funnels a fresh object through page-change.
+   */
   pagination?: Record<string, any>;
   defaultPagination?: Record<string, any>;
   onPaginationChange?: (pagination: Record<string, any>) => void;
+  /**
+   * Server-side hook: when true, sets manualPagination/manualFiltering/manualSorting — table-core trusts the consumer-supplied rows verbatim and only emits the change events (the consumer fetches each page).
+   */
   manual?: boolean;
+  /**
+   * Opt-in gate for expandable rows. When true a leading chevron expander column auto-injects and every row can expand (the #detail seam) unless getSubRows is supplied. Bind :expandable="true" (a bare attr only coerces on Vue+Lit).
+   */
   expandable?: boolean;
+  /**
+   * Expanded state (ExpandedState = { [rowId]: true } | true). The literal `true` expands ALL rows. Two-way: funnels a fresh value through expanded-change. Defaults to null so the uncontrolled + grouping auto-expand fallbacks stay reachable.
+   */
   expanded?: (Record<string, any> | boolean) | null;
   defaultExpanded?: (Record<string, any> | boolean) | null;
   onExpandedChange?: (expanded: (Record<string, any> | boolean) | null) => void;
+  /**
+   * Table-level accessor (originalRow, index) => TData[] | undefined returning a row's child rows. When supplied (with expandable), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the #detail scoped slot is the expand mode.
+   */
   getSubRows?: ((...args: any[]) => any) | null;
+  /**
+   * Opt-in gate for the HEADLESS #groupBar host region. Grouping itself is driven by the `grouping` model slice; this flag only gates the consumer-facing group-bar surface (no built-in drag UI).
+   */
   groupable?: boolean;
+  /**
+   * Grouping state (GroupingState = string[]) — an ordered list of column ids (multi-column → nested groups). Two-way: funnels a fresh array through group-change. Defaults to null so the uncontrolled fallback + grouping auto-expand stay reachable.
+   */
   grouping?: (any[]) | null;
   defaultGrouping?: (any[]) | null;
   onGroupingChange?: (grouping: (any[]) | null) => void;
+  /**
+   * Row-selection state (RowSelectionState = { [rowId]: true }). Driven by selectionMode chrome. Two-way: fires selection-change regardless of binding. Checkbox-only toggle — the row body does not select.
+   */
   rowSelection?: Record<string, any>;
   defaultRowSelection?: Record<string, any>;
   onRowSelectionChange?: (rowSelection: Record<string, any>) => void;
+  /**
+   * Column visibility state (VisibilityState = { [colId]: boolean }). Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through visibility-change.
+   */
   columnVisibility?: Record<string, any>;
   defaultColumnVisibility?: Record<string, any>;
   onColumnVisibilityChange?: (columnVisibility: Record<string, any>) => void;
+  /**
+   * Column sizing state (ColumnSizingState = { [colId]: number }). A pointer-drag resize handle on resizable headers writes a fresh sizing object. Two-way: fires resize-change.
+   */
   columnSizing?: Record<string, any>;
   defaultColumnSizing?: Record<string, any>;
   onColumnSizingChange?: (columnSizing: Record<string, any>) => void;
+  /**
+   * Column order state (ColumnOrderState = string[]). A header drag writes a fresh order array (immutable — never an in-place splice). Two-way: fires reorder-change.
+   */
   columnOrder?: any[];
   defaultColumnOrder?: any[];
   onColumnOrderChange?: (columnOrder: any[]) => void;
+  /**
+   * Column pinning state (ColumnPinningState = { left: string[], right: string[] }). Pinned columns get position:sticky with computed offsets so they stay during horizontal scroll. Two-way: fires pin-change.
+   */
   columnPinning?: Record<string, any>;
   defaultColumnPinning?: Record<string, any>;
   onColumnPinningChange?: (columnPinning: Record<string, any>) => void;
+  /**
+   * Pure-CSS sticky header gate. When true the <thead> sticks to the top of the scroll container.
+   */
   stickyHeader?: boolean;
+  /**
+   * Forward-compat seam: 'table' (default, row-oriented) | 'grid' (cell keyboard navigation). RESERVED only — grid cell-nav is not implemented yet.
+   * @deprecated Reserved forward-compat seam — grid cell-navigation is not implemented yet; do not rely on the `grid` mode.
+   */
   interactionMode?: string;
+  /**
+   * Opt-in gate for vertical row windowing. When true the <tbody> renders a virtualized window via virtual-core; when false it is byte-identical to the non-windowed output.
+   */
   virtual?: boolean;
+  /**
+   * Estimated row height in px — seeds virtual-core's estimateSize before measureElement refines actual heights. Only consulted when virtual is on.
+   */
   estimateRowHeight?: number;
+  /**
+   * A CSS string (e.g. "480px") bounding the scroll container — applied inline and mirrored to --rozie-data-table-max-height (the prop wins; the token is the fallback). Empty → the container falls back to the token rule.
+   */
   maxHeight?: string;
   onSortChange?: (...args: any[]) => void;
   onExpandChange?: (...args: any[]) => void;

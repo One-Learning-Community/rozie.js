@@ -408,31 +408,31 @@ import '@rozie-ui/data-table-solid/themes/shadcn.css';    // or material.css, bo
 
 ## Props
 
-| Name | Type | Default | Two-way (model) | Required |
-| --- | --- | --- | :---: | :---: |
-| `data` | `Array` | `—` | ✓ | ✓ |
-| `columns` | `Array` | `[]` |  |  |
-| `selectionMode` | `String` | `"none"` |  |  |
-| `sorting` | `Array` | `[]` | ✓ |  |
-| `globalFilter` | `String` | `''` | ✓ |  |
-| `columnFilters` | `Array` | `[]` | ✓ |  |
-| `pagination` | `Object` | `{…}` | ✓ |  |
-| `manual` | `Boolean` | `false` |  |  |
-| `expandable` | `Boolean` | `false` |  |  |
-| `expanded` | `any` | `null` | ✓ |  |
-| `getSubRows` | `Function` | `null` |  |  |
-| `groupable` | `Boolean` | `false` |  |  |
-| `grouping` | `Array` | `null` | ✓ |  |
-| `rowSelection` | `Object` | `{}` | ✓ |  |
-| `columnVisibility` | `Object` | `{}` | ✓ |  |
-| `columnSizing` | `Object` | `{}` | ✓ |  |
-| `columnOrder` | `Array` | `[]` | ✓ |  |
-| `columnPinning` | `Object` | `{…}` | ✓ |  |
-| `stickyHeader` | `Boolean` | `false` |  |  |
-| `interactionMode` | `String` | `"table"` |  |  |
-| `virtual` | `Boolean` | `false` |  |  |
-| `estimateRowHeight` | `Number` | `40` |  |  |
-| `maxHeight` | `String` | `''` |  |  |
+| Name | Type | Default | Two-way (model) | Required | Description |
+| --- | --- | --- | :---: | :---: | --- |
+| `data` | `Array` | `—` | ✓ | ✓ | The row data (required). Two-way: a committed cell edit writes a fresh array back through r-model:data. Keep the reference stable — re-feed it directly, never map/clone it in a watcher. |
+| `columns` | `Array` | `[]` |  |  | Config-array column fallback (lower precedence than <Column> children). Each entry: { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may come from this array, from <Column> children, or both (id-keyed last-write-wins union). |
+| `selectionMode` | `String` | `"none"` |  |  | Row-selection mode: 'none' \| 'single' \| 'multiple'. 'multiple' auto-injects a leading checkbox column with a select-all header. |
+| `sorting` | `Array` | `[]` | ✓ |  | Sorting state (SortingState = [{ id, desc }]). Two-way: writes funnel a fresh value through the sort-change event regardless of binding. |
+| `globalFilter` | `String` | `''` | ✓ |  | Global filter string — feeds getFilteredRowModel() and narrows ALL columns. Two-way: fires filter-change regardless of binding. |
+| `columnFilters` | `Array` | `[]` | ✓ |  | Per-column filter state (ColumnFiltersState = [{ id, value }]). Each <Column> opts in via its filterable flag. Two-way: whole-array replace on write, fires filter-change. |
+| `pagination` | `Object` | `{…}` | ✓ |  | Pagination state ({ pageIndex, pageSize }) — feeds getPaginationRowModel(). Two-way: funnels a fresh object through page-change. |
+| `manual` | `Boolean` | `false` |  |  | Server-side hook: when true, sets manualPagination/manualFiltering/manualSorting — table-core trusts the consumer-supplied rows verbatim and only emits the change events (the consumer fetches each page). |
+| `expandable` | `Boolean` | `false` |  |  | Opt-in gate for expandable rows. When true a leading chevron expander column auto-injects and every row can expand (the #detail seam) unless getSubRows is supplied. Bind :expandable="true" (a bare attr only coerces on Vue+Lit). |
+| `expanded` | `any` | `null` | ✓ |  | Expanded state (ExpandedState = { [rowId]: true } \| true). The literal `true` expands ALL rows. Two-way: funnels a fresh value through expanded-change. Defaults to null so the uncontrolled + grouping auto-expand fallbacks stay reachable. |
+| `getSubRows` | `Function` | `null` |  |  | Table-level accessor (originalRow, index) => TData[] \| undefined returning a row's child rows. When supplied (with expandable), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the #detail scoped slot is the expand mode. |
+| `groupable` | `Boolean` | `false` |  |  | Opt-in gate for the HEADLESS #groupBar host region. Grouping itself is driven by the `grouping` model slice; this flag only gates the consumer-facing group-bar surface (no built-in drag UI). |
+| `grouping` | `Array` | `null` | ✓ |  | Grouping state (GroupingState = string[]) — an ordered list of column ids (multi-column → nested groups). Two-way: funnels a fresh array through group-change. Defaults to null so the uncontrolled fallback + grouping auto-expand stay reachable. |
+| `rowSelection` | `Object` | `{}` | ✓ |  | Row-selection state (RowSelectionState = { [rowId]: true }). Driven by selectionMode chrome. Two-way: fires selection-change regardless of binding. Checkbox-only toggle — the row body does not select. |
+| `columnVisibility` | `Object` | `{}` | ✓ |  | Column visibility state (VisibilityState = { [colId]: boolean }). Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through visibility-change. |
+| `columnSizing` | `Object` | `{}` | ✓ |  | Column sizing state (ColumnSizingState = { [colId]: number }). A pointer-drag resize handle on resizable headers writes a fresh sizing object. Two-way: fires resize-change. |
+| `columnOrder` | `Array` | `[]` | ✓ |  | Column order state (ColumnOrderState = string[]). A header drag writes a fresh order array (immutable — never an in-place splice). Two-way: fires reorder-change. |
+| `columnPinning` | `Object` | `{…}` | ✓ |  | Column pinning state (ColumnPinningState = { left: string[], right: string[] }). Pinned columns get position:sticky with computed offsets so they stay during horizontal scroll. Two-way: fires pin-change. |
+| `stickyHeader` | `Boolean` | `false` |  |  | Pure-CSS sticky header gate. When true the <thead> sticks to the top of the scroll container. |
+| `interactionMode` | `String` | `"table"` |  |  | **(deprecated)** Reserved forward-compat seam — grid cell-navigation is not implemented yet; do not rely on the `grid` mode. Forward-compat seam: 'table' (default, row-oriented) \| 'grid' (cell keyboard navigation). RESERVED only — grid cell-nav is not implemented yet. |
+| `virtual` | `Boolean` | `false` |  |  | Opt-in gate for vertical row windowing. When true the <tbody> renders a virtualized window via virtual-core; when false it is byte-identical to the non-windowed output. |
+| `estimateRowHeight` | `Number` | `40` |  |  | Estimated row height in px — seeds virtual-core's estimateSize before measureElement refines actual heights. Only consulted when virtual is on. |
+| `maxHeight` | `String` | `''` |  |  | A CSS string (e.g. "480px") bounding the scroll container — applied inline and mirrored to --rozie-data-table-max-height (the prop wins; the token is the fallback). Empty → the container falls back to the token rule. |
 
 ## Events
 

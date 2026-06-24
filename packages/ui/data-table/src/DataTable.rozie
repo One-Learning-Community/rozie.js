@@ -94,43 +94,105 @@
   // still works when the consumer passes a one-way `:data`). A1/A2: the 10th two-way
   // slice keeps Angular CVA disabled (already disabled at 9 — ROZ125 warns, never an
   // error); no CVA regression.
-  data: { type: Array, required: true, model: true },
+  data: {
+    type: Array,
+    required: true,
+    model: true,
+    docs: {
+      description:
+        'The row data (required). Two-way: a committed cell edit writes a fresh array back through r-model:data. Keep the reference stable — re-feed it directly, never map/clone it in a watcher.',
+      example: '<DataTable r-model:data="rows" :columns="cols" />',
+    },
+  },
 
   // Config-array column fallback (lower precedence than <Column> children). Each:
   // { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may be
   // declared via THIS array OR via <Column> children OR both (id-keyed LWW union).
-  columns: { type: Array, default: () => [] },
+  columns: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Config-array column fallback (lower precedence than <Column> children). Each entry: { id?, field, header?, sortable?, filterable?, pinned?, width? }. Columns may come from this array, from <Column> children, or both (id-keyed last-write-wins union).',
+    },
+  },
 
   // Row-selection mode chrome seam: 'none' | 'single' | 'multiple'. Reserved here;
   // the rowSelection state slice is wired in a later wave. Named distinctly from any
   // future `rowSelection` model prop (no ROZ127 / no slot-name clash).
-  selectionMode: { type: String, default: 'none' },
+  selectionMode: {
+    type: String,
+    default: 'none',
+    docs: {
+      description:
+        "Row-selection mode: 'none' | 'single' | 'multiple'. 'multiple' auto-injects a leading checkbox column with a select-all header.",
+    },
+  },
 
   // ── State slices wired so far ────────────────────────────────────────────────
   // sorting (SortingState = [{ id, desc }]). model:true → six native two-way
   // expansions; uncontrolled fallback is $data.sortingDefault. Each slice has its own
   // model prop, $data.<slice>Default fallback, and a STATIC-KEY write funnel (A4:
   // never a generic indexed funnel — $data[k]=… is ROZ106 on all six).
-  sorting: { type: Array, default: () => [], model: true },
+  sorting: {
+    type: Array,
+    default: () => [],
+    model: true,
+    docs: {
+      description:
+        'Sorting state (SortingState = [{ id, desc }]). Two-way: writes funnel a fresh value through the sort-change event regardless of binding.',
+    },
+  },
 
   // globalFilter (string) — feeds getFilteredRowModel(); narrows ALL columns.
   // Uncontrolled fallback $data.globalFilterDefault. onGlobalFilterChange funnels a
   // fresh value through writeGlobalFilter → filter-change (regardless of binding).
-  globalFilter: { type: String, default: '', model: true },
+  globalFilter: {
+    type: String,
+    default: '',
+    model: true,
+    docs: {
+      description:
+        'Global filter string — feeds getFilteredRowModel() and narrows ALL columns. Two-way: fires filter-change regardless of binding.',
+    },
+  },
 
   // columnFilters (ColumnFiltersState = [{ id, value }]) — per-column narrowing.
   // Each <Column> may opt in via its `filterable` flag (read from the resolved
   // ColumnDef). Whole-array-replace on write (never in-place). filter-change fires.
-  columnFilters: { type: Array, default: () => [], model: true },
+  columnFilters: {
+    type: Array,
+    default: () => [],
+    model: true,
+    docs: {
+      description:
+        'Per-column filter state (ColumnFiltersState = [{ id, value }]). Each <Column> opts in via its filterable flag. Two-way: whole-array replace on write, fires filter-change.',
+    },
+  },
 
   // pagination ({ pageIndex, pageSize }) — feeds getPaginationRowModel(); prev/next +
   // page-size chrome below. onPaginationChange funnels a fresh object → page-change.
-  pagination: { type: Object, default: () => ({ pageIndex: 0, pageSize: 10 }), model: true },
+  pagination: {
+    type: Object,
+    default: () => ({ pageIndex: 0, pageSize: 10 }),
+    model: true,
+    docs: {
+      description:
+        'Pagination state ({ pageIndex, pageSize }) — feeds getPaginationRowModel(). Two-way: funnels a fresh object through page-change.',
+    },
+  },
 
   // Server-side hook (req-6): when true, sets manualPagination/manualFiltering/
   // manualSorting on the table instance — table-core then trusts the consumer-supplied
   // rows verbatim and only emits the change events (the consumer fetches the page).
-  manual: { type: Boolean, default: false },
+  manual: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Server-side hook: when true, sets manualPagination/manualFiltering/manualSorting — table-core trusts the consumer-supplied rows verbatim and only emits the change events (the consumer fetches each page).',
+    },
+  },
 
   // ── Expandable rows (phase 50 reqs 1-3, D-04) ────────────────────────────────
   // expandable: opt-in gate. Default false → byte-identical-OFF (req-10): no expander
@@ -139,7 +201,14 @@
   // injects (after the select column) and every row can expand (the #detail seam) unless
   // getSubRows is supplied (then only rows with children expand). Bare `<DataTable
   // expandable>` only coerces "" → true on Vue+Lit, so consumers bind `:expandable="true"`.
-  expandable: { type: Boolean, default: false },
+  expandable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt-in gate for expandable rows. When true a leading chevron expander column auto-injects and every row can expand (the #detail seam) unless getSubRows is supplied. Bind :expandable="true" (a bare attr only coerces on Vue+Lit).',
+    },
+  },
 
   // expanded (ExpandedState = { [rowId]: true } | true) — req-1/3. model:true → two-way.
   // `true` is the expand-ALL literal (Pitfall 2 — pass through verbatim, never Object.keys
@@ -154,14 +223,29 @@
   // branch always wins → the auto-expand (and uncontrolled expand) path is dead code (the
   // post-mount grouping subtrees stayed collapsed). Bound consumers are unaffected (the bound
   // value is non-null). Uncontrolled expand now correctly funnels through $data.expandedDefault.
-  expanded: { type: [Object, Boolean], default: null, model: true },
+  expanded: {
+    type: [Object, Boolean],
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'Expanded state (ExpandedState = { [rowId]: true } | true). The literal `true` expands ALL rows. Two-way: funnels a fresh value through expanded-change. Defaults to null so the uncontrolled + grouping auto-expand fallbacks stay reachable.',
+    },
+  },
 
   // getSubRows (TABLE option, NOT a per-Column field — RESEARCH anti-pattern): an accessor
   // `(originalRow, index) => TData[] | undefined` that returns a row's child rows. When
   // supplied (with expandable), table-core flattens the hierarchy into getRowModel().rows
   // and the expand seam reveals depth-indented child rows off the SAME D-04 branch (no
   // nested r-for — Pitfall 1). Null (default) → the #detail scoped slot is the expand mode.
-  getSubRows: { type: Function, default: null },
+  getSubRows: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Table-level accessor (originalRow, index) => TData[] | undefined returning a row\'s child rows. When supplied (with expandable), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the #detail scoped slot is the expand mode.',
+    },
+  },
 
   // ── Grouping (phase 50 reqs 4-7, D-01/D-05/D-06) ─────────────────────────────
   // groupable: opt-in gate for the HEADLESS #groupBar host region. Default false →
@@ -170,7 +254,14 @@
   // `grouping` is empty — mirrors getExpandedRowModel), so grouping is driven purely by
   // the `grouping` model slice; `groupable` only gates the consumer-facing group-bar
   // surface (no built-in drag — D-02 REVISED).
-  groupable: { type: Boolean, default: false },
+  groupable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt-in gate for the HEADLESS #groupBar host region. Grouping itself is driven by the `grouping` model slice; this flag only gates the consumer-facing group-bar surface (no built-in drag UI).',
+    },
+  },
 
   // grouping (GroupingState = string[]) — reqs 4/7. model:true → two-way. An ORDERED
   // list of column ids (multi-column → nested groups, e.g. ['region','category']).
@@ -192,7 +283,15 @@
   // null-guarded currentState().grouping / groupingActiveDefault() (`|| []`), so table-core
   // still receives an array. The 12th two-way slice — Angular CVA stays disabled (already
   // disabled at ≥2 models, ROZ125 warns, never errors); no CVA regression.
-  grouping: { type: Array, default: null, model: true },
+  grouping: {
+    type: Array,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'Grouping state (GroupingState = string[]) — an ordered list of column ids (multi-column → nested groups). Two-way: funnels a fresh array through group-change. Defaults to null so the uncontrolled fallback + grouping auto-expand stay reachable.',
+    },
+  },
 
   // rowSelection (RowSelectionState = { [rowId]: true }) — req-7. model:true → two-way.
   // selectionMode drives the chrome: 'none' injects no column; 'single' keeps ≤1
@@ -200,7 +299,15 @@
   // (D-04) with a select-all header (indeterminate when partial, D-06: filtered rows).
   // selection-change fires regardless of binding. Checkbox-only toggle (D-05) — the
   // row body does NOT select.
-  rowSelection: { type: Object, default: () => ({}), model: true },
+  rowSelection: {
+    type: Object,
+    default: () => ({}),
+    model: true,
+    docs: {
+      description:
+        'Row-selection state (RowSelectionState = { [rowId]: true }). Driven by selectionMode chrome. Two-way: fires selection-change regardless of binding. Checkbox-only toggle — the row body does not select.',
+    },
+  },
 
   // ── Column-management slices (feature wave b, req-8/9/10/11) ──────────────────
   // columnVisibility (VisibilityState = { [colId]: boolean }) — req-8. model:true →
@@ -208,7 +315,15 @@
   // row.getVisibleCells() and the header groups expose only visible leaf columns).
   // onColumnVisibilityChange funnels a FRESH object → visibility-change (regardless of
   // binding). Uncontrolled fallback $data.columnVisibilityDefault.
-  columnVisibility: { type: Object, default: () => ({}), model: true },
+  columnVisibility: {
+    type: Object,
+    default: () => ({}),
+    model: true,
+    docs: {
+      description:
+        'Column visibility state (VisibilityState = { [colId]: boolean }). Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through visibility-change.',
+    },
+  },
 
   // columnSizing (ColumnSizingState = { [colId]: number }) — req-9. model:true →
   // two-way. A pointer-drag resize handle on resizable headers (table-core's
@@ -216,44 +331,104 @@
   // object; the <th> applies header.getSize(). onColumnSizingChange → resize-change
   // regardless of binding. Behavioral assertion = width delta. Fallback
   // $data.columnSizingDefault.
-  columnSizing: { type: Object, default: () => ({}), model: true },
+  columnSizing: {
+    type: Object,
+    default: () => ({}),
+    model: true,
+    docs: {
+      description:
+        'Column sizing state (ColumnSizingState = { [colId]: number }). A pointer-drag resize handle on resizable headers writes a fresh sizing object. Two-way: fires resize-change.',
+    },
+  },
 
   // columnOrder (ColumnOrderState = string[]) — req-10. model:true → two-way. A header
   // drag writes a FRESH order array (immutable — never an in-place splice → silent on
   // React/Solid/Angular/Lit). onColumnOrderChange → reorder-change regardless of
   // binding. Fallback $data.columnOrderDefault.
-  columnOrder: { type: Array, default: () => [], model: true },
+  columnOrder: {
+    type: Array,
+    default: () => [],
+    model: true,
+    docs: {
+      description:
+        'Column order state (ColumnOrderState = string[]). A header drag writes a fresh order array (immutable — never an in-place splice). Two-way: fires reorder-change.',
+    },
+  },
 
   // columnPinning (ColumnPinningState = { left: string[], right: string[] }) — req-11.
   // model:true → two-way. A per-header pin control writes columnPinning; pinned columns
   // get position:sticky + computed left/right offsets (column.getStart('left') /
   // getAfter('right')) so they stay during horizontal scroll. onColumnPinningChange →
   // pin-change regardless of binding. Fallback $data.columnPinningDefault.
-  columnPinning: { type: Object, default: () => ({ left: [], right: [] }), model: true },
+  columnPinning: {
+    type: Object,
+    default: () => ({ left: [], right: [] }),
+    model: true,
+    docs: {
+      description:
+        'Column pinning state (ColumnPinningState = { left: string[], right: string[] }). Pinned columns get position:sticky with computed offsets so they stay during horizontal scroll. Two-way: fires pin-change.',
+    },
+  },
 
   // Pure-CSS sticky header gate (req-12). When true the <thead> sticks to the top of
   // the scroll container.
-  stickyHeader: { type: Boolean, default: false },
+  stickyHeader: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description: 'Pure-CSS sticky header gate. When true the <thead> sticks to the top of the scroll container.',
+    },
+  },
 
   // FORWARD-COMPAT SEAM (D-02): 'table' (default, row-oriented) | 'grid' (cell
   // keyboard navigation). RESERVED only — grid cell-nav is NOT implemented in this
   // plan. Declaring it now keeps the public prop shape stable for the later wave.
-  interactionMode: { type: String, default: 'table' },
+  interactionMode: {
+    type: String,
+    default: 'table',
+    docs: {
+      description:
+        "Forward-compat seam: 'table' (default, row-oriented) | 'grid' (cell keyboard navigation). RESERVED only — grid cell-nav is not implemented yet.",
+      deprecated:
+        'Reserved forward-compat seam — grid cell-navigation is not implemented yet; do not rely on the `grid` mode.',
+    },
+  },
 
   // ── Vertical row windowing (phase 53, req-1/2/3) ──────────────────────────────────
   // virtual: opt-in gate. Default false → byte-identical to the pre-phase output (req-1):
   // every virtual-core runtime reference sits behind this guard and the <tbody> windowed
   // structure is an r-if branch whose r-else lowers character-for-character to today.
-  virtual: { type: Boolean, default: false },
+  virtual: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt-in gate for vertical row windowing. When true the <tbody> renders a virtualized window via virtual-core; when false it is byte-identical to the non-windowed output.',
+    },
+  },
 
   // estimateRowHeight (px, D-11): seeds virtual-core's estimateSize before measureElement
   // refines actual heights. Default 40. Only consulted when virtual is on.
-  estimateRowHeight: { type: Number, default: 40 },
+  estimateRowHeight: {
+    type: Number,
+    default: 40,
+    docs: {
+      description:
+        'Estimated row height in px — seeds virtual-core\'s estimateSize before measureElement refines actual heights. Only consulted when virtual is on.',
+    },
+  },
 
   // maxHeight: a CSS STRING (D-06, NOT a Number) bounding the rdt-scroll container — applied
   // inline AND mirrored to --rozie-data-table-max-height (prop wins; token is the fallback for
   // the token-only sizing case). Empty default → the container falls back to the token rule.
-  maxHeight: { type: String, default: '' },
+  maxHeight: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'A CSS string (e.g. "480px") bounding the scroll container — applied inline and mirrored to --rozie-data-table-max-height (the prop wins; the token is the fallback). Empty → the container falls back to the token rule.',
+    },
+  },
 }
 </props>
 
