@@ -45,6 +45,7 @@ import type {
   ComputedDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
@@ -373,6 +374,50 @@ function renderPropField(p: PropDecl): string {
  * coercion) — NOT the identity probe (which would require D-02 caching the
  * Vue emit can't deliver).
  */
+/**
+ * Phase 58 Plan 04 (SC-3) — render the BODY of the props type literal
+ * (`{ … }`) for `defineProps<{ … }>` / `interface FooProps { … }`.
+ *
+ * Open Question 1 (resolved empirically against the data-table Vue pilot +
+ * vue-tsc): Vue's compact `{ a?: A; b?: B }` one-line literal cannot host an
+ * inline JSDoc comment inside a `;`-joined member list. Strategy A — restructure
+ * to a MULTI-LINE member literal, each documented member preceded by its gated
+ * `buildPropJsdoc` block — IS accepted by vue-tsc (a JSDoc comment is legal
+ * inside a `{ … }` TS type literal exactly as in an `interface` body). This is
+ * also the surface vue-tsc + IDE hover read for SFC consumers (Vue's `compile()`
+ * output carries NO `.d.rozie.ts`; the SFC `defineProps<T>()` IS the consumer
+ * type surface — see compile.ts D-84), so the JSDoc must live here, not only in
+ * the sidecar `.d.rozie.ts`.
+ *
+ * GATING (SC-5 byte-identity): the multi-line restructure fires ONLY when at
+ * least one prop in the set carries `docs`. A fully-docless set returns the
+ * exact existing compact `${fields.join('; ')}` form — zero whitespace drift,
+ * byte-identical to today (T-58-07). `innerIndent` is the indent applied to each
+ * member line in the multi-line form (matching the `{ … }` open's column).
+ */
+function renderPropsTypeBody(
+  nonModel: readonly PropDecl[],
+  fields: readonly string[],
+  closeIndent: string,
+): string {
+  const hasDocs = nonModel.some((p) => buildPropJsdoc(p) !== '');
+  if (!hasDocs) {
+    // Byte-identical compact one-line form for fully-docless prop sets.
+    return `{ ${fields.join('; ')} }`;
+  }
+  // Multi-line form: each member on its own line (terminated with `;`), the
+  // documented ones preceded by their gated JSDoc block. `buildPropJsdoc`
+  // returns a trailing-newline block, so the JSDoc lands directly above the
+  // member. vue-tsc accepts JSDoc inside a `{ … }` type literal. Members are
+  // indented one level (2 spaces) past the literal's closing brace.
+  const innerIndent = `${closeIndent}  `;
+  const memberLines = nonModel.map((p, i) => {
+    const jsdoc = buildPropJsdoc(p, innerIndent);
+    return `${jsdoc}${innerIndent}${fields[i]};`;
+  });
+  return `{\n${memberLines.join('\n')}\n${closeIndent}}`;
+}
+
 function emitPropsDecl(
   ir: IRComponent,
   genericParams?: readonly string[],
@@ -414,7 +459,11 @@ function emitPropsDecl(
   // Generic-mode: hoist a named interface so `defineProps<SelectProps<T>>()`
   // resolves T against the enclosing <script setup generic="T"> attribute.
   if (generics.length > 0) {
-    const interfaceLine = `interface ${ir.name}Props${generics} { ${fields.join('; ')} }`;
+    // SC-3: a documented prop set restructures the interface body to multi-line
+    // members so each can carry its JSDoc block; docless sets stay the compact
+    // one-line `{ a?: A; b?: B }` form (byte-identical). Interface members sit
+    // at the 2-space class/interface-body indent.
+    const interfaceLine = `interface ${ir.name}Props${generics} ${renderPropsTypeBody(nonModel, fields, '')}`;
     if (defaultsEntries.length === 0) {
       return (
         `${interfaceLine}\n` +
@@ -431,14 +480,18 @@ function emitPropsDecl(
   }
 
   // Non-generic mode (existing Phase 3 shape — byte-identical for the 5
-  // reference examples that never set genericParams).
+  // reference examples that never set genericParams). SC-3: a documented prop
+  // set restructures the inline `defineProps<{ … }>` literal to multi-line
+  // JSDoc'd members; a docless set stays the compact one-line form.
   if (defaultsEntries.length === 0) {
-    return `const props = defineProps<{ ${fields.join('; ')} }>();`;
+    // `defineProps<` opens at column 0 → closing brace at column 0.
+    return `const props = defineProps<${renderPropsTypeBody(nonModel, fields, '')}>();`;
   }
 
   return (
     `const props = withDefaults(\n` +
-    `  defineProps<{ ${fields.join('; ')} }>(),\n` +
+    // `defineProps<` is at 2-space indent → closing brace at 2-space indent.
+    `  defineProps<${renderPropsTypeBody(nonModel, fields, '  ')}>(),\n` +
     `  { ${defaultsEntries.join(', ')} }\n` +
     `);`
   );
@@ -453,22 +506,31 @@ function emitDefineModels(ir: IRComponent): string[] {
   for (const p of ir.props) {
     if (!p.isModel) continue;
     const tsType = renderType(p.typeAnnotation);
+    // SC-3: prepend the gated JSDoc block above the `defineModel` line for a
+    // documented model prop. `buildPropJsdoc('')` builds the block at zero
+    // indent (model lines sit at column 0 in the <script setup> body) with a
+    // trailing newline, so splicing it directly onto the front of the line puts
+    // the JSDoc immediately above the `const X = defineModel…` statement. A
+    // docless model prop gets `''` → byte-identical to today (SC-5).
+    const jsdoc = buildPropJsdoc(p, '');
     if (p.defaultValue !== null) {
       // A defaulted model prop is optional regardless of `required`
       // (260521-oao — `required: true` + `default:` is dropped upstream in
       // lowerProps, so a defaultValue here means the prop was NOT required).
       const dflt = genCode(p.defaultValue);
       lines.push(
-        `const ${p.name} = defineModel<${tsType}>('${p.name}', { default: ${dflt} });`,
+        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}', { default: ${dflt} });`,
       );
     } else if (p.required) {
       // 260521-oao — a required no-default model prop emits the Vue
       // `required: true` options form so the consumer MUST pass it.
       lines.push(
-        `const ${p.name} = defineModel<${tsType}>('${p.name}', { required: true });`,
+        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}', { required: true });`,
       );
     } else {
-      lines.push(`const ${p.name} = defineModel<${tsType}>('${p.name}');`);
+      lines.push(
+        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}');`,
+      );
     }
   }
   return lines;

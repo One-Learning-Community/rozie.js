@@ -57,6 +57,14 @@ const EXAMPLES = [
   // covering it here exercises the emit path. `maplibre-gl` resolves against the
   // ambient `engine-modules.d.ts` stub.
   'MapLibre',
+  // Phase 58 Plan 04 (SC-3) — first-class prop documentation. The documented
+  // `label` prop emits a multi-line JSDoc'd `defineProps<{ … }>` member (Open
+  // Question 1 resolved to strategy A: JSDoc inside the `{ … }` type literal,
+  // vue-tsc-accepted). This is the gate that locks strategy A: it proves the
+  // multi-line restructure + the `*/`-bearing deprecated string (escaped by
+  // buildPropJsdoc, T-58-06) + the angle-bracket-bearing `@example` line all
+  // pass vue-tsc. The docless sibling `count` prop stays a bare compact member.
+  'PropDocs',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
