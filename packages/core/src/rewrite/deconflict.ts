@@ -542,6 +542,178 @@ export function deconflictStateExposeCollision(ir: {
 }
 
 /**
+ * IR-LEVEL reserved-member deconfliction for `$computed` names + `$inject`
+ * local bindings (Phase 61 Plan 03 — SC-2, R-NEW-1 + R-NEW-5).
+ *
+ * DISTINCT from `deconflictReservedClassFields` (which walks `<script>`
+ * top-level declarators on a per-target CLONED Program): a `$computed` const
+ * and a `$inject` local binding are NOT renamed by that pass on the class
+ * targets, for two different reasons:
+ *
+ *   - `$computed`: the colliding declarator IS reached by the program-clone
+ *     rename, but the getter-emission + template-binding sites read the name
+ *     back from the IR (`ir.computed[].name` / the IR template-expression
+ *     subtrees), NOT from the renamed clone — so the rename does NOT propagate
+ *     (the getter falls through to a broken plain field, and `{{ X }}` still
+ *     reads the old name). `methodNames.ts` additionally SKIPS `$computed`.
+ *   - `$inject`: the declarator rename produces a renamed `get X$local()`
+ *     accessor, but every template/script read of the bound local still reads
+ *     the OLD name (the rename never propagates to the IR template subtrees).
+ *
+ * Both names are INTERNAL (template/method-referenced, never consumer-facing
+ * public contract) → safe to auto-rename to `X$local`. The single uniform fix
+ * is to rename at the IR LEVEL — `ir.computed[].name` / `ir.injects[].localBinding`
+ * + every BARE-identifier reference across the ENTIRE IR (the shared
+ * `setupBody.scriptProgram` declarator/refs AND every template-expression
+ * subtree) — BEFORE the per-target lowering reads any of them. Because the
+ * caller passes a target-specific reserved set, this stays only-on-collision:
+ * a non-reserved computed/inject name is byte-identical.
+ *
+ * Mutates `ir` in place. Callers invoke it from their per-target emit
+ * orchestrator (Lit: `emitLit`) on the target's OWN IR (each `compile()` call
+ * lowers a fresh IR per target — no cross-target leakage). Returns the rename
+ * map (old → new) for diagnostics/tests; empty when nothing collided.
+ *
+ * @param ir         the component IR (computed[].name + injects[].localBinding renamed).
+ * @param reserved   the target's reserved class-member set (e.g. reservedClassMembers('lit')).
+ * @param protectedNames PUBLIC-CONTRACT names never renamed (prop names + $expose verbs).
+ */
+export function deconflictReservedComputedInjectNames(
+  ir: {
+    computed: { name: string }[];
+    injects?: { localBinding: string }[];
+    props?: { name: string }[];
+    expose?: { name: string }[];
+  },
+  reserved: ReadonlySet<string>,
+  protectedNames: ReadonlySet<string> = new Set(),
+): Map<string, string> {
+  const renames = new Map<string, string>();
+  if (reserved.size === 0) return renames;
+
+  // Collect the colliding renameable names. A name that is ALSO a public
+  // contract name (prop / $expose verb) is NEVER renamed (D-02). Defensively
+  // also fold in any IR-level props/expose the caller didn't pass via
+  // protectedNames so the public-contract guard is total.
+  const protectedAll = new Set<string>([
+    ...protectedNames,
+    ...(ir.props ?? []).map((p) => p.name),
+    ...(ir.expose ?? []).map((e) => e.name),
+  ]);
+  const consider = (name: string): void => {
+    if (renames.has(name)) return;
+    if (reserved.has(name) && !protectedAll.has(name)) {
+      renames.set(name, alias(name));
+    }
+  };
+  for (const c of ir.computed) consider(c.name);
+  for (const inj of ir.injects ?? []) consider(inj.localBinding);
+  if (renames.size === 0) return renames;
+
+  // 1. Rename the IR declaration fields themselves (source of truth for the
+  //    getter-emission + ContextConsumer-accessor sites).
+  for (const c of ir.computed) {
+    const renamed = renames.get(c.name);
+    if (renamed) c.name = renamed;
+  }
+  for (const inj of ir.injects ?? []) {
+    const renamed = renames.get(inj.localBinding);
+    if (renamed) inj.localBinding = renamed;
+  }
+
+  // 2. Deep-walk the ENTIRE IR. Rename every BARE-IDENTIFIER reference / binding
+  //    matching a renamed name in every embedded Babel subtree (the shared
+  //    scriptProgram declarators + refs AND each template-expression subtree).
+  //    Position guards skip the non-reference identifier slots:
+  //      - MemberExpression/OptionalMemberExpression `.property` (non-computed)
+  //        — `foo.id` must not rename the `id` PROPERTY (only a bare `id`).
+  //      - ObjectProperty `key` (non-computed, non-shorthand) — `{ id: x }`.
+  //      - ObjectMethod/ClassMethod `key` (non-computed) — `{ get id() {} }`.
+  //      - import/export specifier name slots.
+  //    A declarator id / shorthand-property / object-value / function-param IS a
+  //    reference-or-binding of the renamed local and SHOULD be renamed (these
+  //    are top-level consts; the `$local` suffix keeps decl + refs consistent).
+  const seen = new WeakSet<object>();
+  const isNode = (v: unknown): v is t.Node =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  const renameIdentifiersIn = (node: t.Node, parent: t.Node | null, parentKey: string | null): void => {
+    if (seen.has(node)) return;
+    seen.add(node);
+
+    if (node.type === 'Identifier') {
+      const renamed = renames.get((node as t.Identifier).name);
+      if (renamed && parent) {
+        // Skip non-reference identifier slots (see position-guard list above).
+        const skip =
+          // `obj.id` / `obj?.id` — the property name, not a reference.
+          ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') &&
+            (parent as t.MemberExpression).property === node &&
+            !(parent as t.MemberExpression).computed) ||
+          // `{ id: x }` non-shorthand key OR `{ get id() {} }` method key.
+          ((parent.type === 'ObjectProperty') &&
+            (parent as t.ObjectProperty).key === node &&
+            !(parent as t.ObjectProperty).computed &&
+            !(parent as t.ObjectProperty).shorthand) ||
+          ((parent.type === 'ObjectMethod' || parent.type === 'ClassMethod') &&
+            (parent as t.ObjectMethod).key === node &&
+            !(parent as t.ObjectMethod).computed) ||
+          // import/export specifier name slots are module bindings, not refs.
+          parent.type === 'ImportSpecifier' ||
+          parent.type === 'ImportDefaultSpecifier' ||
+          parent.type === 'ImportNamespaceSpecifier' ||
+          parent.type === 'ExportSpecifier';
+        if (!skip) {
+          (node as t.Identifier).name = renamed;
+        }
+      }
+      return;
+    }
+
+    // Recurse into child node fields (skip non-AST bookkeeping keys).
+    const rec = node as unknown as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+      if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' ||
+          key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') {
+        continue;
+      }
+      const child = rec[key];
+      if (Array.isArray(child)) {
+        for (const item of child) {
+          if (isNode(item)) renameIdentifiersIn(item, node, key);
+        }
+      } else if (isNode(child)) {
+        renameIdentifiersIn(child, node, key);
+      }
+    }
+  };
+
+  // Walk the IR object graph; whenever we hit a Babel node, run the
+  // identifier-renaming descent from there (the descent has its own WeakSet
+  // guard so shared subtrees are visited once).
+  const irSeen = new WeakSet<object>();
+  const walkIr = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (irSeen.has(value)) return;
+    irSeen.add(value);
+    if (isNode(value)) {
+      renameIdentifiersIn(value, null, null);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) walkIr(item);
+      return;
+    }
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      walkIr((value as Record<string, unknown>)[key]);
+    }
+  };
+  walkIr(ir);
+
+  return renames;
+}
+
+/**
  * CLASS-TARGET reserved-member deconfliction (Phase 46 ITEM-5 / D-02 — the NEW
  * collision class). DISTINCT from the bare-ident accessor-shadow above: the
  * trigger here is "a USER TOP-LEVEL `<script>` binding becomes a CLASS FIELD

@@ -29,6 +29,10 @@ import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import {
+  deconflictReservedComputedInjectNames,
+  reservedClassMembers,
+} from '../../../core/src/rewrite/deconflict.js';
 // NOTE: SourceMap import removed (WR-08); EmitLitResult.map is null until Phase 7.
 import {
   LitImportCollector,
@@ -100,6 +104,31 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // emitVue's pattern. emitListeners requires a non-optional registry for
   // its Plan 07.1-02 registry-driven modifier dispatch.
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
+
+  // 0. Reserved-member deconfliction for `$computed` names + `$inject` local
+  //    bindings (Phase 61 Plan 03 — SC-2, R-NEW-1 + R-NEW-5). Both become PUBLIC
+  //    class members on the Lit class (a `$computed` → `get X()` getter; a
+  //    `$inject` local → a `get X()` ContextConsumer read accessor). When that
+  //    name is a reserved class member (inherited HTMLElement/Element/Node member,
+  //    `Object.prototype`, or a Lit lifecycle name) the getter SHADOWS the
+  //    inherited member → gate-3 TS2611/TS2416. These names are INTERNAL
+  //    (template/method-referenced, never consumer-facing), so we auto-rename them
+  //    to `X$local` at the IR level BEFORE any emitter reads them — this is the
+  //    only site that fixes BOTH the getter emission AND the template-binding
+  //    propagation in one shot (the per-target program-clone rename in
+  //    rewriteScript cannot, because the getter + template sites read the name
+  //    back from the IR, not from the clone). Lit-only: each `compile()` lowers a
+  //    fresh IR per target, so mutating THIS IR never leaks to the other five.
+  //    Only-on-collision: a non-reserved computed/inject name is byte-identical.
+  //    Public-contract names (props / $expose verbs) are never renamed (D-02).
+  deconflictReservedComputedInjectNames(
+    ir,
+    reservedClassMembers('lit'),
+    new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...ir.props.map((p) => p.name),
+    ]),
+  );
 
   // 1. Slot declarations — must come early because emitTemplate may reference slot fields.
   const slotResult = emitSlotDecl(ir, { decorators: decoratorImports });
