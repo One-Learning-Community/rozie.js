@@ -72,6 +72,61 @@ Override the month-nav header via the scoped `#header` slot — the component ke
 </DatePicker>
 ```
 
+## Range selection
+
+Set `selectionMode="range"` to turn the same calendar into a date-range picker. In range mode the `value` is no longer an ISO string but a `{ start, end }` object (both ISO `YYYY-MM-DD` strings, `''` when empty) — the prop is polymorphic, `value: string | { start, end }`, so `selectionMode="single"` (the default) is byte-identical to the single-date picker above and stays fully backward-compatible.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import DatePicker from '@rozie-ui/date-picker-vue';
+
+const range = ref({ start: '', end: '' });
+</script>
+
+<template>
+  <DatePicker
+    selectionMode="range"
+    v-model:value="range"
+    @rangeComplete="(e) => console.log('range:', e.value)"
+  />
+</template>
+```
+
+Selection is **direction-agnostic**: the first click drops an anchor, not a forced start. The second click completes the range, and the component applies min/max ordering at both the hover preview and the commit, so selecting backwards (later day first, then an earlier one) yields the same ordered `{ start, end }` as selecting forwards. As you move the pointer (or roving keyboard focus) between the two clicks, the days between the anchor and the hovered day render a live **preview band**; a third click restarts the selection from a new anchor.
+
+A `rangeComplete` event fires once when the second endpoint lands (or a preset applies) — see the [API reference](/components/date-picker-api) for its payload and the per-target consumer-prop casing.
+
+### Presets
+
+Pass `presetRanges` to render a quick-pick rail beside the calendar. Each entry is `{ label, range }`, where `range` is either a literal `{ start, end }` **or** a `() => { start, end }` thunk resolved fresh on render (so "Last 7 days" stays relative to today). The consumer owns the date math and the i18n labels:
+
+```vue
+<script setup lang="ts">
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const presetRanges = [
+  { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+  { label: 'Last 7 days', range: () => ({ start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) }) },
+];
+</script>
+
+<template>
+  <DatePicker selectionMode="range" v-model:value="range" :presetRanges="presetRanges" />
+</template>
+```
+
+Override the default rail entirely with the scoped `#presets` slot — it receives `{ presets, apply }`, so you can render your own buttons and call `apply(p.range)` to commit a preset:
+
+```vue
+<DatePicker selectionMode="range" v-model:value="range" :presetRanges="presetRanges">
+  <template #presets="{ presets, apply }">
+    <button v-for="p in presets" :key="p.label" @click="apply(p.range)">{{ p.label }}</button>
+  </template>
+</DatePicker>
+```
+
+> The object `value` and the function-form `presetRanges` must be passed as **properties**, never string attributes. On Vue/React/Svelte/Angular/Solid this is automatic; on Lit you must use a property binding (`.value=${obj}` / `r-model`, `.presetRanges=${[...]}`) — the same rule already in force for `disabledDates`. See the [API reference](/components/date-picker-api) for details.
+
 See the full prop / event / slot / handle surface on the [API reference](/components/date-picker-api),
 the [live demo](/components/date-picker-demo), and how it compares to existing libraries on the
 [comparison page](/components/date-picker-comparison).
