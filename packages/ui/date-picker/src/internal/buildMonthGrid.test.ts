@@ -13,9 +13,12 @@ import {
   addMonths,
   buildMonthGrid,
   isDayDisabled,
+  isInRange,
   isIsoDate,
   isoToUtc,
   monthLabel,
+  normalizeRange,
+  rangeFromPreset,
   resolveViewIso,
   toIso,
   weekdayLabels,
@@ -175,5 +178,167 @@ describe('weekdayLabels', () => {
     expect(mon.length).toBe(7);
     // rotating by one should shift the first label
     expect(mon[0]).not.toBe(sun[0]);
+  });
+});
+
+describe('normalizeRange', () => {
+  it('coerces an empty string into an empty range', () => {
+    expect(normalizeRange('')).toEqual({ start: '', end: '' });
+  });
+  it('coerces a single ISO string into a start-only anchor', () => {
+    expect(normalizeRange('2025-06-10')).toEqual({ start: '2025-06-10', end: '' });
+  });
+  it('coerces a non-ISO string into an empty range', () => {
+    expect(normalizeRange('not-a-date')).toEqual({ start: '', end: '' });
+  });
+  it('orders an object range so start <= end', () => {
+    expect(normalizeRange({ start: '2025-06-04', end: '2025-06-01' })).toEqual({
+      start: '2025-06-01',
+      end: '2025-06-04',
+    });
+    expect(normalizeRange({ start: '2025-06-01', end: '2025-06-04' })).toEqual({
+      start: '2025-06-01',
+      end: '2025-06-04',
+    });
+  });
+  it('preserves a single-set anchor (end stays empty)', () => {
+    expect(normalizeRange({ start: '2025-06-10', end: '' })).toEqual({
+      start: '2025-06-10',
+      end: '',
+    });
+  });
+  it('coerces null / undefined into an empty range', () => {
+    expect(normalizeRange(null)).toEqual({ start: '', end: '' });
+    expect(normalizeRange(undefined)).toEqual({ start: '', end: '' });
+  });
+});
+
+describe('isInRange', () => {
+  it('returns true for an ISO strictly between ordered endpoints', () => {
+    expect(isInRange('2025-06-03', '2025-06-01', '2025-06-05')).toBe(true);
+  });
+  it('is inclusive of both boundary ISOs', () => {
+    expect(isInRange('2025-06-01', '2025-06-01', '2025-06-05')).toBe(true);
+    expect(isInRange('2025-06-05', '2025-06-01', '2025-06-05')).toBe(true);
+  });
+  it('returns false outside the band', () => {
+    expect(isInRange('2025-05-31', '2025-06-01', '2025-06-05')).toBe(false);
+    expect(isInRange('2025-06-06', '2025-06-01', '2025-06-05')).toBe(false);
+  });
+  it('returns false when either endpoint is empty / malformed', () => {
+    expect(isInRange('2025-06-03', '', '2025-06-05')).toBe(false);
+    expect(isInRange('2025-06-03', '2025-06-01', '')).toBe(false);
+    expect(isInRange('2025-06-03', 'nope', '2025-06-05')).toBe(false);
+  });
+  it('is order-tolerant: reversed start>end is still inclusive', () => {
+    expect(isInRange('2025-06-03', '2025-06-05', '2025-06-01')).toBe(true);
+    expect(isInRange('2025-06-05', '2025-06-05', '2025-06-01')).toBe(true);
+  });
+});
+
+describe('rangeFromPreset', () => {
+  it('returns a literal range verbatim (ordered)', () => {
+    expect(rangeFromPreset({ range: { start: '2025-06-01', end: '2025-06-04' } })).toEqual({
+      start: '2025-06-01',
+      end: '2025-06-04',
+    });
+    // literal ordered too
+    expect(rangeFromPreset({ range: { start: '2025-06-04', end: '2025-06-01' } })).toEqual({
+      start: '2025-06-01',
+      end: '2025-06-04',
+    });
+  });
+  it('calls a thunk and returns its (ordered) result', () => {
+    let called = 0;
+    const range = () => {
+      called++;
+      return { start: '2025-06-10', end: '2025-06-03' };
+    };
+    expect(rangeFromPreset({ range })).toEqual({ start: '2025-06-03', end: '2025-06-10' });
+    expect(called).toBe(1);
+  });
+});
+
+describe('direction-agnostic ordering (SC-3)', () => {
+  it('anchor-then-earlier === earlier-then-anchor', () => {
+    const anchorThenEarlier = normalizeRange({ start: '2025-06-10', end: '2025-06-03' });
+    const earlierThenAnchor = normalizeRange({ start: '2025-06-03', end: '2025-06-10' });
+    expect(anchorThenEarlier).toEqual(earlierThenAnchor);
+    expect(anchorThenEarlier).toEqual({ start: '2025-06-03', end: '2025-06-10' });
+  });
+});
+
+describe('buildMonthGrid — range flags', () => {
+  const find = (g: ReturnType<typeof buildMonthGrid>, iso: string) =>
+    g.weeks.flat().find((d) => d.iso === iso)!;
+
+  it('populates inRange + rangeStart/rangeEnd for a completed selection', () => {
+    const g = buildMonthGrid({
+      viewIso: '2026-06-15',
+      value: '',
+      today: '',
+      selection: { start: '2025-06-03', end: '2025-06-06' },
+    });
+    // viewIso is June 2026 — the selection is June 2025, so flags should be
+    // exercised on the right month: build the matching view.
+    const gv = buildMonthGrid({
+      viewIso: '2025-06-15',
+      value: '',
+      today: '',
+      selection: { start: '2025-06-03', end: '2025-06-06' },
+    });
+    for (const iso of ['2025-06-03', '2025-06-04', '2025-06-05', '2025-06-06']) {
+      expect(find(gv, iso).inRange).toBe(true);
+    }
+    expect(find(gv, '2025-06-03').rangeStart).toBe(true);
+    expect(find(gv, '2025-06-06').rangeEnd).toBe(true);
+    expect(find(gv, '2025-06-02').inRange).toBe(false);
+    expect(find(gv, '2025-06-07').inRange).toBe(false);
+    expect(find(gv, '2025-06-04').rangeStart).toBe(false);
+    expect(find(gv, '2025-06-05').rangeEnd).toBe(false);
+    // the off-month grid touches none of these
+    void g;
+  });
+
+  it('previews a forward band when previewEnd is set on an anchor', () => {
+    const g = buildMonthGrid({
+      viewIso: '2025-06-15',
+      value: '',
+      today: '',
+      selection: { start: '2025-06-03', end: '' },
+      previewEnd: '2025-06-06',
+    });
+    for (const iso of ['2025-06-03', '2025-06-04', '2025-06-05', '2025-06-06']) {
+      expect(find(g, iso).inPreview).toBe(true);
+    }
+    expect(find(g, '2025-06-02').inPreview).toBe(false);
+    expect(find(g, '2025-06-07').inPreview).toBe(false);
+  });
+
+  it('previews BACKWARD when previewEnd is earlier than the anchor (never suppressed)', () => {
+    const g = buildMonthGrid({
+      viewIso: '2025-06-15',
+      value: '',
+      today: '',
+      selection: { start: '2025-06-10', end: '' },
+      previewEnd: '2025-06-05',
+    });
+    for (const iso of ['2025-06-05', '2025-06-06', '2025-06-07', '2025-06-08', '2025-06-09', '2025-06-10']) {
+      expect(find(g, iso).inPreview).toBe(true);
+    }
+    expect(find(g, '2025-06-11').inPreview).toBe(false);
+    expect(find(g, '2025-06-04').inPreview).toBe(false);
+  });
+
+  it('SC-1 guard: single-mode output (no selection/previewEnd) is unchanged', () => {
+    const g = buildMonthGrid({ viewIso: '2026-06-15', value: '2026-06-15', today: '2026-06-24' });
+    const flat = g.weeks.flat();
+    expect(flat.filter((d) => d.selected).map((d) => d.iso)).toEqual(['2026-06-15']);
+    expect(flat.filter((d) => d.today).map((d) => d.iso)).toEqual(['2026-06-24']);
+    // new range flags all false in single mode
+    expect(flat.some((d) => d.inRange)).toBe(false);
+    expect(flat.some((d) => d.inPreview)).toBe(false);
+    expect(flat.some((d) => d.rangeStart)).toBe(false);
+    expect(flat.some((d) => d.rangeEnd)).toBe(false);
   });
 });
