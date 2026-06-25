@@ -24,9 +24,10 @@ vendored into all six leaves.
 | Component shape | **`selectionMode` prop on existing DatePicker** (not a separate family) | One package; chosen by user over the separate-family recommendation. |
 | Range value shape | **Polymorphic `value: string \| {start, end}`** | More ergonomic on read than an ISO-interval string; user accepted the polymorphic cost. |
 | Value type plumbing | **`type: [String, Object]` → `string \| Record<string, any>`** | Union prop types are already supported by all six emitters; Angular CVA bakes the union into `writeValue`. Precise `{start,end}` named type deferred (would need a custom type imported per leaf). |
-| Presets API | **`Array<{ label, range }>` where `range` is a literal `RangeValue` OR a `() => RangeValue` thunk** | Literals for fixed ranges; thunks recompute relative ranges ("last 7 days") fresh on click. Consumer owns date math + i18n labels. |
+| Presets API | **`presetRanges: Array<{ label, range }>` where `range` is a literal `RangeValue` OR a `() => RangeValue` thunk** | Literals for fixed ranges; thunks recompute relative ranges ("last 7 days") fresh on click. Consumer owns date math + i18n labels. **Prop named `presetRanges`** (not `presets`) to clear the ROZ127 collision with the `#presets` slot — research finding; user kept the slot name, moved the prop. |
 | Interaction | **Two-click with hover preview, direction-agnostic** | First click is an anchor, not a forced start; backward and forward selection are symmetric. |
-| `rangeComplete` event + `#presets` slot | **In for v1** | Confirmed by user. |
+| `rangeComplete` event + `#presets` slot | **In for v1** | Confirmed by user. `rangeComplete` is the first camelCase `$emit` in any shipped family → documented per-target casing divergence (`onRangeComplete` / `onrangecomplete`), acceptable under the high-percentage-parity constraint; covered by a round-trip fixture. |
+| **Object-payload model round-trip (RESEARCH)** | **RESOLVED — works on all six targets, zero model-machinery change** | `62-RESEARCH.md` confirmed every controllable runtime is generic `<T>`, no JSON serialization, gates on `Object.is`; the producer writes a fresh object per commit so identity detection fires. The spec's "spike first" caution is retired. Lit objects arrive via property binding (identical to existing `disabledDates`). |
 
 ## 3. Public API additions
 
@@ -34,7 +35,7 @@ vendored into all six leaves.
 // props
 selectionMode: 'single' | 'range'    default 'single'
 value: string | { start, end }        // was string; now type: [String, Object], default ''
-presets: Array<{ label: string, range: RangeValue | (() => RangeValue) }>   default () => []
+presetRanges: Array<{ label: string, range: RangeValue | (() => RangeValue) }>   default () => []
 
 // events
 change        { value }   // fires on every model write (anchor-only AND complete)
@@ -47,7 +48,8 @@ clear()       // writes mode-appropriate empty: '' (single) or {start:'', end:''
 
 // slots
 #header       // unchanged
-#presets      // NEW — receives { presets, apply(range) }; default renders a <button> rail
+#presets      // NEW — receives { presets, apply(range) }; default renders a <button> rail.
+              //       Slot name stays `presets`; the PROP is `presetRanges` (ROZ127 clearance).
 ```
 
 `RangeValue = { start: string; end: string }` (ISO `YYYY-MM-DD` strings; `''` = empty endpoint).
@@ -94,12 +96,13 @@ a FRESH object each call (never fed to a reference-equality `$watch`).
 
 ## 7. Presets
 
-- `presets` is one array; each entry's `range` is a literal `RangeValue` OR a thunk.
+- `presetRanges` is one array (prop name — clears the ROZ127 collision with the
+  `#presets` slot); each entry's `range` is a literal `RangeValue` OR a thunk.
 - Resolution: `typeof range === 'function' ? range() : range`. Thunks recompute on
   click (handles relative-range midnight drift); literals used directly.
 - Default rail renders below the grid (one `<button>` per preset). The preset whose
   resolved range equals the current value gets `aria-pressed` / `is-active`.
-- Overridable via `#presets` slot (receives `presets` + `apply(range)`).
+- Overridable via `#presets` slot (receives the resolved preset list + `apply(range)`).
 - **Lit caveat:** function-form presets require property binding (same as the existing
   `disabledDates` array prop) — documented, not a new constraint class.
 
@@ -108,10 +111,16 @@ a FRESH object each call (never fed to a reference-equality `$watch`).
 - Polymorphic `value` → loose `string | Record<string, any>` (precise typing deferred).
 - New helpers must dodge inherited Lit DOM names AND prop keys: `readRange`,
   `commitRange`, `applyPreset`, `resolvePreset`, `onDayHover` (avoid `start` / `end` /
-  `title` / `label`).
-- **Sharpest risk — object-payload model round-trip:** confirm the React model setter,
-  Vue `update:value`, and Angular CVA round-trip cleanly with an OBJECT payload (the
-  accepted polymorphic cost). Worth a quick spike before full build.
+  `title` / `label`) — all five confirmed collision-clear by research; `$data.hoverIso` clear.
+- **ROZ127 — RESOLVED:** the `#presets` slot would have collided with a `presets` prop
+  (hard compile error ×6). Prop renamed to `presetRanges`; slot kept. No relitigation of
+  the locked presets feature.
+- **Object-payload model round-trip — RESOLVED (was the sharpest risk):** research
+  confirmed it round-trips cleanly on all six targets with no model-machinery change
+  (generic `<T>` runtimes, no JSON serialization, `Object.is` identity + fresh-object-per-commit).
+  No pre-build spike needed.
+- `rangeComplete` → first camelCase `$emit` in any shipped family; per-target casing
+  divergence is a documented edge case (covered by a round-trip fixture).
 - New event (`rangeComplete`) + slot (`#presets`) → regenerate `.d.ts` + all six leaves.
 
 ## 9. Testing
