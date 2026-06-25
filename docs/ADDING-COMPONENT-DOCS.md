@@ -46,6 +46,50 @@ Frontmatter `title:`, then a `<script setup>` importing the **default** export o
 - `displayNameFor()` reads `<Name>` from the generated `packages/react/README.md` line `Idiomatic **react** \`<Name>\``; falls back to the slug. So run codegen (which renders that README) before generating usage pages.
 - The usage page carries a `GENERATED … do not edit by hand` banner — respect it; edit `readme.mjs` and re-run.
 
+## Updating an existing family
+
+The recipe above is scoped to **creating** a family. When a *shipped* family **gains or
+changes a capability** — a new prop, emit, slot, `$expose` verb, or a model-shape change
+like single→range — a different set of surfaces drifts, and only one of them is
+machine-protected:
+
+- The `### Props` table in `<slug>.md` is **codegen-validated** (`validateDocsPropsTable`)
+  and will **fail the build** if it goes stale.
+- The hand-authored `<slug>-comparison.md` capability claims are protected **only** by the
+  `surface_hash` guard (see below), which **forces a human re-read** when the surface
+  changes but does **NOT** auto-correct the prose. This is exactly the gap that let
+  Phase 62 ship date-picker range selection while the comparison page kept claiming
+  "single-date only" (fixed in 048aa120).
+
+So a capability change has a **must-review checklist**:
+
+- [ ] `<slug>.md` Props / Events / Imperative-handle tables reflect the new surface (the
+      Props table is codegen-validated; Events / handle are free prose — keep them accurate
+      against `ir.emits` / `ir.expose`).
+- [ ] `<slug>-comparison.md` capability claims — landscape-table cells **and** prose —
+      re-read and corrected (e.g. "single-date only" → "single or range", a missing
+      slot/handle mention, a "does X but not Y" that the surface now contradicts). Only the
+      `@rozie-ui/<slug>` self-claims must be surface-accurate — competitor rows describe
+      other libraries and are out of scope.
+- [ ] After updating the comparison page, update its `surface_hash:` frontmatter to the
+      new value the guard reports — `pnpm --filter @rozie/docs test` **prints the expected
+      hash on failure**; copy it in (or run `node scripts/surface-hash.mjs --write` from
+      `docs/` to re-seed all markers).
+- [ ] `pnpm --filter @rozie/docs test` passes (surface_hash guard green).
+- [ ] `NODE_OPTIONS=--max-old-space-size=6144 pnpm --filter @rozie/docs build` passes.
+
+### The `surface_hash` guard
+
+`docs/tests/comparison-surface.test.ts` recomputes each family's compiled public surface
+via `docs/scripts/surface-hash.mjs` and asserts the `surface_hash:` marker in every
+family-backed `<slug>-comparison.md` still matches. The hash is over the family's compiled
+**IR public surface** — the *sorted* union of prop / model / emit / slot / `$expose` names
+across all the family's `.rozie` sources. Because it hashes the whole surface, a
+**non-capability tweak** (renaming a prop, adding a slot you didn't document) can also trip
+it — that "false positive" is **intentional**: it forces a human to confirm the comparison
+page is still accurate before the marker is bumped. The guard runs under
+`turbo run test --filter @rozie/docs`, the same pipeline CI uses.
+
 ## Building the docs locally
 
 `docs:build` is **OOM-prone** — Rollup graphs every demo engine at once (~5GB peak). Use the shipped `--max-old-space-size=6144` flag (already wired); do not re-attempt lazy-loading or CDN-externalizing the demos (both measured no-ops / rejected). The demo + usage pages only resolve once the family's `-vue` (and other) leaves are built.
@@ -53,7 +97,7 @@ Frontmatter `title:`, then a `<script setup>` importing the **default** export o
 ## Checklist
 
 - [ ] `<slug>.md` — showcase with an **IR-exact `### Props` table** (codegen validates it).
-- [ ] `<slug>-comparison.md`.
+- [ ] `<slug>-comparison.md` — and seed its `surface_hash:` frontmatter from the shipped surface (`node scripts/surface-hash.mjs --write` from `docs/`, then verify `pnpm --filter @rozie/docs test` is green) so the staleness guard covers the new family.
 - [ ] `<slug>-demo.md` — `<ClientOnly>` + `-vue` package, network-free fixture or test-key warning.
 - [ ] `scripts/readme.mjs` exports family-specific `USAGE` / `HANDLE_USAGE` (→ usage page auto-generates).
 - [ ] Nav block in `.vitepress/config.ts`.
