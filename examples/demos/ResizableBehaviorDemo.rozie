@@ -1,0 +1,104 @@
+<!--
+  ResizableBehaviorDemo — VR behavioral cell for @rozie-ui/resizable (pure-Rozie,
+  no engine). Drives the two-panel splitter: a two-way r-model:size (live percent
+  readout), a direct-model-write button, and a @resize readout. The spec drags the
+  role="separator" handle / keyboard-nudges it and checks the clamped size + the
+  resize event — see resizable.spec.ts (when added). Behavioral-only (no pixel
+  baseline).
+
+  COLLISION NOTE: the direct-write helper is `applySize`, NOT `setSize` — the local
+  $data key is `size`, and a `set<X>` helper collapses onto the generated
+  `$data.size` setter on React/Solid (ROZ524). `apply<X>` is the listbox/data-table
+  precedent (and mirrors the family's own `applySize` $expose verb).
+-->
+<rozie name="ResizableBehaviorDemo">
+
+<components>
+{
+  Resizable: '../../packages/ui/resizable/src/Resizable.rozie',
+}
+</components>
+
+<data>
+{
+  size: 50,
+  lastResize: '',
+}
+</data>
+
+<script>
+const onResize = (e) => {
+  $data.lastResize = e && e.size != null ? String(e.size) : ''
+}
+const applySize = (v) => {
+  $data.size = v
+}
+</script>
+
+<template>
+<div class="resizable-demo">
+  <h3>Resizable — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-size" @click="applySize(70)">Set 70</button>
+    <span class="readout" data-testid="readout-size">{{ $data.size }}</span>
+    <span class="readout" data-testid="readout-resize">{{ $data.lastResize }}</span>
+  </div>
+
+  <div class="resizable-box">
+    <Resizable
+      r-model:size="$data.size"
+      direction="horizontal"
+      :min="20"
+      :max="80"
+      @resize="onResize($event)"
+    >
+      <template #start>
+        <div class="pane pane--start">Navigation</div>
+      </template>
+      <template #end>
+        <div class="pane pane--end">Content</div>
+      </template>
+    </Resizable>
+  </div>
+</div>
+</template>
+
+<style>
+.resizable-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+}
+.resizable-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.resizable-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+.resizable-box {
+  width: 420px;
+  height: 180px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pane {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+}
+.pane--start {
+  background: #f3f4f6;
+}
+.pane--end {
+  background: #ffffff;
+}
+</style>
+
+</rozie>

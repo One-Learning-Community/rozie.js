@@ -1,0 +1,89 @@
+<!--
+  CommandPaletteBehaviorDemo — VR behavioral cell for @rozie-ui/command-palette
+  (pure-Rozie, no engine). Drives the cmdk-style command menu: a two-way
+  r-model:open + r-model:query, a fixed :items list, an open button, and a @select
+  readout. The spec opens the palette, types to filter, arrow-navigates, selects an
+  item (checks the @select payload) and closes via Escape — see
+  command-palette.spec.ts (when added). Behavioral-only (no pixel baseline).
+
+  COLLISION NOTE: the open helper is `openPalette` (not `open`) — `open` is the local
+  $data key AND the inner component's model, and an `open`-named helper collapses onto
+  the generated `$data.open` setter on React/Solid (ROZ524). The select-readout helper
+  is `onSelect` (event-handler, not a setter). The dialog/listbox `show`/`apply<X>`
+  precedent.
+-->
+<rozie name="CommandPaletteBehaviorDemo">
+
+<components>
+{
+  CommandPalette: '../../packages/ui/command-palette/src/CommandPalette.rozie',
+}
+</components>
+
+<data>
+{
+  open: false,
+  query: '',
+  lastSelect: '',
+  items: [
+    { id: 'new', label: 'New File', group: 'File' },
+    { id: 'open', label: 'Open File', group: 'File' },
+    { id: 'save', label: 'Save', group: 'File' },
+    { id: 'cut', label: 'Cut', group: 'Edit' },
+    { id: 'copy', label: 'Copy', group: 'Edit' },
+    { id: 'paste', label: 'Paste', group: 'Edit' },
+  ],
+}
+</data>
+
+<script>
+const onSelect = (e) => {
+  $data.lastSelect = e && e.id != null ? e.id : ''
+}
+const openPalette = () => {
+  $data.open = true
+}
+</script>
+
+<template>
+<div class="command-palette-demo">
+  <h3>CommandPalette — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="open-palette" @click="openPalette()">Open</button>
+    <span class="readout" data-testid="readout-open">{{ $data.open }}</span>
+    <span class="readout" data-testid="readout-query">{{ $data.query }}</span>
+    <span class="readout" data-testid="readout-select">{{ $data.lastSelect }}</span>
+  </div>
+
+  <CommandPalette
+    r-model:open="$data.open"
+    r-model:query="$data.query"
+    :items="$data.items"
+    placeholder="Type a command…"
+    ariaLabel="Command palette"
+    @select="onSelect($event)"
+  />
+</div>
+</template>
+
+<style>
+.command-palette-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.command-palette-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.command-palette-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+</style>
+
+</rozie>

@@ -51,6 +51,16 @@ const EXAMPLES = [
   // x/y from the same anchor/viewport across all six targets (the engine-computed
   // byte-identity premise), so a single shared baseline holds.
   'PopoverScreenshot',
+  // @rozie-ui/command-palette — the cmdk-style menu renders its overlay
+  // `position: fixed` full-viewport (a scrim + a centered role="dialog" panel),
+  // r-if="open" gated. The demo seeds open=true + a fixed :items list (query empty),
+  // so the centered panel + the full command list paint on mount. The fixed overlay
+  // is laid out relative to the VIEWPORT (not the rozie-mount wrapper), so it escapes
+  // the matrix mount clip and is captured PAGE-LEVEL here (the Dialog precedent). The
+  // component focuses the search input on open, so the capture HIDES the text caret
+  // (`caret: 'hide'`) to keep it deterministic. Per D-10 all 6 targets diff against
+  // the same shared CommandPaletteScreenshot.png.
+  'CommandPaletteScreenshot',
 ] as const;
 
 // Baseline-availability gate (per-example), copied from matrix.spec.ts. When
@@ -109,14 +119,28 @@ for (const example of EXAMPLES) {
         await expect(page.locator('[role="dialog"]')).toBeVisible({
           timeout: 15_000,
         });
+      } else if (example === 'CommandPaletteScreenshot') {
+        // The demo seeds open=true; the overlay is r-if="open" with a centered
+        // role="dialog" panel over a role="listbox". Wait for the panel AND all 6
+        // seeded command options (unfiltered list, empty query) before the clip.
+        // role="option" matches exactly the 6 <li> rows (a `[class*=...]` substring
+        // locator over-matches: each option's `-label`/`-group` child class AND the
+        // `--active` modifier also contain the substring → 18 hits). role= pierces
+        // Lit's shadow and is unaffected by React CSS-Modules class hashing.
+        await expect(page.locator('[role="dialog"]')).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.getByRole('option')).toHaveCount(6, { timeout: 15_000 });
       }
 
       // PAGE-level (viewport) capture so the top-layer dialog / fixed-corner toast
       // are included — a mount-clipped capture would miss them. Per D-10 all 6
-      // targets diff against the same shared `${example}.png`.
+      // targets diff against the same shared `${example}.png`. CommandPalette focuses
+      // its search input on open, so its capture hides the blinking text caret.
       await expect(page).toHaveScreenshot(`${example}.png`, {
         animations: 'disabled',
         maxDiffPixels: 2,
+        ...(example === 'CommandPaletteScreenshot' ? { caret: 'hide' as const } : {}),
       });
     });
   }

@@ -1,0 +1,74 @@
+<!--
+  DatePickerBehaviorDemo — VR behavioral cell for @rozie-ui/date-picker (pure-Rozie,
+  no engine). Drives the month-grid calendar: a two-way r-model:value (live ISO
+  readout), a direct-model-write button, and a @change readout. The spec clicks a
+  day, navigates a month, checks the assembled value + change event — see
+  date-picker.spec.ts (when added). Behavioral-only (no pixel baseline).
+
+  COLLISION NOTE: the direct-write helper is `applyDate`, NOT `setDate` — the local
+  $data key is `date`, and a `set<X>` helper collapses onto the generated `$data.date`
+  setter on React/Solid (ROZ524). `apply<X>` is the listbox/data-table precedent.
+-->
+<rozie name="DatePickerBehaviorDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+  lastChange: '',
+}
+</data>
+
+<script>
+const onChange = (e) => {
+  $data.lastChange = e && e.value != null ? e.value : ''
+}
+const applyDate = (v) => {
+  $data.date = v
+}
+</script>
+
+<template>
+<div class="date-picker-demo">
+  <h3>DatePicker — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="set-date" @click="applyDate('2025-06-20')">Set Jun 20</button>
+    <span class="readout" data-testid="readout-date">{{ $data.date }}</span>
+    <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
+  </div>
+
+  <DatePicker
+    r-model:value="$data.date"
+    :weekStartsOn="0"
+    locale="en-US"
+    @change="onChange($event)"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+.date-picker-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.date-picker-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

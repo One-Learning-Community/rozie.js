@@ -1,0 +1,71 @@
+<!--
+  CommandPaletteScreenshotDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/command-palette family (pure-Rozie, no engine).
+
+  Where CommandPaletteBehaviorDemo.rozie is the BEHAVIORAL cell (type to filter,
+  arrow-nav, @select, Escape close), THIS demo is the SEPARATE deterministic
+  SCREENSHOT cell — never extend it for behavior.
+
+  Made fully deterministic by:
+    1. Seeded OPEN (`open: true` in <data>, bound `r-model:open`) so the centered
+       dialog panel + the full command list render on mount — the palette overlay
+       is r-if="open" gated, so without this it renders nothing.
+    2. A FIXED `:items` array (six commands across two groups) and the query is left
+       EMPTY (onOpen clears it to ''), so the unfiltered list is stable run-to-run.
+    3. The first enabled option is highlighted by the component's onOpen reset — a
+       deterministic active row.
+
+  OVERLAY: the palette is `position: fixed` full-viewport (it escapes the
+  rozie-mount clip), so its baseline is captured PAGE-LEVEL by
+  specs/overlay-screenshot.spec.ts (the Dialog/Toaster/Popover precedent), NOT the
+  mount-clipped matrix. The Linux PNG baseline is generated in pinned Linux Docker
+  (NOT here — macOS baselines forbidden, feedback_vr_linux_baselines); until it
+  lands the cell auto-fixmes on `baselineExists()`.
+
+  COLLISION NOTE: the helper that seeds the list is `applyItems` (not `setItems`),
+  though here it is bound directly from <data> — no setter collision arises.
+-->
+
+<rozie name="CommandPaletteScreenshotDemo">
+
+<components>
+{
+  CommandPalette: '../../packages/ui/command-palette/src/CommandPalette.rozie',
+}
+</components>
+
+<data>
+{
+  open: true,
+  query: '',
+  items: [
+    { id: 'new', label: 'New File', group: 'File' },
+    { id: 'open', label: 'Open File', group: 'File' },
+    { id: 'save', label: 'Save', group: 'File' },
+    { id: 'cut', label: 'Cut', group: 'Edit' },
+    { id: 'copy', label: 'Copy', group: 'Edit' },
+    { id: 'paste', label: 'Paste', group: 'Edit' },
+  ],
+}
+</data>
+
+<template>
+<div class="command-palette-screenshot-demo">
+  <CommandPalette
+    r-model:open="$data.open"
+    r-model:query="$data.query"
+    :items="$data.items"
+    placeholder="Type a command…"
+    ariaLabel="Command palette"
+  />
+</div>
+</template>
+
+<style>
+.command-palette-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+}
+</style>
+
+</rozie>

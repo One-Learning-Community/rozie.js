@@ -252,6 +252,13 @@ const PAGINATION_SRC = resolve(
 );
 const SWITCH_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'switch', 'src');
 const POPOVER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'popover', 'src');
+// Same packaging move for @rozie-ui/date-picker / resizable / command-palette: each
+// family's <Name>.rozie lives in the package src; the Angular sub-build walks it via
+// `prebuildExtraRoots` and drops the cross-tree `.rozie.ts` + `<Name>.ts` shim
+// artefacts that must be swept after the Angular build (cleanupCrossTreeAngularArtifacts).
+const DATE_PICKER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'date-picker', 'src');
+const RESIZABLE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'resizable', 'src');
+const COMMAND_PALETTE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'command-palette', 'src');
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -621,6 +628,9 @@ function cleanupCrossTreeAngularArtifacts() {
     [PAGINATION_SRC, 'Pagination.ts'],
     [SWITCH_SRC, 'Switch.ts'],
     [POPOVER_SRC, 'Popover.ts'],
+    [DATE_PICKER_SRC, 'DatePicker.ts'],
+    [RESIZABLE_SRC, 'Resizable.ts'],
+    [COMMAND_PALETTE_SRC, 'CommandPalette.ts'],
   ]) {
     try {
       for (const entry of readdirSync(src)) {

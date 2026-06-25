@@ -1,0 +1,59 @@
+<!--
+  DatePickerScreenshotDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/date-picker family (pure-Rozie, no engine).
+
+  Where DatePickerBehaviorDemo.rozie is the BEHAVIORAL cell (day clicks, month nav,
+  @change readout), THIS demo is the SEPARATE deterministic SCREENSHOT cell — never
+  extend it for behavior, and never bolt pixels onto the behavioral one.
+
+  Made fully deterministic by:
+    1. A FIXED seeded `value` ('2025-06-15') bound `r-model:value="$data.date"`.
+       DatePicker's default view month otherwise depends on TODAY'S DATE (it seeds
+       $data.viewIso from value/today in $onMount), so pinning value forces the
+       June 2025 month grid to render run-to-run — never today's month.
+    2. `:locale="'en-US'"` + `:weekStartsOn="0"` pin the month-year heading + the
+       weekday header row so labels never localize-drift.
+    3. NO interactive controls and the control is never focused — no caret/
+       focus-ring to drift run-to-run.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here — macOS
+  baselines are forbidden, feedback_vr_linux_baselines). Until it lands the matrix
+  cell auto-fixmes on `baselineExists()`. INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="DatePickerScreenshotDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+}
+</data>
+
+<template>
+<div class="date-picker-screenshot-demo">
+  <DatePicker
+    r-model:value="$data.date"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>

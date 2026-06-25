@@ -384,6 +384,21 @@ const EXAMPLES = [
   // panel is position:absolute and escapes the rozie-mount clip). The *Behavior
   // cells are behavioral-only (no pixel baseline).
   'SwitchScreenshot',
+  // @rozie-ui/date-picker + resizable INLINE screenshot cells — both pure-Rozie
+  // families render in normal flow, so they go in this standard mount-clipped matrix.
+  // DatePickerScreenshot pins a FIXED value='2025-06-15' (its default view month
+  // otherwise tracks TODAY's date via $onMount, which would flake the baseline daily)
+  // + locale='en-US' + weekStartsOn=0, so the June-2025 month grid renders
+  // deterministically; the control is never focused (no caret/ring). ResizableScreenshot
+  // pins :size="50" in a fixed 420x180 box with two fixed-text panels, so the split
+  // lands at the midpoint and the handle is never focused. Per D-10 all 6 targets diff
+  // against the SAME shared `${name}.png`. Baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNGs land (feedback_vr_linux_baselines).
+  // The CommandPaletteScreenshot cell lives in overlay-screenshot.spec.ts (its overlay
+  // is position:fixed and escapes the rozie-mount clip). The *Behavior cells are
+  // behavioral-only (no pixel baseline).
+  'DatePickerScreenshot',
+  'ResizableScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -902,6 +917,25 @@ async function settleExample(
   if (example === 'SwitchScreenshot') {
     await expect(page.getByRole('switch')).toHaveCount(3, { timeout: 10_000 });
   }
+  // DatePickerScreenshot (@rozie-ui/date-picker): the calendar renders a 6×7 month
+  // grid → 42 `.rozie-datepicker-day` buttons. The `[class*=...]` substring locator
+  // survives React's CSS-Modules class hashing and pierces Lit's shadow. Wait for all
+  // 42 before clipping; the control is never focused (no caret), so once the grid
+  // paints the frame is final. The pinned value='2025-06-15' fixes the month, so the
+  // grid is deterministic.
+  if (example === 'DatePickerScreenshot') {
+    await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
+      timeout: 10_000,
+    });
+  }
+  // ResizableScreenshot (@rozie-ui/resizable): the splitter renders one
+  // role="separator" handle between the two panels. Its presence proves the wrapper
+  // laid out; the pinned :size="50" fixes the split at the midpoint and the handle is
+  // never focused (no focus ring), so once it paints the frame is final.
+  // `role="separator"` pierces Lit's shadow.
+  if (example === 'ResizableScreenshot') {
+    await expect(page.getByRole('separator')).toBeVisible({ timeout: 10_000 });
+  }
 }
 
 // TipTap · solid Solid-emitter TDZ runtime crash — RESOLVED 2026-05-20
@@ -1067,6 +1101,23 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 // .planning/todos/pending/lit-emitter-hoist-pure-literal-component-props.md.
 const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 
+// @rozie-ui/resizable — the ResizableScreenshot · solid cell is gated here as a
+// REAL Solid emitter bug (NOT accepted divergence). ROOT-CAUSED 2026-06-25 via the
+// Linux-Docker bare verification (17 passed / 1 failed): the Resizable component
+// positions its two panels with an inline `:style="sizeStyle()"` object that sets a
+// CSS CUSTOM PROPERTY (`--rozie-resizable-size: 50%`). The Solid emitter lowers that
+// to `style={parseInlineStyle(sizeStyle())}`, and `@rozie/runtime-solid`'s
+// `parseInlineStyle` helper does NOT pass through `--custom-property` keys — so on
+// Solid the variable is dropped, the start panel's `width: var(--rozie-resizable-size,
+// 50%)` collapses to its content width (~90px) instead of the 50% split, and the cell
+// diffs from the shared baseline by 207px. The other 5 targets (vue/react/svelte/
+// angular/lit) render the 50% split byte-identically and pass. This affects EVERY
+// Solid consumer that binds a CSS custom property via a `:style` object — a
+// cross-cutting `@rozie/runtime-solid` bug to fix in the helper (preserve `--*` keys),
+// NOT a Resizable-specific or demo-specific issue. Until the runtime fix lands the one
+// Solid cell fixme-gates (never red); the cell + the 5-target baseline still run.
+const RESIZABLE_SOLID_STYLE_VAR_TODO = new Set<string>(['ResizableScreenshot::solid']);
+
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
@@ -1086,12 +1137,19 @@ for (const example of EXAMPLES) {
     const maplibreLitScreenshotTodo = MAPLIBRE_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
+    // ResizableScreenshot · solid — REAL @rozie/runtime-solid parseInlineStyle bug
+    // (CSS custom property dropped from a :style object); documented above. NOT
+    // accepted divergence; gated until the runtime helper preserves `--*` keys.
+    const resizableSolidStyleVarTodo = RESIZABLE_SOLID_STYLE_VAR_TODO.has(
+      `${example}::${target}`,
+    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
-      maplibreLitScreenshotTodo
+      maplibreLitScreenshotTodo ||
+      resizableSolidStyleVarTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {

@@ -736,6 +736,27 @@ export const EXAMPLES = [
   // on baselineExists() until the Linux-Docker PNGs land (feedback_vr_linux_baselines).
   'SwitchScreenshot',
   'PopoverScreenshot',
+  // @rozie-ui/date-picker + resizable + command-palette BEHAVIORAL cells (loaders →
+  // examples/demos/{DatePicker,Resizable,CommandPalette}BehaviorDemo.rozie). Each is
+  // a self-contained wrapper that seeds its own state in <data> and binds the inner
+  // component via r-model. Behavioral-only (no pixel baseline). Each family registers
+  // its src root for the Angular cross-tree AOT prebuild (vite.config.ts +
+  // tsconfig.app.json + build-cells.mjs).
+  'DatePickerBehavior',
+  'ResizableBehavior',
+  'CommandPaletteBehavior',
+  // @rozie-ui/date-picker + resizable + command-palette SCREENSHOT cells (loaders →
+  // examples/demos/{DatePicker,Resizable,CommandPalette}ScreenshotDemo.rozie).
+  // DatePickerScreenshot pins value='2025-06-15' (its default month otherwise tracks
+  // TODAY) → INLINE month grid → standard mount-clipped matrix cell (matrix.spec.ts).
+  // ResizableScreenshot pins :size="50" in a fixed 420x180 box → INLINE → matrix.spec.ts.
+  // CommandPaletteScreenshot seeds open=true + a fixed :items list; its overlay is
+  // position:fixed and ESCAPES the mount clip → captured PAGE-LEVEL by
+  // overlay-screenshot.spec.ts (the Dialog/Toaster/Popover precedent). All auto-fixme
+  // on baselineExists() until the Linux-Docker PNGs land (feedback_vr_linux_baselines).
+  'DatePickerScreenshot',
+  'ResizableScreenshot',
+  'CommandPaletteScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -987,6 +1008,16 @@ export const LIT_TAGS: Record<Example, string> = {
   PopoverBehavior: 'rozie-popover-behavior',
   SwitchScreenshot: 'rozie-switch-screenshot',
   PopoverScreenshot: 'rozie-popover-screenshot',
+  // @rozie-ui/date-picker + resizable + command-palette — '-demo' appended on Lit →
+  // tags 'rozie-date-picker-behavior-demo' etc. = kebab of
+  // {DatePicker,Resizable,CommandPalette}{Behavior,Screenshot}Demo (the wrapper
+  // components are name="<Name>Demo").
+  DatePickerBehavior: 'rozie-date-picker-behavior',
+  ResizableBehavior: 'rozie-resizable-behavior',
+  CommandPaletteBehavior: 'rozie-command-palette-behavior',
+  DatePickerScreenshot: 'rozie-date-picker-screenshot',
+  ResizableScreenshot: 'rozie-resizable-screenshot',
+  CommandPaletteScreenshot: 'rozie-command-palette-screenshot',
 };
 
 export interface HostQuery {
@@ -1293,6 +1324,16 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   PopoverBehavior: {},
   SwitchScreenshot: {},
   PopoverScreenshot: {},
+  // @rozie-ui/date-picker + resizable + command-palette — all six demos are
+  // self-contained wrappers (each seeds its own state in <data> and binds the inner
+  // component via r-model). No parent-supplied props; no MODEL_PROPS entry (the model
+  // is bound internally — the FlowCanvas/MapLibre self-binding precedent).
+  DatePickerBehavior: {},
+  ResizableBehavior: {},
+  CommandPaletteBehavior: {},
+  DatePickerScreenshot: {},
+  ResizableScreenshot: {},
+  CommandPaletteScreenshot: {},
 };
 
 /**
