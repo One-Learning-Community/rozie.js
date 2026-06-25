@@ -396,6 +396,17 @@ export default defineConfig({
             { text: 'Popover — live demo', link: '/components/popover-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/command-palette',
+          collapsed: true,
+          items: [
+            { text: 'Command Palette — cmdk-style menu', link: '/components/command-palette' },
+            { text: 'API reference', link: '/components/command-palette-api' },
+            { text: 'Usage examples', link: '/components/command-palette-usage' },
+            { text: 'Command palette comparison', link: '/components/command-palette-comparison' },
+            { text: 'Command Palette — live demo', link: '/components/command-palette-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

@@ -1,0 +1,21 @@
+/*
+ * @rozie-ui/command-palette — Bootstrap 5 bridge.
+ *
+ * Maps the palette tokens onto Bootstrap 5 CSS variables (`--bs-*`).
+ *
+ *   import '@rozie-ui/command-palette-react/themes/bootstrap.css';
+ */
+.rozie-command-palette {
+  --rozie-command-palette-bg: var(--bs-body-bg, #fff);
+  --rozie-command-palette-color: var(--bs-body-color, #212529);
+  --rozie-command-palette-radius: var(--bs-border-radius-lg, 0.5rem);
+  --rozie-command-palette-shadow: var(--bs-box-shadow, 0 0.5rem 1rem rgba(0, 0, 0, 0.15));
+  --rozie-command-palette-divider-color: var(--bs-border-color, #dee2e6);
+
+  --rozie-command-palette-option-active-bg: var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.1));
+  --rozie-command-palette-option-active-color: var(--bs-emphasis-color, inherit);
+
+  --rozie-command-palette-group-color: var(--bs-secondary-color, rgba(0, 0, 0, 0.5));
+  --rozie-command-palette-empty-color: var(--bs-secondary-color, rgba(0, 0, 0, 0.5));
+  --rozie-command-palette-footer-color: var(--bs-secondary-color, rgba(0, 0, 0, 0.55));
+}

@@ -1,0 +1,502 @@
+<!--
+  CommandPalette.rozie — a headless, accessible cmdk-style command menu in a
+  portal-style modal overlay.
+
+  A pure-Rozie family (NO third-party engine). The "⌘K" command-palette pattern —
+  a centered modal with a search box over a filtered, keyboard-navigable list — is
+  re-implemented (often inaccessibly) in every framework. Rozie owns the
+  author-side API: the two-way `open` + `query` bindings, the client filter over
+  label + keywords, the roving-highlight keyboard model, the close policy
+  (backdrop / Escape), and the token-themed skin.
+
+  CONTROLLED via two models: `open` (visibility) and `query` (the search text).
+  Because there are TWO model:true props the component does NOT generate an
+  Angular ControlValueAccessor (a palette is not a single form control) — that is
+  the intended shape, not a regression.
+
+  OVERLAY: the overlay renders inline (a fixed full-viewport backdrop + a centered
+  `role="dialog"` panel) gated by `r-if="$props.open"`, NOT the native <dialog>
+  element. This sidesteps the emitter's missing `dialog` ref-type-map case (the
+  dialog family works around the same gap) and keeps the surface framework-owned
+  so the `item` / `empty` / `footer` slots are ordinary scoped slots (no portal
+  primitive needed — the framework owns this DOM).
+
+  Authoring notes (collision classes — see the authoring playbook §6):
+    - The filter logic lives in src/internal/filterCommands.ts (named
+      `filterCommands`, NOT `filter` — which would shadow Array.prototype.filter
+      and read like a prop). codegen vendors src/internal/ into every leaf.
+    - The OPEN imperative verb is `open` ONLY if it survives the surface gate
+      against the `open` MODEL (the $data/model-key == $expose-verb class, listbox,
+      collapses both onto React's generated `setOpen`/state). It collided, so the
+      verb is `show` (dialog precedent). `close`/`toggle`/`focus` are kept.
+      `close` is collision-safe (no `@close` EVENT is emitted — closing writes the
+      `open` model + emits nothing named `close`). `focus` is the accepted
+      ROZ137 Lit override (slider/otp/combobox precedent).
+    - The select event is `select` (the chosen item object). `open`/`query` are
+      two-way MODELS, not emits.
+    - $refs.inputEl is read only in post-mount callbacks ($onMount / the open
+      $watch callback / handlers) — ROZ123-safe. The watch GETTER is
+      `() => $props.open` (touches no ref).
+    - Handler params are left UNTYPED (neutralize to `any`) so reading
+      `e.target` / `e.preventDefault()` typechecks across all six strict leaves.
+    - Derived views (`filteredItems()`, `activeId()`, …) are PLAIN functions
+      (called from the r-for AND handlers) — never $computed (the listbox
+      value-vs-accessor split).
+
+  Consumer example:
+
+    <CommandPalette
+      r-model:open="paletteOpen"
+      r-model:query="q"
+      :items="commands"
+      @select="run"
+    />
+-->
+
+<rozie name="CommandPalette">
+
+<!--
+  COMPOSITION NOTE (listbox dogfood evaluated, NOT viable source-only):
+
+  Composing the shipped @rozie-ui/listbox family as the results list — via a
+  <components> entry — is NOT expressible in one .rozie source today. A
+  <components> import path is a SINGLE string literal (lowerComponents.ts:
+  `importPath: value.value`) that every one of the six emitters receives
+  verbatim; the only per-target rewrite is the `.rozie` → `.{tsx,vue,svelte,…}`
+  EXTENSION swap (rewriteRozieImport.ts), which assumes the child is a sibling
+  `.rozie` compiled alongside this one. A published listbox leaf is a DIFFERENT
+  PACKAGE NAME per target (`@rozie-ui/listbox-react` vs `-vue` vs `-svelte` …),
+  and there is no mechanism to map one import-path literal to six package names.
+  (Confirmed: zero @rozie-ui leaf depends on another family's leaf, and
+  <components> has never referenced anything but a local `./Child.rozie`.)
+
+  Making it work would need a non-additive core/emitter change (per-target
+  package-name resolution in <components>, or a build-time per-leaf specifier
+  rewrite) + slot-threading against a non-`.rozie` producer — outside the
+  source-only scope fence for a new family. Reported for backlog. The navigable
+  list is therefore authored here as ordinary scoped slots + roving nav (the
+  same primitives listbox itself uses), which is what the original surface spec
+  called for.
+-->
+
+<props>
+{
+  // Visibility (two-way). One of two model:true props (no Angular CVA).
+  open: {
+    type: Boolean,
+    default: false,
+    model: true,
+    docs: {
+      description:
+        'Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`.',
+      example: '<CommandPalette r-model:open="paletteOpen" :items="commands" />',
+    },
+  },
+
+  // The search text (two-way). The other model:true prop.
+  query: {
+    type: String,
+    default: '',
+    model: true,
+    docs: {
+      description:
+        'The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens.',
+    },
+  },
+
+  // The command list.
+  items: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.',
+    },
+  },
+
+  // Search input placeholder.
+  placeholder: {
+    type: String,
+    default: 'Type a command…',
+    docs: {
+      description: 'Placeholder text shown in the search input while the query is empty.',
+    },
+  },
+
+  // Empty-state text (overridable via the `empty` slot).
+  emptyText: {
+    type: String,
+    default: 'No results.',
+    docs: {
+      description:
+        'Text shown when the query matches no items. Override the whole empty state with the `empty` slot when you need richer markup.',
+    },
+  },
+
+  // Whether selecting an item closes the palette (default: yes).
+  closeOnSelect: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Whether choosing an item closes the palette. Defaults to `true` (the cmdk convention); set to `false` to keep the palette open after a selection — e.g. for a multi-action menu where the user runs several commands in a row.',
+    },
+  },
+
+  // Accessible name for the dialog surface.
+  ariaLabel: {
+    type: String,
+    default: 'Command palette',
+    docs: {
+      description:
+        'Accessible name for the dialog surface (`aria-label` on the `role="dialog"` panel). Override it to match the palette\'s purpose (e.g. "Search commands").',
+    },
+  },
+
+  // id base for the listbox + option elements (aria-activedescendant needs ids).
+  idBase: {
+    type: String,
+    default: 'rozie-command-palette',
+    docs: {
+      description:
+        'Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // Highlighted option index within the FILTERED list (for aria-activedescendant).
+  activeIndex: 0,
+}
+</data>
+
+<script lang="ts">
+import { filterCommands } from './internal/filterCommands'
+
+// ---- derived views (plain functions, uniform ×6) -----------------------
+// The filtered command list, each carrying its filtered-list index `_i`. A plain
+// function (called from the r-for AND handlers) — never $computed.
+const filteredItems = () => {
+  const src = Array.isArray($props.items) ? $props.items : []
+  const list = filterCommands(src, $props.query)
+  return list.map((it, i) => ({
+    id: it.id,
+    label: it.label,
+    group: it.group,
+    keywords: it.keywords,
+    disabled: !!it.disabled,
+    _i: i,
+  }))
+}
+
+const optId = (i) => $props.idBase + '-opt-' + i
+const listId = () => $props.idBase + '-list'
+const inputId = () => $props.idBase + '-input'
+
+// The active option's id for aria-activedescendant (null when none).
+const activeId = () => {
+  const list = filteredItems()
+  if ($data.activeIndex >= 0 && list[$data.activeIndex]) return optId($data.activeIndex)
+  return null
+}
+
+// Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
+const nextEnabled = (list, from, dir) => {
+  let i = from
+  for (let step = 0; step < list.length; step++) {
+    i = i + dir
+    if (i < 0) i = 0
+    if (i >= list.length) i = list.length - 1
+    if (list[i] && !list[i].disabled) return i
+    if ((dir < 0 && i === 0) || (dir > 0 && i === list.length - 1)) break
+  }
+  return from
+}
+
+// First selectable index (or 0). Used to reset the highlight on open / re-filter.
+const firstEnabled = (list) => {
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && !list[i].disabled) return i
+  }
+  return 0
+}
+
+// ---- close funnel ------------------------------------------------------
+const closePalette = () => {
+  $model.open = false
+}
+
+// ---- selection ---------------------------------------------------------
+const selectItem = (item) => {
+  if (!item || item.disabled) return
+  $emit('select', { id: item.id, label: item.label, group: item.group })
+  if ($props.closeOnSelect) closePalette()
+}
+
+// ---- input + keyboard handlers -----------------------------------------
+const onInput = (e) => {
+  const q = e && e.target ? e.target.value : ''
+  $model.query = q
+  // Reset the highlight to the first enabled item of the NEW filtered list.
+  const next = filterCommands(Array.isArray($props.items) ? $props.items : [], q)
+  $data.activeIndex = firstEnabled(next)
+}
+
+const onKeydown = (e) => {
+  const key = e ? e.key : ''
+  const list = filteredItems()
+  const ai = $data.activeIndex
+  if (key === 'ArrowDown') {
+    if (e) e.preventDefault()
+    $data.activeIndex = nextEnabled(list, ai, 1)
+  } else if (key === 'ArrowUp') {
+    if (e) e.preventDefault()
+    $data.activeIndex = nextEnabled(list, ai, -1)
+  } else if (key === 'Home') {
+    if (e) e.preventDefault()
+    $data.activeIndex = nextEnabled(list, -1, 1)
+  } else if (key === 'End') {
+    if (e) e.preventDefault()
+    $data.activeIndex = nextEnabled(list, list.length, -1)
+  } else if (key === 'Enter') {
+    if (ai >= 0 && list[ai]) {
+      if (e) e.preventDefault()
+      selectItem(list[ai])
+    }
+  } else if (key === 'Escape') {
+    if (e) e.preventDefault()
+    closePalette()
+  }
+}
+
+// Backdrop click: a click whose target IS the backdrop (not the panel/children).
+const onBackdropClick = (e) => {
+  if (e && e.target === e.currentTarget) closePalette()
+}
+
+// ---- open/close reconcile ----------------------------------------------
+// On open: clear the query, reset the highlight, focus the input (post-mount →
+// $refs safe). Reading $refs here is ROZ123-safe (this runs from $onMount and
+// the lazy $watch callback, both post-mount).
+const onOpen = () => {
+  $model.query = ''
+  $data.activeIndex = firstEnabled(filterCommands(Array.isArray($props.items) ? $props.items : [], ''))
+  const el = $refs.inputEl
+  if (el && el.focus) {
+    // Defer a tick so the overlay is mounted before focusing.
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        const again = $refs.inputEl
+        if (again && again.focus) again.focus()
+      })
+    } else {
+      el.focus()
+    }
+  }
+}
+
+// ---- lifecycle ---------------------------------------------------------
+$onMount(() => {
+  if ($props.open) onOpen()
+})
+
+// Lazy watch (never `immediate` — onMount seeds the initial open). Fire onOpen
+// only on the false→true transition.
+$watch(() => $props.open, (isOpen) => {
+  if (isOpen) onOpen()
+})
+
+// ---- imperative handle -------------------------------------------------
+// show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
+// `open`) — an `open` verb collides with the `open` model on React (both collapse
+// onto the generated open/setOpen state). focus() focuses the input (accepted
+// ROZ137 Lit override). All post-mount → $refs safe.
+const show = () => {
+  $model.open = true
+}
+const close = () => {
+  closePalette()
+}
+const toggle = () => {
+  $model.open = !$props.open
+}
+const focus = () => $refs.inputEl?.focus()
+
+$expose({ show, close, toggle, focus })
+</script>
+
+<template>
+<div
+  r-if="$props.open"
+  class="rozie-command-palette"
+  @click="onBackdropClick($event)"
+>
+  <div
+    class="rozie-command-palette-panel"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="$props.ariaLabel"
+    @keydown="onKeydown($event)"
+  >
+    <div class="rozie-command-palette-search">
+      <input
+        ref="inputEl"
+        class="rozie-command-palette-input"
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        :id="inputId()"
+        :aria-expanded="!!$props.open"
+        :aria-controls="listId()"
+        :aria-activedescendant="activeId()"
+        :aria-label="$props.ariaLabel"
+        :value="$props.query"
+        :placeholder="$props.placeholder"
+        autocomplete="off"
+        @input="onInput($event)"
+      />
+    </div>
+
+    <ul
+      r-if="filteredItems().length > 0"
+      class="rozie-command-palette-list"
+      :id="listId()"
+      role="listbox"
+      :aria-label="$props.ariaLabel"
+    >
+      <li
+        r-for="item in filteredItems()"
+        :key="item.id"
+        class="rozie-command-palette-option"
+        :class="{ 'rozie-command-palette-option--active': item._i === $data.activeIndex, 'rozie-command-palette-option--disabled': item.disabled }"
+        :id="optId(item._i)"
+        role="option"
+        :aria-selected="item._i === $data.activeIndex"
+        :aria-disabled="!!item.disabled"
+        @mousedown.prevent="selectItem(item)"
+        @mouseenter="$data.activeIndex = item._i"
+      >
+        <slot name="item" :item="item" :active="item._i === $data.activeIndex">
+          <span class="rozie-command-palette-option-label">{{ item.label }}</span>
+          <span r-if="item.group" class="rozie-command-palette-option-group">{{ item.group }}</span>
+        </slot>
+      </li>
+    </ul>
+
+    <div r-if="filteredItems().length === 0" class="rozie-command-palette-empty">
+      <slot name="empty">{{ $props.emptyText }}</slot>
+    </div>
+
+    <div r-if="$slots.footer" class="rozie-command-palette-footer">
+      <slot name="footer" />
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+/*
+  Token-driven (mirrors combobox/dialog/otp themes): every visual value is a
+  `var(--rozie-command-palette-*, <fallback>)`. The shipped themes/*.css presets
+  map these onto shadcn/Radix, Material 3, Bootstrap 5. Structural behavior
+  (the fixed overlay, centering, the scrollable list) is not tokenized.
+*/
+
+/* The full-viewport overlay + scrim. Fixed so it escapes overflow ancestors. */
+.rozie-command-palette {
+  position: fixed;
+  inset: 0;
+  z-index: var(--rozie-command-palette-z, 1000);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--rozie-command-palette-overlay-padding, 12vh 1rem 1rem);
+  background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
+  backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
+}
+
+/* The centered dialog box. */
+.rozie-command-palette-panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-height: var(--rozie-command-palette-max-height, 70vh);
+  overflow: hidden;
+  font: var(--rozie-command-palette-font, inherit);
+  color: var(--rozie-command-palette-color, inherit);
+  background: var(--rozie-command-palette-bg, #fff);
+  border: var(--rozie-command-palette-border, none);
+  border-radius: var(--rozie-command-palette-radius, 0.75rem);
+  box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+}
+
+.rozie-command-palette-search {
+  padding: var(--rozie-command-palette-search-padding, 0.75rem);
+  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+}
+
+.rozie-command-palette-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  font: inherit;
+  font-size: var(--rozie-command-palette-input-font-size, 1.05rem);
+  color: inherit;
+  background: var(--rozie-command-palette-input-bg, transparent);
+  border: var(--rozie-command-palette-input-border, none);
+  border-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  outline: none;
+}
+
+.rozie-command-palette-list {
+  margin: 0;
+  padding: var(--rozie-command-palette-list-padding, 0.5rem);
+  list-style: none;
+  overflow-y: auto;
+}
+
+.rozie-command-palette-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
+  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
+  cursor: pointer;
+  color: var(--rozie-command-palette-option-color, inherit);
+}
+
+.rozie-command-palette-option--active {
+  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
+  color: var(--rozie-command-palette-option-active-color, inherit);
+}
+
+.rozie-command-palette-option--disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
+}
+
+.rozie-command-palette-option-group {
+  font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
+  color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
+  text-transform: var(--rozie-command-palette-group-transform, uppercase);
+  letter-spacing: 0.04em;
+}
+
+.rozie-command-palette-empty {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+
+.rozie-command-palette-footer {
+  padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
+  border-top: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  font-size: var(--rozie-command-palette-footer-font-size, 0.8125rem);
+  color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
+}
+</style>
+
+</rozie>

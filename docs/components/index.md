@@ -77,6 +77,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **DatePicker** | *(no engine)* headless accessible single-date calendar | [/components/date-picker](/components/date-picker) |
 | **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |
 | **Resizable** | *(no engine)* headless accessible two-panel splitter / resizable pane | [/components/resizable](/components/resizable) |
+| **CommandPalette** | *(no engine)* headless accessible cmdk-style command menu | [/components/command-palette](/components/command-palette) |
 
 ## Why these exist
 

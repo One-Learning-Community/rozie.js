@@ -1,0 +1,26 @@
+/*
+ * @rozie-ui/command-palette — shadcn/ui (Radix) bridge.
+ *
+ * Maps the palette tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * palette automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/command-palette-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-command-palette {
+  --rozie-command-palette-bg: hsl(var(--popover, 0 0% 100%));
+  --rozie-command-palette-color: hsl(var(--popover-foreground, 222.2 84% 4.9%));
+  --rozie-command-palette-radius: var(--radius, 0.5rem);
+  --rozie-command-palette-divider-color: hsl(var(--border, 214.3 31.8% 91.4%));
+
+  --rozie-command-palette-option-active-bg: hsl(var(--accent, 210 40% 96.1%));
+  --rozie-command-palette-option-active-color: hsl(var(--accent-foreground, 222.2 47.4% 11.2%));
+
+  --rozie-command-palette-group-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-command-palette-empty-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-command-palette-footer-color: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+}

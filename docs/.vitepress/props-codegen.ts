@@ -62,6 +62,7 @@ export function propsCodegen(
       'switch',
       'resizable',
       'popover',
+      'command-palette',
       'sortable-list',
       'flatpickr',
       'fullcalendar',
