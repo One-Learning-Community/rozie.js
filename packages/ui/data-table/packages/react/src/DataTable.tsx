@@ -259,6 +259,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const fillDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
+  const editTransition = useRef(false);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -1975,9 +1976,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       }
     }
     if (wrote > 0) {
-      editTransition = true;
+      editTransition.current = true;
       writeData(next);
-      editTransition = false;
+      editTransition.current = false;
       // One cell-edit-commit per COMMITTED cell (the per-cell event contract, D-03).
       for (let i = 0; i < committed.length; i++) props.onCellEditCommit && props.onCellEditCommit(committed[i]);
     }
@@ -2292,7 +2293,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const focusCol = editingCol;
     // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
     // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
-    editTransition = true;
+    editTransition.current = true;
     writeData(next);
     // Exactly one emit per commit, from this single call site (writeData does NOT emit).
     props.onCellEditCommit && props.onCellEditCommit({
@@ -2302,7 +2303,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       newValue
     });
     endEdit();
-    editTransition = false;
+    editTransition.current = false;
     // Defer the focus return so the display↔editor re-render commits first (async on
     // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
     // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
@@ -2318,9 +2319,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // instead of the cell being cancelled. commitEdit already snapshots editingRow/editingCol.
     const focusRow = editingRow;
     const focusCol = editingCol;
-    editTransition = true;
+    editTransition.current = true;
     endEdit();
-    editTransition = false;
+    editTransition.current = false;
     focusCellWhenReady(focusRow, focusCol);
   }
   function editableColumnsForRow(rowIndex: any) {
@@ -2411,7 +2412,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const next = replaceRowValues(currentData(), srcIndex, fieldValues);
     const focusRow = rowIndex;
     const focusCol = activeColIndex;
-    editTransition = true;
+    editTransition.current = true;
     writeData(next);
     // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
     props.onRowEditCommit && props.onRowEditCommit({
@@ -2419,7 +2420,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       changes
     });
     endRowEdit();
-    editTransition = false;
+    editTransition.current = false;
     focusCellWhenReady(focusRow, focusCol);
     return true;
   }
@@ -2427,9 +2428,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (editingRowIndex == null) return;
     const focusRow = activeRow;
     const focusCol = activeColIndex;
-    editTransition = true;
+    editTransition.current = true;
     endRowEdit();
-    editTransition = false;
+    editTransition.current = false;
     focusCellWhenReady(focusRow, focusCol);
   }
   function replaceRowValues(rows: any, rowIndex: any, fieldValues: any) {
@@ -2473,19 +2474,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return null;
   }
-  // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
-  // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
-  // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
-  // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
-  let editTransition = false;
-
-  // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
-  // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
-  // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
-  // rowDraft — so the four editors open simultaneously never clobber one shared value. These
-  // helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
-  // the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
-  // onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
   function inRowEdit() {
     return editingRowIndex != null;
   }
@@ -2582,7 +2570,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // into N writes + N events, violating the one-write/one-event contract). Tabbing between
     // the row's own editors is a normal focus move, not a commit.
     if (inRowEdit()) return;
-    if (editingRow < 0 || editTransition) return;
+    if (editingRow < 0 || editTransition.current) return;
     const next = e ? e.relatedTarget : null;
     // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
     // another widget). Skip when:
