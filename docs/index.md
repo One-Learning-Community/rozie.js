@@ -49,7 +49,7 @@ The clearest proof that one source can ship six idiomatic targets is a shelf of 
 
 **No-engine, pure Rozie** — headless, fully accessible interaction authored from scratch in a single `.rozie` file, proving Rozie carries rich behavior on its own:
 
-[Listbox](/components/listbox) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [Pagination](/components/pagination) · [DatePicker & Calendar](/components/date-picker) · [Switch & Toggle](/components/switch)
+[Listbox](/components/listbox) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [Pagination](/components/pagination) · [DatePicker & Calendar](/components/date-picker) · [Switch & Toggle](/components/switch) · [Resizable Split Pane](/components/resizable)
 
 **Hosted widgets** — a third-party SaaS widget loaded at runtime (no npm engine), unified across providers *and* frameworks:
 

@@ -1,0 +1,21 @@
+/*
+ * @rozie-ui/resizable — Material Design 3 bridge.
+ *
+ * Maps the resizable tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/resizable-react/themes/material.css';
+ */
+.rozie-resizable {
+  --rozie-resizable-accent: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-resizable-handle-bg: var(--md-sys-color-surface-variant, #e7e0ec);
+  --rozie-resizable-handle-hover-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+  --rozie-resizable-handle-active-bg: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-resizable-grip-bg: var(--md-sys-color-on-surface-variant, #49454f);
+
+  --rozie-resizable-focus-ring-color: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 50%, transparent);
+}

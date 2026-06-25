@@ -375,6 +375,17 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/resizable',
+          collapsed: true,
+          items: [
+            { text: 'Resizable — headless split pane', link: '/components/resizable' },
+            { text: 'API reference', link: '/components/resizable-api' },
+            { text: 'Usage examples', link: '/components/resizable-usage' },
+            { text: 'Split pane / resizable comparison', link: '/components/resizable-comparison' },
+            { text: 'Resizable — live demo', link: '/components/resizable-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/popover',
           collapsed: true,
           items: [

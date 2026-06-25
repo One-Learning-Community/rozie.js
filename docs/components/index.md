@@ -76,6 +76,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
 | **DatePicker** | *(no engine)* headless accessible single-date calendar | [/components/date-picker](/components/date-picker) |
 | **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |
+| **Resizable** | *(no engine)* headless accessible two-panel splitter / resizable pane | [/components/resizable](/components/resizable) |
 
 ## Why these exist
 

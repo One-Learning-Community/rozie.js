@@ -1,0 +1,75 @@
+{
+  "name": "@rozie-ui/resizable-lit",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Lit headless accessible two-panel splitter / resizable pane (pointer-drag + pointer capture, role=separator keyboard control, min/max clamp, two-way size, start/end/handle slots) — one accessible Rozie source compiled to a Lit custom element.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "resizable",
+    "splitter",
+    "split-pane",
+    "resize",
+    "panel",
+    "layout",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "lit"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/resizable/packages/lit"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/Resizable.ts",
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-lit": "workspace:*"
+  },
+  "peerDependencies": {
+    "lit": "^3.2",
+    "@lit-labs/preact-signals": "^1.0.0",
+    "@preact/signals-core": "^1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": false
+    },
+    "@lit-labs/preact-signals": {
+      "optional": false
+    },
+    "@preact/signals-core": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

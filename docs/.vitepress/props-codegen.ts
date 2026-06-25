@@ -60,6 +60,7 @@ export function propsCodegen(
       'pagination',
       'date-picker',
       'switch',
+      'resizable',
       'popover',
       'sortable-list',
       'flatpickr',

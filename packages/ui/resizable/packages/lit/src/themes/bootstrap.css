@@ -1,0 +1,22 @@
+/*
+ * @rozie-ui/resizable — Bootstrap 5 bridge.
+ *
+ * Maps the resizable tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the splitter follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/resizable-react/themes/bootstrap.css';
+ */
+.rozie-resizable {
+  --rozie-resizable-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-resizable-handle-bg: var(--bs-border-color, #dee2e6);
+  --rozie-resizable-handle-hover-bg: var(--bs-secondary-bg, #e9ecef);
+  --rozie-resizable-handle-active-bg: var(--bs-primary, #0d6efd);
+
+  --rozie-resizable-grip-bg: var(--bs-secondary-color, #6c757d);
+
+  --rozie-resizable-focus-ring-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.5);
+  --rozie-resizable-disabled-opacity: 0.5;
+}

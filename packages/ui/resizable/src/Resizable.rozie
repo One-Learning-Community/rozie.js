@@ -1,0 +1,376 @@
+<!--
+  Resizable.rozie — a headless, accessible two-panel splitter / resizable pane.
+
+  A pure-Rozie family (NO third-party engine) in the spirit of otp / slider: it
+  fills a real cross-framework need (every layout re-implements a draggable
+  split pane) with zero engine dependency. The platform IS the engine: native
+  Pointer Events + pointer capture do the drag, the keyboard drives the handle
+  (role="separator"), and a single CSS custom property (`--rozie-resizable-size`)
+  positions the two panels. Rozie owns the author-side API, the two-way binding,
+  the clamp/percent math, and the token-themed skin.
+
+  TWO PANELS ONLY (v1): a `start` panel, an `end` panel, and one draggable
+  `handle` between them. N-panel layouts are intentionally out of scope — the
+  single `size` percent (width of the FIRST panel) is the whole state, which is
+  what keeps it fully controlled with no draft buffer.
+
+  CONTROLLED, NO LOCAL STATE: `size` (the sole model:true prop → Angular
+  ControlValueAccessor; a splitter position IS a form-controllable value) is the
+  first panel's percent. The second panel takes the remainder via CSS
+  (`flex: 1 1 0` / `calc(100% - var(...))`). A `$data.dragging` flag only tracks
+  the active-drag CSS class; it is NOT the value.
+
+  DRAG via TEMPLATE pointer events + pointer capture (NOT a document <listeners>
+  block): `@pointerdown` captures the pointer on the handle, `@pointermove`
+  maps the pointer into a first-panel percent off the container rect, and
+  `@pointerup` releases. This avoids the documented React emitter gap where
+  `$event` in a <listeners> handler leaks into the useEffect deps array (TS2552);
+  template `@event` is typed and safe, and pointer capture keeps move/up events
+  flowing to the handle even when the pointer leaves it mid-drag.
+
+  $refs.root is read ONLY inside the pointer handlers and the $expose verbs (all
+  post-mount → ROZ123-safe), and getBoundingClientRect reaches the container
+  inside Lit's shadow root too.
+
+  Authoring notes (collision classes — see the authoring playbook):
+    - The expose verbs are `applySize` / `reset`. The natural `setSize` verb
+      COLLIDES with the React state setter auto-generated for the `size` model
+      prop (ROZ524) — and the Phase-46 deconfliction pass does NOT rename inside
+      an `$expose`-verb closure, so it surfaces as an INTERNAL ROZ524 at
+      compile(react). Renamed to `applySize` (the listbox/data-table `apply<X>`
+      precedent). `reset` is collision-safe.
+    - Handler params are LEFT UNTYPED so they neutralize to `any`; reading
+      `e.clientX` / `e.currentTarget` / `e.pointerId` then typechecks across all
+      six strict leaves. Never annotate them.
+    - The clamp/percent math lives in ./internal/resizeMath (vendored into every
+      leaf, unit-tested once) — the §"branchy math → src/internal helper" rule.
+
+  Consumer example:
+
+    <Resizable r-model:size="$data.split" :min="20" :max="80" direction="horizontal">
+      <template #start><nav>…</nav></template>
+      <template #end><main>…</main></template>
+    </Resizable>
+-->
+
+<rozie name="Resizable">
+
+<props>
+{
+  // The first panel's size as a percent of the container along the split axis
+  // (width when horizontal, height when vertical). The sole model:true prop →
+  // drives the Angular ControlValueAccessor. Always clamped to [min, max].
+  size: {
+    type: Number,
+    default: 50,
+    model: true,
+    docs: {
+      description:
+        'The first (`start`) panel\'s size as a percent of the container along the split axis (its width when `direction="horizontal"`, its height when `"vertical"`). Two-way via `r-model:size`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so the splitter position **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Every commit (drag, keyboard, or a programmatic `applySize`) is clamped to `[min, max]` and written back.',
+      example: '<Resizable r-model:size="split" :min="20" :max="80" direction="horizontal" />',
+    },
+  },
+
+  // Split axis. 'horizontal' → side-by-side panels with a vertical handle;
+  // 'vertical' → stacked panels with a horizontal handle.
+  direction: {
+    type: String,
+    default: 'horizontal',
+    docs: {
+      description:
+        "The split axis. `'horizontal'` (default) lays the two panels out side-by-side with a vertical drag handle between them (`size` is the first panel's **width**); `'vertical'` stacks them with a horizontal handle (`size` is the first panel's **height**). Also sets the handle's `aria-orientation`.",
+    },
+  },
+
+  // Lower bound on `size` (percent). The first panel can never shrink below this.
+  min: {
+    type: Number,
+    default: 10,
+    docs: {
+      description:
+        'The minimum `size` percent — the first panel can never be dragged or nudged below this. Clamps every commit.',
+    },
+  },
+
+  // Upper bound on `size` (percent). The first panel can never grow beyond this.
+  max: {
+    type: Number,
+    default: 90,
+    docs: {
+      description:
+        'The maximum `size` percent — the first panel can never be dragged or nudged beyond this (so the second panel keeps at least `100 - max` percent). Clamps every commit.',
+    },
+  },
+
+  // Disable resizing — the handle becomes non-interactive and the panels lock at
+  // the current `size`.
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable resizing — the handle becomes non-interactive (pointer drag and keyboard are ignored) and the panels lock at the current `size`. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // Active-drag flag — drives the `--dragging` CSS class only (NOT the value).
+  dragging: false,
+}
+</data>
+
+<script lang="ts">
+import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath'
+
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The current size, normalized + clamped. Plain function (called in template
+// bindings AND handlers) — never $computed (a $computed is a value on React but
+// an accessor on Solid; a plain fn reads uniformly).
+const currentSize = () => {
+  const raw = typeof $props.size === 'number' ? $props.size : $props.min
+  return clampPercent(raw, $props.min, $props.max)
+}
+
+const isVertical = () => $props.direction === 'vertical'
+
+// Inline CSS custom property positioning the panels. Read BARE in the template
+// via :style — a plain object literal, recomputed each render.
+const sizeStyle = () => ({ '--rozie-resizable-size': currentSize() + '%' })
+
+// ---- write funnel (single $emit site) ----------------------------------
+// Clamp, write the model, emit resize. The SOLE $emit('resize') site so the
+// React prop-destructure for onResize hoists exactly once.
+const commitSize = (raw) => {
+  const next = clampPercent(raw, $props.min, $props.max)
+  $model.size = next
+  $emit('resize', { size: next })
+}
+
+// ---- pointer drag (template @event + pointer capture) ------------------
+// $refs.root is post-mount-only (ROZ123-safe): read inside these handlers.
+const onPointerDown = (e) => {
+  if ($props.disabled) return
+  if (e && e.preventDefault) e.preventDefault()
+  $data.dragging = true
+  // Capture the pointer on the handle so move/up keep firing on it even when the
+  // pointer leaves the handle mid-drag.
+  if (e && e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+}
+
+const onPointerMove = (e) => {
+  if (!$data.dragging || $props.disabled) return
+  const root = $refs.root
+  if (!root) return
+  const rect = root.getBoundingClientRect()
+  const pct = isVertical()
+    ? percentFromPointer(e.clientY, rect.top, rect.height)
+    : percentFromPointer(e.clientX, rect.left, rect.width)
+  commitSize(pct)
+}
+
+const onPointerUp = (e) => {
+  if (!$data.dragging) return
+  $data.dragging = false
+  if (e && e.currentTarget && e.currentTarget.releasePointerCapture && e.pointerId != null) {
+    if (e.currentTarget.hasPointerCapture && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+  }
+}
+
+// ---- keyboard (role="separator") ---------------------------------------
+// Arrow keys nudge by 1% (toward/away from the start panel along the axis);
+// Home/End jump to min/max. Matches the WAI-ARIA window-splitter pattern.
+const onKeydown = (e) => {
+  if ($props.disabled) return
+  const key = e ? e.key : ''
+  const vertical = isVertical()
+  const decKey = vertical ? 'ArrowUp' : 'ArrowLeft'
+  const incKey = vertical ? 'ArrowDown' : 'ArrowRight'
+  if (key === decKey) {
+    if (e) e.preventDefault()
+    commitSize(nudge(currentSize(), -1, $props.min, $props.max))
+  } else if (key === incKey) {
+    if (e) e.preventDefault()
+    commitSize(nudge(currentSize(), 1, $props.min, $props.max))
+  } else if (key === 'Home') {
+    if (e) e.preventDefault()
+    commitSize($props.min)
+  } else if (key === 'End') {
+    if (e) e.preventDefault()
+    commitSize($props.max)
+  }
+}
+
+// ---- imperative handle -------------------------------------------------
+// applySize(percent) — set the split programmatically (clamped + emits resize).
+// reset() — recentre to the midpoint of [min, max].
+// COLLISION NOTE: the verb is `applySize`, NOT the natural `setSize` — the model
+// prop is `size`, so the React emitter auto-generates a `setSize` state setter.
+// A `$expose` verb named `setSize` collapses onto that setter ident and trips
+// ROZ524 (it fires as an INTERNAL diagnostic because the Phase-46 deconfliction
+// pass does NOT rename inside an `$expose`-verb closure — see the emitter-gap
+// note in the family README). `apply<X>` is the listbox/data-table precedent for
+// dodging a generated React setter. It is also NOT `resize` (→ ROZ121 emit clash)
+// and NOT a host-element member.
+const applySize = (percent) => commitSize(percent)
+const reset = () => commitSize(($props.min + $props.max) / 2)
+
+$expose({ applySize, reset })
+</script>
+
+<template>
+<div
+  class="rozie-resizable"
+  ref="root"
+  :class="{ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': $data.dragging, 'rozie-resizable--disabled': $props.disabled }"
+  :style="sizeStyle()"
+>
+  <!-- start panel — sized by --rozie-resizable-size along the split axis -->
+  <div class="rozie-resizable-panel rozie-resizable-panel--start">
+    <slot name="start"></slot>
+  </div>
+
+  <!-- draggable handle. role="separator" + aria-value* is the WAI-ARIA window-
+       splitter pattern; tabindex=0 makes it keyboard-focusable. The #handle slot
+       overrides the visual grip but keeps the behavior.
+       aria-valuenow binds the BARE `$props.size` (a provably-primitive Number)
+       rather than `currentSize()` — a call expression wraps in `rozieAttr` and
+       returns `string`, which React's `aria-valuenow: number` rejects (TS2322;
+       the aria-numeric sibling of listbox's `!!` boolean wrap). Since every
+       commit writes the model back CLAMPED, `$props.size` is in range in
+       practice; the layout itself still uses the clamped `currentSize()`. -->
+  <div
+    class="rozie-resizable-handle"
+    role="separator"
+    tabindex="0"
+    :aria-orientation="isVertical() ? 'horizontal' : 'vertical'"
+    :aria-valuenow="$props.size"
+    :aria-valuemin="$props.min"
+    :aria-valuemax="$props.max"
+    :aria-disabled="!!$props.disabled"
+    @pointerdown="onPointerDown($event)"
+    @pointermove="onPointerMove($event)"
+    @pointerup="onPointerUp($event)"
+    @keydown="onKeydown($event)"
+  >
+    <slot name="handle">
+      <span class="rozie-resizable-grip" aria-hidden="true"></span>
+    </slot>
+  </div>
+
+  <!-- end panel — takes the remaining space (flex: 1 1 0) -->
+  <div class="rozie-resizable-panel rozie-resizable-panel--end">
+    <slot name="end"></slot>
+  </div>
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven (mirrors otp/slider themes): every COSMETIC value is a
+  `var(--rozie-resizable-*, <fallback>)`, so the component renders with zero
+  config yet is completely re-skinnable. The shipped themes/*.css presets map
+  these tokens onto shadcn/Radix, Material 3, Bootstrap 5.
+
+  STRUCTURAL rules (the flex container, the --size-driven first-panel basis, the
+  remainder second panel, the handle hit-area, and the vertical column variant)
+  are behavior-critical and NOT consumer-overridable.
+*/
+
+.rozie-resizable {
+  display: flex;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  font: var(--rozie-resizable-font, inherit);
+}
+.rozie-resizable--horizontal {
+  flex-direction: row;
+}
+.rozie-resizable--vertical {
+  flex-direction: column;
+}
+
+/* The first panel is sized to --rozie-resizable-size along the split axis; the
+   second panel flexes into the remainder. */
+.rozie-resizable-panel {
+  box-sizing: border-box;
+  overflow: auto;
+}
+.rozie-resizable-panel--start {
+  flex: 0 0 auto;
+}
+.rozie-resizable--horizontal .rozie-resizable-panel--start {
+  width: var(--rozie-resizable-size, 50%);
+  height: 100%;
+}
+.rozie-resizable--vertical .rozie-resizable-panel--start {
+  height: var(--rozie-resizable-size, 50%);
+  width: 100%;
+}
+.rozie-resizable-panel--end {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The handle — a thin draggable divider with a centered grip. */
+.rozie-resizable-handle {
+  flex: 0 0 var(--rozie-resizable-handle-size, 0.5rem);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rozie-resizable-handle-bg, rgba(0, 0, 0, 0.08));
+  outline: none;
+  transition: background-color 0.15s;
+  touch-action: none;
+}
+.rozie-resizable--horizontal .rozie-resizable-handle {
+  cursor: col-resize;
+  align-self: stretch;
+}
+.rozie-resizable--vertical .rozie-resizable-handle {
+  cursor: row-resize;
+}
+.rozie-resizable-handle:hover {
+  background: var(--rozie-resizable-handle-hover-bg, rgba(0, 0, 0, 0.16));
+}
+.rozie-resizable-handle:focus-visible {
+  box-shadow: 0 0 0 var(--rozie-resizable-focus-ring-width, 2px)
+    var(--rozie-resizable-focus-ring-color, rgba(0, 102, 204, 0.5));
+  z-index: 1;
+}
+.rozie-resizable--dragging .rozie-resizable-handle {
+  background: var(--rozie-resizable-handle-active-bg, var(--rozie-resizable-accent, #0066cc));
+}
+
+/* The default grip — a short bar centered in the handle. */
+.rozie-resizable-grip {
+  display: block;
+  border-radius: 999px;
+  background: var(--rozie-resizable-grip-bg, rgba(0, 0, 0, 0.35));
+}
+.rozie-resizable--horizontal .rozie-resizable-grip {
+  width: var(--rozie-resizable-grip-thickness, 2px);
+  height: var(--rozie-resizable-grip-length, 1.5rem);
+}
+.rozie-resizable--vertical .rozie-resizable-grip {
+  height: var(--rozie-resizable-grip-thickness, 2px);
+  width: var(--rozie-resizable-grip-length, 1.5rem);
+}
+
+.rozie-resizable--disabled .rozie-resizable-handle {
+  cursor: default;
+  opacity: var(--rozie-resizable-disabled-opacity, 0.55);
+}
+</style>
+
+</rozie>

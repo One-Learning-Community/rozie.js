@@ -1,0 +1,24 @@
+/*
+ * @rozie-ui/resizable — shadcn/ui (Radix) bridge.
+ *
+ * Maps the resizable tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--border: 214.3 31.8% 91.4%`
+ * consumed as `hsl(var(--border))`). Because it reads those vars live, the
+ * splitter automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/resizable-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-resizable {
+  --rozie-resizable-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-resizable-handle-bg: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-resizable-handle-hover-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rozie-resizable-handle-active-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-resizable-grip-bg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+
+  --rozie-resizable-focus-ring-color: hsl(var(--ring, 222.2 84% 4.9%) / 0.5);
+}

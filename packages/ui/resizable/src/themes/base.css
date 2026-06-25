@@ -1,0 +1,43 @@
+/*
+ * @rozie-ui/resizable — base token reference.
+ *
+ * Every COSMETIC value the splitter renders is a `--rozie-resizable-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * The structural rules (the flex container, the `--rozie-resizable-size`-driven
+ * first-panel basis, the remainder second panel, the handle hit-area, and the
+ * vertical column variant) live in the component's scoped `<style>` (per-leaf,
+ * NOT consumer-overridable). Only the values below flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-resizable` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-resizable {
+  /* typography */
+  --rozie-resizable-font: inherit;
+
+  /* accent — the single color most consumers will set; the active handle + focus
+     ring derive from it */
+  --rozie-resizable-accent: #0066cc;
+
+  /* the handle (the draggable divider) */
+  --rozie-resizable-handle-size: 0.5rem;
+  --rozie-resizable-handle-bg: rgba(0, 0, 0, 0.08);
+  --rozie-resizable-handle-hover-bg: rgba(0, 0, 0, 0.16);
+  --rozie-resizable-handle-active-bg: var(--rozie-resizable-accent);
+
+  /* the default grip (the short centered bar) */
+  --rozie-resizable-grip-bg: rgba(0, 0, 0, 0.35);
+  --rozie-resizable-grip-thickness: 2px;
+  --rozie-resizable-grip-length: 1.5rem;
+
+  /* focus ring (keyboard focus on the handle) */
+  --rozie-resizable-focus-ring-width: 2px;
+  --rozie-resizable-focus-ring-color: rgba(0, 102, 204, 0.5);
+
+  /* disabled */
+  --rozie-resizable-disabled-opacity: 0.55;
+}
