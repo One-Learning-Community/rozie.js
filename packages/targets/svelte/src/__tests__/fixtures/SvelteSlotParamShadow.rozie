@@ -1,0 +1,13 @@
+<rozie name="SvelteSlotParamShadow">
+<components>{ Row: './Row.rozie' }</components>
+<data>{ rows: [] }</data>
+<template>
+  <ul>
+    <li r-for="node in $data.rows" :key="node.id">
+      <Row :node="node">
+        <template #body="{ node }">{{ node.label }}</template>
+      </Row>
+    </li>
+  </ul>
+</template>
+</rozie>

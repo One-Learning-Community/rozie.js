@@ -1,0 +1,11 @@
+<rozie name="SvelteLoopVarHelper">
+<data>{ rows: [] }</data>
+<script>
+const toggle = (x) => 'toggled:' + x;
+</script>
+<template>
+  <ul>
+    <li r-for="toggle in $data.rows" :key="toggle.id">{{ toggle(toggle) }}</li>
+  </ul>
+</template>
+</rozie>
