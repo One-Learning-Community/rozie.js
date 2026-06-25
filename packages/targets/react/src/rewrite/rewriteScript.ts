@@ -43,6 +43,7 @@ import {
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { reactGeneratedBindingNames } from './reactGeneratedNames.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -510,25 +511,28 @@ export function rewriteRozieIdentifiers(
   //   - `_props`             — the controllable-state internal props alias.
   //   - `_rozieExposeRef`    — the `$expose` handle-stash useRef.
   //   - `portals`            — the portal-slot closure injected in the mount hook.
-  //   - `prev`               — the functional-updater param (`setX(prev => …)`).
-  // A user `<script>` helper/const named one of these shadows the synthesized
-  // binding → broken emit (e.g. a user `const attrs = …` clobbers the
-  // fallthrough spread). The renameable side is the USER binding (the
-  // synthesized name is the contract) → rename to `<name>$local`. A `{ kind:
-  // 'binding' }` trigger: the collision exists as soon as the user binding does
-  // (these symbols are unconditionally minted), so no accessor read gates it.
-  // Only-on-collision: a component with no such helper is byte-identical.
+  // A user `<script>` TOP-LEVEL helper/const named one of these REDECLARES the
+  // synthesized program-scope binding → broken emit (e.g. a top-level `const
+  // attrs = …` clobbers the fallthrough spread). The renameable side is the USER
+  // binding (the synthesized name is the contract) → rename to `<name>$local`.
+  //
+  // Phase 61 Plan 09 — TWO precise gates (mirrors the Vue 61-07 over-application
+  // fix). (1) `programOnly: true` on the group: ONLY a PROGRAM/setup-scope
+  // binding is renamed; a function PARAMETER (tiptap `(attrs) => …` /
+  // `function isActive(name, attrs)`) or a function-LOCAL `const` (chartjs
+  // `const prev = live.datasets.slice()`) is a LEGAL nested shadow (no
+  // redeclare) — never touched. (2) `reactGeneratedBindingNames(ir)`: the set is
+  // the ACTUALLY-generated names for THIS component, each gated on the IR
+  // condition that mints it at program scope. `prev` is EXCLUDED entirely (React
+  // never emits a top-level `prev` — it is only the `setX(prev => …)` updater
+  // PARAMETER). Without these gates the static set + unconditional binding
+  // trigger drifted the committed React leaves (`prev → prev$local` ×35,
+  // `attrs → attrs$local` ×4, `props → props$local` ×2). Only-on-collision: a
+  // component with no such TOP-LEVEL helper is byte-identical.
   // Prefix-pattern internals (`_*Ref`/`__ctx_*`/`__default*`/`_rozieProp_*`) are
   // lower-risk (collision-react §2) — handle the literal short names first; add
   // prefix matching only if a corpus fixture needs it.
-  const synthesizedInternalNames = new Set<string>([
-    'props',
-    'attrs',
-    '_props',
-    '_rozieExposeRef',
-    'portals',
-    'prev',
-  ]);
+  const synthesizedInternalNames = reactGeneratedBindingNames(ir);
 
   // Phase 61 Plan 05 risk E — `$computed` name == helper: NO React group needed.
   // The plan flagged a `$computed`-name vs helper collision as "rare but
@@ -552,7 +556,10 @@ export function rewriteRozieIdentifiers(
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
     { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: setterNames, trigger: { kind: 'binding' } },
-    { names: synthesizedInternalNames, trigger: { kind: 'binding' } },
+    {
+      names: synthesizedInternalNames,
+      trigger: { kind: 'binding', programOnly: true },
+    },
   ];
   deconflictGeneratedSymbols(program, reactGroups, reactProtected);
 

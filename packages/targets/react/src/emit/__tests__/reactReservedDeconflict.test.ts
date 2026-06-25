@@ -92,3 +92,32 @@ describe('Phase 61-05 risk B — expose-body module-let hoist', () => {
     expect(code).toContain('nextId.current');
   });
 });
+
+describe('Phase 61-05 risk D + Plan 09 — synthesized-internal program-scope-only rename', () => {
+  it('renames a TOP-LEVEL `const attrs` (redeclare) but NEVER a nested `attrs` param or function-local `prev` (legal shadow)', () => {
+    const code = emit('ReactSynthesizedInternalShadow');
+
+    // GENUINE collision: the user TOP-LEVEL `const attrs = { role: 'group' }`
+    // redeclares the synthesized fallthrough `const attrs = props as Record<…>`
+    // → renamed to `attrs$local`. The synthesized one keeps the bare name.
+    expect(code).toContain('attrs$local');
+    expect(code).toContain("const attrs$local = {");
+    // The synthesized fallthrough binding keeps the bare `attrs` name.
+    expect(code).toContain('const attrs = props as Record');
+
+    // OVER-APPLICATION GUARD (Plan 09): the function PARAMETER `attrs` of
+    // `mergeAttrs` is a LEGAL nested shadow — it must STAY `attrs`, not become
+    // `attrs$local`. The param + its body spread stay bare.
+    expect(code).toContain('mergeAttrs(attrs');
+    expect(code).toContain('...attrs,');
+
+    // The function-LOCAL `const prev` (chartjs-style reconcile local) is NEVER a
+    // top-level React binding → it must stay byte-identical, no `prev$local`.
+    expect(code).not.toContain('prev$local');
+    expect(code).toContain('const prev = rows.slice()');
+
+    // Count guard: exactly one `attrs$local` BINDING (the renamed top-level
+    // const). The nested param/body keep the bare name.
+    expect(count(code, 'attrs$local')).toBeGreaterThanOrEqual(1);
+  });
+});

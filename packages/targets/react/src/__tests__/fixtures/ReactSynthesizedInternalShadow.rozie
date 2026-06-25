@@ -1,0 +1,60 @@
+<!--
+  ReactSynthesizedInternalShadow.rozie — Phase 61 Plan 05 risk D + Plan 09
+  over-application guard fixture.
+
+  Risk D (collision-react §2): a user TOP-LEVEL `<script>` helper/const named one
+  of the React emitter's synthesized internals (`props`/`attrs`/`_props`/
+  `_rozieExposeRef`/`portals`) redeclares the synthesized program-scope binding
+  → broken emit. The renameable side is the USER binding → rename to `X$local`.
+
+  Plan 09 OVER-APPLICATION GUARD: the rename MUST be program-scope only. A
+  function PARAMETER named `attrs` and a function-LOCAL `const prev` are LEGAL
+  nested shadows (no redeclare) and MUST stay byte-identical — they mirror the
+  chartjs `const prev = live.datasets.slice()` reconcile helper and the tiptap
+  `(attrs) => …` / `function isActive(name, attrs)` params that the Plan-05
+  static-set + unconditional binding trigger wrongly renamed.
+
+  ASSERTIONS:
+    - TOP-LEVEL `const attrs = …` → renamed to `attrs$local` (genuine redeclare).
+    - NESTED `(attrs) => …` param + function-local `const prev = …` → NOT
+      renamed (`attrs$local` appears ONLY for the top-level const; `prev$local`
+      never appears).
+-->
+<rozie name="ReactSynthesizedInternalShadow">
+
+<data>
+{
+  total: 0,
+}
+</data>
+
+<script>
+// TOP-LEVEL `const attrs` — genuinely redeclares the synthesized fallthrough
+// `const attrs = props as Record<...>`. This is the renameable side → attrs$local.
+const attrs = { role: 'group' }
+
+// A helper whose PARAMETER is named `attrs` — a LEGAL nested shadow. The param
+// must NOT be renamed (it is not a program-scope redeclare).
+const mergeAttrs = (attrs) => {
+  return { ...attrs, 'data-merged': true }
+}
+
+// A helper with a function-LOCAL `const prev` — mirrors the chartjs reconcile
+// loop. `prev` is NEVER a top-level React binding (only the setX(prev => …)
+// updater param), so this nested local must stay byte-identical.
+const reconcile = (rows) => {
+  const prev = rows.slice()
+  prev.forEach((r, i) => {
+    $data.total = $data.total + (prev[i] ? 1 : 0)
+  })
+  return prev
+}
+
+const merged = mergeAttrs(attrs)
+</script>
+
+<template>
+  <div>total: {{ $data.total }} merged: {{ merged['data-merged'] }}</div>
+</template>
+
+</rozie>
