@@ -464,6 +464,7 @@ export default defineConfig({
     socialLinks: [],
     footer: {
       message: 'Pre-v1.0 — internal monorepo.',
+      copyright: 'Copyright © 2026 One Learning Community LTD',
     },
   },
 });
