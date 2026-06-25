@@ -56,7 +56,21 @@ import type {
   IRComponent,
   IRTemplateNode as TemplateNode,
 } from '@rozie/core';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import {
+  rewriteTemplateExpression,
+  type ScopeRename,
+} from '../rewrite/rewriteTemplateExpression.js';
+
+/**
+ * Phase 61 Plan 08 — RUNTIME-ONLY slot-PARAM shadow auto-fix (collision-svelte
+ * §3 risk 1). The `$$slot` suffix mirrors the producer-side
+ * `findRForSlotNameCollisions` snippet-rename convention. A param `node`
+ * shadowing an enclosing `{#each rows as node}` loop var is renamed `node$$slot`
+ * (destructure + body reads), so the snippet body reads its own param and the
+ * loop var stays intact. No svelte-check / leaf-typecheck catches the un-renamed
+ * shadow → the rename is the only guard.
+ */
+const SLOT_PARAM_SHADOW_SUFFIX = '$$slot';
 
 /**
  * Slot-key mapping. Mirrors producer-side emitSlotInvocation.ts L47.
@@ -71,10 +85,23 @@ function snippetKey(slotName: string): string {
  *   - [{name:'close'}]                   → '{ close }'
  *   - [{name:'a'},{name:'b'}]            → '{ a, b }'
  *   - [{name:'item', bindAs:'column'}]   → '{ item: column }'  (rename)
+ *
+ * Phase 61 Plan 08 — a param that shadows an enclosing loop var (`shadowed` set)
+ * and has NO explicit `bindAs` is destructured-and-renamed: `{ node: node$$slot }`.
+ * A param with `bindAs` already binds to a distinct local, so it never collides.
  */
-function paramsDestructure(filler: SlotFillerDecl): string {
+function paramsDestructure(
+  filler: SlotFillerDecl,
+  shadowed: ReadonlySet<string>,
+): string {
   if (filler.params.length === 0) return '';
-  return `{ ${filler.params.map((p) => (p.bindAs ? `${p.name}: ${p.bindAs}` : p.name)).join(', ')} }`;
+  return `{ ${filler.params
+    .map((p) => {
+      if (p.bindAs) return `${p.name}: ${p.bindAs}`;
+      if (shadowed.has(p.name)) return `${p.name}: ${p.name}${SLOT_PARAM_SHADOW_SUFFIX}`;
+      return p.name;
+    })
+    .join(', ')} }`;
 }
 
 /**
@@ -85,8 +112,38 @@ function paramsDestructure(filler: SlotFillerDecl): string {
  */
 export interface EmitSlotFillerCtx {
   ir: IRComponent;
-  /** Recursive call back into emitNode for fill bodies. */
-  emitChildren: (children: TemplateNode[]) => string;
+  /**
+   * Recursive call back into emitNode for fill bodies. `extraRenames` (Phase 61
+   * Plan 08) threads the slot-param-shadow rename into the body emit so a
+   * shadowed param read (`node` → `node$$slot`) is rewritten consistently with
+   * its renamed destructure.
+   */
+  emitChildren: (
+    children: TemplateNode[],
+    extraRenames?: readonly ScopeRename[],
+  ) => string;
+  /**
+   * Phase 61 Plan 08 — the loop-var names of every ENCLOSING `r-for`. A filler
+   * param whose name is in this set shadows the loop var (risk 1, runtime-only)
+   * and is renamed `<param>$$slot`. Empty/undefined off-collision → byte-identical.
+   */
+  enclosingLoopVars?: ReadonlySet<string>;
+}
+
+/**
+ * Phase 61 Plan 08 — the set of this filler's params that shadow an enclosing
+ * loop var AND have no explicit `bindAs` (a `bindAs` param already binds a
+ * distinct local, so it never collides). These are renamed `<param>$$slot`.
+ */
+function shadowedParams(
+  filler: SlotFillerDecl,
+  enclosingLoopVars: ReadonlySet<string>,
+): Set<string> {
+  const out = new Set<string>();
+  for (const p of filler.params) {
+    if (!p.bindAs && enclosingLoopVars.has(p.name)) out.add(p.name);
+  }
+  return out;
 }
 
 /**
@@ -100,7 +157,13 @@ export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitSlotFillerCtx,
 ): string {
-  const bodyMarkup = ctx.emitChildren(filler.body);
+  const shadowed = shadowedParams(filler, ctx.enclosingLoopVars ?? new Set());
+  const bodyRenames: ScopeRename[] = [...shadowed].map((name) => ({
+    kind: 'slot-param',
+    from: name,
+    to: `${name}${SLOT_PARAM_SHADOW_SUFFIX}`,
+  }));
+  const bodyMarkup = ctx.emitChildren(filler.body, bodyRenames);
 
   // Default-shorthand without params: bare children inside the component
   // tag. Svelte 5's implicit `children` snippet picks them up.
@@ -110,7 +173,7 @@ export function emitSlotFiller(
 
   // All other cases: emit a {#snippet} block.
   const key = snippetKey(filler.name);
-  const destructure = paramsDestructure(filler);
+  const destructure = paramsDestructure(filler, shadowed);
   const argList = destructure === '' ? '()' : `(${destructure})`;
   return `{#snippet ${key}${argList}}${bodyMarkup}{/snippet}`;
 }
@@ -149,7 +212,11 @@ export function emitSlotFiller(
 export function emitDynamicSnippetsProp(
   fillers: readonly SlotFillerDecl[],
   ir: IRComponent,
-  emitChildren: (children: TemplateNode[]) => string,
+  emitChildren: (
+    children: TemplateNode[],
+    extraRenames?: readonly ScopeRename[],
+  ) => string,
+  enclosingLoopVars: ReadonlySet<string> = new Set(),
 ): { prop: string | null; snippetBlocks: string[] } {
   void ir; // kept in signature for future use (e.g. expression-source diagnostics)
   const dynamics = fillers.filter((f) => f.isDynamic);
@@ -162,9 +229,15 @@ export function emitDynamicSnippetsProp(
     if (!filler.dynamicNameExpr) continue; // ROZ946 emitted upstream
     const snippetName = `__rozieDynSlot_${idx}`;
     const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ir);
-    const destructure = paramsDestructure(filler);
+    const shadowed = shadowedParams(filler, enclosingLoopVars);
+    const bodyRenames: ScopeRename[] = [...shadowed].map((name) => ({
+      kind: 'slot-param',
+      from: name,
+      to: `${name}${SLOT_PARAM_SHADOW_SUFFIX}`,
+    }));
+    const destructure = paramsDestructure(filler, shadowed);
     const argList = destructure === '' ? '()' : `(${destructure})`;
-    const body = emitChildren(filler.body);
+    const body = emitChildren(filler.body, bodyRenames);
     snippetBlocks.push(`{#snippet ${snippetName}${argList}}${body}{/snippet}`);
     entries.push(`[${keyExpr}]: ${snippetName}`);
     idx++;

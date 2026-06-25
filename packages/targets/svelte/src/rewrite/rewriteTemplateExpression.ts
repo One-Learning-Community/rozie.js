@@ -47,12 +47,75 @@ function flattenInlineCode(code: string): string {
 }
 
 /**
+ * Phase 61 Plan 08 — RUNTIME-ONLY loop-shadow rename rule (collision-svelte §3
+ * risks 1 + 2). Applied to a CLONED expression BEFORE the main accessor rewrite.
+ *
+ *   - `kind: 'loop-var'` — a `{#each … as <from>}` loop var that shadows a
+ *     top-level `<script>` helper. Rename every read of `<from>` to `<to>`
+ *     (the renamed loop var, e.g. `toggle$loop`) EXCEPT a CALL-callee `<from>(…)`
+ *     whose name is in `helperNames` — that callee stays bare so it resolves to
+ *     the un-shadowed helper. This keeps the helper call working while the loop
+ *     ITEM reads target the renamed loop var.
+ *   - `kind: 'slot-param'` — a `<template #X="{ <from> }">` snippet param that
+ *     shadows an enclosing loop var. Rename EVERY read of `<from>` to `<to>`
+ *     (`<from>$$slot`); the snippet body reads its own param, never the loop var.
+ *
+ * Off-collision (`scopeRenames` undefined/empty) the function is byte-identical.
+ */
+export type ScopeRename =
+  | { kind: 'loop-var'; from: string; to: string; helperNames: ReadonlySet<string> }
+  | { kind: 'slot-param'; from: string; to: string };
+
+function applyScopeRenames(
+  file: t.File,
+  renames: readonly ScopeRename[],
+): void {
+  if (renames.length === 0) return;
+  const byName = new Map<string, ScopeRename>();
+  for (const r of renames) byName.set(r.from, r);
+  traverse(file, {
+    Identifier(path) {
+      const rule = byName.get(path.node.name);
+      if (!rule) return;
+      // Only rename genuine value READS — never an object-property key, a member
+      // property, or a declaration id.
+      const parent = path.parent;
+      if (
+        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+        parent.property === path.node &&
+        !parent.computed
+      ) {
+        return;
+      }
+      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.computed) {
+        return;
+      }
+      if (rule.kind === 'loop-var') {
+        // Keep a helper CALL-callee bare so it resolves to the un-shadowed
+        // helper; rename everything else (the loop-item reads).
+        const isCallee =
+          (t.isCallExpression(parent) || t.isOptionalCallExpression(parent)) &&
+          parent.callee === path.node;
+        if (isCallee && rule.helperNames.has(path.node.name)) return;
+      }
+      path.node.name = rule.to;
+    },
+  });
+}
+
+/**
  * Render a Babel Expression as a Svelte-template-friendly string.
  * IR is consulted for prop/data/ref/slot name lookups.
+ *
+ * `scopeRenames` (Phase 61 Plan 08) applies RUNTIME-ONLY loop-shadow renames
+ * (loop-var==helper / slot-param==loop-var) within the loop / filler body. It is
+ * threaded from the Svelte emit walk (EmitNodeCtx.scopeRenames); off-collision it
+ * is empty and the output is byte-identical.
  */
 export function rewriteTemplateExpression(
   expr: t.Expression,
   ir: IRComponent,
+  scopeRenames: readonly ScopeRename[] = [],
 ): string {
   // Clone the expression so we don't mutate the IR's preserved nodes.
   const cloned = t.cloneNode(expr, true, false);
@@ -64,6 +127,11 @@ export function rewriteTemplateExpression(
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
+
+  // Phase 61 Plan 08 — apply RUNTIME-ONLY loop-shadow renames FIRST (before the
+  // accessor rewrite) so a renamed loop-var/slot-param read is a plain bare
+  // identifier the downstream rewrite leaves alone. Off-collision (empty) = no-op.
+  applyScopeRenames(wrapper, scopeRenames);
 
   // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
   // event handlers (`@click="$model.open = false"`), bindings, AND <listeners>-

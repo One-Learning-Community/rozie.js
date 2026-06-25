@@ -34,6 +34,10 @@ import {
   deconflictGeneratedSymbols,
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
+import {
+  SVELTE_EMITTER_NAMES,
+  SVELTE_RUNTIME_IMPORTS,
+} from '../../../../core/src/rewrite/reservedNames.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { portalSlotMergeName } from '../emit/portalSlotMergeName.js';
 
@@ -225,9 +229,27 @@ export function rewriteRozieIdentifiers(
   // name — that local is the renameable side, not the public contract.
   const propNames = new Set<string>([...modelProps, ...nonModelProps]);
   const svelteProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
+  // Phase 61 Plan 08 (collision-svelte §3 risk 5) — a top-level `<script>` helper
+  // or import named an EMITTER-GENERATED symbol (`children`/`snippets`/`portals`/
+  // `applyListeners`/`__rozieAttrs`/`__rozieRoot`) or a folded `'svelte'` runtime
+  // import (`onMount`/`onDestroy`/`untrack`/`getContext`/`setContext`) duplicate-
+  // binds or shadows the generated symbol in the single unified `<script>` scope
+  // → hard Svelte "already declared" / wrong-binding. The renameable side is the
+  // USER binding (`X$local`); the generated symbol is the contract. `programOnly:
+  // true` restricts the rename to a PROGRAM/setup-scope binding so a NESTED param
+  // / function-local that legally shadows the name (the over-application class the
+  // Vue leg (61-07) fixed) is never touched. `$expose` verbs stay protected.
+  const svelteBindingNames = new Set<string>([
+    ...SVELTE_EMITTER_NAMES,
+    ...SVELTE_RUNTIME_IMPORTS,
+  ]);
   const svelteGroups: GeneratedSymbolGroup[] = [
     { names: propNames, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
+    {
+      names: svelteBindingNames,
+      trigger: { kind: 'binding', programOnly: true },
+    },
   ];
   deconflictGeneratedSymbols(program, svelteGroups, svelteProtected);
 

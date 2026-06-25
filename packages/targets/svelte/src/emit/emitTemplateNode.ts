@@ -33,7 +33,14 @@ import type {
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import {
+  rewriteTemplateExpression,
+  type ScopeRename,
+} from '../rewrite/rewriteTemplateExpression.js';
+import {
+  findRForLoopVarShadows,
+  collectTopLevelScriptBindings,
+} from '../../../../core/src/ir/findRForLoopVarShadows.js';
 import {
   emitAttributes,
   emitListenerSpread,
@@ -98,6 +105,28 @@ export interface EmitNodeCtx {
    * pre-Item-2 verbatim emit path, used by degenerate test-only callers).
    */
   scopeAttr: string;
+  /**
+   * Phase 61 Plan 08 — RUNTIME-ONLY loop-shadow renames active in the CURRENT
+   * emit scope (loop body / slot-filler body). Threaded by `emitLoop` /
+   * `emitSlotFiller` onto a CHILD ctx so the recursive body emit rewrites the
+   * shadowed identifier. Empty (default) off-collision → byte-identical output.
+   */
+  scopeRenames?: readonly ScopeRename[];
+  /**
+   * Phase 61 Plan 08 — the loop-var names of every ENCLOSING `r-for` (risk 1
+   * slot-param shadow detection). Accumulated by `emitLoop`; read by
+   * `emitElement` to decide whether a slot-filler param collides.
+   */
+  enclosingLoopVars?: ReadonlySet<string>;
+}
+
+/**
+ * Phase 61 Plan 08 — forward the active scope renames to rewriteTemplateExpression.
+ * A thin accessor so every body-content call site reads `ctx.scopeRenames`
+ * uniformly (empty/undefined off-collision → byte-identical).
+ */
+function ctxRenames(ctx: EmitNodeCtx): readonly ScopeRename[] {
+  return ctx.scopeRenames ?? [];
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -153,7 +182,7 @@ function emitInterpolation(
   node: TemplateInterpolationIR,
   ctx: EmitNodeCtx,
 ): string {
-  const expr = rewriteTemplateExpression(node.expression, ctx.ir);
+  const expr = rewriteTemplateExpression(node.expression, ctx.ir, ctxRenames(ctx));
   // Phase 26 (D-06/D-07) — gate on the IR-precomputed wrap decision. A
   // non-primitive value renders portable JSON (`[object Object]` divergence
   // eliminated); raw when provably string|number|boolean or safeInterpolation
@@ -187,11 +216,11 @@ function emitConditional(
     const inner = emitChildrenJoined(branch.body, ctx);
     if (i === 0) {
       const test = branch.test
-        ? rewriteTemplateExpression(branch.test, ctx.ir)
+        ? rewriteTemplateExpression(branch.test, ctx.ir, ctxRenames(ctx))
         : 'true';
       parts.push(`{#if ${test}}`);
     } else if (branch.test) {
-      const test = rewriteTemplateExpression(branch.test, ctx.ir);
+      const test = rewriteTemplateExpression(branch.test, ctx.ir, ctxRenames(ctx));
       parts.push(`{:else if ${test}}`);
     } else {
       parts.push(`{:else}`);
@@ -210,12 +239,51 @@ function emitConditional(
  * doesn't double-emit alongside the loop's `(key)` directive.
  */
 function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
-  const iter = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
-  const itemDecl = node.indexAlias
-    ? `${node.itemAlias}, ${node.indexAlias}`
-    : node.itemAlias;
+  // The iterable expression is evaluated in the OUTER scope (it references the
+  // collection, never the loop var) — so it must NOT receive the loop-var rename.
+  const iter = rewriteTemplateExpression(node.iterableExpression, ctx.ir, ctxRenames(ctx));
+
+  // Phase 61 Plan 08 — RUNTIME-ONLY loop-var == script-HELPER shadow auto-fix
+  // (collision-svelte §3 risk 2). When this loop's var equals a top-level helper
+  // CALLED inside the loop, `{#each … as toggle}` shadows the helper → the bare
+  // `toggle(…)` invokes the loop ITEM (a non-function) → runtime crash on Svelte
+  // only (no svelte-check / leaf-typecheck signal). Auto-fix: rename the LOOP VAR
+  // (decl + key + loop-item reads) to `<var>$loop`, leaving the helper CALL-callee
+  // bare so it resolves to the un-shadowed helper. Conditional — only a genuine
+  // shadow renames, so non-colliding loops stay byte-identical.
+  const shadows = findRForLoopVarShadows(ctx.ir);
+  const helperNames = collectTopLevelScriptBindings(ctx.ir);
+  const renameLoopVar = (alias: string): string =>
+    shadows.loopVarHelperShadows.has(alias) ? `${alias}$loop` : alias;
+
+  const bodyRenames: ScopeRename[] = [...ctxRenames(ctx)];
+  for (const alias of [node.itemAlias, node.indexAlias]) {
+    if (alias && shadows.loopVarHelperShadows.has(alias)) {
+      bodyRenames.push({
+        kind: 'loop-var',
+        from: alias,
+        to: `${alias}$loop`,
+        helperNames,
+      });
+    }
+  }
+
+  // Loop-var declaration + key are INSIDE the loop scope → rename the var.
+  const emittedItem = renameLoopVar(node.itemAlias);
+  const emittedIndex = node.indexAlias ? renameLoopVar(node.indexAlias) : null;
+  const itemDecl = emittedIndex ? `${emittedItem}, ${emittedIndex}` : emittedItem;
+  // Accumulate THIS loop's variable names for enclosing-loop slot-param detection.
+  const nextEnclosing = new Set<string>(ctx.enclosingLoopVars ?? []);
+  nextEnclosing.add(node.itemAlias);
+  if (node.indexAlias) nextEnclosing.add(node.indexAlias);
+
+  const bodyCtx: EmitNodeCtx = {
+    ...ctx,
+    scopeRenames: bodyRenames,
+    enclosingLoopVars: nextEnclosing,
+  };
   const keySuffix = node.keyExpression
-    ? ` (${rewriteTemplateExpression(node.keyExpression, ctx.ir)})`
+    ? ` (${rewriteTemplateExpression(node.keyExpression, ctx.ir, bodyRenames)})`
     : '';
 
   // Strip `:key` from the inner element to avoid duplicate emission.
@@ -230,7 +298,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   };
 
   const innerNodes = node.body.map(stripKey);
-  const inner = emitChildrenJoined(innerNodes, ctx);
+  const inner = emitChildrenJoined(innerNodes, bodyCtx);
 
   return `{#each ${iter} as ${itemDecl}${keySuffix}}${inner}{/each}`;
 }
@@ -500,9 +568,26 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   // To avoid double-emission, emit the structured slotFillers view only and
   // skip the children path below.
   if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
-    const emitChildren = (children: TemplateNode[]): string =>
-      emitChildrenJoined(children, ctx);
-    const fillerCtx = { ir: ctx.ir, emitChildren };
+    // Phase 61 Plan 08 — the filler-body emit must carry BOTH the ambient scope
+    // renames (an enclosing loop-var==helper rename) AND any slot-param-shadow
+    // rename the filler introduces (`extraRenames`). Merge them per call.
+    const emitChildren = (
+      children: TemplateNode[],
+      extraRenames: readonly ScopeRename[] = [],
+    ): string =>
+      emitChildrenJoined(
+        children,
+        extraRenames.length > 0
+          ? { ...ctx, scopeRenames: [...ctxRenames(ctx), ...extraRenames] }
+          : ctx,
+      );
+    const fillerCtx: import('./emitSlotFiller.js').EmitSlotFillerCtx = {
+      ir: ctx.ir,
+      emitChildren,
+      ...(ctx.enclosingLoopVars !== undefined
+        ? { enclosingLoopVars: ctx.enclosingLoopVars }
+        : {}),
+    };
 
     const fillerParts: string[] = [];
     for (const filler of node.slotFillers) {
@@ -513,6 +598,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       node.slotFillers,
       ctx.ir,
       emitChildren,
+      ctx.enclosingLoopVars,
     );
     // Dynamic-name dispatch (R5): the prop carries the `snippets={{ [expr]:
     // __rozieDynSlot_<N> }}` map; the snippet identifier blocks live inside
