@@ -25,7 +25,7 @@
 
   
   <slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
-    <div v-if="resolvedPresets().length" class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
+    <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
       <button v-for="p in resolvedPresets()" :key="p.label" type="button" :class="['rozie-datepicker-preset', { 'is-active': isPresetActive(p.range) }]" :aria-pressed="!!isPresetActive(p.range)" :disabled="!!props.disabled" @click="applyPreset(p.range)">{{ p.label }}</button>
     </div></slot>
 </div>
@@ -464,6 +464,22 @@ const resolvedPresets = () => props.presetRanges.map((p: any) => ({
   label: p.label,
   range: rangeFromPreset(p)
 }));
+
+// Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
+// `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
+// `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
+// the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
+// stripped back to `length` by the production minifier in the boolean-`&&`
+// context — routing through a named boolean helper keeps the guard a true
+// boolean through minification (the React falsy-number-in-r-if discipline).
+// Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
+// `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
+// `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
+// the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
+// stripped back to `length` by the production minifier in the boolean-`&&`
+// context — routing through a named boolean helper keeps the guard a true
+// boolean through minification (the React falsy-number-in-r-if discipline).
+const hasPresets = (): boolean => resolvedPresets().length > 0;
 
 // Apply a preset = a complete range: write the (ordered) value + clear any
 // in-progress preview + emit change AND rangeComplete.

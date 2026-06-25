@@ -86,7 +86,7 @@ function __rozieAttr(v: unknown): string | null {
     <ng-container *ngTemplateOutlet="(presetsTpl ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
     } @else {
 
-        @if (resolvedPresets().length) {
+        @if (hasPresets()) {
     <div class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
           @for (p of resolvedPresets(); track p.label) {
     <button type="button" class="rozie-datepicker-preset" [ngClass]="{ 'is-active': isPresetActive(p.range) }" [attr.aria-pressed]="!!isPresetActive(p.range)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="applyPreset(p.range)">{{ rozieDisplay(p.label) }}</button>
@@ -535,6 +535,7 @@ export class DatePicker {
     label: p.label,
     range: rangeFromPreset(p)
   }));
+  hasPresets = (): boolean => this.resolvedPresets().length > 0;
   applyPreset = (range: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const next = normalizeRange(range);

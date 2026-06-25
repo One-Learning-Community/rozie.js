@@ -399,6 +399,18 @@ const EXAMPLES = [
   // behavioral-only (no pixel baseline).
   'DatePickerScreenshot',
   'ResizableScreenshot',
+  // @rozie-ui/date-picker RANGE-mode INLINE screenshot cells. DatePickerRangeComplete
+  // seeds a FIXED completed cross-month range ({ start: '2025-05-28', end: '2025-06-04' });
+  // the DatePicker pins its view to the range's start month (May 2025) so the continuous
+  // band + the May→June spill render deterministically. DatePickerPresetActive seeds a
+  // FIXED range + a :presetRanges list whose first preset EQUALS the value, so the active
+  // preset pill (is-active / aria-pressed) renders run-to-run. Both render in normal flow
+  // (mount-clipped). Per D-10 all 6 targets diff the SAME shared `${name}.png`; baseline-
+  // gates to test.fixme via baselineExists() until the Linux-Docker PNGs land
+  // (feedback_vr_linux_baselines). The driven DatePickerRangeBehavior cell is
+  // behavioral-only (date-picker-range-behavior.spec.ts) — deliberately NOT in this list.
+  'DatePickerRangeComplete',
+  'DatePickerPresetActive',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -924,6 +936,15 @@ async function settleExample(
   // paints the frame is final. The pinned value='2025-06-15' fixes the month, so the
   // grid is deterministic.
   if (example === 'DatePickerScreenshot') {
+    await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
+      timeout: 10_000,
+    });
+  }
+  // DatePickerRangeComplete / DatePickerPresetActive (@rozie-ui/date-picker, range
+  // mode): same 6×7 = 42-day grid as DatePickerScreenshot. Wait for all 42 day
+  // buttons before clipping; the seeded range pins the view month, so the band /
+  // active-preset frame is final once the grid paints (nothing is focused).
+  if (example === 'DatePickerRangeComplete' || example === 'DatePickerPresetActive') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });

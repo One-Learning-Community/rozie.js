@@ -329,7 +329,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   
   ${this.presets !== undefined ? this.presets({presets: this.resolvedPresets(), apply: this.applyPreset}) : html`<slot name="presets" data-rozie-params=${(() => { try { return JSON.stringify({presets: this.resolvedPresets()}); } catch { return '{}'; } })()} @rozie-presets-apply=${($event: CustomEvent) => ((this.applyPreset) as (...args: any[]) => any)($event.detail)}>
-    ${this.resolvedPresets().length ? html`<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>
+    ${this.hasPresets() ? html`<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>
       ${repeat<any>(this.resolvedPresets(), (p, _idx) => p.label, (p, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-preset": true, 'is-active': this.isPresetActive(p.range) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(p.label)} type="button" aria-pressed=${!!this.isPresetActive(p.range)} ?disabled=${!!this.disabled} @click=${($event: Event) => { this.applyPreset(p.range); }} data-rozie-s-6800c7a2>${rozieDisplay(p.label)}</button>`)}
     </div>` : nothing}</slot>`}
 </div>
@@ -581,6 +581,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   label: p.label,
   range: rangeFromPreset(p)
 }));
+
+  hasPresets = (): boolean => this.resolvedPresets().length > 0;
 
   applyPreset = (range: any) => {
   if (this.disabled) return;

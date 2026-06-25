@@ -310,6 +310,9 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       range: rangeFromPreset(p)
     }));
   }
+  function hasPresets(): boolean {
+    return resolvedPresets().length > 0;
+  }
   const { onRangeComplete: _rozieProp_onRangeComplete } = props;
     const applyPreset = useCallback((range: any) => {
     if (props.disabled) return;
@@ -404,7 +407,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       </div>
 
       
-      {(props.renderPresets ?? props.slots?.['presets']) ? ((props.renderPresets ?? props.slots?.['presets']) as Function)({ presets: resolvedPresets(), apply: applyPreset }) : (resolvedPresets().length) && <div className={"rozie-datepicker-presets"} role="group" aria-label="Date range presets" data-rozie-s-6800c7a2="">
+      {(props.renderPresets ?? props.slots?.['presets']) ? ((props.renderPresets ?? props.slots?.['presets']) as Function)({ presets: resolvedPresets(), apply: applyPreset }) : (hasPresets()) && <div className={"rozie-datepicker-presets"} role="group" aria-label="Date range presets" data-rozie-s-6800c7a2="">
           {resolvedPresets().map((p) => <button key={p.label} type="button" className={clsx("rozie-datepicker-preset", { "is-active": isPresetActive(p.range) })} aria-pressed={!!isPresetActive(p.range)} disabled={!!props.disabled} onClick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2="">{rozieDisplay(p.label)}</button>)}
         </div>}
     </div>

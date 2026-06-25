@@ -463,6 +463,15 @@ const isoToMs = (iso) => {
 const resolvedPresets = () =>
   $props.presetRanges.map((p) => ({ label: p.label, range: rangeFromPreset(p) }))
 
+// Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
+// `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
+// `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
+// the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
+// stripped back to `length` by the production minifier in the boolean-`&&`
+// context — routing through a named boolean helper keeps the guard a true
+// boolean through minification (the React falsy-number-in-r-if discipline).
+const hasPresets = (): boolean => resolvedPresets().length > 0
+
 // Apply a preset = a complete range: write the (ordered) value + clear any
 // in-progress preview + emit change AND rangeComplete.
 const applyPreset = (range) => {
@@ -631,7 +640,7 @@ $expose({ focus, goToToday, clear })
        button per preset and ONLY when presets exist (empty → nothing renders, so
        the single-mode / no-presets default output stays byte-identical). -->
   <slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
-    <div class="rozie-datepicker-presets" r-if="resolvedPresets().length" role="group" aria-label="Date range presets">
+    <div class="rozie-datepicker-presets" r-if="hasPresets()" role="group" aria-label="Date range presets">
       <button
         r-for="p in resolvedPresets()"
         :key="p.label"

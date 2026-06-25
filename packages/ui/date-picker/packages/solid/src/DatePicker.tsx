@@ -562,6 +562,17 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     }));
   }
 
+  // Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
+  // `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
+  // `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
+  // the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
+  // stripped back to `length` by the production minifier in the boolean-`&&`
+  // context — routing through a named boolean helper keeps the guard a true
+  // boolean through minification (the React falsy-number-in-r-if discipline).
+  function hasPresets(): boolean {
+    return resolvedPresets().length > 0;
+  }
+
   // Apply a preset = a complete range: write the (ordered) value + clear any
   // in-progress preview + emit change AND rangeComplete.
   function applyPreset(range: any) {
@@ -663,7 +674,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
       </div>
 
       
-      {(_props.presetsSlot ?? _props.slots?.['presets'])?.({ presets: resolvedPresets(), apply: applyPreset }) ?? <Show when={resolvedPresets().length}><div class={"rozie-datepicker-presets"} role="group" aria-label="Date range presets" data-rozie-s-6800c7a2="">
+      {(_props.presetsSlot ?? _props.slots?.['presets'])?.({ presets: resolvedPresets(), apply: applyPreset }) ?? <Show when={hasPresets()}><div class={"rozie-datepicker-presets"} role="group" aria-label="Date range presets" data-rozie-s-6800c7a2="">
           <For each={resolvedPresets()}>{(p) => <button type="button" aria-pressed={!!isPresetActive(p.range)} class={"rozie-datepicker-preset" + " " + rozieClass({ 'is-active': isPresetActive(p.range) })} disabled={!!local.disabled} onClick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2="">{rozieDisplay(p.label)}</button>}</For>
         </div></Show>}
     </div>
