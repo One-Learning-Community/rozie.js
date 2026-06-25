@@ -40,11 +40,7 @@ import {
   deconflictGeneratedSymbols,
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
-import {
-  VUE_EMITTER_BINDINGS,
-  VUE_IMPORT_NAMES,
-  VUE_RUNTIME_IMPORTS,
-} from '../../../../core/src/rewrite/reservedNames.js';
+import { vueGeneratedBindingNames } from './vueGeneratedNames.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -53,21 +49,6 @@ const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
-
-/**
- * Phase 61 Plan 07 (SC-2) — the union of every GENERATED Vue `<script setup>`
- * top-level binding name (`VUE_EMITTER_BINDINGS`) and every `'vue'` / runtime-vue
- * import the emitter may inject (`VUE_IMPORT_NAMES` ∪ `VUE_RUNTIME_IMPORTS`). A
- * USER `<data>`/`$computed`/helper/import/inject-local equal to any of these
- * redeclares the generated binding (TS2451) or shadows the injected import
- * (TS2440). Frozen module constant (single allocation; the sets come from the
- * single source of truth in `@rozie/core/rewrite/reservedNames.ts`).
- */
-const VUE_GENERATED_BINDING_NAMES: ReadonlySet<string> = new Set<string>([
-  ...VUE_EMITTER_BINDINGS,
-  ...VUE_IMPORT_NAMES,
-  ...VUE_RUNTIME_IMPORTS,
-]);
 
 /**
  * Decide whether a `$refs.X` / `$el` access should lower to a non-null
@@ -284,38 +265,34 @@ export function rewriteRozieIdentifiers(
     { names: modelProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
     { names: computedNames, trigger: { kind: 'bare-read' } },
-    // Phase 61 Plan 07 (SC-2, collision-vue §3 risks 2 + 3) — internal author
-    // kinds (`<data>`, `$computed`, `<script>` helpers, imports, inject-locals)
-    // that collide with a GENERATED `<script setup>` top-level binding
-    // (`props`/`emit`/`slots`/`portals`/`portalContainers`) OR a `'vue'`/
-    // runtime-vue import name the emitter may inject (`ref`/`computed`/`watch`/
-    // `h`/`render`/`Fragment`/`debounce`/…). Pre-Plan-07 ROZ202 guarded only
-    // `$`-sigil shadows; a plain `<data> slots` → `const slots = ref(...)` after
-    // the generated `const slots = useSlots()` → TS2451 redeclare; a `<data> ref`
-    // → `const ref = ref(...)` after `import { ref } from 'vue'` → TS2440 import
-    // shadow. The names come from the single source of truth in
-    // `@rozie/core/rewrite/reservedNames.ts` (VUE_EMITTER_BINDINGS ∪
-    // VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORTS).
+    // Phase 61 Plan 07 (SC-2, collision-vue §3 risks 2 + 3) — `<script>` HELPERS +
+    // IMPORTS (the two internal kinds that ARE top-level declarators/specifiers in
+    // the cloned Program) named a GENERATED `<script setup>` binding
+    // (`props`/`emit`/`slots`/`portals`/`portalContainers`) OR an injected
+    // `'vue'`/runtime-vue import (`ref`/`computed`/`watch`/`debounce`/…). A
+    // top-level `const ref = …` redeclares `import { ref } from 'vue'` (TS2440); a
+    // top-level helper named `props`/`emit` redeclares the generated binding
+    // (TS2451). The other three internal kinds (`<data>`/`$computed`/`$inject`)
+    // lower via IR-codegen, NOT this cloned Program, and are handled by the
+    // IR-level `deconflictVueGeneratedBindingNames` pass in emitVue.
     //
-    // `{ kind: 'binding' }`: these generated symbols are minted UNCONDITIONALLY
-    // (or by an emitter feature the author does not control), so the mere
-    // existence of a same-named user binding is the collision — no accessor read
-    // to gate on (unlike the model/data accessor groups). The renameable side is
-    // ALWAYS the USER local/param/helper/import (`X$local`); the generated
-    // binding / `'vue'` import is the contract and is never mutated (per the
-    // collision-vue §4 uniformity note — rename the author local, not the
-    // import). `vueProtected` (expose verbs) keeps the public contract intact.
+    // `programOnly: true` — rename ONLY a PROGRAM/setup-scope binding (a genuine
+    // top-level redeclare). A function PARAMETER (`resizeChart(w, h)`) or a
+    // function-LOCAL `const h = portals.body(...)` is a LEGAL nested shadow of the
+    // import/binding (no redeclare error) → never renamed (the chartjs/rete
+    // over-apply guard — byte-identity).
     //
-    // Name-set DISJOINTNESS with the prior three groups (so no double-rename):
-    // `props`/`emit`/`slots`/`portals`/`portalContainers` + the vue-import names
-    // are GENERATED-symbol names — they are never `$data`/`$computed`/model-prop
-    // author names in a well-formed component (a `<data> ref` is the author NAME
-    // we rename, not the lowered bare symbol the accessor groups gate on). The
-    // groups target distinct sides, so the order-independent multi-group pass
-    // renames each colliding user binding exactly once.
+    // The names are the ACTUALLY-GENERATED set for THIS component
+    // (`vueGeneratedBindingNames(ir)`), NOT the static union — each name is gated
+    // on the IR condition that makes the emitter inject it (e.g. `ref` only when
+    // there is `<data>`/refs; `h`/`render`/`Fragment` never, since the Vue target
+    // emits SFC templates not render functions). Off-collision corpus stays
+    // byte-identical. The renameable side is ALWAYS the USER binding (`X$local`);
+    // the generated binding / `'vue'` import is the contract and is never mutated.
+    // `vueProtected` (expose verbs) keeps the public contract intact.
     {
-      names: VUE_GENERATED_BINDING_NAMES,
-      trigger: { kind: 'binding' },
+      names: vueGeneratedBindingNames(ir),
+      trigger: { kind: 'binding', programOnly: true },
     },
   ];
   deconflictGeneratedSymbols(program, vueGroups, vueProtected);

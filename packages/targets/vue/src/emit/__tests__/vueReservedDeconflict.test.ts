@@ -153,4 +153,39 @@ const greeting = () => $data.label;
     expect(code).toContain("const count = ref(0);");
     expect(code).toContain("const label = ref('hi');");
   });
+
+  // REGRESSION (over-application guard): a function PARAMETER or a function-LOCAL
+  // `const` named a vue-import symbol (`h`/`ref`/…) is a LEGAL nested shadow —
+  // NOT a top-level redeclare — and must NEVER be renamed. (The chartjs
+  // `resizeChart(w, h)` + rete `const h = portals.body(...)` corpus drift.) The
+  // `programOnly` gate + the actually-generated-set gate keep these byte-identical.
+  const NESTED_SHADOW = `<rozie name="VueNestedShadow">
+<data>
+{
+  size: 10
+}
+</data>
+<script>
+const resize = (w, h) => { return w * h + $data.size; };
+const build = () => {
+  const h = { dispose() {} };
+  return h;
+};
+</script>
+<template>
+  <div>{{ $data.size }}</div>
+</template>
+</rozie>`;
+
+  it('does NOT rename a function param `h` or a function-local `const h` (legal nested shadow)', () => {
+    const code = compileVue(NESTED_SHADOW, 'VueNestedShadow.rozie');
+    // `ref` import IS injected (there is <data>), so `h` would be in the
+    // generated-name set — but `h` here is only a nested param/local, never a
+    // top-level binding, so it must stay un-renamed.
+    expect(code).not.toContain('h$local');
+    // The param `h` and the function-local `const h` survive un-renamed (the
+    // type-neutralizer may annotate params `: any`, but the NAME `h` is intact).
+    expect(code).toMatch(/const resize = \(w(?::\s*any)?,\s*h(?::\s*any)?\)\s*=>/);
+    expect(code).toMatch(/const h = \{/);
+  });
 });

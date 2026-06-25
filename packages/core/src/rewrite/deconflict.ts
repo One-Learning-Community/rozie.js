@@ -305,6 +305,16 @@ export interface GeneratedSymbolGroup {
    *     destructure binding) AND the Angular/Lit reserved-class-member case (a
    *     user local that becomes a colliding class field). The renameable side is
    *     always the user binding; the generated symbol is the contract.
+   *
+   *     OPTIONAL `programOnly: true` — restrict the rename to PROGRAM/setup-scope
+   *     (top-level) bindings ONLY; a function PARAMETER or a function-LOCAL
+   *     `const`/`let` named `name` is NOT renamed. Used by the Vue
+   *     generated-binding group (Plan 61-07): a top-level `const slots = ref(...)`
+   *     genuinely REDECLARES the generated `const slots = useSlots()` (TS2451), but
+   *     a function-local `const h = portals.body(...)` or a param `(w, h) => …` is
+   *     a LEGAL nested shadow of the `import { h }` / generated binding (no
+   *     redeclare error) — renaming it would be byte-identity drift. Mirrors the
+   *     `deconflictReservedClassFields` "program-level only" discipline.
    *   - `{ kind: 'bare-read' }` — a user binding for `name` collides ONLY when
    *     its scope contains a BARE Identifier READ of `name` (gated via
    *     `subtreeReadsBareIdentifier`). This is the Vue `$computed` case: a
@@ -317,7 +327,7 @@ export interface GeneratedSymbolGroup {
    */
   trigger:
     | { kind: 'accessor'; accessor: string }
-    | { kind: 'binding' }
+    | { kind: 'binding'; programOnly?: boolean }
     | { kind: 'bare-read' };
 }
 
@@ -373,6 +383,10 @@ export function deconflictGeneratedSymbols(
       const body = path.node.body;
       for (const param of path.node.params) {
         for (const group of active) {
+          // `programOnly` binding groups (Vue generated-binding) NEVER rename a
+          // function parameter — a param is a legal nested shadow, never a
+          // top-level redeclare. Skip the whole group for params.
+          if (group.trigger.kind === 'binding' && group.trigger.programOnly) continue;
           for (const name of group.names) {
             if (patternIntroducesBinding(param, name) && collides(group, name, body)) {
               // `path.scope` for a Function path is the scope it INTRODUCES
@@ -411,6 +425,16 @@ export function deconflictGeneratedSymbols(
           if (group.trigger.kind === 'bare-read' && t.isProgram(ownerScope.block)) {
             continue;
           }
+          // `programOnly` binding groups rename ONLY a PROGRAM/setup-scope
+          // declarator (a genuine top-level redeclare); a function-LOCAL `const`
+          // named the symbol is a legal nested shadow → skip.
+          if (
+            group.trigger.kind === 'binding' &&
+            group.trigger.programOnly &&
+            !t.isProgram(ownerScope.block)
+          ) {
+            continue;
+          }
           if (collides(group, name, ownerScope.block)) {
             ownerScope.rename(name, alias(name));
           }
@@ -432,6 +456,10 @@ export function deconflictGeneratedSymbols(
         if (!group.names.has(name)) continue;
         if (protectedNames.has(name)) continue; // public contract — never rename
         const ownerScope = path.scope.parent ?? path.scope;
+        // `programOnly` (Vue generated-binding): only a TOP-LEVEL `function X(){}`
+        // (declared in Program scope) genuinely redeclares the generated binding;
+        // a nested function declaration named the symbol is a legal shadow.
+        if (group.trigger.programOnly && !t.isProgram(ownerScope.block)) continue;
         ownerScope.rename(name, alias(name));
       }
     },

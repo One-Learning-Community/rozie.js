@@ -31,11 +31,7 @@ import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuilt
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 import { deconflictVueGeneratedBindingNames } from '../../../core/src/rewrite/deconflict.js';
-import {
-  VUE_EMITTER_BINDINGS,
-  VUE_IMPORT_NAMES,
-  VUE_RUNTIME_IMPORTS,
-} from '../../../core/src/rewrite/reservedNames.js';
+import { vueGeneratedBindingNames } from './rewrite/vueGeneratedNames.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -91,22 +87,6 @@ function templateContainsSelfReference(node: TemplateNode | null): boolean {
       return false;
   }
 }
-
-/**
- * Phase 61 Plan 07 (SC-2) — the union of every GENERATED Vue `<script setup>`
- * top-level binding name (`VUE_EMITTER_BINDINGS`) + every `'vue'` / runtime-vue
- * import the emitter may inject (`VUE_IMPORT_NAMES` ∪ `VUE_RUNTIME_IMPORTS`),
- * from the single source of truth in `@rozie/core/rewrite/reservedNames.ts`. A
- * USER `<data>`/`$computed`/`$inject`-local equal to any of these collides with
- * the generated binding (TS2451) or the injected import (TS2440) — renamed to
- * `X$local` by `deconflictVueGeneratedBindingNames` at the IR level (the trio of
- * internal kinds the cloned-program `vueGroups` binding group cannot reach).
- */
-const VUE_GENERATED_BINDING_NAMES: ReadonlySet<string> = new Set<string>([
-  ...VUE_EMITTER_BINDINGS,
-  ...VUE_IMPORT_NAMES,
-  ...VUE_RUNTIME_IMPORTS,
-]);
 
 export interface EmitVueOptions {
   /**
@@ -315,7 +295,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // The `$expose` verbs are public contract and are NEVER renamed.
   deconflictVueGeneratedBindingNames(
     ir,
-    VUE_GENERATED_BINDING_NAMES,
+    vueGeneratedBindingNames(ir),
     new Set<string>((ir.expose ?? []).map((e) => e.name)),
   );
 
