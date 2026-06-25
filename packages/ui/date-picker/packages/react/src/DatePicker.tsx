@@ -106,11 +106,17 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function readRange() {
     return normalizeRange(value);
   }
+  function viewAnchor(): string {
+    const s = selected();
+    if (s !== '') return s;
+    if (props.selectionMode === 'range') return readRange().start;
+    return '';
+  }
   const viewMonthGrid = useCallback(() => resolveViewIso({
     viewIso: viewIso,
-    value: selected(),
+    value: viewAnchor(),
     today: todayIso()
-  }), [selected, todayIso, viewIso]);
+  }), [todayIso, viewAnchor, viewIso]);
   function grid() {
     return buildMonthGrid({
       viewIso: viewMonthGrid(),

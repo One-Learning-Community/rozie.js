@@ -277,11 +277,21 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     return normalizeRange(value());
   }
 
-  // The resolved month anchor: the local view state, falling back to value/today.
+  // The resolved month anchor: the local view state, falling back to the selected
+  // value, then today. In range mode `selected()` is '' (the value is an object),
+  // so fall back to the range's `start` endpoint — a DatePicker opened with a
+  // pre-selected range must show that range's month, mirroring how single mode
+  // pins the view to its selected ISO (else range mode always opens on today).
+  function viewAnchor(): string {
+    const s = selected();
+    if (s !== '') return s;
+    if (local.selectionMode === 'range') return readRange().start;
+    return '';
+  }
   function viewMonthGrid() {
     return resolveViewIso({
       viewIso: viewIso(),
-      value: selected(),
+      value: viewAnchor(),
       today: todayIso()
     });
   }

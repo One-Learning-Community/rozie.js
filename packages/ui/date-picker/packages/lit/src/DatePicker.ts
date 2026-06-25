@@ -348,9 +348,16 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   readRange = () => normalizeRange(this.value);
 
+  viewAnchor = (): string => {
+  const s = this.selected();
+  if (s !== '') return s;
+  if (this.selectionMode === 'range') return this.readRange().start;
+  return '';
+};
+
   viewMonthGrid = () => resolveViewIso({
   viewIso: this._viewIso.value,
-  value: this.selected(),
+  value: this.viewAnchor(),
   today: this.todayIso()
 });
 

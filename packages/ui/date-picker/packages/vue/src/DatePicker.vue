@@ -139,11 +139,25 @@ const selected = (): string => {
 // this — never $props.value directly — so the polymorph is funneled in one place.
 const readRange = () => normalizeRange(value.value);
 
-// The resolved month anchor: the local view state, falling back to value/today.
-// The resolved month anchor: the local view state, falling back to value/today.
+// The resolved month anchor: the local view state, falling back to the selected
+// value, then today. In range mode `selected()` is '' (the value is an object),
+// so fall back to the range's `start` endpoint — a DatePicker opened with a
+// pre-selected range must show that range's month, mirroring how single mode
+// pins the view to its selected ISO (else range mode always opens on today).
+// The resolved month anchor: the local view state, falling back to the selected
+// value, then today. In range mode `selected()` is '' (the value is an object),
+// so fall back to the range's `start` endpoint — a DatePicker opened with a
+// pre-selected range must show that range's month, mirroring how single mode
+// pins the view to its selected ISO (else range mode always opens on today).
+const viewAnchor = (): string => {
+  const s = selected();
+  if (s !== '') return s;
+  if (props.selectionMode === 'range') return readRange().start;
+  return '';
+};
 const viewMonthGrid = () => resolveViewIso({
   viewIso: viewIso.value,
-  value: selected(),
+  value: viewAnchor(),
   today: todayIso()
 });
 
