@@ -63,55 +63,228 @@
 <props>
 {
   // [lng, lat] — lng FIRST (NOT Leaflet's [lat, lng]).
-  center:          { type: Array,   default: () => [0, 0], model: true },
-  zoom:            { type: Number,  default: 1,            model: true },
-  bearing:         { type: Number,  default: 0,            model: true },
-  pitch:           { type: Number,  default: 0,            model: true },
+  center: {
+    type: Array,
+    default: () => [0, 0],
+    model: true,
+    docs: {
+      description:
+        "The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.",
+      example: '<MapLibre r-model:center="center" r-model:zoom="zoom" />',
+    },
+  },
+  zoom: {
+    type: Number,
+    default: 1,
+    model: true,
+    docs: {
+      description:
+        "The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.",
+    },
+  },
+  bearing: {
+    type: Number,
+    default: 0,
+    model: true,
+    docs: {
+      description:
+        'The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.',
+    },
+  },
+  pitch: {
+    type: Number,
+    default: 0,
+    model: true,
+    docs: {
+      description:
+        'The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.',
+    },
+  },
   // mapStyle (NOT `style` — reserved attr across targets). StyleSpecification
   // object OR a style URL. No `type:` so it accepts string|object → emits as
   // `unknown`; the default is therefore `undefined` (Vue's withDefaults rejects a
   // raw string default on an `unknown`-typed prop) and the actual demo-tiles
   // fallback (so the component "just works" with zero config) is applied in-script
   // via DEFAULT_STYLE. Pass an offline style object for network-free rendering.
-  mapStyle:        { default: undefined },
+  mapStyle: {
+    default: undefined,
+    docs: {
+      description:
+        "The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component \"just works\" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.",
+    },
+  },
   // 0 / 22 are MapLibre's own min/maxZoom defaults — concrete (not `undefined`)
   // so the strict-tsc props-merge stays `number` (a `default: undefined` on a
   // typed prop emits a `number | undefined` that fails the framework-typecheck
   // harness; passing the engine's own defaults is behavior-preserving).
-  minZoom:         { type: Number,  default: 0 },
-  maxZoom:         { type: Number,  default: 22 },
+  minZoom: {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'Minimum zoom level. Applied at construction and via `setMinZoom` on change.',
+    },
+  },
+  maxZoom: {
+    type: Number,
+    default: 22,
+    docs: {
+      description:
+        'Maximum zoom level. Applied at construction and via `setMaxZoom` on change.',
+    },
+  },
   // LngLatBoundsLike — no `type:` (array-of-arrays or LngLatBounds). Untyped →
   // `unknown`, so `default: undefined` merges cleanly (no number-vs-undefined clash).
-  maxBounds:       { default: undefined },
+  maxBounds: {
+    default: undefined,
+    docs: {
+      description:
+        'A `LngLatBoundsLike` the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear).',
+    },
+  },
   // construction-only initial fit (overrides center/zoom when set).
-  bounds:          { default: undefined },
-  fitBoundsOptions:{ type: Object,  default: () => ({}) },
+  bounds: {
+    default: undefined,
+    docs: {
+      description:
+        '**Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`.',
+    },
+  },
+  fitBoundsOptions: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        '**Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.).',
+    },
+  },
   // interaction toggles — applied at construction + reconciled at runtime via
   // map.<handler>.enable()/disable().
-  dragPan:         { type: Boolean, default: true },
-  dragRotate:      { type: Boolean, default: true },
-  scrollZoom:      { type: Boolean, default: true },
-  doubleClickZoom: { type: Boolean, default: true },
-  boxZoom:         { type: Boolean, default: true },
-  keyboard:        { type: Boolean, default: true },
-  touchZoomRotate: { type: Boolean, default: true },
-  touchPitch:      { type: Boolean, default: true },
+  dragPan: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        "Toggle drag-to-pan. Applied at construction and reconciled live via the handler's `enable()` / `disable()`.",
+    },
+  },
+  dragRotate: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Toggle right-drag / ctrl-drag rotation. Applied at construction and reconciled live.',
+    },
+  },
+  scrollZoom: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description: 'Toggle scroll-wheel zoom. Applied at construction and reconciled live.',
+    },
+  },
+  doubleClickZoom: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description: 'Toggle double-click zoom. Applied at construction and reconciled live.',
+    },
+  },
+  boxZoom: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description: 'Toggle shift-drag box zoom. Applied at construction and reconciled live.',
+    },
+  },
+  keyboard: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description: 'Toggle keyboard navigation. Applied at construction and reconciled live.',
+    },
+  },
+  touchZoomRotate: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Toggle touch pinch-zoom + rotate. Applied at construction and reconciled live.',
+    },
+  },
+  touchPitch: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Toggle two-finger touch pitch. Applied at construction and reconciled live.',
+    },
+  },
   // markers/popups drive the REACTIVE MULTI-INSTANCE `marker`/`popup` portal
   // slots — each entry { lng, lat, id?, anchor?, offset?, ... }.
-  markers:         { type: Array,   default: () => [] },
-  popups:          { type: Array,   default: () => [] },
+  markers: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The marker data that drives the reactive multi-instance `marker` slot — one entry per marker (`{ lng, lat, id?, anchor?, offset?, draggable?, ... }`). One portal handle mounts per entry; changing the array reconciles markers keep / update / dispose with no remount. Only meaningful when the `marker` slot is filled.',
+    },
+  },
+  popups: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The popup data that drives the reactive multi-instance `popup` slot — one entry per popup (`{ lng, lat, id?, anchor?, offset?, closeButton?, closeOnClick?, ... }`). One portal handle mounts per entry. Only meaningful when the `popup` slot is filled.',
+    },
+  },
   // style-load-gated source/layer reconcile. sources: [{ id, spec }] (or a bare
   // SourceSpecification with an `id`); layers: [LayerSpecification with id].
-  sources:         { type: Array,   default: () => [] },
-  layers:          { type: Array,   default: () => [] },
+  sources: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Declarative GeoJSON / vector / raster sources — `[{ id, spec }]` (or a bare `SourceSpecification` carrying an `id`). Reconciled into the live style (add / `setData` / remove) once the style has loaded. The config-array authoring shape for sources; declarative `<Source>` / `<Layer>` children are the alternative shape (both feed the same registry).',
+    },
+  },
+  layers: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Declarative layers — `LayerSpecification[]` (each with an `id`). Reconciled into the live style (add / `setPaintProperty` / `setLayoutProperty` / remove) once the style has loaded; `beforeId` controls draw order.',
+    },
+  },
   // layer ids whose feature mouseenter/mouseleave fire (populates e.features).
-  interactiveLayerIds: { type: Array, default: () => [] },
+  interactiveLayerIds: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Layer ids whose feature `mouseenter` / `mouseleave` fire the `@mouseenter` / `@mouseleave` events (populating `e.features`). Registered / unregistered per id on change.',
+    },
+  },
   // standard-control config: 'navigation' | 'geolocate' | 'scale' | 'fullscreen'
   // | 'attribution', or { type, position?, options? }.
-  controls:        { type: Array,   default: () => [] },
+  controls: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        "Standard map controls — strings (`'navigation'` / `'geolocate'` / `'scale'` / `'fullscreen'` / `'attribution'`) or `{ type, position?, options? }` objects. Reconciled (remove-all + re-add) on change.",
+    },
+  },
   // passthrough — spread into the Map constructor BEFORE curated keys (explicit
   // props win).
-  options:         { type: Object,  default: () => ({}) },
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        "The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.",
+    },
+  },
 }
 </props>
 

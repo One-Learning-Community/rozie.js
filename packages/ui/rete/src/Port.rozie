@@ -44,13 +44,26 @@
 <props>
 {
   // OUTPUT key — set this (not `input`) to declare an output port. side ⇒ 'output'.
-  output:   { type: String, default: undefined },
+  output:   { type: String, default: undefined,
+    docs: {
+      description:
+        "Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.",
+      example: '<Port output="num" type="number" />',
+    } },
   // INPUT key — set this (not `output`) to declare an input port. side ⇒ 'input'.
-  input:    { type: String, default: undefined },
+  input:    { type: String, default: undefined,
+    docs: {
+      description:
+        "Declares an INPUT port and names its key — set this (not `output`) so the port direction resolves to `input`. The attribute is `input`, not `in`: `in` is a JS reserved word that Svelte's mandatory `$props()` destructure rejects, so `input`/`output` are used instead.",
+    } },
   // The PORT TYPE — drives the canvas's typed-socket :validate-types (a type-
   // mismatched connection is auto-rejected). Optional (an untyped port imposes no
   // type constraint → connects to anything).
-  type:     { type: String, default: undefined },
+  type:     { type: String, default: undefined,
+    docs: {
+      description:
+        "The port TYPE — drives the canvas's typed-socket `:validate-types` (a type-mismatched connection is auto-rejected). It is the typed layer, NOT socket identity (a single shared Socket gates identity). Optional: an untyped port imposes no type constraint and connects to anything.",
+    } },
   // optional socket label (defaults to the key in buildSocketRow). TYPED String:
   // on Lit a prop with no explicit `type:` lowers to `@property({ type: Object })`,
   // which JSON.parses the HTML attribute — so `label="number"` becomes `JSON.parse
@@ -58,7 +71,11 @@
   // KEY ('num') instead of the label ('number') on Lit (the 5 other targets pass the
   // attribute through verbatim, so they were correct). Declaring `type: String` lowers
   // to `@property({ type: String })` (no JSON parse) so the attribute string lands as-is.
-  label:    { type: String, default: undefined },
+  label:    { type: String, default: undefined,
+    docs: {
+      description:
+        'Optional socket label shown next to the port (defaults to the port key when omitted).',
+    } },
   // allow multiple connections into/out of this socket. Left UNTYPED (default undefined)
   // to PRESERVE the canvas's side asymmetry keyed off undefined: outputs default multi
   // (`multiple !== false`), inputs default single (`multiple === true`). Forcing
@@ -70,7 +87,11 @@
   // attribute is the empty string → `JSON.parse('')` THROWS → multiple stays undefined;
   // a BOUND `:multiple="true"` passes a real boolean through the framework prop binding
   // (no HTML-attribute JSON parse), landing true on all 6 targets.
-  multiple: { default: undefined },
+  multiple: { default: undefined,
+    docs: {
+      description:
+        "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, BIND it (`:multiple=\"true\"`) rather than using the bare boolean attribute (a bare `multiple` lands as undefined on Lit).",
+    } },
   // VISUAL placement of the socket on the node: 'left' | 'right' | 'top' | 'bottom'.
   // Default by DIRECTION (input → left, output → right — exact back-compat; existing
   // graphs unchanged). 'top'/'bottom' enable VERTICAL flows (decision trees, top-down
@@ -78,7 +99,11 @@
   // shifts on the matching axis (a custom getDOMSocketPosition offset). type:String
   // (the Lit JSON-parse discipline — a bare position="top" attribute must land as the
   // string, not be JSON-parsed to undefined).
-  position: { type: String, default: undefined },
+  position: { type: String, default: undefined,
+    docs: {
+      description:
+        "Visual placement of the socket on the node: `left`, `right`, `top`, or `bottom`. Defaults by direction (input → left, output → right). `top`/`bottom` enable vertical flows (decision trees, top-down pipelines) — the canvas lays the socket out on that edge and the connection anchor shifts onto the matching axis.",
+    } },
 }
 </props>
 

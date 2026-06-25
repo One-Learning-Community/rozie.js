@@ -16,14 +16,63 @@
 
 <props>
 {
-  columnId: { type: String,   default: '' },
-  column:   { type: null,     default: null },
-  row:      { type: null,     default: null },
-  value:    { type: null,     default: null },
-  commit:   { type: Function, default: null },
-  cancel:   { type: Function, default: null },
+  columnId: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.',
+    },
+  },
+  column:   {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The table-core column object (opaque passthrough from the `#editor` slot scope).',
+    },
+  },
+  row:      {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        "The consumer's row data object (opaque passthrough from the `#editor` slot scope).",
+    },
+  },
+  value:    {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The current cell value the `<select>` binds to (String-coerced).',
+    },
+  },
+  commit:   {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.',
+    },
+  },
+  cancel:   {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`() => void` — revert the edit (Escape). Null-guarded at call sites.',
+    },
+  },
   // The select options — `[{ value, label }]`. Mirrors <Column editorOptions>.
-  options:  { type: Array,    default: () => [] },
+  options:  {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.',
+    },
+  },
 }
 </props>
 

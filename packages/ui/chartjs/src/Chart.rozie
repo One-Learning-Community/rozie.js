@@ -52,22 +52,100 @@
 
 <props>
 {
-  data:        { type: Object,  default: () => ({ labels: [], datasets: [] }) },
-  options:     { type: Object,  default: () => ({}) },
-  type:        { type: String,  default: 'line' },
-  height:      { type: Number,  default: 240 },
-  width:       { type: Number,  default: undefined },
-  plugins:     { type: Array,   default: () => [] },
-  updateMode:  { type: String,  default: undefined },
-  redraw:      { type: Boolean, default: false },
-  ariaLabel:   { type: String,  default: undefined },
+  data: {
+    type: Object,
+    default: () => ({ labels: [], datasets: [] }),
+    docs: {
+      description:
+        "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+      example: '<Chart :data="$data.chartData" type="bar" />',
+    },
+  },
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+    },
+  },
+  type: {
+    type: String,
+    default: 'line',
+    docs: {
+      description:
+        'The chart kind — any Chart.js controller (`line`/`bar`/`pie`/`doughnut`/`radar`/`polarArea`/`scatter`/`bubble`/…). Changing it **re-creates** the instance, since Chart.js has no stable runtime type-swap.',
+    },
+  },
+  height: {
+    type: Number,
+    default: 240,
+    docs: {
+      description:
+        "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+    },
+  },
+  width: {
+    type: Number,
+    default: undefined,
+    docs: {
+      description:
+        'Optional fixed chart width in pixels. Omit for the default full-width responsive box.',
+    },
+  },
+  plugins: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.',
+    },
+  },
+  updateMode: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).',
+    },
+  },
+  redraw: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.',
+    },
+  },
+  ariaLabel: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'Accessible label applied to the `<canvas role="img">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.',
+    },
+  },
   // Dataset diff key (react-chartjs-2 parity): datasets are matched across
   // updates by ds[datasetIdKey], falling back to array index when the key is
   // absent — guards the "first dataset copied over the others" hazard.
-  datasetIdKey: { type: String, default: 'label' },
+  datasetIdKey: {
+    type: String,
+    default: 'label',
+    docs: {
+      description:
+        'The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard.',
+    },
+  },
   // ms grace before destroy() on unmount so exit transitions can finish
   // (vue-chartjs parity). 0 = destroy immediately.
-  destroyDelay: { type: Number, default: 0 },
+  destroyDelay: {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.',
+    },
+  },
 }
 </props>
 

@@ -49,47 +49,133 @@
   // The current value (two-way). A scalar number in single mode; a sorted
   // [lo, hi] array in range mode. As the sole `model:true` prop it drives the
   // Angular ControlValueAccessor — a Slider IS a form control.
-  value:       { type: null,     default: null, model: true },
+  value:       {
+    type: null,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).',
+      example: '<Slider r-model:value="volume" :min="0" :max="100" :step="1" ariaLabel="Volume" />',
+    },
+  },
 
   // Range mode: `value` becomes a sorted [lo, hi] array driven by two
   // overlapping thumbs. Exact mirror of listbox's `multiple` (scalar↔array).
   // Bare-attr `<Slider range>` coerces to true (Phase 46 ITEM-2).
-  range:       { type: Boolean,  default: false },
+  range:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Switch to dual-thumb range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping native inputs. The exact analog of listbox\'s `multiple` (scalar↔array). A bare attribute (`<Slider range>`) coerces to `true`.',
+    },
+  },
 
   // Linear scale bounds + granularity. Forwarded to the native input as the
   // `min`/`max`/`step` attributes (NOT aria-valuemin/max — the browser derives
   // those; MDN slider role).
-  min:         { type: Number,   default: 0 },
-  max:         { type: Number,   default: 100 },
-  step:        { type: Number,   default: 1 },
+  min:         {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'The lower bound of the scale, forwarded to the native input as the `min` attribute (the browser derives `aria-valuemin` from it — not set by hand, per MDN slider-role guidance).',
+    },
+  },
+  max:         {
+    type: Number,
+    default: 100,
+    docs: {
+      description:
+        'The upper bound of the scale, forwarded to the native input as the `max` attribute (the browser derives `aria-valuemax` from it — not set by hand, per MDN slider-role guidance).',
+    },
+  },
+  step:        {
+    type: Number,
+    default: 1,
+    docs: {
+      description:
+        'The granularity of the scale, forwarded as the native `step` attribute; every write-back is quantized to it.',
+    },
+  },
 
   // 'horizontal' (default) or 'vertical'. Vertical rotates the wrapper -90deg so
   // up = increase, and sets aria-orientation="vertical" explicitly.
-  orientation: { type: String,   default: 'horizontal' },
+  orientation: {
+    type: String,
+    default: 'horizontal',
+    docs: {
+      description:
+        "Layout orientation — `'horizontal'` (default) or `'vertical'`. Vertical rotates the wrapper `-90deg` so up = increase and sets `aria-orientation=\"vertical\"` explicitly (a native range input always reports itself as horizontal even when visually rotated).",
+    },
+  },
 
-  disabled:    { type: Boolean,  default: false },
+  disabled:    {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable the control — it becomes non-interactive and dimmed. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
 
   // Tick marks. A union: a bare value[] (positions only) OR a {value,label}[]
   // (positioned, labelled). The #mark scoped slot ({ value, label, position })
   // overrides the default rendering. Marks are a decorative overlay over the
   // track (siblings of the native input).
-  marks:       { type: Array,    default: () => [] },
+  marks:       {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Tick marks over the track — either a bare `value[]` (positions only) or a `{ value, label }[]` (positioned and labelled). Rendered as a decorative overlay above the track; override per-mark rendering via the `mark` scoped slot (`{ value, label, position }`).',
+    },
+  },
 
   // Accessible name when there is no visible <label for>. Reflected onto each
   // native input's aria-label.
-  ariaLabel:   { type: String,   default: null },
+  ariaLabel:   {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for each native input when there is no visible `<label for>`, reflected onto the input\'s `aria-label`.',
+    },
+  },
 
   // The PageUp/PageDown jump. null → step × 10. Applied by a thin @keydown
   // augment (arrows / Home / End stay native).
-  pageStep:    { type: Number,   default: null },
+  pageStep:    {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'The jump applied on `PageUp` / `PageDown`. `null` falls back to `step × 10`. Applied by a thin `@keydown` augment so it honours this value (native browsers otherwise use their own large step); arrows / `Home` / `End` stay native.',
+    },
+  },
 
   // Formats the value shown in the #value bubble and aria-valuetext. null → the
   // raw value. Receives the numeric value, returns a string.
-  formatValue: { type: Function, default: null },
+  formatValue: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'A `(value) => string` formatter for the value shown in the `bubble` slot and surfaced as `aria-valuetext`. Receives the numeric value and returns a string; `null` uses the raw value.',
+    },
+  },
 
   // Render the #value bubble overlay (one per thumb in range mode). Headless:
   // no default-styled bubble — the slot stays opt-in.
-  showValue:   { type: Boolean,  default: false },
+  showValue:   {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.',
+    },
+  },
 }
 </props>
 

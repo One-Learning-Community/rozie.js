@@ -53,31 +53,82 @@
 {
   // 'recaptcha' (Google reCAPTCHA v2) | 'hcaptcha' | 'turnstile' (Cloudflare)
   // | 'friendly' (Friendly Captcha).
-  provider: { type: String, default: 'recaptcha' },
+  provider: {
+    type: String,
+    default: 'recaptcha',
+    docs: {
+      description:
+        'Which widget to render: `recaptcha` (Google reCAPTCHA v2), `hcaptcha`, `turnstile` (Cloudflare), or `friendly` (Friendly Captcha). The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. Construction-time — re-key the component to switch it live.',
+    },
+  },
 
   // The public site key from your provider dashboard. Required.
-  sitekey:  { type: String, required: true },
+  sitekey:  {
+    type: String,
+    required: true,
+    docs: {
+      description:
+        'Required. The public site key from your provider dashboard. Identifies your site to the chosen provider.',
+    },
+  },
 
   // The verified response token. Two-way: written by the widget on success,
   // cleared on expire/reset. Read it for form submission via r-model="token".
-  token:    { type: String, default: '', model: true },
+  token:    {
+    type: String,
+    default: '',
+    model: true,
+    docs: {
+      description:
+        'The verified response token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written by the widget on success and cleared on expire/reset, so reading it gives you the live response to send to your server for form submission.',
+      example: '<Captcha r-model:token="token" provider="recaptcha" sitekey="…" />',
+    },
+  },
 
   // 'light' | 'dark' (all three) | 'auto' (Turnstile only). Construction-time.
-  theme:    { type: String, default: 'light' },
+  theme:    {
+    type: String,
+    default: 'light',
+    docs: {
+      description:
+        'Widget color theme: `light` or `dark` (all three core providers), or `auto` (Turnstile only). Construction-time — re-key the component to change it live.',
+    },
+  },
 
   // reCAPTCHA/hCaptcha: 'normal' | 'compact' | 'invisible'.
   // Turnstile: 'normal' | 'compact' | 'flexible'. Construction-time.
   // No-op for Friendly Captcha (FC has no `size` concept — its `startMode`
   // analog rides through the `options` escape hatch instead).
-  size:     { type: String, default: 'normal' },
+  size:     {
+    type: String,
+    default: 'normal',
+    docs: {
+      description:
+        'Widget size. reCAPTCHA/hCaptcha accept `normal`/`compact`/`invisible`; Turnstile accepts `normal`/`compact`/`flexible`. A no-op for Friendly Captcha (its `startMode` analog rides through the `options` escape hatch instead). Construction-time.',
+    },
+  },
 
   // Optional tabindex forwarded to the widget (omitted when null).
-  tabindex: { type: Number, default: null },
+  tabindex: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Optional tab index forwarded to the rendered widget. Omitted from the render config when left unset (`null`).',
+    },
+  },
 
   // Escape hatch — provider-specific render options merged last (e.g. Turnstile
   // `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`). Lets consumers
   // reach keys this component does not promote to first-class props.
-  options:  { type: Object, default: () => ({}) },
+  options:  {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Escape hatch — provider-specific render options merged last (e.g. Turnstile `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`, Friendly Captcha `startMode`). Lets you reach keys this component does not promote to first-class props.',
+    },
+  },
 }
 </props>
 

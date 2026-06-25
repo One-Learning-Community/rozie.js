@@ -45,7 +45,15 @@
   // The node TYPE id (required) — graph nodes whose `type` matches render this
   // template + use this type's port schema. NO id/x/y: this is a TEMPLATE, not an
   // instance (instance identity + position live in the bound `graph` model).
-  type: { type: String, required: true },
+  type: {
+    type: String,
+    required: true,
+    docs: {
+      description:
+        'The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type\'s `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.',
+      example: '<NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>',
+    },
+  },
 }
 </props>
 

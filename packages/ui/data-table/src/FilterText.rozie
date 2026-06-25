@@ -32,13 +32,41 @@
 {
   // The column id (mirrors the #filter slot scope) — used as the filter key + an
   // aria-label fallback.
-  columnId:  { type: String,   default: '' },
+  columnId:  {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label`.',
+    },
+  },
   // The table-core column object (opaque passthrough).
-  column:    { type: null,     default: null },
+  column:    {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The table-core column object (opaque passthrough from the `#filter` slot scope).',
+    },
+  },
   // The current column filter value the input seeds from.
-  value:     { type: null,     default: null },
+  value:     {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The current column filter value the local draft seeds from (setup-once).',
+    },
+  },
   // (columnId, value) => void — apply the column filter. Null-guarded at call sites.
-  setFilter: { type: Function, default: null },
+  setFilter: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.',
+    },
+  },
 }
 </props>
 

@@ -49,44 +49,136 @@
   // The option set. Each entry is either a primitive (string/number) or an
   // object; objects resolve their label/value/disabled via the option* props
   // (falling back to `.label` / `.value` / `.disabled`).
-  options:        { type: Array,    default: () => [] },
+  options:        {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.',
+    },
+  },
 
   // The selected value (two-way). Scalar in single-select; an array of values
   // in multi-select. As the sole `model:true` prop it drives the Angular CVA —
   // a Listbox IS a form control.
-  value:          { type: null,     default: null, model: true },
+  value:          {
+    type: null,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Listbox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).',
+      example: '<Listbox r-model:value="fruit" :options="fruits" />',
+    },
+  },
 
   // Multi-select: `value` becomes an array; selecting toggles membership and
   // keeps the popup open.
-  multiple:       { type: Boolean,  default: false },
+  multiple:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit.',
+    },
+  },
 
   // Combobox mode: render a text <input role="combobox"> and filter options by
   // the typed query. Off → a select-only combobox (a button trigger).
-  combobox:       { type: Boolean,  default: false },
+  combobox:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.',
+    },
+  },
 
   // Whether combobox mode filters the options client-side. Turn off for
   // remote/async filtering — listen to the `search` event and update `options`.
-  filterable:     { type: Boolean,  default: true },
+  filterable:     {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.',
+    },
+  },
 
-  disabled:       { type: Boolean,  default: false },
-  placeholder:    { type: String,   default: '' },
+  disabled:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
+  placeholder:    {
+    type: String,
+    default: '',
+    docs: {
+      description: 'Placeholder text shown in the empty control.',
+    },
+  },
 
   // Close the popup after a selection. Defaults true; multi-select callers
   // usually want it open — pass :closeOnSelect="false".
-  closeOnSelect:  { type: Boolean,  default: true },
+  closeOnSelect:  {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Close the popup after a single-select commit. Defaults `true`; multi-select keeps the popup open regardless of this setting.',
+    },
+  },
 
   // Resolver overrides for object options.
-  optionLabel:    { type: Function, default: null },
-  optionValue:    { type: Function, default: null },
-  optionDisabled: { type: Function, default: null },
+  optionLabel:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.",
+    },
+  },
+  optionValue:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.",
+    },
+  },
+  optionDisabled: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option\'s `.disabled` property.',
+    },
+  },
 
   // Stable id base for the ARIA wiring (listbox id + per-option ids +
   // aria-activedescendant). Required-distinct for multiple instances on one
   // page (the standard ARIA-widget contract).
-  id:             { type: String,   default: 'rozie-listbox' },
+  id:             {
+    type: String,
+    default: 'rozie-listbox',
+    docs: {
+      description:
+        'Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.',
+    },
+  },
 
   // Accessible name for the control when there is no visible <label for>.
-  ariaLabel:      { type: String,   default: null },
+  ariaLabel:      {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).',
+    },
+  },
 }
 </props>
 

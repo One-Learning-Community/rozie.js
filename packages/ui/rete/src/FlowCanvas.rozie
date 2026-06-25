@@ -99,41 +99,98 @@
   // The canvas WRITES BACK a FRESH top-level object via `$model.graph` on every
   // drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges
   // style (in-place deep mutation is silent on React/Solid/Lit/Angular, Wave-0).
-  graph:        { type: Object,  default: () => ({ nodes: [], connections: [] }), model: true },
+  graph:        { type: Object,  default: () => ({ nodes: [], connections: [] }), model: true,
+    docs: {
+      description:
+        "The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.",
+      example: '<FlowCanvas r-model:graph="graph" :validate-types="true" />',
+    } },
   // Automatic typed-socket validation (D3, default ON). When true, the canvas
   // resolves each endpoint's port TYPE from the per-TYPE port schema (declared on
   // <Port type>) and auto-rejects a type-mismatched connection. `canConnect`
   // survives as the optional custom-rule OVERRIDE (runs in addition); either path
   // fires `connection-rejected`. Set false for pure-`canConnect` (type as metadata).
-  validateTypes: { type: Boolean, default: true },
+  validateTypes: { type: Boolean, default: true,
+    docs: {
+      description:
+        "Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).",
+    } },
   // Two-way zoom (model). NOTE: no `zoom`/`zoomed` EMIT — a same-named emit
   // collides with the model on Vue (defineModel vs defineEmits) and Angular
   // (ModelSignal vs OutputEmitterRef) — the MapLibre zoom/pitch lesson. The
   // two-way binding conveys zoom changes; consumers wanting a discrete signal use
   // `@translated` for pan or read the bound zoom.
-  zoom:         { type: Number,  default: 1, model: true },
+  zoom:         { type: Number,  default: 1, model: true,
+    docs: {
+      description:
+        "The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.",
+    } },
   // interaction toggles — applied at construction (drag/zoom handlers, selection).
-  pannable:     { type: Boolean, default: true },
-  zoomable:     { type: Boolean, default: true },
-  selectable:   { type: Boolean, default: true },
+  pannable:     { type: Boolean, default: true,
+    docs: {
+      description:
+        "Whether the canvas can be panned by dragging the background (applied at construction). Set `false` to detach the area's drag handler.",
+    } },
+  zoomable:     { type: Boolean, default: true,
+    docs: {
+      description:
+        "Whether the canvas can be zoomed by scroll/pinch (applied at construction). Set `false` to detach the area's zoom handler.",
+    } },
+  selectable:   { type: Boolean, default: true,
+    docs: {
+      description:
+        'Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event.',
+    } },
   // when true: no node drag, no connection editing (read-only viewer).
-  readonly:     { type: Boolean, default: false },
+  readonly:     { type: Boolean, default: false,
+    docs: {
+      description:
+        'Read-only viewer mode — no node drag, no connection editing, and no selection. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled.',
+    } },
   // zoom clamp (restrictor extension). 0 disables the corresponding bound.
-  minZoom:      { type: Number,  default: 0.1 },
-  maxZoom:      { type: Number,  default: 4 },
+  minZoom:      { type: Number,  default: 0.1,
+    docs: {
+      description:
+        "Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.",
+    } },
+  maxZoom:      { type: Number,  default: 4,
+    docs: {
+      description:
+        "Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.",
+    } },
   // snap-to-grid size in px (0 = off).
-  snapGrid:     { type: Number,  default: 0 },
+  snapGrid:     { type: Number,  default: 0,
+    docs: {
+      description:
+        'Snap-to-grid size in pixels for node dragging. `0` turns snapping off.',
+    } },
   // ctrl-accumulating multi-select.
-  accumulateOnCtrl: { type: Boolean, default: true },
+  accumulateOnCtrl: { type: Boolean, default: true,
+    docs: {
+      description:
+        'When selectable, hold Ctrl to add to the current selection instead of replacing it.',
+    } },
   // connection bezier curvature (classicConnectionPath).
-  curvature:    { type: Number,  default: 0.3 },
+  curvature:    { type: Number,  default: 0.3,
+    docs: {
+      description:
+        'The bezier curvature of connection paths (`classicConnectionPath`).',
+    } },
   // auto-fit the viewport to all nodes after the initial graph mounts.
-  fitOnMount:   { type: Boolean, default: true },
+  fitOnMount:   { type: Boolean, default: true,
+    docs: {
+      description:
+        'After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).',
+    } },
   // built-in Controls overlay (zoom in / zoom out / fit) — default ON; opt out with
   // :controls="false". type:Boolean lowers cleanly cross-target (no Lit object-prop
   // JSON.parse landmine). The buttons reuse the same zoom/fit path as the zoomTo/
   // zoomToFit $expose verbs (one implementation).
-  controls:     { type: Boolean, default: true },
+  controls:     { type: Boolean, default: true,
+    docs: {
+      description:
+        'Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls="false"`.',
+    } },
   // built-in MiniMap overlay (opt-in, default OFF — the React-Flow `<MiniMap/>` style).
   // When true an absolute light-DOM SVG overlay (bottom-right; Controls is bottom-left)
   // renders a scaled map of every node rect — sized by the MEASURED engine node-view
@@ -144,14 +201,22 @@
   // unchanged (no rebless unless a demo turns it on). type:Boolean lowers cleanly
   // cross-target (no Lit object-prop JSON.parse landmine). Like pannable/zoomable/
   // controls, evaluated at CONSTRUCTION (read once in $onMount) — set it at mount time.
-  minimap:      { type: Boolean, default: false },
+  minimap:      { type: Boolean, default: false,
+    docs: {
+      description:
+        'Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.',
+    } },
   // Connection-validation predicate. Receives the normalized candidate connection
   // { source, sourceOutput, target, targetInput }; return false to REJECT (the
   // wrapper cancels Rete's connectioncreate pre-event — no edge committed, no ghost
   // path — and emits `connection-rejected`). Absent/null = allow all connections
   // (back-compat: zero behavioral change for existing demos). Gates ALL three paths
   // (drag-to-connect, imperative addConnection, config-array reconcile) uniformly.
-  canConnect:   { type: Function, default: null },
+  canConnect:   { type: Function, default: null,
+    docs: {
+      description:
+        'Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.',
+    } },
   // T1.3 — UNDO/REDO toggle (D-02, on-by-default). When true (default) every gesture
   // (drag / connect / disconnect / delete) pushes ONE capped (~100) snapshot of the
   // bound graph (nodes incl x/y + connections; NOT the viewport) and undo()/redo() +
@@ -159,7 +224,11 @@
   // the cheap escape hatch — pushHistory bails immediately so the stacks stay empty and
   // undo/redo no-op. type:Boolean lowers cleanly cross-target (no Lit object-prop
   // JSON.parse landmine), default true so existing demos get undo for free.
-  history:      { type: Boolean, default: true },
+  history:      { type: Boolean, default: true,
+    docs: {
+      description:
+        'Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty and the verbs no-op).',
+    } },
   // T2.4 — interaction MODE (D-05), a two-way r-model string: 'pan' (default) | 'select'.
   // The Figma-style pan↔select toggle. In 'pan' (default) an empty-canvas drag PANS the
   // viewport — UNCHANGED, zero behavioral drift for every existing demo. In 'select' an
@@ -173,13 +242,21 @@
   // restore pan). type:String, default 'pan' → React generates a setMode setter (NOT a
   // lifecycle/emit/prop collision). Only 'select' triggers the marquee branch; any other
   // value uses the default pan path (Threat T-44-04-1).
-  mode:         { type: String,  default: 'pan', model: true },
+  mode:         { type: String,  default: 'pan', model: true,
+    docs: {
+      description:
+        "Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).",
+    } },
   // T2.4 — gate the 4th Controls MODE button (D-05). Default false so the built-in Controls
   // overlay keeps its 3 buttons (zoom-in/out/fit) → FlowCanvasScreenshot stays byte-identical
   // (gate over rebless). Set :marquee="true" to render the pan↔select toggle button in the
   // Controls cluster (it two-way-writes $model.mode). The marquee BEHAVIOR works regardless
   // of this flag (a consumer can drive `mode` directly); this only governs the built-in button.
-  marquee:      { type: Boolean, default: false },
+  marquee:      { type: Boolean, default: false,
+    docs: {
+      description:
+        'Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === \'select\'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.',
+    } },
   // T2.8 — NodeToolbar (D-06, OPT-IN, default OFF). When true, selecting a node pops a
   // floating toolbar OVER the selected node (positioned from the engine node-view rect +
   // the area transform, re-tracked on pan/zoom/drag). Default buttons: delete (→ the
@@ -189,7 +266,11 @@
   // portal slot. Default OFF keeps existing demos + the FlowCanvasScreenshot pixel baseline
   // unchanged (selecting a node never pops a toolbar unless opted in). type:Boolean lowers
   // cleanly cross-target (no Lit object-prop JSON.parse landmine).
-  nodeToolbar:  { type: Boolean, default: false },
+  nodeToolbar:  { type: Boolean, default: false,
+    docs: {
+      description:
+        "Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.",
+    } },
 }
 </props>
 

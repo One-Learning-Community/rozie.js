@@ -23,13 +23,48 @@
 
 <props>
 {
-  columnId:     { type: String,   default: '' },
-  column:       { type: null,     default: null },
+  columnId:     {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id (mirrors the `#filter` slot scope) — used as the filter key and the select `aria-label`.',
+    },
+  },
+  column:       {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The table-core column object (opaque passthrough from the `#filter` slot scope).',
+    },
+  },
   // The current column filter value the select seeds from.
-  value:        { type: null,     default: null },
-  setFilter:    { type: Function, default: null },
+  value:        {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The current column filter value the select seeds from (String-coerced).',
+    },
+  },
+  setFilter:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.',
+    },
+  },
   // The faceted distinct KEYS for this column (D-03 — keys only, no counts).
-  uniqueValues: { type: Array,    default: () => [] },
+  uniqueValues: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.',
+    },
+  },
 }
 </props>
 

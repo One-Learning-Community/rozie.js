@@ -33,18 +33,59 @@
 <props>
 {
   // The MapLibre layer id (required). Sole optionality determinant.
-  id:       { type: String, required: true },
+  id: {
+    type: String,
+    required: true,
+    docs: {
+      description:
+        'The MapLibre layer id (required). Identifies the layer in the parent `<MapLibre>` registry and the underlying style.',
+      example: '<Layer id="circles" type="circle" :paint="{ \'circle-radius\': 5 }" />',
+    },
+  },
   // LayerSpecification.type — 'circle' | 'fill' | 'line' | 'symbol' | 'raster' |
   // 'background' | … (string). default:undefined keeps the merge clean.
-  type:     { type: String, default: undefined },
+  type: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        "The `LayerSpecification.type` — `'circle'` / `'fill'` / `'line'` / `'symbol'` / `'raster'` / `'background'` / … A `'background'` layer needs no source; every other type requires a `source` (explicit or injected from a parent `<Source>`).",
+    },
+  },
   // paint / layout are union objects → no `type:`, default:undefined.
-  paint:    { default: undefined },
-  layout:   { default: undefined },
+  paint: {
+    default: undefined,
+    docs: {
+      description:
+        "The layer's `paint` properties (the `LayerSpecification.paint` object, e.g. `{ 'line-color': '#e11', 'line-width': 3 }`). Changes are reconciled via `setPaintProperty` with no remount.",
+    },
+  },
+  layout: {
+    default: undefined,
+    docs: {
+      description:
+        "The layer's `layout` properties (the `LayerSpecification.layout` object, e.g. `{ 'line-cap': 'round' }`). Changes are reconciled via `setLayoutProperty` with no remount.",
+    },
+  },
   // explicit source id for the flat shape (background/cross-source). When omitted
   // inside a <Source>, the injected source ctx supplies it.
-  source:   { type: String, default: undefined },
+  source: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'Explicit source id for the flat shape (a background layer needs none, or a cross-source reference). When omitted inside a `<Source>`, the injected source context supplies the id automatically.',
+    },
+  },
   // insert this layer BEFORE the layer with this id (applyLayers ordering).
-  beforeId: { type: String, default: undefined },
+  beforeId: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'Insert this layer immediately **before** the layer with this id, controlling draw order (the `addLayer` `beforeId` argument). Omit to append on top.',
+    },
+  },
 }
 </props>
 

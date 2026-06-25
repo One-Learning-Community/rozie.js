@@ -33,22 +33,72 @@
 {
   // The column id. Optional — defaults to `field` when omitted (resolved in colId()).
   // Consumer-controlled, so the parent registry guards __proto__/constructor (T-48-PP).
-  id:         { type: String,  default: '' },
+  id:         {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id. Optional — defaults to `field` when omitted. Used as the key in the id-keyed registry union and in the `#cell` / `#colHeader` slot dispatch.',
+    },
+  },
   // The row field this column reads (table-core accessorKey). PrimeVue-shaped public
   // attr name. NOT a JS reserved word (the rete `in`/`out`→`input`/`output` lesson).
-  field:      { type: String,  default: '' },
+  field:      {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The row field this column reads (table-core `accessorKey`). The plain accessor value renders when the `#cell` slot falls through.',
+      example: '<Column field="email" header="Email" />',
+    },
+  },
   // The header label (rendered when the parent #header slot falls through to the label).
-  header:     { type: String,  default: '' },
+  header:     {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The header label, rendered when the parent `#colHeader` slot falls through to the plain label.',
+    },
+  },
   // Whether this column participates in click-to-sort. Bare `<Column sortable>` emits
   // sortable="" and only Vue+Lit coerce → bind `:sortable="true"` in consumers, or
   // rely on the Phase-46 ITEM-2 bare-bool-attr coercion. Default false.
-  sortable:   { type: Boolean, default: false },
+  sortable:   {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Whether this column participates in click-to-sort. Default `false`. Bind `:sortable="true"` (a bare attr only coerces on Vue+Lit).',
+    },
+  },
   // Whether this column participates in column filtering.
-  filterable: { type: Boolean, default: false },
+  filterable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Whether this column participates in per-column filtering (the `#filter` slot / faceted filter chrome). Default `false`.',
+    },
+  },
   // Pin side: '' (unpinned) | 'left' | 'right' (reserved metadata).
-  pinned:     { type: String,  default: '' },
+  pinned:     {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "Pin side: `''` (unpinned) | `'left'` | `'right'`. Reserved metadata carried into the parent's column pinning state.",
+    },
+  },
   // Optional fixed/initial column width (CSS length or px number).
-  width:      { type: [String, Number], default: '' },
+  width:      {
+    type: [String, Number],
+    default: '',
+    docs: {
+      description:
+        'Optional fixed/initial column width — a CSS length string or a px number.',
+    },
+  },
 
   // ── Expandable rows (phase 50, D-04) ──────────────────────────────────────────
   // Reserved per-column metadata: whether this column participates in the expand
@@ -58,7 +108,14 @@
   // TABLE-LEVEL option on <DataTable> (`:getSubRows`), NOT a per-<Column> field
   // (table-core anti-pattern). Default false. Bare `<Column expandable>` only coerces
   // "" → true on Vue+Lit, so consumers bind `:expandable="true"`.
-  expandable: { type: Boolean, default: false },
+  expandable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Reserved per-column metadata flagging participation in the expand affordance. The expander chevron is its own auto-injected leading column on `<DataTable expandable>`, so this is forward-compat metadata, not the toggle host. Default `false`.',
+    },
+  },
 
   // ── Grouping + aggregation (phase 50, reqs 4-7, D-05) ─────────────────────────
   // groupable: whether this column is OFFERED to the headless #groupBar as a grouping
@@ -67,7 +124,14 @@
   // actual #groupBar host on its own table-level `groupable` prop; this flag only filters the
   // groupable-columns list. Whether grouping is ENGAGED is driven by the parent's `grouping`
   // model slice, never this flag.
-  groupable: { type: Boolean, default: true },
+  groupable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Whether this column is offered to the headless `#groupBar` as a grouping target. Defaults `true` (opt-OUT via `:groupable="false"`); this only filters the groupable-columns list. Whether grouping is engaged is driven by the parent\'s `grouping` model, never this flag.',
+    },
+  },
   // aggregationFn: the table-core aggregation for this column's value inside a group-header
   // cell (req-5). Either a BUILT-IN name string — 'sum' | 'min' | 'max' | 'extent' | 'mean' |
   // 'median' | 'unique' | 'uniqueCount' | 'count' — OR a CUSTOM function
@@ -77,24 +141,59 @@
   // (default) → no aggregation (the cell renders as a placeholder on group-header rows). The
   // [String, Function] union accepts both forms; bare `aggregationFn="sum"` is a plain string
   // attr (no bare-bool caveat).
-  aggregationFn: { type: [String, Function], default: null },
+  aggregationFn: {
+    type: [String, Function],
+    default: null,
+    docs: {
+      description:
+        "The table-core aggregation for this column inside a group-header cell. Either a built-in name string — `'sum'` | `'min'` | `'max'` | `'extent'` | `'mean'` | `'median'` | `'unique'` | `'uniqueCount'` | `'count'` — or a custom function `(columnId, leafRows, childRows) => any` (defensively wrapped by the parent so a throw cannot crash grouping). Null → no aggregation (the group-header cell renders as a placeholder).",
+    },
+  },
 
   // ── Editable-cell config (Phase 51, req-1/2/5) ────────────────────────────────
   // Whether this column's cells are editable (opt-in). Default false → the column is
   // read-only and the parent's display↔editor branch never mounts an editor for it.
   // Bare `<Column editable>` only coerces "" → true on Vue+Lit, so consumers bind
   // `:editable="true"` (same bare-bool-attr-on-component caveat as `sortable`).
-  editable:      { type: Boolean,  default: false },
+  editable:      {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Whether this column\'s cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).',
+    },
+  },
   // Built-in editor type for this column: 'text' | 'number' | 'select' | 'checkbox'.
   // Ignored when a custom #editor scoped slot handles the column. Default 'text'.
-  editor:        { type: String,   default: 'text' },
+  editor:        {
+    type: String,
+    default: 'text',
+    docs: {
+      description:
+        "Built-in editor type for this column: `'text'` | `'number'` | `'select'` | `'checkbox'`. Ignored when a custom `#editor` scoped slot handles the column. Default `'text'`.",
+    },
+  },
   // Options for editor='select' — `[{ value, label }]`. Empty for other editor types.
-  editorOptions: { type: Array,    default: () => [] },
+  editorOptions: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        "Options for `editor: 'select'` — `[{ value, label }]`. Empty for other editor types.",
+    },
+  },
   // Synchronous per-column validator `(value, row) => true | string` (req-5/D-01). A
   // string return is the error message (editor stays OPEN, aria-live announces). Null
   // (default) = no validation. The parent wraps it defensively (runValidator coerces a
   // thrown/non-bool/non-string return to a generic message — Security V5 DoS).
-  validate:      { type: Function, default: null },
+  validate:      {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Synchronous per-column validator `(value, row) => true | string`. A string return is the error message (the editor stays open and the aria-live region announces it). Null → no validation. The parent wraps it defensively against a thrown/non-bool/non-string return.',
+    },
+  },
 }
 </props>
 

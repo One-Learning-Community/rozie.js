@@ -45,27 +45,77 @@
 <props>
 {
   // The selected option's value (two-way). Sole model:true prop → Angular CVA.
-  value:         { type: null,    default: null, model: true },
+  value: {
+    type: null,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        "The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.",
+      example: '<Combobox r-model:value="country" :options="countries" />',
+    },
+  },
 
   // The option list: `[{ value, label, disabled? }]`.
-  options:       { type: Array,   default: () => [] },
+  options: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, and an optional `disabled` flag makes an option non-selectable.',
+    },
+  },
 
-  placeholder:   { type: String,  default: '' },
+  placeholder: {
+    type: String,
+    default: '',
+    docs: {
+      description: 'Placeholder text shown in the input while it is empty.',
+    },
+  },
 
-  disabled:      { type: Boolean, default: false },
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable the control — the input becomes non-interactive and the popup cannot be opened. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
 
   // Opt OUT of built-in client filtering (async / server-side mode): show the
   // `options` as supplied and rely on the `search` event to refetch. Default:
   // filter `options` by label against the typed query.
-  disableFilter: { type: Boolean, default: false },
+  disableFilter: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of built-in client filtering (async / server-side mode): render `options` exactly as supplied and rely on the `search` event to refetch. By default the component filters `options` by `label`, case-insensitively, against the typed query.',
+    },
+  },
 
   // Accessible name for the input (when there is no visible <label for>).
-  ariaLabel:     { type: String,  default: null },
+  ariaLabel: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for the input (`aria-label`), used when there is no visible `<label for>` pointing at it. Provide this (or an external label) so the combobox is announced.',
+    },
+  },
 
   // id base for the listbox + option elements (aria-activedescendant needs real
   // ids). Set a DISTINCT value per instance when more than one combobox is on a
   // page. Named `idBase` (not `id`) to avoid shadowing HTMLElement.id on Lit.
-  idBase:        { type: String,  default: 'rozie-combobox' },
+  idBase: {
+    type: String,
+    default: 'rozie-combobox',
+    docs: {
+      description:
+        'Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
+    },
+  },
 }
 </props>
 

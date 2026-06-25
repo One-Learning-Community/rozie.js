@@ -36,20 +36,50 @@
 <props>
 {
   // The public reCAPTCHA v3 site key from your Google admin console. Required.
-  sitekey:        { type: String, required: true },
+  sitekey:        {
+    type: String,
+    required: true,
+    docs: {
+      description:
+        'Required. The public reCAPTCHA v3 site key from your Google admin console.',
+    },
+  },
 
   // The default action label reported to reCAPTCHA's risk analysis (e.g.
   // 'submit', 'login'). Overridable per-call via execute(action).
-  action:         { type: String, default: 'submit' },
+  action:         {
+    type: String,
+    default: 'submit',
+    docs: {
+      description:
+        "The default action label reported to reCAPTCHA's risk analysis (e.g. `submit`, `login`). Overridable per call via `execute(action)`.",
+    },
+  },
 
   // The latest verification token. Two-way: written on each successful execute.
   // Read it for the request via r-model="token".
-  token:          { type: String, default: '', model: true },
+  token:          {
+    type: String,
+    default: '',
+    model: true,
+    docs: {
+      description:
+        'The latest verification token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written on each successful `execute()` — read it to attach the fresh token to your request.',
+      example: '<RecaptchaV3 r-model:token="token" sitekey="…" action="signup" />',
+    },
+  },
 
   // Opt-in: run one execute() at mount and emit @verify with the initial token.
   // Default false — v3 is imperative-first (tokens are short-lived; fetch one at
   // the moment of submission, not eagerly at mount).
-  executeOnMount: { type: Boolean, default: false },
+  executeOnMount: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.',
+    },
+  },
 }
 </props>
 

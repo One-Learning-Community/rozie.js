@@ -52,32 +52,86 @@
   // The assembled code (two-way). As the sole model:true prop it drives the
   // Angular ControlValueAccessor — an Otp IS a form control. Always a contiguous
   // string of 0..length chars.
-  value:       { type: String,   default: '', model: true },
+  value: {
+    type: String,
+    default: '',
+    model: true,
+    docs: {
+      description:
+        'The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).',
+      example: '<Otp r-model:value="code" :length="6" type="numeric" ariaLabel="Verification code" />',
+    },
+  },
 
   // Number of cells.
-  length:      { type: Number,   default: 6 },
+  length: {
+    type: Number,
+    default: 6,
+    docs: {
+      description: 'Number of input cells to render.',
+    },
+  },
 
   // Allowed-character class + mobile keyboard hint:
   //   'numeric'      → digits only,  inputmode="numeric"
   //   'alphanumeric' → [A-Za-z0-9],  inputmode="text"
   //   'text'         → any non-space, inputmode="text"
-  type:        { type: String,   default: 'numeric' },
+  type: {
+    type: String,
+    default: 'numeric',
+    docs: {
+      description:
+        "Allowed-character class plus the mobile keyboard hint: `'numeric'` permits digits only and sets `inputmode=\"numeric\"`; `'alphanumeric'` permits `[A-Za-z0-9]` with `inputmode=\"text\"`; `'text'` permits any non-space character with `inputmode=\"text\"`. Characters that fail the test are rejected on type and filtered on paste.",
+    },
+  },
 
   // Render cells as masked dots (password) — for sensitive codes.
-  mask:        { type: Boolean,  default: false },
+  mask: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render the cells as masked dots (`type="password"`) for sensitive codes, while keeping the same keyboard and ARIA behavior.',
+    },
+  },
 
   // Focus the first empty cell on mount.
-  autoFocus:   { type: Boolean,  default: false },
+  autoFocus: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description: 'Focus the first empty cell on mount.',
+    },
+  },
 
   // Disable every cell.
-  disabled:    { type: Boolean,  default: false },
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description: 'Disable every cell. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
 
   // Per-cell placeholder character (e.g. '•' or '0').
-  placeholder: { type: String,   default: '' },
+  placeholder: {
+    type: String,
+    default: '',
+    docs: {
+      description: "Per-cell placeholder character shown in empty cells (e.g. `'•'` or `'0'`).",
+    },
+  },
 
   // Accessible name for the whole group (role="group"). Each cell also gets an
   // ordinal aria-label ("Digit 1 of 6").
-  ariaLabel:   { type: String,   default: null },
+  ariaLabel: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for the whole group (`role="group"`, applied as `aria-label`). Each cell additionally gets an ordinal `aria-label` (`"Digit 1 of 6"`).',
+    },
+  },
 }
 </props>
 

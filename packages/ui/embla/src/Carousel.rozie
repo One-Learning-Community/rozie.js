@@ -38,45 +38,188 @@
 {
   // Slide data for config-array mode (mode a). Optional — the default <slot/> is
   // mode b (consumer drops slide DOM directly).
-  slides:         { type: Array,   default: () => [] },
+  slides:         {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Slide data for config-array mode (mode a): Rozie renders one `.rozie-embla__slide` per item, optionally via the scoped `slide` slot for custom markup. Optional — leave it unset and use the default slot (mode b) to drop slide DOM directly.',
+      example: "<Carousel :slides=\"['A', 'B', 'C']\" r-model:selectedIndex=\"idx\" />",
+    },
+  },
   // Runtime-updatable Embla options — each is $watch'd → embla.reInit() (Embla has
   // no per-option setter; reInit is the only update path).
-  loop:           { type: Boolean, default: false },
-  align:          { type: String,  default: 'center' },
-  axis:           { type: String,  default: 'x' },
-  slidesToScroll: { type: Number,  default: 1 },
-  dragFree:       { type: Boolean, default: false },
+  loop:           {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Wrap from the last snap back to the first (the Embla `loop` option). Runtime-updatable — toggling it re-inits the engine.',
+    },
+  },
+  align:          {
+    type: String,
+    default: 'center',
+    docs: {
+      description:
+        "Snap alignment of slides within the viewport — one of `'start'`, `'center'`, or `'end'`. Runtime-updatable.",
+    },
+  },
+  axis:           {
+    type: String,
+    default: 'x',
+    docs: {
+      description:
+        "Scroll axis — `'x'` for a horizontal carousel or `'y'` for a vertical one. Runtime-updatable.",
+    },
+  },
+  slidesToScroll: {
+    type: Number,
+    default: 1,
+    docs: {
+      description:
+        'Number of slides advanced per snap (the Embla `slidesToScroll` option). Runtime-updatable.',
+    },
+  },
+  dragFree:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Enable momentum/free-scroll dragging with no hard snapping (the Embla `dragFree` option). Runtime-updatable.',
+    },
+  },
   // `draggable` → Embla `watchDrag` (Vue-clarity rename; false disables pointer drag).
-  draggable:      { type: Boolean, default: true },
-  containScroll:  { type: String,  default: 'trimSnaps' },
-  startIndex:     { type: Number,  default: 0 },
-  skipSnaps:      { type: Boolean, default: false },
-  duration:       { type: Number,  default: 25 },
-  direction:      { type: String,  default: 'ltr' },
+  draggable:      {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Enable pointer drag (mapped to the Embla `watchDrag` option — a Vue-clarity rename). Set `false` to disable dragging and leave only programmatic/arrow navigation. Runtime-updatable.',
+    },
+  },
+  containScroll:  {
+    type: String,
+    default: 'trimSnaps',
+    docs: {
+      description:
+        "Edge-snap containment (the Embla `containScroll` option) — `''` (off), `'trimSnaps'`, or `'keepSnaps'`. Runtime-updatable.",
+    },
+  },
+  startIndex:     {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'Initial snap index the carousel starts at (the Embla `startIndex` option). Runtime-updatable.',
+    },
+  },
+  skipSnaps:      {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Allow a fast flick to skip intermediate snaps (the Embla `skipSnaps` option). Runtime-updatable.',
+    },
+  },
+  duration:       {
+    type: Number,
+    default: 25,
+    docs: {
+      description:
+        "Scroll transition duration in Embla's relative unit (the `duration` option) — lower is snappier. Runtime-updatable.",
+    },
+  },
+  direction:      {
+    type: String,
+    default: 'ltr',
+    docs: {
+      description:
+        "Text/scroll direction — `'ltr'` or `'rtl'` (the Embla `direction` option). Runtime-updatable.",
+    },
+  },
   // Autoplay plugin toggle + delay.
-  autoplay:       { type: Boolean, default: false },
-  autoplayDelay:  { type: Number,  default: 4000 },
+  autoplay:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Mount the `embla-carousel-autoplay` plugin to auto-advance the carousel. Toggling it at runtime rebuilds the plugin set.',
+    },
+  },
+  autoplayDelay:  {
+    type: Number,
+    default: 4000,
+    docs: {
+      description:
+        'Delay in milliseconds between auto-advances when `autoplay` is on. Runtime-updatable.',
+    },
+  },
   // ─── built-in navigation UI (all opt-in, default off) ───────────────────────
   // dot pagination (one dot per scroll snap; the selected snap is highlighted;
   // clicking a dot scrolls to it).
-  dots:           { type: Boolean, default: false },
+  dots:           {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Show built-in dot pagination — one dot per scroll snap, the active snap highlighted, and clicking a dot scrolls to it. Opt-in, off by default.',
+    },
+  },
   // prev/next arrow buttons overlaid on the viewport (disabled at the ends unless
   // `loop`).
-  arrows:         { type: Boolean, default: false },
+  arrows:         {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Show built-in prev/next arrow buttons overlaid on the viewport. The arrows disable at the ends unless `loop` is set. Opt-in, off by default.',
+    },
+  },
   // a synced thumbnail strip below the carousel — its OWN Embla instance, one
   // thumb per slide (config-array mode). Fill the `thumb` scoped slot for custom
   // thumb content (falls back to the slide value). Clicking a thumb scrolls the
   // main carousel; the main selection highlights + scrolls the active thumb.
-  thumbnails:     { type: Boolean, default: false },
+  thumbnails:     {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Show a synced thumbnail strip below the carousel — its own Embla instance with one thumb per slide (config-array mode). Fill the `thumb` scoped slot for custom thumb content (falls back to the slide value). Clicking a thumb scrolls the main carousel; the main selection highlights and scrolls the active thumb. Opt-in, off by default.',
+    },
+  },
   // Escape hatches: extra Embla plugins appended verbatim; raw EmblaOptionsType
   // spread last (the SortableList ...$props.options precedent).
-  plugins:        { type: Array,   default: () => [] },
-  options:        { type: Object,  default: () => ({}) },
+  plugins:        {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Escape hatch — extra Embla plugins (Fade, Class Names, Wheel Gestures, …) appended verbatim after the built-in Autoplay plugin.',
+    },
+  },
+  options:        {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Escape hatch — a raw `EmblaOptionsType` object spread last over the curated option props, so a consumer can override anything Embla supports.',
+    },
+  },
   // Two-way: the current scroll snap. DISTINCT from the `select` emit (the
   // MapLibre model⇄emit rule — a model prop must NOT share a name with an emit or
   // the continuous emit drops on Vue/Angular). Read $props.selectedIndex, write
   // $model.selectedIndex.
-  selectedIndex:  { type: Number,  default: 0, model: true },
+  selectedIndex:  {
+    type: Number,
+    default: 0,
+    model: true,
+    docs: {
+      description:
+        'The current scroll-snap index (two-way `r-model`). Dragging or scrolling writes the new index back (echo-guarded so a programmatic `scrollTo` does not ping-pong); a consumer write scrolls the carousel. Distinct from the `select` emit — a model prop must not share a name with an emit.',
+      example: '<Carousel :slides="items" r-model:selectedIndex="idx" />',
+    },
+  },
 }
 </props>
 

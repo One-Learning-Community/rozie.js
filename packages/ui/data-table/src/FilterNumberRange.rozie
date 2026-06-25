@@ -28,14 +28,49 @@
 
 <props>
 {
-  columnId:  { type: String,   default: '' },
-  column:    { type: null,     default: null },
+  columnId:  {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label` base.',
+    },
+  },
+  column:    {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The table-core column object (opaque passthrough from the `#filter` slot scope).',
+    },
+  },
   // The current column filter value ([min,max]|null) the inputs seed from.
-  value:     { type: null,     default: null },
-  setFilter: { type: Function, default: null },
+  value:     {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The current column filter value (`[min, max]` tuple or null) the two inputs seed from (setup-once).',
+    },
+  },
+  setFilter: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(columnId, value) => void` — apply the column filter as a `[min, max]` tuple (each side coerced to a Number or `undefined`, so a one-sided range works); both empty clears the filter. Null-guarded at call sites.',
+    },
+  },
   // The faceted [min,max] bounds for this column ([number,number]|null) — used for
   // the input placeholders only.
-  minMax:    { type: null,     default: null },
+  minMax:    {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.',
+    },
+  },
 }
 </props>
 

@@ -23,7 +23,14 @@
 <props>
 {
   // The RAW row object (the #detail slot scope `row` = row.original). Opaque passthrough.
-  row: { type: null, default: null },
+  row: {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The raw row object (the `#detail` slot scope `row` = `row.original`). This drop-in walks its own enumerable keys and String-coerces each value into a key/value definition list; a null row renders an empty list.',
+    },
+  },
 }
 </props>
 

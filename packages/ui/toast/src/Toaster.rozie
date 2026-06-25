@@ -38,20 +38,55 @@
 {
   // Stack corner: 'top-left' | 'top-right' | 'top-center' | 'bottom-left' |
   // 'bottom-right' | 'bottom-center'.
-  position:             { type: String,  default: 'bottom-right' },
+  position:             {
+    type: String,
+    default: 'bottom-right',
+    docs: {
+      description:
+        "Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.",
+    },
+  },
 
   // Default auto-dismiss in ms. 0 (or a per-toast duration of 0) = sticky.
-  duration:             { type: Number,  default: 4000 },
+  duration:             {
+    type: Number,
+    default: 4000,
+    docs: {
+      description:
+        'Default auto-dismiss time in milliseconds, applied to any toast that does not pass its own `duration`. `0` (or a per-toast `duration` of `0`) makes the toast sticky — it stays until explicitly dismissed.',
+    },
+  },
 
   // Max visible toasts (0 = unlimited); when exceeded, the oldest drop.
-  max:                  { type: Number,  default: 0 },
+  max:                  {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'Maximum number of visible toasts (`0` = unlimited). When the queue exceeds this, the oldest toasts drop off the stack.',
+    },
+  },
 
   // Opt OUT of pausing auto-dismiss timers while the pointer is over the stack
   // (default: hovering pauses).
-  disablePauseOnHover:  { type: Boolean, default: false },
+  disablePauseOnHover:  {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of pausing the auto-dismiss timers while the pointer is over the stack. By default hovering pauses every timer and leaving restarts them; set this to keep toasts dismissing on schedule regardless of hover.',
+    },
+  },
 
   // Accessible name for the live region (default 'Notifications').
-  ariaLabel:            { type: String,  default: null },
+  ariaLabel:            {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        "Accessible name for the live region (`role=\"region\"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.",
+    },
+  },
 }
 </props>
 

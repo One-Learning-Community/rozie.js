@@ -32,17 +32,59 @@
 {
   // The column id (mirrors the #editor slot scope). Optional — used for an
   // aria-label fallback if a consumer doesn't override.
-  columnId: { type: String,   default: '' },
+  columnId: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.',
+    },
+  },
   // The table-core column object (opaque passthrough).
-  column:   { type: null,     default: null },
+  column:   {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The table-core column object (opaque passthrough from the `#editor` slot scope).',
+    },
+  },
   // The consumer's row data object (opaque passthrough).
-  row:      { type: null,     default: null },
+  row:      {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        "The consumer's row data object (opaque passthrough from the `#editor` slot scope).",
+    },
+  },
   // The current draft value the editor seeds from.
-  value:    { type: null,     default: null },
+  value:    {
+    type: null,
+    default: null,
+    docs: {
+      description:
+        'The current cell value the editor seeds its local draft from (setup-once).',
+    },
+  },
   // (value) => void — commit the cell. Null-guarded at call sites.
-  commit:   { type: Function, default: null },
+  commit:   {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.',
+    },
+  },
   // () => void — revert the cell. Null-guarded at call sites.
-  cancel:   { type: Function, default: null },
+  cancel:   {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        '`() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.',
+    },
+  },
 }
 </props>
 

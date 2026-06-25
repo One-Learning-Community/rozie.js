@@ -31,52 +31,187 @@
 
 <props>
 {
-  items:          { type: Array,    default: () => [],  model: true },
+  items: {
+    type: Array,
+    default: () => [],
+    model: true,
+    docs: {
+      description:
+        'The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.',
+      example: '<SortableList r-model:items="$data.todos" itemKey="id" />',
+    },
+  },
   // String property name OR a (item, index) => key function for the per-row key.
   // With neither, id-less object items get a stable synthetic key via an internal
   // WeakMap (survives reorder); primitive items fall back to index.
-  itemKey:        { type: [String, Function], default: null },
-  handle:         { type: String,   default: null },
-  group:          { type: String,   default: null },
-  animation:      { type: Number,   default: 150 },
-  disabled:       { type: Boolean,  default: false },
+  itemKey: {
+    type: [String, Function],
+    default: null,
+    docs: {
+      description:
+        'The per-row key the framework reconciler tracks each item by across a reorder — either a property name (e.g. `itemKey="id"` reads `item.id`) or an `(item, index) => key` function. With neither, id-less object items get a stable synthetic key via an internal `WeakMap` (survives reorder by object identity); primitive items fall back to index — pass a function for reorderable duplicate primitives.',
+    },
+  },
+  handle: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector(\'grip\')` is an optional, typo-checked way to author it.',
+    },
+  },
+  group: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'SortableJS group name enabling cross-list drag — two lists sharing a `group` accept items between each other (the source fires `remove`, the destination fires `add`). Set `cloneable: true` to flip a string group into clone-mode.',
+    },
+  },
+  animation: {
+    type: Number,
+    default: 150,
+    docs: {
+      description:
+        'Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.',
+    },
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Temporarily disable dragging without unmounting — reapplied live via `instance.option(\'disabled\', v)` (no remount). Also suppresses keyboard reordering: a disabled list is not sortable by any input, so rows lose their `tabindex` and the keydown handler no-ops.',
+    },
+  },
   // Keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) is
   // on by default. Set `disableKeyboard: true` to remove it entirely — rows lose
   // their tabindex (so they drop out of the tab order) and onRowKeyDown no-ops.
   // `disabled` ALSO suppresses keyboard reordering: a disabled list is not
   // sortable by ANY input, so keyboard access is gated on `!disabled && !disableKeyboard`.
-  disableKeyboard: { type: Boolean, default: false },
-  options:        { type: Object,   default: () => ({}) },
-  labelFor:       { type: Function, default: null },
+  disableKeyboard: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no `tabindex`) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`.',
+    },
+  },
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.',
+    },
+  },
+  labelFor: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label` (or `String(item)` when no `label` field exists).',
+    },
+  },
   // Runtime-updatable SortableJS pass-through props (forwarded via the
   // inline options literal in $onMount + reapplied through $watch +
   // instance.option(name, v) on change).
-  ghostClass:     { type: String,   default: null },
-  chosenClass:    { type: String,   default: null },
-  dragClass:      { type: String,   default: null },
-  filter:         { type: String,   default: null },
-  easing:         { type: String,   default: null },
+  ghostClass: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Class name applied to the drop-placeholder (ghost) element while dragging. Forwarded live via `instance.option`, so toggling it at runtime takes effect without a remount.',
+    },
+  },
+  chosenClass: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Class name applied to the currently-chosen item while dragging. Forwarded live via `instance.option` (no remount needed to change it).',
+    },
+  },
+  dragClass: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Class name applied to the dragging element. Only takes effect in fallback mode (`forceFallback: true`). Forwarded live via `instance.option`.',
+    },
+  },
+  filter: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.',
+    },
+  },
+  easing: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'CSS easing function for the reorder animation (e.g. `\'ease-in\'`, `\'cubic-bezier(0.4, 0, 0.2, 1)\'`). Runtime-updatable.',
+    },
+  },
   // Construction-time-only SortableJS knobs — changing these at runtime
   // requires destroying and recreating the SortableJS instance. The
   // SortableListShowcaseDemo bridges this by re-keying its <SortableList>
   // instance on a string of these values; consumers wanting per-knob
   // runtime updates must do the same.
-  forceFallback:  { type: Boolean,  default: false },
-  swapThreshold:  { type: Number,   default: 1 },
+  forceFallback: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Force SortableJS\'s mouse-event drag path over HTML5 DnD — useful for touch devices, consistent cross-browser behavior, and synthetic test drivers (and `dragClass` only applies in this mode). **Construction-time only**: SortableJS reads it once at construction, so re-key the `<SortableList>` to toggle it at runtime.',
+    },
+  },
+  swapThreshold: {
+    type: Number,
+    default: 1,
+    docs: {
+      description:
+        'SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. **Construction-time only**: re-key the `<SortableList>` to change it at runtime.',
+    },
+  },
   // High-level prop that REPLACES a string `group` with the SortableJS
   // clone-mode object form `{ name, pull: 'clone', put: true }`. When
   // `cloneable: true` AND `$props.group` is null, the group is left
   // untouched (a `cloneable` flag without a `group` name is not
   // meaningful — see docs/guide/sortable-list.md).
-  cloneable:      { type: Boolean,  default: false },
+  cloneable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'High-level prop that REPLACES a string `group` with SortableJS\'s `{ name, pull: \'clone\', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). **Construction-time only**: re-key the `<SortableList>` to change it at runtime.',
+    },
+  },
   // Class hooks — extra class(es) merged onto the list container and every
   // item row. Accept String | Array | Object (the cross-target rozieClass
   // normalizer shipped in 260620-kby); bound DIRECTLY as an array/object
   // :class so the base rozie-sortable-list / rozie-sortable-item classes are
   // preserved and the default '' adds no stray/trailing class on any target.
   // itemClass ALSO accepts a (item, index) => class function for per-row classes.
-  listClass:      { type: [String, Array, Object], default: '' },
-  itemClass:      { type: [String, Array, Object, Function], default: '' },
+  listClass: {
+    type: [String, Array, Object],
+    default: '',
+    docs: {
+      description:
+        'Extra class(es) merged onto the list container (the SortableJS root) alongside the base `rozie-sortable-list` class. Accepts a `String`, `Array`, or `Object` (Vue-style class binding), normalized identically across all six targets — the hook for bridging a CSS framework (`.list-group`) or a flex/grid parent onto the component.',
+    },
+  },
+  itemClass: {
+    type: [String, Array, Object, Function],
+    default: '',
+    docs: {
+      description:
+        'Extra class(es) merged onto every item row alongside the base `rozie-sortable-item` class. Accepts a `String`, `Array`, or `Object` (Vue-style class binding) applied uniformly, OR an `(item, index) => class` function for per-row classes evaluated at render time. Normalized identically across all six targets.',
+    },
+  },
   // Per-row inline style applied to the .rozie-sortable-item wrapper. Accepts a
   // string, a flat style object (Record<string, string | number>), or a
   // (item, index) => string | object function for per-row styling. Bound as a
@@ -85,7 +220,14 @@
   // the wrapper — the direct child of the list container — it can drive CSS-grid
   // placement (grid-column / grid-row / align-self) when the consumer sets
   // display:grid via listClass. null / empty → no style attribute on any target.
-  itemStyle:      { type: [String, Object, Function], default: null },
+  itemStyle: {
+    type: [String, Object, Function],
+    default: null,
+    docs: {
+      description:
+        'Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.',
+    },
+  },
 }
 </props>
 

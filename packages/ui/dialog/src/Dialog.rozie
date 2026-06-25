@@ -53,23 +53,67 @@
 {
   // Visibility (two-way). The sole model:true prop. Read $props.open; write
   // $model.open. `r-model:open` / `v-model:open` / `[(open)]` outside.
-  open:                 { type: Boolean, default: false, model: true },
+  open:                 {
+    type: Boolean,
+    default: false,
+    model: true,
+    docs: {
+      description:
+        'Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.',
+      example: '<Dialog r-model:open="confirmOpen" ariaLabelledby="confirm-title" />',
+    },
+  },
 
   // Opt OUT of backdrop-click-to-dismiss (default: a backdrop click closes).
-  disableBackdropClose: { type: Boolean, default: false },
+  disableBackdropClose: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: \'backdrop\'`; set this to require an explicit action.',
+    },
+  },
 
   // Opt OUT of Escape-to-dismiss (default: Esc closes; native `cancel`).
-  disableEscapeClose:   { type: Boolean, default: false },
+  disableEscapeClose:   {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: \'escape\'`; the component `preventDefault()`s it so the close always flows through the `open` model. Set this to keep the dialog open on Escape (e.g. a required confirmation).',
+    },
+  },
 
   // Opt OUT of locking <html> scroll while open (default: scroll is locked).
-  disableScrollLock:    { type: Boolean, default: false },
+  disableScrollLock:    {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of locking `<html>` scroll while the dialog is open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown; set this to leave background scrolling enabled.',
+    },
+  },
 
   // Accessible name when the dialog has no visible title to point at.
-  ariaLabel:            { type: String,  default: null },
+  ariaLabel:            {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.',
+    },
+  },
 
   // id of the element that titles the dialog (preferred over ariaLabel when a
   // visible heading exists).
-  ariaLabelledby:       { type: String,  default: null },
+  ariaLabelledby:       {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.',
+    },
+  },
 }
 </props>
 

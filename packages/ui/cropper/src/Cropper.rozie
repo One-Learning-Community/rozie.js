@@ -68,44 +68,191 @@
 <props>
 {
   // image source — bound onto the <img> AND reconciled at runtime via replace().
-  src:              { type: String,  default: '' },
+  src: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.',
+      example: '<Cropper :src="imageUrl" r-model:data="crop" />',
+    },
+  },
   // two-way crop box { x, y, width, height, rotate, scaleX, scaleY }. Untyped (no
   // `type:`) so it emits as `unknown` and `default: undefined` merges cleanly
   // under the strict framework-typecheck harness (the MapLibre maxBounds idiom; a
   // typed Object + default undefined would emit `T | undefined` and clash).
-  data:             { default: undefined, model: true },
+  data: {
+    default: undefined,
+    model: true,
+    docs: {
+      description:
+        'The crop box — `{ x, y, width, height, rotate, scaleX, scaleY }`. The lone two-way `model: true` prop: dragging or resizing the crop box writes the new box back (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write `setData`s the live cropper.',
+    },
+  },
   // NaN aspectRatio = free ratio (Cropper's own sentinel). Runtime-reconciled via
   // setAspectRatio().
-  aspectRatio:      { type: Number,  default: NaN },
+  aspectRatio: {
+    type: Number,
+    default: NaN,
+    docs: {
+      description:
+        'The crop box aspect ratio. `NaN` (the default) is Cropper\'s sentinel for a free ratio. Reconciled at runtime via `setAspectRatio`.',
+    },
+  },
   // 0|1|2|3 — construction-time (v1 has no setViewMode).
-  viewMode:         { type: Number,  default: 0 },
+  viewMode: {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'The view constraint mode (`0`–`3`) that governs how the crop box is restricted to the canvas. Construction-only — Cropper.js v1 has no `setViewMode`.',
+    },
+  },
   // 'crop' | 'move' | 'none' — runtime-reconciled via setDragMode().
-  dragMode:         { type: String,  default: 'crop' },
+  dragMode: {
+    type: String,
+    default: 'crop',
+    docs: {
+      description:
+        'The drag behavior: `\'crop\'` draws a new box, `\'move\'` pans the canvas, `\'none\'` disables dragging. Reconciled at runtime via `setDragMode`.',
+    },
+  },
   // enable/disable the whole cropper — runtime-reconciled.
-  disabled:         { type: Boolean, default: false },
+  disabled: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Freeze the cropper so it no longer responds to user interaction. Reconciled at runtime via `enable()` / `disable()`.',
+    },
+  },
   // construction-time interaction/appearance toggles (no v1 runtime setters).
-  guides:           { type: Boolean, default: true },
-  center:           { type: Boolean, default: true },
-  background:       { type: Boolean, default: true },
-  movable:          { type: Boolean, default: true },
-  rotatable:        { type: Boolean, default: true },
-  scalable:         { type: Boolean, default: true },
-  zoomable:         { type: Boolean, default: true },
-  zoomOnWheel:      { type: Boolean, default: true },
-  cropBoxMovable:   { type: Boolean, default: true },
-  cropBoxResizable: { type: Boolean, default: true },
-  autoCrop:         { type: Boolean, default: true },
-  autoCropArea:     { type: Number,  default: 0.8 },
-  responsive:       { type: Boolean, default: true },
+  guides: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Show the dashed guide lines over the crop box. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  center: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Show the center indicator inside the crop box. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  background: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Show the grid background behind the image. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  movable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow moving (panning) the image. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  rotatable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow rotating the image. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  scalable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow scaling (flipping) the image. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  zoomable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow zooming the image. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  zoomOnWheel: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow zooming the image via the mouse wheel. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  cropBoxMovable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow moving the crop box. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  cropBoxResizable: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Allow resizing the crop box. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  autoCrop: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Render a crop box automatically when the cropper initializes. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  autoCropArea: {
+    type: Number,
+    default: 0.8,
+    docs: {
+      description:
+        'The initial crop-box size as a fraction of the canvas (`0`–`1`). Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
+  responsive: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Re-render the cropper on window resize to keep it responsive. Construction-only — Cropper.js v1 has no runtime setter.',
+    },
+  },
   // Cropper.js `preview` (selector string OR element ref(s)) — live crop thumbnail(s).
   // Construction-time (v1 has no setPreview); read DIRECTLY in buildCropper (NOT through
   // the $snapshot(options) path — structuredClone throws on DOM elements). On Lit an
   // element ref is more robust than a selector (a document selector can't cross the
   // wrapper's shadow boundary). Untyped like `data` so it accepts string | element(s).
-  preview:          { default: undefined },
+  preview: {
+    default: undefined,
+    docs: {
+      description:
+        'Live crop-thumbnail target(s) — a selector string or element ref(s) (`HTMLElement`, array, or `NodeList`). Construction-only (v1 has no `setPreview`). On Lit prefer an element ref: a document selector cannot cross the wrapper\'s shadow boundary.',
+    },
+  },
   // passthrough — spread into the Cropper constructor BEFORE the curated keys
   // (explicit props win), so power users can set any v1 option not surfaced here.
-  options:          { type: Object,  default: () => ({}) },
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).',
+    },
+  },
 }
 </props>
 
