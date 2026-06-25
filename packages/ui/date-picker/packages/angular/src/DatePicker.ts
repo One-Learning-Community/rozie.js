@@ -332,7 +332,10 @@ export class DatePicker {
     const d = new Date();
     return toIso(d.getFullYear(), d.getMonth(), d.getDate());
   };
-  selected = () => typeof this.value() === 'string' ? this.value() : '';
+  selected = (): string => {
+    const v = this.value();
+    return typeof v === 'string' ? v : '';
+  };
   readRange = () => normalizeRange(this.value());
   viewMonthGrid = () => resolveViewIso({
     viewIso: this.viewIso(),

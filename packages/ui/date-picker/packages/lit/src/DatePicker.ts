@@ -341,7 +341,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   return toIso(d.getFullYear(), d.getMonth(), d.getDate());
 };
 
-  selected = () => typeof this.value === 'string' ? this.value : '';
+  selected = (): string => {
+  const v = this.value;
+  return typeof v === 'string' ? v : '';
+};
 
   readRange = () => normalizeRange(this.value);
 

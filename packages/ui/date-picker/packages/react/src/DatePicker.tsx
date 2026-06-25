@@ -99,8 +99,9 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const d = new Date();
     return toIso(d.getFullYear(), d.getMonth(), d.getDate());
   }
-  function selected() {
-    return typeof value === 'string' ? value : '';
+  function selected(): string {
+    const v = value;
+    return typeof v === 'string' ? v : '';
   }
   function readRange() {
     return normalizeRange(value);

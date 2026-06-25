@@ -259,8 +259,15 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // ---- derived view (ONE plain function, uniform x6) ---------------------
   // The current selected ISO, normalized to a string. In range mode the value is
   // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
-  function selected() {
-    return typeof value() === 'string' ? value() : '';
+  // CAPTURE the polymorphic value into a local const BEFORE the typeof guard so
+  // the narrowing flows uniformly on all six targets — on Solid `$props.value`
+  // lowers to the accessor CALL `value()`, and TS does NOT narrow across two
+  // separate `value()` calls (`typeof value() === 'string' ? value()` keeps the
+  // union → TS2322 where it feeds the string grid params). A local const narrows
+  // identically on Solid (accessor call), React (variable), Vue/Lit (property).
+  function selected(): string {
+    const v = value();
+    return typeof v === 'string' ? v : '';
   }
 
   // The RANGE normalization funnel (mirrors selected()): coerce the polymorphic
