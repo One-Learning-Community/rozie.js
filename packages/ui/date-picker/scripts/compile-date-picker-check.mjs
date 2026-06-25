@@ -20,10 +20,10 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'DatePicker',
-  props: ['value', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale'],
+  props: ['value', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale', 'selectionMode', 'presetRanges'],
   models: ['value'],
-  emits: ['change'],
-  slots: ['header'],
+  emits: ['change', 'rangeComplete'],
+  slots: ['header', 'presets'],
   expose: ['focus', 'goToToday', 'clear'],
 };
 
