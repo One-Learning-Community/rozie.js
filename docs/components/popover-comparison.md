@@ -1,3 +1,7 @@
+---
+surface_hash: 951a5ea440e4
+---
+
 # Popover — how it compares
 
 `@rozie-ui/popover` wraps [`@floating-ui/dom`](https://floating-ui.com) — the same vanilla-JS positioning engine that powers most of the libraries below. The difference is **one source, six idiomatic packages**: instead of maintaining a separate React hook library, a Vue plugin, and hand-rolled Svelte/Solid/Lit ports, you ship a single `Popover.rozie` and consumers install only their framework's leaf.

@@ -1,3 +1,7 @@
+---
+surface_hash: fdf504a945a4
+---
+
 # Node-flow editor libraries comparison
 
 How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-flow / graph editor libraries. A node editor's hard parts — the graph model, viewport pan/zoom, node drag, and drag-to-connect — are inherently framework-agnostic; [Rete.js v2](https://retejs.org/) is the engine that owns all of them and delegates only *rendering* to a swappable layer. The per-framework editors each re-solve those hard parts from scratch, which is why the ecosystem is **siloed**: React and Svelte are well-served, Vue has a separate reimplementation, Angular has a couple of options, and **Solid has only an experiment while Lit has nothing**. Rozie ships one source to all six by wrapping the agnostic engine with a single vanilla render layer.

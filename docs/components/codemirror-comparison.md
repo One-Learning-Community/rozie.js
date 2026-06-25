@@ -1,3 +1,7 @@
+---
+surface_hash: 828323b8b2e9
+---
+
 # CodeMirror libraries comparison
 
 How `@rozie-ui/codemirror` compares to the existing per-framework CodeMirror 6 wrappers. CodeMirror 6's engine (`@codemirror/state` + `@codemirror/view`) is framework-agnostic and mounts anywhere — every wrapper exists only to shuttle a `value` through the `EditorView`/`EditorState` API, forward changes back out, and reconcile prop changes. The ecosystem is **healthier than most vanilla-engine ecosystems** — React, Vue, Svelte, and Solid all have CM6 wrappers — but it still has two real holes (**Lit has no CM6 wrapper at all**, and **Angular's most-used wrapper is still CodeMirror *5***), a stale-but-popular Vue option, and no uniform cross-framework surface. Rozie ships one source to all six.

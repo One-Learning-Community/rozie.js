@@ -1,3 +1,7 @@
+---
+surface_hash: 55a0e102b7f7
+---
+
 # Flatpickr libraries comparison
 
 Date pickers are one of the most-wrapped vanilla-JS engines in the front-end

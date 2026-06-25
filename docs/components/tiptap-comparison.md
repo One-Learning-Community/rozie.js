@@ -1,3 +1,7 @@
+---
+surface_hash: 67adc9537b5d
+---
+
 # TipTap libraries comparison
 
 How `@rozie-ui/tiptap` compares to the existing per-framework TipTap wrappers. TipTap's editor core (`@tiptap/core` + ProseMirror) is framework-agnostic and mounts anywhere — every wrapper exists only to glue reactive state, forward extensions, and bridge node views. The result is an **uneven ecosystem**: first-party React/Vue, healthy community Svelte/Angular, a thin-and-stalling Solid story, and **nothing for Lit**. Rozie ships one source to all six.

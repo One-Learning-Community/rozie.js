@@ -1,5 +1,6 @@
 ---
 title: Pagination — comparison
+surface_hash: 93b6d215eb7e
 ---
 
 # Pagination vs the per-framework libraries it replaces

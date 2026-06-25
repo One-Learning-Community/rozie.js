@@ -1,3 +1,7 @@
+---
+surface_hash: 3d83e8021be7
+---
+
 # Headless combobox / autocomplete comparison
 
 How `@rozie-ui/combobox` compares to the existing combobox / autocomplete libraries across the six frameworks. Like the slider and otp, the combobox has **no shared vanilla-JS engine** — but unlike a slider, the combobox/autocomplete landscape is overwhelmingly **per-framework**: every ecosystem grew its own typeahead (`@headlessui/react` Combobox, `downshift`, `react-select`, Ariakit, `vue-select`, PrimeVue AutoComplete, Bits/Melt UI, Kobalte, the Angular autocomplete, …) with its own props, its own filtering model, and its own accessibility story. Rozie authors the WAI-ARIA combobox pattern **once** on native DOM and ships it to all six frameworks as the *same* idiomatic `<Combobox>`.

@@ -1,3 +1,7 @@
+---
+surface_hash: 654b8b91e617
+---
+
 # Headless toast / notification comparison
 
 How `@rozie-ui/toast` compares to the existing toast / notification libraries across the six frameworks. Like the slider, listbox, and OTP input, the toast host has **no shared vanilla-JS engine** — and like the OTP landscape, the toast landscape is overwhelmingly **per-framework**: every ecosystem grew its own notification system (`sonner`, `react-hot-toast`, `react-toastify`, `vue-sonner`, `vue-toastification`, `ngx-toastr`, …) with its own API, its own queue model, and its own theming story. Rozie authors the behaviour **once** in one `Toaster.rozie` and ships it to all six frameworks as the *same* idiomatic `<Toaster>` driven by an imperative `ref`.

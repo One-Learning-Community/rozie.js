@@ -1,3 +1,7 @@
+---
+surface_hash: 5b198fe4fe61
+---
+
 # MapLibre libraries comparison
 
 How `@rozie-ui/maplibre` compares to the existing per-framework [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) wrappers. MapLibre GL is the open-source (BSD-3) WebGL map engine — the community fork of Mapbox GL JS v1 — and it is framework-agnostic: every wrapper exists only to glue reactive state to the imperative `Map`, render markers / popups / controls as framework components, and forward the event set. The result is an **uneven ecosystem**: deep React, solid Vue / Svelte / Angular, a **thin-and-stale Solid story, and effectively no Lit wrapper at all**. Rozie ships one source to all six.

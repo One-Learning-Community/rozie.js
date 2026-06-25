@@ -1,3 +1,7 @@
+---
+surface_hash: 1d6ef6220899
+---
+
 # Data table comparison
 
 How `@rozie-ui/data-table` compares to the existing data-table / data-grid libraries across the six frameworks. The data table is the densest, most-requested UI surface there is — and like the listbox and slider it builds on a **single framework-agnostic state engine** (`@tanstack/table-core`), but unlike them it does so **without** the per-framework adapter every other TanStack consumer ships. Rozie wires `table-core` to all six reactivity systems by hand, once, and emits the *same* idiomatic `<DataTable>` + `<Column>` to each.

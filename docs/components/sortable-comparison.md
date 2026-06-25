@@ -1,3 +1,7 @@
+---
+surface_hash: 75fa191490d6
+---
+
 # Sortable libraries comparison
 
 How `@rozie-ui/sortable-list` compares to the per-framework drag-and-drop reorderable-list ecosystem. Unlike the date-picker or rich-text ecosystems, this is **not** a single-engine landscape: some libraries are thin bindings over the [SortableJS](https://sortablejs.github.io/Sortable/) engine (react-sortablejs, vuedraggable, ngx-sortablejs — the family Rozie joins), while others are full native drag-and-drop toolkits with their *own* engines (dnd-kit, Angular CDK, svelte-dnd-action, solid-dnd). So the comparison spans two axes at once: **engine** (SortableJS vs bespoke) and **framework reach**. Rozie wraps SortableJS and ships one source to all six frameworks.

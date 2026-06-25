@@ -1,3 +1,7 @@
+---
+surface_hash: b3eea757a447
+---
+
 # Headless slider / range comparison
 
 How `@rozie-ui/slider` compares to the existing slider libraries across the six frameworks. Like the listbox, the slider has **no shared vanilla-JS engine** — but unlike the listbox, the cross-framework slider landscape splits along a second axis: **headless-behaviour libraries** (React Aria, Radix, Kobalte, Melt, Angular CDK) that reimplement the WAI-ARIA [slider pattern](https://www.w3.org/WAI/ARIA/apg/patterns/slider/) per ecosystem, versus the **native-input wrappers** (rc-slider, MUI Slider, noUiSlider) that ship a styled, batteries-included widget. Rozie sits deliberately in a third spot: it authors the behaviour **once** on top of the browser's own `<input type="range">` and ships it to all six frameworks as the *same* idiomatic `<Slider>`.

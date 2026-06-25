@@ -1,3 +1,7 @@
+---
+surface_hash: e0d05594bc13
+---
+
 # Switch vs the per-framework alternatives
 
 An accessible on/off toggle — `role="switch"`, a controlled boolean, keyboard support, and a re-skinnable thumb/track — is something every design system re-implements, once per framework. `Switch` is authored **once** in `Switch.rozie` and compiled to all six. Here is what it replaces.

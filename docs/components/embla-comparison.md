@@ -1,3 +1,7 @@
+---
+surface_hash: 882fa245fb67
+---
+
 # Embla libraries comparison
 
 How `@rozie-ui/embla` compares to the existing per-framework [Embla Carousel](https://www.embla-carousel.com) wrappers. Embla is the de-facto dependency-free, library-agnostic carousel engine: its core is pure vanilla JS that attaches to a viewport, reads the consumer's slide DOM, and drives `transform: translate3d(...)`. Every framework wrapper exists only to glue reactive state to that imperative engine, surface its options as props, and forward the event set. The result is a **lopsided ecosystem**: four official wrappers that are **four divergent APIs**; a single-maintainer Angular community package; and **nothing at all for Lit / web components**. Rozie ships one source to all six.

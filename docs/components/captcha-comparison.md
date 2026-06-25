@@ -1,3 +1,7 @@
+---
+surface_hash: 5f9d16684713
+---
+
 # Captcha libraries comparison
 
 How `@rozie-ui/captcha` compares to the existing CAPTCHA wrappers. Every provider — Google reCAPTCHA, hCaptcha, Cloudflare Turnstile — ships a framework-agnostic vanilla-JS widget; each wrapper exists only to inject the provider script, render the widget into an element, surface its config as props, and forward the `verify`/`expire`/`error` callbacks. Because that glue is rewritten **per provider × per framework**, the ecosystem is a sprawl of small, independently-versioned packages — and crucially, **almost none is multi-provider**: switching from reCAPTCHA to Turnstile means swapping libraries, not flipping a prop.

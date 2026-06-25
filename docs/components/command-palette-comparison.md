@@ -1,3 +1,7 @@
+---
+surface_hash: 339b7686eb70
+---
+
 # Command palette — comparison
 
 The "⌘K" command palette — a centered modal overlay with a search box over a filtered, keyboard-navigable list of commands — is a staple of modern apps (VS Code, Linear, Raycast, GitHub, Vercel). The pattern has one dominant library, **cmdk**, and a scattering of single-framework alternatives and community ports around it. What no one ships is *one* accessible command palette that spans React **and** Vue **and** Svelte **and** Angular (**and** Solid **and** Lit) with a single API. That gap is what `@rozie-ui/command-palette` fills: one `CommandPalette.rozie` source compiled to six idiomatic, accessible packages.

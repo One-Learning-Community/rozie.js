@@ -1,3 +1,7 @@
+---
+surface_hash: 486eb31a1361
+---
+
 # Headless tags input comparison
 
 How `@rozie-ui/tags` compares to the existing tags / token / chips-input libraries across the six frameworks. Like the OTP, slider, and listbox families, the tags input has **no shared vanilla-JS engine** — and like OTP, the landscape is overwhelmingly **per-framework**: every ecosystem grew its own token input (`react-tag-input`, `@yaireo/tagify` wrappers, `vue3-tags-input`, PrimeVue `Chips` / `AutoComplete`, `ngx-chips`, Angular Material `MatChipGrid`, …) with its own props, its own paste behaviour, and its own accessibility story. Rozie authors the behaviour **once** on top of one native `<input>` + a row of chips and ships it to all six frameworks as the *same* idiomatic `<Tags>`.

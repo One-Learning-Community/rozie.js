@@ -1,3 +1,7 @@
+---
+surface_hash: 867d41570f18
+---
+
 # Chart.js libraries comparison
 
 [Chart.js](https://www.chartjs.org/) is the most-installed canvas charting

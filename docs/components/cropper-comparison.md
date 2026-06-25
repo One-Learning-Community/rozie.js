@@ -1,3 +1,7 @@
+---
+surface_hash: 17f8b8d41384
+---
+
 # Cropper libraries comparison
 
 How `@rozie-ui/cropper` compares to the existing per-framework [Cropper.js](https://github.com/fengyuanchen/cropperjs) wrappers. Cropper.js is the de-facto vanilla-JS image-cropping engine, and it is framework-agnostic: every wrapper exists only to glue reactive state to the imperative `Cropper` instance, surface its options as props, and forward the event set. The result is a **lopsided ecosystem**: a deep, maintained React wrapper; an older Vue one; and for Angular / Svelte / Solid / Lit, either an *unrelated* cropping engine or nothing at all. Rozie ships one source to all six.

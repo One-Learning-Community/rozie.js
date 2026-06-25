@@ -1,3 +1,7 @@
+---
+surface_hash: 4a5c43776a0f
+---
+
 # Headless one-time-code input comparison
 
 How `@rozie-ui/otp` compares to the existing OTP / PIN-input libraries across the six frameworks. Like the slider and listbox, the OTP input has **no shared vanilla-JS engine** — but unlike a slider, the OTP landscape is overwhelmingly **per-framework**: every ecosystem grew its own segmented-code component (`react-otp-input`, `input-otp`, `vue3-otp-input`, `ng-otp-input`, Corvu's OTP Field, …) with its own props, its own paste behaviour, and its own accessibility story. The one genuinely cross-framework option, Zag.js's `pin-input` machine, ships *separate per-framework bindings* you wire yourself. Rozie authors the behaviour **once** on top of N native `<input>` cells and ships it to all six frameworks as the *same* idiomatic `<Otp>`.

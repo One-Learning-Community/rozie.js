@@ -1,3 +1,7 @@
+---
+surface_hash: 1982a81536c3
+---
+
 # FullCalendar libraries comparison
 
 A full calendar/scheduler is one of the heaviest UI primitives a component

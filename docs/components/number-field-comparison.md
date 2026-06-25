@@ -1,3 +1,7 @@
+---
+surface_hash: 7a049414b9f3
+---
+
 # NumberField vs the per-framework alternatives
 
 A clamped, step-snapped, locale-formatted number input with +/- steppers, full keyboard control, and press-and-hold acceleration is something every form library re-implements — once per framework. `NumberField` is authored **once** in `NumberField.rozie` and compiled to all six. Here is what it replaces.

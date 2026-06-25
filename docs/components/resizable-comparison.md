@@ -1,3 +1,7 @@
+---
+surface_hash: af3d40aabb57
+---
+
 # Headless split-pane comparison
 
 How `@rozie-ui/resizable` compares to the existing split-pane / resizable-panel libraries across the six frameworks. Like the slider and otp, the resizable splitter has **no shared vanilla-JS engine** — and like them, the split-pane landscape is overwhelmingly **per-framework**: every ecosystem grew its own splitter (`react-resizable-panels` for React, `splitpanes` for Vue, `paneforge` for Svelte, `angular-split` for Angular, `@corvu/resizable` for Solid) with its own API, its own persistence story, and its own — often partial — accessibility coverage. The one option that *is* framework-agnostic, [Split.js](https://www.npmjs.com/package/split.js), is a styled DOM engine you wrap per framework yourself, and its last release was four years ago. Rozie authors the behaviour **once** on top of native Pointer Events and the keyboard, and ships it to all six frameworks as the *same* idiomatic `<Resizable>`.

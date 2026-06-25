@@ -1,3 +1,7 @@
+---
+surface_hash: aed903b8bc6f
+---
+
 # Headless select / combobox comparison
 
 How `@rozie-ui/listbox` compares to the existing headless select & combobox libraries across the six frameworks. Unlike Rozie's engine-wrapper components (Embla, Flatpickr, Chart.js…), the listbox has **no vanilla-JS engine** behind it — there is no shared "select core" the way Embla is a shared carousel core. Instead, **every framework ecosystem reimplements the WAI-ARIA [listbox](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/) / [combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/) pattern from scratch**, in its own idiom. The result is the most fragmented landscape of any component Rozie ships: the best options are **React-only**, the one cross-framework incumbent (Headless UI) covers **just React + Vue**, Svelte and Solid each have their own separate community libraries, Angular gives you low-level CDK primitives you assemble yourself, and **web components have no headless combobox at all**. Rozie authors the ARIA behaviour **once** and ships it to all six.

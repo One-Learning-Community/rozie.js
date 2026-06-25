@@ -1,5 +1,6 @@
 ---
 title: DatePicker — comparison
+surface_hash: 4df0b282a837
 ---
 
 # DatePicker vs the per-framework date pickers
