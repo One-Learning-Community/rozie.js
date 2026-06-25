@@ -137,6 +137,25 @@ export function validateSlotPropCollision(
     }
 
     // ── (3) slot == inherited DOM member / $expose verb (Lit collision) ──────
+    //
+    // GATE (Phase 61 Plan 09): this collision is REAL only for a SCOPED or
+    // PORTAL slot. On Lit, ONLY a scoped/portal slot lowers to a bare
+    // `@property`-decorated class member named after the slot
+    // (`@property title?: (scope) => unknown` — see emitSlotDecl.ts
+    // `isScopedOrPortal` + portalSlotMemberName) — THAT bare member shadows the
+    // inherited `HTMLElement.title` (TS2416). A PLAIN consumer-provided named
+    // slot (no `portal`, no `:params`) lowers to ONLY `_`-prefixed internal
+    // members (`_hasSlotTitle` / `_slotTitleElements`) plus a native
+    // `<slot name="title">` element — NEITHER collides with any DOM member. The
+    // Plan-02 generalization fired on slot NAME unconditionally, false-positiving
+    // every plain named slot whose name happened to be a DOM word (e.g. the
+    // slot-matrix `consumer-re-projection` wrapper's `<slot name="title">`, which
+    // the committed Lit snapshot proves compiles clean). Restrict the check to
+    // the slots that actually mint the bare accessor.
+    const slotMintsBareAccessor =
+      slot.isPortal === true || (slot.params?.length ?? 0) > 0;
+    if (!slotMintsBareAccessor) continue;
+
     const exposeHit = exposeByName.get(slot.name);
     const isDomFootgun = SLOT_DOM_FOOTGUNS.has(slot.name);
     if (exposeHit !== undefined || isDomFootgun) {

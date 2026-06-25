@@ -131,6 +131,53 @@ describe('validateSlotPropCollision [Phase 28] — direct IR', () => {
     validateSlotPropCollision(ir, diagnostics);
     expect(diagnostics).toHaveLength(0);
   });
+
+  // Phase 61 Plan 09 — DOM-footgun check (3) is gated to SCOPED/PORTAL slots.
+  // A PLAIN named slot named after a DOM member (`title`) does NOT mint a bare
+  // Lit `@property` accessor (only `_hasSlotTitle` / `_slotTitleElements` +
+  // a native `<slot name="title">`), so it must NOT fire ROZ127. This is the
+  // slot-matrix `consumer-re-projection` wrapper false-positive root cause.
+  it('(b″) a PLAIN named slot `title` (no portal, no params) does NOT fire ROZ127', () => {
+    const plainTitle: SlotDecl = {
+      type: 'SlotDecl',
+      name: 'title',
+      defaultContent: null,
+      params: [],
+      presence: 'always',
+      nestedSlots: [],
+      isPortal: false,
+      sourceLoc: { start: 500, end: 505 },
+    } as unknown as SlotDecl;
+    const ir = stubIR([], [plainTitle]);
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  // The TRUE-POSITIVE side: a SCOPED slot `title` (params present) DOES mint a
+  // bare `@property title` accessor on Lit → genuine TS2416 → ROZ127 fires.
+  it('(b‴) a SCOPED slot `title` (params present) DOES fire ROZ127 (bare @property accessor)', () => {
+    const scopedTitle: SlotDecl = {
+      type: 'SlotDecl',
+      name: 'title',
+      defaultContent: null,
+      params: [
+        { type: 'ParamDecl', name: 'row', valueExpression: null } as unknown,
+      ],
+      presence: 'always',
+      nestedSlots: [],
+      isPortal: false,
+      sourceLoc: { start: 500, end: 505 },
+    } as unknown as SlotDecl;
+    const ir = stubIR([], [scopedTitle]);
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+    const collisions = diagnostics.filter(
+      (d) => d.code === SLOT_PROP_NAME_COLLISION,
+    );
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0]!.message).toContain('title');
+  });
 });
 
 // A colliding inline `.rozie` source — a prop `panel` AND a portal-slot
