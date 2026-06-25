@@ -4,9 +4,21 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 
 @customElement('rozie-filter-text')
 export default class FilterText extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label`.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#filter` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The current column filter value the local draft seeds from (setup-once).
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
+   */
   @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
   private _draft = signal('');
 

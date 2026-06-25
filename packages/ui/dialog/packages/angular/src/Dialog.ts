@@ -74,11 +74,31 @@ interface DefaultCtx {}
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Dialog {
+  /**
+   * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
+   * @example
+   * <Dialog r-model:open="confirmOpen" ariaLabelledby="confirm-title" />
+   */
   open = model<boolean>(false);
+  /**
+   * Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: 'backdrop'`; set this to require an explicit action.
+   */
   disableBackdropClose = input<boolean>(false);
+  /**
+   * Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: 'escape'`; the component `preventDefault()`s it so the close always flows through the `open` model. Set this to keep the dialog open on Escape (e.g. a required confirmation).
+   */
   disableEscapeClose = input<boolean>(false);
+  /**
+   * Opt **out** of locking `<html>` scroll while the dialog is open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown; set this to leave background scrolling enabled.
+   */
   disableScrollLock = input<boolean>(false);
+  /**
+   * Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.
+   */
   ariaLabel = input<(string) | null>(null);
+  /**
+   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
+   */
   ariaLabelledby = input<(string) | null>(null);
   panelEl = viewChild<ElementRef<HTMLDivElement>>('panelEl');
   close = output<unknown>();

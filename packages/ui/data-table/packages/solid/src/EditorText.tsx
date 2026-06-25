@@ -2,11 +2,29 @@ import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 
 interface EditorTextProps {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.
+   */
   columnId?: string;
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   column?: (unknown) | null;
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   row?: (unknown) | null;
+  /**
+   * The current cell value the editor seeds its local draft from (setup-once).
+   */
   value?: (unknown) | null;
+  /**
+   * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   commit?: ((...args: unknown[]) => unknown) | null;
+  /**
+   * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   cancel?: ((...args: unknown[]) => unknown) | null;
 }
 

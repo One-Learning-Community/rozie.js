@@ -171,18 +171,56 @@ export default class Slider extends SignalWatcher(LitElement) {
 }
 `;
 
+  /**
+   * The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
+   * @example
+   * <Slider r-model:value="volume" :min="0" :max="100" :step="1" ariaLabel="Volume" />
+   */
   @property({ type: Object, attribute: 'value' }) _value_attr: unknown = null;
   private _valueControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'value-change', defaultValue: null, initialControlledValue: undefined });
+  /**
+   * Switch to dual-thumb range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping native inputs. The exact analog of listbox's `multiple` (scalar↔array). A bare attribute (`<Slider range>`) coerces to `true`.
+   */
   @property({ type: Boolean, reflect: true }) range: boolean = false;
+  /**
+   * The lower bound of the scale, forwarded to the native input as the `min` attribute (the browser derives `aria-valuemin` from it — not set by hand, per MDN slider-role guidance).
+   */
   @property({ type: Number, reflect: true }) min: number = 0;
+  /**
+   * The upper bound of the scale, forwarded to the native input as the `max` attribute (the browser derives `aria-valuemax` from it — not set by hand, per MDN slider-role guidance).
+   */
   @property({ type: Number, reflect: true }) max: number = 100;
+  /**
+   * The granularity of the scale, forwarded as the native `step` attribute; every write-back is quantized to it.
+   */
   @property({ type: Number, reflect: true }) step: number = 1;
+  /**
+   * Layout orientation — `'horizontal'` (default) or `'vertical'`. Vertical rotates the wrapper `-90deg` so up = increase and sets `aria-orientation="vertical"` explicitly (a native range input always reports itself as horizontal even when visually rotated).
+   */
   @property({ type: String, reflect: true }) orientation: string = 'horizontal';
+  /**
+   * Disable the control — it becomes non-interactive and dimmed. Also sets the Angular `ControlValueAccessor` disabled state.
+   */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Tick marks over the track — either a bare `value[]` (positions only) or a `{ value, label }[]` (positioned and labelled). Rendered as a decorative overlay above the track; override per-mark rendering via the `mark` scoped slot (`{ value, label, position }`).
+   */
   @property({ type: Array }) marks: any[] = [];
+  /**
+   * Accessible name for each native input when there is no visible `<label for>`, reflected onto the input's `aria-label`.
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = null;
+  /**
+   * The jump applied on `PageUp` / `PageDown`. `null` falls back to `step × 10`. Applied by a thin `@keydown` augment so it honours this value (native browsers otherwise use their own large step); arrows / `Home` / `End` stay native.
+   */
   @property({ type: Number, reflect: true }) pageStep: number = null;
+  /**
+   * A `(value) => string` formatter for the value shown in the `bubble` slot and surfaced as `aria-valuetext`. Receives the numeric value and returns a string; `null` uses the raw value.
+   */
   @property({ type: Function }) formatValue: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.
+   */
   @property({ type: Boolean, reflect: true }) showValue: boolean = false;
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 

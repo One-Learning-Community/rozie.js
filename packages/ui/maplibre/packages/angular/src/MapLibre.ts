@@ -123,30 +123,107 @@ function rozieToken(key: string): InjectionToken<unknown> {
   ],
 })
 export class MapLibre {
+  /**
+   * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
+   * @example
+   * <MapLibre r-model:center="center" r-model:zoom="zoom" />
+   */
   center = model<any[]>((() => [0, 0])());
+  /**
+   * The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.
+   */
   zoom = model<number>(1);
+  /**
+   * The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.
+   */
   bearing = model<number>(0);
+  /**
+   * The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.
+   */
   pitch = model<number>(0);
+  /**
+   * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
+   */
   mapStyle = input<unknown>(undefined);
+  /**
+   * Minimum zoom level. Applied at construction and via `setMinZoom` on change.
+   */
   minZoom = input<number>(0);
+  /**
+   * Maximum zoom level. Applied at construction and via `setMaxZoom` on change.
+   */
   maxZoom = input<number>(22);
+  /**
+   * A `LngLatBoundsLike` the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear).
+   */
   maxBounds = input<unknown>(undefined);
+  /**
+   * **Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`.
+   */
   bounds = input<unknown>(undefined);
+  /**
+   * **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.).
+   */
   fitBoundsOptions = input<Record<string, any>>((() => ({}))());
+  /**
+   * Toggle drag-to-pan. Applied at construction and reconciled live via the handler's `enable()` / `disable()`.
+   */
   dragPan = input<boolean>(true);
+  /**
+   * Toggle right-drag / ctrl-drag rotation. Applied at construction and reconciled live.
+   */
   dragRotate = input<boolean>(true);
+  /**
+   * Toggle scroll-wheel zoom. Applied at construction and reconciled live.
+   */
   scrollZoom = input<boolean>(true);
+  /**
+   * Toggle double-click zoom. Applied at construction and reconciled live.
+   */
   doubleClickZoom = input<boolean>(true);
+  /**
+   * Toggle shift-drag box zoom. Applied at construction and reconciled live.
+   */
   boxZoom = input<boolean>(true);
+  /**
+   * Toggle keyboard navigation. Applied at construction and reconciled live.
+   */
   keyboard = input<boolean>(true);
+  /**
+   * Toggle touch pinch-zoom + rotate. Applied at construction and reconciled live.
+   */
   touchZoomRotate = input<boolean>(true);
+  /**
+   * Toggle two-finger touch pitch. Applied at construction and reconciled live.
+   */
   touchPitch = input<boolean>(true);
+  /**
+   * The marker data that drives the reactive multi-instance `marker` slot — one entry per marker (`{ lng, lat, id?, anchor?, offset?, draggable?, ... }`). One portal handle mounts per entry; changing the array reconciles markers keep / update / dispose with no remount. Only meaningful when the `marker` slot is filled.
+   */
   markers = input<any[]>((() => [])());
+  /**
+   * The popup data that drives the reactive multi-instance `popup` slot — one entry per popup (`{ lng, lat, id?, anchor?, offset?, closeButton?, closeOnClick?, ... }`). One portal handle mounts per entry. Only meaningful when the `popup` slot is filled.
+   */
   popups = input<any[]>((() => [])());
+  /**
+   * Declarative GeoJSON / vector / raster sources — `[{ id, spec }]` (or a bare `SourceSpecification` carrying an `id`). Reconciled into the live style (add / `setData` / remove) once the style has loaded. The config-array authoring shape for sources; declarative `<Source>` / `<Layer>` children are the alternative shape (both feed the same registry).
+   */
   sources = input<any[]>((() => [])());
+  /**
+   * Declarative layers — `LayerSpecification[]` (each with an `id`). Reconciled into the live style (add / `setPaintProperty` / `setLayoutProperty` / remove) once the style has loaded; `beforeId` controls draw order.
+   */
   layers = input<any[]>((() => [])());
+  /**
+   * Layer ids whose feature `mouseenter` / `mouseleave` fire the `@mouseenter` / `@mouseleave` events (populating `e.features`). Registered / unregistered per id on change.
+   */
   interactiveLayerIds = input<any[]>((() => [])());
+  /**
+   * Standard map controls — strings (`'navigation'` / `'geolocate'` / `'scale'` / `'fullscreen'` / `'attribution'`) or `{ type, position?, options? }` objects. Reconciled (remove-all + re-add) on change.
+   */
   controls = input<any[]>((() => [])());
+  /**
+   * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
+   */
   options = input<Record<string, any>>((() => ({}))());
   sourceReg = signal({});
   layerReg = signal({});

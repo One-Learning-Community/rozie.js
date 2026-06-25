@@ -74,10 +74,25 @@ export default class Toaster extends SignalWatcher(LitElement) {
 }
 `;
 
+  /**
+   * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
+   */
   @property({ type: String, reflect: true }) position: string = 'bottom-right';
+  /**
+   * Default auto-dismiss time in milliseconds, applied to any toast that does not pass its own `duration`. `0` (or a per-toast `duration` of `0`) makes the toast sticky — it stays until explicitly dismissed.
+   */
   @property({ type: Number, reflect: true }) duration: number = 4000;
+  /**
+   * Maximum number of visible toasts (`0` = unlimited). When the queue exceeds this, the oldest toasts drop off the stack.
+   */
   @property({ type: Number, reflect: true }) max: number = 0;
+  /**
+   * Opt **out** of pausing the auto-dismiss timers while the pointer is over the stack. By default hovering pauses every timer and leaving restarts them; set this to keep toasts dismissing on schedule regardless of hover.
+   */
   @property({ type: Boolean, reflect: true }) disablePauseOnHover: boolean = false;
+  /**
+   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = null;
   private _toasts = signal([]);
   private _seq = signal(0);

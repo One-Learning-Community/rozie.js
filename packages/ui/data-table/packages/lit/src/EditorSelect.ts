@@ -6,12 +6,33 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-editor-select')
 export default class EditorSelect extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) row: unknown = null;
+  /**
+   * The current cell value the `<select>` binds to (String-coerced).
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+   */
   @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
+   */
   @property({ type: Array }) options: any[] = [];
 
   private _disconnectCleanups: Array<() => void> = [];

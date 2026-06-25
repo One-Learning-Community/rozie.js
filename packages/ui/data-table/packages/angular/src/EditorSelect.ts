@@ -34,12 +34,33 @@ function __rozieAttr(v: unknown): string | null {
   `,
 })
 export class EditorSelect {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.
+   */
   columnId = input<string>('');
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   column = input<(unknown) | null>(null);
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   row = input<(unknown) | null>(null);
+  /**
+   * The current cell value the `<select>` binds to (String-coerced).
+   */
   value = input<(unknown) | null>(null);
+  /**
+   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   */
   commit = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+   */
   cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
+   */
   options = input<any[]>((() => [])());
 
   selectValue = () => this.value() != null ? String(this.value()) : '';

@@ -90,8 +90,13 @@ function makeVariantSource(src, variant) {
   guard(s.includes('<rozie name="Chart"'), 'no `<rozie name="Chart"`');
   s = s.replace('<rozie name="Chart"', `<rozie name="${variant.name}"`);
 
-  // (b) remove the `type` prop declaration
-  const typePropRe = /\n\s*type:\s*\{ type: String,\s*default: 'line' \},/;
+  // (b) remove the `type` prop declaration. The prop may carry a multi-line
+  //     `docs: { description }` block (Phase 58 self-documenting props), so match
+  //     from the 2-space `type: {` opener lazily through its matching 2-space
+  //     `},` close — the nested `docs: {` closes at 4-space indent and is skipped.
+  //     The `type: String` / `default: 'line'` anchors keep this fail-loud if the
+  //     core prop shape changes.
+  const typePropRe = /\n {2}type: \{\n {4}type: String,\n {4}default: 'line',[\s\S]*?\n {2}\},/;
   guard(typePropRe.test(s), 'no `type` prop line');
   s = s.replace(typePropRe, '');
 

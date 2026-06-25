@@ -10,9 +10,21 @@ import { Component, ViewEncapsulation, input, signal } from '@angular/core';
   `,
 })
 export class FilterText {
+  /**
+   * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label`.
+   */
   columnId = input<string>('');
+  /**
+   * The table-core column object (opaque passthrough from the `#filter` slot scope).
+   */
   column = input<(unknown) | null>(null);
+  /**
+   * The current column filter value the local draft seeds from (setup-once).
+   */
   value = input<(unknown) | null>(null);
+  /**
+   * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
+   */
   setFilter = input<((...args: unknown[]) => unknown) | null>(null);
   draft = signal('');
 

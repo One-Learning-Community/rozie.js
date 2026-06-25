@@ -4,11 +4,29 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 
 @customElement('rozie-editor-text')
 export default class EditorText extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) row: unknown = null;
+  /**
+   * The current cell value the editor seeds its local draft from (setup-once).
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
   private _draft = signal('');
 

@@ -6,6 +6,9 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-detail-panel')
 export default class DetailPanel extends SignalWatcher(LitElement) {
+  /**
+   * The raw row object (the `#detail` slot scope `row` = `row.original`). This drop-in walks its own enumerable keys and String-coerces each value into a key/value definition list; a null row renders an empty list.
+   */
   @property({ type: Object }) row: unknown = null;
 
   private _disconnectCleanups: Array<() => void> = [];

@@ -8,7 +8,32 @@
 import { ref } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ columnId?: string; column?: Record<string, any> | null; row?: Record<string, any> | null; value?: Record<string, any> | null; commit?: ((...args: any[]) => any) | null; cancel?: ((...args: any[]) => any) | null }>(),
+  defineProps<{
+    /**
+     * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.
+     */
+    columnId?: string;
+    /**
+     * The table-core column object (opaque passthrough from the `#editor` slot scope).
+     */
+    column?: Record<string, any> | null;
+    /**
+     * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+     */
+    row?: Record<string, any> | null;
+    /**
+     * The current cell value the editor seeds its local draft from (setup-once).
+     */
+    value?: Record<string, any> | null;
+    /**
+     * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
+     */
+    commit?: ((...args: any[]) => any) | null;
+    /**
+     * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
+     */
+    cancel?: ((...args: any[]) => any) | null;
+  }>(),
   { columnId: '', column: null, row: null, value: null, commit: null, cancel: null }
 );
 

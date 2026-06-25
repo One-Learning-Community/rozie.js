@@ -256,6 +256,11 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   }
 `;
 
+  /**
+   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
+   * @example
+   * <FlowCanvas r-model:graph="graph" :validate-types="true" />
+   */
   @property({ type: Object, attribute: 'graph' }) _graph_attr: any = {
   nodes: [],
   connections: []
@@ -264,26 +269,83 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   nodes: [],
   connections: []
 }, initialControlledValue: undefined });
+  /**
+   * Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).
+   */
   @property({ type: Boolean, reflect: true }) validateTypes: boolean = true;
+  /**
+   * The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.
+   */
   @property({ type: Number, attribute: 'zoom' }) _zoom_attr: number = 1;
   private _zoomControllable = createLitControllableProperty<number>({ host: this, eventName: 'zoom-change', defaultValue: 1, initialControlledValue: undefined });
+  /**
+   * Whether the canvas can be panned by dragging the background (applied at construction). Set `false` to detach the area's drag handler.
+   */
   @property({ type: Boolean, reflect: true }) pannable: boolean = true;
+  /**
+   * Whether the canvas can be zoomed by scroll/pinch (applied at construction). Set `false` to detach the area's zoom handler.
+   */
   @property({ type: Boolean, reflect: true }) zoomable: boolean = true;
+  /**
+   * Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event.
+   */
   @property({ type: Boolean, reflect: true }) selectable: boolean = true;
+  /**
+   * Read-only viewer mode — no node drag, no connection editing, and no selection. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled.
+   */
   @property({ type: Boolean, reflect: true }) readonly: boolean = false;
+  /**
+   * Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.
+   */
   @property({ type: Number, reflect: true }) minZoom: number = 0.1;
+  /**
+   * Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.
+   */
   @property({ type: Number, reflect: true }) maxZoom: number = 4;
+  /**
+   * Snap-to-grid size in pixels for node dragging. `0` turns snapping off.
+   */
   @property({ type: Number, reflect: true }) snapGrid: number = 0;
+  /**
+   * When selectable, hold Ctrl to add to the current selection instead of replacing it.
+   */
   @property({ type: Boolean, reflect: true }) accumulateOnCtrl: boolean = true;
+  /**
+   * The bezier curvature of connection paths (`classicConnectionPath`).
+   */
   @property({ type: Number, reflect: true }) curvature: number = 0.3;
+  /**
+   * After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).
+   */
   @property({ type: Boolean, reflect: true }) fitOnMount: boolean = true;
+  /**
+   * Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls="false"`.
+   */
   @property({ type: Boolean, reflect: true }) controls: boolean = true;
+  /**
+   * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.
+   */
   @property({ type: Boolean, reflect: true }) minimap: boolean = false;
+  /**
+   * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
+   */
   @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty and the verbs no-op).
+   */
   @property({ type: Boolean, reflect: true }) history: boolean = true;
+  /**
+   * Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).
+   */
   @property({ type: String, attribute: 'mode' }) _mode_attr: string = 'pan';
   private _modeControllable = createLitControllableProperty<string>({ host: this, eventName: 'mode-change', defaultValue: 'pan', initialControlledValue: undefined });
+  /**
+   * Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.
+   */
   @property({ type: Boolean, reflect: true }) marquee: boolean = false;
+  /**
+   * Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.
+   */
   @property({ type: Boolean, reflect: true }) nodeToolbar: boolean = false;
   private _typeReg = signal({});
   private _portReg = signal({});

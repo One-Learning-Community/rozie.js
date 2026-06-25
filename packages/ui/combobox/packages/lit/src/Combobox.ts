@@ -75,13 +75,36 @@ export default class Combobox extends SignalWatcher(LitElement) {
 }
 `;
 
+  /**
+   * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
+   * @example
+   * <Combobox r-model:value="country" :options="countries" />
+   */
   @property({ type: Object, attribute: 'value' }) _value_attr: unknown = null;
   private _valueControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'value-change', defaultValue: null, initialControlledValue: undefined });
+  /**
+   * The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, and an optional `disabled` flag makes an option non-selectable.
+   */
   @property({ type: Array }) options: any[] = [];
+  /**
+   * Placeholder text shown in the input while it is empty.
+   */
   @property({ type: String, reflect: true }) placeholder: string = '';
+  /**
+   * Disable the control — the input becomes non-interactive and the popup cannot be opened. Also sets the Angular `ControlValueAccessor` disabled state.
+   */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Opt **out** of built-in client filtering (async / server-side mode): render `options` exactly as supplied and rely on the `search` event to refetch. By default the component filters `options` by `label`, case-insensitively, against the typed query.
+   */
   @property({ type: Boolean, reflect: true }) disableFilter: boolean = false;
+  /**
+   * Accessible name for the input (`aria-label`), used when there is no visible `<label for>` pointing at it. Provide this (or an external label) so the combobox is announced.
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = null;
+  /**
+   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   */
   @property({ type: String, reflect: true }) idBase: string = 'rozie-combobox';
   private _query = signal('');
   private _isOpen = signal(false);

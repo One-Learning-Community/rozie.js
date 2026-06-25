@@ -2,6 +2,9 @@
 import { rozieDisplay } from '@rozie/runtime-svelte';
 
 interface Props {
+  /**
+   * The raw row object (the `#detail` slot scope `row` = `row.original`). This drop-in walks its own enumerable keys and String-coerces each value into a key/value definition list; a null row renders an empty list.
+   */
   row?: (unknown) | null;
 }
 

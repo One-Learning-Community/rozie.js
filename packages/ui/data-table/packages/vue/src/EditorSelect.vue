@@ -8,7 +8,36 @@
 
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{ columnId?: string; column?: Record<string, any> | null; row?: Record<string, any> | null; value?: Record<string, any> | null; commit?: ((...args: any[]) => any) | null; cancel?: ((...args: any[]) => any) | null; options?: any[] }>(),
+  defineProps<{
+    /**
+     * The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.
+     */
+    columnId?: string;
+    /**
+     * The table-core column object (opaque passthrough from the `#editor` slot scope).
+     */
+    column?: Record<string, any> | null;
+    /**
+     * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+     */
+    row?: Record<string, any> | null;
+    /**
+     * The current cell value the `<select>` binds to (String-coerced).
+     */
+    value?: Record<string, any> | null;
+    /**
+     * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+     */
+    commit?: ((...args: any[]) => any) | null;
+    /**
+     * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+     */
+    cancel?: ((...args: any[]) => any) | null;
+    /**
+     * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
+     */
+    options?: any[];
+  }>(),
   { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: () => [] }
 );
 

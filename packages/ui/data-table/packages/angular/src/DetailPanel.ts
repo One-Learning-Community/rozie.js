@@ -38,6 +38,9 @@ function __rozieAttr(v: unknown): string | null {
   `,
 })
 export class DetailPanel {
+  /**
+   * The raw row object (the `#detail` slot scope `row` = `row.original`). This drop-in walks its own enumerable keys and String-coerces each value into a key/value definition list; a null row renders an empty list.
+   */
   row = input<(unknown) | null>(null);
 
   entries = () => {

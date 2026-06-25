@@ -114,10 +114,25 @@ function __rozieAttr(v: unknown): string | null {
   `],
 })
 export class Toaster {
+  /**
+   * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
+   */
   position = input<string>('bottom-right');
+  /**
+   * Default auto-dismiss time in milliseconds, applied to any toast that does not pass its own `duration`. `0` (or a per-toast `duration` of `0`) makes the toast sticky — it stays until explicitly dismissed.
+   */
   duration = input<number>(4000);
+  /**
+   * Maximum number of visible toasts (`0` = unlimited). When the queue exceeds this, the oldest toasts drop off the stack.
+   */
   max = input<number>(0);
+  /**
+   * Opt **out** of pausing the auto-dismiss timers while the pointer is over the stack. By default hovering pauses every timer and leaving restarts them; set this to keep toasts dismissing on schedule regardless of hover.
+   */
   disablePauseOnHover = input<boolean>(false);
+  /**
+   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   */
   ariaLabel = input<(string) | null>(null);
   toasts = signal<any[]>([]);
   seq = signal(0);

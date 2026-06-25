@@ -35,10 +35,25 @@ function __rozieAttr(v: unknown): string | null {
   `,
 })
 export class FilterSelect {
+  /**
+   * The column id (mirrors the `#filter` slot scope) — used as the filter key and the select `aria-label`.
+   */
   columnId = input<string>('');
+  /**
+   * The table-core column object (opaque passthrough from the `#filter` slot scope).
+   */
   column = input<(unknown) | null>(null);
+  /**
+   * The current column filter value the select seeds from (String-coerced).
+   */
   value = input<(unknown) | null>(null);
+  /**
+   * `(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.
+   */
   setFilter = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
+   */
   uniqueValues = input<any[]>((() => [])());
 
   selectValue = () => this.value() != null ? String(this.value()) : '';

@@ -7,19 +7,63 @@ const __rozieCtx_data_table_columns = createContext(Symbol.for("rozie:data-table
 
 @customElement('rozie-column')
 export default class Column extends SignalWatcher(LitElement) {
+  /**
+   * The column id. Optional — defaults to `field` when omitted. Used as the key in the id-keyed registry union and in the `#cell` / `#colHeader` slot dispatch.
+   */
   @property({ type: String, reflect: true }) id: string = '';
+  /**
+   * The row field this column reads (table-core `accessorKey`). The plain accessor value renders when the `#cell` slot falls through.
+   * @example
+   * <Column field="email" header="Email" />
+   */
   @property({ type: String, reflect: true }) field: string = '';
+  /**
+   * The header label, rendered when the parent `#colHeader` slot falls through to the plain label.
+   */
   @property({ type: String, reflect: true }) header: string = '';
+  /**
+   * Whether this column participates in click-to-sort. Default `false`. Bind `:sortable="true"` (a bare attr only coerces on Vue+Lit).
+   */
   @property({ type: Boolean, reflect: true }) sortable: boolean = false;
+  /**
+   * Whether this column participates in per-column filtering (the `#filter` slot / faceted filter chrome). Default `false`.
+   */
   @property({ type: Boolean, reflect: true }) filterable: boolean = false;
+  /**
+   * Pin side: `''` (unpinned) | `'left'` | `'right'`. Reserved metadata carried into the parent's column pinning state.
+   */
   @property({ type: String, reflect: true }) pinned: string = '';
+  /**
+   * Optional fixed/initial column width — a CSS length string or a px number.
+   */
   @property({ type: String }) width: string | number = '';
+  /**
+   * Reserved per-column metadata flagging participation in the expand affordance. The expander chevron is its own auto-injected leading column on `<DataTable expandable>`, so this is forward-compat metadata, not the toggle host. Default `false`.
+   */
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
+  /**
+   * Whether this column is offered to the headless `#groupBar` as a grouping target. Defaults `true` (opt-OUT via `:groupable="false"`); this only filters the groupable-columns list. Whether grouping is engaged is driven by the parent's `grouping` model, never this flag.
+   */
   @property({ type: Boolean, reflect: true }) groupable: boolean = true;
+  /**
+   * The table-core aggregation for this column inside a group-header cell. Either a built-in name string — `'sum'` | `'min'` | `'max'` | `'extent'` | `'mean'` | `'median'` | `'unique'` | `'uniqueCount'` | `'count'` — or a custom function `(columnId, leafRows, childRows) => any` (defensively wrapped by the parent so a throw cannot crash grouping). Null → no aggregation (the group-header cell renders as a placeholder).
+   */
   @property({ type: String }) aggregationFn: string | (((...args: unknown[]) => unknown) | null) = null;
+  /**
+   * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
+   */
   @property({ type: Boolean, reflect: true }) editable: boolean = false;
+  /**
+   * Built-in editor type for this column: `'text'` | `'number'` | `'select'` | `'checkbox'`. Ignored when a custom `#editor` scoped slot handles the column. Default `'text'`.
+   */
   @property({ type: String, reflect: true }) editor: string = 'text';
+  /**
+   * Options for `editor: 'select'` — `[{ value, label }]`. Empty for other editor types.
+   */
   @property({ type: Array }) editorOptions: any[] = [];
+  /**
+   * Synchronous per-column validator `(value, row) => true | string`. A string return is the error message (the editor stays open and the aria-live region announces it). Null → no validation. The parent wraps it defensively against a thrown/non-bool/non-string return.
+   */
   @property({ type: Function }) validate: ((...args: unknown[]) => unknown) | null = null;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_data_table_columns = new ContextConsumer(this, { context: __rozieCtx_data_table_columns, subscribe: true });

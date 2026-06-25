@@ -45,14 +45,40 @@ export default class Otp extends SignalWatcher(LitElement) {
 }
 `;
 
+  /**
+   * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
+   * @example
+   * <Otp r-model:value="code" :length="6" type="numeric" ariaLabel="Verification code" />
+   */
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
   private _valueControllable = createLitControllableProperty<string>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });
+  /**
+   * Number of input cells to render.
+   */
   @property({ type: Number, reflect: true }) length: number = 6;
+  /**
+   * Allowed-character class plus the mobile keyboard hint: `'numeric'` permits digits only and sets `inputmode="numeric"`; `'alphanumeric'` permits `[A-Za-z0-9]` with `inputmode="text"`; `'text'` permits any non-space character with `inputmode="text"`. Characters that fail the test are rejected on type and filtered on paste.
+   */
   @property({ type: String, reflect: true }) type: string = 'numeric';
+  /**
+   * Render the cells as masked dots (`type="password"`) for sensitive codes, while keeping the same keyboard and ARIA behavior.
+   */
   @property({ type: Boolean, reflect: true }) mask: boolean = false;
+  /**
+   * Focus the first empty cell on mount.
+   */
   @property({ type: Boolean, reflect: true }) autoFocus: boolean = false;
+  /**
+   * Disable every cell. Also sets the Angular `ControlValueAccessor` disabled state.
+   */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Per-cell placeholder character shown in empty cells (e.g. `'•'` or `'0'`).
+   */
   @property({ type: String, reflect: true }) placeholder: string = '';
+  /**
+   * Accessible name for the whole group (`role="group"`, applied as `aria-label`). Each cell additionally gets an ordinal `aria-label` (`"Digit 1 of 6"`).
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = null;
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 

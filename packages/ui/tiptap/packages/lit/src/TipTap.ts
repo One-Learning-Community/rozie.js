@@ -110,14 +110,40 @@ export default class TipTap extends SignalWatcher(LitElement) {
   }
 `;
 
+  /**
+   * The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.
+   * @example
+   * <TipTap r-model:html="content" placeholder="Start writing…" />
+   */
   @property({ type: String, attribute: 'html' }) _html_attr: string = '<p>Start writing…</p>';
   private _htmlControllable = createLitControllableProperty<string>({ host: this, eventName: 'html-change', defaultValue: '<p>Start writing…</p>', initialControlledValue: undefined });
+  /**
+   * Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class.
+   */
   @property({ type: Boolean, reflect: true }) editable: boolean = true;
+  /**
+   * Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder` and painted as ghost text on the first empty node via the bundled Placeholder extension. An empty string adds no placeholder.
+   */
   @property({ type: String, reflect: true }) placeholder: string = '';
+  /**
+   * Whether to place the caret in the document on mount (TipTap's `autofocus` option).
+   */
   @property({ type: Boolean, reflect: true }) autofocus: boolean = false;
+  /**
+   * A CSS class applied to the contenteditable element (`editorProps.attributes.class`).
+   */
   @property({ type: String, reflect: true }) editorClass: string = '';
+  /**
+   * The accessible name (`aria-label`) applied to the contenteditable element.
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = 'Rich text editor';
+  /**
+   * ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.
+   */
   @property({ type: Object }) editorProps: any = {};
+  /**
+   * Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Composed **last** so consumer extensions win for the same node or mark.
+   */
   @property({ type: Array }) extensions: any[] = [];
   private _active = signal({
   bold: false,

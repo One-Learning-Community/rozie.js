@@ -44,26 +44,91 @@ import CropperEngine from 'cropperjs';
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Cropper {
+  /**
+   * The image URL the cropper attaches to. Bound onto the `<img>` and reconciled at runtime — changing it calls the engine `replace(url)`.
+   * @example
+   * <Cropper :src="imageUrl" r-model:data="crop" />
+   */
   src = input<string>('');
+  /**
+   * The crop box — `{ x, y, width, height, rotate, scaleX, scaleY }`. The lone two-way `model: true` prop: dragging or resizing the crop box writes the new box back (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write `setData`s the live cropper.
+   */
   data = model<unknown>(undefined);
+  /**
+   * The crop box aspect ratio. `NaN` (the default) is Cropper's sentinel for a free ratio. Reconciled at runtime via `setAspectRatio`.
+   */
   aspectRatio = input<number>(NaN);
+  /**
+   * The view constraint mode (`0`–`3`) that governs how the crop box is restricted to the canvas. Construction-only — Cropper.js v1 has no `setViewMode`.
+   */
   viewMode = input<number>(0);
+  /**
+   * The drag behavior: `'crop'` draws a new box, `'move'` pans the canvas, `'none'` disables dragging. Reconciled at runtime via `setDragMode`.
+   */
   dragMode = input<string>('crop');
+  /**
+   * Freeze the cropper so it no longer responds to user interaction. Reconciled at runtime via `enable()` / `disable()`.
+   */
   disabled = input<boolean>(false);
+  /**
+   * Show the dashed guide lines over the crop box. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   guides = input<boolean>(true);
+  /**
+   * Show the center indicator inside the crop box. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   center = input<boolean>(true);
+  /**
+   * Show the grid background behind the image. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   background = input<boolean>(true);
+  /**
+   * Allow moving (panning) the image. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   movable = input<boolean>(true);
+  /**
+   * Allow rotating the image. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   rotatable = input<boolean>(true);
+  /**
+   * Allow scaling (flipping) the image. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   scalable = input<boolean>(true);
+  /**
+   * Allow zooming the image. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   zoomable = input<boolean>(true);
+  /**
+   * Allow zooming the image via the mouse wheel. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   zoomOnWheel = input<boolean>(true);
+  /**
+   * Allow moving the crop box. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   cropBoxMovable = input<boolean>(true);
+  /**
+   * Allow resizing the crop box. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   cropBoxResizable = input<boolean>(true);
+  /**
+   * Render a crop box automatically when the cropper initializes. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   autoCrop = input<boolean>(true);
+  /**
+   * The initial crop-box size as a fraction of the canvas (`0`–`1`). Construction-only — Cropper.js v1 has no runtime setter.
+   */
   autoCropArea = input<number>(0.8);
+  /**
+   * Re-render the cropper on window resize to keep it responsive. Construction-only — Cropper.js v1 has no runtime setter.
+   */
   responsive = input<boolean>(true);
+  /**
+   * Live crop-thumbnail target(s) — a selector string or element ref(s) (`HTMLElement`, array, or `NodeList`). Construction-only (v1 has no `setPreview`). On Lit prefer an element ref: a document selector cannot cross the wrapper's shadow boundary.
+   */
   preview = input<unknown>(undefined);
+  /**
+   * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
+   */
   options = input<Record<string, any>>((() => ({}))());
   imageEl = viewChild<ElementRef<HTMLElement>>('imageEl');
   ready = output<void>();

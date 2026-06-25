@@ -31,9 +31,23 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class RecaptchaV3 {
+  /**
+   * Required. The public reCAPTCHA v3 site key from your Google admin console.
+   */
   sitekey = input.required<string>();
+  /**
+   * The default action label reported to reCAPTCHA's risk analysis (e.g. `submit`, `login`). Overridable per call via `execute(action)`.
+   */
   action = input<string>('submit');
+  /**
+   * The latest verification token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written on each successful `execute()` — read it to attach the fresh token to your request.
+   * @example
+   * <RecaptchaV3 r-model:token="token" sitekey="…" action="signup" />
+   */
   token = model<string>('');
+  /**
+   * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
+   */
   executeOnMount = input<boolean>(false);
   error = output<unknown>();
   verify = output<unknown>();

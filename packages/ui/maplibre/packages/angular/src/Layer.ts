@@ -22,11 +22,31 @@ function rozieToken(key: string): InjectionToken<unknown> {
   `,
 })
 export class Layer {
+  /**
+   * The MapLibre layer id (required). Identifies the layer in the parent `<MapLibre>` registry and the underlying style.
+   * @example
+   * <Layer id="circles" type="circle" :paint="{ 'circle-radius': 5 }" />
+   */
   id = input.required<string>();
+  /**
+   * The `LayerSpecification.type` — `'circle'` / `'fill'` / `'line'` / `'symbol'` / `'raster'` / `'background'` / … A `'background'` layer needs no source; every other type requires a `source` (explicit or injected from a parent `<Source>`).
+   */
   type = input<string>(undefined);
+  /**
+   * The layer's `paint` properties (the `LayerSpecification.paint` object, e.g. `{ 'line-color': '#e11', 'line-width': 3 }`). Changes are reconciled via `setPaintProperty` with no remount.
+   */
   paint = input<unknown>(undefined);
+  /**
+   * The layer's `layout` properties (the `LayerSpecification.layout` object, e.g. `{ 'line-cap': 'round' }`). Changes are reconciled via `setLayoutProperty` with no remount.
+   */
   layout = input<unknown>(undefined);
+  /**
+   * Explicit source id for the flat shape (a background layer needs none, or a cross-source reference). When omitted inside a `<Source>`, the injected source context supplies the id automatically.
+   */
   source = input<string>(undefined);
+  /**
+   * Insert this layer immediately **before** the layer with this id, controlling draw order (the `addLayer` `beforeId` argument). Omit to append on top.
+   */
   beforeId = input<string>(undefined);
   srcCtx = inject(rozieToken('maplibre:source'), { optional: true }) ?? null;
   layers = inject(rozieToken('maplibre:layers'));

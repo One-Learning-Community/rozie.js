@@ -16,10 +16,24 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
 
 @customElement('rozie-recaptcha-v3')
 export default class RecaptchaV3 extends SignalWatcher(LitElement) {
+  /**
+   * Required. The public reCAPTCHA v3 site key from your Google admin console.
+   */
   @property({ type: String, reflect: true }) sitekey!: string;
+  /**
+   * The default action label reported to reCAPTCHA's risk analysis (e.g. `submit`, `login`). Overridable per call via `execute(action)`.
+   */
   @property({ type: String, reflect: true }) action: string = 'submit';
+  /**
+   * The latest verification token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written on each successful `execute()` — read it to attach the fresh token to your request.
+   * @example
+   * <RecaptchaV3 r-model:token="token" sitekey="…" action="signup" />
+   */
   @property({ type: String, attribute: 'token' }) _token_attr: string = '';
   private _tokenControllable = createLitControllableProperty<string>({ host: this, eventName: 'token-change', defaultValue: '', initialControlledValue: undefined });
+  /**
+   * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
+   */
   @property({ type: Boolean, reflect: true }) executeOnMount: boolean = false;
 
   private _disconnectCleanups: Array<() => void> = [];

@@ -10,11 +10,29 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
   `,
 })
 export class EditorCheckbox {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label`.
+   */
   columnId = input<string>('');
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   column = input<(unknown) | null>(null);
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   row = input<(unknown) | null>(null);
+  /**
+   * The current cell value — coerced to a real boolean via `!!` to seed the checkbox `checked` state.
+   */
   value = input<(unknown) | null>(null);
+  /**
+   * `(value) => void` — commit the cell. This editor immediately commits the boolean checked state on `@change`. Null-guarded at call sites.
+   */
   commit = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+   */
   cancel = input<((...args: unknown[]) => unknown) | null>(null);
 
   onChange = (e: any) => {

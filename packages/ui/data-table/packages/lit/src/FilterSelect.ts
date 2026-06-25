@@ -6,10 +6,25 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-filter-select')
 export default class FilterSelect extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#filter` slot scope) — used as the filter key and the select `aria-label`.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#filter` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The current column filter value the select seeds from (String-coerced).
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.
+   */
   @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
+   */
   @property({ type: Array }) uniqueValues: any[] = [];
 
   private _disconnectCleanups: Array<() => void> = [];

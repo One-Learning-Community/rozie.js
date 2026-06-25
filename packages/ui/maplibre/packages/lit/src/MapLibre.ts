@@ -43,34 +43,111 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   }
 `;
 
+  /**
+   * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
+   * @example
+   * <MapLibre r-model:center="center" r-model:zoom="zoom" />
+   */
   @property({ type: Array, attribute: 'center' }) _center_attr: any[] = [0, 0];
   private _centerControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'center-change', defaultValue: [0, 0], initialControlledValue: undefined });
+  /**
+   * The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.
+   */
   @property({ type: Number, attribute: 'zoom' }) _zoom_attr: number = 1;
   private _zoomControllable = createLitControllableProperty<number>({ host: this, eventName: 'zoom-change', defaultValue: 1, initialControlledValue: undefined });
+  /**
+   * The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.
+   */
   @property({ type: Number, attribute: 'bearing' }) _bearing_attr: number = 0;
   private _bearingControllable = createLitControllableProperty<number>({ host: this, eventName: 'bearing-change', defaultValue: 0, initialControlledValue: undefined });
+  /**
+   * The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.
+   */
   @property({ type: Number, attribute: 'pitch' }) _pitch_attr: number = 0;
   private _pitchControllable = createLitControllableProperty<number>({ host: this, eventName: 'pitch-change', defaultValue: 0, initialControlledValue: undefined });
+  /**
+   * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
+   */
   @property({ type: Object }) mapStyle: unknown = undefined;
+  /**
+   * Minimum zoom level. Applied at construction and via `setMinZoom` on change.
+   */
   @property({ type: Number, reflect: true }) minZoom: number = 0;
+  /**
+   * Maximum zoom level. Applied at construction and via `setMaxZoom` on change.
+   */
   @property({ type: Number, reflect: true }) maxZoom: number = 22;
+  /**
+   * A `LngLatBoundsLike` the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear).
+   */
   @property({ type: Object }) maxBounds: unknown = undefined;
+  /**
+   * **Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`.
+   */
   @property({ type: Object }) bounds: unknown = undefined;
+  /**
+   * **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.).
+   */
   @property({ type: Object }) fitBoundsOptions: any = {};
+  /**
+   * Toggle drag-to-pan. Applied at construction and reconciled live via the handler's `enable()` / `disable()`.
+   */
   @property({ type: Boolean, reflect: true }) dragPan: boolean = true;
+  /**
+   * Toggle right-drag / ctrl-drag rotation. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) dragRotate: boolean = true;
+  /**
+   * Toggle scroll-wheel zoom. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) scrollZoom: boolean = true;
+  /**
+   * Toggle double-click zoom. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) doubleClickZoom: boolean = true;
+  /**
+   * Toggle shift-drag box zoom. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) boxZoom: boolean = true;
+  /**
+   * Toggle keyboard navigation. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) keyboard: boolean = true;
+  /**
+   * Toggle touch pinch-zoom + rotate. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) touchZoomRotate: boolean = true;
+  /**
+   * Toggle two-finger touch pitch. Applied at construction and reconciled live.
+   */
   @property({ type: Boolean, reflect: true }) touchPitch: boolean = true;
+  /**
+   * The marker data that drives the reactive multi-instance `marker` slot — one entry per marker (`{ lng, lat, id?, anchor?, offset?, draggable?, ... }`). One portal handle mounts per entry; changing the array reconciles markers keep / update / dispose with no remount. Only meaningful when the `marker` slot is filled.
+   */
   @property({ type: Array }) markers: any[] = [];
+  /**
+   * The popup data that drives the reactive multi-instance `popup` slot — one entry per popup (`{ lng, lat, id?, anchor?, offset?, closeButton?, closeOnClick?, ... }`). One portal handle mounts per entry. Only meaningful when the `popup` slot is filled.
+   */
   @property({ type: Array }) popups: any[] = [];
+  /**
+   * Declarative GeoJSON / vector / raster sources — `[{ id, spec }]` (or a bare `SourceSpecification` carrying an `id`). Reconciled into the live style (add / `setData` / remove) once the style has loaded. The config-array authoring shape for sources; declarative `<Source>` / `<Layer>` children are the alternative shape (both feed the same registry).
+   */
   @property({ type: Array }) sources: any[] = [];
+  /**
+   * Declarative layers — `LayerSpecification[]` (each with an `id`). Reconciled into the live style (add / `setPaintProperty` / `setLayoutProperty` / remove) once the style has loaded; `beforeId` controls draw order.
+   */
   @property({ type: Array }) layers: any[] = [];
+  /**
+   * Layer ids whose feature `mouseenter` / `mouseleave` fire the `@mouseenter` / `@mouseleave` events (populating `e.features`). Registered / unregistered per id on change.
+   */
   @property({ type: Array }) interactiveLayerIds: any[] = [];
+  /**
+   * Standard map controls — strings (`'navigation'` / `'geolocate'` / `'scale'` / `'fullscreen'` / `'attribution'`) or `{ type, position?, options? }` objects. Reconciled (remove-all + re-add) on change.
+   */
   @property({ type: Array }) controls: any[] = [];
+  /**
+   * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
+   */
   @property({ type: Object }) options: any = {};
   private _sourceReg = signal({});
   private _layerReg = signal({});

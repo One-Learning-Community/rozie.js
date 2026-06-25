@@ -4,11 +4,29 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 
 @customElement('rozie-editor-checkbox')
 export default class EditorCheckbox extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label`.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) row: unknown = null;
+  /**
+   * The current cell value — coerced to a real boolean via `!!` to seed the checkbox `checked` state.
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(value) => void` — commit the cell. This editor immediately commits the boolean checked state on `@change`. Null-guarded at call sites.
+   */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+   */
   @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
 
   private _disconnectCleanups: Array<() => void> = [];

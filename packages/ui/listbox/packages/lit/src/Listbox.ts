@@ -108,19 +108,60 @@ export default class Listbox extends SignalWatcher(LitElement) {
 .rozie-listbox-empty[data-rozie-s-b576227a] { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }
 `;
 
+  /**
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
+   */
   @property({ type: Array }) options: any[] = [];
+  /**
+   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Listbox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
+   * @example
+   * <Listbox r-model:value="fruit" :options="fruits" />
+   */
   @property({ type: Object, attribute: 'value' }) _value_attr: unknown = null;
   private _valueControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'value-change', defaultValue: null, initialControlledValue: undefined });
+  /**
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit.
+   */
   @property({ type: Boolean, reflect: true }) multiple: boolean = false;
+  /**
+   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
+   */
   @property({ type: Boolean, reflect: true }) combobox: boolean = false;
+  /**
+   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
+   */
   @property({ type: Boolean, reflect: true }) filterable: boolean = true;
+  /**
+   * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
+   */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Placeholder text shown in the empty control.
+   */
   @property({ type: String, reflect: true }) placeholder: string = '';
+  /**
+   * Close the popup after a single-select commit. Defaults `true`; multi-select keeps the popup open regardless of this setting.
+   */
   @property({ type: Boolean, reflect: true }) closeOnSelect: boolean = true;
+  /**
+   * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+   */
   @property({ type: Function }) optionLabel: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   */
   @property({ type: Function }) optionValue: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+   */
   @property({ type: Function }) optionDisabled: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
+   */
   @property({ type: String, reflect: true }) id: string = 'rozie-listbox';
+  /**
+   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   */
   @property({ type: String, reflect: true }) ariaLabel: string = null;
   private _open$local = signal(false);
   private _activeIndex = signal(-1);

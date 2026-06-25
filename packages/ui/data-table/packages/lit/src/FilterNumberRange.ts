@@ -5,10 +5,25 @@ import { rozieAttr } from '@rozie/runtime-lit';
 
 @customElement('rozie-filter-number-range')
 export default class FilterNumberRange extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label` base.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#filter` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The current column filter value (`[min, max]` tuple or null) the two inputs seed from (setup-once).
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(columnId, value) => void` — apply the column filter as a `[min, max]` tuple (each side coerced to a Number or `undefined`, so a one-sided range works); both empty clears the filter. Null-guarded at call sites.
+   */
   @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
+   */
   @property({ type: Object }) minMax: unknown = null;
   private _minDraft = signal('');
   private _maxDraft = signal('');

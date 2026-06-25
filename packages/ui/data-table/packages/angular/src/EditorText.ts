@@ -10,11 +10,29 @@ import { Component, ViewEncapsulation, input, signal } from '@angular/core';
   `,
 })
 export class EditorText {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label` fallback.
+   */
   columnId = input<string>('');
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   column = input<(unknown) | null>(null);
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   row = input<(unknown) | null>(null);
+  /**
+   * The current cell value the editor seeds its local draft from (setup-once).
+   */
   value = input<(unknown) | null>(null);
+  /**
+   * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   commit = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
+   */
   cancel = input<((...args: unknown[]) => unknown) | null>(null);
   draft = signal('');
 

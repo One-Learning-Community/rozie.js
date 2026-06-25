@@ -4,11 +4,29 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 
 @customElement('rozie-editor-date')
 export default class EditorDate extends SignalWatcher(LitElement) {
+  /**
+   * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label`.
+   */
   @property({ type: String, reflect: true }) columnId: string = '';
+  /**
+   * The table-core column object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) column: unknown = null;
+  /**
+   * The consumer's row data object (opaque passthrough from the `#editor` slot scope).
+   */
   @property({ type: Object }) row: unknown = null;
+  /**
+   * The current cell value the local draft seeds from (setup-once); String-coerced to an ISO `YYYY-MM-DD` string for the native date input.
+   */
   @property({ type: Object }) value: unknown = null;
+  /**
+   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+   */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * `() => void` — revert the edit (Escape). Null-guarded at call sites.
+   */
   @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
   private _draft = signal('');
 

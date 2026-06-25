@@ -15,6 +15,11 @@ interface RozieBodySlotCtx {
 
 @customElement('rozie-node-type')
 export default class NodeType extends SignalWatcher(LitElement) {
+  /**
+   * The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.
+   * @example
+   * <NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
+   */
   @property({ type: String, reflect: true }) type!: string;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();

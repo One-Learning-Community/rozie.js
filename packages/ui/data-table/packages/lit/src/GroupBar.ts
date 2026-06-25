@@ -6,9 +6,21 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-group-bar')
 export default class GroupBar extends SignalWatcher(LitElement) {
+  /**
+   * The ordered active grouping key array (read-only source of truth from the `#groupBar` slot scope). This drop-in never keeps its own copy — it always reads this and writes through `applyGrouping` / `clearGrouping`.
+   */
   @property({ type: Array }) grouping: any[] = [];
+  /**
+   * The columns offered as grouping targets — `[{ id, label }]` — rendered as draggable chips.
+   */
   @property({ type: Array }) groupableColumns: any[] = [];
+  /**
+   * `(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.
+   */
   @property({ type: Function }) applyGrouping: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * `() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.
+   */
   @property({ type: Function }) clearGrouping: ((...args: unknown[]) => unknown) | null = null;
   private _draggingId = signal('');
 
