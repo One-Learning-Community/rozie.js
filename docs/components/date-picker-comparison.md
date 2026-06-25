@@ -18,8 +18,9 @@ accessibility quality**.
 `.rozie` source → six idiomatic, accessible packages with **one** API
 (`value` model, `min`/`max`/`disabledDates`, roving-grid keyboard nav, a
 `#header` slot, a `focus`/`goToToday`/`clear` handle). It does **less** than the
-feature-deep incumbents on purpose — single calendar date, headless,
-token-themed — and that scope is stated plainly below, not hidden.
+feature-deep incumbents on purpose — single-date **or range** selection (with
+preset shortcuts), headless, token-themed — and that scope is stated plainly
+below, not hidden.
 
 > Research snapshot: **2026-06-24**. Versions, publish dates, and weekly-download
 > figures were verified live against the npm registry (`registry.npmjs.org`) and
@@ -34,7 +35,7 @@ partial / stale / lightly-documented.
 
 | Library | Framework(s) | Headless? | WAI-ARIA a11y | Maintained (latest / date) | Range / time | Notes |
 | --- | --- | :---: | :---: | --- | :---: | --- |
-| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | this repo (2026-06) | ✗ single-date only | One source → six idiomatic packages, one API. |
+| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | this repo (2026-06) | range ✓ / time ✗ | One source → six idiomatic packages, one API. Single + range selection with presets; no time-of-day. |
 | [react-datepicker](https://github.com/Hacker0x01/react-datepicker) | React | ✗ styled | ~ keyboard, partial ARIA | 9.1.0 / 2025-12 | ✓ / ✓ | ~4.7M wk. The popular default; opinionated CSS. |
 | [react-day-picker](https://daypicker.dev) | React | ~ restyleable | ✓ follows APG | 10.0.1 / 2026-05 | range ✓ / time ✗ | Strong a11y; non-Gregorian calendars. Powers shadcn/ui's calendar. |
 | [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) | React | ✗ Material | ✓ documented WCAG/ARIA | 9.6.0 / 2026-06 | time ✓ / **range Pro-only** | Date/time/datetime free; **range pickers are commercial**. |
@@ -107,15 +108,17 @@ This page is honest about where the incumbents win — that's what keeps it
 credible.
 
 - **You ship one framework and want maximum features.** If you're React-only and
-  need ranges, time, and presets,
+  need **time-of-day, month/year/multi-calendar, or non-Gregorian systems**,
   [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) or
   [react-datepicker](https://github.com/Hacker0x01/react-datepicker) out-feature
-  Rozie's v1 outright (note MUI's *range* pickers are a commercial Pro tier).
-  Vue-only? [@vuepic/vue-datepicker](https://vue3datepicker.com) is deeper.
-  Angular-only with a time requirement? [PrimeNG](https://primeng.org/datepicker).
-- **You need a range or date-time picker today.** Rozie's v1 is single-date only.
-  Reach for flatpickr, @vuepic, MUI X, PrimeNG, react-day-picker (range),
-  bits-ui, or Cally (range) instead.
+  Rozie outright (note MUI's *range* pickers are a commercial Pro tier — Rozie's
+  range is free and on all six frameworks). Vue-only?
+  [@vuepic/vue-datepicker](https://vue3datepicker.com) is deeper. Angular-only
+  with a time requirement? [PrimeNG](https://primeng.org/datepicker).
+- **You need a date-*time* or multi-date picker today.** Rozie ships single-date
+  and date-**range** selection (with presets), but **not** time-of-day or
+  arbitrary multi-date. Reach for flatpickr, @vuepic, MUI X, or PrimeNG (time)
+  instead.
 - **You want the absolute accessibility ceiling on React.**
   [react-aria](https://react-spectrum.adobe.com/react-aria/useDatePicker.html)'s
   date hooks are the gold standard (13 calendar systems, touch screen-reader
@@ -132,11 +135,13 @@ credible.
 
 Rozie's scope is narrow on purpose; framing it as deliberate is the honest move.
 
-- **Not a range / multi-date / date-time picker.** v1 is a single calendar date
-  (`value` is one ISO `YYYY-MM-DD` string). Ranges, time-of-day, multi-select,
-  and preset shortcuts are **out of scope** — areas where flatpickr, @vuepic,
-  MUI X, PrimeNG, and react-day-picker lead. (See the
-  [`value` prop + scope notes](/components/date-picker-api#props).)
+- **Not a date-time or arbitrary multi-date picker.** It selects a single date
+  *or* a date **range** — `value` is one ISO `YYYY-MM-DD` string in single mode,
+  or `{ start, end }` in `selectionMode="range"`, with optional preset shortcuts
+  (`presetRanges` + a `#presets` slot). **Time-of-day and arbitrary multi-date
+  (3+ discrete dates) remain out of scope** — areas where flatpickr, @vuepic,
+  MUI X, and PrimeNG lead. (See the
+  [`selectionMode` + `value` prop notes](/components/date-picker-api#props).)
 - **Not a popover/input combo.** It is the **calendar surface** — compose it
   inside your own field + popover (e.g. [`@rozie-ui/popover`](/components/popover))
   when you want a dropdown date field. Staying headless is what lets it drop into
@@ -165,7 +170,8 @@ is the point:
 | Two-way value + form binding | ✓ ISO `value` model + Angular `ControlValueAccessor` on all six | ~ per-framework idiom |
 | Imperative handle | ✓ uniform `focus()` / `goToToday()` / `clear()` | ~ varies per library |
 | Date-library dependency | ✓ none (UTC-safe internal helper) | ~ frequently `date-fns` / `dayjs` / `luxon` |
-| Range / time / presets | ✗ single-date only (deliberate) | ✓ many lead here |
+| Range selection + presets | ✓ `selectionMode="range"` + `presetRanges`/`#presets`, all six | ✓ many lead here |
+| Time-of-day / arbitrary multi-date | ✗ out of scope (deliberate) | ✓ many lead here |
 
 ## See also
 
