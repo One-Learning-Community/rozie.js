@@ -1101,22 +1101,15 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 // .planning/todos/pending/lit-emitter-hoist-pure-literal-component-props.md.
 const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 
-// @rozie-ui/resizable — the ResizableScreenshot · solid cell is gated here as a
-// REAL Solid emitter bug (NOT accepted divergence). ROOT-CAUSED 2026-06-25 via the
-// Linux-Docker bare verification (17 passed / 1 failed): the Resizable component
-// positions its two panels with an inline `:style="sizeStyle()"` object that sets a
-// CSS CUSTOM PROPERTY (`--rozie-resizable-size: 50%`). The Solid emitter lowers that
-// to `style={parseInlineStyle(sizeStyle())}`, and `@rozie/runtime-solid`'s
-// `parseInlineStyle` helper does NOT pass through `--custom-property` keys — so on
-// Solid the variable is dropped, the start panel's `width: var(--rozie-resizable-size,
-// 50%)` collapses to its content width (~90px) instead of the 50% split, and the cell
-// diffs from the shared baseline by 207px. The other 5 targets (vue/react/svelte/
-// angular/lit) render the 50% split byte-identically and pass. This affects EVERY
-// Solid consumer that binds a CSS custom property via a `:style` object — a
-// cross-cutting `@rozie/runtime-solid` bug to fix in the helper (preserve `--*` keys),
-// NOT a Resizable-specific or demo-specific issue. Until the runtime fix lands the one
-// Solid cell fixme-gates (never red); the cell + the 5-target baseline still run.
-const RESIZABLE_SOLID_STYLE_VAR_TODO = new Set<string>(['ResizableScreenshot::solid']);
+// NOTE: ResizableScreenshot · solid was briefly gated here (2026-06-25) on a
+// MISDIAGNOSIS — it was blamed on `@rozie/runtime-solid`'s `parseInlineStyle`
+// dropping a `--custom-property` from a `:style` object. The real cause was the
+// Solid emitter emitting both `class={…}` and `classList={…}` on the same
+// element: Solid's `el.className=…` setter clobbered the `classList.toggle()`
+// conditional classes, so the `--horizontal` layout class never applied and the
+// start panel collapsed to content width. Fixed in emitTemplateAttribute.ts
+// (object `:class` merges into the single `class=` via rozieClass, no classList=);
+// the cell now runs and passes on all six targets. See feedback_snapshot_tests_cement_bugs.
 
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
@@ -1137,19 +1130,12 @@ for (const example of EXAMPLES) {
     const maplibreLitScreenshotTodo = MAPLIBRE_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
-    // ResizableScreenshot · solid — REAL @rozie/runtime-solid parseInlineStyle bug
-    // (CSS custom property dropped from a :style object); documented above. NOT
-    // accepted divergence; gated until the runtime helper preserves `--*` keys.
-    const resizableSolidStyleVarTodo = RESIZABLE_SOLID_STYLE_VAR_TODO.has(
-      `${example}::${target}`,
-    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
-      maplibreLitScreenshotTodo ||
-      resizableSolidStyleVarTodo
+      maplibreLitScreenshotTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {

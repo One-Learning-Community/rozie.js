@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
 
 // ---- derived view (plain functions, uniform ×6) ------------------------
@@ -241,7 +241,7 @@ export default function Resizable(_props: ResizableProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging(), 'rozie-resizable--disabled': local.disabled }} ref={(el) => { rootRef = el as HTMLElement; }} style={parseInlineStyle(sizeStyle())} {...attrs} class={"rozie-resizable" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8330bc5a="">
+    <div ref={(el) => { rootRef = el as HTMLElement; }} style={parseInlineStyle(sizeStyle())} {...attrs} class={"rozie-resizable" + " " + rozieClass({ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging(), 'rozie-resizable--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8330bc5a="">
       
       <div class={"rozie-resizable-panel rozie-resizable-panel--start"} data-rozie-s-8330bc5a="">
         {(_props.startSlot ?? _props.slots?.['start']?.({}))}

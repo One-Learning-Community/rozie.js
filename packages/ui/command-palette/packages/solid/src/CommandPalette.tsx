@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
@@ -320,7 +320,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         </div>
 
         {<Show when={filteredItems().length > 0}><ul class={"rozie-command-palette-list"} id={rozieAttr(listId())} role="listbox" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
-          <For each={filteredItems()}>{(item) => <li role="option" aria-selected={item._i === activeIndex()} aria-disabled={!!item.disabled} class={"rozie-command-palette-option"} classList={{ 'rozie-command-palette-option--active': item._i === activeIndex(), 'rozie-command-palette-option--disabled': item.disabled }} id={rozieAttr(optId(item._i))} onMouseDown={($event) => { $event.preventDefault(); selectItem(item); }} onMouseEnter={($event) => { setActiveIndex(item._i); }} data-rozie-s-768cad96="">
+          <For each={filteredItems()}>{(item) => <li role="option" aria-selected={item._i === activeIndex()} aria-disabled={!!item.disabled} class={"rozie-command-palette-option" + " " + rozieClass({ 'rozie-command-palette-option--active': item._i === activeIndex(), 'rozie-command-palette-option--disabled': item.disabled })} id={rozieAttr(optId(item._i))} onMouseDown={($event) => { $event.preventDefault(); selectItem(item); }} onMouseEnter={($event) => { setActiveIndex(item._i); }} data-rozie-s-768cad96="">
             {(_props.itemSlot ?? _props.slots?.['item'])?.({ item, active: item._i === activeIndex() }) ?? <><span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(item.label)}</span>{<Show when={item.group}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(item.group)}</span></Show>}</>}
           </li>}</For>
         </ul></Show>}{<Show when={filteredItems().length === 0}><div class={"rozie-command-palette-empty"} data-rozie-s-768cad96="">

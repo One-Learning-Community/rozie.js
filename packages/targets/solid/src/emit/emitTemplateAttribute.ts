@@ -397,8 +397,12 @@ function composeClassValue(
   if (attrs.length === 1 && attrs[0]!.kind === 'binding') {
     const a = attrs[0]!;
     if (t.isObjectExpression(a.expression)) {
-      // Object form: { active: isActive } → keep as-is (no styles lookup)
-      return renderExpr(a.expression, ir, exprOpts);
+      // Object form: { active: isActive } → rozieClass({ active: isActive() })
+      // so it renders a space-joined string for `class=`. We never emit a
+      // separate `classList=` (Solid's className setter would clobber it when a
+      // static class coexists — the systemic class/classList conflict).
+      runtime?.add('rozieClass');
+      return `rozieClass(${renderExpr(a.expression, ir, exprOpts)})`;
     }
     // A non-provably-string single `:class` binding (array/identifier/member/
     // call/conditional — `wrapForDisplay=true`) is normalized through
@@ -466,7 +470,10 @@ function composeClassValue(
       // it needs no extra parens in the `+ " " +` concat. Provably-string
       // members AND template literals (provably a string) stay the
       // byte-identical parenthesized raw form.
-      if (a.wrapForDisplay && !t.isTemplateLiteral(a.expression)) {
+      if ((a.wrapForDisplay || t.isObjectExpression(a.expression)) && !t.isTemplateLiteral(a.expression)) {
+        // Object-form `:class` and other non-provably-string bindings normalize
+        // through rozieClass (clsx-style) so they join the class string as a
+        // valid space-joined token list — never a separate classList=.
         runtime?.add('rozieClass');
         parts.push(`rozieClass(${renderExpr(a.expression, ir, exprOpts)})`);
       } else {
@@ -987,12 +994,17 @@ export function emitAttributes(
       continue;
     }
 
-    // Solid uses `class=` not `className=`. Bucket all class attrs together.
-    // Object-form `:class="{ active: isActive }"` → `classList={{ active: isActive() }}`
-    // (Solid's classList= accepts an object; class= only accepts strings.)
+    // Solid uses `class=` not `className=`. Bucket ALL class attrs (static,
+    // interpolated, string-binding, AND object-form `:class="{ active: x }"`)
+    // into a SINGLE `class=` value. We deliberately do NOT emit a separate
+    // `classList=`: Solid applies `class` via `el.className = …`, which WIPES
+    // any classes a sibling `classList.toggle()` set on the same element — so an
+    // element carrying both a static class and an object `:class` silently lost
+    // its conditional classes. Object forms are normalized through `rozieClass`
+    // (clsx-style: truthy keys → space-joined string) inside composeClassValue,
+    // so they merge into the one class string instead of fighting it.
     if (a.name === 'class') {
       const bucketAttrs = buckets.get('class') ?? [];
-      const classListAttrs: AttributeBinding[] = [];
       const classStrAttrs: AttributeBinding[] = [];
       // Walk the FULL attrs list to preserve source order — at each spread
       // position with a literal class, insert the synthetic class binding so
@@ -1005,14 +1017,11 @@ export function emitAttributes(
         }
         if (!bucketAttrs.includes(src)) continue;
         if (consumed.has(src)) continue;
-        if (src.kind === 'binding' && t.isObjectExpression(src.expression)) {
-          classListAttrs.push(src);
-        } else {
-          classStrAttrs.push(src);
-        }
+        classStrAttrs.push(src);
         consumed.add(src);
       }
-      // Emit `class=` for string/interpolated attrs.
+      // Emit a single `class=` for all class sources (object forms wrapped in
+      // rozieClass by composeClassValue).
       if (classStrAttrs.length > 0) {
         let classValue = composeClassValue(classStrAttrs, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams }, ctx.collectors.runtime);
         if (needsPostSpreadClass) {
@@ -1028,11 +1037,6 @@ export function emitAttributes(
         } else {
           out.push(`class={${classValue}}`);
         }
-      }
-      // Emit `classList=` for each object-form `:class` binding.
-      for (const cla of classListAttrs) {
-        const exprCode = renderExpr((cla as Extract<AttributeBinding, { kind: 'binding' }>).expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
-        out.push(`classList={${exprCode}}`);
       }
       continue;
     }

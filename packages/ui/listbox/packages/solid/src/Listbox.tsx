@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createMemo, createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Listbox-b576227a', `.rozie-listbox[data-rozie-s-b576227a] {
   position: relative;
@@ -455,7 +455,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled }} {...attrs} class={"rozie-listbox" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
+    <div {...attrs} class={"rozie-listbox" + " " + rozieClass({ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">
@@ -466,7 +466,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
       
       {<Show when={open$local()}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
-        <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-listbox-option"} classList={{ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index()); }} data-rozie-s-b576227a="">
+        <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) })} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index()); }} data-rozie-s-b576227a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt, index: index(), active: activeIndex() === index(), selected: isSelected(opt), disabled: disabledOf(opt) }) ?? rozieDisplay(labelOf(opt))}
         </div>}</For>
 

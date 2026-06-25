@@ -175,6 +175,18 @@
             'FlowCanvasAdvanced',
 
             'DataTableColumns',
+            // Headless pure-Rozie families (added 2026-06-25): date-picker,
+            // resizable, command-palette. Behavior + Screenshot cell each.
+            // NOTE: ResizableScreenshot currently renders WRONG on SOLID — the
+            // first panel collapses to min instead of the pinned :size="50"
+            // (size() is non-number at first paint on Solid only). Flagged for
+            // debug — compare the six targets here.
+            'DatePickerBehavior',
+            'DatePickerScreenshot',
+            'ResizableBehavior',
+            'ResizableScreenshot',
+            'CommandPaletteBehavior',
+            'CommandPaletteScreenshot',
           ],
         },
       ];

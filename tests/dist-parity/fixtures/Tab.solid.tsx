@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, splitProps, useContext } from 'solid-js';
-import { __rozieInjectStyle, mergeListeners, rozieAttr, rozieContext } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, mergeListeners, rozieAttr, rozieClass, rozieContext } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Tab-18645a16', `.tab[data-rozie-s-18645a16] {
   font-family: system-ui, -apple-system, sans-serif;
@@ -29,7 +29,7 @@ export default function Tab(_props: TabProps): JSX.Element {
 
   return (
     <>
-    <button classList={{ 'is-active': tabs && tabs.active === local.index }} data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === local.index)} {...attrs} class={"tab" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { tabs && tabs.setActive(local.index); } }, attrs)} data-rozie-s-18645a16="">
+    <button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === local.index)} {...attrs} class={"tab" + " " + rozieClass({ 'is-active': tabs && tabs.active === local.index }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { tabs && tabs.setActive(local.index); } }, attrs)} data-rozie-s-18645a16="">
       {local.label}
     </button>
     </>

@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createMemo, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Slider-4e6f0be6', `.rozie-slider[data-rozie-s-4e6f0be6] {
   position: relative;
@@ -429,7 +429,7 @@ export default function Slider(_props: SliderProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-slider--vertical': local.orientation === 'vertical', 'rozie-slider--horizontal': local.orientation !== 'vertical', 'rozie-slider--range': local.range, 'rozie-slider--disabled': local.disabled }} style={parseInlineStyle(fillStyle())} {...attrs} class={"rozie-slider" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4e6f0be6="">
+    <div style={parseInlineStyle(fillStyle())} {...attrs} class={"rozie-slider" + " " + rozieClass({ 'rozie-slider--vertical': local.orientation === 'vertical', 'rozie-slider--horizontal': local.orientation !== 'vertical', 'rozie-slider--range': local.range, 'rozie-slider--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4e6f0be6="">
       
       <div class={"rozie-slider-track"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         <div class={"rozie-slider-fill"} data-rozie-s-4e6f0be6="" />

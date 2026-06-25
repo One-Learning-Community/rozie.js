@@ -20,7 +20,7 @@ export default function ClassNormShapes(_props: ClassNormShapesProps): JSX.Eleme
         <span class={"static-a static-b" + " " + ('lit-a lit-b')} data-rozie-s-8915b51f="">string literal</span>
         <span class={local.variant} data-rozie-s-8915b51f="">string-typed prop</span>
         <span class={rozieClass(['arr-a', local.variant])} data-rozie-s-8915b51f="">array literal</span>
-        <span classList={{ active: cond() }} data-rozie-s-8915b51f="">object literal</span>
+        <span class={rozieClass({ active: cond() })} data-rozie-s-8915b51f="">object literal</span>
         <span class={rozieClass(local.arr)} data-rozie-s-8915b51f="">array via prop</span>
         <span class={rozieClass(local.flags)} data-rozie-s-8915b51f="">object via prop</span>
         <span class={"base" + " " + rozieClass(local.arr)} data-rozie-s-8915b51f="">static + dynamic merge</span>

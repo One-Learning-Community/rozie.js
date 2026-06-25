@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createSignal, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Tags-64848f8e', `.rozie-tags[data-rozie-s-64848f8e] {
   display: inline-flex;
@@ -334,7 +334,7 @@ export default function Tags(_props: TagsProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-tags--disabled': local.disabled, 'rozie-tags--readonly': local.readonly }} ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={local.ariaLabel} {...attrs} class={"rozie-tags" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-64848f8e="">
+    <div ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={local.ariaLabel} {...attrs} class={"rozie-tags" + " " + rozieClass({ 'rozie-tags--disabled': local.disabled, 'rozie-tags--readonly': local.readonly }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-64848f8e="">
       <ul class={"rozie-tags-list"} data-rozie-s-64848f8e="">
         <For each={tokens()}>{(t) => <li class={"rozie-tags-chip"} data-rozie-s-64848f8e="">
           {(_props.tagSlot ?? _props.slots?.['tag'])?.({ tag: t, index: tokens().indexOf(t), remove: () => removeAt(tokens().indexOf(t)) }) ?? <><span class={"rozie-tags-chip__label"} data-rozie-s-64848f8e="">{rozieDisplay(t)}</span>{<Show when={!local.readonly}><button type="button" aria-label={rozieAttr(removeLabel(t))} class={"rozie-tags-chip__remove"} disabled={!!local.disabled} onClick={($event) => { removeAt(tokens().indexOf(t)); }} data-rozie-s-64848f8e="">×</button></Show>}</>}

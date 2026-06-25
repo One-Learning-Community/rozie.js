@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -3518,7 +3518,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
         <button type="button" data-testid="flow-zoom-out" aria-label="Zoom out" class={"rozie-flow-controls__btn"} onClick={controlZoomOut} data-rozie-s-cd396d6a="">&#8722;</button>
         <button type="button" data-testid="flow-fit" aria-label="Fit view" class={"rozie-flow-controls__btn"} onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
         
-        {<Show when={local.marquee}><button type="button" data-testid="flow-mode" aria-label={rozieAttr(mode() === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} class={"rozie-flow-controls__btn"} classList={{ 'is-active': mode() === 'select' }} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode() === 'select' ? '▢' : '✥')}</button></Show>}</div></Show>}{<Show when={local.minimap}><div class={"rozie-flow-minimap"} ref={(el) => { minimapElRef = el as HTMLElement; }} data-testid="flow-minimap" data-rozie-s-cd396d6a="" /></Show>}<div class={"rozie-flow-marquee"} ref={(el) => { marqueeElRef = el as HTMLElement; }} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
+        {<Show when={local.marquee}><button type="button" data-testid="flow-mode" aria-label={rozieAttr(mode() === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} class={"rozie-flow-controls__btn" + " " + rozieClass({ 'is-active': mode() === 'select' })} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode() === 'select' ? '▢' : '✥')}</button></Show>}</div></Show>}{<Show when={local.minimap}><div class={"rozie-flow-minimap"} ref={(el) => { minimapElRef = el as HTMLElement; }} data-testid="flow-minimap" data-rozie-s-cd396d6a="" /></Show>}<div class={"rozie-flow-marquee"} ref={(el) => { marqueeElRef = el as HTMLElement; }} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
       
       {<Show when={local.nodeToolbar}><div class={"rozie-flow-toolbar"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" /></Show>}</div>
 

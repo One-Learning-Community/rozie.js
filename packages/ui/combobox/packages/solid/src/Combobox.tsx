@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] {
   position: relative;
@@ -274,11 +274,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': local.disabled }} {...attrs} class={"rozie-combobox" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9546115a="">
+    <div {...attrs} class={"rozie-combobox" + " " + rozieClass({ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9546115a="">
       <input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={local.ariaLabel} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-combobox-input"} value={query()} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
       {<Show when={isOpen() && filteredOptions().length > 0}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
-        <For each={filteredOptions()}>{(opt) => <li role="option" aria-selected={opt.value === value()} aria-disabled={!!opt.disabled} class={"rozie-combobox-option"} classList={{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }} id={rozieAttr(optId(opt._i))} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
+        <For each={filteredOptions()}>{(opt) => <li role="option" aria-selected={opt.value === value()} aria-disabled={!!opt.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled })} id={rozieAttr(optId(opt._i))} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt, active: opt._i === activeIndex(), selected: opt.value === value() }) ?? rozieDisplay(opt.label)}
         </li>}</For>
       </ul></Show>}</div>

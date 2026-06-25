@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, children, createMemo, createSignal, mergeProps, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('TodoList-52bec3de', `.todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
 ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
@@ -79,7 +79,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {<Show when={items().length > 0} fallback={<p class={"empty"} data-rozie-s-52bec3de="">
         {(_props.emptySlot ?? _props.slots?.['empty']?.({})) ?? "Nothing to do. ✨"}
       </p>}><ul data-rozie-s-52bec3de="">
-        <For each={items()}>{(item) => <li classList={{ done: item.done }} data-rozie-s-52bec3de="">
+        <For each={items()}>{(item) => <li class={rozieClass({ done: item.done })} data-rozie-s-52bec3de="">
           
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{rozieDisplay(item.text)}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>}</For>

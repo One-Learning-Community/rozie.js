@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('NumberField-ceb089aa', `.rozie-number-field[data-rozie-s-ceb089aa] {
   display: inline-flex;
@@ -385,7 +385,7 @@ export default function NumberField(_props: NumberFieldProps): JSX.Element {
 
   return (
     <>
-    <div classList={{ 'rozie-number-field--disabled': local.disabled }} {...attrs} class={"rozie-number-field" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-ceb089aa="">
+    <div {...attrs} class={"rozie-number-field" + " " + rozieClass({ 'rozie-number-field--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-ceb089aa="">
       <button type="button" aria-label="Decrement" class={"rozie-number-field-btn rozie-number-field-btn--dec"} tabIndex={-1} disabled={!!local.disabled || !!local.readonly} onPointerDown={($event) => { startHold(-1); }} onPointerUp={($event) => { stopHold(); }} onPointerLeave={($event) => { stopHold(); }} data-rozie-s-ceb089aa="">−</button>
 
       <input type="text" inputMode="decimal" autocomplete="off" role="spinbutton" aria-label={local.ariaLabel} aria-valuemin={local.min} aria-valuemax={local.max} aria-valuenow={modelValue()} aria-valuetext={rozieAttr(ariaText())} aria-disabled={!!local.disabled} ref={(el) => { inputRef = el as HTMLElement; }} class={"rozie-number-field-input"} value={displayText()} disabled={!!local.disabled} readOnly={!!local.readonly} onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} onPointerDown={($event) => { onScrubDown($event); }} onPointerMove={($event) => { onScrubMove($event); }} onPointerUp={($event) => { onScrubUp(); }} data-rozie-s-ceb089aa="" />
