@@ -1,0 +1,68 @@
+<!--
+  DatePickerRangeCompleteDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/date-picker family in RANGE mode (pure-Rozie, no engine).
+
+  This is the SEPARATE deterministic SCREENSHOT cell for a COMPLETED cross-month
+  range. Its sibling DatePickerRangeBehaviorDemo is the DRIVEN behavioral cell
+  (anchor + hover forward/backward preview, asserted at the DOM level by
+  date-picker-range-behavior.spec.ts). NEVER bolt pixels onto the behavioral one,
+  and never extend this one for behavior.
+
+  Made fully deterministic by:
+    1. selectionMode="range" + a FIXED completed range seeded in <data>
+       ({ start: '2025-05-28', end: '2025-06-04' }) bound r-model:value.
+       The DatePicker pins its view month to the range's `start` endpoint
+       (viewAnchor() fallback — a range DatePicker opened with a value shows that
+       range's month, NOT today). So the MAY 2025 grid renders run-to-run.
+    2. The May 2025 grid shows the in-month band tail (May 28-31, with the
+       range-START rounded cap) AND the trailing June spill (Jun 1-4, with the
+       range-END rounded cap on Jun 4) — a continuous band spanning the
+       month boundary. is-in-range fills the interior; is-range-start /
+       is-range-end cap the endpoints.
+    3. :weekStartsOn="0" + locale="en-US" pin the month-year heading + the
+       weekday header row so labels never localize-drift.
+    4. NO interactive controls and the control is never focused — no caret /
+       focus-ring to drift run-to-run.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated separately in pinned Linux Docker (NOT here — macOS
+  baselines are forbidden, feedback_vr_linux_baselines). Until it lands the matrix
+  cell auto-fixmes on baselineExists(). INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="DatePickerRangeCompleteDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  range: { start: '2025-05-28', end: '2025-06-04' },
+}
+</data>
+
+<template>
+<div class="date-picker-range-screenshot-demo">
+  <DatePicker
+    r-model:value="$data.range"
+    selectionMode="range"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-range-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>

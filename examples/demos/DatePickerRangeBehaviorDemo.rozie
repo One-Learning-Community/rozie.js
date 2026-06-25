@@ -1,0 +1,100 @@
+<!--
+  DatePickerRangeBehaviorDemo — VR DRIVEN behavioral cell for the
+  @rozie-ui/date-picker family in RANGE mode (pure-Rozie, no engine).
+
+  This is the NON-SNAPSHOT proof cell: date-picker-range-behavior.spec.ts drives
+  clicks + hover on its day cells and asserts the range / preview DOM classes
+  across all six targets. A static PNG cannot prove "the backward-preview band is
+  present BECAUSE of a backward hover" (SC-3 "never suppressed") — only a driven
+  DOM assertion can. Behavioral-only (NO pixel baseline — feedback_vr_linux_baselines:
+  a structural-only spec runs locally without Docker).
+
+  DETERMINISTIC VIEW MONTH: <data>.range is seeded to a COMPLETED June-2025 range
+  ({ start: '2025-06-10', end: '2025-06-15' }). The inner DatePicker pins its view
+  to the range's `start` endpoint (viewAnchor() fallback) → the JUNE 2025 grid
+  renders run-to-run, so the spec can address day cells by their stable
+  [data-day="2025-06-NN"] ISO attribute (every day <button> carries it, even spill
+  cells). Re-clicking any June day re-anchors within June (commitRange writes
+  $data.viewIso = clicked iso → same month), so the spec can re-drive
+  anchor/forward/backward/completed/reverse states without leaving June.
+
+  PRESET: :presetRanges supplies one literal preset whose range lies INSIDE the
+  June view ({ start: '2025-06-05', end: '2025-06-20' }) so that, after a preset
+  click, BOTH the active pill (is-active / aria-pressed) AND the matching
+  range-start / range-end day cells render in the visible grid (SC-4). Bound via
+  the PROPERTY form (:presetRanges) — Lit requires a property, never an attribute
+  (same as disabledDates); a literal range (no thunk) keeps it safe on all six.
+
+  COLLISION NOTE: the readout-helper is `applyRange`, NOT `setRange` — a set<X>
+  helper collapses onto the generated $data.range setter on React/Solid (ROZ524).
+  apply<X> is the listbox/data-table precedent (DatePickerBehaviorDemo applyDate).
+-->
+<rozie name="DatePickerRangeBehaviorDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  range: { start: '2025-06-10', end: '2025-06-15' },
+  presets: [
+    { label: 'Mid June', range: { start: '2025-06-05', end: '2025-06-20' } },
+  ],
+  lastComplete: '',
+}
+</data>
+
+<script>
+const onRangeComplete = (e) => {
+  const v = e && e.value ? e.value : { start: '', end: '' }
+  $data.lastComplete = (v.start || '') + '…' + (v.end || '')
+}
+const applyRange = (r) => {
+  $data.range = r
+}
+</script>
+
+<template>
+<div class="date-picker-range-demo">
+  <h3>DatePicker — range behavioral</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-start">{{ $data.range.start }}</span>
+    <span class="readout" data-testid="readout-end">{{ $data.range.end }}</span>
+    <span class="readout" data-testid="readout-complete">{{ $data.lastComplete }}</span>
+  </div>
+
+  <DatePicker
+    r-model:value="$data.range"
+    selectionMode="range"
+    :presetRanges="$data.presets"
+    :weekStartsOn="0"
+    locale="en-US"
+    @rangeComplete="onRangeComplete($event)"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-range-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+.date-picker-range-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.date-picker-range-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

@@ -745,6 +745,21 @@ export const EXAMPLES = [
   'DatePickerBehavior',
   'ResizableBehavior',
   'CommandPaletteBehavior',
+  // @rozie-ui/date-picker RANGE-mode cells (loaders →
+  // examples/demos/DatePickerRange{Complete,Behavior}Demo.rozie +
+  // DatePickerPresetActiveDemo.rozie). DatePickerRangeComplete + DatePickerPresetActive
+  // are deterministic INLINE SCREENSHOT cells (a completed cross-month band /
+  // an active preset pill) → standard mount-clipped matrix cells (matrix.spec.ts),
+  // each auto-fixme on baselineExists() until the Linux-Docker PNGs land
+  // (feedback_vr_linux_baselines). DatePickerRangeBehavior is the DRIVEN
+  // behavioral cell (forward/backward hover preview, completed-range endpoints,
+  // direction-agnostic, preset-active) asserted at the DOM level by
+  // specs/date-picker-range-behavior.spec.ts — NO pixel baseline. All three live
+  // under examples/demos/ (covered by the date-picker src root already registered
+  // for the Angular cross-tree AOT prebuild).
+  'DatePickerRangeComplete',
+  'DatePickerPresetActive',
+  'DatePickerRangeBehavior',
   // @rozie-ui/date-picker + resizable + command-palette SCREENSHOT cells (loaders →
   // examples/demos/{DatePicker,Resizable,CommandPalette}ScreenshotDemo.rozie).
   // DatePickerScreenshot pins value='2025-06-15' (its default month otherwise tracks
@@ -1018,6 +1033,12 @@ export const LIT_TAGS: Record<Example, string> = {
   DatePickerScreenshot: 'rozie-date-picker-screenshot',
   ResizableScreenshot: 'rozie-resizable-screenshot',
   CommandPaletteScreenshot: 'rozie-command-palette-screenshot',
+  // @rozie-ui/date-picker RANGE-mode cells — '-demo' appended on Lit → tags
+  // 'rozie-date-picker-range-complete-demo' etc. = kebab of
+  // DatePickerRange{Complete,Behavior}Demo / DatePickerPresetActiveDemo.
+  DatePickerRangeComplete: 'rozie-date-picker-range-complete',
+  DatePickerPresetActive: 'rozie-date-picker-preset-active',
+  DatePickerRangeBehavior: 'rozie-date-picker-range-behavior',
 };
 
 export interface HostQuery {
@@ -1334,6 +1355,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DatePickerScreenshot: {},
   ResizableScreenshot: {},
   CommandPaletteScreenshot: {},
+  // @rozie-ui/date-picker RANGE-mode cells — self-contained wrappers (each seeds
+  // its own range value + presets in <data> and binds the inner DatePicker via
+  // r-model). No parent-supplied props; no MODEL_PROPS entry (the model is bound
+  // internally — the self-binding precedent).
+  DatePickerRangeComplete: {},
+  DatePickerPresetActive: {},
+  DatePickerRangeBehavior: {},
 };
 
 /**

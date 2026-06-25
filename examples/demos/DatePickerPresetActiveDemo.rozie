@@ -1,0 +1,70 @@
+<!--
+  DatePickerPresetActiveDemo.rozie — content-STABLE screenshot consumer for the
+  @rozie-ui/date-picker preset rail in RANGE mode (pure-Rozie, no engine).
+
+  The SEPARATE deterministic SCREENSHOT cell proving SC-4: the preset whose range
+  EQUALS the current value renders ACTIVE (is-active / aria-pressed="true"). Its
+  sibling DatePickerRangeBehaviorDemo drives the preset click at the DOM level
+  (date-picker-range-behavior.spec.ts).
+
+  Made fully deterministic by:
+    1. selectionMode="range" + a FIXED completed range seeded in <data>
+       ({ start: '2025-06-10', end: '2025-06-16' }) bound r-model:value. The
+       DatePicker pins its view to the range's `start` (June 2025) — so the grid
+       AND the highlighted band render run-to-run.
+    2. :presetRanges supplies TWO literal presets — the first ("This week")
+       EQUALS the seeded value → its button reads is-active / aria-pressed; the
+       second ("Next week") does not. The rail shows one active + one inactive
+       pill so the active state is visually unambiguous.
+       NOTE: bound via the PROPERTY form (:presetRanges) — on Lit a preset array
+       must arrive as a property, never a string attribute (same rule as
+       disabledDates); literal ranges (no thunks) keep it attribute-safe on the
+       other five too.
+    3. :weekStartsOn="0" + locale="en-US" pin the labels; no focus / no caret.
+
+  One .rozie source → six per-framework screenshot consumers; the Linux PNG
+  baseline is generated separately in pinned Linux Docker (macOS baselines are
+  forbidden — feedback_vr_linux_baselines). INLINE-rendering → mount-clipped
+  matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="DatePickerPresetActiveDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  range: { start: '2025-06-10', end: '2025-06-16' },
+  presets: [
+    { label: 'This week', range: { start: '2025-06-10', end: '2025-06-16' } },
+    { label: 'Next week', range: { start: '2025-06-17', end: '2025-06-23' } },
+  ],
+}
+</data>
+
+<template>
+<div class="date-picker-preset-screenshot-demo">
+  <DatePicker
+    r-model:value="$data.range"
+    selectionMode="range"
+    :presetRanges="$data.presets"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-preset-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>
