@@ -152,4 +152,4 @@ Releasing packages to npm? See [`RELEASING.md`](RELEASING.md) — the release ru
 
 ## License
 
-[MIT](LICENSE) © 2026 Dan Krieger and Rozie.js contributors.
+[MIT](LICENSE) © 2026 One Learning Community LTD.
