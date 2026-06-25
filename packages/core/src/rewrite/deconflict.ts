@@ -466,35 +466,142 @@ export function deconflictGeneratedSymbols(
  * propagates. Also covers the user-side `$data` self-shadow (`const open =
  * $data.open`) — after the state key becomes `open$local`, the rewrite reads the
  * renamed key, and the user's `const open` (if any) no longer collides.
+ *
+ * Phase 61 Plan 06 (SC-2, collision-solid §"NEW risks" 5) — ALSO walks
+ * `ir.computed`. A `$computed value` const collides with an `$expose({ value })`
+ * verb the same way a `<data> value` does: the synthesized handle `{ value }` (re-
+ * built from `ir.expose[].name` on every target — the raw `$expose(...)` call is
+ * STRIPPED everywhere) would reference the bare memo accessor instead of the
+ * author's intended exposed binding. A `$computed` name is read as a BARE
+ * identifier (there is NO `$computed.<name>` member to gate on — unlike `$data.X`),
+ * so its references are renamed via a BARE-IDENTIFIER IR walk with position guards
+ * (member-property / object-key / specifier slots skipped). The renameable side is
+ * the INTERNAL computed; the `$expose` verb stays. The bare reference inside the
+ * (about-to-be-stripped) `$expose(...)` call argument is skipped explicitly so the
+ * public-handle synthesis is provably untouched regardless of per-target stripping.
  */
 export function deconflictStateExposeCollision(ir: {
   state: { name: string }[];
+  computed?: { name: string }[];
   expose?: { name: string }[];
 }): void {
   const exposeVerbs = new Set((ir.expose ?? []).map((e) => e.name));
   if (exposeVerbs.size === 0) return;
-  const renames = new Map<string, string>();
+
+  // State renames go through the `$data.<key>` MEMBER path; computed renames go
+  // through the BARE-identifier path. Kept in separate maps because the two
+  // reference shapes are disjoint (a `$data.X` member vs a bare `X` read).
+  const stateRenames = new Map<string, string>();
   for (const s of ir.state) {
     if (exposeVerbs.has(s.name)) {
-      const renamed = `${s.name}${DECONFLICT_SUFFIX}`;
-      renames.set(s.name, renamed);
+      stateRenames.set(s.name, `${s.name}${DECONFLICT_SUFFIX}`);
     }
   }
-  if (renames.size === 0) return;
+  const computedRenames = new Map<string, string>();
+  for (const c of ir.computed ?? []) {
+    if (exposeVerbs.has(c.name)) {
+      computedRenames.set(c.name, `${c.name}${DECONFLICT_SUFFIX}`);
+    }
+  }
+  if (stateRenames.size === 0 && computedRenames.size === 0) return;
 
-  // 1. Rename the state declarations themselves.
+  // 1. Rename the state / computed declarations themselves.
   for (const s of ir.state) {
-    const renamed = renames.get(s.name);
+    const renamed = stateRenames.get(s.name);
     if (renamed) s.name = renamed;
   }
+  for (const c of ir.computed ?? []) {
+    const renamed = computedRenames.get(c.name);
+    if (renamed) c.name = renamed;
+  }
 
-  // 2. Deep-walk the ENTIRE IR. For every embedded Babel node, rename a
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  // 2a. Bare-identifier rename of every `$computed`-name reference across the IR.
+  //     A `$computed c` is read bare (`c`, `c + 1`, `{{ c }}`), so renaming the
+  //     declaration is not enough — every reference must move too. Position guards
+  //     skip non-reference identifier slots; the `$expose(...)` call argument is
+  //     skipped wholesale so the public handle synthesis is untouched.
+  const renameComputedBareRefs = (root: unknown): void => {
+    if (computedRenames.size === 0) return;
+    const seenNodes = new WeakSet<object>();
+    const isExposeCall = (n: { type: string }): boolean => {
+      const call = n as {
+        type: string;
+        callee?: { type?: string; name?: string };
+      };
+      return (
+        (call.type === 'CallExpression' || call.type === 'OptionalCallExpression') &&
+        call.callee?.type === 'Identifier' &&
+        call.callee.name === '$expose'
+      );
+    };
+    const renameIn = (node: { type: string }, parent: { type: string } | null, parentKey: string | null): void => {
+      if (seenNodes.has(node)) return;
+      seenNodes.add(node);
+
+      if (node.type === 'Identifier') {
+        const id = node as { type: string; name: string };
+        const renamed = computedRenames.get(id.name);
+        if (renamed && parent) {
+          const p = parent as Record<string, unknown> & { type: string };
+          const skip =
+            // `obj.c` / `obj?.c` non-computed member PROPERTY (not a bare read).
+            ((p.type === 'MemberExpression' || p.type === 'OptionalMemberExpression') &&
+              p['property'] === node && p['computed'] !== true) ||
+            // `{ c: x }` non-shorthand key OR `{ get c() {} }` method key.
+            (p.type === 'ObjectProperty' && p['key'] === node &&
+              p['computed'] !== true && p['shorthand'] !== true) ||
+            ((p.type === 'ObjectMethod' || p.type === 'ClassMethod') &&
+              p['key'] === node && p['computed'] !== true) ||
+            // import/export specifier name slots are module bindings, not refs.
+            p.type === 'ImportSpecifier' || p.type === 'ImportDefaultSpecifier' ||
+            p.type === 'ImportNamespaceSpecifier' || p.type === 'ExportSpecifier';
+          if (!skip) id.name = renamed;
+        }
+        return;
+      }
+
+      // Do NOT descend into the `$expose(...)` call argument — its `{ verb }`
+      // shorthand is PUBLIC contract (key === verb name); the handle is
+      // re-synthesized from `ir.expose[].name` on every target.
+      if (isExposeCall(node)) return;
+
+      const rec = node as unknown as Record<string, unknown>;
+      for (const key of Object.keys(rec)) {
+        if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' ||
+            key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') {
+          continue;
+        }
+        const child = rec[key];
+        if (Array.isArray(child)) {
+          for (const item of child) if (isNode(item)) renameIn(item, node, key);
+        } else if (isNode(child)) {
+          renameIn(child, node, key);
+        }
+      }
+    };
+    const irSeen = new WeakSet<object>();
+    const walkRoot = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (irSeen.has(value)) return;
+      irSeen.add(value);
+      if (isNode(value)) { renameIn(value, null, null); return; }
+      if (Array.isArray(value)) { for (const item of value) walkRoot(item); return; }
+      for (const k of Object.keys(value as Record<string, unknown>)) {
+        walkRoot((value as Record<string, unknown>)[k]);
+      }
+    };
+    walkRoot(root);
+  };
+  renameComputedBareRefs(ir);
+
+  // 2b. Deep-walk the ENTIRE IR. For every embedded Babel node, rename a
   //    non-computed `$data.<oldKey>` MemberExpression property to the new key.
   //    For every SignalRef `{ scope: 'data', path: [oldKey, ...] }`, rename
   //    path[0]. A WeakSet guards against re-visiting shared nodes / cycles.
   const seen = new WeakSet<object>();
-  const isNode = (v: unknown): v is { type: string } =>
-    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
 
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return;
@@ -505,7 +612,7 @@ export function deconflictStateExposeCollision(ir: {
     const asDep = value as { scope?: unknown; path?: unknown };
     if (asDep.scope === 'data' && Array.isArray(asDep.path) && asDep.path.length > 0) {
       const head = asDep.path[0];
-      const renamed = typeof head === 'string' ? renames.get(head) : undefined;
+      const renamed = typeof head === 'string' ? stateRenames.get(head) : undefined;
       if (renamed) asDep.path[0] = renamed;
     }
 
@@ -525,7 +632,7 @@ export function deconflictStateExposeCollision(ir: {
         node.property?.type === 'Identifier' &&
         typeof node.property.name === 'string'
       ) {
-        const renamed = renames.get(node.property.name);
+        const renamed = stateRenames.get(node.property.name);
         if (renamed) node.property.name = renamed;
       }
     }
@@ -863,6 +970,262 @@ export function deconflictReservedDataRefNames(
     }
   };
   walk(ir);
+
+  return renames;
+}
+
+/**
+ * IR-LEVEL generated-name deconfliction for the SOLID target (Phase 61 Plan 06 —
+ * SC-2, collision-solid §"NEW risks" 1/2).
+ *
+ * Solid emits a plain function. `emitScript` mints the `<data>` getter, the
+ * `$computed` memo const, and the `$refs.<name>` → `<name>Ref` ref local as
+ * STRING lines built directly from the IR (`ir.state[].name` / `ir.computed[].name`
+ * / `ir.refs[].name`) — NOT as declarators in the cloned `<script>` Program. So the
+ * per-target `deconflictGeneratedSymbols` clone-walk (which renames USER `<script>`
+ * helpers/params) cannot reach these GENERATED names. They collide:
+ *
+ *   - `<data>` / `$computed` name == a bare solid-js / runtime IMPORT
+ *     (`children`/`on`/`For`/`createSignal`/…) → `const children = createSignal`
+ *     after `import { children }` → TS2440/TS2451. (A default-slot component
+ *     imports `children` + emits `const resolved = children(...)`.)
+ *   - `<data>` / `$computed` name == an emitter LOCAL (`local`/`attrs`/`_merged`/
+ *     `resolved`/`portals`/…) → TS2451.
+ *   - `<data> x` == `$computed x` == model-prop `x` (cross-kind siblings) → two
+ *     top-level `const x` → TS2451.
+ *
+ * All three GENERATED names are INTERNAL (template/script-referenced, never the
+ * consumer-facing public contract) → safe to auto-rename to `X$local`. Renaming
+ * the IR source-of-truth field renames the emitted const, the `<name>Ref` ref
+ * local (the `Ref` suffix is appended by the rewrite from `ir.refs[].name`), the
+ * `viewChild`-free Solid ref callback, AND every reference (script + template
+ * subtrees) in lockstep. `<data>`/`$refs` references are `$data.X` / `$refs.X`
+ * MEMBER expressions; `$computed` references are BARE identifiers — both shapes are
+ * renamed. Cross-kind collisions rename the LATER kind (computed before data before
+ * model-prop is the priority — model-prop name is closest to public contract among
+ * the three INTERNAL kinds, so it wins the bare name; the `$expose` verbs + prop
+ * names passed in `protectedNames` are NEVER renamed).
+ *
+ * Mutates `ir` in place. Invoked from `emitSolid` on the target's OWN fresh IR
+ * (each `compile()` lowers a fresh IR per target — no cross-target leakage), BEFORE
+ * any rewrite reads a name. Only-on-collision: a non-colliding name is
+ * byte-identical (zero corpus drift). Returns the rename map for tests/diagnostics.
+ *
+ * @param ir       the component IR (state/computed/refs `.name` renamed).
+ * @param reserved the Solid reserved set: SOLID_EMITTER_LOCALS ∪ SOLID_IMPORT_NAMES.
+ * @param protectedNames PUBLIC-CONTRACT names never renamed (prop names + $expose verbs).
+ */
+export function deconflictSolidGeneratedNames(
+  ir: {
+    state: { name: string }[];
+    computed: { name: string }[];
+    refs: { name: string }[];
+    props?: { name: string }[];
+    expose?: { name: string }[];
+  },
+  reserved: ReadonlySet<string>,
+  protectedNames: ReadonlySet<string> = new Set(),
+): Map<string, string> {
+  const protectedAll = new Set<string>([
+    ...protectedNames,
+    ...(ir.props ?? []).map((p) => p.name),
+    ...(ir.expose ?? []).map((e) => e.name),
+  ]);
+  const modelPropNames = new Set<string>(
+    (ir.props ?? []).filter((p) => (p as { isModel?: boolean }).isModel).map((p) => p.name),
+  );
+
+  // dataRenames go through the `$data.X` MEMBER path; computedRenames through the
+  // BARE-identifier path; refRenames through the `$refs.X` MEMBER + `ref="X"` attr
+  // path. Kept separate because the reference shapes are disjoint.
+  const dataRenames = new Map<string, string>();
+  const computedRenames = new Map<string, string>();
+  const refRenames = new Map<string, string>();
+
+  // Synthesized-internal names (the `$el` root ref `__rozieRoot`, etc.) are minted
+  // by the lowering passes themselves and have dedicated rewrite handling
+  // (`$refs.__rozieRoot` → `__rozieRootRef`). They are NOT author bindings and must
+  // never be renamed. NOTE `__rozieRoot` is intentionally ALSO in
+  // SOLID_EMITTER_LOCALS (so a USER ref/data/computed literally named `__rozieRoot`
+  // would still collide with the emitter local) — so guard by the reserved `__rozie`
+  // prefix, which a normal author name never carries.
+  const isSynthesizedInternal = (name: string): boolean => name.startsWith('__rozie');
+
+  // `taken` tracks every name already claimed at module/function scope so a rename
+  // does not re-collide. Seed with the reserved set + model-prop names (these are
+  // emitted regardless and are never renamed by this pass) + the public-contract
+  // names. As each INTERNAL kind is processed it claims its (possibly renamed) name.
+  const taken = new Set<string>([...reserved, ...modelPropNames, ...protectedAll]);
+  const freshName = (base: string): string => {
+    let candidate = `${base}${DECONFLICT_SUFFIX}`;
+    while (taken.has(candidate)) candidate = `${candidate}${DECONFLICT_SUFFIX}`;
+    return candidate;
+  };
+
+  // Process order: model-prop names already in `taken` (win the bare name). Then
+  // `<data>` (renames on reserve/model collision), then `$computed` (renames on
+  // reserve/model/data collision) — so a `<data> x` + `$computed x` pair renames
+  // the COMPUTED side, leaving exactly one top-level `const x`.
+  for (const s of ir.state) {
+    if (protectedAll.has(s.name) || isSynthesizedInternal(s.name)) { taken.add(s.name); continue; }
+    if (taken.has(s.name)) {
+      dataRenames.set(s.name, freshName(s.name));
+      taken.add(dataRenames.get(s.name)!);
+    } else {
+      taken.add(s.name);
+    }
+  }
+  for (const c of ir.computed) {
+    if (protectedAll.has(c.name) || isSynthesizedInternal(c.name)) { taken.add(c.name); continue; }
+    if (taken.has(c.name)) {
+      computedRenames.set(c.name, freshName(c.name));
+      taken.add(computedRenames.get(c.name)!);
+    } else {
+      taken.add(c.name);
+    }
+  }
+  for (const r of ir.refs) {
+    if (protectedAll.has(r.name) || isSynthesizedInternal(r.name)) { taken.add(`${r.name}Ref`); continue; }
+    // The ref lands as `<name>Ref` — collision is only with a reserved/taken
+    // `<name>Ref` string. Use the suffixed form for the collision check.
+    const refLocal = `${r.name}Ref`;
+    if (taken.has(refLocal) || taken.has(r.name)) {
+      refRenames.set(r.name, freshName(r.name));
+      taken.add(`${refRenames.get(r.name)!}Ref`);
+    } else {
+      taken.add(refLocal);
+    }
+  }
+
+  const renames = new Map<string, string>([
+    ...dataRenames,
+    ...computedRenames,
+    ...refRenames,
+  ]);
+  if (renames.size === 0) return renames;
+
+  // 1. Rename the IR declaration fields themselves (codegen source of truth).
+  for (const s of ir.state) {
+    const renamed = dataRenames.get(s.name);
+    if (renamed) s.name = renamed;
+  }
+  for (const c of ir.computed) {
+    const renamed = computedRenames.get(c.name);
+    if (renamed) c.name = renamed;
+  }
+  for (const r of ir.refs) {
+    const renamed = refRenames.get(r.name);
+    if (renamed) r.name = renamed;
+  }
+
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  // 2a. BARE-identifier rename of every `$computed`-name reference (a `$computed`
+  //     is read bare). Position guards skip non-reference identifier slots.
+  if (computedRenames.size > 0) {
+    const seenNodes = new WeakSet<object>();
+    const renameIn = (node: { type: string }, parent: { type: string } | null): void => {
+      if (seenNodes.has(node)) return;
+      seenNodes.add(node);
+      if (node.type === 'Identifier') {
+        const id = node as { type: string; name: string };
+        const renamed = computedRenames.get(id.name);
+        if (renamed && parent) {
+          const p = parent as Record<string, unknown> & { type: string };
+          const skip =
+            ((p.type === 'MemberExpression' || p.type === 'OptionalMemberExpression') &&
+              p['property'] === node && p['computed'] !== true) ||
+            (p.type === 'ObjectProperty' && p['key'] === node &&
+              p['computed'] !== true && p['shorthand'] !== true) ||
+            ((p.type === 'ObjectMethod' || p.type === 'ClassMethod') &&
+              p['key'] === node && p['computed'] !== true) ||
+            p.type === 'ImportSpecifier' || p.type === 'ImportDefaultSpecifier' ||
+            p.type === 'ImportNamespaceSpecifier' || p.type === 'ExportSpecifier';
+          if (!skip) id.name = renamed;
+        }
+        return;
+      }
+      const rec = node as unknown as Record<string, unknown>;
+      for (const key of Object.keys(rec)) {
+        if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' ||
+            key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') {
+          continue;
+        }
+        const child = rec[key];
+        if (Array.isArray(child)) {
+          for (const item of child) if (isNode(item)) renameIn(item, node);
+        } else if (isNode(child)) {
+          renameIn(child, node);
+        }
+      }
+    };
+    const cSeen = new WeakSet<object>();
+    const cWalk = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (cSeen.has(value)) return;
+      cSeen.add(value);
+      if (isNode(value)) { renameIn(value, null); return; }
+      if (Array.isArray(value)) { for (const item of value) cWalk(item); return; }
+      for (const k of Object.keys(value as Record<string, unknown>)) {
+        cWalk((value as Record<string, unknown>)[k]);
+      }
+    };
+    cWalk(ir);
+  }
+
+  // 2b. MEMBER rename of every `$data.<old>` / `$refs.<old>` reference + SignalRef
+  //     data dep + template `ref="<old>"` static attribute value.
+  const memberRenames = new Map<string, string>([...dataRenames, ...refRenames]);
+  if (memberRenames.size > 0) {
+    const seen = new WeakSet<object>();
+    const walk = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (seen.has(value)) return;
+      seen.add(value);
+
+      const asDep = value as { scope?: unknown; path?: unknown };
+      if (asDep.scope === 'data' && Array.isArray(asDep.path) && asDep.path.length > 0) {
+        const head = asDep.path[0];
+        const renamed = typeof head === 'string' ? dataRenames.get(head) : undefined;
+        if (renamed) asDep.path[0] = renamed;
+      }
+
+      const asAttr = value as { kind?: unknown; name?: unknown; value?: unknown };
+      if (asAttr.kind === 'static' && asAttr.name === 'ref' && typeof asAttr.value === 'string') {
+        const renamed = refRenames.get(asAttr.value);
+        if (renamed) (value as { value: string }).value = renamed;
+      }
+
+      if (isNode(value)) {
+        const node = value as {
+          type: string;
+          computed?: boolean;
+          object?: { type?: string; name?: string };
+          property?: { type?: string; name?: string };
+        };
+        if (
+          (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+          node.computed !== true &&
+          node.object?.type === 'Identifier' &&
+          node.property?.type === 'Identifier' &&
+          typeof node.property.name === 'string'
+        ) {
+          if (node.object.name === '$data') {
+            const renamed = dataRenames.get(node.property.name);
+            if (renamed) node.property.name = renamed;
+          } else if (node.object.name === '$refs') {
+            const renamed = refRenames.get(node.property.name);
+            if (renamed) node.property.name = renamed;
+          }
+        }
+      }
+
+      if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+      for (const key of Object.keys(value)) walk((value as Record<string, unknown>)[key]);
+    };
+    walk(ir);
+  }
 
   return renames;
 }

@@ -27,6 +27,11 @@ import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
+import { deconflictSolidGeneratedNames } from '../../../core/src/rewrite/deconflict.js';
+import {
+  SOLID_EMITTER_LOCALS,
+  SOLID_IMPORT_NAMES,
+} from '../../../core/src/rewrite/reservedNames.js';
 import { SolidImportCollector, RuntimeSolidImportCollector } from './rewrite/collectSolidImports.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -63,6 +68,28 @@ export interface EmitSolidResult {
 }
 
 export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSolidResult {
+  // Phase 61 Plan 06 (SC-2, collision-solid §"NEW risks" 1/2) — IR-LEVEL rename of
+  // GENERATED `<data>`/`$computed`/`$refs` names that collide with the Solid
+  // reserved set (emitter locals ∪ bare solid-js/runtime imports) or each other /
+  // a model-prop. These names are minted by emitScript as STRING lines from the IR
+  // (not user declarators in the cloned <script>), so the per-target
+  // `deconflictGeneratedSymbols` clone-walk cannot reach them. Run on THIS fresh
+  // per-target IR BEFORE any name is read (emitScript / emitTemplate / shell). Solid
+  // is a FUNCTION target — the reserved set carries NO DOM/Object.prototype/CVA
+  // names (collision-solid §4). Public-contract names (props + $expose verbs) are
+  // never renamed. Only-on-collision: a non-colliding name is byte-identical.
+  {
+    const solidReserved = new Set<string>([
+      ...SOLID_EMITTER_LOCALS,
+      ...SOLID_IMPORT_NAMES,
+    ]);
+    const protectedNames = new Set<string>([
+      ...(ir.expose ?? []).map((e) => e.name),
+      ...ir.props.map((p) => p.name),
+    ]);
+    deconflictSolidGeneratedNames(ir, solidReserved, protectedNames);
+  }
+
   // 1. Resolve registry + blockOffsets.
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
   let resolvedBlockOffsets: BlockMap;
