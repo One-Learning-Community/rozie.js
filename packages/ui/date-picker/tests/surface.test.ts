@@ -26,10 +26,10 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'DatePicker',
-  props: ['value', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale'],
+  props: ['value', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale', 'selectionMode', 'presetRanges'],
   models: ['value'],
-  emits: ['change'],
-  slots: ['header'] as string[],
+  emits: ['change', 'rangeComplete'],
+  slots: ['header', 'presets'] as string[],
   expose: ['focus', 'goToToday', 'clear'],
 } as const;
 
@@ -50,7 +50,7 @@ describe('DatePicker.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (7 props)', () => {
+  it('props surface matches (9 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -62,11 +62,11 @@ describe('DatePicker.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (change)', () => {
+  it('emits surface matches (change/rangeComplete)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('slots surface matches (header)', () => {
+  it('slots surface matches (header/presets)', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
