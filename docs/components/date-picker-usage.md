@@ -46,6 +46,38 @@ export function CustomHeaderDemo() {
     </DatePicker>
   );
 }
+
+// Range selection: set selectionMode="range" and bind an object value
+// { start, end }. React capitalizes the event prop → onRangeComplete.
+export function RangeDemo() {
+  const [range, setRange] = useState({ start: '', end: '' });
+  // presetRanges: each range is a literal OR a () => { start, end } thunk.
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const presetRanges = [
+    { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+    { label: 'Last 7 days', range: () => ({ start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) }) },
+  ];
+  return (
+    <DatePicker
+      selectionMode="range"
+      value={range}
+      onValueChange={setRange}
+      presetRanges={presetRanges}
+      onRangeComplete={(e) => console.log('range:', e.value)}
+    >
+      {{
+        // Override the default preset rail via the #presets slot (render-prop).
+        presets: ({ presets, apply }) => (
+          <div className="my-presets">
+            {presets.map((p) => (
+              <button key={p.label} onClick={() => apply(p.range)}>{p.label}</button>
+            ))}
+          </div>
+        ),
+      }}
+    </DatePicker>
+  );
+}
 ```
 
 ```vue [Vue]
@@ -57,6 +89,15 @@ const date = ref(''); // ISO YYYY-MM-DD, '' = no selection
 function onChange(e: { value: string }) {
   console.log('picked:', e.value);
 }
+
+// Range mode: value becomes a { start, end } object.
+const range = ref({ start: '', end: '' });
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const presetRanges = [
+  { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+  // a () => { start, end } thunk is resolved fresh on render
+  { label: 'Last 7 days', range: () => ({ start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) }) },
+];
 </script>
 
 <template>
@@ -72,6 +113,18 @@ function onChange(e: { value: string }) {
       </div>
     </template>
   </DatePicker>
+
+  <!-- Range selection with quick-pick presets + a #presets override -->
+  <DatePicker
+    selectionMode="range"
+    v-model:value="range"
+    :presetRanges="presetRanges"
+    @rangeComplete="(e) => console.log('range:', e.value)"
+  >
+    <template #presets="{ presets, apply }">
+      <button v-for="p in presets" :key="p.label" @click="apply(p.range)">{{ p.label }}</button>
+    </template>
+  </DatePicker>
 </template>
 ```
 
@@ -80,6 +133,14 @@ function onChange(e: { value: string }) {
   import DatePicker from '@rozie-ui/date-picker-svelte';
 
   let date = $state(''); // ISO YYYY-MM-DD, '' = no selection
+
+  // Range mode: value becomes a { start, end } object.
+  let range = $state({ start: '', end: '' });
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const presetRanges = [
+    { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+    { label: 'Last 7 days', range: () => ({ start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) }) },
+  ];
 </script>
 
 <DatePicker
@@ -98,6 +159,21 @@ function onChange(e: { value: string }) {
     </div>
   {/snippet}
 </DatePicker>
+
+<!-- Range selection. NOTE: Svelte LOWERCASES the event prop → onrangecomplete
+     (NOT onRangeComplete — a camelCase binding silently never fires). -->
+<DatePicker
+  selectionMode="range"
+  bind:value={range}
+  {presetRanges}
+  onrangecomplete={(e) => console.log('range:', e.value)}
+>
+  {#snippet presets({ presets, apply })}
+    {#each presets as p (p.label)}
+      <button onclick={() => apply(p.range)}>{p.label}</button>
+    {/each}
+  {/snippet}
+</DatePicker>
 ```
 
 ```ts [Angular]
@@ -110,12 +186,31 @@ import { DatePicker } from '@rozie-ui/date-picker-angular';
   imports: [DatePicker],
   template: `
     <DatePicker [(value)]="date" min="2026-01-01" (change)="onChange($event)" />
+
+    <!-- Range selection with quick-pick presets -->
+    <DatePicker
+      selectionMode="range"
+      [(value)]="range"
+      [presetRanges]="presetRanges"
+      (rangeComplete)="onRange($event)"
+    />
   `,
 })
 export class DemoComponent {
   date = ''; // ISO YYYY-MM-DD, '' = no selection
+  range: { start: string; end: string } = { start: '', end: '' };
+  presetRanges = [
+    { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+    { label: 'Last 7 days', range: () => {
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      return { start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) };
+    } },
+  ];
   onChange(e: { value: string }) {
     console.log('picked:', e.value);
+  }
+  onRange(e: { value: { start: string; end: string } }) {
+    console.log('range:', e.value);
   }
 }
 ```
@@ -135,6 +230,35 @@ export function Demo() {
     />
   );
 }
+
+// Range selection with presets + a #presets override.
+export function RangeDemo() {
+  const [range, setRange] = createSignal({ start: '', end: '' });
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const presetRanges = [
+    { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+    { label: 'Last 7 days', range: () => ({ start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) }) },
+  ];
+  return (
+    <DatePicker
+      selectionMode="range"
+      value={range()}
+      onValueChange={setRange}
+      presetRanges={presetRanges}
+      onRangeComplete={(e) => console.log('range:', e.value)}
+    >
+      {{
+        presets: ({ presets, apply }) => (
+          <div class="my-presets">
+            {presets.map((p) => (
+              <button onClick={() => apply(p.range)}>{p.label}</button>
+            ))}
+          </div>
+        ),
+      }}
+    </DatePicker>
+  );
+}
 ```
 
 ```ts [Lit]
@@ -150,6 +274,20 @@ el.addEventListener('value-change', (e) => {
 });
 el.addEventListener('change', (e) => {
   console.log('picked:', e.detail.value);
+});
+
+// Range selection. The OBJECT value + the function-valued presets MUST be set
+// via a PROPERTY, never a string attribute (value="..." would stringify to
+// '[object Object]') — the SAME rule already in force for `disabledDates`.
+el.selectionMode = 'range';
+el.value = { start: '', end: '' };            // property binding (.value), not an attribute
+el.presetRanges = [
+  { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
+  { label: 'Last 7 days', range: () => ({ start: '2026-06-19', end: '2026-06-25' }) },
+];
+// The custom event name is CASE-PRESERVED on Lit → 'rangeComplete'.
+el.addEventListener('rangeComplete', (e) => {
+  console.log('range:', e.detail.value);
 });
 ```
 
