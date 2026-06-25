@@ -1,0 +1,456 @@
+<template>
+
+<div :class="['rozie-datepicker', { 'rozie-datepicker--disabled': props.disabled }]" ref="rootRef" role="group" aria-label="Date picker" :aria-disabled="!!props.disabled" v-bind="$attrs">
+  
+  <slot name="header" :label="monthHeading()" :prev="goPrevMonth" :next="goNextMonth" :disabled="!!props.disabled">
+    <div class="rozie-datepicker-header">
+      <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Previous month" @click="goPrevMonth">‹</button>
+      <span class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span>
+      <button type="button" class="rozie-datepicker-nav rozie-datepicker-next" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Next month" @click="goNextMonth">›</button>
+    </div>
+  </slot>
+
+  
+  <div class="rozie-datepicker-grid" role="grid">
+    <div class="rozie-datepicker-weekdays" role="row">
+      <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="wd">{{ wd }}</span>
+    </div>
+
+    <div v-for="(week, wk) in grid().weeks" :key="wk" class="rozie-datepicker-week" role="row">
+      <span v-for="day in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!day.selected">
+        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth }]" :data-day="day.iso" :tabindex="dayTabIndex(day)" :disabled="!!day.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="commitValue(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Inclusive lower bound as an ISO `YYYY-MM-DD` string. Days before it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no lower bound.
+     */
+    min?: string | null;
+    /**
+     * Inclusive upper bound as an ISO `YYYY-MM-DD` string. Days after it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no upper bound.
+     */
+    max?: string | null;
+    /**
+     * An array of ISO `YYYY-MM-DD` strings to disable individually (e.g. holidays or already-booked days), in addition to the `min`/`max` bounds. Disabled days are non-interactive and marked `aria-disabled`.
+     */
+    disabledDates?: any[];
+    /**
+     * The first day of the week as a number, `0` = Sunday through `6` = Saturday. Rotates both the weekday header row and the grid columns (e.g. `1` for a Monday-first calendar).
+     */
+    weekStartsOn?: number;
+    /**
+     * Disable the entire control — every day cell and the previous/next month buttons become non-interactive and are marked `aria-disabled`. Also sets the Angular `ControlValueAccessor` disabled state.
+     */
+    disabled?: boolean;
+    /**
+     * BCP-47 locale tag used by `Intl.DateTimeFormat` to render the month-year heading and the short weekday header labels (e.g. `"fr-FR"`, `"ja-JP"`). Falls back to English names in a runtime without `Intl`.
+     */
+    locale?: string;
+  }>(),
+  { min: null, max: null, disabledDates: () => [], weekStartsOn: 0, disabled: false, locale: 'en-US' }
+);
+
+/**
+ * The selected date as an ISO `YYYY-MM-DD` string (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). An empty string `""` means no date is selected; selecting a day writes the new ISO string back and emits `change`.
+ * @example
+ * <DatePicker r-model:value="date" :min="'2026-01-01'" @change="onPick" />
+ */
+const value = defineModel<string>('value', { default: '' });
+
+const emit = defineEmits<{
+  change: [...args: any[]];
+}>();
+
+defineSlots<{
+  header(props: { label: any; prev: any; next: any; disabled: any }): any;
+}>();
+
+const viewIso = ref('');
+
+const rootRef = ref<HTMLElement>();
+
+import { addDays, addMonths, buildMonthGrid, isDayDisabled, isIsoDate, monthLabel, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+
+// ---- today (deterministic per-render read) -----------------------------
+// Today's ISO, computed from the local clock. A plain function so each call is
+// fresh (a date picker open across midnight should follow the wall clock).
+// ---- today (deterministic per-render read) -----------------------------
+// Today's ISO, computed from the local clock. A plain function so each call is
+// fresh (a date picker open across midnight should follow the wall clock).
+const todayIso = () => {
+  const d = new Date();
+  return toIso(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
+// ---- derived view (ONE plain function, uniform x6) ---------------------
+// The current selected ISO, normalized to a string.
+// ---- derived view (ONE plain function, uniform x6) ---------------------
+// The current selected ISO, normalized to a string.
+const selected = () => typeof value.value === 'string' ? value.value : '';
+
+// The resolved month anchor: the local view state, falling back to value/today.
+// The resolved month anchor: the local view state, falling back to value/today.
+const viewMonthGrid = () => resolveViewIso({
+  viewIso: viewIso.value,
+  value: selected(),
+  today: todayIso()
+});
+
+// The whole render model in a single call: { year, month, weeks }. A PLAIN
+// function (not $computed) so it reads uniformly on all six targets and can be
+// aliased in handlers without the Solid accessor divergence. Returns a FRESH
+// object each call — never feed it to a reference-equality $watch getter.
+// The whole render model in a single call: { year, month, weeks }. A PLAIN
+// function (not $computed) so it reads uniformly on all six targets and can be
+// aliased in handlers without the Solid accessor divergence. Returns a FRESH
+// object each call — never feed it to a reference-equality $watch getter.
+const grid = () => buildMonthGrid({
+  viewIso: viewMonthGrid(),
+  value: selected(),
+  today: todayIso(),
+  min: props.min,
+  max: props.max,
+  disabledDates: props.disabledDates,
+  weekStartsOn: props.weekStartsOn,
+  disabled: props.disabled
+});
+
+// Roving-tabindex value for a day cell: the selected day (or today, when nothing
+// is selected) is the single tab stop (0), the rest are -1. The return type is
+// annotated `number | undefined` ON PURPOSE — the React emitter wraps every
+// numeric `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null
+// value (a bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is
+// unreachable". Routing tabindex through this nullable-typed helper keeps the
+// `?? undefined` reachable (the pagination `tabIndexFor` precedent).
+// Roving-tabindex value for a day cell: the selected day (or today, when nothing
+// is selected) is the single tab stop (0), the rest are -1. The return type is
+// annotated `number | undefined` ON PURPOSE — the React emitter wraps every
+// numeric `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null
+// value (a bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is
+// unreachable". Routing tabindex through this nullable-typed helper keeps the
+// `?? undefined` reachable (the pagination `tabIndexFor` precedent).
+const dayTabIndex = (day: any): number | undefined => day.selected || selected() === '' && day.today ? 0 : -1;
+
+// The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
+// `label` helper becomes a class field on the Lit custom element and a `title`
+// would collide with the inherited HTMLElement.title; `monthHeading` is clear.
+// The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
+// `label` helper becomes a class field on the Lit custom element and a `title`
+// would collide with the inherited HTMLElement.title; `monthHeading` is clear.
+const monthHeading = () => monthLabel(viewMonthGrid(), props.locale);
+// The seven weekday header labels, rotated by weekStartsOn.
+// The seven weekday header labels, rotated by weekStartsOn.
+const weekdays = () => weekdayLabels(props.weekStartsOn, props.locale);
+
+// Whether a given ISO can be selected (the template gates clicks on it too).
+// Whether a given ISO can be selected (the template gates clicks on it too).
+const dayEnabled = (iso: any) => !isDayDisabled(iso, {
+  viewIso: viewMonthGrid(),
+  value: selected(),
+  today: todayIso(),
+  min: props.min,
+  max: props.max,
+  disabledDates: props.disabledDates,
+  weekStartsOn: props.weekStartsOn,
+  disabled: props.disabled
+});
+
+// ---- write funnel (single $emit site) ----------------------------------
+// Select an ISO date: write the model + emit change. NOT named `setValue`
+// (collides with React's generated `value` model setter → ROZ524). A no-op
+// (re-selecting the same date) still re-emits intentionally? No — guard it.
+// ---- write funnel (single $emit site) ----------------------------------
+// Select an ISO date: write the model + emit change. NOT named `setValue`
+// (collides with React's generated `value` model setter → ROZ524). A no-op
+// (re-selecting the same date) still re-emits intentionally? No — guard it.
+const commitValue = (iso: any) => {
+  if (props.disabled) return;
+  if (!isIsoDate(iso)) return;
+  if (!dayEnabled(iso)) return;
+  if (iso === selected()) return;
+  value.value = iso;
+  viewIso.value = iso;
+  emit('change', {
+    value: iso
+  });
+};
+
+// ---- month navigation --------------------------------------------------
+// ---- month navigation --------------------------------------------------
+const goToMonth = (delta: any) => {
+  if (props.disabled) return;
+  viewIso.value = addMonths(viewMonthGrid(), delta);
+};
+const goPrevMonth = () => goToMonth(-1);
+const goNextMonth = () => goToMonth(1);
+
+// ---- focus choreography (container ref, post-mount only) ---------------
+// Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
+// ROZ123-safe). querySelectorAll reaches the day cells inside Lit's shadow root
+// too. Focus a day by its ISO; the [data-day] attribute carries the iso.
+// ---- focus choreography (container ref, post-mount only) ---------------
+// Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
+// ROZ123-safe). querySelectorAll reaches the day cells inside Lit's shadow root
+// too. Focus a day by its ISO; the [data-day] attribute carries the iso.
+const dayCells = () => {
+  const root = rootRef.value;
+  if (!root) return [];
+  return Array.from(root.querySelectorAll('[data-day]')) as HTMLElement[];
+};
+const focusDayIso = (iso: any) => {
+  const cells = dayCells();
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].getAttribute('data-day') === iso) {
+      cells[i].focus();
+      return;
+    }
+  }
+};
+
+// Move the roving focus by `days`, crossing into an adjacent month when the
+// target leaves the displayed grid. Skips nothing — disabled days are still
+// focusable (standard grid pattern) but not selectable.
+// Move the roving focus by `days`, crossing into an adjacent month when the
+// target leaves the displayed grid. Skips nothing — disabled days are still
+// focusable (standard grid pattern) but not selectable.
+const moveFocus = (fromIso: any, days: any) => {
+  if (props.disabled) return;
+  const next = addDays(fromIso, days);
+  const g = grid();
+  // If `next` is not in the rendered weeks, swing the view to its month first.
+  const present = g.weeks.some((row: any) => row.some((d: any) => d.iso === next));
+  if (!present) viewIso.value = next;
+  focusDayIso(next);
+};
+
+// ---- keyboard ----------------------------------------------------------
+// Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
+// month, Enter/Space select. The focused day's iso rides on [data-day].
+// ---- keyboard ----------------------------------------------------------
+// Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
+// month, Enter/Space select. The focused day's iso rides on [data-day].
+const onDayKeydown = (iso: any, e: any) => {
+  if (props.disabled) return;
+  const key = e ? e.key : '';
+  if (key === 'ArrowLeft') {
+    e.preventDefault();
+    moveFocus(iso, -1);
+  } else if (key === 'ArrowRight') {
+    e.preventDefault();
+    moveFocus(iso, 1);
+  } else if (key === 'ArrowUp') {
+    e.preventDefault();
+    moveFocus(iso, -7);
+  } else if (key === 'ArrowDown') {
+    e.preventDefault();
+    moveFocus(iso, 7);
+  } else if (key === 'Home') {
+    e.preventDefault();
+    moveFocus(iso, -weekdayOffset(iso));
+  } else if (key === 'End') {
+    e.preventDefault();
+    moveFocus(iso, 6 - weekdayOffset(iso));
+  } else if (key === 'PageUp') {
+    e.preventDefault();
+    moveFocus(iso, 0 - daysInMonthSpan(iso, -1));
+  } else if (key === 'PageDown') {
+    e.preventDefault();
+    moveFocus(iso, daysInMonthSpan(iso, 1));
+  } else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    e.preventDefault();
+    commitValue(iso);
+  }
+};
+
+// Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
+// Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
+const weekdayOffset = (iso: any) => {
+  const g = grid();
+  for (const row of g.weeks as any) {
+    for (let c = 0; c < row.length; c++) {
+      if (row[c].iso === iso) return c;
+    }
+  }
+  return 0;
+};
+
+// The day-delta to the same column one month away (PageUp/PageDown). Computed as
+// the difference between `iso` and `addMonths(iso, dir)` so the focus lands on
+// the clamped same-day-of-month.
+// The day-delta to the same column one month away (PageUp/PageDown). Computed as
+// the difference between `iso` and `addMonths(iso, dir)` so the focus lands on
+// the clamped same-day-of-month.
+const daysInMonthSpan = (iso: any, dir: any) => {
+  const a = isoToMs(iso);
+  const b = isoToMs(addMonths(iso, dir));
+  return Math.round((b - a) / 86400000);
+};
+const isoToMs = (iso: any) => {
+  const t = isIsoDate(iso) ? Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : 0;
+  return t;
+};
+
+// ---- lifecycle + imperative handle -------------------------------------
+// Seed the view month from value / today on mount.
+// focus() — focus the selected day, or today, or the first day of the view.
+// DELIBERATELY overrides HTMLElement.focus on Lit (ROZ137 warn, accepted).
+const focus = () => {
+  const sel = selected();
+  const t = todayIso();
+  const g = grid();
+  const present = (iso: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === iso));
+  if (sel && present(sel)) {
+    focusDayIso(sel);
+  } else if (present(t)) {
+    focusDayIso(t);
+  } else {
+    const first = g.weeks[0] && g.weeks[0][0] ? g.weeks[0][0].iso : '';
+    if (first) focusDayIso(first);
+  }
+};
+
+// goToToday() — swing the view to the current month (no selection change).
+// goToToday() — swing the view to the current month (no selection change).
+const goToToday = () => {
+  if (props.disabled) return;
+  viewIso.value = todayIso();
+};
+
+// clear() — deselect (write '' back, emit change).
+// clear() — deselect (write '' back, emit change).
+const clear = () => {
+  if (props.disabled) return;
+  if (selected() === '') return;
+  value.value = '';
+  emit('change', {
+    value: ''
+  });
+};
+
+onMounted(() => {
+  viewIso.value = viewMonthGrid();
+});
+
+defineExpose({ focus, goToToday, clear });
+</script>
+
+<style scoped>
+.rozie-datepicker {
+  display: inline-block;
+  font: var(--rozie-datepicker-font, inherit);
+  color: var(--rozie-datepicker-fg, #1a1a1a);
+  background: var(--rozie-datepicker-bg, #fff);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-radius, 10px);
+  padding: var(--rozie-datepicker-padding, 0.75rem);
+}
+.rozie-datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-datepicker-gap, 0.25rem);
+  margin-bottom: var(--rozie-datepicker-header-gap, 0.5rem);
+}
+.rozie-datepicker-heading {
+  font-weight: var(--rozie-datepicker-heading-weight, 600);
+  font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+}
+.rozie-datepicker-nav {
+  box-sizing: border-box;
+  width: var(--rozie-datepicker-nav-size, 2rem);
+  height: var(--rozie-datepicker-nav-size, 2rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-datepicker-nav-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-nav:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-nav:focus-visible,
+.rozie-datepicker-day:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-grid {
+  display: grid;
+  gap: var(--rozie-datepicker-cell-gap, 0.125rem);
+}
+.rozie-datepicker-weekdays,
+.rozie-datepicker-week {
+  display: grid;
+  grid-template-columns: repeat(7, var(--rozie-datepicker-cell-size, 2.25rem));
+  gap: var(--rozie-datepicker-cell-gap, 0.125rem);
+}
+.rozie-datepicker-weekday {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--rozie-datepicker-weekday-height, 1.75rem);
+  font-size: var(--rozie-datepicker-weekday-size, 0.72rem);
+  font-weight: var(--rozie-datepicker-weekday-weight, 600);
+  color: var(--rozie-datepicker-weekday-fg, rgba(0, 0, 0, 0.5));
+  text-transform: uppercase;
+  user-select: none;
+}
+.rozie-datepicker-cell {
+  display: inline-flex;
+}
+.rozie-datepicker-day {
+  box-sizing: border-box;
+  width: var(--rozie-datepicker-cell-size, 2.25rem);
+  height: var(--rozie-datepicker-cell-size, 2.25rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--rozie-datepicker-day-size, 0.85rem);
+  color: inherit;
+  background: var(--rozie-datepicker-day-bg, transparent);
+  border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-day-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-day:hover:not(:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-day.is-outside {
+  color: var(--rozie-datepicker-outside-fg, rgba(0, 0, 0, 0.35));
+}
+.rozie-datepicker-day.is-today:not(.is-selected) {
+  border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+}
+.rozie-datepicker-day.is-selected {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-day:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+.rozie-datepicker--disabled {
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.55);
+  pointer-events: none;
+}
+</style>

@@ -1,0 +1,25 @@
+{
+  "name": "@rozie-ui/date-picker-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless WAI-ARIA single-date calendar (month grid, prev/next nav, weekStartsOn, min/max/disabledDates, roving keyboard focus) — one accessible Rozie source compiled to Svelte.",
+  "keywords": ["rozie","rozie-ui","date-picker","calendar","datepicker","date","headless","accessibility","aria","component","svelte"],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/One-Learning-Community/rozie.js.git", "directory": "packages/ui/date-picker/packages/svelte" },
+  "bugs": { "url": "https://github.com/One-Learning-Community/rozie.js/issues" },
+  "exports": {
+    ".": { "svelte": "./dist/DatePicker.svelte", "types": "./dist/DatePicker.svelte.d.ts", "default": "./dist/DatePicker.svelte" },
+    "./themes/*": "./src/themes/*",
+    "./source": { "svelte": "./src/DatePicker.svelte", "default": "./src/DatePicker.svelte" }
+  },
+  "files": ["dist","src"],
+  "dependencies": { "@rozie/runtime-svelte": "workspace:^" },
+  "peerDependencies": { "svelte": "^5" },
+  "peerDependenciesMeta": { "svelte": { "optional": false } },
+  "scripts": { "build": "svelte-package --input src --output dist", "typecheck": "echo 'source+dist; svelte-check at repo level'" },
+  "publishConfig": { "access": "public" },
+  "devDependencies": { "@sveltejs/package": "^2", "@sveltejs/vite-plugin-svelte": "^5", "svelte": "^5", "svelte2tsx": "^0.7", "typescript": "~5.6.0" }
+}

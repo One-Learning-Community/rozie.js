@@ -1,0 +1,26 @@
+/*
+ * @rozie-ui/date-picker — Bootstrap 5 bridge.
+ *
+ * Maps the DatePicker tokens onto Bootstrap 5 CSS variables (`--bs-*`). Reads
+ * them live, so the calendar follows a Bootstrap theme (including
+ * `data-bs-theme="dark"`) and `--bs-primary` accent automatically.
+ *
+ *   import '@rozie-ui/date-picker-react/themes/bootstrap.css';
+ */
+.rozie-datepicker {
+  --rozie-datepicker-accent: var(--bs-primary, #0d6efd);
+
+  --rozie-datepicker-fg: var(--bs-body-color, #212529);
+  --rozie-datepicker-bg: var(--bs-body-bg, #fff);
+  --rozie-datepicker-border: var(--bs-border-color, #dee2e6);
+  --rozie-datepicker-radius: var(--bs-border-radius-lg, 0.5rem);
+
+  --rozie-datepicker-hover-bg: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.05));
+  --rozie-datepicker-ring: var(--bs-primary, #0d6efd);
+
+  --rozie-datepicker-weekday-fg: var(--bs-secondary-color, rgba(33, 37, 41, 0.6));
+  --rozie-datepicker-outside-fg: var(--bs-tertiary-color, rgba(33, 37, 41, 0.4));
+
+  --rozie-datepicker-selected-fg: #fff;
+  --rozie-datepicker-selected-bg: var(--bs-primary, #0d6efd);
+}

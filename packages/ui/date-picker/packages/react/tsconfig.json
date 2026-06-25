@@ -1,0 +1,11 @@
+{
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true, "module": "ESNext", "target": "ES2022", "moduleResolution": "bundler",
+    "strict": true, "verbatimModuleSyntax": true, "jsx": "react-jsx", "skipLibCheck": true,
+    "strictNullChecks": false, "exactOptionalPropertyTypes": false, "noImplicitAny": false,
+    "lib": ["ES2022","DOM","DOM.Iterable"], "types": ["react"]
+  },
+  "include": ["src"],
+  "exclude": ["dist","node_modules"]
+}

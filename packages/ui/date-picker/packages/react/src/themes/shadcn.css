@@ -1,0 +1,30 @@
+/*
+ * @rozie-ui/date-picker — shadcn/ui (Radix) bridge.
+ *
+ * Maps the DatePicker tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * calendar automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/date-picker-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ */
+.rozie-datepicker {
+  --rozie-datepicker-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+
+  --rozie-datepicker-fg: hsl(var(--foreground, 222.2 84% 4.9%));
+  --rozie-datepicker-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-datepicker-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-datepicker-radius: var(--radius, 0.625rem);
+
+  --rozie-datepicker-hover-bg: hsl(var(--accent, 210 40% 96.1%));
+  --rozie-datepicker-ring: hsl(var(--ring, 222.2 84% 4.9%));
+
+  --rozie-datepicker-weekday-fg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-datepicker-outside-fg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%) / 0.6);
+
+  --rozie-datepicker-selected-fg: hsl(var(--primary-foreground, 210 40% 98%));
+  --rozie-datepicker-selected-bg: hsl(var(--primary, 222.2 47.4% 11.2%));
+}

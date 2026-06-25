@@ -74,6 +74,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Tags** | *(no engine)* headless accessible token / tags input | [/components/tags](/components/tags) |
 | **NumberField** | *(no engine)* headless accessible number field / stepper | [/components/number-field](/components/number-field) |
 | **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
+| **DatePicker** | *(no engine)* headless accessible single-date calendar | [/components/date-picker](/components/date-picker) |
 | **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |
 
 ## Why these exist

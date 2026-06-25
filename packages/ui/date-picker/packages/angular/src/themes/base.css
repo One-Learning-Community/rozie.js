@@ -1,0 +1,69 @@
+/*
+ * @rozie-ui/date-picker — base token reference.
+ *
+ * Every COSMETIC value the calendar renders is a `--rozie-datepicker-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * The structural rules (the month-nav header, the 7-column grid, the roving
+ * focus ring) live in the component's scoped `<style>` (per-leaf, NOT consumer-
+ * overridable). Only the values below flow through tokens.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-datepicker` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ */
+.rozie-datepicker {
+  /* surface */
+  --rozie-datepicker-font: inherit;
+  --rozie-datepicker-fg: #1a1a1a;
+  --rozie-datepicker-bg: #fff;
+  --rozie-datepicker-border-width: 1px;
+  --rozie-datepicker-border: rgba(0, 0, 0, 0.18);
+  --rozie-datepicker-radius: 10px;
+  --rozie-datepicker-padding: 0.75rem;
+
+  /* accent — the single color most consumers will set; selected day, today
+     ring + focus ring all derive from it */
+  --rozie-datepicker-accent: #0066cc;
+
+  /* header */
+  --rozie-datepicker-gap: 0.25rem;
+  --rozie-datepicker-header-gap: 0.5rem;
+  --rozie-datepicker-heading-weight: 600;
+  --rozie-datepicker-heading-size: 0.95rem;
+  --rozie-datepicker-nav-size: 2rem;
+  --rozie-datepicker-nav-bg: transparent;
+  --rozie-datepicker-nav-radius: 6px;
+  --rozie-datepicker-hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* focus ring */
+  --rozie-datepicker-ring: var(--rozie-datepicker-accent);
+  --rozie-datepicker-ring-width: 2px;
+  --rozie-datepicker-ring-offset: 1px;
+
+  /* grid */
+  --rozie-datepicker-cell-size: 2.25rem;
+  --rozie-datepicker-cell-gap: 0.125rem;
+  --rozie-datepicker-weekday-height: 1.75rem;
+  --rozie-datepicker-weekday-size: 0.72rem;
+  --rozie-datepicker-weekday-weight: 600;
+  --rozie-datepicker-weekday-fg: rgba(0, 0, 0, 0.5);
+
+  /* day cell */
+  --rozie-datepicker-day-bg: transparent;
+  --rozie-datepicker-day-border-width: 1px;
+  --rozie-datepicker-day-radius: 6px;
+  --rozie-datepicker-day-size: 0.85rem;
+  --rozie-datepicker-outside-fg: rgba(0, 0, 0, 0.35);
+
+  /* today + selected */
+  --rozie-datepicker-today-border: var(--rozie-datepicker-accent);
+  --rozie-datepicker-selected-fg: #fff;
+  --rozie-datepicker-selected-bg: var(--rozie-datepicker-accent);
+  --rozie-datepicker-selected-weight: 600;
+
+  /* disabled */
+  --rozie-datepicker-disabled-opacity: 0.4;
+}

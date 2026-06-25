@@ -1,0 +1,109 @@
+.rozie-datepicker[data-rozie-s-6800c7a2] {
+  display: inline-block;
+  font: var(--rozie-datepicker-font, inherit);
+  color: var(--rozie-datepicker-fg, #1a1a1a);
+  background: var(--rozie-datepicker-bg, #fff);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-radius, 10px);
+  padding: var(--rozie-datepicker-padding, 0.75rem);
+}
+.rozie-datepicker-header[data-rozie-s-6800c7a2] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-datepicker-gap, 0.25rem);
+  margin-bottom: var(--rozie-datepicker-header-gap, 0.5rem);
+}
+.rozie-datepicker-heading[data-rozie-s-6800c7a2] {
+  font-weight: var(--rozie-datepicker-heading-weight, 600);
+  font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+}
+.rozie-datepicker-nav[data-rozie-s-6800c7a2] {
+  box-sizing: border-box;
+  width: var(--rozie-datepicker-nav-size, 2rem);
+  height: var(--rozie-datepicker-nav-size, 2rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-datepicker-nav-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-nav[data-rozie-s-6800c7a2]:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-nav[data-rozie-s-6800c7a2]:focus-visible,
+.rozie-datepicker-day[data-rozie-s-6800c7a2]:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-grid[data-rozie-s-6800c7a2] {
+  display: grid;
+  gap: var(--rozie-datepicker-cell-gap, 0.125rem);
+}
+.rozie-datepicker-weekdays[data-rozie-s-6800c7a2],
+.rozie-datepicker-week[data-rozie-s-6800c7a2] {
+  display: grid;
+  grid-template-columns: repeat(7, var(--rozie-datepicker-cell-size, 2.25rem));
+  gap: var(--rozie-datepicker-cell-gap, 0.125rem);
+}
+.rozie-datepicker-weekday[data-rozie-s-6800c7a2] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--rozie-datepicker-weekday-height, 1.75rem);
+  font-size: var(--rozie-datepicker-weekday-size, 0.72rem);
+  font-weight: var(--rozie-datepicker-weekday-weight, 600);
+  color: var(--rozie-datepicker-weekday-fg, rgba(0, 0, 0, 0.5));
+  text-transform: uppercase;
+  user-select: none;
+}
+.rozie-datepicker-cell[data-rozie-s-6800c7a2] {
+  display: inline-flex;
+}
+.rozie-datepicker-day[data-rozie-s-6800c7a2] {
+  box-sizing: border-box;
+  width: var(--rozie-datepicker-cell-size, 2.25rem);
+  height: var(--rozie-datepicker-cell-size, 2.25rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--rozie-datepicker-day-size, 0.85rem);
+  color: inherit;
+  background: var(--rozie-datepicker-day-bg, transparent);
+  border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-day-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-day[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-day.is-outside[data-rozie-s-6800c7a2] {
+  color: var(--rozie-datepicker-outside-fg, rgba(0, 0, 0, 0.35));
+}
+.rozie-datepicker-day.is-today[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]) {
+  border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+}
+.rozie-datepicker-day.is-selected[data-rozie-s-6800c7a2] {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-day[data-rozie-s-6800c7a2]:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+.rozie-datepicker--disabled[data-rozie-s-6800c7a2] {
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.55);
+  pointer-events: none;
+}

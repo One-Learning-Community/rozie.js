@@ -353,6 +353,17 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/date-picker',
+          collapsed: true,
+          items: [
+            { text: 'DatePicker — headless calendar', link: '/components/date-picker' },
+            { text: 'API reference', link: '/components/date-picker-api' },
+            { text: 'Usage examples', link: '/components/date-picker-usage' },
+            { text: 'Date picker comparison', link: '/components/date-picker-comparison' },
+            { text: 'DatePicker — live demo', link: '/components/date-picker-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/switch',
           collapsed: true,
           items: [

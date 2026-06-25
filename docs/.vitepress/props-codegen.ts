@@ -58,6 +58,7 @@ export function propsCodegen(
       'tags',
       'number-field',
       'pagination',
+      'date-picker',
       'switch',
       'popover',
       'sortable-list',

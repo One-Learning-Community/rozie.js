@@ -1,0 +1,29 @@
+/*
+ * @rozie-ui/date-picker — Material 3 bridge.
+ *
+ * Maps the DatePicker tokens onto Material Design 3 system tokens
+ * (`--md-sys-color-*`). Reads them live, so the calendar follows an MD3 theme's
+ * light/dark scheme and dynamic color automatically.
+ *
+ *   import '@rozie-ui/date-picker-react/themes/material.css';
+ */
+.rozie-datepicker {
+  --rozie-datepicker-accent: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-datepicker-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-datepicker-bg: var(--md-sys-color-surface, #fef7ff);
+  --rozie-datepicker-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-datepicker-radius: 16px;
+
+  --rozie-datepicker-hover-bg: color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 8%, transparent);
+  --rozie-datepicker-ring: var(--md-sys-color-primary, #6750a4);
+
+  --rozie-datepicker-weekday-fg: var(--md-sys-color-on-surface-variant, #49454f);
+  --rozie-datepicker-outside-fg: color-mix(in srgb, var(--md-sys-color-on-surface, #1d1b20) 38%, transparent);
+
+  --rozie-datepicker-day-radius: 999px;
+  --rozie-datepicker-nav-radius: 999px;
+
+  --rozie-datepicker-selected-fg: var(--md-sys-color-on-primary, #fff);
+  --rozie-datepicker-selected-bg: var(--md-sys-color-primary, #6750a4);
+}
