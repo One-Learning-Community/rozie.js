@@ -2,7 +2,7 @@ import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { addDays, addMonths, buildMonthGrid, isDayDisabled, isIsoDate, monthLabel, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -14,6 +14,12 @@ interface HeaderCtx {
   prev: any;
   next: any;
   disabled: any;
+}
+
+interface PresetsCtx {
+  $implicit: { presets: any; apply: any };
+  presets: any;
+  apply: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -57,7 +63,7 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      <div class="rozie-datepicker-grid" role="grid">
+      <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
         <div class="rozie-datepicker-weekdays" role="row">
           @for (wd of weekdays(); track wi; let wi = $index) {
     <span class="rozie-datepicker-weekday" role="columnheader" [attr.aria-label]="rozieAttr(wd)">{{ rozieDisplay(wd) }}</span>
@@ -67,13 +73,27 @@ function __rozieAttr(v: unknown): string | null {
         @for (week of grid().weeks; track wk; let wk = $index) {
     <div class="rozie-datepicker-week" role="row">
           @for (day of week; track day.iso) {
-    <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!day.selected">
-            <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth }" [attr.data-day]="rozieAttr(day.iso)" [attr.tabindex]="rozieAttr(dayTabIndex(day))" [disabled]="!!day.disabled" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (click)="commitValue(day.iso)" (keydown)="onDayKeydown(day.iso, $event)">{{ rozieDisplay(day.day) }}</button>
+    <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!(day.selected || day.rangeStart || day.rangeEnd)">
+            <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [attr.tabindex]="rozieAttr(dayTabIndex(day))" [disabled]="!!day.disabled" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (click)="onDaySelect(day.iso)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayKeydown(day.iso, $event)">{{ rozieDisplay(day.day) }}</button>
           </span>
     }
         </div>
     }
       </div>
+
+      
+      @if ((presetsTpl ?? templates()?.['presets'])) {
+    <ng-container *ngTemplateOutlet="(presetsTpl ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
+    } @else {
+
+        @if (resolvedPresets().length) {
+    <div class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
+          @for (p of resolvedPresets(); track p.label) {
+    <button type="button" class="rozie-datepicker-preset" [ngClass]="{ 'is-active': isPresetActive(p.range) }" [attr.aria-pressed]="!!isPresetActive(p.range)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="applyPreset(p.range)">{{ rozieDisplay(p.label) }}</button>
+    }
+        </div>
+    }
+    }
     </div>
 
   `,
@@ -178,6 +198,29 @@ function __rozieAttr(v: unknown): string | null {
       border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
       font-weight: var(--rozie-datepicker-selected-weight, 600);
     }
+    .rozie-datepicker-day.is-in-range {
+      background: var(--rozie-datepicker-range-bg, rgba(0, 102, 204, 0.14));
+      border-radius: 0;
+    }
+    .rozie-datepicker-day.is-in-preview {
+      background: var(--rozie-datepicker-preview-bg, rgba(0, 102, 204, 0.08));
+      border-radius: 0;
+    }
+    .rozie-datepicker-day.is-range-start,
+    .rozie-datepicker-day.is-range-end {
+      color: var(--rozie-datepicker-selected-fg, #fff);
+      background: var(--rozie-datepicker-range-endpoint-bg, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)));
+      border-color: var(--rozie-datepicker-range-endpoint-bg, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)));
+      font-weight: var(--rozie-datepicker-selected-weight, 600);
+    }
+    .rozie-datepicker-day.is-range-start {
+      border-top-left-radius: var(--rozie-datepicker-day-radius, 6px);
+      border-bottom-left-radius: var(--rozie-datepicker-day-radius, 6px);
+    }
+    .rozie-datepicker-day.is-range-end {
+      border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
+      border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
+    }
     .rozie-datepicker-day:disabled {
       cursor: not-allowed;
       opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
@@ -185,6 +228,42 @@ function __rozieAttr(v: unknown): string | null {
     }
     .rozie-datepicker--disabled {
       opacity: var(--rozie-datepicker-disabled-opacity, 0.55);
+      pointer-events: none;
+    }
+    .rozie-datepicker-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--rozie-datepicker-presets-gap, 0.25rem);
+      margin-top: var(--rozie-datepicker-presets-gap-top, 0.5rem);
+    }
+    .rozie-datepicker-preset {
+      font: inherit;
+      font-size: var(--rozie-datepicker-preset-size, 0.78rem);
+      color: var(--rozie-datepicker-preset-fg, inherit);
+      background: var(--rozie-datepicker-preset-bg, transparent);
+      border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+      border-radius: var(--rozie-datepicker-preset-radius, 999px);
+      padding: var(--rozie-datepicker-preset-padding, 0.2rem 0.6rem);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .rozie-datepicker-preset:hover:not(:disabled) {
+      background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+    .rozie-datepicker-preset:focus-visible {
+      outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+      outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+    }
+    .rozie-datepicker-preset.is-active {
+      color: var(--rozie-datepicker-selected-fg, #fff);
+      background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+      border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+      font-weight: var(--rozie-datepicker-selected-weight, 600);
+    }
+    .rozie-datepicker-preset:disabled {
+      cursor: not-allowed;
+      opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
       pointer-events: none;
     }
   `],
@@ -199,11 +278,15 @@ function __rozieAttr(v: unknown): string | null {
 })
 export class DatePicker {
   /**
-   * The selected date as an ISO `YYYY-MM-DD` string (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). An empty string `""` means no date is selected; selecting a day writes the new ISO string back and emits `change`.
+   * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
    * @example
    * <DatePicker r-model:value="date" :min="'2026-01-01'" @change="onPick" />
    */
-  value = model<string>('');
+  value = model<string | Record<string, any>>('');
+  /**
+   * Selection mode: `'single'` (the default — `value` is one ISO `YYYY-MM-DD` string, fully backward-compatible) or `'range'` (`value` becomes a `{ start, end }` object selected with two clicks plus a live hover preview, direction-agnostic). In `range` mode a completed selection additionally emits `rangeComplete`.
+   */
+  selectionMode = input<string>('single');
   /**
    * Inclusive lower bound as an ISO `YYYY-MM-DD` string. Days before it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no lower bound.
    */
@@ -228,10 +311,17 @@ export class DatePicker {
    * BCP-47 locale tag used by `Intl.DateTimeFormat` to render the month-year heading and the short weekday header labels (e.g. `"fr-FR"`, `"ja-JP"`). Falls back to English names in a runtime without `Intl`.
    */
   locale = input<string>('en-US');
+  /**
+   * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
+   */
+  presetRanges = input<any[]>((() => [])());
   viewIso = signal('');
+  hoverIso = signal('');
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   change = output<unknown>();
+  rangeComplete = output<unknown>();
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
+  @ContentChild('presets', { read: TemplateRef }) presetsTpl?: TemplateRef<PresetsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   ngAfterViewInit() {
@@ -243,6 +333,7 @@ export class DatePicker {
     return toIso(d.getFullYear(), d.getMonth(), d.getDate());
   };
   selected = () => typeof this.value() === 'string' ? this.value() : '';
+  readRange = () => normalizeRange(this.value());
   viewMonthGrid = () => resolveViewIso({
     viewIso: this.viewIso(),
     value: this.selected(),
@@ -256,7 +347,9 @@ export class DatePicker {
     max: this.max(),
     disabledDates: this.disabledDates(),
     weekStartsOn: this.weekStartsOn(),
-    disabled: (this.disabled() || this.__rozieCvaDisabled())
+    disabled: (this.disabled() || this.__rozieCvaDisabled()),
+    selection: this.selectionMode() === 'range' ? this.readRange() : undefined,
+    previewEnd: this.selectionMode() === 'range' ? this.hoverIso() : undefined
   });
   dayTabIndex = (day: any): number | undefined => day.selected || this.selected() === '' && day.today ? 0 : -1;
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale());
@@ -281,6 +374,52 @@ export class DatePicker {
     this.change.emit({
       value: iso
     });
+  };
+  commitRange = (iso: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (!isIsoDate(iso)) return;
+    if (!this.dayEnabled(iso)) return;
+    const r = this.readRange();
+    if (r.start === '' || r.end !== '') {
+      // No in-progress selection, or a completed one → (re)start the anchor.
+      this.value.set({
+        start: iso,
+        end: ''
+      }), this.__rozieCvaOnChange({
+        start: iso,
+        end: ''
+      });
+      this.viewIso.set(iso);
+      this.change.emit({
+        value: {
+          start: iso,
+          end: ''
+        }
+      });
+    } else {
+      // Anchor set, end empty → complete the range (ordered by normalizeRange).
+      const next = normalizeRange({
+        start: r.start,
+        end: iso
+      });
+      this.value.set(next), this.__rozieCvaOnChange(next);
+      this.viewIso.set(iso);
+      this.hoverIso.set('');
+      this.change.emit({
+        value: next
+      });
+      this.rangeComplete.emit({
+        value: next
+      });
+    }
+  };
+  onDayHover = (iso: any) => {
+    if (this.selectionMode() !== 'range') return;
+    const r = this.readRange();
+    if (r.start !== '' && r.end === '') this.hoverIso.set(iso);
+  };
+  onDaySelect = (iso: any) => {
+    if (this.selectionMode() === 'range') this.commitRange(iso);else this.commitValue(iso);
   };
   goToMonth = (delta: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
@@ -340,7 +479,29 @@ export class DatePicker {
       this.moveFocus(iso, this.daysInMonthSpan(iso, 1));
     } else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
       e.preventDefault();
-      this.commitValue(iso);
+      this.onDaySelect(iso);
+    } else if (key === 'Escape') {
+      // In range mode, cancel an in-progress (anchor-set) selection.
+      if (this.selectionMode() === 'range') {
+        const r = this.readRange();
+        if (r.start !== '' && r.end === '') {
+          e.preventDefault();
+          this.value.set({
+            start: '',
+            end: ''
+          }), this.__rozieCvaOnChange({
+            start: '',
+            end: ''
+          });
+          this.hoverIso.set('');
+          this.change.emit({
+            value: {
+              start: '',
+              end: ''
+            }
+          });
+        }
+      }
     }
   };
   weekdayOffset = (iso: any) => {
@@ -360,6 +521,28 @@ export class DatePicker {
   isoToMs = (iso: any) => {
     const t = isIsoDate(iso) ? Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : 0;
     return t;
+  };
+  resolvedPresets = () => this.presetRanges().map((p: any) => ({
+    label: p.label,
+    range: rangeFromPreset(p)
+  }));
+  applyPreset = (range: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    const next = normalizeRange(range);
+    this.value.set(next), this.__rozieCvaOnChange(next);
+    this.hoverIso.set('');
+    this.change.emit({
+      value: next
+    });
+    this.rangeComplete.emit({
+      value: next
+    });
+  };
+  isPresetActive = (range: any) => {
+    const p = normalizeRange(range);
+    if (p.start === '') return false;
+    const r = this.readRange();
+    return r.start === p.start && r.end === p.end;
   };
   focus = () => {
     const sel = this.selected();
@@ -381,21 +564,40 @@ export class DatePicker {
   };
   clear = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    if (this.selected() === '') return;
-    this.value.set(''), this.__rozieCvaOnChange('');
-    this.change.emit({
-      value: ''
-    });
+    if (this.selectionMode() === 'range') {
+      const r = this.readRange();
+      if (r.start === '' && r.end === '') return;
+      this.value.set({
+        start: '',
+        end: ''
+      }), this.__rozieCvaOnChange({
+        start: '',
+        end: ''
+      });
+      this.hoverIso.set('');
+      this.change.emit({
+        value: {
+          start: '',
+          end: ''
+        }
+      });
+    } else {
+      if (this.selected() === '') return;
+      this.value.set(''), this.__rozieCvaOnChange('');
+      this.change.emit({
+        value: ''
+      });
+    }
   };
 
-  private __rozieCvaOnChange: (v: string) => void = () => {};
+  private __rozieCvaOnChange: (v: string | Record<string, any>) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
   protected __rozieCvaDisabled = signal(false);
 
-  writeValue(v: string | null): void {
+  writeValue(v: string | Record<string, any> | null): void {
     this.value.set(v ?? '');
   }
-  registerOnChange(fn: (v: string) => void): void {
+  registerOnChange(fn: (v: string | Record<string, any>) => void): void {
     this.__rozieCvaOnChange = fn;
   }
   registerOnTouched(fn: () => void): void {
@@ -411,7 +613,7 @@ export class DatePicker {
   static ngTemplateContextGuard(
     _dir: DatePicker,
     _ctx: unknown,
-  ): _ctx is HeaderCtx {
+  ): _ctx is HeaderCtx | PresetsCtx {
     return true;
   }
 

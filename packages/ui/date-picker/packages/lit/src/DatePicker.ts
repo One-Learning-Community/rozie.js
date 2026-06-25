@@ -1,9 +1,9 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
-import { addDays, addMonths, buildMonthGrid, isDayDisabled, isIsoDate, monthLabel, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -14,6 +14,11 @@ interface RozieHeaderSlotCtx {
   prev: unknown;
   next: unknown;
   disabled: unknown;
+}
+
+interface RoziePresetsSlotCtx {
+  presets: unknown;
+  apply: unknown;
 }
 
 @customElement('rozie-date-picker')
@@ -119,6 +124,29 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
   font-weight: var(--rozie-datepicker-selected-weight, 600);
 }
+.rozie-datepicker-day.is-in-range[data-rozie-s-6800c7a2] {
+  background: var(--rozie-datepicker-range-bg, rgba(0, 102, 204, 0.14));
+  border-radius: 0;
+}
+.rozie-datepicker-day.is-in-preview[data-rozie-s-6800c7a2] {
+  background: var(--rozie-datepicker-preview-bg, rgba(0, 102, 204, 0.08));
+  border-radius: 0;
+}
+.rozie-datepicker-day.is-range-start[data-rozie-s-6800c7a2],
+.rozie-datepicker-day.is-range-end[data-rozie-s-6800c7a2] {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-range-endpoint-bg, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)));
+  border-color: var(--rozie-datepicker-range-endpoint-bg, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-day.is-range-start[data-rozie-s-6800c7a2] {
+  border-top-left-radius: var(--rozie-datepicker-day-radius, 6px);
+  border-bottom-left-radius: var(--rozie-datepicker-day-radius, 6px);
+}
+.rozie-datepicker-day.is-range-end[data-rozie-s-6800c7a2] {
+  border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
+  border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
+}
 .rozie-datepicker-day[data-rozie-s-6800c7a2]:disabled {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
@@ -128,15 +156,55 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   opacity: var(--rozie-datepicker-disabled-opacity, 0.55);
   pointer-events: none;
 }
+.rozie-datepicker-presets[data-rozie-s-6800c7a2] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rozie-datepicker-presets-gap, 0.25rem);
+  margin-top: var(--rozie-datepicker-presets-gap-top, 0.5rem);
+}
+.rozie-datepicker-preset[data-rozie-s-6800c7a2] {
+  font: inherit;
+  font-size: var(--rozie-datepicker-preset-size, 0.78rem);
+  color: var(--rozie-datepicker-preset-fg, inherit);
+  background: var(--rozie-datepicker-preset-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-preset-radius, 999px);
+  padding: var(--rozie-datepicker-preset-padding, 0.2rem 0.6rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-preset[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-preset[data-rozie-s-6800c7a2]:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-preset.is-active[data-rozie-s-6800c7a2] {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-preset[data-rozie-s-6800c7a2]:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
 `;
 
   /**
-   * The selected date as an ISO `YYYY-MM-DD` string (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). An empty string `""` means no date is selected; selecting a day writes the new ISO string back and emits `change`.
+   * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
    * @example
    * <DatePicker r-model:value="date" :min="'2026-01-01'" @change="onPick" />
    */
-  @property({ type: String, attribute: 'value' }) _value_attr: string = '';
-  private _valueControllable = createLitControllableProperty<string>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });
+  @property({ type: String, attribute: 'value' }) _value_attr: string | any = '';
+  private _valueControllable = createLitControllableProperty<string | any>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });
+  /**
+   * Selection mode: `'single'` (the default — `value` is one ISO `YYYY-MM-DD` string, fully backward-compatible) or `'range'` (`value` becomes a `{ start, end }` object selected with two clicks plus a live hover preview, direction-agnostic). In `range` mode a completed selection additionally emits `rangeComplete`.
+   */
+  @property({ type: String, reflect: true }) selectionMode: string = 'single';
   /**
    * Inclusive lower bound as an ISO `YYYY-MM-DD` string. Days before it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no lower bound.
    */
@@ -161,12 +229,20 @@ export default class DatePicker extends SignalWatcher(LitElement) {
    * BCP-47 locale tag used by `Intl.DateTimeFormat` to render the month-year heading and the short weekday header labels (e.g. `"fr-FR"`, `"ja-JP"`). Falls back to English names in a runtime without `Intl`.
    */
   @property({ type: String, reflect: true }) locale: string = 'en-US';
+  /**
+   * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
+   */
+  @property({ type: Array }) presetRanges: any[] = [];
   private _viewIso = signal('');
+  private _hoverIso = signal('');
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
   @property({ attribute: false }) header?: (scope: { label: unknown; prev: unknown; next: unknown; disabled: unknown }) => unknown;
+  @state() private _hasSlotPresets = false;
+  @queryAssignedElements({ slot: 'presets', flatten: true }) private _slotPresetsElements!: Element[];
+  @property({ attribute: false }) presets?: (scope: { presets: unknown; apply: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -184,11 +260,23 @@ export default class DatePicker extends SignalWatcher(LitElement) {
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="presets"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotPresets = this._slotPresetsElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
+    this._hasSlotPresets = Array.from(this.children).some((el) => el.getAttribute('slot') === 'presets');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -211,7 +299,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
-    if (name === 'value') this._valueControllable.notifyAttributeChange(value as unknown as string);
+    if (name === 'value') this._valueControllable.notifyAttributeChange(value as unknown as string | any);
   }
 
   render() {
@@ -227,17 +315,23 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   </slot>`}
 
   
-  <div class="rozie-datepicker-grid" role="grid" data-rozie-s-6800c7a2>
+  <div class="rozie-datepicker-grid" role="grid" @mouseleave=${($event: Event) => { this._hoverIso.value = ''; }} data-rozie-s-6800c7a2>
     <div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>
       ${repeat<any>(this.weekdays(), (wd, wi) => wi, (wd, wi) => html`<span class="rozie-datepicker-weekday" key=${rozieAttr(wi)} role="columnheader" aria-label=${rozieAttr(wd)} data-rozie-s-6800c7a2>${rozieDisplay(wd)}</span>`)}
     </div>
 
     ${repeat<any>(this.grid().weeks, (week, wk) => wk, (week, wk) => html`<div class="rozie-datepicker-week" key=${rozieAttr(wk)} role="row" data-rozie-s-6800c7a2>
-      ${repeat<any>(week, (day, _idx) => day.iso, (day, _idx) => html`<span class="rozie-datepicker-cell" key=${rozieAttr(day.iso)} role="gridcell" aria-selected=${!!day.selected} data-rozie-s-6800c7a2>
-        <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} tabindex=${rozieAttr(this.dayTabIndex(day))} ?disabled=${!!day.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @click=${($event: Event) => { this.commitValue(day.iso); }} @keydown=${($event: Event) => { this.onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
+      ${repeat<any>(week, (day, _idx) => day.iso, (day, _idx) => html`<span class="rozie-datepicker-cell" key=${rozieAttr(day.iso)} role="gridcell" aria-selected=${!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2>
+        <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} tabindex=${rozieAttr(this.dayTabIndex(day))} ?disabled=${!!day.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @click=${($event: Event) => { this.onDaySelect(day.iso); }} @mouseenter=${($event: Event) => { this.onDayHover(day.iso); }} @focus=${($event: Event) => { this.onDayHover(day.iso); }} @keydown=${($event: Event) => { this.onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
       </span>`)}
     </div>`)}
   </div>
+
+  
+  ${this.presets !== undefined ? this.presets({presets: this.resolvedPresets(), apply: this.applyPreset}) : html`<slot name="presets" data-rozie-params=${(() => { try { return JSON.stringify({presets: this.resolvedPresets()}); } catch { return '{}'; } })()} @rozie-presets-apply=${($event: CustomEvent) => ((this.applyPreset) as (...args: any[]) => any)($event.detail)}>
+    ${this.resolvedPresets().length ? html`<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>
+      ${repeat<any>(this.resolvedPresets(), (p, _idx) => p.label, (p, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-preset": true, 'is-active': this.isPresetActive(p.range) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(p.label)} type="button" aria-pressed=${!!this.isPresetActive(p.range)} ?disabled=${!!this.disabled} @click=${($event: Event) => { this.applyPreset(p.range); }} data-rozie-s-6800c7a2>${rozieDisplay(p.label)}</button>`)}
+    </div>` : nothing}</slot>`}
 </div>
 `;
   }
@@ -248,6 +342,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 };
 
   selected = () => typeof this.value === 'string' ? this.value : '';
+
+  readRange = () => normalizeRange(this.value);
 
   viewMonthGrid = () => resolveViewIso({
   viewIso: this._viewIso.value,
@@ -263,7 +359,9 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   max: this.max,
   disabledDates: this.disabledDates,
   weekStartsOn: this.weekStartsOn,
-  disabled: this.disabled
+  disabled: this.disabled,
+  selection: this.selectionMode === 'range' ? this.readRange() : undefined,
+  previewEnd: this.selectionMode === 'range' ? this._hoverIso.value : undefined
 });
 
   dayTabIndex = (day: any): number | undefined => day.selected || this.selected() === '' && day.today ? 0 : -1;
@@ -297,6 +395,64 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     bubbles: true,
     composed: true
   }));
+};
+
+  commitRange = (iso: any) => {
+  if (this.disabled) return;
+  if (!isIsoDate(iso)) return;
+  if (!this.dayEnabled(iso)) return;
+  const r = this.readRange();
+  if (r.start === '' || r.end !== '') {
+    // No in-progress selection, or a completed one → (re)start the anchor.
+    this._valueControllable.write({
+      start: iso,
+      end: ''
+    });
+    this._viewIso.value = iso;
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: {
+          start: iso,
+          end: ''
+        }
+      },
+      bubbles: true,
+      composed: true
+    }));
+  } else {
+    // Anchor set, end empty → complete the range (ordered by normalizeRange).
+    const next = normalizeRange({
+      start: r.start,
+      end: iso
+    });
+    this._valueControllable.write(next);
+    this._viewIso.value = iso;
+    this._hoverIso.value = '';
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: next
+      },
+      bubbles: true,
+      composed: true
+    }));
+    this.dispatchEvent(new CustomEvent("rangeComplete", {
+      detail: {
+        value: next
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+};
+
+  onDayHover = (iso: any) => {
+  if (this.selectionMode !== 'range') return;
+  const r = this.readRange();
+  if (r.start !== '' && r.end === '') this._hoverIso.value = iso;
+};
+
+  onDaySelect = (iso: any) => {
+  if (this.selectionMode === 'range') this.commitRange(iso);else this.commitValue(iso);
 };
 
   goToMonth = (delta: any) => {
@@ -363,7 +519,30 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     this.moveFocus(iso, this.daysInMonthSpan(iso, 1));
   } else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
     e.preventDefault();
-    this.commitValue(iso);
+    this.onDaySelect(iso);
+  } else if (key === 'Escape') {
+    // In range mode, cancel an in-progress (anchor-set) selection.
+    if (this.selectionMode === 'range') {
+      const r = this.readRange();
+      if (r.start !== '' && r.end === '') {
+        e.preventDefault();
+        this._valueControllable.write({
+          start: '',
+          end: ''
+        });
+        this._hoverIso.value = '';
+        this.dispatchEvent(new CustomEvent("change", {
+          detail: {
+            value: {
+              start: '',
+              end: ''
+            }
+          },
+          bubbles: true,
+          composed: true
+        }));
+      }
+    }
   }
 };
 
@@ -388,6 +567,39 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   return t;
 };
 
+  resolvedPresets = () => this.presetRanges.map((p: any) => ({
+  label: p.label,
+  range: rangeFromPreset(p)
+}));
+
+  applyPreset = (range: any) => {
+  if (this.disabled) return;
+  const next = normalizeRange(range);
+  this._valueControllable.write(next);
+  this._hoverIso.value = '';
+  this.dispatchEvent(new CustomEvent("change", {
+    detail: {
+      value: next
+    },
+    bubbles: true,
+    composed: true
+  }));
+  this.dispatchEvent(new CustomEvent("rangeComplete", {
+    detail: {
+      value: next
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  isPresetActive = (range: any) => {
+  const p = normalizeRange(range);
+  if (p.start === '') return false;
+  const r = this.readRange();
+  return r.start === p.start && r.end === p.end;
+};
+
   focus = () => {
   const sel = this.selected();
   const t = this.todayIso();
@@ -410,19 +622,39 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   clear = () => {
   if (this.disabled) return;
-  if (this.selected() === '') return;
-  this._valueControllable.write('');
-  this.dispatchEvent(new CustomEvent("change", {
-    detail: {
-      value: ''
-    },
-    bubbles: true,
-    composed: true
-  }));
+  if (this.selectionMode === 'range') {
+    const r = this.readRange();
+    if (r.start === '' && r.end === '') return;
+    this._valueControllable.write({
+      start: '',
+      end: ''
+    });
+    this._hoverIso.value = '';
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: {
+          start: '',
+          end: ''
+        }
+      },
+      bubbles: true,
+      composed: true
+    }));
+  } else {
+    if (this.selected() === '') return;
+    this._valueControllable.write('');
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: ''
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
 };
 
-  get value(): string { return this._valueControllable.read(); }
-  set value(v: string) { this._valueControllable.notifyPropertyWrite(v); }
+  get value(): string | any { return this._valueControllable.read(); }
+  set value(v: string | any) { this._valueControllable.notifyPropertyWrite(v); }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
@@ -437,7 +669,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['value', 'min', 'max', 'disabled-dates', 'disableddates', 'week-starts-on', 'weekstartson', 'disabled', 'locale']);
+    const __skip = new Set<string>(['value', 'selection-mode', 'selectionmode', 'min', 'max', 'disabled-dates', 'disableddates', 'week-starts-on', 'weekstartson', 'disabled', 'locale', 'preset-ranges', 'presetranges']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

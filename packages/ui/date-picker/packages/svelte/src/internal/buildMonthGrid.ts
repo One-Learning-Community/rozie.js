@@ -18,6 +18,18 @@
  * No framework imports, no DOM — pure data in, pure data out.
  */
 
+/**
+ * A normalized range value. ISO `YYYY-MM-DD` endpoints; `''` marks an empty
+ * (unset) endpoint. After `normalizeRange`, `start <= end` whenever both are set,
+ * and a single-set anchor lives in `start` with `end === ''`.
+ */
+export interface RangeValue {
+  /** Ordered range start (ISO) or `''` when unset. */
+  start: string;
+  /** Ordered range end (ISO) or `''` when unset / anchor-only. */
+  end: string;
+}
+
 export interface CalendarDay {
   /** The ISO `YYYY-MM-DD` string for this cell. */
   iso: string;
@@ -31,6 +43,14 @@ export interface CalendarDay {
   today: boolean;
   /** `true` when the day is outside `[min, max]`, in `disabledDates`, or the control is disabled. */
   disabled: boolean;
+  /** `true` when this day === the (ordered) range `start`. */
+  rangeStart: boolean;
+  /** `true` when this day === the (ordered) range `end`. */
+  rangeEnd: boolean;
+  /** `true` when this day falls within a COMPLETED range (both endpoints set, inclusive). */
+  inRange: boolean;
+  /** `true` when this day falls within the live hover-preview band (anchor + `previewEnd`, inclusive, direction-agnostic). */
+  inPreview: boolean;
 }
 
 export interface MonthGridInput {
@@ -50,6 +70,17 @@ export interface MonthGridInput {
   weekStartsOn?: number;
   /** Disable every day (the whole control is disabled). */
   disabled?: boolean;
+  /**
+   * Range-mode selection: a single ISO (anchor-only) or a `{start,end}` object.
+   * Normalized internally via `normalizeRange`. Absent in single-date mode — when
+   * omitted, all four range flags are `false` (SC-1 backward-compat).
+   */
+  selection?: string | RangeValue;
+  /**
+   * The hovered ISO during an in-progress range selection. Combined with the
+   * anchor (`selection.start`) it lights the `inPreview` band, direction-agnostic.
+   */
+  previewEnd?: string;
 }
 
 export interface MonthGrid {
@@ -91,6 +122,66 @@ export function isoToUtc(iso: unknown): number | null {
   // Reject overflow (e.g. 2024-02-31 rolls into March).
   if (d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null;
   return t;
+}
+
+/**
+ * Coerce an untrusted polymorphic value into a canonical, ordered `RangeValue`.
+ *
+ * - A string: an ISO date → `{ start: iso, end: '' }` (anchor-only); anything
+ *   else (incl. `''`) → `{ start: '', end: '' }`.
+ * - An object: collect the valid ISO endpoints; two valid → ordered so
+ *   `start <= end`; exactly one valid → that one in `start`, `end: ''`
+ *   (a single-set anchor is preserved); none valid → empty range.
+ * - `null` / `undefined` / anything else → `{ start: '', end: '' }`.
+ *
+ * Every parse is gated through `isIsoDate` / `isoToUtc` (T-62-01) — never
+ * `new Date(str)`.
+ */
+export function normalizeRange(value: unknown): RangeValue {
+  if (typeof value === 'string') {
+    return isIsoDate(value) ? { start: value, end: '' } : { start: '', end: '' };
+  }
+  if (value && typeof value === 'object') {
+    const v = value as { start?: unknown; end?: unknown };
+    const s = isIsoDate(v.start) ? (v.start as string) : '';
+    const e = isIsoDate(v.end) ? (v.end as string) : '';
+    if (s !== '' && e !== '') {
+      const st = isoToUtc(s) as number;
+      const et = isoToUtc(e) as number;
+      return st <= et ? { start: s, end: e } : { start: e, end: s };
+    }
+    // Exactly one (or zero) valid endpoint → anchor lives in `start`.
+    const only = s !== '' ? s : e;
+    return { start: only, end: '' };
+  }
+  return { start: '', end: '' };
+}
+
+/**
+ * Inclusive, order-tolerant membership test: `true` when `iso` lies between
+ * `start` and `end` (in either order), all three being valid ISO dates. Any
+ * empty / malformed endpoint → `false`.
+ */
+export function isInRange(iso: unknown, start: unknown, end: unknown): boolean {
+  const t = isoToUtc(iso);
+  const a = isoToUtc(start);
+  const b = isoToUtc(end);
+  if (t == null || a == null || b == null) return false;
+  const lo = a <= b ? a : b;
+  const hi = a <= b ? b : a;
+  return t >= lo && t <= hi;
+}
+
+/**
+ * Resolve a preset's `range` — a literal `RangeValue` OR a `() => RangeValue`
+ * thunk (consumer owns the date math + i18n labels). The result is normalized
+ * (ordered) via `normalizeRange`. A throwing thunk surfaces synchronously to the
+ * consumer (T-62-02 — accepted; the consumer owns the thunk).
+ */
+export function rangeFromPreset(preset: { range: RangeValue | (() => RangeValue) }): RangeValue {
+  return typeof preset.range === 'function'
+    ? normalizeRange(preset.range())
+    : normalizeRange(preset.range);
 }
 
 /** The displayed month anchor: `viewIso` when valid, else `value`, else `today`. */
@@ -155,6 +246,12 @@ export function buildMonthGrid(input: MonthGridInput): MonthGrid {
   const value = isIsoDate(input.value) ? input.value : '';
   const today = isIsoDate(input.today) ? input.today : '';
 
+  // Range-mode model (additive — empty/absent in single mode → all flags false).
+  const range = normalizeRange(input.selection);
+  const rangeComplete = range.start !== '' && range.end !== '';
+  const previewing =
+    range.start !== '' && range.end === '' && isIsoDate(input.previewEnd);
+
   // The weekday index (0=Sun) of the 1st of the month, shifted by weekStartsOn.
   const firstDow = new Date(Date.UTC(year, month, 1)).getUTCDay();
   const lead = (firstDow - weekStartsOn + 7) % 7;
@@ -176,6 +273,10 @@ export function buildMonthGrid(input: MonthGridInput): MonthGrid {
         selected: value !== '' && iso === value,
         today: today !== '' && iso === today,
         disabled: isDayDisabled(iso, input),
+        rangeStart: range.start !== '' && iso === range.start,
+        rangeEnd: range.end !== '' && iso === range.end,
+        inRange: rangeComplete && isInRange(iso, range.start, range.end),
+        inPreview: previewing && isInRange(iso, range.start, input.previewEnd),
       });
     }
     weeks.push(row);
