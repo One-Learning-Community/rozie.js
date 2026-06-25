@@ -16,6 +16,7 @@ name: Adoption Smokes
 # Triggered on changes to the relevant packages OR the demos themselves.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
