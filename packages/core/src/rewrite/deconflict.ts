@@ -975,6 +975,227 @@ export function deconflictReservedDataRefNames(
 }
 
 /**
+ * IR-LEVEL generated-binding / vue-import deconfliction for the VUE target
+ * (Phase 61 Plan 07 — SC-2, collision-vue §3 risks 2 + 3).
+ *
+ * The Vue arm of the systemic "author flat namespace ∩ hidden generated symbols"
+ * problem. THREE of the five internal author kinds lower on Vue via CODEGEN that
+ * reads the name back from the IR — NOT from the cloned `<script>` Program — so
+ * the per-target `deconflictGeneratedSymbols` program-walk (run inside
+ * `rewriteRozieIdentifiers`) cannot reach them:
+ *
+ *   - `<data> X`      → `const X = ref(...)`           (emitted from `ir.state[].name`)
+ *   - `$computed X`   → `const X = computed(...)`      (emitted from `ir.computed[].name`)
+ *   - `$inject(...) X` → `const X = inject('k', f?)`   (emitted from `ir.injects[].localBinding`;
+ *                          the `$inject` binder is STRIPPED from the residual body and
+ *                          re-emitted by emitContext)
+ *
+ * Each collides with a GENERATED `<script setup>` binding
+ * (`props`/`emit`/`slots`/`portals`/`portalContainers`) or a `'vue'`/runtime-vue
+ * import (`ref`/`computed`/`watch`/`h`/`render`/`Fragment`/`debounce`/…): e.g. a
+ * `<data> slots` → `const slots = ref(...)` after the generated `const slots =
+ * useSlots()` → TS2451 redeclare; a `<data> ref` → `const ref = ref(...)` after
+ * `import { ref } from 'vue'` → TS2440 import shadow.
+ *
+ * The OTHER two internal kinds — `<script>` HELPERS and `<script>` IMPORTS (+
+ * function params) — ARE top-level declarators/specifiers in the cloned program,
+ * so they ARE renamed by the `{ kind: 'binding' }` group added to `vueGroups`
+ * (rewriteScript.ts). This pass closes the IR-sourced trio that the program-walk
+ * structurally cannot see. Together they cover all five kinds.
+ *
+ * Distinct from `deconflictReservedDataRefNames` (Angular): that pass ALSO
+ * renames `$refs` names. On Vue, `$refs.X` lowers to a SUFFIXED `XRef.value`
+ * local (never a bare `const X`), so a `$refs` name can NEVER collide with one of
+ * these generated bindings — and the rewriteScript `vueGroups` comment EXCLUDES
+ * refs by design. So this pass deliberately renames state + computed + inject
+ * ONLY, never refs (no `ref="X"` attribute rename, no `$refs.X` member rename).
+ *
+ * All three kinds are INTERNAL (template/script-referenced, never consumer-facing
+ * public contract) → safe to auto-rename to `X$local`. References:
+ *   - `<data> X`    → `$data.X` MEMBER expressions + `{ scope:'data', path:[X] }` deps
+ *   - `$computed X` → BARE-identifier reads (no `$computed.X` member)
+ *   - `$inject X`   → BARE-identifier reads (the `const X` binder + every read)
+ * The bare-identifier kinds reuse the same position-guarded bare walk as the
+ * computed/inject pass.
+ *
+ * Mutates `ir` in place. Invoked from `emitVue` on the target's OWN fresh IR
+ * (each `compile()` lowers a fresh IR per target — no cross-target leakage),
+ * BEFORE `emitScript` reads any name. Only-on-collision: a non-colliding
+ * name is byte-identical (zero corpus drift). Returns the rename map for
+ * tests/diagnostics; empty when nothing collided.
+ *
+ * @param ir       the component IR (state/computed/inject `.name`/`.localBinding` renamed).
+ * @param reserved the Vue generated-binding set: VUE_EMITTER_BINDINGS ∪
+ *                 VUE_IMPORT_NAMES ∪ VUE_RUNTIME_IMPORTS.
+ * @param protectedNames PUBLIC-CONTRACT names never renamed (prop names + $expose verbs).
+ */
+export function deconflictVueGeneratedBindingNames(
+  ir: {
+    state: { name: string }[];
+    computed: { name: string }[];
+    injects?: { localBinding: string }[];
+    props?: { name: string }[];
+    expose?: { name: string }[];
+  },
+  reserved: ReadonlySet<string>,
+  protectedNames: ReadonlySet<string> = new Set(),
+): Map<string, string> {
+  const renames = new Map<string, string>();
+  if (reserved.size === 0) return renames;
+
+  // Public-contract names are NEVER renamed (D-02). Fold in IR-level props/expose
+  // the caller may not have passed, so the guard is total.
+  const protectedAll = new Set<string>([
+    ...protectedNames,
+    ...(ir.props ?? []).map((p) => p.name),
+    ...(ir.expose ?? []).map((e) => e.name),
+  ]);
+
+  // `<data>` references are `$data.X` MEMBER expressions; `$computed` + `$inject`
+  // references are BARE identifiers. Kept in separate maps because the two
+  // reference shapes are disjoint and renamed by different walks.
+  const dataRenames = new Map<string, string>();
+  const bareRenames = new Map<string, string>();
+
+  const considerInto = (map: Map<string, string>, name: string): void => {
+    if (renames.has(name) || dataRenames.has(name) || bareRenames.has(name)) return;
+    if (reserved.has(name) && !protectedAll.has(name)) {
+      const renamed = alias(name);
+      map.set(name, renamed);
+      renames.set(name, renamed);
+    }
+  };
+  for (const s of ir.state) considerInto(dataRenames, s.name);
+  for (const c of ir.computed) considerInto(bareRenames, c.name);
+  for (const inj of ir.injects ?? []) considerInto(bareRenames, inj.localBinding);
+  if (renames.size === 0) return renames;
+
+  // 1. Rename the IR declaration fields (codegen source of truth).
+  for (const s of ir.state) {
+    const renamed = dataRenames.get(s.name);
+    if (renamed) s.name = renamed;
+  }
+  for (const c of ir.computed) {
+    const renamed = bareRenames.get(c.name);
+    if (renamed) c.name = renamed;
+  }
+  for (const inj of ir.injects ?? []) {
+    const renamed = bareRenames.get(inj.localBinding);
+    if (renamed) inj.localBinding = renamed;
+  }
+
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  // 2a. BARE-identifier rename of every `$computed` / `$inject` reference across
+  //     the ENTIRE IR (these names are read bare — no member to gate on).
+  //     Position guards skip the non-reference identifier slots (member-property,
+  //     object-key, specifier ids). A declarator id / shorthand value / param IS
+  //     a binding-or-reference of the renamed local and SHOULD be renamed.
+  if (bareRenames.size > 0) {
+    const seenNodes = new WeakSet<object>();
+    const renameIn = (node: { type: string }, parent: { type: string } | null): void => {
+      if (seenNodes.has(node)) return;
+      seenNodes.add(node);
+      if (node.type === 'Identifier') {
+        const id = node as { type: string; name: string };
+        const renamed = bareRenames.get(id.name);
+        if (renamed && parent) {
+          const p = parent as Record<string, unknown> & { type: string };
+          const skip =
+            ((p.type === 'MemberExpression' || p.type === 'OptionalMemberExpression') &&
+              p['property'] === node && p['computed'] !== true) ||
+            (p.type === 'ObjectProperty' && p['key'] === node &&
+              p['computed'] !== true && p['shorthand'] !== true) ||
+            ((p.type === 'ObjectMethod' || p.type === 'ClassMethod') &&
+              p['key'] === node && p['computed'] !== true) ||
+            p.type === 'ImportSpecifier' || p.type === 'ImportDefaultSpecifier' ||
+            p.type === 'ImportNamespaceSpecifier' || p.type === 'ExportSpecifier';
+          if (!skip) id.name = renamed;
+        }
+        return;
+      }
+      const rec = node as unknown as Record<string, unknown>;
+      for (const key of Object.keys(rec)) {
+        if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' ||
+            key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') {
+          continue;
+        }
+        const child = rec[key];
+        if (Array.isArray(child)) {
+          for (const item of child) if (isNode(item)) renameIn(item, node);
+        } else if (isNode(child)) {
+          renameIn(child, node);
+        }
+      }
+    };
+    const bSeen = new WeakSet<object>();
+    const bWalk = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (bSeen.has(value)) return;
+      bSeen.add(value);
+      if (isNode(value)) { renameIn(value, null); return; }
+      if (Array.isArray(value)) { for (const item of value) bWalk(item); return; }
+      for (const k of Object.keys(value as Record<string, unknown>)) {
+        bWalk((value as Record<string, unknown>)[k]);
+      }
+    };
+    bWalk(ir);
+  }
+
+  // 2b. `$data.<key>` MEMBER rename + SignalRef `{ scope:'data', path:[key] }`
+  //     dep rename across the ENTIRE IR (the `<data>` member-reference shape).
+  //     NO `ref="X"` attribute rename and NO `$refs.X` member rename — refs are
+  //     out of scope on Vue (they lower to a suffixed `XRef.value`).
+  if (dataRenames.size > 0) {
+    const seen = new WeakSet<object>();
+    const walk = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return;
+      if (seen.has(value)) return;
+      seen.add(value);
+
+      const asDep = value as { scope?: unknown; path?: unknown };
+      if (asDep.scope === 'data' && Array.isArray(asDep.path) && asDep.path.length > 0) {
+        const head = asDep.path[0];
+        const renamed = typeof head === 'string' ? dataRenames.get(head) : undefined;
+        if (renamed) asDep.path[0] = renamed;
+      }
+
+      if (isNode(value)) {
+        const node = value as {
+          type: string;
+          computed?: boolean;
+          object?: { type?: string; name?: string };
+          property?: { type?: string; name?: string };
+        };
+        if (
+          (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+          node.computed !== true &&
+          node.object?.type === 'Identifier' &&
+          node.object.name === '$data' &&
+          node.property?.type === 'Identifier' &&
+          typeof node.property.name === 'string'
+        ) {
+          const renamed = dataRenames.get(node.property.name);
+          if (renamed) node.property.name = renamed;
+        }
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item);
+        return;
+      }
+      for (const key of Object.keys(value)) {
+        walk((value as Record<string, unknown>)[key]);
+      }
+    };
+    walk(ir);
+  }
+
+  return renames;
+}
+
+/**
  * IR-LEVEL generated-name deconfliction for the SOLID target (Phase 61 Plan 06 —
  * SC-2, collision-solid §"NEW risks" 1/2).
  *
