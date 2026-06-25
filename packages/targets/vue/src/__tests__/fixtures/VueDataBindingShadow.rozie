@@ -1,0 +1,31 @@
+<rozie name="VueDataBindingShadow">
+<props>
+{
+  label: { type: String, default: '' }
+}
+</props>
+<data>
+{
+  slots: 'shadow-a',
+  emit: 'shadow-b'
+}
+</data>
+<script>
+const showSlots = () => $data.slots;
+const showEmit = () => $data.emit;
+const fire = () => $emit('go', $data.emit);
+const hasFooter = () => !!$slots.footer;
+$onMount(() => {
+  console.log($data.slots, $data.emit, hasFooter());
+});
+</script>
+<template>
+  <div>
+    <span class="a">{{ $data.slots }}</span>
+    <span class="b">{{ $data.emit }}</span>
+    <span class="c">{{ $props.label }}</span>
+    <button @click="fire">go</button>
+    <slot name="footer" />
+  </div>
+</template>
+</rozie>
