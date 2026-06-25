@@ -29,6 +29,19 @@ export default defineConfig({
   base: '/rozie.js/',
   cleanUrls: true,
   lastUpdated: true,
+  // Cloudflare Web Analytics — privacy-friendly, cookieless page metrics for the
+  // deployed docs site (GitHub only reports repo traffic, not site visits).
+  // The beacon token is a public client-side identifier, safe to commit.
+  head: [
+    [
+      'script',
+      {
+        defer: '',
+        src: 'https://static.cloudflareinsights.com/beacon.min.js',
+        'data-cf-beacon': '{"token": "b9e858dff0e743cf852f98b0b4a491a0"}',
+      },
+    ],
+  ],
   // Contributor/maintainer guides that live under docs/ but are NOT site pages
   // (they contain bare <slug>/<Name> tokens the VitePress Vue compiler would try
   // to parse as unclosed elements). Keep them co-located but out of the build.
