@@ -28,6 +28,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   deconflictGeneratedSymbols,
+  deconflictReservedClassFields,
   type GeneratedSymbolGroup,
 } from '../../../../core/src/rewrite/deconflict.js';
 import {
@@ -236,34 +237,40 @@ export function rewriteRozieIdentifiers(
   // renameable side — see the React/Svelte rationale).
   const solidProtected = new Set<string>((ir.expose ?? []).map((e) => e.name));
 
-  // Phase 61 Plan 06 (SC-2, collision-solid §"NEW risks" 1/2) — a USER `<script>`
-  // helper/const/param colliding with a Solid emitter LOCAL (`local`/`attrs`/
-  // `_merged`/`resolved`/`portals`/…) or a bare solid-js / runtime IMPORT
-  // (`children`/`on`/`For`/`createSignal`/…) auto-renames to `X$local`. These are
-  // unconditionally-minted bindings, so a pure `binding` trigger is correct; the
-  // names come from reservedNames.ts (single source of truth — NO inline
-  // re-listing). The `<name>Ref`-suffixed ref local is the rare helper==`<name>Ref`
-  // case (the ref site is suffixed, so the group's names are the SUFFIXED strings).
-  // Solid is a FUNCTION target: NO DOM/Object.prototype/CVA names here (collision-
-  // solid §4). The GENERATED `<data>`/`$computed`/`$refs` NAMES themselves (minted
-  // from the IR by emitScript as string lines, NOT user declarators in this clone)
-  // collide with imports / emitter-locals / each other at the IR level — those are
-  // renamed by `deconflictSolidGeneratedNames(ir, …)` in emitSolid BEFORE this
-  // per-target rewrite runs, so `dataNames`/`computedNames` are NOT user-binding
-  // groups here (adding them as `binding` groups would spuriously rename an
-  // unrelated same-named user PARAM/declarator → corpus drift).
-  const refNamesSuffixed = new Set<string>([...refNames].map((n) => n + 'Ref'));
-  const solidReservedLocals = new Set<string>([
-    ...SOLID_EMITTER_LOCALS,
-    ...SOLID_IMPORT_NAMES,
-  ]);
   const solidGroups: GeneratedSymbolGroup[] = [
     { names: solidProps, trigger: { kind: 'accessor', accessor: '$props' } },
     { names: solidSetters, trigger: { kind: 'binding' } },
-    { names: refNamesSuffixed, trigger: { kind: 'binding' } },
-    { names: solidReservedLocals, trigger: { kind: 'binding' } },
   ];
   deconflictGeneratedSymbols(cloned, solidGroups, solidProtected);
+
+  // Phase 61 Plan 06 (SC-2, collision-solid §"NEW risks" 1/2) — a USER TOP-LEVEL
+  // `<script>` const/let/function whose name equals a Solid emitter LOCAL
+  // (`local`/`attrs`/`_merged`/`resolved`/`portals`/…), a bare solid-js / runtime
+  // IMPORT (`children`/`on`/`For`/`createSignal`/…), or the `<name>Ref` ref local
+  // collides with the emitter-minted COMPONENT-SCOPE binding → auto-rename to
+  // `X$local`. The reserved set comes from reservedNames.ts (single source of
+  // truth). Solid is a FUNCTION target: NO DOM/Object.prototype/CVA names here
+  // (collision-solid §4).
+  //
+  // PROGRAM-LEVEL ONLY (via `deconflictReservedClassFields`, whose mechanism is
+  // target-agnostic despite the name): only a COMPONENT-SCOPE binding actually
+  // shadows the import / emitter-local at its use site. A NESTED arrow PARAM named
+  // `on`/`attrs` (`(on) => …`, `(attrs) => …`, common in engine-wrapper helpers)
+  // is block-scoped and HARMLESS — it must NOT be renamed (the `binding`-trigger
+  // `deconflictGeneratedSymbols` would over-rename it at any depth → corpus drift).
+  //
+  // The GENERATED `<data>`/`$computed`/`$refs` NAMES themselves (minted from the IR
+  // by emitScript as string lines, NOT user declarators in this clone) collide with
+  // imports / emitter-locals / each other at the IR level — those are renamed by
+  // `deconflictSolidGeneratedNames(ir, …)` in emitSolid BEFORE this per-target
+  // rewrite runs, so `dataNames`/`computedNames` are NOT user-binding groups here.
+  const refNamesSuffixed = new Set<string>([...refNames].map((n) => n + 'Ref'));
+  const solidReservedBindings = new Set<string>([
+    ...SOLID_EMITTER_LOCALS,
+    ...SOLID_IMPORT_NAMES,
+    ...refNamesSuffixed,
+  ]);
+  deconflictReservedClassFields(cloned, solidReservedBindings, solidProtected);
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
