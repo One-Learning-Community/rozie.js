@@ -49,6 +49,7 @@ import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
+import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -599,6 +600,14 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
   // only collides → non-colliding components stay byte-identical (supersedes the
   // retired ROZ980 warning).
   const loopCollisions = findRForSlotNameCollisions(ir);
+  // re-projected-slot == child-fill-name collision auto-fix: when a
+  // `<slot name="X">` is re-projected into a child component's slot ALSO named
+  // `X`, the forwarded `{#snippet X}` shadows the same-named resolver. Rename the
+  // resolver IDENTIFIER to `X$$slot` (lockstep with emitSlotInvocation) so the
+  // re-projection render-site resolves the consumer slot, not the fill snippet.
+  // Phase 999.4 (command-palette → vendored-listbox). Conditional → non-colliding
+  // components stay byte-identical.
+  const reprojectionCollisions = findReprojectionSlotNameCollisions(ir);
   // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
   // exactly ONE `$derived` merge declaration (see distinctSlotsByName).
   for (const s of distinctSlotsByName(ir.slots)) {
@@ -611,7 +620,10 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
     // bare — only the lvalue is disambiguated. Non-colliding slots are
     // byte-identical. Lockstep with portalSlotMergeName usages in emitPortals /
     // rewriteScript / rewriteTemplateExpression.
-    const ident = loopCollisions.has(key) ? `${key}$$slot` : portalSlotMergeName(key, ir);
+    const ident =
+      loopCollisions.has(key) || reprojectionCollisions.has(key)
+        ? `${key}$$slot`
+        : portalSlotMergeName(key, ir);
     lines.push(`const ${ident} = $derived(__${key}Prop ?? snippets?.${key});`);
   }
   return lines;

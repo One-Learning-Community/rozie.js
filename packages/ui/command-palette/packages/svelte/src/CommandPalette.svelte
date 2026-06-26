@@ -67,8 +67,8 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-const option = $derived(__optionProp ?? snippets?.option);
-const empty = $derived(__emptyProp ?? snippets?.empty);
+const option$$slot = $derived(__optionProp ?? snippets?.option);
+const empty$$slot = $derived(__emptyProp ?? snippets?.empty);
 const footer = $derived(__footerProp ?? snippets?.footer);
 
 let activeValue: any = $state(null);
@@ -250,7 +250,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Listbox combobox={true} filterable={false} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} id={idBase} bind:value={activeValue} onchange={($event) => { onListboxChange($event); }} onsearch={($event) => { onListboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option}{@render option({ option, index, active, selected, disabled })}{:else}<span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}{/if}{/snippet}{#snippet empty({ query })}{#if empty}{@render empty({ query })}{:else}{emptyText}{/if}{/snippet}</Listbox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Listbox combobox={true} filterable={false} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} id={idBase} bind:value={activeValue} onchange={($event) => { onListboxChange($event); }} onsearch={($event) => { onListboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Listbox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {

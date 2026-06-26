@@ -45,6 +45,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
+import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -71,16 +72,24 @@ export function emitSlotInvocation(
   if (node.isPortal) return '';
   const slotKey = node.slotName === '' ? 'children' : node.slotName;
 
-  // r-for-loop-var == slot-name collision auto-fix (lockstep with emitScript's
-  // emitSlotDerivedMerges binding rename): when this slot's name is shadowed by
-  // an enclosing `r-for` loop var, render the safe suffixed snippet binding
-  // (`X$$slot`) instead of the bare `X` — inside the compiled `{#each … as X}`
-  // the bare `X` resolves to the loop ITEM (a non-function) → runtime crash on
-  // Svelte only. Conditional: only colliding slots are renamed, so non-colliding
-  // components emit byte-identical Svelte (supersedes the retired ROZ980 warning).
-  const renderName = findRForSlotNameCollisions(ctx.ir).has(node.slotName)
-    ? `${node.slotName}$$slot`
-    : slotKey;
+  // Slot-RESOLVER rename (lockstep with emitScript's emitSlotDerivedMerges
+  // binding rename): render the safe suffixed binding (`X$$slot`) instead of the
+  // bare `X` when the resolver `X` is shadowed in the compiled output. Two
+  // collision classes, both Svelte-only, both auto-fixed by the same suffix:
+  //   1. r-for-loop-var == slot-name — inside `{#each … as X}` the bare `X`
+  //      resolves to the loop ITEM (a non-function) → runtime crash.
+  //   2. re-projected-slot == child-fill-name — when this `<slot name="X">` is
+  //      re-projected into a child component's slot ALSO named `X`, the
+  //      forwarded `{#snippet X}` (the fill handed to the child) shadows the
+  //      same-named resolver, so a bare `{@render X}` targets the fill snippet /
+  //      scope data instead of the consumer slot → re-projected content renders
+  //      nothing (Phase 999.4 command-palette → vendored-listbox class).
+  // Conditional: only colliding slots are renamed, so non-colliding components
+  // emit byte-identical Svelte (supersedes the retired ROZ980 warning).
+  const needsResolverSuffix =
+    findRForSlotNameCollisions(ctx.ir).has(node.slotName) ||
+    findReprojectionSlotNameCollisions(ctx.ir).has(node.slotName);
+  const renderName = needsResolverSuffix ? `${node.slotName}$$slot` : slotKey;
 
   // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's
   // snippet invocation is positional in syntax but Rozie's cross-target
