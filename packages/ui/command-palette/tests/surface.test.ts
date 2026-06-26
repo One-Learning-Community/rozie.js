@@ -19,7 +19,10 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src', 'CommandPalette.rozie');
-const FILENAME = 'CommandPalette.rozie';
+// Use the ABSOLUTE source path as the compile filename so the <components>
+// producer resolution (threadParamTypes) finds the vendored ./Listbox.rozie
+// sibling on disk next to it.
+const FILENAME = SRC;
 const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
@@ -27,16 +30,34 @@ const EXPECT = {
   props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase'],
   models: ['open', 'query'],
   emits: ['select'],
-  slots: ['item', 'empty', 'footer'],
+  // D-05 (BREAKING, Phase 999.4): the public slots are re-aligned to the vendored
+  // listbox vocabulary — `#item {item,active}` → `#option {option,index,active,
+  // selected,disabled}`; `#empty` gains `{query}`; `#footer` unchanged (a panel
+  // sibling outside the listbox).
+  slots: ['option', 'empty', 'footer'],
   expose: ['show', 'close', 'toggle', 'focus'],
 } as const;
+
+// D-07 (LOAD-BEARING): the authored CommandPalette.rozie must use the STABLE
+// package-style specifier (which the codegen vendor-step remaps to the local
+// sibling under Option B) and NEVER the relative form. This is the byte-identity
+// invariant — switching B→A touches only codegen + the drift guard, never the
+// authored source.
+const STABLE_LISTBOX_SPECIFIER = '@rozie-ui/listbox/Listbox.rozie';
+const RELATIVE_LISTBOX_SPECIFIER = './Listbox.rozie';
+
+// The compiled shape: under Option B the codegen rewrites the stable specifier to
+// the local vendored sibling BEFORE compile (so producer resolution finds it on
+// disk). The surface gate must compile the SAME remapped source the leaves do.
+const composedSource = source.replaceAll(STABLE_LISTBOX_SPECIFIER, RELATIVE_LISTBOX_SPECIFIER);
 
 const sorted = (a: readonly string[]) => [...a].sort();
 
 describe('CommandPalette.rozie surface gate', () => {
-  const { ast } = parse(source, { filename: FILENAME });
+  const { ast } = parse(composedSource, { filename: FILENAME });
   const { ir, diagnostics: lowerDiags = [] } = lowerToIR(ast, {
     modifierRegistry: createDefaultRegistry(),
+    filename: FILENAME,
   });
 
   it('lowerToIR emits zero error diagnostics', () => {
@@ -64,9 +85,17 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the item/empty/footer slots', () => {
+  it('declares the option/empty/footer slots (D-05 re-aligned to listbox vocabulary)', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
+  });
+
+  it('D-07 byte-identity: composes via the STABLE specifier, never the relative form', () => {
+    // Encodes the D-07 acceptance check at the source level: the authored file is
+    // byte-identical between Option B (vendored) and a future Option A (published).
+    // Only the codegen vendor-remap + the D-04 drift guard are B-specific.
+    expect(source).toContain(`'${STABLE_LISTBOX_SPECIFIER}'`);
+    expect(source).not.toContain(`'${RELATIVE_LISTBOX_SPECIFIER}'`);
   });
 
   it('expose surface matches (show/close/toggle/focus)', () => {
@@ -93,7 +122,7 @@ describe('CommandPalette.rozie surface gate', () => {
 
   const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
   it.each(TARGETS)('compile(%s) emits zero error diagnostics + non-empty code', (target) => {
-    const r = compile(source, { target, filename: FILENAME });
+    const r = compile(composedSource, { target, filename: FILENAME });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);
