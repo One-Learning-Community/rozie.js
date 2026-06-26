@@ -131,6 +131,20 @@ for (const example of EXAMPLES) {
           timeout: 15_000,
         });
         await expect(page.getByRole('option')).toHaveCount(6, { timeout: 15_000 });
+        // REGRESSION GUARD (snapshot-cements-bugs): the results list must render
+        // IN FLOW inside the panel, not as an absolute popup culled by the panel's
+        // overflow:hidden. toHaveCount above (DOM presence) and Playwright's
+        // CSS-visibility BOTH passed while the list hung clipped below a collapsed
+        // 36px panel — only a GEOMETRIC containment check catches that. Assert the
+        // first option's box sits within the dialog panel's box.
+        const dialogBox = await page.locator('[role="dialog"]').boundingBox();
+        const optionBox = await page.getByRole('option').first().boundingBox();
+        expect(dialogBox).not.toBeNull();
+        expect(optionBox).not.toBeNull();
+        expect(optionBox!.y).toBeGreaterThanOrEqual(dialogBox!.y - 1);
+        expect(optionBox!.y + optionBox!.height).toBeLessThanOrEqual(
+          dialogBox!.y + dialogBox!.height + 1,
+        );
       }
 
       // PAGE-level (viewport) capture so the top-layer dialog / fixed-corner toast

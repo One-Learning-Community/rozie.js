@@ -47,6 +47,7 @@ import '@rozie-ui/listbox-svelte/themes/shadcn.css';    // or material.css, boot
 | `value` | `unknown` | `null` | ✓ |  |
 | `multiple` | `Boolean` | `false` |  |  |
 | `combobox` | `Boolean` | `false` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
 | `filterable` | `Boolean` | `true` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `placeholder` | `String` | `''` |  |  |

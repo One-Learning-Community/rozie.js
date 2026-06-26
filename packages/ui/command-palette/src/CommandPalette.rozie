@@ -335,6 +335,7 @@ $expose({ show, close, toggle, focus })
     -->
     <Listbox
       :combobox="true"
+      :inline="true"
       :filterable="false"
       :close-on-select="false"
       :options="filteredItems()"

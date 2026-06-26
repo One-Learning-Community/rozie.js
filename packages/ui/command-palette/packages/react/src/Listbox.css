@@ -54,6 +54,17 @@
   border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
   box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
 }
+.rozie-listbox-inline[data-rozie-s-b576227a] {
+  display: block;
+  width: 100%;
+}
+.rozie-listbox-inline[data-rozie-s-b576227a] .rozie-listbox-list[data-rozie-s-b576227a] {
+  position: static;
+  margin-top: var(--rozie-listbox-popup-offset, 4px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 .rozie-listbox-option[data-rozie-s-b576227a] {
   padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);
   border-radius: var(--rozie-listbox-option-radius, 4px);

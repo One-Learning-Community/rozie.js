@@ -1,6 +1,6 @@
 <template>
 
-<div :class="['rozie-listbox', { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': props.disabled }]" v-bind="$attrs">
+<div :class="['rozie-listbox', { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': props.disabled, 'rozie-listbox-inline': props.inline }]" v-bind="$attrs">
 
   
   <div class="rozie-listbox-control" ref="controlElRef">
@@ -43,6 +43,10 @@ const props = withDefaults(
      */
     combobox?: boolean;
     /**
+     * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+     */
+    inline?: boolean;
+    /**
      * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
      */
     filterable?: boolean;
@@ -79,7 +83,7 @@ const props = withDefaults(
      */
     ariaLabel?: string | null;
   }>(),
-  { options: () => [], multiple: false, combobox: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }
+  { options: () => [], multiple: false, combobox: false, inline: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }
 );
 
 /**
@@ -459,6 +463,17 @@ useOutsideClick(
   border: var(--rozie-listbox-border-width, 1px) solid var(--rozie-listbox-popup-border, var(--rozie-listbox-border, rgba(0, 0, 0, 0.15)));
   border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
   box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
+}
+.rozie-listbox-inline {
+  display: block;
+  width: 100%;
+}
+.rozie-listbox-inline .rozie-listbox-list {
+  position: static;
+  margin-top: var(--rozie-listbox-popup-offset, 4px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 .rozie-listbox-option {
   padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);

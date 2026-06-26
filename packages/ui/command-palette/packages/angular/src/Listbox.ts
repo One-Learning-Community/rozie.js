@@ -48,7 +48,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-listbox" [ngClass]="{ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': (disabled() || this.__rozieCvaDisabled()) }" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-listbox" [ngClass]="{ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-listbox-inline': inline() }" #rozieSpread_0 #rozieListenersTarget_1>
 
       
       <div class="rozie-listbox-control" #controlEl>
@@ -154,6 +154,17 @@ function __rozieAttr(v: unknown): string | null {
       border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
       box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
     }
+    .rozie-listbox-inline {
+      display: block;
+      width: 100%;
+    }
+    .rozie-listbox-inline .rozie-listbox-list {
+      position: static;
+      margin-top: var(--rozie-listbox-popup-offset, 4px);
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
     .rozie-listbox-option {
       padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);
       border-radius: var(--rozie-listbox-option-radius, 4px);
@@ -209,6 +220,10 @@ export class Listbox {
    * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
    */
   combobox = input<boolean>(false);
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline = input<boolean>(false);
   /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */

@@ -24,6 +24,10 @@ export interface ListboxProps {
    */
   combobox?: boolean;
   /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */
   filterable?: boolean;

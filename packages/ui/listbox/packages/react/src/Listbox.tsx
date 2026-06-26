@@ -31,6 +31,10 @@ interface ListboxProps {
    */
   combobox?: boolean;
   /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */
   filterable?: boolean;
@@ -85,11 +89,12 @@ export interface ListboxHandle {
 
 const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props: ListboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<ListboxProps, 'options' | 'multiple' | 'combobox' | 'filterable' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel'> & { options: any[]; multiple: boolean; combobox: boolean; filterable: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null } = {
+  const props: Omit<ListboxProps, 'options' | 'multiple' | 'combobox' | 'inline' | 'filterable' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel'> & { options: any[]; multiple: boolean; combobox: boolean; inline: boolean; filterable: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     multiple: _props.multiple ?? false,
     combobox: _props.combobox ?? false,
+    inline: _props.inline ?? false,
     filterable: _props.filterable ?? true,
     disabled: _props.disabled ?? false,
     placeholder: _props.placeholder ?? '',
@@ -101,8 +106,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, combobox, filterable, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
-    void options; void value; void multiple; void combobox; void filterable; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void defaultValue; void onValueChange;
+    const { options, value, multiple, combobox, inline, filterable, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
+    void options; void value; void multiple; void combobox; void inline; void filterable; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void defaultValue; void onValueChange;
     return rest;
   })();
   const typeTimer = useRef<any>(null);
@@ -348,7 +353,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": open$local, "rozie-listbox-disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
+    <div {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": open$local, "rozie-listbox-disabled": props.disabled, "rozie-listbox-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
 
       
       <div className={"rozie-listbox-control"} ref={controlEl} data-rozie-s-b576227a="">

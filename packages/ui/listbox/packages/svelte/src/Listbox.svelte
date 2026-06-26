@@ -24,6 +24,10 @@ interface Props {
    */
   combobox?: boolean;
   /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */
   filterable?: boolean;
@@ -76,6 +80,7 @@ let {
   value = $bindable(null),
   multiple = false,
   combobox = false,
+  inline = false,
   filterable = true,
   disabled = false,
   placeholder = '',
@@ -414,7 +419,7 @@ $effect(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-listbox", { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-b576227a><div class="rozie-listbox-control" bind:this={controlEl} data-rozie-s-b576227a>{#if combobox}<input bind:this={inputEl} class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} placeholder={placeholder} value={query} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onControlKeyDown($event); }} onfocus={open} data-rozie-s-b576227a />{:else}<button bind:this={triggerEl} type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} onclick={toggle} onkeydown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-listbox-selected" data-rozie-s-b576227a>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>{placeholder}</span>{/if}{/if}<span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span></button>{/if}</div>{#if open$local}<div bind:this={listEl} class="rozie-listbox-list" role="listbox" id={rozieAttr(id + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-b576227a>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-listbox-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-listbox-empty" role="presentation" data-rozie-s-b576227a>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-listbox", { 'rozie-listbox-open': open$local, 'rozie-listbox-disabled': disabled, 'rozie-listbox-inline': inline }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-b576227a><div class="rozie-listbox-control" bind:this={controlEl} data-rozie-s-b576227a>{#if combobox}<input bind:this={inputEl} class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} placeholder={placeholder} value={query} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onControlKeyDown($event); }} onfocus={open} data-rozie-s-b576227a />{:else}<button bind:this={triggerEl} type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={ariaLabel} disabled={disabled} onclick={toggle} onkeydown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-listbox-selected" data-rozie-s-b576227a>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>{placeholder}</span>{/if}{/if}<span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span></button>{/if}</div>{#if open$local}<div bind:this={listEl} class="rozie-listbox-list" role="listbox" id={rozieAttr(id + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-b576227a>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-listbox-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-listbox-empty" role="presentation" data-rozie-s-b576227a>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
 
 <style>
 :global {
@@ -473,6 +478,17 @@ $effect(() => {
     border: var(--rozie-listbox-border-width, 1px) solid var(--rozie-listbox-popup-border, var(--rozie-listbox-border, rgba(0, 0, 0, 0.15)));
     border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
     box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
+  }
+  .rozie-listbox-inline[data-rozie-s-b576227a] {
+    display: block;
+    width: 100%;
+  }
+  .rozie-listbox-inline[data-rozie-s-b576227a] .rozie-listbox-list[data-rozie-s-b576227a] {
+    position: static;
+    margin-top: var(--rozie-listbox-popup-offset, 4px);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
   .rozie-listbox-option[data-rozie-s-b576227a] {
     padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);

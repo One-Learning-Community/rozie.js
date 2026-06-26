@@ -58,6 +58,17 @@ __rozieInjectStyle('Listbox-b576227a', `.rozie-listbox[data-rozie-s-b576227a] {
   border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
   box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
 }
+.rozie-listbox-inline[data-rozie-s-b576227a] {
+  display: block;
+  width: 100%;
+}
+.rozie-listbox-inline[data-rozie-s-b576227a] .rozie-listbox-list[data-rozie-s-b576227a] {
+  position: static;
+  margin-top: var(--rozie-listbox-popup-offset, 4px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 .rozie-listbox-option[data-rozie-s-b576227a] {
   padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);
   border-radius: var(--rozie-listbox-option-radius, 4px);
@@ -113,6 +124,10 @@ interface ListboxProps {
    */
   combobox?: boolean;
   /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */
   filterable?: boolean;
@@ -167,8 +182,8 @@ export interface ListboxHandle {
 }
 
 export default function Listbox(_props: ListboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])(), multiple: false, combobox: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'combobox', 'filterable', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'ref']);
+  const _merged = mergeProps({ options: (() => [])(), multiple: false, combobox: false, inline: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'combobox', 'inline', 'filterable', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'ref']);
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
@@ -455,7 +470,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} class={"rozie-listbox" + " " + rozieClass({ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
+    <div {...attrs} class={"rozie-listbox" + " " + rozieClass({ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled, 'rozie-listbox-inline': local.inline }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">

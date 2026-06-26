@@ -62,6 +62,7 @@ Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobo
 | `value` | `unknown` | `null` | yes (via `r-model`) | The selected value. `model: true` — scalar in single-select, an array of values in multi-select. The sole model prop, so Angular emits a `ControlValueAccessor`. |
 | `multiple` | `Boolean` | `false` | yes | Multi-select: `value` becomes an array; selecting toggles membership and keeps the popup open. |
 | `combobox` | `Boolean` | `false` | yes | Render a text `<input role="combobox">` and filter options by the typed query, instead of a select-only button trigger. |
+| `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as an absolute popup, so an `overflow:hidden` ancestor (e.g. a command palette) can't clip it. Defaults to the standalone dropdown behavior. |
 | `filterable` | `Boolean` | `true` | yes | Whether combobox mode filters client-side. Turn off for remote/async filtering — listen to `search` and replace `options` yourself. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control (also sets the Angular CVA disabled state). |
 | `placeholder` | `String` | `''` | yes | Placeholder text for the empty control. |

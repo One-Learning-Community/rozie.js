@@ -80,6 +80,17 @@ export default class Listbox extends SignalWatcher(LitElement) {
   border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
   box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
 }
+.rozie-listbox-inline[data-rozie-s-b576227a] {
+  display: block;
+  width: 100%;
+}
+.rozie-listbox-inline[data-rozie-s-b576227a] .rozie-listbox-list[data-rozie-s-b576227a] {
+  position: static;
+  margin-top: var(--rozie-listbox-popup-offset, 4px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 .rozie-listbox-option[data-rozie-s-b576227a] {
   padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);
   border-radius: var(--rozie-listbox-option-radius, 4px);
@@ -127,6 +138,10 @@ export default class Listbox extends SignalWatcher(LitElement) {
    * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
    */
   @property({ type: Boolean, reflect: true }) combobox: boolean = false;
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  @property({ type: Boolean, reflect: true }) inline: boolean = false;
   /**
    * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
    */
@@ -257,7 +272,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-listbox": true, 'rozie-listbox-open': this._open$local.value, 'rozie-listbox-disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-b576227a>
+<div class="${Object.entries({ "rozie-listbox": true, 'rozie-listbox-open': this._open$local.value, 'rozie-listbox-disabled': this.disabled, 'rozie-listbox-inline': this.inline }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-b576227a>
 
   
   <div class="rozie-listbox-control" data-rozie-ref="controlEl" data-rozie-s-b576227a>
@@ -540,7 +555,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['options', 'value', 'multiple', 'combobox', 'filterable', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id', 'aria-label', 'arialabel']);
+    const __skip = new Set<string>(['options', 'value', 'multiple', 'combobox', 'inline', 'filterable', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id', 'aria-label', 'arialabel']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

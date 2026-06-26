@@ -3,7 +3,7 @@
 <div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onPanelKeydown($event)">
     
-    <Listbox :combobox="true" :filterable="false" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id="props.idBase" v-model:value="activeValue" @change="onListboxChange($event)" @search="onListboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+    <Listbox :combobox="true" :inline="true" :filterable="false" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id="props.idBase" v-model:value="activeValue" @change="onListboxChange($event)" @search="onListboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled">
           <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
           <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></slot>

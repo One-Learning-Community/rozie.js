@@ -60,7 +60,7 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onPanelKeydown($event)">
         
-        <rozie-listbox [combobox]="true" [filterable]="false" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [id]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onListboxChange($event)" (search)="onListboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+        <rozie-listbox [combobox]="true" [inline]="true" [filterable]="false" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [id]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onListboxChange($event)" (search)="onListboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled }, option: option, index: index, active: active, selected: selected, disabled: disabled }" />
     } @else {

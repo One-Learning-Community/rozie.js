@@ -94,6 +94,19 @@
     },
   },
 
+  // Render the results list IN FLOW (static) instead of as an absolute popup.
+  // Use when the listbox is embedded inside a fixed-size, overflow-clipped
+  // container (e.g. a command-palette panel) where an absolute popup would be
+  // culled. Off (default) keeps the standalone dropdown behavior unchanged.
+  inline:         {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).',
+    },
+  },
+
   // Whether combobox mode filters the options client-side. Turn off for
   // remote/async filtering — listen to the `search` event and update `options`.
   filterable:     {
@@ -433,7 +446,7 @@ $expose({ open, close, toggle, clear, focusControl })
 </listeners>
 
 <template>
-<div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.open, 'rozie-listbox-disabled': $props.disabled }">
+<div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.open, 'rozie-listbox-disabled': $props.disabled, 'rozie-listbox-inline': $props.inline }">
 
   <!-- Control: an editable combobox input OR a select-only button. Both carry
        role="combobox" per the modern ARIA APG. -->
@@ -582,6 +595,22 @@ $expose({ open, close, toggle, clear, focusControl })
   border: var(--rozie-listbox-border-width, 1px) solid var(--rozie-listbox-popup-border, var(--rozie-listbox-border, rgba(0, 0, 0, 0.15)));
   border-radius: var(--rozie-listbox-popup-radius, var(--rozie-listbox-radius, 6px));
   box-shadow: var(--rozie-listbox-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* Inline mode: the root fills its container (so the control + list span the full
+   width even when a host wrapper — lit custom element / angular host — sits
+   between it and a stretching flex parent), and the list renders IN FLOW so an
+   overflow-clipped ancestor (e.g. a command-palette panel) can't cull it. */
+.rozie-listbox-inline {
+  display: block;
+  width: 100%;
+}
+.rozie-listbox-inline .rozie-listbox-list {
+  position: static;
+  margin-top: var(--rozie-listbox-popup-offset, 4px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 .rozie-listbox-option {
   padding: var(--rozie-listbox-option-padding, 0.4rem 0.6rem);

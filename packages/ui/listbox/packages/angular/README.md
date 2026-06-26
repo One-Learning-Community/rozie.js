@@ -85,6 +85,7 @@ export class PickFormComponent {
 | `value` | `unknown` | `null` | ✓ |  |
 | `multiple` | `Boolean` | `false` |  |  |
 | `combobox` | `Boolean` | `false` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
 | `filterable` | `Boolean` | `true` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `placeholder` | `String` | `''` |  |  |
