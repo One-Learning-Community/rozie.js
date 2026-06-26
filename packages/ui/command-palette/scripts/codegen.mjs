@@ -27,7 +27,7 @@
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. ENFORCE validateDocsPropsTable against docs/components/command-palette.md
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
@@ -36,17 +36,63 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/command-palette
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
-const SRC = resolve(ROOT, 'src/CommandPalette.rozie');
+const LISTBOX_ROOT = resolve(REPO_ROOT, 'packages/ui/listbox'); // canonical primitive home (D-01)
 const FILENAME = 'CommandPalette.rozie';
 
-/** Per-target leaf dir + emitted filename (build mode is informational). */
+// MULTI-COMPONENT (the data-table precedent, Phase 999.4): command-palette
+// composes the shipped <Listbox> primitive by VENDORING its `.rozie` source into
+// this family's src/ (D-03) and compiling it as a per-leaf sibling alongside the
+// parent. CommandPalette MUST be FIRST — it owns the handle-manifest +
+// docs-table validation gates. The vendored Listbox is an INTERNAL implementation
+// detail (NOT publicly re-exported — consumers use @rozie-ui/listbox directly).
+const PARENT = 'CommandPalette';
+const COMPONENTS = [PARENT, 'Listbox'];
+
+// D-07 (LOAD-BEARING): the authored CommandPalette.rozie writes a STABLE
+// package-style `<components>` specifier `@rozie-ui/listbox/Listbox.rozie`. Under
+// Option B (vendored) the codegen rewrites that specifier to the local sibling
+// `./Listbox.rozie` BEFORE compile() so threadParamTypes resolves the vendored
+// copy on disk; the existing rewriteRozieImport then swaps `.rozie`→per-target
+// ext. The authored file is NEVER edited — only this in-memory string is — so it
+// stays byte-identical between B and a future Option A (only this remap + the
+// D-04 drift guard are B-specific, the deletable plumbing).
+const STABLE_LISTBOX_SPECIFIER = '@rozie-ui/listbox/Listbox.rozie';
+const LOCAL_LISTBOX_SPECIFIER = './Listbox.rozie';
+
+// D-03: the GENERATED banner prepended to the vendored copy. It sits OUTSIDE the
+// `<rozie>` envelope (a leading HTML comment is tolerated — CommandPalette.rozie
+// itself opens with one), so the D-04 drift guard hashes only the
+// `<rozie>…</rozie>` envelope span and ignores this banner.
+const BANNER =
+  `<!-- GENERATED — do not edit. Vendored from @rozie-ui/listbox by codegen.\n` +
+  `     Re-run \`pnpm --filter @rozie-ui/command-palette codegen\` to refresh.\n` +
+  `     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->\n`;
+
+/**
+ * D-03 / D-01 / D-07 — vendor the canonical listbox primitive `.rozie` into this
+ * composite's src/ as a GENERATED, committed, overwrite-on-codegen sibling.
+ *
+ * ORDERING HAZARD (RESEARCH Pitfall 2): this MUST run in main() BEFORE any source
+ * is read and BEFORE the compile loop. The vendored `./Listbox.rozie` is a compile
+ * INPUT — threadParamTypes' producer resolution reads it on disk for slot-type
+ * threading and degrades to `null` SILENTLY (untyped slot params, green-but-wrong
+ * codegen) if the file is missing at compile time. Contrast copyThemes/copyInternal
+ * which run AFTER write because they are leaf assets, not compile inputs.
+ */
+function vendorPrimitives() {
+  const canonical = resolve(LISTBOX_ROOT, 'src/Listbox.rozie');
+  const dest = resolve(ROOT, 'src/Listbox.rozie');
+  writeFileSync(dest, BANNER + readFileSync(canonical, 'utf8'));
+}
+
+/** Per-target leaf dir + emitted file extension (build mode is informational). */
 const TARGETS = {
-  react: { dir: 'react', file: 'CommandPalette.tsx', build: 'tsdown' },
-  vue: { dir: 'vue', file: 'CommandPalette.vue', build: 'source' },
-  svelte: { dir: 'svelte', file: 'CommandPalette.svelte', build: 'source' },
-  angular: { dir: 'angular', file: 'CommandPalette.ts', build: 'source' },
-  solid: { dir: 'solid', file: 'CommandPalette.tsx', build: 'tsdown' },
-  lit: { dir: 'lit', file: 'CommandPalette.ts', build: 'tsdown' },
+  react: { dir: 'react', ext: 'tsx', build: 'tsdown' },
+  vue: { dir: 'vue', ext: 'vue', build: 'source' },
+  svelte: { dir: 'svelte', ext: 'svelte', build: 'source' },
+  angular: { dir: 'angular', ext: 'ts', build: 'source' },
+  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown' },
+  lit: { dir: 'lit', ext: 'ts', build: 'tsdown' },
 };
 
 function leafPkgName(dir) {
@@ -73,11 +119,29 @@ function copyInternal(leafSrc) {
 }
 
 function main() {
-  const source = readFileSync(SRC, 'utf8');
+  // (1) D-03/D-07 ORDERING HAZARD: vendor the canonical Listbox primitive into
+  // this composite's src/ FIRST — before any source is read, before parse/lower,
+  // before the compile loop. The vendored `./Listbox.rozie` is a compile INPUT
+  // (RESEARCH Pitfall 2).
+  vendorPrimitives();
 
-  // (2) parse + lower ONCE for the doc tables.
-  const { ast } = parse(source, { filename: FILENAME });
-  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+  // Read every component source once, keyed by component name (data-table shape).
+  const sources = Object.fromEntries(
+    COMPONENTS.map((name) => [name, readFileSync(resolve(ROOT, 'src', `${name}.rozie`), 'utf8')]),
+  );
+
+  // D-07: pre-compile remap of the CommandPalette source's stable `<components>`
+  // specifier → the local vendored sibling, so threadParamTypes resolves the copy
+  // on disk. The authored file is untouched; only this in-memory string changes.
+  const composedSource = sources[PARENT].replaceAll(STABLE_LISTBOX_SPECIFIER, LOCAL_LISTBOX_SPECIFIER);
+
+  // (2) parse + lower the PARENT ONCE for the doc tables + manifests. Use the
+  // composed (remapped) source so the IR's <components> resolves the local sibling.
+  const { ast } = parse(composedSource, { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
+  const { ir } = lowerToIR(ast, {
+    modifierRegistry: createDefaultRegistry(),
+    filename: resolve(ROOT, 'src', `${PARENT}.rozie`),
+  });
 
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
@@ -93,23 +157,47 @@ function main() {
 
   // (3)(4)(5) per-target emit + vendor themes/internal + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
-    const errs = r.diagnostics.filter((d) => d.severity === 'error');
-    if (errs.length) {
-      throw new Error(
-        `codegen ${target}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
-          errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
-      );
-    }
-
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
-    writeFileSync(resolve(leafSrc, cfg.file), r.code);
 
-    // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
-    // DEFAULT export, so the barrel re-exports the default under the named
-    // `CommandPalette`. React/Solid also emit a named `CommandPaletteHandle`
-    // interface (the `$expose` handle), forwarded verbatim.
+    // Compile each sibling component into this leaf. The SCOPE FENCE throw is
+    // applied to EACH compile. The CommandPalette parent compiles from the D-07
+    // composed (specifier-remapped) source; the vendored Listbox sibling compiles
+    // from its verbatim vendored source. The ABSOLUTE host path keeps the two
+    // .rozie collision-safe via scopeHash basename-keying.
+    for (const componentName of COMPONENTS) {
+      const filename = resolve(ROOT, 'src', `${componentName}.rozie`);
+      const componentSource = componentName === PARENT ? composedSource : sources[componentName];
+      const r = compile(componentSource, { target, filename });
+      const errs = r.diagnostics.filter((d) => d.severity === 'error');
+      if (errs.length) {
+        throw new Error(
+          `codegen ${target} ${componentName}: compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n` +
+            errs.map((e) => `  ${e.code}: ${e.message}`).join('\n'),
+        );
+      }
+
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
+
+      // React-only sidecars, PER COMPONENT (data-table:199-208 shape). Both
+      // CommandPalette.css/.d.ts AND Listbox.css/.d.ts are emitted.
+      if (target === 'react') {
+        if (r.css) writeFileSync(resolve(leafSrc, `${componentName}.css`), r.css);
+        const globalCssPath = resolve(leafSrc, `${componentName}.global.css`);
+        if (r.globalCss) {
+          writeFileSync(globalCssPath, r.globalCss);
+        } else if (existsSync(globalCssPath)) {
+          rmSync(globalCssPath);
+        }
+        if (r.types) writeFileSync(resolve(leafSrc, `${componentName}.d.ts`), r.types);
+      }
+    }
+
+    // Bundled leaves (tsdown) entry on src/index.ts. CommandPalette is the ONLY
+    // default/named export — the vendored Listbox is an INTERNAL implementation
+    // detail and is NOT re-exported (consumers use @rozie-ui/listbox directly;
+    // RESEARCH Pattern 1 / Anti-Patterns). React/Solid also emit a named
+    // `CommandPaletteHandle` interface (the `$expose` handle), forwarded verbatim.
     if (cfg.build === 'tsdown') {
       const barrel =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
@@ -121,12 +209,6 @@ function main() {
             `export type { CommandPaletteHandle } from './CommandPalette';\n`
           : `export { default as CommandPalette } from './CommandPalette';\nexport { default } from './CommandPalette';\n`;
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
-    }
-
-    // React-only sidecars.
-    if (target === 'react') {
-      if (r.css) writeFileSync(resolve(leafSrc, 'CommandPalette.css'), r.css);
-      if (r.types) writeFileSync(resolve(leafSrc, 'CommandPalette.d.ts'), r.types);
     }
 
     // (4) vendor the design-token presets + the internal filter helper.
@@ -142,7 +224,8 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/ + internal/)`);
+    const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/ + internal/)`);
   }
 
   // (6) ENFORCE docs props-table validation against the API reference page

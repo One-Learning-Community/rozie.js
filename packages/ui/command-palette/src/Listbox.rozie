@@ -1,3 +1,6 @@
+<!-- GENERATED — do not edit. Vendored from @rozie-ui/listbox by codegen.
+     Re-run `pnpm --filter @rozie-ui/command-palette codegen` to refresh.
+     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->
 <!--
   Listbox.rozie — a headless, WAI-ARIA Listbox / Combobox.
 
