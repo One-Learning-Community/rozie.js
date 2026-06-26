@@ -720,14 +720,83 @@ export function createTransformHook(
  * directory because Vite's resolveId may invoke the transform from any
  * cwd, and the sibling-file convention is the dominant case.
  */
+// ---------------------------------------------------------------------------
+// Build-scoped shared producer-resolution state.
+//
+// Each `.rozie` load used to construct a fresh `IRCache` + `ProducerResolver`
+// inside EVERY pipeline helper (2 caches + 3 resolvers per load), so a
+// composition (`<components>`) consumer re-read + re-parsed + re-lowered all of
+// its producer files on every single load — no amortization across a build.
+// On the VR build (6 Vite builds × ~136 fixtures, ~56% composition) that is
+// hundreds of redundant producer parse/lower cycles.
+//
+// We now share resolution state across the whole build. This is exactly the
+// amortization `compile.ts`'s `opts.irCache` JSDoc anticipates "(e.g., from
+// `@rozie/unplugin`)". It stays byte-identical because:
+//   - The `IRCache` is keyed by RESOLVED ABSOLUTE producer path and an
+//     `IRComponent` is a pure function of that file's content — a cache hit is
+//     byte-identical to a fresh lower, regardless of which consumer filled it
+//     (RESEARCH Pitfall 2: cache fill order MUST NEVER drive output — it does
+//     not here). One instance is therefore safe to share build-wide.
+//   - The `ProducerResolver` DOES depend on its `root` (tsconfig discovery), so
+//     we memoize ONE resolver per root. Same root → same resolver, which is a
+//     pure function of root and thus byte-identical to constructing it fresh.
+//     The resolver intentionally omits `CachedInputFileSystem` (see
+//     nodeResolve.ts), so it carries no filesystem cache to go stale — reusing
+//     the instance is safe.
+//
+// Lifetime: module-scoped. `vite build` runs one process per target build, so
+// the cache is fresh per build and freed at exit. For `vite dev` the process is
+// long-lived, so `handleHotUpdate` MUST call `invalidateSharedIRCache()` on a
+// `.rozie` change to drop the stale producer IR (+ its transitive consumers).
+// The registry-identity guard rebuilds the cache (and clears the resolver memo)
+// if a different plugin instance with a different `ModifierRegistry` appears.
+let sharedIRCache: IRCache | null = null;
+let sharedCacheRegistry: ModifierRegistry | null = null;
+const resolverByRoot = new Map<string, ProducerResolver>();
+
+function getSharedIRCache(registry: ModifierRegistry): IRCache {
+  if (sharedIRCache === null || sharedCacheRegistry !== registry) {
+    sharedIRCache = new IRCache({ modifierRegistry: registry });
+    sharedCacheRegistry = registry;
+    // Tie the resolver memo lifetime to the cache so a registry swap starts
+    // from a clean, consistent resolution state.
+    resolverByRoot.clear();
+  }
+  return sharedIRCache;
+}
+
+function getResolverForRoot(root: string): ProducerResolver {
+  let resolver = resolverByRoot.get(root);
+  if (resolver === undefined) {
+    resolver = new ProducerResolver({ root });
+    resolverByRoot.set(root, resolver);
+  }
+  return resolver;
+}
+
+/**
+ * HMR hook (dev): drop a changed `.rozie` producer's cached IR plus the
+ * transitive set of consumers that touched it, so a stale producer IR cannot
+ * survive an edit. Returns the affected path set (empty when no cache exists
+ * yet). Wired from `handleHotUpdate` in index.ts. No-op for `vite build`.
+ */
+export function invalidateSharedIRCache(changedPath: string): Set<string> {
+  if (sharedIRCache === null) return new Set();
+  return sharedIRCache.invalidate(changedPath);
+}
+
 function threadParamTypesForPipeline(
   ir: import('../../core/src/ir/types.js').IRComponent,
   filePath: string,
   registry: ModifierRegistry,
   acc: Diagnostic[],
 ): void {
-  const cache = new IRCache({ modifierRegistry: registry });
-  const resolver = new ProducerResolver({ root: dirname(filePath) });
+  // Shared build-scoped cache + per-root resolver (see block above). The same
+  // cache + resolver are reused by `validateTwoWayBindingsForPipeline` below —
+  // matching compile.ts, which threads ONE cache through both passes.
+  const cache = getSharedIRCache(registry);
+  const resolver = getResolverForRoot(dirname(filePath));
   threadParamTypes(ir, filePath, cache, resolver, acc);
 }
 
@@ -751,7 +820,9 @@ function partialInlineLowerOptions(filePath: string): {
   filename: string;
 } {
   return {
-    resolver: new ProducerResolver({ root: dirname(filePath) }),
+    // Per-root memoized resolver (see the build-scoped state block above) —
+    // byte-identical to a fresh `ProducerResolver({ root })`, just shared.
+    resolver: getResolverForRoot(dirname(filePath)),
     filename: filePath,
   };
 }
@@ -767,8 +838,11 @@ function validateTwoWayBindingsForPipeline(
   registry: ModifierRegistry,
   acc: Diagnostic[],
 ): void {
-  const cache = new IRCache({ modifierRegistry: registry });
-  const resolver = new ProducerResolver({ root: dirname(filePath) });
+  // Same shared build-scoped cache + per-root resolver as
+  // `threadParamTypesForPipeline` — producer IRs fetched during threading are
+  // reused here for free, mirroring compile.ts's single-cache-both-passes flow.
+  const cache = getSharedIRCache(registry);
+  const resolver = getResolverForRoot(dirname(filePath));
   validateTwoWayBindings(ir, filePath, cache, resolver, acc);
 }
 

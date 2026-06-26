@@ -42,6 +42,7 @@ import {
   createLoadHook,
   createResolveIdHook,
   emitRozieTsToDisk,
+  invalidateSharedIRCache,
   prebuildAngularRozieFiles,
   transformIncludeRozie,
   walkRozieFiles,
@@ -288,6 +289,11 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       // biome-ignore lint/suspicious/noExplicitAny: Vite HMR context type varies by version
       handleHotUpdate({ file, server }: { file: string; server: any }) {
         if (!file.endsWith('.rozie')) return;
+        // Drop the changed file's cached producer IR (+ transitive consumers)
+        // from the build-scoped shared IRCache so a `<components>` consumer
+        // re-lowers the edited producer on its next load instead of serving a
+        // stale cache hit. No-op when nothing has populated the cache yet.
+        invalidateSharedIRCache(file);
         // Phase 22 Plan 22-05 — Vite-only sidecar refresh OPTIMIZATION on top
         // of the shared buildStart primary path: when a `.rozie` source changes
         // in dev, re-emit its `<Name>.d.rozie.ts` so the consumer's tsc/IDE
