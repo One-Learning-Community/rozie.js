@@ -1,26 +1,26 @@
 <template>
 
 <div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
-  <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onKeydown($event)">
-    <div class="rozie-command-palette-search">
-      <input ref="inputElRef" class="rozie-command-palette-input" type="text" role="combobox" aria-autocomplete="list" :id="inputId()" :aria-expanded="!!open" :aria-controls="listId()" :aria-activedescendant="activeId()" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" autocomplete="off" @input="onInput($event)" />
-    </div>
+  <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onPanelKeydown($event)">
+    
+    <Listbox :combobox="true" :filterable="false" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id="props.idBase" v-model:value="activeValue" @change="onListboxChange($event)" @search="onListboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+        <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled">
+          <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
+          <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></slot>
+      </template><template #empty="{ query }">
+        <slot name="empty" :query="query">{{ props.emptyText }}</slot>
+      </template></Listbox>
 
-    <ul v-if="filteredItems().length > 0" class="rozie-command-palette-list" :id="listId()" role="listbox" :aria-label="props.ariaLabel">
-      <li v-for="item in filteredItems()" :key="item.id" :class="['rozie-command-palette-option', { 'rozie-command-palette-option--active': item._i === activeIndex, 'rozie-command-palette-option--disabled': item.disabled }]" :id="optId(item._i)" role="option" :aria-selected="item._i === activeIndex" :aria-disabled="!!item.disabled" @mousedown.prevent="selectItem(item)" @mouseenter="activeIndex = item._i">
-        <slot name="item" :item="item" :active="item._i === activeIndex">
-          <span class="rozie-command-palette-option-label">{{ item.label }}</span>
-          <span v-if="item.group" class="rozie-command-palette-option-group">{{ item.group }}</span></slot>
-      </li>
-    </ul><div v-if="filteredItems().length === 0" class="rozie-command-palette-empty">
-      <slot name="empty">{{ props.emptyText }}</slot>
-    </div><div v-if="$slots.footer" class="rozie-command-palette-footer">
+    
+    <div v-if="$slots.footer" class="rozie-command-palette-footer">
       <slot name="footer"></slot>
     </div></div>
 </div>
 </template>
 
 <script setup lang="ts">
+import Listbox from './Listbox.vue';
+
 import { onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
@@ -69,69 +69,61 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-  item(props: { item: any; active: any }): any;
-  empty(props: {  }): any;
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  empty(props: { query: any }): any;
   footer(props: {  }): any;
 }>();
 
-const activeIndex = ref(0);
+const activeValue = ref<any>(null);
 
-const inputElRef = ref<HTMLInputElement>();
+const panelRef = ref<HTMLElement>();
 
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 const filteredItems = () => {
   const src = Array.isArray(props.items) ? props.items : [];
-  const list = filterCommands(src, query.value);
-  return list.map((it: any, i: any) => ({
-    id: it.id,
-    label: it.label,
-    group: it.group,
-    keywords: it.keywords,
-    disabled: !!it.disabled,
-    _i: i
-  }));
-};
-const optId = (i: any) => props.idBase + '-opt-' + i;
-const listId = () => props.idBase + '-list';
-const inputId = () => props.idBase + '-input';
-
-// The active option's id for aria-activedescendant (null when none).
-// The active option's id for aria-activedescendant (null when none).
-const activeId = () => {
-  const list = filteredItems();
-  if (activeIndex.value >= 0 && list[activeIndex.value]) return optId(activeIndex.value);
-  return null;
+  return filterCommands(src, query.value);
 };
 
-// Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
-// Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
-const nextEnabled = (list: any, from: any, dir: any) => {
-  let i = from;
-  for (let step = 0; step < list.length; step++) {
-    i = i + dir;
-    if (i < 0) i = 0;
-    if (i >= list.length) i = list.length - 1;
-    if (list[i] && !list[i].disabled) return i;
-    if (dir < 0 && i === 0 || dir > 0 && i === list.length - 1) break;
-  }
-  return from;
-};
+// The vendored <Listbox> commits the OPTION's value; resolve each command's value
+// to its stable `id` (the key passed back on `select`). disabled is resolved off
+// the item's own `disabled` flag (listbox's default `.disabled` fallback already
+// handles it, but we pass an explicit resolver for clarity + safety on primitives).
+// The vendored <Listbox> commits the OPTION's value; resolve each command's value
+// to its stable `id` (the key passed back on `select`). disabled is resolved off
+// the item's own `disabled` flag (listbox's default `.disabled` fallback already
+// handles it, but we pass an explicit resolver for clarity + safety on primitives).
+const commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
+const commandDisabled = (it: any) => !!(it && it.disabled);
 
-// First selectable index (or 0). Used to reset the highlight on open / re-filter.
-// First selectable index (or 0). Used to reset the highlight on open / re-filter.
-const firstEnabled = (list: any) => {
-  for (let i = 0; i < list.length; i++) {
-    if (list[i] && !list[i].disabled) return i;
-  }
-  return 0;
-};
+// Default-fill display helpers. The re-projected #option scope param `option`
+// threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
+// the default fill content reads its label/group through these UNTYPED helpers
+// (neutralized to `any`) rather than `option.label` directly — keeps the Lit leaf
+// typechecking without a per-target cast.
+// Default-fill display helpers. The re-projected #option scope param `option`
+// threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
+// the default fill content reads its label/group through these UNTYPED helpers
+// (neutralized to `any`) rather than `option.label` directly — keeps the Lit leaf
+// typechecking without a per-target cast.
+const labelText = (o: any) => o && o.label !== undefined ? o.label : '';
+const groupText = (o: any) => o && o.group !== undefined ? o.group : '';
 
 // ---- close funnel ------------------------------------------------------
 // ---- close funnel ------------------------------------------------------
@@ -140,51 +132,38 @@ const closePalette = () => {
 };
 
 // ---- selection ---------------------------------------------------------
+// Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+// PUBLIC `select` event with the chosen command and (optionally) close. The
+// `option` IS the original command item (we feed items straight through as
+// listbox options), so read its id/label/group directly.
 // ---- selection ---------------------------------------------------------
-const selectItem = (item: any) => {
+// Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+// PUBLIC `select` event with the chosen command and (optionally) close. The
+// `option` IS the original command item (we feed items straight through as
+// listbox options), so read its id/label/group directly.
+const onListboxChange = (e: any) => {
+  const item = e ? e.option : null;
   if (!item || item.disabled) return;
   emit('select', {
     id: item.id,
     label: item.label,
     group: item.group
   });
+  // Clear the internal selection so re-selecting the same command re-fires.
+  activeValue.value = null;
   if (props.closeOnSelect) closePalette();
 };
 
-// ---- input + keyboard handlers -----------------------------------------
-// ---- input + keyboard handlers -----------------------------------------
-const onInput = (e: any) => {
-  const q = e && e.target ? e.target.value : '';
-  query.value = q;
-  // Reset the highlight to the first enabled item of the NEW filtered list.
-  const next = filterCommands(Array.isArray(props.items) ? props.items : [], q);
-  activeIndex.value = firstEnabled(next);
-};
-const onKeydown = (e: any) => {
-  const key = e ? e.key : '';
-  const list = filteredItems();
-  const ai = activeIndex.value;
-  if (key === 'ArrowDown') {
-    if (e) e.preventDefault();
-    activeIndex.value = nextEnabled(list, ai, 1);
-  } else if (key === 'ArrowUp') {
-    if (e) e.preventDefault();
-    activeIndex.value = nextEnabled(list, ai, -1);
-  } else if (key === 'Home') {
-    if (e) e.preventDefault();
-    activeIndex.value = nextEnabled(list, -1, 1);
-  } else if (key === 'End') {
-    if (e) e.preventDefault();
-    activeIndex.value = nextEnabled(list, list.length, -1);
-  } else if (key === 'Enter') {
-    if (ai >= 0 && list[ai]) {
-      if (e) e.preventDefault();
-      selectItem(list[ai]);
-    }
-  } else if (key === 'Escape') {
-    if (e) e.preventDefault();
-    closePalette();
-  }
+// Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+// Pipe it into command-palette's own two-way `query` model — `filteredItems()`
+// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// (never re-read a just-written $data/$model key on React — it is stale).
+// Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+// Pipe it into command-palette's own two-way `query` model — `filteredItems()`
+// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// (never re-read a just-written $data/$model key on React — it is stale).
+const onListboxSearch = (e: any) => {
+  query.value = e && e.query !== undefined ? e.query : '';
 };
 
 // Backdrop click: a click whose target IS the backdrop (not the panel/children).
@@ -194,36 +173,65 @@ const onBackdropClick = (e: any) => {
 };
 
 // ---- open/close reconcile ----------------------------------------------
-// On open: clear the query, reset the highlight, focus the input (post-mount →
-// $refs safe). Reading $refs here is ROZ123-safe (this runs from $onMount and
-// the lazy $watch callback, both post-mount).
+// Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
+// element and querying for it. The Listbox owns the input now; reaching it via a
+// plain DOM query off command-palette's own panel ref types cleanly across all
+// six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
+// element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
+// the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
-// On open: clear the query, reset the highlight, focus the input (post-mount →
-// $refs safe). Reading $refs here is ROZ123-safe (this runs from $onMount and
-// the lazy $watch callback, both post-mount).
+// Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
+// element and querying for it. The Listbox owns the input now; reaching it via a
+// plain DOM query off command-palette's own panel ref types cleanly across all
+// six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
+// element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
+// the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
+const focusInput = () => {
+  const panel = panelRef.value;
+  if (!panel) return;
+  const input = panel.querySelector('input');
+  if (input && input.focus) input.focus();
+};
+
+// On open: clear the query + internal selection, then focus the search input.
+// Runs from $onMount and the lazy open $watch callback, both post-mount.
+// On open: clear the query + internal selection, then focus the search input.
+// Runs from $onMount and the lazy open $watch callback, both post-mount.
 const onOpen = () => {
   query.value = '';
-  activeIndex.value = firstEnabled(filterCommands(Array.isArray(props.items) ? props.items : [], ''));
-  const el = inputElRef.value;
-  if (el && el.focus) {
-    // Defer a tick so the overlay is mounted before focusing.
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        const again = inputElRef.value;
-        if (again && again.focus) again.focus();
-      });
-    } else {
-      el.focus();
-    }
+  activeValue.value = null;
+  // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      focusInput();
+    });
+  } else {
+    focusInput();
   }
 };
 
 // ---- lifecycle ---------------------------------------------------------
+// Escape closes from anywhere in the panel (the vendored <Listbox> only closes
+// its own popup on Escape; the palette overlay close is command-palette's).
+const onPanelKeydown = (e: any) => {
+  if (e && e.key === 'Escape') {
+    e.preventDefault();
+    closePalette();
+  }
+};
+
 // ---- imperative handle -------------------------------------------------
 // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
-// onto the generated open/setOpen state). focus() focuses the input (accepted
-// ROZ137 Lit override). All post-mount → $refs safe.
+// onto the generated open/setOpen state). focus() focuses the vendored listbox's
+// control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
+// $refs safe.
+// ---- imperative handle -------------------------------------------------
+// show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
+// `open`) — an `open` verb collides with the `open` model on React (both collapse
+// onto the generated open/setOpen state). focus() focuses the vendored listbox's
+// control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
+// $refs safe.
 const show = () => {
   open.value = true;
 };
@@ -233,7 +241,7 @@ const close = () => {
 const toggle = () => {
   open.value = !open.value;
 };
-const focus = () => inputElRef.value?.focus();
+const focus = () => focusInput();
 
 onMounted(() => {
   if (open.value) onOpen();

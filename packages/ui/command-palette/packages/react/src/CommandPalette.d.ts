@@ -42,8 +42,8 @@ export interface CommandPaletteProps {
    */
   idBase?: string;
   onSelect?: (...args: unknown[]) => void;
-  renderItem?: (params: { item: () => void; active: unknown }) => ReactNode;
-  renderEmpty?: () => ReactNode;
+  renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void }) => ReactNode;
+  renderEmpty?: (params: { query: string }) => ReactNode;
   renderFooter?: () => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

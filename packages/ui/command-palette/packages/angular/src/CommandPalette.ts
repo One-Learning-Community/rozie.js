@@ -1,19 +1,32 @@
 import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
-import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
+
+import { Listbox } from './Listbox';
 
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 
-interface ItemCtx {
-  $implicit: { item: any; active: any };
-  item: any;
+interface OptionCtx {
+  $implicit: { option: any; index: any; active: any; selected: any; disabled: any };
+  option: any;
+  index: any;
   active: any;
+  selected: any;
+  disabled: any;
 }
 
-interface EmptyCtx {}
+interface EmptyCtx {
+  $implicit: { query: any };
+  query: any;
+}
 
 interface FooterCtx {}
 
@@ -40,41 +53,33 @@ function __rozieAttr(v: unknown): string | null {
 @Component({
   selector: 'rozie-command-palette',
   standalone: true,
-  imports: [NgTemplateOutlet, NgClass],
+  imports: [NgTemplateOutlet, Listbox],
   template: `
 
     @if (open()) {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)">
-      <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onKeydown($event)">
-        <div class="rozie-command-palette-search">
-          <input #inputEl class="rozie-command-palette-input" type="text" role="combobox" aria-autocomplete="list" [attr.id]="rozieAttr(inputId())" [attr.aria-expanded]="!!open()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="ariaLabel()" [value]="query()" [placeholder]="placeholder()" autocomplete="off" (input)="onInput($event)" />
-        </div>
-
-        @if (filteredItems().length > 0) {
-    <ul class="rozie-command-palette-list" [attr.id]="rozieAttr(listId())" role="listbox" [attr.aria-label]="ariaLabel()">
-          @for (item of filteredItems(); track item.id) {
-    <li class="rozie-command-palette-option" [ngClass]="{ 'rozie-command-palette-option--active': item._i === activeIndex(), 'rozie-command-palette-option--disabled': item.disabled }" [attr.id]="rozieAttr(optId(item._i))" role="option" [attr.aria-selected]="item._i === activeIndex()" [attr.aria-disabled]="!!item.disabled" (mousedown)="$event.preventDefault(); selectItem(item)" (mouseenter)="activeIndex.set(item._i)">
-            @if ((itemTpl ?? templates()?.['item'])) {
-    <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: { $implicit: { item: item, active: item._i === activeIndex() }, item: item, active: item._i === activeIndex() }" />
+      <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onPanelKeydown($event)">
+        
+        <rozie-listbox [combobox]="true" [filterable]="false" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [id]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onListboxChange($event)" (search)="onListboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+            @if ((optionTpl ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled }, option: option, index: index, active: active, selected: selected, disabled: disabled }" />
     } @else {
 
-              <span class="rozie-command-palette-option-label">{{ rozieDisplay(item.label) }}</span>
-              @if (item.group) {
-    <span class="rozie-command-palette-option-group">{{ rozieDisplay(item.group) }}</span>
+              <span class="rozie-command-palette-option-label">{{ rozieDisplay(labelText(option)) }}</span>
+              @if (groupText(option)) {
+    <span class="rozie-command-palette-option-group">{{ rozieDisplay(groupText(option)) }}</span>
     }
     }
-          </li>
-    }
-        </ul>
-    }@if (filteredItems().length === 0) {
-    <div class="rozie-command-palette-empty">
-          @if ((emptyTpl ?? templates()?.['empty'])) {
-    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
+          </ng-template><ng-template #empty let-query="query">
+            @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     {{ emptyText() }}
     }
-        </div>
-    }@if ((footerTpl ?? templates()?.['footer'])) {
+          </ng-template></rozie-listbox>
+
+        
+        @if ((footerTpl ?? templates()?.['footer'])) {
     <div class="rozie-command-palette-footer">
           @if ((footerTpl ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])" />
@@ -203,10 +208,10 @@ export class CommandPalette {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase = input<string>('rozie-command-palette');
-  activeIndex = signal(0);
-  inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
+  activeValue = signal<any>(null);
+  panel = viewChild<ElementRef<HTMLDivElement>>('panel');
   select = output<unknown>();
-  @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
+  @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -225,106 +230,55 @@ export class CommandPalette {
   filteredItems = () => {
     const __items = this.items();
     const src = Array.isArray(__items) ? __items : [];
-    const list = filterCommands(src, this.query());
-    return list.map((it: any, i: any) => ({
-      id: it.id,
-      label: it.label,
-      group: it.group,
-      keywords: it.keywords,
-      disabled: !!it.disabled,
-      _i: i
-    }));
+    return filterCommands(src, this.query());
   };
-  optId = (i: any) => this.idBase() + '-opt-' + i;
-  listId = () => this.idBase() + '-list';
-  inputId = () => this.idBase() + '-input';
-  activeId = () => {
-    const __activeIndex = this.activeIndex();
-    const list = this.filteredItems();
-    if (__activeIndex >= 0 && list[__activeIndex]) return this.optId(__activeIndex);
-    return null;
-  };
-  nextEnabled = (list: any, from: any, dir: any) => {
-    let i = from;
-    for (let step = 0; step < list.length; step++) {
-      i = i + dir;
-      if (i < 0) i = 0;
-      if (i >= list.length) i = list.length - 1;
-      if (list[i] && !list[i].disabled) return i;
-      if (dir < 0 && i === 0 || dir > 0 && i === list.length - 1) break;
-    }
-    return from;
-  };
-  firstEnabled = (list: any) => {
-    for (let i = 0; i < list.length; i++) {
-      if (list[i] && !list[i].disabled) return i;
-    }
-    return 0;
-  };
+  commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
+  commandDisabled = (it: any) => !!(it && it.disabled);
+  labelText = (o: any) => o && o.label !== undefined ? o.label : '';
+  groupText = (o: any) => o && o.group !== undefined ? o.group : '';
   closePalette = () => {
     this.open.set(false);
   };
-  selectItem = (item: any) => {
+  onListboxChange = (e: any) => {
+    const item = e ? e.option : null;
     if (!item || item.disabled) return;
     this.select.emit({
       id: item.id,
       label: item.label,
       group: item.group
     });
+    // Clear the internal selection so re-selecting the same command re-fires.
+    this.activeValue.set(null);
     if (this.closeOnSelect()) this.closePalette();
   };
-  onInput = (e: any) => {
-    const __items = this.items();
-    const q = e && e.target ? e.target.value : '';
-    this.query.set(q);
-    // Reset the highlight to the first enabled item of the NEW filtered list.
-    const next = filterCommands(Array.isArray(__items) ? __items : [], q);
-    this.activeIndex.set(this.firstEnabled(next));
-  };
-  onKeydown = (e: any) => {
-    const key = e ? e.key : '';
-    const list = this.filteredItems();
-    const ai = this.activeIndex();
-    if (key === 'ArrowDown') {
-      if (e) e.preventDefault();
-      this.activeIndex.set(this.nextEnabled(list, ai, 1));
-    } else if (key === 'ArrowUp') {
-      if (e) e.preventDefault();
-      this.activeIndex.set(this.nextEnabled(list, ai, -1));
-    } else if (key === 'Home') {
-      if (e) e.preventDefault();
-      this.activeIndex.set(this.nextEnabled(list, -1, 1));
-    } else if (key === 'End') {
-      if (e) e.preventDefault();
-      this.activeIndex.set(this.nextEnabled(list, list.length, -1));
-    } else if (key === 'Enter') {
-      if (ai >= 0 && list[ai]) {
-        if (e) e.preventDefault();
-        this.selectItem(list[ai]);
-      }
-    } else if (key === 'Escape') {
-      if (e) e.preventDefault();
-      this.closePalette();
-    }
+  onListboxSearch = (e: any) => {
+    this.query.set(e && e.query !== undefined ? e.query : '');
   };
   onBackdropClick = (e: any) => {
     if (e && e.target === e.currentTarget) this.closePalette();
   };
+  focusInput = () => {
+    const panel = this.panel()?.nativeElement;
+    if (!panel) return;
+    const input = panel.querySelector('input');
+    if (input && input.focus) input.focus();
+  };
   onOpen = () => {
-    const __items = this.items();
     this.query.set('');
-    this.activeIndex.set(this.firstEnabled(filterCommands(Array.isArray(__items) ? __items : [], '')));
-    const el = this.inputEl()?.nativeElement;
-    if (el && el.focus) {
-      // Defer a tick so the overlay is mounted before focusing.
-      if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(() => {
-          const again = this.inputEl()?.nativeElement;
-          if (again && again.focus) again.focus();
-        });
-      } else {
-        el.focus();
-      }
+    this.activeValue.set(null);
+    // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        this.focusInput();
+      });
+    } else {
+      this.focusInput();
+    }
+  };
+  onPanelKeydown = (e: any) => {
+    if (e && e.key === 'Escape') {
+      e.preventDefault();
+      this.closePalette();
     }
   };
   show = () => {
@@ -336,12 +290,12 @@ export class CommandPalette {
   toggle = () => {
     this.open.set(!this.open());
   };
-  focus = () => this.inputEl()?.nativeElement?.focus();
+  focus = () => this.focusInput();
 
   static ngTemplateContextGuard(
     _dir: CommandPalette,
     _ctx: unknown,
-  ): _ctx is ItemCtx | EmptyCtx | FooterCtx {
+  ): _ctx is OptionCtx | EmptyCtx | FooterCtx {
     return true;
   }
 

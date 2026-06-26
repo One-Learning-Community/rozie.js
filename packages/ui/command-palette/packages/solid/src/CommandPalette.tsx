@@ -1,11 +1,17 @@
 import type { JSX } from 'solid-js';
-import { For, Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+import { Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
+import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
+import Listbox from './Listbox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 
 __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
@@ -89,7 +95,9 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
 }`);
 
-interface ItemSlotCtx { item: any; active: any; }
+interface OptionSlotCtx { option: any; index: any; active: any; selected: any; disabled: any; }
+
+interface EmptySlotCtx { query: any; }
 
 interface CommandPaletteProps {
   /**
@@ -131,8 +139,8 @@ interface CommandPaletteProps {
    */
   idBase?: string;
   onSelect?: (...args: unknown[]) => void;
-  itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;
-  emptySlot?: JSX.Element;
+  optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
+  emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
   footerSlot?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: CommandPaletteHandle) => void;
@@ -152,66 +160,49 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   const [query, setQuery] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'query', '');
-  const [activeIndex, setActiveIndex] = createSignal(0);
+  const [activeValue, setActiveValue] = createSignal(null);
   onMount(() => {
     if (open()) onOpen();
   });
   createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
     if (isOpen) onOpen();
   })(v)), { defer: true }));
-  let inputElRef: HTMLElement | null = null;
+  let panelRef: HTMLElement | null = null;
 
   // ---- derived views (plain functions, uniform ×6) -----------------------
-  // The filtered command list, each carrying its filtered-list index `_i`. A plain
-  // function (called from the r-for AND handlers) — never $computed.
+  // The filtered command list fed to the vendored <Listbox> as its `:options`.
+  // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+  // runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+  // substring and would drop the keyword matching + source-order grouping. A plain
+  // function (called from the template binding AND handlers) — never $computed (the
+  // listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+  // resolves its value via `optionValue` (below) and its label via `.label`.
   function filteredItems() {
     const src = Array.isArray(local.items) ? local.items : [];
-    const list = filterCommands(src, query());
-    return list.map((it: any, i: any) => ({
-      id: it.id,
-      label: it.label,
-      group: it.group,
-      keywords: it.keywords,
-      disabled: !!it.disabled,
-      _i: i
-    }));
-  }
-  function optId(i: any) {
-    return local.idBase + '-opt-' + i;
-  }
-  function listId() {
-    return local.idBase + '-list';
-  }
-  function inputId() {
-    return local.idBase + '-input';
+    return filterCommands(src, query());
   }
 
-  // The active option's id for aria-activedescendant (null when none).
-  function activeId() {
-    const list = filteredItems();
-    if (activeIndex() >= 0 && list[activeIndex()]) return optId(activeIndex());
-    return null;
+  // The vendored <Listbox> commits the OPTION's value; resolve each command's value
+  // to its stable `id` (the key passed back on `select`). disabled is resolved off
+  // the item's own `disabled` flag (listbox's default `.disabled` fallback already
+  // handles it, but we pass an explicit resolver for clarity + safety on primitives).
+  function commandValue(it: any) {
+    return it && it.id !== undefined ? it.id : it;
+  }
+  function commandDisabled(it: any) {
+    return !!(it && it.disabled);
   }
 
-  // Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
-  function nextEnabled(list: any, from: any, dir: any) {
-    let i = from;
-    for (let step = 0; step < list.length; step++) {
-      i = i + dir;
-      if (i < 0) i = 0;
-      if (i >= list.length) i = list.length - 1;
-      if (list[i] && !list[i].disabled) return i;
-      if (dir < 0 && i === 0 || dir > 0 && i === list.length - 1) break;
-    }
-    return from;
+  // Default-fill display helpers. The re-projected #option scope param `option`
+  // threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
+  // the default fill content reads its label/group through these UNTYPED helpers
+  // (neutralized to `any`) rather than `option.label` directly — keeps the Lit leaf
+  // typechecking without a per-target cast.
+  function labelText(o: any) {
+    return o && o.label !== undefined ? o.label : '';
   }
-
-  // First selectable index (or 0). Used to reset the highlight on open / re-filter.
-  function firstEnabled(list: any) {
-    for (let i = 0; i < list.length; i++) {
-      if (list[i] && !list[i].disabled) return i;
-    }
-    return 0;
+  function groupText(o: any) {
+    return o && o.group !== undefined ? o.group : '';
   }
 
   // ---- close funnel ------------------------------------------------------
@@ -220,49 +211,29 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   }
 
   // ---- selection ---------------------------------------------------------
-  function selectItem(item: any) {
+  // Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+  // PUBLIC `select` event with the chosen command and (optionally) close. The
+  // `option` IS the original command item (we feed items straight through as
+  // listbox options), so read its id/label/group directly.
+  function onListboxChange(e: any) {
+    const item = e ? e.option : null;
     if (!item || item.disabled) return;
     _props.onSelect?.({
       id: item.id,
       label: item.label,
       group: item.group
     });
+    // Clear the internal selection so re-selecting the same command re-fires.
+    setActiveValue(null);
     if (local.closeOnSelect) closePalette();
   }
 
-  // ---- input + keyboard handlers -----------------------------------------
-  function onInput(e: any) {
-    const q = e && e.target ? e.target.value : '';
-    setQuery(q);
-    // Reset the highlight to the first enabled item of the NEW filtered list.
-    const next = filterCommands(Array.isArray(local.items) ? local.items : [], q);
-    setActiveIndex(firstEnabled(next));
-  }
-  function onKeydown(e: any) {
-    const key = e ? e.key : '';
-    const list = filteredItems();
-    const ai = activeIndex();
-    if (key === 'ArrowDown') {
-      if (e) e.preventDefault();
-      setActiveIndex(nextEnabled(list, ai, 1));
-    } else if (key === 'ArrowUp') {
-      if (e) e.preventDefault();
-      setActiveIndex(nextEnabled(list, ai, -1));
-    } else if (key === 'Home') {
-      if (e) e.preventDefault();
-      setActiveIndex(nextEnabled(list, -1, 1));
-    } else if (key === 'End') {
-      if (e) e.preventDefault();
-      setActiveIndex(nextEnabled(list, list.length, -1));
-    } else if (key === 'Enter') {
-      if (ai >= 0 && list[ai]) {
-        if (e) e.preventDefault();
-        selectItem(list[ai]);
-      }
-    } else if (key === 'Escape') {
-      if (e) e.preventDefault();
-      closePalette();
-    }
+  // Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+  // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
+  // then re-filters via filterCommands (keyword-aware). Capture the fresh value
+  // (never re-read a just-written $data/$model key on React — it is stale).
+  function onListboxSearch(e: any) {
+    setQuery(e && e.query !== undefined ? e.query : '');
   }
 
   // Backdrop click: a click whose target IS the backdrop (not the panel/children).
@@ -271,33 +242,51 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   }
 
   // ---- open/close reconcile ----------------------------------------------
-  // On open: clear the query, reset the highlight, focus the input (post-mount →
-  // $refs safe). Reading $refs here is ROZ123-safe (this runs from $onMount and
-  // the lazy $watch callback, both post-mount).
+  // Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
+  // element and querying for it. The Listbox owns the input now; reaching it via a
+  // plain DOM query off command-palette's own panel ref types cleanly across all
+  // six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
+  // element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
+  // the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
+  function focusInput() {
+    const panel = panelRef;
+    if (!panel) return;
+    const input = panel.querySelector('input');
+    if (input && input.focus) input.focus();
+  }
+
+  // On open: clear the query + internal selection, then focus the search input.
+  // Runs from $onMount and the lazy open $watch callback, both post-mount.
   function onOpen() {
     setQuery('');
-    setActiveIndex(firstEnabled(filterCommands(Array.isArray(local.items) ? local.items : [], '')));
-    const el = inputElRef;
-    if (el && el.focus) {
-      // Defer a tick so the overlay is mounted before focusing.
-      if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(() => {
-          const again = inputElRef;
-          if (again && again.focus) again.focus();
-        });
-      } else {
-        el.focus();
-      }
+    setActiveValue(null);
+    // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        focusInput();
+      });
+    } else {
+      focusInput();
     }
   }
 
   // ---- lifecycle ---------------------------------------------------------
 
+  // Escape closes from anywhere in the panel (the vendored <Listbox> only closes
+  // its own popup on Escape; the palette overlay close is command-palette's).
+  function onPanelKeydown(e: any) {
+    if (e && e.key === 'Escape') {
+      e.preventDefault();
+      closePalette();
+    }
+  }
+
   // ---- imperative handle -------------------------------------------------
   // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
   // `open`) — an `open` verb collides with the `open` model on React (both collapse
-  // onto the generated open/setOpen state). focus() focuses the input (accepted
-  // ROZ137 Lit override). All post-mount → $refs safe.
+  // onto the generated open/setOpen state). focus() focuses the vendored listbox's
+  // control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
+  // $refs safe.
   function show() {
     setOpen(true);
   }
@@ -308,24 +297,22 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     setOpen(!open());
   }
   function focus() {
-    return inputElRef?.focus();
+    return focusInput();
   }
 
   return (
     <>
     {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
-      <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} class={"rozie-command-palette-panel"} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-768cad96="">
-        <div class={"rozie-command-palette-search"} data-rozie-s-768cad96="">
-          <input type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!open()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={local.ariaLabel} autocomplete="off" ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-command-palette-input"} id={rozieAttr(inputId())} value={query()} placeholder={local.placeholder} onInput={($event) => { onInput($event); }} data-rozie-s-768cad96="" />
-        </div>
+      <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+        
+        <Listbox aria-label={local.ariaLabel} combobox={true} filterable={false} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={local.placeholder} id={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onListboxChange($event); }} onSearch={($event) => { onListboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled }) ?? <><span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>{<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</>}
+          </>)} emptySlot={({ query }) => (<>
+            {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}
+          </>)} />
 
-        {<Show when={filteredItems().length > 0}><ul class={"rozie-command-palette-list"} id={rozieAttr(listId())} role="listbox" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
-          <For each={filteredItems()}>{(item) => <li role="option" aria-selected={item._i === activeIndex()} aria-disabled={!!item.disabled} class={"rozie-command-palette-option" + " " + rozieClass({ 'rozie-command-palette-option--active': item._i === activeIndex(), 'rozie-command-palette-option--disabled': item.disabled })} id={rozieAttr(optId(item._i))} onMouseDown={($event) => { $event.preventDefault(); selectItem(item); }} onMouseEnter={($event) => { setActiveIndex(item._i); }} data-rozie-s-768cad96="">
-            {(_props.itemSlot ?? _props.slots?.['item'])?.({ item, active: item._i === activeIndex() }) ?? <><span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(item.label)}</span>{<Show when={item.group}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(item.group)}</span></Show>}</>}
-          </li>}</For>
-        </ul></Show>}{<Show when={filteredItems().length === 0}><div class={"rozie-command-palette-empty"} data-rozie-s-768cad96="">
-          {(_props.emptySlot ?? _props.slots?.['empty']?.({})) ?? local.emptyText}
-        </div></Show>}{<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}><div class={"rozie-command-palette-footer"} data-rozie-s-768cad96="">
+        
+        {<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}><div class={"rozie-command-palette-footer"} data-rozie-s-768cad96="">
           {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
         </div></Show>}</div>
     </div></Show>}</>

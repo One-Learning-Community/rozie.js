@@ -90,6 +90,6 @@ const palette = ref();          // template ref
 
 | Slot | Params |
 | --- | --- |
-| item | item, active |
-| empty |  |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | footer |  |

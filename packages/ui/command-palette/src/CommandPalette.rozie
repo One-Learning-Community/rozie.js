@@ -17,9 +17,20 @@
   OVERLAY: the overlay renders inline (a fixed full-viewport backdrop + a centered
   `role="dialog"` panel) gated by `r-if="$props.open"`, NOT the native <dialog>
   element. This sidesteps the emitter's missing `dialog` ref-type-map case (the
-  dialog family works around the same gap) and keeps the surface framework-owned
-  so the `item` / `empty` / `footer` slots are ordinary scoped slots (no portal
-  primitive needed — the framework owns this DOM).
+  dialog family works around the same gap) and keeps the surface framework-owned.
+
+  COMPOSITION (Phase 999.4): the search input + navigable results list + empty
+  state are NO LONGER hand-rolled here — they are delegated to the shipped
+  @rozie-ui/listbox primitive, composed via a <components> block keyed on the
+  STABLE package-style specifier `@rozie-ui/listbox/Listbox.rozie` (D-07). Under
+  Option B the codegen vendors that primitive's source into this family's src/ as
+  a generated sibling and remaps the specifier to `./Listbox.rozie`; the authored
+  file here stays byte-identical to a future Option A (published-package) form.
+  The dialog overlay/backdrop stays command-palette's; <Listbox combobox> owns the
+  input + listbox + empty inside it; `#footer` renders as a sibling OUTSIDE it.
+  The public slots are re-aligned to listbox's vocabulary (D-05 — BREAKING):
+  `#item {item, active}` → `#option {option, index, active, selected, disabled}`,
+  `#empty` gains `{query}`, `#footer` unchanged.
 
   Authoring notes (collision classes — see the authoring playbook §6):
     - The filter logic lives in src/internal/filterCommands.ts (named
@@ -56,28 +67,12 @@
 <rozie name="CommandPalette">
 
 <!--
-  COMPOSITION NOTE (listbox dogfood evaluated, NOT viable source-only):
-
-  Composing the shipped @rozie-ui/listbox family as the results list — via a
-  <components> entry — is NOT expressible in one .rozie source today. A
-  <components> import path is a SINGLE string literal (lowerComponents.ts:
-  `importPath: value.value`) that every one of the six emitters receives
-  verbatim; the only per-target rewrite is the `.rozie` → `.{tsx,vue,svelte,…}`
-  EXTENSION swap (rewriteRozieImport.ts), which assumes the child is a sibling
-  `.rozie` compiled alongside this one. A published listbox leaf is a DIFFERENT
-  PACKAGE NAME per target (`@rozie-ui/listbox-react` vs `-vue` vs `-svelte` …),
-  and there is no mechanism to map one import-path literal to six package names.
-  (Confirmed: zero @rozie-ui leaf depends on another family's leaf, and
-  <components> has never referenced anything but a local `./Child.rozie`.)
-
-  Making it work would need a non-additive core/emitter change (per-target
-  package-name resolution in <components>, or a build-time per-leaf specifier
-  rewrite) + slot-threading against a non-`.rozie` producer — outside the
-  source-only scope fence for a new family. Reported for backlog. The navigable
-  list is therefore authored here as ordinary scoped slots + roving nav (the
-  same primitives listbox itself uses), which is what the original surface spec
-  called for.
+  D-07 (LOAD-BEARING): the STABLE package-style specifier ending in `.rozie`. The
+  codegen vendor-step (Option B) remaps this to `./Listbox.rozie` in-memory before
+  compile; the authored value here NEVER changes — it is byte-identical to a future
+  Option A (published-package) form. Do NOT hand-write the relative `./Listbox.rozie`.
 -->
+<components>{ Listbox: '@rozie-ui/listbox/Listbox.rozie' }</components>
 
 <props>
 {
@@ -167,8 +162,12 @@
 
 <data>
 {
-  // Highlighted option index within the FILTERED list (for aria-activedescendant).
-  activeIndex: 0,
+  // The selected command id, driving the vendored <Listbox>'s `value` model
+  // INTERNALLY (A5 — NOT a third public model; command-palette keeps exactly two
+  // public models, `open` + `query`, and no Angular CVA). The composition writes
+  // this back via `r-model:value`; selecting a command re-emits the public
+  // `select` event and clears it.
+  activeValue: null,
 }
 </data>
 
@@ -176,52 +175,32 @@
 import { filterCommands } from './internal/filterCommands'
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 const filteredItems = () => {
   const src = Array.isArray($props.items) ? $props.items : []
-  const list = filterCommands(src, $props.query)
-  return list.map((it, i) => ({
-    id: it.id,
-    label: it.label,
-    group: it.group,
-    keywords: it.keywords,
-    disabled: !!it.disabled,
-    _i: i,
-  }))
+  return filterCommands(src, $props.query)
 }
 
-const optId = (i) => $props.idBase + '-opt-' + i
-const listId = () => $props.idBase + '-list'
-const inputId = () => $props.idBase + '-input'
+// The vendored <Listbox> commits the OPTION's value; resolve each command's value
+// to its stable `id` (the key passed back on `select`). disabled is resolved off
+// the item's own `disabled` flag (listbox's default `.disabled` fallback already
+// handles it, but we pass an explicit resolver for clarity + safety on primitives).
+const commandValue = (it) => (it && it.id !== undefined ? it.id : it)
+const commandDisabled = (it) => !!(it && it.disabled)
 
-// The active option's id for aria-activedescendant (null when none).
-const activeId = () => {
-  const list = filteredItems()
-  if ($data.activeIndex >= 0 && list[$data.activeIndex]) return optId($data.activeIndex)
-  return null
-}
-
-// Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
-const nextEnabled = (list, from, dir) => {
-  let i = from
-  for (let step = 0; step < list.length; step++) {
-    i = i + dir
-    if (i < 0) i = 0
-    if (i >= list.length) i = list.length - 1
-    if (list[i] && !list[i].disabled) return i
-    if ((dir < 0 && i === 0) || (dir > 0 && i === list.length - 1)) break
-  }
-  return from
-}
-
-// First selectable index (or 0). Used to reset the highlight on open / re-filter.
-const firstEnabled = (list) => {
-  for (let i = 0; i < list.length; i++) {
-    if (list[i] && !list[i].disabled) return i
-  }
-  return 0
-}
+// Default-fill display helpers. The re-projected #option scope param `option`
+// threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
+// the default fill content reads its label/group through these UNTYPED helpers
+// (neutralized to `any`) rather than `option.label` directly — keeps the Lit leaf
+// typechecking without a per-target cast.
+const labelText = (o) => (o && o.label !== undefined ? o.label : '')
+const groupText = (o) => (o && o.group !== undefined ? o.group : '')
 
 // ---- close funnel ------------------------------------------------------
 const closePalette = () => {
@@ -229,46 +208,25 @@ const closePalette = () => {
 }
 
 // ---- selection ---------------------------------------------------------
-const selectItem = (item) => {
+// Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+// PUBLIC `select` event with the chosen command and (optionally) close. The
+// `option` IS the original command item (we feed items straight through as
+// listbox options), so read its id/label/group directly.
+const onListboxChange = (e) => {
+  const item = e ? e.option : null
   if (!item || item.disabled) return
   $emit('select', { id: item.id, label: item.label, group: item.group })
+  // Clear the internal selection so re-selecting the same command re-fires.
+  $data.activeValue = null
   if ($props.closeOnSelect) closePalette()
 }
 
-// ---- input + keyboard handlers -----------------------------------------
-const onInput = (e) => {
-  const q = e && e.target ? e.target.value : ''
-  $model.query = q
-  // Reset the highlight to the first enabled item of the NEW filtered list.
-  const next = filterCommands(Array.isArray($props.items) ? $props.items : [], q)
-  $data.activeIndex = firstEnabled(next)
-}
-
-const onKeydown = (e) => {
-  const key = e ? e.key : ''
-  const list = filteredItems()
-  const ai = $data.activeIndex
-  if (key === 'ArrowDown') {
-    if (e) e.preventDefault()
-    $data.activeIndex = nextEnabled(list, ai, 1)
-  } else if (key === 'ArrowUp') {
-    if (e) e.preventDefault()
-    $data.activeIndex = nextEnabled(list, ai, -1)
-  } else if (key === 'Home') {
-    if (e) e.preventDefault()
-    $data.activeIndex = nextEnabled(list, -1, 1)
-  } else if (key === 'End') {
-    if (e) e.preventDefault()
-    $data.activeIndex = nextEnabled(list, list.length, -1)
-  } else if (key === 'Enter') {
-    if (ai >= 0 && list[ai]) {
-      if (e) e.preventDefault()
-      selectItem(list[ai])
-    }
-  } else if (key === 'Escape') {
-    if (e) e.preventDefault()
-    closePalette()
-  }
+// Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+// Pipe it into command-palette's own two-way `query` model — `filteredItems()`
+// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// (never re-read a just-written $data/$model key on React — it is stale).
+const onListboxSearch = (e) => {
+  $model.query = e && e.query !== undefined ? e.query : ''
 }
 
 // Backdrop click: a click whose target IS the backdrop (not the panel/children).
@@ -277,23 +235,31 @@ const onBackdropClick = (e) => {
 }
 
 // ---- open/close reconcile ----------------------------------------------
-// On open: clear the query, reset the highlight, focus the input (post-mount →
-// $refs safe). Reading $refs here is ROZ123-safe (this runs from $onMount and
-// the lazy $watch callback, both post-mount).
+// Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
+// element and querying for it. The Listbox owns the input now; reaching it via a
+// plain DOM query off command-palette's own panel ref types cleanly across all
+// six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
+// element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
+// the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
+const focusInput = () => {
+  const panel = $refs.panel
+  if (!panel) return
+  const input = panel.querySelector('input')
+  if (input && input.focus) input.focus()
+}
+
+// On open: clear the query + internal selection, then focus the search input.
+// Runs from $onMount and the lazy open $watch callback, both post-mount.
 const onOpen = () => {
   $model.query = ''
-  $data.activeIndex = firstEnabled(filterCommands(Array.isArray($props.items) ? $props.items : [], ''))
-  const el = $refs.inputEl
-  if (el && el.focus) {
-    // Defer a tick so the overlay is mounted before focusing.
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        const again = $refs.inputEl
-        if (again && again.focus) again.focus()
-      })
-    } else {
-      el.focus()
-    }
+  $data.activeValue = null
+  // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      focusInput()
+    })
+  } else {
+    focusInput()
   }
 }
 
@@ -308,11 +274,21 @@ $watch(() => $props.open, (isOpen) => {
   if (isOpen) onOpen()
 })
 
+// Escape closes from anywhere in the panel (the vendored <Listbox> only closes
+// its own popup on Escape; the palette overlay close is command-palette's).
+const onPanelKeydown = (e) => {
+  if (e && e.key === 'Escape') {
+    e.preventDefault()
+    closePalette()
+  }
+}
+
 // ---- imperative handle -------------------------------------------------
 // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
-// onto the generated open/setOpen state). focus() focuses the input (accepted
-// ROZ137 Lit override). All post-mount → $refs safe.
+// onto the generated open/setOpen state). focus() focuses the vendored listbox's
+// control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
+// $refs safe.
 const show = () => {
   $model.open = true
 }
@@ -322,7 +298,7 @@ const close = () => {
 const toggle = () => {
   $model.open = !$props.open
 }
-const focus = () => $refs.inputEl?.focus()
+const focus = () => focusInput()
 
 $expose({ show, close, toggle, focus })
 </script>
@@ -334,61 +310,63 @@ $expose({ show, close, toggle, focus })
   @click="onBackdropClick($event)"
 >
   <div
+    ref="panel"
     class="rozie-command-palette-panel"
     role="dialog"
     aria-modal="true"
     :aria-label="$props.ariaLabel"
-    @keydown="onKeydown($event)"
+    @keydown="onPanelKeydown($event)"
   >
-    <div class="rozie-command-palette-search">
-      <input
-        ref="inputEl"
-        class="rozie-command-palette-input"
-        type="text"
-        role="combobox"
-        aria-autocomplete="list"
-        :id="inputId()"
-        :aria-expanded="!!$props.open"
-        :aria-controls="listId()"
-        :aria-activedescendant="activeId()"
-        :aria-label="$props.ariaLabel"
-        :value="$props.query"
-        :placeholder="$props.placeholder"
-        autocomplete="off"
-        @input="onInput($event)"
-      />
-    </div>
-
-    <ul
-      r-if="filteredItems().length > 0"
-      class="rozie-command-palette-list"
-      :id="listId()"
-      role="listbox"
+    <!--
+      The vendored <Listbox combobox> owns the search input + navigable results
+      list + empty state. command-palette feeds it the pre-filtered command list
+      (filterCommands, keyword-aware, A1) and runs it NON-filterable so listbox's
+      own label-only filter doesn't double-filter. Its `value` is driven by
+      command-palette's INTERNAL $data (A5 — not a third public model); the change
+      is re-emitted as the public `select` event. `:combobox="true"` (not a bare
+      `combobox` attr — React/Svelte/Angular/Solid pass falsy "" otherwise).
+    -->
+    <Listbox
+      :combobox="true"
+      :filterable="false"
+      :close-on-select="false"
+      :options="filteredItems()"
+      :option-value="commandValue"
+      :option-disabled="commandDisabled"
+      :placeholder="$props.placeholder"
       :aria-label="$props.ariaLabel"
+      :id="$props.idBase"
+      r-model:value="$data.activeValue"
+      @change="onListboxChange($event)"
+      @search="onListboxSearch($event)"
     >
-      <li
-        r-for="item in filteredItems()"
-        :key="item.id"
-        class="rozie-command-palette-option"
-        :class="{ 'rozie-command-palette-option--active': item._i === $data.activeIndex, 'rozie-command-palette-option--disabled': item.disabled }"
-        :id="optId(item._i)"
-        role="option"
-        :aria-selected="item._i === $data.activeIndex"
-        :aria-disabled="!!item.disabled"
-        @mousedown.prevent="selectItem(item)"
-        @mouseenter="$data.activeIndex = item._i"
-      >
-        <slot name="item" :item="item" :active="item._i === $data.activeIndex">
-          <span class="rozie-command-palette-option-label">{{ item.label }}</span>
-          <span r-if="item.group" class="rozie-command-palette-option-group">{{ item.group }}</span>
+      <!--
+        Re-project command-palette's PUBLIC #option fill INTO the vendored
+        <Listbox>'s #option slot, exposing listbox's richer scope
+        { option, index, active, selected, disabled } (D-05 BREAKING: `item`→
+        `option`, gains index/selected/disabled).
+      -->
+      <template #option="{ option, index, active, selected, disabled }">
+        <slot
+          name="option"
+          :option="option"
+          :index="index"
+          :active="active"
+          :selected="selected"
+          :disabled="disabled"
+        >
+          <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
+          <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
         </slot>
-      </li>
-    </ul>
+      </template>
 
-    <div r-if="filteredItems().length === 0" class="rozie-command-palette-empty">
-      <slot name="empty">{{ $props.emptyText }}</slot>
-    </div>
+      <!-- Re-project #empty into listbox's #empty (additive: gains `query`). -->
+      <template #empty="{ query }">
+        <slot name="empty" :query="query">{{ $props.emptyText }}</slot>
+      </template>
+    </Listbox>
 
+    <!-- #footer stays OUTSIDE the listbox in the palette panel (listbox has none). -->
     <div r-if="$slots.footer" class="rozie-command-palette-footer">
       <slot name="footer" />
     </div>

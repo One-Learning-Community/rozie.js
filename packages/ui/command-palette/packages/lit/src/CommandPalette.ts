@@ -1,17 +1,30 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
-import { repeat } from 'lit/directives/repeat.js';
+import { adoptConsumerStyles, createLitControllableProperty, rozieDisplay } from '@rozie/runtime-lit';
+import { ref } from 'lit/directives/ref.js';
+import './Listbox.rozie';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list, each carrying its filtered-list index `_i`. A plain
-// function (called from the r-for AND handlers) — never $computed.
+// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
+// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// substring and would drop the keyword matching + source-order grouping. A plain
+// function (called from the template binding AND handlers) — never $computed (the
+// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// resolves its value via `optionValue` (below) and its label via `.label`.
 
-interface RozieItemSlotCtx {
-  item: unknown;
+interface RozieOptionSlotCtx {
+  option: unknown;
+  index: unknown;
   active: unknown;
+  selected: unknown;
+  disabled: unknown;
+}
+
+interface RozieEmptySlotCtx {
+  query: unknown;
 }
 
 @customElement('rozie-command-palette')
@@ -136,15 +149,16 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true }) idBase: string = 'rozie-command-palette';
-  private _activeIndex = signal(0);
-  @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
+  private _activeValue = signal(null);
+  @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 
-  @state() private _hasSlotItem = false;
-  @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
-  @property({ attribute: false }) item?: (scope: { item: unknown; active: unknown }) => unknown;
+  @state() private _hasSlotOption = false;
+  @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
+  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
+  @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
 
@@ -155,9 +169,9 @@ private __rozieWatchInitial_0 = true;
 
   private _armListeners(): void {
     {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="item"]');
+      const slotEl = this.shadowRoot?.querySelector('slot[name="option"]');
       if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotItem = this._slotItemElements.length > 0; };
+        const update = () => { this._hasSlotOption = this._slotOptionElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -190,7 +204,7 @@ private __rozieWatchInitial_0 = true;
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
-    this._hasSlotItem = Array.from(this.children).some((el) => el.getAttribute('slot') === 'item');
+    this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
@@ -226,20 +240,18 @@ private __rozieWatchInitial_0 = true;
   render() {
     return html`
 ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) => { this.onBackdropClick($event); }} data-rozie-s-768cad96>
-  <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-768cad96>
-    <div class="rozie-command-palette-search" data-rozie-s-768cad96>
-      <input class="rozie-command-palette-input" type="text" role="combobox" aria-autocomplete="list" id=${rozieAttr(this.inputId())} aria-expanded=${!!this.open} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${this.ariaLabel} .value=${this.query} placeholder=${this.placeholder} autocomplete="off" @input=${($event: Event) => { this.onInput($event); }} data-rozie-ref="inputEl" data-rozie-s-768cad96 />
-    </div>
+  <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: Event) => { this.onPanelKeydown($event); }} data-rozie-ref="panel" data-rozie-s-768cad96>
+    
+    <rozie-listbox .combobox=${true} .filterable=${false} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .id=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onListboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onListboxSearch($event); }} data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+        ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}); } catch { return '{}'; } })()}>
+          <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
+          ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</slot>`}
+      `} .empty=${(scope: { query: unknown }) => html`
+        ${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}
+      `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-listbox>
 
-    ${this.filteredItems().length > 0 ? html`<ul class="rozie-command-palette-list" id=${rozieAttr(this.listId())} role="listbox" aria-label=${this.ariaLabel} data-rozie-s-768cad96>
-      ${repeat<any>(this.filteredItems(), (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ "rozie-command-palette-option": true, 'rozie-command-palette-option--active': item._i === this._activeIndex.value, 'rozie-command-palette-option--disabled': item.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(item.id)} id=${rozieAttr(this.optId(item._i))} role="option" aria-selected=${item._i === this._activeIndex.value} aria-disabled=${!!item.disabled} @mousedown=${($event: MouseEvent) => { $event.preventDefault(); this.selectItem(item); }} @mouseenter=${($event: Event) => { this._activeIndex.value = item._i; }} data-rozie-s-768cad96>
-        ${this.item !== undefined ? this.item({item: item, active: item._i === this._activeIndex.value}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({item: item, active: item._i === this._activeIndex.value}); } catch { return '{}'; } })()}>
-          <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(item.label)}</span>
-          ${item.group ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(item.group)}</span>` : nothing}</slot>`}
-      </li>`)}
-    </ul>` : nothing}${this.filteredItems().length === 0 ? html`<div class="rozie-command-palette-empty" data-rozie-s-768cad96>
-      <slot name="empty">${this.emptyText}</slot>
-    </div>` : nothing}${this._hasSlotFooter ? html`<div class="rozie-command-palette-footer" data-rozie-s-768cad96>
+    
+    ${this._hasSlotFooter ? html`<div class="rozie-command-palette-footer" data-rozie-s-768cad96>
       <slot name="footer"></slot>
     </div>` : nothing}</div>
 </div>` : nothing}`;
@@ -247,53 +259,23 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
 
   filteredItems = () => {
   const src = Array.isArray(this.items) ? this.items : [];
-  const list = filterCommands(src, this.query);
-  return list.map((it: any, i: any) => ({
-    id: it.id,
-    label: it.label,
-    group: it.group,
-    keywords: it.keywords,
-    disabled: !!it.disabled,
-    _i: i
-  }));
+  return filterCommands(src, this.query);
 };
 
-  optId = (i: any) => this.idBase + '-opt-' + i;
+  commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
 
-  listId = () => this.idBase + '-list';
+  commandDisabled = (it: any) => !!(it && it.disabled);
 
-  inputId = () => this.idBase + '-input';
+  labelText = (o: any) => o && o.label !== undefined ? o.label : '';
 
-  activeId = () => {
-  const list = this.filteredItems();
-  if (this._activeIndex.value >= 0 && list[this._activeIndex.value]) return this.optId(this._activeIndex.value);
-  return null;
-};
-
-  nextEnabled = (list: any, from: any, dir: any) => {
-  let i = from;
-  for (let step = 0; step < list.length; step++) {
-    i = i + dir;
-    if (i < 0) i = 0;
-    if (i >= list.length) i = list.length - 1;
-    if (list[i] && !list[i].disabled) return i;
-    if (dir < 0 && i === 0 || dir > 0 && i === list.length - 1) break;
-  }
-  return from;
-};
-
-  firstEnabled = (list: any) => {
-  for (let i = 0; i < list.length; i++) {
-    if (list[i] && !list[i].disabled) return i;
-  }
-  return 0;
-};
+  groupText = (o: any) => o && o.group !== undefined ? o.group : '';
 
   closePalette = () => {
   this._openControllable.write(false);
 };
 
-  selectItem = (item: any) => {
+  onListboxChange = (e: any) => {
+  const item = e ? e.option : null;
   if (!item || item.disabled) return;
   this.dispatchEvent(new CustomEvent("select", {
     detail: {
@@ -304,62 +286,43 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
     bubbles: true,
     composed: true
   }));
+  // Clear the internal selection so re-selecting the same command re-fires.
+  this._activeValue.value = null;
   if (this.closeOnSelect) this.closePalette();
 };
 
-  onInput = (e: any) => {
-  const q = e && e.target ? e.target.value : '';
-  this._queryControllable.write(q);
-  // Reset the highlight to the first enabled item of the NEW filtered list.
-  const next = filterCommands(Array.isArray(this.items) ? this.items : [], q);
-  this._activeIndex.value = this.firstEnabled(next);
-};
-
-  onKeydown = (e: any) => {
-  const key = e ? e.key : '';
-  const list = this.filteredItems();
-  const ai = this._activeIndex.value;
-  if (key === 'ArrowDown') {
-    if (e) e.preventDefault();
-    this._activeIndex.value = this.nextEnabled(list, ai, 1);
-  } else if (key === 'ArrowUp') {
-    if (e) e.preventDefault();
-    this._activeIndex.value = this.nextEnabled(list, ai, -1);
-  } else if (key === 'Home') {
-    if (e) e.preventDefault();
-    this._activeIndex.value = this.nextEnabled(list, -1, 1);
-  } else if (key === 'End') {
-    if (e) e.preventDefault();
-    this._activeIndex.value = this.nextEnabled(list, list.length, -1);
-  } else if (key === 'Enter') {
-    if (ai >= 0 && list[ai]) {
-      if (e) e.preventDefault();
-      this.selectItem(list[ai]);
-    }
-  } else if (key === 'Escape') {
-    if (e) e.preventDefault();
-    this.closePalette();
-  }
+  onListboxSearch = (e: any) => {
+  this._queryControllable.write(e && e.query !== undefined ? e.query : '');
 };
 
   onBackdropClick = (e: any) => {
   if (e && e.target === e.currentTarget) this.closePalette();
 };
 
+  focusInput = () => {
+  const panel = this._refPanel;
+  if (!panel) return;
+  const input = panel.querySelector('input');
+  if (input && input.focus) input.focus();
+};
+
   onOpen = () => {
   this._queryControllable.write('');
-  this._activeIndex.value = this.firstEnabled(filterCommands(Array.isArray(this.items) ? this.items : [], ''));
-  const el = this._refInputEl;
-  if (el && el.focus) {
-    // Defer a tick so the overlay is mounted before focusing.
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(() => {
-        const again = this._refInputEl;
-        if (again && again.focus) again.focus();
-      });
-    } else {
-      el.focus();
-    }
+  this._activeValue.value = null;
+  // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      this.focusInput();
+    });
+  } else {
+    this.focusInput();
+  }
+};
+
+  onPanelKeydown = (e: any) => {
+  if (e && e.key === 'Escape') {
+    e.preventDefault();
+    this.closePalette();
   }
 };
 
@@ -375,7 +338,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
   this._openControllable.write(!this.open);
 };
 
-  focus = () => this._refInputEl?.focus();
+  focus = () => this.focusInput();
 
   get open(): boolean { return this._openControllable.read(); }
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }

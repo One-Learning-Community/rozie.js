@@ -95,6 +95,6 @@ palette.current?.close();
 
 | Slot | Params |
 | --- | --- |
-| item | item, active |
-| empty |  |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | footer |  |
