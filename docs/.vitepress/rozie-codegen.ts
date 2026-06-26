@@ -23,7 +23,13 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, type CompileTarget } from '@rozie/core';
+import {
+  compile,
+  createDefaultRegistry,
+  IRCache,
+  ProducerResolver,
+  type CompileTarget,
+} from '@rozie/core';
 import type MarkdownIt from 'markdown-it';
 
 /** Map a compile target to the fenced-code language for syntax highlighting. */
@@ -106,6 +112,23 @@ export function rozieCodegen(
     }
   };
 
+  // Build-scoped shared resolution state, created once per md instance (reused
+  // across every page in the `vitepress build`). Each `rozie-out` fence used to
+  // compile() with a fresh IRCache + ProducerResolver, so composition examples
+  // re-read/re-parsed/re-lowered their producers on every fence. Sharing one
+  // cache amortizes producer lowering across the whole docs render.
+  //
+  // Byte-identical to the per-fence default: the resolver is rooted at
+  // `process.cwd()` — exactly the root `compile()` builds when no `resolverRoot`
+  // is passed — and the IRCache is keyed by resolved producer path (a producer
+  // IR is a pure function of its content, never of fill order). The shared
+  // registry is `createDefaultRegistry()`, identical to compile()'s per-call
+  // default; passing it explicitly keeps the cache's producer-lowering registry
+  // in lockstep with the consumer's.
+  const sharedRegistry = createDefaultRegistry();
+  const sharedCache = new IRCache({ modifierRegistry: sharedRegistry });
+  const sharedResolver = new ProducerResolver({ root: process.cwd() });
+
   md.core.ruler.push('rozie-codegen', (state) => {
     for (const token of state.tokens) {
       if (token.type !== 'fence') continue;
@@ -142,6 +165,11 @@ export function rozieCodegen(
         const result = compile(source, {
           target: target as CompileTarget,
           filename: `${name}.rozie`,
+          // Shared build-scoped cache/resolver/registry (see above) — amortizes
+          // producer parse+lower across fences; byte-identical to the default.
+          modifierRegistry: sharedRegistry,
+          irCache: sharedCache,
+          resolver: sharedResolver,
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         if (errors.length > 0) {

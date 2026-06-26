@@ -11,6 +11,20 @@ export type { ParseResult } from './parse.js';
 export { compile } from './compile.js';
 export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
 
+// Phase 07.2 IR cache + producer resolver. `compile()` already accepts these as
+// `opts.irCache` / `opts.resolver` to amortize producer parse+lower across many
+// compile() calls (the JSDoc names "@rozie/unplugin" as the motivating consumer).
+// Re-exported here so external batch callers (a docs render, a CLI build matrix)
+// can construct ONE shared instance and pass it across calls — the same
+// build-scoped sharing @rozie/unplugin does internally. Output is a pure
+// function of (consumerSource, producerSource), never of cache fill order, so a
+// shared cache is byte-identical to per-call construction (RESEARCH Pitfall 2).
+// @experimental — shape may change before v1.0
+export { IRCache } from './ir/cache.js';
+export type { IRCacheOptions } from './ir/cache.js';
+export { ProducerResolver } from './resolver/index.js';
+export type { ResolverOptions } from './resolver/index.js';
+
 // AST contract types (Plan 01 + Plan 03 + Plan 04 — concrete shapes).
 export type {
   SourceLoc,
