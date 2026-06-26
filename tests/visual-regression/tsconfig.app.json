@@ -11,6 +11,8 @@
     "paths": {
       "@angular/*": ["node_modules/@angular/*"],
       "@analogjs/*": ["node_modules/@analogjs/*"],
+      "listboxPathComment": "Phase 999.4 cross-family composition: command-palette's CommandPalette.rozie composes the vendored listbox via the STABLE D-07 specifier `@rozie-ui/listbox/Listbox.rozie`; the Angular emit ext-strips it to `@rozie-ui/listbox/Listbox`. The vite build resolves that via resolve.alias, but @analogjs's NgtscProgram resolves AOT imports through tsconfig `paths`, NOT vite aliases — without this entry the import is unresolved, `imports: [Listbox]` collapses to any[], no `ɵcmp` is emitted, and the cell falls back to (browser-absent) JIT → empty mount. Maps to the SAME vendored copy the vite alias targets (`command-palette/src/Listbox.rozie` → +`.ts` → the prebuilt `Listbox.rozie.ts` disk-cache, which is in `include`) so the AOT-analyzed class identity matches the bundled one.",
+      "@rozie-ui/listbox/*": ["../../packages/ui/command-palette/src/*.rozie"],
       "zone.js": ["node_modules/zone.js"],
       "zone.js/*": ["node_modules/zone.js/*"],
       "rxjs": ["node_modules/rxjs"],

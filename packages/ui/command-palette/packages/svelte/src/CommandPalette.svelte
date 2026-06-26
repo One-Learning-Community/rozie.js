@@ -170,23 +170,33 @@ const onBackdropClick = (e: any) => {
 };
 
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
-// element and querying for it. The Listbox owns the input now; reaching it via a
-// plain DOM query off command-palette's own panel ref types cleanly across all
-// six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
-// element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
-// the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
+// Focus the vendored <Listbox>'s combobox <input>; focusing it fires the
+// listbox's `@focus="open"` → the popup opens (the screenshot demo seeds the
+// palette open, so this runs on mount). The five light-DOM targets render the
+// input directly under the panel, so a plain `querySelector('input')` finds it.
+// On Lit the <Listbox> compiles to a `<rozie-listbox>` CUSTOM ELEMENT whose input
+// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
+// palette never opened and rendered 0 options. Fall back to piercing the child
+// element's open shadow root on Lit. A `$refs.listbox.focusControl()` handle call
+// would be cleaner but is blocked by the refs-lowering type gap (a composed-
+// component ref types inconsistently across targets, not as the ListboxHandle).
+// $refs read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Listbox>'s combobox <input> by reaching into the panel
-// element and querying for it. The Listbox owns the input now; reaching it via a
-// plain DOM query off command-palette's own panel ref types cleanly across all
-// six leaves (a `$refs.listbox` COMPONENT-handle read still types as the host
-// element, not the ListboxHandle — the refs-lowering type gap — so a DOM query is
-// the source-only path). $refs is read in a post-mount callback only (ROZ123-safe).
+// Focus the vendored <Listbox>'s combobox <input>; focusing it fires the
+// listbox's `@focus="open"` → the popup opens (the screenshot demo seeds the
+// palette open, so this runs on mount). The five light-DOM targets render the
+// input directly under the panel, so a plain `querySelector('input')` finds it.
+// On Lit the <Listbox> compiles to a `<rozie-listbox>` CUSTOM ELEMENT whose input
+// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
+// palette never opened and rendered 0 options. Fall back to piercing the child
+// element's open shadow root on Lit. A `$refs.listbox.focusControl()` handle call
+// would be cleaner but is blocked by the refs-lowering type gap (a composed-
+// component ref types inconsistently across targets, not as the ListboxHandle).
+// $refs read in a post-mount callback only (ROZ123-safe).
 const focusInput = () => {
   const panel$local = panel;
   if (!panel$local) return;
-  const input = panel$local.querySelector('input');
+  const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
   if (input && input.focus) input.focus();
 };
 

@@ -144,7 +144,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function focusInput() {
     const panel$local = panel.current;
     if (!panel$local) return;
-    const input = panel$local.querySelector('input');
+    const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
     if (input && input.focus) input.focus();
   }
   const onOpen = useCallback(() => {

@@ -260,7 +260,7 @@ export class CommandPalette {
   focusInput = () => {
     const panel = this.panel()?.nativeElement;
     if (!panel) return;
-    const input = panel.querySelector('input');
+    const input = panel.querySelector('input') || panel.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
     if (input && input.focus) input.focus();
   };
   onOpen = () => {

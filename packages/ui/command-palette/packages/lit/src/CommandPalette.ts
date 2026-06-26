@@ -302,7 +302,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
   focusInput = () => {
   const panel = this._refPanel;
   if (!panel) return;
-  const input = panel.querySelector('input');
+  const input = panel.querySelector('input') || panel.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
   if (input && input.focus) input.focus();
 };
 
