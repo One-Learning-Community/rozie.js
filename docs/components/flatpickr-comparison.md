@@ -99,8 +99,9 @@ re-check the dates before relying on them.
 
 - **Uniform imperative handle + two-way string value across all six.** Rozie's
   [`$expose` handle](/components/flatpickr#imperative-handle) gives the *same*
-  five-method API — `clear` / `openPicker` / `closePicker` / `selectDate` /
-  `jumpToDate` — on every target. react-flatpickr exposes the raw instance via
+  nine-method API — `clear` / `openPicker` / `closePicker` / `togglePicker` /
+  `selectDate` / `jumpToDate` / `changeMonth` / `changeYear` / `getSelectedDates` —
+  on every target. react-flatpickr exposes the raw instance via
   a `.flatpickr` ref and lit-flatpickr ships a rich method set, but
   vue-flatpickr-component and svelte-flatpickr don't document an instance
   accessor (scored `~`). And Rozie's `r-model:date` binds the **formatted

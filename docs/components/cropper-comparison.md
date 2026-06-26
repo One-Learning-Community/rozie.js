@@ -30,10 +30,10 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Cropper.js v1 engine | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Mount cropper from `src` | ✅ | ✅ | hand-roll | hand-roll | hand-roll | hand-roll | ✅ |
-| Full option surface as props | ✅ | ⚠️ partial | — | — | — | — | ✅ 20 props |
+| Full option surface as props | ✅ | ⚠️ partial | — | — | — | — | ✅ 21 props |
 | **Two-way crop box** | ⚠️ via `crop` callback | ⚠️ via event | — | — | — | — | ✅ `data` model (round-trip-guarded) |
 | Full event set | ✅ | ⚠️ partial | — | — | — | — | ✅ 6 events |
-| Imperative handle (rotate / zoom / export…) | ✅ via ref `.cropper` | ⚠️ via `$refs` methods | — | — | — | hand-roll | ✅ uniform 18-verb `$expose` |
+| Imperative handle (rotate / zoom / export…) | ✅ via ref `.cropper` | ⚠️ via `$refs` methods | — | — | — | hand-roll | ✅ uniform 27-verb `$expose` |
 | `getCroppedCanvas` / export | ✅ | ✅ | — | — | — | — | ✅ + `getCroppedDataURL` convenience |
 | Angular `ControlValueAccessor` | n/a | n/a | ❌ | n/a | n/a | n/a | ✅ (`data` model → `[(ngModel)]`) |
 | TypeScript | ✅ | ⚠️ | — | — | — | — | ✅ |
@@ -43,7 +43,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 - **One definition, six idiomatic packages** — including the four frameworks with **no Cropper.js option at all** (Angular, Svelte, Solid, Lit). An Angular or Svelte dev today must adopt a *different* cropping engine (`ngx-image-cropper`, `svelte-easy-crop`) with its own API and look; a Solid or Lit dev hand-rolls everything around the raw engine. Rozie hands all four a first-class Cropper.js component.
 - **A real two-way crop box on all six** — the `data` model (`{ x, y, width, height, rotate, scaleX, scaleY }`) reads *and* drives the crop box, echoed on every `crop` event and applied via `setData` with a round-trip guard. `react-cropper` and `vue-cropperjs` surface the box via a one-way callback / event; you wire the write-back yourself.
-- **A uniform 18-verb imperative handle** (`getCroppedCanvas` / `getCroppedDataURL` / `rotateBy` / `zoomBy` / `scaleX` / `setAspectRatio` / …) grabbed with each framework's native ref — identical on every target, versus "however this wrapper happens to expose the instance" (a `.cropper` ref property, `$refs` methods, …).
+- **A uniform 27-verb imperative handle** (`getCroppedCanvas` / `getCroppedDataURL` / `rotateBy` / `zoomBy` / `scaleX` / `setAspectRatio` / …) grabbed with each framework's native ref — identical on every target, versus "however this wrapper happens to expose the instance" (a `.cropper` ref property, `$refs` methods, …).
 - **Angular gets a `ControlValueAccessor` for free** — because `data` is the lone model prop, `[(ngModel)]="box"` and reactive `formControl` bindings work out of the box. No Cropper.js wrapper offers this today (there isn't one).
 - **`getCropper()` is always one hop from the raw engine**, so the full Cropper.js v1 API is reachable on any target when the curated surface doesn't cover something.
 
@@ -55,13 +55,13 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **Runtime-reconciling every option.** Cropper.js v1 ships runtime setters only for the aspect ratio, drag mode, crop box, enable/disable, and source — so those five props reconcile live, and the rest are applied at construction (the *Runtime-updatable?* column in the [API table](/components/cropper#props)). Wrappers that rebuild the whole instance on any option change (as `react-cropper` does for some props) can appear to "reconcile" more; Rozie deliberately keeps the construction-time set construction-time rather than churning a full destroy/rebuild. Anything not surfaced reconciles through the `options` passthrough at construction.
 
-- **`@rozie-ui/cropper` is `0.1.0`.** The surface (20 props / 6 events / 18-verb handle / two-way `data` model) is stable and gate-verified, but it is younger than `react-cropper`.
+- **`@rozie-ui/cropper` is `0.1.0`.** The surface (21 props / 6 events / 27-verb handle / two-way `data` model) is stable and gate-verified, but it is younger than `react-cropper`.
 
 - **Cropper.js v1, not v2.** These packages wrap the mature v1. Cropper.js v2 (the Web-Components rewrite) is a separate, newer API; teams that want v2's web-component model are better served by it directly (it is already cross-framework via custom elements). See [Why v1, not v2](/components/cropper#why-v1-not-v2).
 
 ## Try it
 
-The [`@rozie-ui/cropper` showcase + API reference](/components/cropper) documents the `@rozie-ui/cropper-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/cropper-react cropperjs`, etc.), plus the `import 'cropperjs/dist/cropper.css'` the engine DOM needs. The showcase walks the two-way `data` binding, the 6-event surface, the 18-verb imperative handle, and the crop/rotate/flip/export recipes.
+The [`@rozie-ui/cropper` showcase + API reference](/components/cropper) documents the `@rozie-ui/cropper-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/cropper-react cropperjs`, etc.), plus the `import 'cropperjs/dist/cropper.css'` the engine DOM needs. The showcase walks the two-way `data` binding, the 6-event surface, the 27-verb imperative handle, and the crop/rotate/flip/export recipes.
 
 ## Cross-references
 

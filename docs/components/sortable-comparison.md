@@ -82,7 +82,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 - **Modern React leans dnd-kit, not SortableJS.** `@dnd-kit` (~17.0M/wk) is the React drag-and-drop standard in 2026 — sensors, virtualization, a rich ecosystem — and `react-beautiful-dnd` (~2.32M/wk), though deprecated/archived, is still everywhere. Rozie wraps **SortableJS**, a different engine with a simpler DOM-mutation model and its own tradeoffs. For a single-React app that needs virtualization or dnd-kit's sensor model, dnd-kit is the better pick. Rozie's value is cross-framework reach plus the keyboard / a11y / two-way contract from one source — not "better than dnd-kit on React."
 - **Angular CDK and svelte-dnd-action are first-rate native toolkits.** CDK (first-party, connected lists, keyboard) and svelte-dnd-action (FLIP animations, Svelte 5, actively maintained) are excellent *single-framework* choices. The matrix scores cross-framework reach, not single-framework ergonomics.
-- **`@rozie-ui/sortable-list` is `0.1.0`.** The surface (17 props / 5 events / scoped row slot) is stable and VR-pinned, but younger than the established libraries — and it inherits SortableJS's engine-level limitations (touch-fallback fragility, no windowing) along with its strengths.
+- **`@rozie-ui/sortable-list` is `0.1.0`.** The surface (20 props / 5 events / scoped row slot) is stable and VR-pinned, but younger than the established libraries — and it inherits SortableJS's engine-level limitations (touch-fallback fragility, no windowing) along with its strengths.
 
 ## Cross-references
 

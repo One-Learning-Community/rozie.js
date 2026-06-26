@@ -37,7 +37,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Standard controls | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ `:controls` prop (all 6) |
 | Sources / layers | ✅ `<Source>` / `<Layer>` | ✅ `MglGeoJSONSource` / `Mgl…Layer` | ✅ source / layer directives | ✅ `<Source>` / `<Layer>` | ⚠️ | ❌ | ✅ `<Source>` / `<Layer>` children **and** `:sources` / `:layers` config props (see below) |
 | Interactive-layer hover (`features`) | ✅ `interactiveLayerIds` | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ `:interactiveLayerIds` + `@mouseenter`/`@mouseleave` |
-| Imperative handle (`getMap` etc.) | ✅ `useMap` / ref | ✅ `useMap` | ✅ `MapService` / ref | ✅ | ⚠️ | hand-roll | ✅ uniform 8-verb `$expose` |
+| Imperative handle (`getMap` etc.) | ✅ `useMap` / ref | ✅ `useMap` | ✅ `MapService` / ref | ✅ | ⚠️ | hand-roll | ✅ uniform 15-verb `$expose` |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
@@ -47,7 +47,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **Framework-native markers & popups on all six** — the `marker` / `popup` **reactive multi-instance portal slots** render a real framework fragment (any component, any reactivity) as a map marker / popup, reconciled keep / update / dispose off the `markers` / `popups` data arrays. This is exactly the capability `solid-maplibre` is thin on and Lit lacks entirely: **Solid and Lit consumers get real, reactive marker / popup content they otherwise can't have**, from the same source.
 - **Two-way camera out of the box on all six** — four `r-model` props (`center` / `zoom` / `bearing` / `pitch`) with a built-in echo-guard (the `eventData` marker that survives batched camera ops). `center` is `[lng, lat]`, MapLibre's convention.
 - **A uniform 20-event surface** with structured pointer payloads (`{ lngLat, point, features, originalEvent }`) — identical on every target, instead of each wrapper's own event idiom.
-- **A uniform 8-verb imperative handle** (`getMap` / `flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `getCenter` / `getZoom` / `resize`) grabbed with each framework's native ref — versus "however this wrapper happens to expose the `Map`" (a hook, a service, a ref, a directive input).
+- **A uniform 15-verb imperative handle** (`getMap` / `flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `getCenter` / `getZoom` / `getBounds` / `panBy` / `zoomIn` / `zoomOut` / `project` / `unproject` / `queryRenderedFeatures` / `resize`) grabbed with each framework's native ref — versus "however this wrapper happens to expose the `Map`" (a hook, a service, a ref, a directive input).
 - **`getMap()` is always one hop from the raw engine**, so the full MapLibre API is reachable on any target when the curated surface doesn't cover something.
 
 ## Declarative `<Source>` / `<Layer>` children — now supported {#declarative-children}
@@ -75,7 +75,7 @@ This page concedes where the standalone wrappers are genuinely ahead — that's 
 
 - **Big-framework depth on the home framework.** `react-map-gl` (vis.gl, OpenJS-foundation-backed), `vue-maplibre-gl`, `svelte-maplibre-gl` (MIERUNE), and the official `ngx-maplibre-gl` are mature, multi-year libraries with deep component catalogs (terrain, globe / projection, geocoding integrations, draw plugins, and the full declarative children model). On their own framework, they expose more surface than Rozie's curated prop set. Rozie's value is **not** "more than react-map-gl on React" — it's the **same idiomatic component on all six frameworks from one source**, with the underserved **Solid and Lit** getting a first-class wrapper they otherwise lack. For anything outside the curated surface, `getMap()` hands you the raw engine on every target.
 
-- **`@rozie-ui/maplibre` is `0.1.0`.** The surface (25 props / 20 events / 8-verb handle / `marker` + `popup` reactive slots + `control` mount-once slot) is stable and gate-verified, but it is younger than the multi-year incumbents.
+- **`@rozie-ui/maplibre` is `0.1.0`.** The surface (25 props / 20 events / 15-verb handle / `marker` + `popup` reactive slots + `control` mount-once slot) is stable and gate-verified, but it is younger than the multi-year incumbents.
 
 ## Try it
 

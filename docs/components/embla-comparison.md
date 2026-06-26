@@ -30,11 +30,11 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Embla v8 engine | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | Idiomatic **component** surface | ⚠️ hook | ⚠️ composable | ⚠️ action | ⚠️ primitive | ⚠️ directive | hand-roll | ✅ `<Carousel>` |
-| Option surface as props | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ | — | ✅ 17 props |
+| Option surface as props | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ | — | ✅ 20 props |
 | **Two-way snap index** | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ | — | ✅ `selectedIndex` model (echo-guarded) |
 | Runtime option reconcile | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ | — | ✅ each option `$watch`→`reInit` |
 | Autoplay plugin toggle | ⚠️ wire the plugin yourself | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ `autoplay` prop |
-| Imperative handle | ✅ via the api object | ✅ via the api object | ✅ via the api object | ✅ via the api accessor | ⚠️ | hand-roll | ✅ uniform 9-verb `$expose` |
+| Imperative handle | ✅ via the api object | ✅ via the api object | ✅ via the api object | ✅ via the api accessor | ⚠️ | hand-roll | ✅ uniform 14-verb `$expose` |
 | Plugin / options escape hatch | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ `:plugins` + `:options` |
 | Config-array **and** declarative slides | ❌ (slot only) | ❌ | ❌ | ❌ | ❌ | — | ✅ `:slides` array OR default slot |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
@@ -45,7 +45,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **One definition, six idiomatic packages** — including Lit, which has **no Embla wrapper at all**, and Angular, which has only a single-maintainer community package. Lit consumers get a category-leading Embla custom element for free; Angular gets a first-party-quality signals component from the same source as the other five.
 - **The same component surface everywhere.** The four official wrappers are a hook, a composable, an action, and a primitive — four mental models for the same engine. `@rozie-ui/embla` is one `<Carousel>` component with the same props/events/handle on all six.
 - **A real two-way snap index on all six** — the `selectedIndex` model reads *and* drives the carousel: dragging echoes the new index out (via Embla's `select` event), and a consumer write scrolls the carousel (echo-guarded so a programmatic `scrollTo` doesn't ping-pong). The official wrappers surface the index via a one-way `select` listener; you wire the write-back yourself.
-- **A uniform 9-verb imperative handle** (`scrollNext` / `scrollPrev` / `scrollToIndex` / `reInitCarousel` / `canScrollNext` / `canScrollPrev` / `getSelectedIndex` / `scrollSnapList` / `getInstance`) grabbed with each framework's native ref — identical on every target.
+- **A uniform 14-verb imperative handle** (`scrollNext` / `scrollPrev` / `scrollToIndex` / `reInitCarousel` / `canScrollNext` / `canScrollPrev` / `getSelectedIndex` / `scrollSnapList` / `scrollProgress` / `slidesInView` / `slidesNotInView` / `previousScrollSnap` / `getPlugins` / `getInstance`) grabbed with each framework's native ref — identical on every target.
 - **Two slide-source modes from one component** — pass a `:slides` config array, or drop declarative `.rozie-embla__slide` children into the default slot. The official wrappers only support consumer-authored slide DOM.
 - **`getInstance()` is always one hop from the raw engine**, so the full Embla v8 API is reachable on any target when the curated surface doesn't cover something.
 
@@ -55,12 +55,12 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **React/Vue/Svelte/Solid depth on their home framework.** The four official wrappers are mature, maintained, and idiomatic for their framework's own conventions (a React dev expects a hook; a Svelte dev expects an action). On its home framework each is a perfectly good pick. Rozie's value is **not** "more than `embla-carousel-react` on React" — it's the **same idiomatic component on all six frameworks from one source**, with Lit and Angular getting an Embla component they otherwise lack. For anything outside the curated surface, `getInstance()` hands you the raw engine on every target.
 - **Per-option setters.** Embla itself ships **no** per-option setters — `reInit(options)` is the only update path. So `@rozie-ui/embla` `$watch`es each runtime option and calls `reInit`, exactly as you would by hand with the official wrappers. A consumer rapidly mutating options can thrash `reInit`; debounce on the consumer side if needed (Embla's native `watchSlides` is incremental for slide changes).
-- **`@rozie-ui/embla` is `0.1.0`.** The surface (17 props / 4 events / 9-verb handle / two-way `selectedIndex` model) is stable and gate-verified, but it is younger than the official wrappers.
+- **`@rozie-ui/embla` is `0.1.0`.** The surface (20 props / 4 events / 14-verb handle / two-way `selectedIndex` model) is stable and gate-verified, but it is younger than the official wrappers.
 - **Embla v8, not v9.** These packages wrap the mature v8. Embla v9 (RC at time of writing) renames the API surface; teams that want v9 are better served by it directly once it ships stable.
 
 ## Try it
 
-The [`@rozie-ui/embla` showcase + API reference](/components/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 9-verb imperative handle, and the prev/next/dots recipe.
+The [`@rozie-ui/embla` showcase + API reference](/components/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 14-verb imperative handle, and the prev/next/dots recipe.
 
 ## Cross-references
 

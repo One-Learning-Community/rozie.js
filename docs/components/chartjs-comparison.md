@@ -16,7 +16,7 @@ idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers — six framewor
 targets from a single source, each a pre-compiled `@rozie-ui/chartjs-*` package
 with no Rozie toolchain required. The same generic `Chart` (the `type` prop
 drives the whole controller set), the same three structured events, the same
-eight-verb imperative handle, the same external-HTML **tooltip portal slot**, and
+fifteen-verb imperative handle, the same external-HTML **tooltip portal slot**, and
 the same `:plugins` passthrough — on all six.
 
 Every wrapper on this page — including Rozie's — drives the **same `chart.js`
@@ -34,7 +34,7 @@ of absence.)
 
 | Wrapper | Frameworks | Latest published | Framework support | Structured events | Imperative handle | HTML-tooltip slot | Per-type components | Selective (tree-shakable) registration |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: |
-| **[Rozie @rozie-ui/chartjs](/components/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (8 verbs) on all 6 | ✓ **portal slot** on all 6 | ✓ **8 typed components** + generic `Chart`, all 6 | ✓ consumer-registers + `/auto` entry (per-type tree-shakes on source leaves) |
+| **[Rozie @rozie-ui/chartjs](/components/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (15 verbs) on all 6 | ✓ **portal slot** on all 6 | ✓ **8 typed components** + generic `Chart`, all 6 | ✓ consumer-registers + `/auto` entry (per-type tree-shakes on source leaves) |
 | [react-chartjs-2](https://react-chartjs-2.js.org/) | React | **5.3.1** · 2025-10 | React 16.8 – **19** | ~ `options.onClick` + `getElement*AtEvent` helpers (no React events) | ✓ `ref` → Chart.js instance | ✗ external-handler only (no React slot) | ✓ 8 typed + generic `Chart` | ✓ typed components auto-register their controller |
 | [vue-chartjs](https://vue-chartjs.org/) | Vue 3 | **5.3.3** · 2025 | Vue 3 (3.x+) | ✗ emits no Vue events | ✓ `ref.chart` → instance | ✗ external-handler only (canvas-fallback slot only) | ✓ 8 typed + generic + `createTypedChart` | ✓ manual `ChartJS.register(...)` |
 | [ng2-charts](https://valor-software.com/ng2-charts) | Angular | **10.0.0** · 2026-03 *(v8 = Ng19)* | Angular 17 – **21** *(no signals — `@Input`/`OnChanges`)* | ✓ `chartClick` / `chartHover` (2, Angular only) | ✓ `ViewChild(BaseChartDirective).chart` | ✗ no `ng-template` tooltip | ~ one `canvas[baseChart]` directive (`type` input) | ✓ `provideCharts(...)` selective |
@@ -98,9 +98,11 @@ dates before relying on them.
   Chart.js instance its own way — a React `ref` to the instance, vue-chartjs's
   `ref.chart`, ng2-charts's `ViewChild(BaseChartDirective).chart`, svelte-chartjs's
   `bind:chart`, and nothing documented on Solid/Lit. Rozie's
-  [`$expose` handle](/components/chartjs#imperative-handle) is the *same* eight verbs —
+  [`$expose` handle](/components/chartjs#imperative-handle) is the *same* fifteen verbs —
   `getChart` / `updateChart` / `resizeChart` / `resetChart` / `renderChart` /
-  `stopChart` / `clearChart` / **`toBase64Image`** (PNG export) — on every target,
+  `stopChart` / `clearChart` / `getActiveElements` / `setActiveElements` /
+  `getDatasetMeta` / `isDatasetVisible` / `setDatasetVisibility` / `showDataset` /
+  `hideDataset` / **`toBase64Image`** (PNG export) — on every target,
   grabbed with each framework's native ref mechanism. `getChart()` returns the raw
   instance, so the full Chart.js API is always one hop away.
 

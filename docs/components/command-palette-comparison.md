@@ -59,7 +59,7 @@ Stated plainly — this doubles as the roadmap:
 - **No built-in async / loading state.** There is no first-class "loading" affordance; drive it through your `items` array and the `empty` slot. (cmdk and Bits UI have explicit loading states.)
 - **It does not own a global keyboard shortcut.** Bind ⌘K / Ctrl-K yourself and call `show()` (or set the `open` model). cmdk, kbar, and ninja-keys variously help with this; Rozie stays unopinionated about how the palette is summoned.
 - **It is self-contained, not composed from the listbox family.** The results list is authored inline (scoped slots + roving nav), **not** by composing the published `@rozie-ui/listbox` package — cross-family composition of published leaves isn't expressible in the compiler today. The accessibility primitives are the same; the implementation is just not a dependency on another leaf.
-- **`@rozie-ui/command-palette` is `0.1.0`.** The surface (7 props / 1 `select` event / a 4-verb handle / `item` · `empty` · `footer` slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
+- **`@rozie-ui/command-palette` is `0.1.0`.** The surface (8 props / 1 `select` event / a 4-verb handle / `item` · `empty` · `footer` slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
 
 ## Try it
 

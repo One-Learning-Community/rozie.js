@@ -57,7 +57,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 - **It's a single component, not a primitive suite.** Headless UI, Radix, Ariakit, Kobalte, and Melt ship whole families — Menu, Dialog, Tabs, Popover, Tooltip, and more. Rozie ships listbox/combobox (alongside its other `@rozie-ui` components), not a unified headless-primitive system.
 - **Virtualization for very large lists.** React Aria and others integrate list virtualizers for thousands of options. `@rozie-ui/listbox` renders the (filtered) option list directly — for very large datasets, filter server-side via `:filterable="false"` + the `search` event rather than shipping every row to the client.
 - **Batteries-included async combobox.** downshift and React Aria have mature async/remote-data patterns (loading states, debounce, cancellation). Rozie gives you the `search` event and `filterable="false"` hook; the loading/debounce/cancellation policy is yours to wire.
-- **`@rozie-ui/listbox` is `0.1.0`.** The surface (12 props / 3 events / single + multi / combobox / 5-verb handle / 3 slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
+- **`@rozie-ui/listbox` is `0.1.0`.** The surface (13 props / 3 events / single + multi / combobox / 5-verb handle / 3 slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
 
 ## Try it
 

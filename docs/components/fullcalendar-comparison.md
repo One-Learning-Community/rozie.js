@@ -16,7 +16,7 @@ file to idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers — six
 framework targets from a single source, each a pre-compiled
 `@rozie-ui/fullcalendar-*` package with no Rozie toolchain required. Where the
 ecosystem ships three official connectors plus scattered community coverage,
-Rozie ships the *same* 13-prop / 11-event surface, the *same* eight-verb
+Rozie ships the *same* 13-prop / 11-event surface, the *same* sixteen-verb
 imperative handle, the *same* ten custom-content portal slots, and the *same*
 `:options` long-tail passthrough — including consumer-engageable plugins beyond
 the bundled set — on all six.
@@ -37,7 +37,7 @@ evidence of absence.)
 
 | Wrapper | Frameworks | Last published | Latest-framework support | Runtime option reconcile | Imperative handle | Custom event content |
 | ------- | ---------- | -------------- | ------------------------ | :----------------------: | :---------------: | :------------------: |
-| **[Rozie @rozie-ui/fullcalendar](/components/fullcalendar)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ managed `$watch`→`setOption` + `:options` long-tail (+ merged `:options.plugins`) | ✓ uniform `$expose` (8 verbs) | ✓ 10 portal-slots, all 6 |
+| **[Rozie @rozie-ui/fullcalendar](/components/fullcalendar)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ managed `$watch`→`setOption` + `:options` long-tail (+ merged `:options.plugins`) | ✓ uniform `$expose` (16 verbs) | ✓ 10 portal-slots, all 6 |
 | [@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react) *(official)* | React | 6.1.20 · 2025-12 | **React ≤ 18** (peer `^16.7 \|\| ^17 \|\| ^18`) | ✓ diff → re-render | ✓ `ref` → `getApi()` | ✓ `eventContent` render-prop |
 | [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3) *(official)* | Vue 3 | 6.1.20 · 2025-12 | Vue 3.0.11+ (✓ 3.4+) | ✓ watches options | ✓ `ref` → `getApi()` | ✓ scoped slot |
 | [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular) *(official)* | Angular | 6.1.20 · 2025-12 | Angular **12 – 21** (✓ 19+) | ✓ diffs `[options]` | ✓ `getApi()` | ✓ `ng-template` |
