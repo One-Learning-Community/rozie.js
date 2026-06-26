@@ -645,7 +645,35 @@ function cleanupCrossTreeAngularArtifacts() {
   }
 }
 
-const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
+const ALL_TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
+
+// Iteration filter: `ROZIE_VR_TARGETS=lit,vue` builds ONLY those targets, so a
+// focused debug rebuild skips the 4 you aren't looking at (each sub-build bundles
+// the full example corpus incl. the multi-MB engine ports, so per-target cost is
+// real). Unset/empty → all six (CI + blessing default, unchanged). Unknown names
+// fail loudly rather than silently building nothing. PARTIAL builds are for local
+// iteration only — never bless a baseline or trust CI parity off a filtered build.
+const targetFilter = (process.env.ROZIE_VR_TARGETS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const unknownTargets = targetFilter.filter((t) => !ALL_TARGETS.includes(t));
+if (unknownTargets.length > 0) {
+  process.stderr.write(
+    `\n[visual-regression] ROZIE_VR_TARGETS: unknown target(s) ${unknownTargets.join(', ')} ` +
+      `— valid: ${ALL_TARGETS.join(', ')}\n`,
+  );
+  process.exit(1);
+}
+const TARGETS = targetFilter.length
+  ? ALL_TARGETS.filter((t) => targetFilter.includes(t))
+  : ALL_TARGETS;
+if (targetFilter.length > 0) {
+  process.stdout.write(
+    `\n[visual-regression] ROZIE_VR_TARGETS filter active → building ${TARGETS.join(', ')} ` +
+      `(PARTIAL build — local iteration only; not for blessing/CI)\n`,
+  );
+}
 
 // Targets whose sub-build failure is treated as non-fatal. Empty after Quick
 // task 260515-1y4: the cross-tree prebuild fix
