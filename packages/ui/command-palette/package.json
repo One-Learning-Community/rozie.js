@@ -9,7 +9,9 @@
     "test": "vitest run",
     "typecheck": "echo 'meta-pkg: pure-Rozie source; the emitted leaves typecheck individually, the surface gate runs under vitest'"
   },
+  "comment:listbox-devdep": "D-07/Option B: command-palette VENDORS @rozie-ui/listbox's .rozie source at codegen time (vendorPrimitives reads it via filesystem path, and the shipped leaves embed the compiled copy — so this is NOT a runtime dependency). It is a devDependency because the authoring/dev surface — the VR harness, the surface test, and the IDE LSP — compiles CommandPalette.rozie from raw source and must resolve the stable `<components>` specifier `@rozie-ui/listbox/Listbox.rozie` via node resolution against the primitive's `exports` map. Forward-compatible to Option A, where it graduates to a real dependency.",
   "devDependencies": {
+    "@rozie-ui/listbox": "workspace:*",
     "@rozie/core": "workspace:*",
     "typescript": "~5.6.0",
     "vitest": "^4.1.0"

@@ -177,7 +177,24 @@ function main() {
         );
       }
 
-      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
+      // D-07 (Option B, codegen-local plumbing — NOT an emitter edit): the Lit
+      // emitter emits a vendored-sibling composition import as a verbatim
+      // side-effect `import './Listbox.rozie';` (it registers the @customElement;
+      // resolved by the rozie unplugin in the consumer-coexist flow). A
+      // pre-compiled leaf package, however, is bundled standalone by tsdown
+      // (entry src/index.ts, bundler resolution) with no unplugin and no
+      // `.rozie` on disk — only the compiled sibling `Listbox.ts` — so the raw
+      // `.rozie` specifier is UNRESOLVED. Rewrite it to the extensionless sibling
+      // form (`./Listbox`), exactly what rewriteRozieImport(·,'lit') yields and
+      // what the react/solid/angular leaves already import. Lit-only; the bare
+      // side-effect form is unique to Lit composition, so this never touches
+      // binding imports or the canonical/consumer `.rozie` contract.
+      const code =
+        target === 'lit'
+          ? r.code.replace(/import '\.\/([A-Za-z0-9_]+)\.rozie';/g, "import './$1';")
+          : r.code;
+
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), code);
 
       // React-only sidecars, PER COMPONENT (data-table:199-208 shape). Both
       // CommandPalette.css/.d.ts AND Listbox.css/.d.ts are emitted.

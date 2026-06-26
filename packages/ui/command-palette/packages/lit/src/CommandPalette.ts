@@ -3,7 +3,7 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { adoptConsumerStyles, createLitControllableProperty, rozieDisplay } from '@rozie/runtime-lit';
 import { ref } from 'lit/directives/ref.js';
-import './Listbox.rozie';
+import './Listbox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------

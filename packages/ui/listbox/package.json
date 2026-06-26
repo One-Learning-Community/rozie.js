@@ -4,6 +4,11 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "comment:exports": "vendorable: true (D-02). A vendorable primitive exposes its canonical .rozie source under a STABLE subpath so the D-07 <components> specifier `@rozie-ui/listbox/Listbox.rozie` resolves via ProducerResolver (enhanced-resolve, exportsFields:['exports']) for every NON-codegen consumer — the VR harness, the surface test, the IDE LSP, and any consumer that compiles the composite from raw source. Codegen itself never hits this path (it remaps the specifier to the local vendored sibling in-memory before compile); this export is the universal authoring/dev-time half of the same forward-to-Option-A contract.",
+  "exports": {
+    "./Listbox.rozie": "./src/Listbox.rozie",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "node scripts/codegen.mjs",
     "test": "echo 'no unit tests (pure-Rozie component; behaviour covered by the VR matrix)'",
