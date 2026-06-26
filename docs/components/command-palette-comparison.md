@@ -1,5 +1,5 @@
 ---
-surface_hash: 339b7686eb70
+surface_hash: 5a1520748367
 ---
 
 # Command palette — comparison
@@ -34,7 +34,7 @@ So a design system that ships React **and** Vue **and** Svelte **and** Angular w
 - **One source, six idiomatic packages.** `CommandPalette.rozie` compiles to `@rozie-ui/command-palette-{react,vue,svelte,angular,solid,lit}`. Install only your framework's; there is no Rozie toolchain or build step for the consumer.
 - **The same accessibility everywhere.** A `role="dialog"` `aria-modal` overlay, an `<input role="combobox" aria-autocomplete="list" aria-expanded aria-controls aria-activedescendant>` search field, a `role="listbox"` of `role="option"` results with `aria-selected` / `aria-disabled`, a roving highlight tracked via `aria-activedescendant` while DOM focus stays on the input, Enter-to-select, Escape / backdrop to dismiss — the WAI-ARIA APG combobox-with-listbox pattern, authored once and identical across targets.
 - **Idiomatic two-way state.** Two `model: true` slices — `open` (visibility) and `query` (search text) — bound with `r-model:open` / `v-model:open` / `bind:open` / `[(open)]` and likewise for `query`. No per-framework controlled/uncontrolled glue. (Because there are *two* models, the Angular output deliberately ships **no** `ControlValueAccessor` — a palette is not a single form value.)
-- **Scoped slots.** `item` (custom row render, scoped with <span v-pre>`{ item, active }`</span>), `empty` (the no-results state), and `footer` (a persistent footer bar) — ordinary scoped slots on every target.
+- **Scoped slots.** `option` (custom row render, scoped with <span v-pre>`{ option, index, active, selected, disabled }`</span> — the listbox vocabulary shared with `@rozie-ui/listbox`, which the palette composes internally), `empty` (the no-results state, scoped with <span v-pre>`{ query }`</span>), and `footer` (a persistent footer bar) — ordinary scoped slots on every target.
 - **An imperative handle.** `show()` / `close()` / `toggle()` / `focus()`, obtained through each framework's native ref mechanism. (The open verb is `show`, not `open`, because an `open()` verb would collide with the `open` model.)
 - **A web-component build.** The Lit leaf gives plain-HTML / web-component consumers a real `<rozie-command-palette>` element with the *same* headless ARIA behavior — the one tier where the only real off-the-shelf option, `ninja-keys`, is a pre-styled element rather than a headless primitive.
 - **Token-themed.** Every visual value is a `--rozie-command-palette-*` CSS custom property with a fallback; shadcn/ui, Material 3, and Bootstrap 5 theme bridges ship in the box.
@@ -55,11 +55,11 @@ Rozie's wedge is **consistency and coverage**, not feature maximalism: there is 
 Stated plainly — this doubles as the roadmap:
 
 - **It is not a fuzzy-ranking search engine.** The filter is a **case-insensitive substring match** over each item's `label` plus its optional `keywords`, **preserving source order**. cmdk and Bits UI ship real fuzzy *scoring* that reranks results by match quality; Rozie does not. For fuzzy ranking, pre-rank your `items` and feed the ordered list in — the `query` model and the `select` event give you the hook.
-- **It is a flat list, not nested groups.** Items carry an optional `group` field surfaced per-row (and in the `item` slot scope), but Rozie does **not** render sticky group *headings* automatically the way cmdk's `Command.Group` or Bits UI's `Command.Group` do. Render grouped headings yourself via the `item` slot.
+- **It is a flat list, not nested groups.** Items carry an optional `group` field surfaced per-row (and in the `option` slot scope), but Rozie does **not** render sticky group *headings* automatically the way cmdk's `Command.Group` or Bits UI's `Command.Group` do. Render grouped headings yourself via the `option` slot.
 - **No built-in async / loading state.** There is no first-class "loading" affordance; drive it through your `items` array and the `empty` slot. (cmdk and Bits UI have explicit loading states.)
 - **It does not own a global keyboard shortcut.** Bind ⌘K / Ctrl-K yourself and call `show()` (or set the `open` model). cmdk, kbar, and ninja-keys variously help with this; Rozie stays unopinionated about how the palette is summoned.
 - **It is self-contained, not composed from the listbox family.** The results list is authored inline (scoped slots + roving nav), **not** by composing the published `@rozie-ui/listbox` package — cross-family composition of published leaves isn't expressible in the compiler today. The accessibility primitives are the same; the implementation is just not a dependency on another leaf.
-- **`@rozie-ui/command-palette` is `0.1.0`.** The surface (8 props / 1 `select` event / a 4-verb handle / `item` · `empty` · `footer` slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
+- **`@rozie-ui/command-palette` is `0.1.0`.** The surface (8 props / 1 `select` event / a 4-verb handle / `option` · `empty` · `footer` slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
 
 ## Try it
 

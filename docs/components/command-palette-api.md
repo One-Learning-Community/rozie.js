@@ -39,6 +39,6 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `item` | `{ item, active }` | Custom render for a single result row. `item` is the command (`{ id, label, group, keywords, disabled, _i }`); `active` is whether it is currently highlighted. Falls back to the label plus an optional group badge. |
-| `empty` | — | The no-results state. Falls back to the `emptyText` prop. |
+| `option` | `{ option, index, active, selected, disabled }` | Custom render for a single result row. **Breaking change:** renamed from `item` and realigned to the `@rozie-ui/listbox` `option` vocabulary (the palette now composes the listbox primitive). `option` is the command (`{ id, label, group, keywords, disabled, _i }`); `index` is its position; `active` is whether it is currently highlighted; `selected` whether it is the committed value; `disabled` whether it is non-selectable. Falls back to the label plus an optional group badge. |
+| `empty` | `{ query }` | The no-results state; `query` is the current search string. Falls back to the `emptyText` prop. |
 | `footer` | — | A persistent footer bar below the list (e.g. keyboard hints). Rendered only when provided. |

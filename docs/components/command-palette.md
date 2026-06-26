@@ -67,7 +67,7 @@ const run = (e) => {
 - **Portal-style overlay.** The overlay is a `position: fixed` full-viewport backdrop + a centered `role="dialog"` panel, rendered only while `open`. It escapes overflow/`z-index` ancestors without a teleport. A click on the backdrop (not the panel) closes; Escape closes; selecting an item closes when `closeOnSelect` (the default).
 - **Filter over label + keywords.** The query matches case-insensitively against each item's `label` and every entry of its optional `keywords` array. The filter lives in `src/internal/filterCommands.ts` and is unit-tested in isolation.
 - **Roving keyboard model.** ArrowUp / ArrowDown move the highlight (skipping `disabled` items), Home / End jump to the ends, Enter selects the highlighted item, Escape closes. The highlight is tracked virtually via `aria-activedescendant` — DOM focus stays on the search `<input role="combobox">`.
-- **Scoped slots.** `item` (custom item render, scoped with `{ item, active }`), `empty` (the no-results state), and `footer` (a persistent footer bar).
+- **Scoped slots.** `option` (custom row render, scoped with <span v-pre>`{ option, index, active, selected, disabled }`</span> — the listbox vocabulary shared with `@rozie-ui/listbox`, which the palette now composes internally), `empty` (the no-results state, scoped with <span v-pre>`{ query }`</span>), and `footer` (a persistent footer bar). **Breaking change in this release:** the row slot was renamed `item` → `option` and its scope realigned from <span v-pre>`{ item, active }`</span> to the listbox `option` vocabulary.
 
 ## Accessibility
 
