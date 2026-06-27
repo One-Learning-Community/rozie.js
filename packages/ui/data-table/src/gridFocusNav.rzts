@@ -32,10 +32,23 @@ const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).i
 // 'table'-mode DOM clean. rowKey is the literal
 // '__header' for header cells or the String(bodyRowIndex) for body cells, so the active
 // header state (activeIsHeader) is addressable through the same computed.
-const cellTabindex = (rowKey, colIndex) => {
+const cellTabindex = (rowKey, colIndex, level = null) => {
   if (!isGrid()) return null
-  const activeKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
-  const isActive = rowKey === activeKey && colIndex === $data.activeColIndex
+  // B6: an empty / all-filtered grid (no body rows) must STILL be keyboard-reachable. Fall
+  // the single roving tab-stop back to the FIRST leaf-header cell so the grid never has ZERO
+  // tab-stops (a keyboard trap). Only the leaf-level header col 0 carries the tab-stop.
+  if (bodyRowCount() === 0) {
+    return (rowKey === '__header' && colIndex === 0 && level === headerLeafLevel()) ? 0 : -1
+  }
+  // B12: when a header cell is active, address it by BOTH its level AND its colIndex so a
+  // grouped multi-level header carries exactly ONE tab-stop. The pre-fix level-blind compare
+  // lit BOTH the parent (level 0) and the leaf (level 1) at the same colIndex → multiple
+  // tab-stops (the roving invariant broke under grouped headers).
+  if ($data.activeIsHeader) {
+    if (rowKey !== '__header') return -1
+    return (colIndex === $data.activeColIndex && level === $data.activeHeaderLevel) ? 0 : -1
+  }
+  const isActive = rowKey === String($data.activeRow) && colIndex === $data.activeColIndex
   return isActive ? 0 : -1
 }
 
@@ -44,11 +57,17 @@ const cellTabindex = (rowKey, colIndex) => {
 // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
 // component's own scope). rowKey is the literal '__header' or a String(integer index) and
 // colIndex is an integer — NO consumer string is interpolated into the selector (T-49-01).
-const resolveCellEl = (rowKey, colIndex) => {
+const resolveCellEl = (rowKey, colIndex, level = null) => {
   if (!gridRoot) return null
-  return gridRoot.querySelector(
-    '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]'
-  )
+  // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
+  // same data-col-index across levels (parent vs leaf). Disambiguate header lookups by the
+  // integer data-header-level so resolveCellEl('__header', 0) no longer returns the FIRST DOM
+  // match (the parent) when the leaf is meant. level is an integer (NO consumer string is
+  // interpolated — T-49-01 stays safe); body lookups pass level=null → the selector is
+  // byte-unchanged.
+  let sel = '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]'
+  if (rowKey === '__header' && level != null) sel = sel + '[data-header-level="' + level + '"]'
+  return gridRoot.querySelector(sel)
 }
 
 // focusActiveCell: THE single DOM-focus-resolution path (req-6). Every focus change —
@@ -64,10 +83,14 @@ const resolveCellEl = (rowKey, colIndex) => {
 // The `= null` default reproduces the documented "falls back to $data when
 // omitted" contract: an omitted arg arrives as `null`, and the body's `== null`
 // checks already route those to the live `$data` value — behavior-identical.
-const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
+const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) => {
   if (!isGrid() || !gridRoot) return
   const r = nextRow == null ? $data.activeRow : nextRow
   const c = nextCol == null ? $data.activeColIndex : nextCol
+  // B12: thread the FRESH post-write header level (the grouped-header analog of the
+  // nextIsHeader threading) so a leaf↔parent header move resolves the cell at the correct
+  // level, never the async-stale $data.activeHeaderLevel re-read (React ROZ138 / Angular signal).
+  const lvl = nextLevel == null ? $data.activeHeaderLevel : nextLevel
   // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
   // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
   // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -104,7 +127,7 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) =>
     return
   }
   const rowKey = header ? '__header' : String(r)
-  const el = resolveCellEl(rowKey, c)
+  const el = resolveCellEl(rowKey, c, header ? lvl : null)
   if (el) el.focus()
 }
 
@@ -145,6 +168,59 @@ const visibleColCount = () => {
 const bodyRowCount = () => ($data.rows || []).length
 const clamp = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v))
 
+// ── Multi-level (grouped) header addressing (B12) ──────────────────────────────────────
+// $data.headerGroups is ordered top→bottom; the LEAF header row (the one adjacent to the
+// body) is the LAST group. The roving active-header state carries activeHeaderLevel (the
+// group index) alongside activeColIndex (the index within THAT level's headers) so the
+// single-tab-stop invariant + ArrowUp parent-resolution span every header level — a flat
+// grid has one level (leafLevel 0), so the table-mode/flat path is unchanged.
+const headerLeafLevel = () => {
+  const hg = $data.headerGroups || []
+  return hg.length ? hg.length - 1 : 0
+}
+const headerAt = (level, colIndex) => {
+  const hg = $data.headerGroups || []
+  const grp = hg[level]
+  if (!grp || !grp.headers) return null
+  return grp.headers[colIndex] || null
+}
+// ArrowUp from a (level, colIndex) leaf/child header → the index of its PARENT header in the
+// level above (the parent column that spans it, via table-core header.column.parent). -1 when
+// there is no real parent (already at the top, or a placeholder with no group) → the caller
+// keeps the active header where it is.
+const parentHeaderColIndex = (level, colIndex) => {
+  if (level <= 0) return -1
+  const h = headerAt(level, colIndex)
+  if (!h || !h.column || !h.column.parent) return -1
+  const parentId = h.column.parent.id
+  const hg = $data.headerGroups || []
+  const pg = hg[level - 1]
+  if (!pg || !pg.headers) return -1
+  for (let i = 0; i < pg.headers.length; i++) {
+    const ph = pg.headers[i]
+    if (ph && ph.column && ph.column.id === parentId) return i
+  }
+  return -1
+}
+// ArrowDown from a (level, colIndex) GROUP header → the index of its FIRST child header in the
+// level below (via table-core column.columns). -1 when the header has no child columns (a leaf)
+// → the caller drops into the body instead.
+const firstChildHeaderColIndex = (level, colIndex) => {
+  const h = headerAt(level, colIndex)
+  if (!h || !h.column) return -1
+  const kids = h.column.columns || []
+  if (!kids.length) return -1
+  const childId = kids[0].id
+  const hg = $data.headerGroups || []
+  const cg = hg[level + 1]
+  if (!cg || !cg.headers) return -1
+  for (let i = 0; i < cg.headers.length; i++) {
+    const ch = cg.headers[i]
+    if (ch && ch.column && ch.column.id === childId) return i
+  }
+  return -1
+}
+
 // ── Nav helpers: compute the NEXT indices into LOCAL consts, write $data from them, and
 // RETURN the fresh locals so the caller threads the SAME values into BOTH focusActiveCell
 // AND the activecell-change emit. NEVER re-read $data.activeRow/activeColIndex after the
@@ -168,24 +244,49 @@ const moveCol = (delta) => {
 const moveRow = (delta) => {
   const lastRow = bodyRowCount() - 1
   const maxRow = lastRow < 0 ? 0 : lastRow
+  const leafLevel = headerLeafLevel()
   if ($data.activeIsHeader) {
-    // In the header: any downward move lands on body row 0; upward stays in the header.
     if (delta > 0) {
+      // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
+      // level down); from the LEAF header level, drop into the body (row 0).
+      if ($data.activeHeaderLevel < leafLevel) {
+        const childCol = firstChildHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
+        if (childCol >= 0) {
+          const nextLevel = $data.activeHeaderLevel + 1
+          $data.activeHeaderLevel = nextLevel
+          $data.activeColIndex = childCol
+          return { row: $data.activeRow, isHeader: true, level: nextLevel }
+        }
+      }
+      // At the leaf header: an empty grid has no body to drop into → stay put.
+      if (bodyRowCount() === 0) return { row: $data.activeRow, isHeader: true, level: $data.activeHeaderLevel }
       $data.activeIsHeader = false
       $data.activeRow = 0
-      return { row: 0, isHeader: false }
+      return { row: 0, isHeader: false, level: 0 }
     }
-    return { row: $data.activeRow, isHeader: true }
+    // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
+    // spans the active column; at the top level (or no real parent) stay put.
+    const parentCol = parentHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
+    if (parentCol >= 0) {
+      const nextLevel = $data.activeHeaderLevel - 1
+      $data.activeHeaderLevel = nextLevel
+      $data.activeColIndex = parentCol
+      return { row: $data.activeRow, isHeader: true, level: nextLevel }
+    }
+    return { row: $data.activeRow, isHeader: true, level: $data.activeHeaderLevel }
   }
-  // In the body: an upward move from row 0 crosses into the header.
+  // In the body: an upward move from row 0 crosses into the LEAF header level (the header row
+  // adjacent to the body). The body col index aligns 1:1 with the leaf header col index, so
+  // activeColIndex carries over unchanged.
   if (delta < 0 && $data.activeRow === 0) {
     $data.activeIsHeader = true
-    return { row: $data.activeRow, isHeader: true }
+    $data.activeHeaderLevel = leafLevel
+    return { row: $data.activeRow, isHeader: true, level: leafLevel }
   }
   const nextRow = clamp($data.activeRow + delta, 0, maxRow)
   $data.activeRow = nextRow
   $data.activeIsHeader = false
-  return { row: nextRow, isHeader: false }
+  return { row: nextRow, isHeader: false, level: 0 }
 }
 
 // Home/End within the current row → col 0 / max. Returns the fresh colIndex.
@@ -219,7 +320,7 @@ const gotoEnd = () => {
 // the focus seam. rowKey is the literal '__header' or String(integer) — no consumer string.
 const currentCellEl = () => {
   const rowKey = $data.activeIsHeader ? '__header' : String($data.activeRow)
-  return resolveCellEl(rowKey, $data.activeColIndex)
+  return resolveCellEl(rowKey, $data.activeColIndex, $data.activeIsHeader ? $data.activeHeaderLevel : null)
 }
 
 // The focusable descendants of a cell (non-disabled), in DOM order. Pure DOM — uniform ×6.
@@ -257,4 +358,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

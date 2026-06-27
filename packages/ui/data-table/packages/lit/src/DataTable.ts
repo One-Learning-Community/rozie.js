@@ -498,6 +498,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _activeRow = signal(0);
   private _activeColIndex = signal(0);
   private _activeIsHeader = signal(false);
+  private _activeHeaderLevel = signal(0);
+  private _gridEmptyFallback = signal(false);
   private _activeInControl = signal(false);
   private _editingRow = signal(-1);
   private _editingCol = signal(-1);
@@ -2255,22 +2257,47 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
 
-  cellTabindex = (rowKey: any, colIndex: any) => {
+  cellTabindex = (rowKey: any, colIndex: any, level = null) => {
   if (!this.isGrid()) return null;
-  const activeKey = this._activeIsHeader.value ? '__header' : String(this._activeRow.value);
-  const isActive = rowKey === activeKey && colIndex === this._activeColIndex.value;
+  // B6: an empty / all-filtered grid (no body rows) must STILL be keyboard-reachable. Fall
+  // the single roving tab-stop back to the FIRST leaf-header cell so the grid never has ZERO
+  // tab-stops (a keyboard trap). Only the leaf-level header col 0 carries the tab-stop.
+  if (this.bodyRowCount() === 0) {
+    return rowKey === '__header' && colIndex === 0 && level === this.headerLeafLevel() ? 0 : -1;
+  }
+  // B12: when a header cell is active, address it by BOTH its level AND its colIndex so a
+  // grouped multi-level header carries exactly ONE tab-stop. The pre-fix level-blind compare
+  // lit BOTH the parent (level 0) and the leaf (level 1) at the same colIndex → multiple
+  // tab-stops (the roving invariant broke under grouped headers).
+  if (this._activeIsHeader.value) {
+    if (rowKey !== '__header') return -1;
+    return colIndex === this._activeColIndex.value && level === this._activeHeaderLevel.value ? 0 : -1;
+  }
+  const isActive = rowKey === String(this._activeRow.value) && colIndex === this._activeColIndex.value;
   return isActive ? 0 : -1;
 };
 
-  resolveCellEl = (rowKey: any, colIndex: any) => {
+  resolveCellEl = (rowKey: any, colIndex: any, level = null) => {
   if (!this.gridRoot) return null;
-  return this.gridRoot.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
+  // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
+  // same data-col-index across levels (parent vs leaf). Disambiguate header lookups by the
+  // integer data-header-level so resolveCellEl('__header', 0) no longer returns the FIRST DOM
+  // match (the parent) when the leaf is meant. level is an integer (NO consumer string is
+  // interpolated — T-49-01 stays safe); body lookups pass level=null → the selector is
+  // byte-unchanged.
+  let sel = '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]';
+  if (rowKey === '__header' && level != null) sel = sel + '[data-header-level="' + level + '"]';
+  return this.gridRoot.querySelector(sel);
 };
 
-  focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null) => {
+  focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) => {
   if (!this.isGrid() || !this.gridRoot) return;
   const r = nextRow == null ? this._activeRow.value : nextRow;
   const c = nextCol == null ? this._activeColIndex.value : nextCol;
+  // B12: thread the FRESH post-write header level (the grouped-header analog of the
+  // nextIsHeader threading) so a leaf↔parent header move resolves the cell at the correct
+  // level, never the async-stale $data.activeHeaderLevel re-read (React ROZ138 / Angular signal).
+  const lvl = nextLevel == null ? this._activeHeaderLevel.value : nextLevel;
   // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
   // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
   // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -2310,7 +2337,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     return;
   }
   const rowKey = header ? '__header' : String(r);
-  const el = this.resolveCellEl(rowKey, c);
+  const el = this.resolveCellEl(rowKey, c, header ? lvl : null);
   if (el) el.focus();
 };
 
@@ -2334,6 +2361,49 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   clamp = (v: any, lo: any, hi: any) => v < lo ? lo : v > hi ? hi : v;
 
+  headerLeafLevel = () => {
+  const hg = this._headerGroups.value || [];
+  return hg.length ? hg.length - 1 : 0;
+};
+
+  headerAt = (level: any, colIndex: any) => {
+  const hg = this._headerGroups.value || [];
+  const grp = hg[level];
+  if (!grp || !grp.headers) return null;
+  return grp.headers[colIndex] || null;
+};
+
+  parentHeaderColIndex = (level: any, colIndex: any) => {
+  if (level <= 0) return -1;
+  const h = this.headerAt(level, colIndex);
+  if (!h || !h.column || !h.column.parent) return -1;
+  const parentId = h.column.parent.id;
+  const hg = this._headerGroups.value || [];
+  const pg = hg[level - 1];
+  if (!pg || !pg.headers) return -1;
+  for (let i = 0; i < pg.headers.length; i++) {
+    const ph = pg.headers[i];
+    if (ph && ph.column && ph.column.id === parentId) return i;
+  }
+  return -1;
+};
+
+  firstChildHeaderColIndex = (level: any, colIndex: any) => {
+  const h = this.headerAt(level, colIndex);
+  if (!h || !h.column) return -1;
+  const kids = h.column.columns || [];
+  if (!kids.length) return -1;
+  const childId = kids[0].id;
+  const hg = this._headerGroups.value || [];
+  const cg = hg[level + 1];
+  if (!cg || !cg.headers) return -1;
+  for (let i = 0; i < cg.headers.length; i++) {
+    const ch = cg.headers[i];
+    if (ch && ch.column && ch.column.id === childId) return i;
+  }
+  return -1;
+};
+
   moveCol = (delta: any) => {
   const max = this.visibleColCount() - 1;
   const nextCol = this.clamp(this._activeColIndex.value + delta, 0, max < 0 ? 0 : max);
@@ -2344,27 +2414,67 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   moveRow = (delta: any) => {
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
+  const leafLevel = this.headerLeafLevel();
   if (this._activeIsHeader.value) {
-    // In the header: any downward move lands on body row 0; upward stays in the header.
     if (delta > 0) {
+      // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
+      // level down); from the LEAF header level, drop into the body (row 0).
+      if (this._activeHeaderLevel.value < leafLevel) {
+        const childCol = this.firstChildHeaderColIndex(this._activeHeaderLevel.value, this._activeColIndex.value);
+        if (childCol >= 0) {
+          const nextLevel = this._activeHeaderLevel.value + 1;
+          this._activeHeaderLevel.value = nextLevel;
+          this._activeColIndex.value = childCol;
+          return {
+            row: this._activeRow.value,
+            isHeader: true,
+            level: nextLevel
+          };
+        }
+      }
+      // At the leaf header: an empty grid has no body to drop into → stay put.
+      if (this.bodyRowCount() === 0) return {
+        row: this._activeRow.value,
+        isHeader: true,
+        level: this._activeHeaderLevel.value
+      };
       this._activeIsHeader.value = false;
       this._activeRow.value = 0;
       return {
         row: 0,
-        isHeader: false
+        isHeader: false,
+        level: 0
+      };
+    }
+    // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
+    // spans the active column; at the top level (or no real parent) stay put.
+    const parentCol = this.parentHeaderColIndex(this._activeHeaderLevel.value, this._activeColIndex.value);
+    if (parentCol >= 0) {
+      const nextLevel = this._activeHeaderLevel.value - 1;
+      this._activeHeaderLevel.value = nextLevel;
+      this._activeColIndex.value = parentCol;
+      return {
+        row: this._activeRow.value,
+        isHeader: true,
+        level: nextLevel
       };
     }
     return {
       row: this._activeRow.value,
-      isHeader: true
+      isHeader: true,
+      level: this._activeHeaderLevel.value
     };
   }
-  // In the body: an upward move from row 0 crosses into the header.
+  // In the body: an upward move from row 0 crosses into the LEAF header level (the header row
+  // adjacent to the body). The body col index aligns 1:1 with the leaf header col index, so
+  // activeColIndex carries over unchanged.
   if (delta < 0 && this._activeRow.value === 0) {
     this._activeIsHeader.value = true;
+    this._activeHeaderLevel.value = leafLevel;
     return {
       row: this._activeRow.value,
-      isHeader: true
+      isHeader: true,
+      level: leafLevel
     };
   }
   const nextRow = this.clamp(this._activeRow.value + delta, 0, maxRow);
@@ -2372,7 +2482,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._activeIsHeader.value = false;
   return {
     row: nextRow,
-    isHeader: false
+    isHeader: false,
+    level: 0
   };
 };
 
@@ -2409,7 +2520,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   currentCellEl = () => {
   const rowKey = this._activeIsHeader.value ? '__header' : String(this._activeRow.value);
-  return this.resolveCellEl(rowKey, this._activeColIndex.value);
+  return this.resolveCellEl(rowKey, this._activeColIndex.value, this._activeIsHeader.value ? this._activeHeaderLevel.value : null);
 };
 
   focusables = (cellEl: any) => {
@@ -2480,9 +2591,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const prevRow = this._activeRow.value;
   const prevCol = this._activeColIndex.value;
   const prevIsHeader = this._activeIsHeader.value;
+  const prevLevel = this._activeHeaderLevel.value;
   let nextRow = prevRow;
   let nextCol = prevCol;
   let nextIsHeader = prevIsHeader;
+  // B12: the fresh post-write header LEVEL (the grouped-header analog of nextIsHeader) is
+  // threaded into the focus seam so a leaf↔parent header move lands focus at the correct
+  // level. moveRow returns it; the non-vertical branches keep the pre-move level.
+  let nextLevel = prevLevel;
   // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
   // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
   // fall through to a plain navigation move). Body cells only (no range from a header). The
@@ -2517,22 +2633,26 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const m = this.moveRow(1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
+    nextLevel = m.level;
   } else if (key === 'ArrowUp') {
     e.preventDefault();
     this.clearRange();
     const m = this.moveRow(-1);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
+    nextLevel = m.level;
   } else if (key === 'PageDown') {
     e.preventDefault();
     const m = this.moveRow(this.GRID_PAGE_STEP);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
+    nextLevel = m.level;
   } else if (key === 'PageUp') {
     e.preventDefault();
     const m = this.moveRow(-this.GRID_PAGE_STEP);
     nextRow = m.row;
     nextIsHeader = m.isHeader;
+    nextLevel = m.level;
   } else if (key === 'Home') {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
@@ -2605,11 +2725,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   } else return;
   // THE seam — built from the SAME fresh post-write locals (Pitfall 2). Always re-assert
   // focus on the resolved cell (harmless on a no-op clamp; corrects any drift otherwise).
-  this.focusActiveCell(nextRow, nextCol, nextIsHeader);
+  this.focusActiveCell(nextRow, nextCol, nextIsHeader, nextLevel);
   // WR-06: the D-02 activecell-change event fires ONLY when the resolved cell actually
   // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
   // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
-  if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader) {
+  // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+  if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
     this.dispatchEvent(new CustomEvent("activecell-change", {
       detail: {
         rowIndex: nextRow,
@@ -2634,7 +2755,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!Number.isFinite(col)) return;
   const isHeader = rowAttr === '__header';
   this._activeIsHeader.value = isHeader;
-  if (!isHeader) {
+  if (isHeader) {
+    // B12: a click/focus onto a grouped header cell must capture its header LEVEL too, so the
+    // roving model + a subsequent ArrowUp/ArrowDown resolve from the correct level (not a stale
+    // one). data-header-level is an integer marker on the <th>; fall back to the leaf level.
+    const lvlAttr = cellEl.getAttribute('data-header-level');
+    const lvl = lvlAttr != null ? parseInt(lvlAttr, 10) : this.headerLeafLevel();
+    this._activeHeaderLevel.value = Number.isFinite(lvl) ? lvl : this.headerLeafLevel();
+  } else {
     const row = parseInt(rowAttr, 10);
     if (Number.isFinite(row)) this._activeRow.value = row;
   }
@@ -2694,6 +2822,26 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const maxCol = colN - 1;
   const col = this.clamp(this._activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== this._activeColIndex.value) this._activeColIndex.value = col;
+  // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
+  // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
+  // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
+  // re-seats a body cell. The cellTabindex empty-fallback keeps exactly one header tab-stop.
+  if (rowN <= 0) {
+    this._activeIsHeader.value = true;
+    this._activeHeaderLevel.value = this.headerLeafLevel();
+    this._activeColIndex.value = 0;
+    this._gridEmptyFallback.value = true;
+    this.clampRange(rowN - 1, colN - 1);
+    return;
+  }
+  // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
+  // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
+  // cell. A user-driven header position (not the empty fallback) is left untouched.
+  if (this._gridEmptyFallback.value) {
+    this._gridEmptyFallback.value = false;
+    this._activeIsHeader.value = false;
+    this._activeRow.value = 0;
+  }
   if (!this._activeIsHeader.value) {
     const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;

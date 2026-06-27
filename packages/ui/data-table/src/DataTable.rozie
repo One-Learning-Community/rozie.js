@@ -520,6 +520,17 @@
   // activeIsHeader: the active cell is in the header row (reachable via ArrowUp). When
   // true the rowKey resolves to the literal '__header'.
   activeIsHeader: false,
+  // activeHeaderLevel: WHICH header-row level the active header cell is on (B12 — grouped
+  // multi-level headers). The group index into $data.headerGroups (0 = the topmost parent
+  // row, headerGroups.length-1 = the leaf row adjacent to the body). Only meaningful while
+  // activeIsHeader is true; a flat grid has a single level (0), so the flat/table path is
+  // unchanged. Pairs with activeColIndex (the index within THAT level's headers).
+  activeHeaderLevel: 0,
+  // gridEmptyFallback: true while the active cell is parked on the empty-grid header fallback
+  // (B6 — an all-filtered body has no cell to hold the roving tab-stop). Set by clampActiveCell
+  // when the body shrinks to zero; cleared (and a body cell re-seated) on the next non-empty
+  // refresh so the roving tab-stop recovers onto a real body cell.
+  gridEmptyFallback: false,
   // activeInControl: navigation (false) vs interaction (true) mode (D-07). Plan 03 drives
   // the Enter/F2-to-enter / Escape-to-exit transition; this field reserves the state.
   activeInControl: false,

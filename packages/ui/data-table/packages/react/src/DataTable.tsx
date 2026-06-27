@@ -369,6 +369,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [activeRow, setActiveRow] = useState(0);
   const [activeColIndex, setActiveColIndex] = useState(0);
   const [activeIsHeader, setActiveIsHeader] = useState(false);
+  const [activeHeaderLevel, setActiveHeaderLevel] = useState(0);
+  const [gridEmptyFallback, setGridEmptyFallback] = useState(false);
   const [activeInControl, setActiveInControl] = useState(false);
   const [editingRow, setEditingRow] = useState(-1);
   const [editingCol, setEditingCol] = useState(-1);
@@ -1383,20 +1385,45 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function headerColIndexOf(hg: any, header: any) {
     return (hg && hg.headers ? hg.headers : []).indexOf(header);
   }
-  function cellTabindex(rowKey: any, colIndex: any) {
+  function cellTabindex(rowKey: any, colIndex: any, level = null) {
     if (!isGrid()) return null;
-    const activeKey = activeIsHeader ? '__header' : String(activeRow);
-    const isActive = rowKey === activeKey && colIndex === activeColIndex;
+    // B6: an empty / all-filtered grid (no body rows) must STILL be keyboard-reachable. Fall
+    // the single roving tab-stop back to the FIRST leaf-header cell so the grid never has ZERO
+    // tab-stops (a keyboard trap). Only the leaf-level header col 0 carries the tab-stop.
+    if (bodyRowCount() === 0) {
+      return rowKey === '__header' && colIndex === 0 && level === headerLeafLevel() ? 0 : -1;
+    }
+    // B12: when a header cell is active, address it by BOTH its level AND its colIndex so a
+    // grouped multi-level header carries exactly ONE tab-stop. The pre-fix level-blind compare
+    // lit BOTH the parent (level 0) and the leaf (level 1) at the same colIndex → multiple
+    // tab-stops (the roving invariant broke under grouped headers).
+    if (activeIsHeader) {
+      if (rowKey !== '__header') return -1;
+      return colIndex === activeColIndex && level === activeHeaderLevel ? 0 : -1;
+    }
+    const isActive = rowKey === String(activeRow) && colIndex === activeColIndex;
     return isActive ? 0 : -1;
   }
-  function resolveCellEl(rowKey: any, colIndex: any) {
+  function resolveCellEl(rowKey: any, colIndex: any, level = null) {
     if (!gridRoot.current) return null;
-    return gridRoot.current.querySelector('[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]');
+    // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
+    // same data-col-index across levels (parent vs leaf). Disambiguate header lookups by the
+    // integer data-header-level so resolveCellEl('__header', 0) no longer returns the FIRST DOM
+    // match (the parent) when the leaf is meant. level is an integer (NO consumer string is
+    // interpolated — T-49-01 stays safe); body lookups pass level=null → the selector is
+    // byte-unchanged.
+    let sel = '[data-grid-cell][data-row="' + rowKey + '"][data-col-index="' + colIndex + '"]';
+    if (rowKey === '__header' && level != null) sel = sel + '[data-header-level="' + level + '"]';
+    return gridRoot.current.querySelector(sel);
   }
-  function focusActiveCell(nextRow = null, nextCol = null, nextIsHeader = null) {
+  function focusActiveCell(nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) {
     if (!isGrid() || !gridRoot.current) return;
     const r = nextRow == null ? activeRow : nextRow;
     const c = nextCol == null ? activeColIndex : nextCol;
+    // B12: thread the FRESH post-write header level (the grouped-header analog of the
+    // nextIsHeader threading) so a leaf↔parent header move resolves the cell at the correct
+    // level, never the async-stale $data.activeHeaderLevel re-read (React ROZ138 / Angular signal).
+    const lvl = nextLevel == null ? activeHeaderLevel : nextLevel;
     // Thread the FRESH post-write isHeader flag (the plan-01-PROVEN contract): a header
     // crossing sets $data.activeIsHeader inside moveRow, but React's setState (ROZ138) and
     // Angular's signal write are async within one handler — re-reading $data.activeIsHeader
@@ -1436,7 +1463,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       return;
     }
     const rowKey = header ? '__header' : String(r);
-    const el = resolveCellEl(rowKey, c);
+    const el = resolveCellEl(rowKey, c, header ? lvl : null);
     if (el) el.focus();
   }
   function totalRowCount() {
@@ -1459,6 +1486,45 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function clamp(v: any, lo: any, hi: any) {
     return v < lo ? lo : v > hi ? hi : v;
   }
+  function headerLeafLevel() {
+    const hg = headerGroups || [];
+    return hg.length ? hg.length - 1 : 0;
+  }
+  function headerAt(level: any, colIndex: any) {
+    const hg = headerGroups || [];
+    const grp = hg[level];
+    if (!grp || !grp.headers) return null;
+    return grp.headers[colIndex] || null;
+  }
+  function parentHeaderColIndex(level: any, colIndex: any) {
+    if (level <= 0) return -1;
+    const h = headerAt(level, colIndex);
+    if (!h || !h.column || !h.column.parent) return -1;
+    const parentId = h.column.parent.id;
+    const hg = headerGroups || [];
+    const pg = hg[level - 1];
+    if (!pg || !pg.headers) return -1;
+    for (let i = 0; i < pg.headers.length; i++) {
+      const ph = pg.headers[i];
+      if (ph && ph.column && ph.column.id === parentId) return i;
+    }
+    return -1;
+  }
+  function firstChildHeaderColIndex(level: any, colIndex: any) {
+    const h = headerAt(level, colIndex);
+    if (!h || !h.column) return -1;
+    const kids = h.column.columns || [];
+    if (!kids.length) return -1;
+    const childId = kids[0].id;
+    const hg = headerGroups || [];
+    const cg = hg[level + 1];
+    if (!cg || !cg.headers) return -1;
+    for (let i = 0; i < cg.headers.length; i++) {
+      const ch = cg.headers[i];
+      if (ch && ch.column && ch.column.id === childId) return i;
+    }
+    return -1;
+  }
   function moveCol(delta: any) {
     const max = visibleColCount() - 1;
     const nextCol = clamp(activeColIndex + delta, 0, max < 0 ? 0 : max);
@@ -1468,27 +1534,67 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function moveRow(delta: any) {
     const lastRow = bodyRowCount() - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
+    const leafLevel = headerLeafLevel();
     if (activeIsHeader) {
-      // In the header: any downward move lands on body row 0; upward stays in the header.
       if (delta > 0) {
+        // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
+        // level down); from the LEAF header level, drop into the body (row 0).
+        if (activeHeaderLevel < leafLevel) {
+          const childCol = firstChildHeaderColIndex(activeHeaderLevel, activeColIndex);
+          if (childCol >= 0) {
+            const nextLevel = activeHeaderLevel + 1;
+            setActiveHeaderLevel(nextLevel);
+            setActiveColIndex(childCol);
+            return {
+              row: activeRow,
+              isHeader: true,
+              level: nextLevel
+            };
+          }
+        }
+        // At the leaf header: an empty grid has no body to drop into → stay put.
+        if (bodyRowCount() === 0) return {
+          row: activeRow,
+          isHeader: true,
+          level: activeHeaderLevel
+        };
         setActiveIsHeader(false);
         setActiveRow(0);
         return {
           row: 0,
-          isHeader: false
+          isHeader: false,
+          level: 0
+        };
+      }
+      // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
+      // spans the active column; at the top level (or no real parent) stay put.
+      const parentCol = parentHeaderColIndex(activeHeaderLevel, activeColIndex);
+      if (parentCol >= 0) {
+        const nextLevel = activeHeaderLevel - 1;
+        setActiveHeaderLevel(nextLevel);
+        setActiveColIndex(parentCol);
+        return {
+          row: activeRow,
+          isHeader: true,
+          level: nextLevel
         };
       }
       return {
         row: activeRow,
-        isHeader: true
+        isHeader: true,
+        level: activeHeaderLevel
       };
     }
-    // In the body: an upward move from row 0 crosses into the header.
+    // In the body: an upward move from row 0 crosses into the LEAF header level (the header row
+    // adjacent to the body). The body col index aligns 1:1 with the leaf header col index, so
+    // activeColIndex carries over unchanged.
     if (delta < 0 && activeRow === 0) {
       setActiveIsHeader(true);
+      setActiveHeaderLevel(leafLevel);
       return {
         row: activeRow,
-        isHeader: true
+        isHeader: true,
+        level: leafLevel
       };
     }
     const nextRow = clamp(activeRow + delta, 0, maxRow);
@@ -1496,7 +1602,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setActiveIsHeader(false);
     return {
       row: nextRow,
-      isHeader: false
+      isHeader: false,
+      level: 0
     };
   }
   function gotoColEdge(toEnd: any) {
@@ -1529,7 +1636,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function currentCellEl() {
     const rowKey = activeIsHeader ? '__header' : String(activeRow);
-    return resolveCellEl(rowKey, activeColIndex);
+    return resolveCellEl(rowKey, activeColIndex, activeIsHeader ? activeHeaderLevel : null);
   }
   function focusables(cellEl: any) {
     if (!cellEl || !cellEl.querySelectorAll) return [];
@@ -1597,9 +1704,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const prevRow = activeRow;
     const prevCol = activeColIndex;
     const prevIsHeader = activeIsHeader;
+    const prevLevel = activeHeaderLevel;
     let nextRow = prevRow;
     let nextCol = prevCol;
     let nextIsHeader = prevIsHeader;
+    // B12: the fresh post-write header LEVEL (the grouped-header analog of nextIsHeader) is
+    // threaded into the focus seam so a leaf↔parent header move lands focus at the correct
+    // level. moveRow returns it; the non-vertical branches keep the pre-move level.
+    let nextLevel = prevLevel;
     // ── Cell-range extend (phase 51 req-7 / D-07) — Shift+Arrow extends the rectangle from
     // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
     // fall through to a plain navigation move). Body cells only (no range from a header). The
@@ -1634,22 +1746,26 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const m = moveRow(1);
       nextRow = m.row;
       nextIsHeader = m.isHeader;
+      nextLevel = m.level;
     } else if (key === 'ArrowUp') {
       e.preventDefault();
       clearRange();
       const m = moveRow(-1);
       nextRow = m.row;
       nextIsHeader = m.isHeader;
+      nextLevel = m.level;
     } else if (key === 'PageDown') {
       e.preventDefault();
       const m = moveRow(GRID_PAGE_STEP);
       nextRow = m.row;
       nextIsHeader = m.isHeader;
+      nextLevel = m.level;
     } else if (key === 'PageUp') {
       e.preventDefault();
       const m = moveRow(-GRID_PAGE_STEP);
       nextRow = m.row;
       nextIsHeader = m.isHeader;
+      nextLevel = m.level;
     } else if (key === 'Home') {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -1722,17 +1838,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     } else return;
     // THE seam — built from the SAME fresh post-write locals (Pitfall 2). Always re-assert
     // focus on the resolved cell (harmless on a no-op clamp; corrects any drift otherwise).
-    focusActiveCell(nextRow, nextCol, nextIsHeader);
+    focusActiveCell(nextRow, nextCol, nextIsHeader, nextLevel);
     // WR-06: the D-02 activecell-change event fires ONLY when the resolved cell actually
     // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
     // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
-    if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader) {
+    // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+    if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
       _rozieProp_onActivecellChange && _rozieProp_onActivecellChange({
         rowIndex: nextRow,
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -1746,7 +1863,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!Number.isFinite(col)) return;
     const isHeader = rowAttr === '__header';
     setActiveIsHeader(isHeader);
-    if (!isHeader) {
+    if (isHeader) {
+      // B12: a click/focus onto a grouped header cell must capture its header LEVEL too, so the
+      // roving model + a subsequent ArrowUp/ArrowDown resolve from the correct level (not a stale
+      // one). data-header-level is an integer marker on the <th>; fall back to the leaf level.
+      const lvlAttr = cellEl.getAttribute('data-header-level');
+      const lvl = lvlAttr != null ? parseInt(lvlAttr, 10) : headerLeafLevel();
+      setActiveHeaderLevel(Number.isFinite(lvl) ? lvl : headerLeafLevel());
+    } else {
       const row = parseInt(rowAttr, 10);
       if (Number.isFinite(row)) setActiveRow(row);
     }
@@ -1766,7 +1890,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     // The cell box (not an inner control) receiving focus = navigation mode.
     if (tgt === cellEl) setActiveInControl(false);
-  }, [clearRange, isGrid]);
+  }, [clearRange, headerLeafLevel, isGrid]);
   const onGridMouseDown = useCallback((e: any) => {
     if (!isGrid() || !e || !e.shiftKey) return;
     const tgt = e.target;
@@ -1803,6 +1927,26 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const maxCol = colN - 1;
     const col = clamp(activeColIndex, 0, maxCol < 0 ? 0 : maxCol);
     if (col !== activeColIndex) setActiveColIndex(col);
+    // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
+    // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
+    // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
+    // re-seats a body cell. The cellTabindex empty-fallback keeps exactly one header tab-stop.
+    if (rowN <= 0) {
+      setActiveIsHeader(true);
+      setActiveHeaderLevel(headerLeafLevel());
+      setActiveColIndex(0);
+      setGridEmptyFallback(true);
+      clampRange(rowN - 1, colN - 1);
+      return;
+    }
+    // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
+    // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
+    // cell. A user-driven header position (not the empty fallback) is left untouched.
+    if (gridEmptyFallback) {
+      setGridEmptyFallback(false);
+      setActiveIsHeader(false);
+      setActiveRow(0);
+    }
     if (!activeIsHeader) {
       const lastRow = rowN - 1;
       const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -1813,7 +1957,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
     // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
     clampRange(rowN - 1, colN - 1);
-  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, isGrid, visibleColCount]);
+  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, gridEmptyFallback, headerLeafLevel, isGrid, visibleColCount]);
   // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
   // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
   // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
