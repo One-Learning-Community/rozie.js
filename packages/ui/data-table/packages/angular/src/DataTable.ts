@@ -1068,9 +1068,9 @@ export class DataTable {
       // Capture fresh locals; never write a $data key then re-read it in the same fn
       // (ROZ138 / React stale-read — setState is async on React, the closure binds the
       // PRE-write value).
-      // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+      // windowSource(): the FULL pre-pagination model when virtual (windowing replaces client
       // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
-      const nextRows = this.windowingSource().slice();
+      const nextRows = this.windowSource().slice();
       const nextGroups = this.table.getHeaderGroups().slice();
       this.rows.set(nextRows);
       this.headerGroups.set(nextGroups);
@@ -1547,41 +1547,11 @@ export class DataTable {
     const next = this.applyUpdater(updater, this.columnSizingInfo());
     this.columnSizingInfo.set(next != null ? next : this.columnSizingInfo());
   };
-  windowingSource = () => {
+  windowSource = () => {
     if (!this.table) return [];
     if (this.virtual()) return this.table.getPrePaginationRowModel().rows;
     return this.table.getRowModel().rows;
   };
-  virtualItemKey = (i: any) => {
-    const src = this.windowingSource();
-    return src && src[i] ? src[i].id : undefined;
-  };
-  virtualizerOptions = (): any => ({
-    count: this.windowingSource().length,
-    getScrollElement: () => this.gridScrollEl,
-    estimateSize: () => this.estimateRowHeight(),
-    observeElementRect,
-    observeElementOffset,
-    scrollToFn: elementScroll,
-    measureElement,
-    overscan: 8,
-    getItemKey: this.virtualItemKey,
-    onChange: () => {
-      this.windowVer.set(this.windowVer() + 1);
-      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
-      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
-      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
-      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
-      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
-      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
-      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
-      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
-      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
-      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
-      // re-measure is a no-op.
-      this.scheduleRemeasure();
-    }
-  });
   scheduleRemeasure = () => {
     if (this.remeasurePending) return;
     this.remeasurePending = true;
@@ -1611,6 +1581,49 @@ export class DataTable {
     const ms = this.virtualizer.getMeasurements();
     return ms && ms[pin] ? ms[pin] : null;
   };
+  remeasureWindow = () => {
+    if (!this.virtualizer || !this.gridRoot) return;
+    // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
+    // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
+    // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
+    // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
+    // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
+    // regression); the next settled onChange re-measures the stable window. Manual-scroll
+    // recycling (the CR-01 case) has scrollState === null, so it measures normally.
+    if (this.virtualizer.scrollState) return;
+    const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
+    for (const tr of trs as any) this.virtualizer.measureElement(tr);
+  };
+  virtualItemKey = (i: any) => {
+    const src = this.windowSource();
+    return src && src[i] ? src[i].id : undefined;
+  };
+  virtualizerOptions = (): any => ({
+    count: this.windowSource().length,
+    getScrollElement: () => this.gridScrollEl,
+    estimateSize: () => this.estimateRowHeight(),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: this.virtualItemKey,
+    onChange: () => {
+      this.windowVer.set(this.windowVer() + 1);
+      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+      // re-measure is a no-op.
+      this.scheduleRemeasure();
+    }
+  });
   windowedRows = () => {
     const __rows = this.rows();
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
@@ -1740,19 +1753,6 @@ export class DataTable {
     const items = this.virtualizer.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
-  };
-  remeasureWindow = () => {
-    if (!this.virtualizer || !this.gridRoot) return;
-    // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
-    // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
-    // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
-    // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
-    // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
-    // regression); the next settled onChange re-measures the stable window. Manual-scroll
-    // recycling (the CR-01 case) has scrollState === null, so it measures normally.
-    if (this.virtualizer.scrollState) return;
-    const trs = this.gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
-    for (const tr of trs as any) this.virtualizer.measureElement(tr);
   };
   reFeed = () => {
     if (!this.table) return;

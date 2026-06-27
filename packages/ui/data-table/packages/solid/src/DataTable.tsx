@@ -651,9 +651,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // Capture fresh locals; never write a $data key then re-read it in the same fn
       // (ROZ138 / React stale-read — setState is async on React, the closure binds the
       // PRE-write value).
-      // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+      // windowSource(): the FULL pre-pagination model when virtual (windowing replaces client
       // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
-      const nextRows = windowingSource().slice();
+      const nextRows = windowSource().slice();
       const nextGroups = table.getHeaderGroups().slice();
       setRows(nextRows);
       setHeaderGroups(nextGroups);
@@ -1348,58 +1348,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // via the SEPARATE $data.windowVer tick, re-fed via setOptions()+_willUpdate() in the
   // refreshRowModel path (NEVER a render helper — Pitfall 1). Every runtime reference is guarded
   // so the virtual=false emitted path is dead (req-1).
+  //
+  // Phase 64 (D-04): the PURE windowing math (windowedRows / padTop / padBottom / pmIndexInWindow /
+  // rowIsOutsideWindow / virtualizerOptions / virtualItemKey) now lives in the shared, target-agnostic
+  // `@rozie-ui/headless-core/windowing.rzts` partial and is re-exported below — this file is now the
+  // thin DATA-TABLE HOST SHELL holding only the impure, per-consumer pieces (the table-bound row
+  // source + the DOM/refs/virtualizer-instance machinery + the D-05 edit-pinning hook). The math
+  // dissolves in via inlineScriptPartials() byte-identically; behavior is unchanged (the B13 specs +
+  // dist-parity are the net). The host satisfies the windowing.rzts contract by convention:
+  // windowSource() (the row source), pinnedEditIndex()/pinnedMeasurement() (the D-05 pin hook),
+  // scheduleRemeasure(), and the gridScrollEl/virtualizer/virtual-core-fn references.
 
-  // windowingSource(): the rows fed to the virtualizer AND held in $data.rows. When virtual, the
-  // FULL filtered+sorted PRE-PAGINATION model (A2-verified table.getPrePaginationRowModel()) so
-  // windowing REPLACES client pagination (req-9); else the normal (paginated) row model — the
-  // non-virtual path is byte-unchanged.
-  function windowingSource() {
+  // windowSource(): the rows fed to the virtualizer AND held in $data.rows — the windowing.rzts
+  // host-contract source. When virtual, the FULL filtered+sorted PRE-PAGINATION model
+  // (A2-verified table.getPrePaginationRowModel()) so windowing REPLACES client pagination (req-9);
+  // else the normal (paginated) row model — the non-virtual path is byte-unchanged.
+  function windowSource() {
     if (!table) return [];
     if (local.virtual) return table.getPrePaginationRowModel().rows;
     return table.getRowModel().rows;
-  }
-
-  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
-  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
-  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
-  function virtualItemKey(i: any) {
-    const src = windowingSource();
-    return src && src[i] ? src[i].id : undefined;
-  }
-
-  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
-  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
-  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
-  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
-  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
-  // increment the React emitter lowers to functional setState — correct even from a mount closure.
-  function virtualizerOptions(): any {
-    return {
-      count: windowingSource().length,
-      getScrollElement: () => gridScrollEl,
-      estimateSize: () => local.estimateRowHeight,
-      observeElementRect,
-      observeElementOffset,
-      scrollToFn: elementScroll,
-      measureElement,
-      overscan: 8,
-      getItemKey: virtualItemKey,
-      onChange: () => {
-        setWindowVer(windowVer() + 1);
-        // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
-        // virtual-core only observe()s a node you explicitly hand to measureElement (it does
-        // NOT auto-discover rendered rows — measureElement is the SOLE caller of
-        // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
-        // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
-        // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
-        // so the new <tr> set is in the DOM before we measure. Safe from an infinite
-        // measure→onChange→measure loop: measureElement is idempotent on an already-observed
-        // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
-        // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
-        // re-measure is a no-op.
-        scheduleRemeasure();
-      }
-    };
   }
 
   // Defer remeasureWindow() until AFTER the framework commits the recycled window (onChange fires
@@ -1438,17 +1405,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending = false;else setTimeout(rafPass, 0);
   }
 
-  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
-  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
-  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
-  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
-  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
   // pinnedEditIndex(): the FULL-MODEL row index of the row currently in edit (D-02 pin-row),
   // or -1 when no editor is open. Under virtualization `$data.rows` is the FULL pre-pagination
   // model, so editingRow (single-cell) / editingRowIndex (full-row) — both in that index space —
   // ARE the full-model index. The pinned row must never recycle while editing (req-9): it is
   // unioned into the windowed slice when it scrolls off-window and its height is subtracted from
   // the appropriate spacer so the total stays exactly getTotalSize() (the 51-01-proven mechanism).
+  // This is the data-table half of the D-05 windowing.rzts pin-extension hook (listbox provides none).
   function pinnedEditIndex() {
     if (editingRow() >= 0) return editingRow();
     if (editingRowIndex() != null) return editingRowIndex();
@@ -1463,6 +1426,107 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const ms = virtualizer.getMeasurements();
     return ms && ms[pin] ? ms[pin] : null;
   }
+
+  // measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
+  // querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
+  // <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
+  // virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
+  // internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
+  // getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
+  // scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
+  // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
+  // visible window each commit is cheap and loop-free.
+  function remeasureWindow() {
+    if (!virtualizer || !gridRoot) return;
+    // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
+    // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
+    // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
+    // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
+    // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
+    // regression); the next settled onChange re-measures the stable window. Manual-scroll
+    // recycling (the CR-01 case) has scrollState === null, so it measures normally.
+    if (virtualizer.scrollState) return;
+    const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
+    for (const tr of trs as any) virtualizer.measureElement(tr);
+  }
+
+  // D-04: this shell exports ONLY the impure, data-table-specific host pieces. The pure windowing
+  // math (windowedRows / padTop / padBottom / pmIndexInWindow / rowIsOutsideWindow / virtualizerOptions
+  // / virtualItemKey) is imported DIRECTLY by the host (DataTable.rozie) from
+  // `@rozie-ui/headless-core/windowing.rzts` via bare specifier — the P0-proven cross-package inline
+  // path that DISSOLVES the partial into the leaf (a re-export-from THROUGH this shell would survive as
+  // a runtime import, not inline — verified). The math closes over these host symbols by convention.
+  // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+  // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+  // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+  // in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+  // compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+  //
+  // HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+  // by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+  //   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+  //                             returns its pre-pagination row model, listbox/combobox return the
+  //                             filtered options). This partial MUST NOT reach into the host data engine
+  //                             directly — rows arrive ONLY through windowSource().
+  //   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+  //   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+  //   - gridScrollEl              — the scroll-container element handle.
+  //   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+  //   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+  //   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+  //   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+  //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+  //                             listbox passes nothing. Routing pinning through this host hook (NOT
+  //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+
+  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
+  function virtualItemKey(i: any) {
+    const src = windowSource();
+    return src && src[i] ? src[i].id : undefined;
+  }
+
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
+  function virtualizerOptions(): any {
+    return {
+      count: windowSource().length,
+      getScrollElement: () => gridScrollEl,
+      estimateSize: () => local.estimateRowHeight,
+      observeElementRect,
+      observeElementOffset,
+      scrollToFn: elementScroll,
+      measureElement,
+      overscan: 8,
+      getItemKey: virtualItemKey,
+      onChange: () => {
+        setWindowVer(windowVer() + 1);
+        // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+        // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+        // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+        // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+        // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+        // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+        // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+        // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+        // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+        // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+        // re-measure is a no-op.
+        scheduleRemeasure();
+      }
+    };
+  }
+
+  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
   function windowedRows() {
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
     // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -1598,28 +1662,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const items = virtualizer.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
-  }
-  // measureElement sweep (D-10 / CR-01): refine estimated heights to MEASURED ones. The off-root
-  // querySelector idiom (chartjs/cropper/embla precedent — no per-row callback ref). Each rendered
-  // <tr> MUST be handed to virtualizer.measureElement on every window commit for it to be observed:
-  // virtual-core does NOT auto-register rendered rows — measureElement is the SOLE caller of its
-  // internal ResizeObserver's observe() (virtual-core@3.17.1 dist/esm/index.js:794-817), keyed by
-  // getItemKey. So this sweep must run not just once at mount but on every onChange tick (via
-  // scheduleRemeasure), or recycled rows keep the estimateRowHeight seed forever. measureElement is
-  // idempotent on an already-observed node (the `prevNode !== node` guard), so re-sweeping the
-  // visible window each commit is cheap and loop-free.
-  function remeasureWindow() {
-    if (!virtualizer || !gridRoot) return;
-    // Bail ONLY while a PROGRAMMATIC scroll is in flight: virtualizer.scrollState is non-null
-    // exclusively during scrollToIndex / scrollToOffset (the D-12 scroll-then-focus seam) and
-    // null for ordinary user/scrollTop-driven scrolling (verified virtual-core@3.17.1: set in
-    // scrollToIndex L992, cleared to null on reconcile L378). Measuring mid-scrollToIndex lets
-    // resizeItem nudge the offset and starve the scroll target (the Solid off-window focus
-    // regression); the next settled onChange re-measures the stable window. Manual-scroll
-    // recycling (the CR-01 case) has scrollState === null, so it measures normally.
-    if (virtualizer.scrollState) return;
-    const trs = gridRoot.querySelectorAll('tbody.rdt-tbody > tr[data-index]');
-    for (const tr of trs as any) virtualizer.measureElement(tr);
   }
   // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.

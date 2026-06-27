@@ -697,7 +697,8 @@ let refreshRowModel = null
 
 import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilterChangeCb, onColumnFiltersChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onColumnVisibilityChangeCb, onColumnSizingChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCallbacks.rzts'
 
-import { windowingSource, virtualItemKey, virtualizerOptions, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow, remeasureWindow } from './virtualization.rzts'
+import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow } from './virtualization.rzts'
+import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow } from '@rozie-ui/headless-core/windowing.rzts'
 
 $onMount(() => {
   // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -800,9 +801,9 @@ $onMount(() => {
     // Capture fresh locals; never write a $data key then re-read it in the same fn
     // (ROZ138 / React stale-read — setState is async on React, the closure binds the
     // PRE-write value).
-    // windowingSource(): the FULL pre-pagination model when virtual (windowing replaces client
+    // windowSource(): the FULL pre-pagination model when virtual (windowing replaces client
     // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
-    const nextRows = windowingSource().slice()
+    const nextRows = windowSource().slice()
     const nextGroups = table.getHeaderGroups().slice()
     $data.rows = nextRows
     $data.headerGroups = nextGroups
