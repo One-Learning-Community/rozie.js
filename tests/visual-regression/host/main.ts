@@ -752,6 +752,22 @@ export const EXAMPLES = [
   // registered for Angular cross-tree AOT in phase 48).
   'DataTableVirtualGroup',
   'DataTableVirtualExpand',
+  // Phase 63 Wave-10 (C4: RTL logical-nav contract) — the RTL contract-pin fixture
+  // (loader → examples/demos/DataTableGridRtlDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). A 3-column grid
+  // (interactionMode='grid') wrapped in a dir="rtl" container, so
+  // data-table-grid-rtl.spec.ts asserts the arrow nav stays LOGICAL (index-based): from
+  // col 0, ArrowRight increments data-col-index to 1 (NO physical flip under rtl),
+  // ArrowLeft decrements, Home → col 0, End → last col, and the @activecell-change emit
+  // carries the same logical colIndex. The grid nav is purely index-based (no dir/rtl
+  // branch), so the contract holds by construction — this cell is the canonical CONTRACT
+  // PIN that lands RED if a future change introduced a physical flip. Behavioral-only;
+  // NOT in matrix.spec.ts EXAMPLES (no pixel baseline). Lives under examples/demos/ so no
+  // new Angular 3-file registration is needed (prebuildExtraRoots[examplesRoot] + the
+  // examples tsconfig include + the glob-driven build-cells demos sweep already cover it,
+  // importing the data-table source pkg already registered for Angular cross-tree AOT in
+  // phase 48).
+  'DataTableGridRtl',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1133,6 +1149,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of DataTableVirtualGroupDemo / DataTableVirtualExpandDemo.
   DataTableVirtualGroup: 'rozie-data-table-virtual-group',
   DataTableVirtualExpand: 'rozie-data-table-virtual-expand',
+  // Phase 63 wave-10 RTL contract — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-rtl-demo' = kebab of DataTableGridRtlDemo.
+  DataTableGridRtl: 'rozie-data-table-grid-rtl',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
@@ -1462,6 +1481,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-supplied props.
   DataTableVirtualGroup: {},
   DataTableVirtualExpand: {},
+  // Phase 63 wave-10 RTL contract — self-contained ($data only: the rows + the
+  // activecell readout). The DataTable is mounted inline with its props inside a
+  // dir="rtl" wrapper. No parent-supplied props.
+  DataTableGridRtl: {},
   // Phase 50 round-out — all three behavioral demos are self-contained: each seeds its
   // own rows + readouts in <data> and mounts the DataTable inline with its props. No
   // parent-supplied props.

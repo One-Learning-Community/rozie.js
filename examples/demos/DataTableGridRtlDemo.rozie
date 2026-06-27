@@ -1,0 +1,110 @@
+<!--
+  DataTableGridRtlDemo.rozie — Phase 63 Wave-10 (C4: RTL logical-nav contract) behavioral VR cell.
+
+  Proves the GRID arrow navigation stays LOGICAL (index-based) under dir="rtl" — it does
+  NOT physically flip just because the wrapper renders right-to-left:
+
+    - LOGICAL nav: from col 0, ArrowRight INCREMENTS data-col-index to 1 (NOT decrements,
+      which a physical "follow the visual direction" mapping would do under rtl); ArrowLeft
+      DECREMENTS. The column index is the model order (table-core column order), independent
+      of the visual mirror the browser applies for dir=rtl.
+    - Home → col 0 (logical first column, index-addressed); End → last col (index = colCount-1).
+    - The @activecell-change emit carries the LOGICAL colIndex (matches data-col-index), so a
+      consumer addressing cells by index gets the same coordinate regardless of dir.
+
+  data-table-grid-rtl.spec.ts asserts this ×6. The grid nav (gridFocusNav.rzts moveCol/
+  gridKeydownHandlers.rzts) is purely index-based (clamp($data.activeColIndex ± delta)) — it
+  has NO `dir`/`rtl` branch, so the contract holds by construction. This spec is the CANONICAL
+  CONTRACT PIN (C4): it locks the logical-nav guarantee so a future emitter/source change that
+  introduced a physical flip under rtl would land RED here. No source change was required for
+  the contract to hold (recorded in the plan SUMMARY).
+
+  Static dataset (no clock/random) for VR determinism. NO loop var or slot named
+  `cell`/`row`/`header` (table-core drives the columns; the slot binding name is `value`).
+-->
+
+<rozie name="DataTableGridRtlDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Three columns, three rows — enough to walk col 0 → 1 → 2 (End) and back. Static.
+  rows: [
+    { id: 1, name: 'Aleph', qty: 3, city: 'Cairo' },
+    { id: 2, name: 'Bet',   qty: 5, city: 'Amman' },
+    { id: 3, name: 'Gimel', qty: 2, city: 'Doha'  },
+  ],
+  // Last activecell-change payload (the LOGICAL r,c) — proves the emitted colIndex is
+  // index-based even under dir=rtl.
+  lastActiveCell: '',
+}
+</data>
+
+<script lang="ts">
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+</script>
+
+<template>
+<div class="dt-rtl-demo">
+  <h3>DataTable — grid under dir=rtl (logical nav)</h3>
+
+  <div class="controls">
+    <span class="label">activecell-change:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+  </div>
+
+  <!-- The dir="rtl" wrapper renders the table right-to-left visually; arrow nav stays
+       LOGICAL (index-based) — the contract this cell pins. -->
+  <div dir="rtl" data-testid="rtl-table">
+    <DataTable
+      ref="dt"
+      :data="$data.rows"
+      interactionMode="grid"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+      <Column field="city" header="City" />
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-rtl-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.dt-rtl-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+/* Make the roving active cell visible (token surface; :focus-visible parity). */
+[data-testid="rtl-table"] [role="gridcell"][tabindex="0"],
+[data-testid="rtl-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>
