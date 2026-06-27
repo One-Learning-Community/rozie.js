@@ -1207,44 +1207,74 @@ for (const target of TARGETS) {
     });
     expect(imgCount, 'pasted markup must render as text — no <img> element created (T-51-01)').toBe(0);
 
-    // ── Drag-fill (D-04 — VALUE-COPY ONLY, no series detection): select a 1×3 vertical range
-    //    in the name column anchored at row 0 (Alpha), then fillRange propagates the anchor's
-    //    value down the column. A "Alpha" source does NOT become a series. ────────────────────
-    // Reset: select name cells rows 0-2 (col 0). The anchor (top-left) value is row 0's name.
+    // ── Drag-fill (D-04 — VALUE-COPY ONLY, no series detection; B7 — PER-COLUMN copy, no
+    //    multi-column clobber): select a 1×2 horizontal SOURCE (row 0, cols 0-1 = Alpha + qty
+    //    3), then drag the fill handle DOWN to row 2. Each source column copies its OWN value
+    //    down its OWN column — name → Alpha down col 0, qty → 3 down col 1 — never a single
+    //    scalar broadcast (which clobbered col 1, the B7 data-loss), never a numeric series. ──
     await focusBodyCellStable(page, 0, 0);
-    await page.keyboard.press('Shift+ArrowDown'); // (1,0)
-    await page.keyboard.press('Shift+ArrowDown'); // (2,0): box rows 0-2 × col 0
+    await page.keyboard.press('Shift+ArrowRight'); // source row 0, cols 0-1 (handle at (0,1))
     await expect
       .poll(async () => inRangeCells(page), { timeout: 10_000 })
-      .toEqual(['0:0', '1:0', '2:0']);
-    const anchorName = (await cellDisplayValues(page))[0]; // row 0 name (the fill source).
-    // Drag the fill handle: pointerdown on the handle, pointermove over the bottom cell,
-    // pointerup. The handle sits on the range's bottom-right corner (2,0).
+      .toEqual(['0:0', '0:1']);
+    const anchorName = (await cellDisplayValues(page))[0]; // row 0 name (the col-0 fill source).
+    await page.waitForTimeout(150); // let the SOURCE range internally commit (React useState async)
+    // pointerdown on the handle (captures the pre-drag source box) + pointermove to cell (2,1)
+    // (extends the range via the shadow-pierced cellIndexFromPoint; tracks the gesture's end cell).
     await page.evaluate(() => {
-      const find = (root: Document | ShadowRoot): Element | null => {
-        const direct = root.querySelector('[data-fill-handle]');
-        if (direct) return direct;
-        for (const el of Array.from(root.querySelectorAll('*'))) {
-          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-          if (sr) {
-            const inner = find(sr);
-            if (inner) return inner;
+      const findCell = (sel: string): HTMLElement | null => {
+        const walk = (root: Document | ShadowRoot): HTMLElement | null => {
+          const direct = root.querySelector(sel) as HTMLElement | null;
+          if (direct) return direct;
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) { const inner = walk(sr); if (inner) return inner; }
           }
-        }
-        return null;
+          return null;
+        };
+        return walk(document);
       };
-      const handle = find(document) as HTMLElement | null;
-      if (handle) {
-        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-        // No move needed — the existing range IS the fill target; release commits the fill.
-        document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      const handle = findCell('[data-fill-handle]');
+      const target = findCell('[data-grid-cell][data-row="2"][data-col-index="1"]');
+      if (handle && target) {
+        const tr = target.getBoundingClientRect();
+        const cx = tr.left + tr.width / 2;
+        const cy = tr.top + tr.height / 2;
+        const hr = handle.getBoundingClientRect();
+        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hr.left + hr.width / 2, clientY: hr.top + hr.height / 2 }));
+        document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy }));
       }
     });
-    // Every name cell in rows 0-2 now equals the anchor name (value-copy, NOT a series).
+    await page.waitForTimeout(250); // let setRangeFocus + the gesture end cell settle (React)
+    await page.evaluate(() => {
+      const findCell = (sel: string): HTMLElement | null => {
+        const walk = (root: Document | ShadowRoot): HTMLElement | null => {
+          const direct = root.querySelector(sel) as HTMLElement | null;
+          if (direct) return direct;
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+            if (sr) { const inner = walk(sr); if (inner) return inner; }
+          }
+          return null;
+        };
+        return walk(document);
+      };
+      const target = findCell('[data-grid-cell][data-row="2"][data-col-index="1"]');
+      if (target) {
+        const tr = target.getBoundingClientRect();
+        document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: tr.left + tr.width / 2, clientY: tr.top + tr.height / 2 }));
+      }
+    });
+    // col 0 (name): rows 0-2 all equal the source name (value-copy down, NOT a series).
     // Name cells are at indices 0, 5, 10 (col 0 of rows 0,1,2 with 5 columns per row).
     await expect
       .poll(async () => cellDisplayValues(page).then((c) => [c[0], c[5], c[10]]), { timeout: 10_000 })
       .toEqual([anchorName, anchorName, anchorName]);
+    // B7: col 1 (qty) ALSO copied its OWN source value (3) down — NOT clobbered by the name
+    // broadcast (the pre-fix data loss), NOT incremented into a series. qty cells = 1, 6, 11.
+    await expect
+      .poll(async () => cellDisplayValues(page).then((c) => [c[1], c[6], c[11]]), { timeout: 10_000 })
+      .toEqual(['3', '3', '3']);
   });
 
   // req-9 — editor + index-based range survive virtualization recycling (Wave-(c), Plan 51-04
