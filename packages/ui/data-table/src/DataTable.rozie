@@ -1463,17 +1463,28 @@ $expose({
     <!-- The windowed slice. Loop var `wr` = { vi, row }; keyed on the FULL-model row.id so Lit's
          repeat / Solid's For never recycle a node from one full-model row into another (req-10).
          data-row/data-index use vi.index (O(1), authoritative full-model index — NOT the O(n)
-         rowIndexOf scan over the full model). The <td> cell loop mirrors the non-virtual body. -->
+         rowIndexOf scan over the full model). The <td> cell loop mirrors the non-virtual body.
+         B13 (phase 63, FULL PARITY): the windowed body now carries the SAME structural branches
+         as the non-virtual body (~1711-1905) — the data-group-header/leaf/depth markers + the
+         rdt-group-header class on the <tr>, the isExpanderColumn / cellIsGrouped <td> branches,
+         and a conditional #detail <tr> sibling — so a virtual + grouping/expand grid renders at
+         full parity (no silent feature drop). Wrapped in a <template r-for> (wrapper-free multi-
+         root) so the data <tr> + the #detail <tr> ride one keyed iteration, exactly like the
+         non-virtual D-04 expand seam. The verified-correct invariants are preserved: group rows
+         render a FULL cell set (no colspan, data-col-index intact) and the #detail <tr> carries
+         no data-row/data-index so it never shifts the windowed body's row indices. -->
+    <template r-for="wr in windowedRows()" :key="wr.row.id">
     <tr
       class="rdt-tr"
       role="row"
-      r-for="wr in windowedRows()"
-      :key="wr.row.id"
       :data-row="wr.vi.index"
       :aria-rowindex="wr.vi.index + 1"
       :data-index="wr.vi.index"
       :data-pinned="wr.pinned ? 'true' : null"
-      :class="{ 'rdt-row-pinned': wr.pinned }"
+      :data-depth="wr.row.depth"
+      :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : null"
+      :data-group-leaf="(groupingActive() && !rowIsGrouped(wr.row)) ? wr.row.id : null"
+      :class="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }"
     >
       <td
         class="rdt-td"
@@ -1486,11 +1497,27 @@ $expose({
         :data-col-index="colIndexOf(wr.row, cellCtx)"
         :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
         :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }"
-        :style="pinStyle(cellCtx.column.id)"
+        :style="bodyCellStyle(wr.row, cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))"
         :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null"
+        :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : null"
       >
-        <span style="display:contents" r-if="isSelectColumn(cellCtx.column.id)">
+        <!-- B13 (phase 63) — auto-injected chevron expander cell, windowed body. Identical
+             shape to the non-virtual body (~1797): a native <button> (Enter/Space → click
+             natively) gated on rowCanExpand(wr.row); aria-expanded reflects wr.row's expanded
+             state. FIRST branch (matching the non-virtual order). -->
+        <span style="display:contents" r-if="isExpanderColumn(cellCtx.column.id)">
+          <button
+            r-if="rowCanExpand(wr.row)"
+            type="button"
+            class="rdt-expander"
+            data-expander
+            :aria-expanded="!!rowIsExpanded(wr.row)"
+            :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'"
+            @click="onToggleExpand(wr.row, $event)"
+          >{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
+        </span>
+        <span style="display:contents" r-else-if="isSelectColumn(cellCtx.column.id)">
           <slot
             name="selectCell"
             :row="wr.row.original"
@@ -1505,6 +1532,30 @@ $expose({
               @change="onToggleRow(wr.row, $event)"
             />
           </slot>
+        </span>
+        <!-- B13 (phase 63) — group-header cell, windowed body. Identical shape to the non-
+             virtual body (~1840): the cellIsGrouped branch renders a native <button data-expander
+             class="rdt-group-toggle"> (REUSING onToggleExpand — group rows are expandable rows) +
+             the group key through the EXISTING #cell slot + the member count. -->
+        <span style="display:contents" r-else-if="cellIsGrouped(cellCtx)">
+          <button
+            type="button"
+            class="rdt-expander rdt-group-toggle"
+            data-expander
+            :aria-expanded="!!rowIsExpanded(wr.row)"
+            :aria-label="rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group'"
+            @click="onToggleExpand(wr.row, $event)"
+          >{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
+          <span class="rdt-group-value">
+            <slot
+              name="cell"
+              :columnId="cellCtx.column.id"
+              :column="cellCtx.column"
+              :row="wr.row.original"
+              :value="cellCtx.getValue()"
+            >{{ cellCtx.getValue() }}</slot>
+          </span>
+          <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span>
         <!-- Editor branch (phase 51) — virtual body. Identical shape to the non-virtual
              body; keyed on wr.vi.index (the full-model index, the activeRow space). Single-
@@ -1587,6 +1638,22 @@ $expose({
         ></span>
       </td>
     </tr>
+    <!-- B13 (phase 63) — #detail row, windowed body. Identical shape to the non-virtual
+         body (~1948): renders the #detail scoped slot ({ row }) under an expanded row, ONLY in
+         #detail mode (no getSubRows; rowShowsDetail gates it). Sibling of the data <tr> inside
+         the same <template r-for> iteration. Carries NO data-row/data-index → it never shifts
+         the windowed body's row indices (the verified-correct invariant). -->
+    <tr
+      r-if="rowShowsDetail(wr.row)"
+      class="rdt-detail-row"
+      role="row"
+      :data-detail-row="wr.row.id"
+    >
+      <td class="rdt-detail-cell" :colspan="visibleColCount()">
+        <slot name="detail" :row="wr.row.original" />
+      </td>
+    </tr>
+    </template>
     <!-- Trailing spacer (D-03): occupies the height of the rows below the window. -->
     <tr class="rdt-spacer" aria-hidden="true">
       <td :colspan="visibleColCount()" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>

@@ -73,6 +73,14 @@ interface SelectCellCtx {
   toggle: any;
 }
 
+interface CellCtx {
+  $implicit: { columnId: any; column: any; row: any; value: any };
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+}
+
 interface EditorCtx {
   $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any };
   columnId: any;
@@ -81,14 +89,6 @@ interface EditorCtx {
   value: any;
   commit: any;
   cancel: any;
-}
-
-interface CellCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any };
-  columnId: any;
-  column: any;
-  row: any;
-  value: any;
 }
 
 interface DetailCtx {
@@ -243,10 +243,17 @@ function rozieToken(key: string): InjectionToken<unknown> {
         </tr>
         
         @for (wr of windowedRows(); track wr.row.id) {
-    <tr class="rdt-tr" [ngClass]="{ 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)">
+
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)">
           @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="pinStyle(cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)">
-            @if (isSelectColumn(cellCtx.column.id)) {
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="bodyCellStyle(wr.row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
+            
+            @if (isExpanderColumn(cellCtx.column.id)) {
+    <span style="display:contents">
+              @if (rowCanExpand(wr.row)) {
+    <button type="button" class="rdt-expander" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
+    }</span>
+    } @else if (isSelectColumn(cellCtx.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
     <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cellCtx)" />
@@ -255,6 +262,18 @@ function rozieToken(key: string): InjectionToken<unknown> {
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(wr.row)" (change)="onToggleRow(wr.row, $event)" />
               
     }
+            </span>
+    } @else if (cellIsGrouped(cellCtx)) {
+    <span style="display:contents">
+              <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
+              <span class="rdt-group-value">
+                @if ((cellTpl ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }" />
+    } @else {
+    {{ rozieDisplay(cellCtx.getValue()) }}
+    }
+              </span>
+              <span class="rdt-group-count">{{ rozieDisplay('(' + groupSubRowCount(wr.row) + ')') }}</span>
             </span>
     } @else if (isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))) {
     <span style="display:contents">
@@ -288,6 +307,14 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }</td>
     }
         </tr>
+        
+        @if (rowShowsDetail(wr.row)) {
+    <tr class="rdt-detail-row" role="row" [attr.data-detail-row]="rozieAttr(wr.row.id)">
+          <td class="rdt-detail-cell" [attr.colspan]="rozieAttr(visibleColCount())">
+            <ng-container *ngTemplateOutlet="(detailTpl ?? templates()?.['detail']); context: { $implicit: { row: wr.row.original }, row: wr.row.original }" />
+          </td>
+        </tr>
+    }
     }
         
         <tr class="rdt-spacer" aria-hidden="true">
@@ -903,8 +930,8 @@ export class DataTable {
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
   @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
-  @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
+  @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
@@ -4103,7 +4130,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | EditorCtx | CellCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx {
     return true;
   }
 

@@ -294,9 +294,9 @@ interface FilterSlotCtx { columnId: any; uniqueValues: any; minMax: any; setFilt
 
 interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
 
-interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
-
 interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
+
+interface EditorSlotCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
 
 interface DetailSlotCtx { row: any; }
 
@@ -441,8 +441,8 @@ interface DataTableProps {
   colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
   filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
-  editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
+  editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
   detailSlot?: (ctx: DetailSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: DataTableHandle) => void;
@@ -5039,9 +5039,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
           <td colSpan={rozieAttr(visibleColCount())} style={parseInlineStyle('height:' + padTop() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
         </tr>
         
-        <For each={windowedRows()}>{(wr) => <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-row-pinned': wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : null)} data-rozie-s-d5dcab4c="">
-          <For each={visibleCellsFor(wr.row)}>{(cellCtx) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-rozie-s-d5dcab4c="">
-            {<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+        <For each={windowedRows()}>{(wr) => <>
+        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : null)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)} data-rozie-s-d5dcab4c="">
+          <For each={visibleCellsFor(wr.row)}>{(cellCtx) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))} style={parseInlineStyle(bodyCellStyle(wr.row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c="">
+            
+            {<Show when={isExpanderColumn(cellCtx.column.id)} fallback={<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={cellIsGrouped(cellCtx)} fallback={<Show when={isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={hasEditorSlot(cellCtx.column.id)} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'number'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'select'} fallback={<Show when={editorTypeOf(cellCtx.column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onChange={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
@@ -5049,9 +5051,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr.row)} aria-label={rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event) => { onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸')}</button>
+              <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
+                {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) ?? rozieDisplay(cellCtx.getValue())}
+              </span>
+              <span class={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(wr.row) + ')')}</span>
+            </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
-            </span></Show>}{<Show when={isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</For>
-        </tr>}</For>
+            </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={rowCanExpand(wr.row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr.row)} aria-label={rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event) => { onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</For>
+        </tr>
+        
+        {<Show when={rowShowsDetail(wr.row)}><tr class={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(wr.row.id)} data-rozie-s-d5dcab4c="">
+          <td class={"rdt-detail-cell"} colSpan={rozieAttr(visibleColCount())} data-rozie-s-d5dcab4c="">
+            {(_props.detailSlot ?? _props.slots?.['detail'])?.({ row: wr.row.original })}
+          </td>
+        </tr></Show>}</>}</For>
         
         <tr class={"rdt-spacer"} aria-hidden="true" data-rozie-s-d5dcab4c="">
           <td colSpan={rozieAttr(visibleColCount())} style={parseInlineStyle('height:' + padBottom() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />

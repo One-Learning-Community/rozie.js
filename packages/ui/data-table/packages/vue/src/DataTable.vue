@@ -59,12 +59,21 @@
       <td :colspan="visibleColCount()" :style="'height:' + padTop() + 'px;padding:0;border:0'"></td>
     </tr>
     
-    <tr v-for="wr in windowedRows()" :key="wr.row.id" :class="['rdt-tr', { 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined">
-      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="pinStyle(cellCtx.column.id)" :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined">
-        <span v-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
+    <template v-for="wr in windowedRows()" :key="wr.row.id">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined">
+      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="bodyCellStyle(wr.row, cellCtx.column.id)" :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
+        
+        <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
+          <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
           <slot name="selectCell" :row="wr.row.original" :checked="rowIsSelected(wr.row)" :toggle="e => onToggleRow(wr.row, e)">
             <input class="rdt-select-row" type="checkbox" aria-label="Select row" :checked="rowIsSelected(wr.row)" @change="onToggleRow(wr.row, $event)" />
           </slot>
+        </span><span v-else-if="cellIsGrouped(cellCtx)" style="display:contents">
+          <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
+          <span class="rdt-group-value">
+            <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
+          </span>
+          <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span><span v-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))" style="display:contents">
           <span v-if="hasEditorSlot(cellCtx.column.id)" style="display:contents">
             <slot name="editor" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="editorValueFor(cellCtx.column.id)" :commit="editorCommitFor(cellCtx.column.id)" :cancel="editorCancelFor()"></slot>
@@ -74,6 +83,12 @@
           <slot name="cell" :columnId="cellCtx.column.id" :column="cellCtx.column" :row="wr.row.original" :value="cellCtx.getValue()">{{ cellCtx.getValue() }}</slot>
         </span><span v-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
+    
+    <tr v-if="rowShowsDetail(wr.row)" class="rdt-detail-row" role="row" :data-detail-row="wr.row.id">
+      <td class="rdt-detail-cell" :colspan="visibleColCount()">
+        <slot name="detail" :row="wr.row.original"></slot>
+      </td>
+    </tr></template>
     
     <tr class="rdt-spacer" aria-hidden="true">
       <td :colspan="visibleColCount()" :style="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
@@ -300,8 +315,10 @@ defineSlots<{
   colHeader(props: { columnId: any; column: any; label: any }): any;
   filter(props: { columnId: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
+  cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
+  detail(props: { row: any }): any;
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;

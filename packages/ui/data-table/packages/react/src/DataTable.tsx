@@ -45,9 +45,9 @@ interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: 
 
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
-interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
-
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
+
+interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
 
 interface DetailCtx { row: any; }
 
@@ -191,8 +191,8 @@ interface DataTableProps {
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
   renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
-  renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
+  renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderDetail?: (ctx: DetailCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -3740,10 +3740,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padTop() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
         </tr>
         
-        {windowedRows().map((wr) => <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
-          {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
-            {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+        {windowedRows().map((wr) => <Fragment key={wr.row.id}>
+        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-rozie-s-d5dcab4c="">
+          {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(wr.row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
+            
+            {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {(rowCanExpand(wr.row)) && <button type="button" className={"rdt-expander"} data-expander="" aria-expanded={!!rowIsExpanded(wr.row)} aria-label={rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')} onClick={($event) => { onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸')}</button>}</span> : (isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
+            </span> : (cellIsGrouped(cellCtx)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              <button type="button" className={"rdt-expander rdt-group-toggle"} data-expander="" aria-expanded={!!rowIsExpanded(wr.row)} aria-label={rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')} onClick={($event) => { onToggleExpand(wr.row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸')}</button>
+              <span className={"rdt-group-value"} data-rozie-s-d5dcab4c="">
+                {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
+              </span>
+              <span className={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(wr.row) + ')')}</span>
             </span> : (isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(hasEditorSlot(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() })}
@@ -3752,7 +3761,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               </select> : (editorTypeOf(cellCtx.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cellCtx.column.id)} onChange={($event) => { onCellEditorCheckbox(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cellCtx.column.id)} onInput={($event) => { onCellEditorInput(cellCtx.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }) : rozieDisplay(cellCtx.getValue())}
             </span>}{(isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
-        </tr>)}
+        </tr>
+        
+        {(rowShowsDetail(wr.row)) && <tr key={wr.row.id} className={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(wr.row.id)} data-rozie-s-d5dcab4c="">
+          <td className={"rdt-detail-cell"} colSpan={(visibleColCount()) ?? undefined} data-rozie-s-d5dcab4c="">
+            {(props.renderDetail ?? props.slots?.['detail'])?.({ row: wr.row.original })}
+          </td>
+        </tr>}</Fragment>)}
         
         <tr className={"rdt-spacer"} aria-hidden="true" data-rozie-s-d5dcab4c="">
           <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padBottom() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
