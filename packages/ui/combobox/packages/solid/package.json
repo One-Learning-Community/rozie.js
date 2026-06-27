@@ -48,11 +48,15 @@
     "@rozie/runtime-solid": "workspace:*"
   },
   "peerDependencies": {
-    "solid-js": "^1.8"
+    "solid-js": "^1.8",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "solid-js": {
       "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
     }
   },
   "scripts": {

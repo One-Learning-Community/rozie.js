@@ -55,10 +55,24 @@ export interface ListboxProps {
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   */
+  virtual?: boolean;
+  /**
+   * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
+   */
+  estimateRowHeight?: number;
+  /**
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   */
+  maxHeight?: string;
   onOpenChange?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
   renderSelected?: (params: { selected: () => void; value: unknown }) => ReactNode;
   renderOption?: (params: { option: () => void; index: () => void; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
+  renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

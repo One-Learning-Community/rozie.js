@@ -48,7 +48,8 @@
   },
   "peerDependencies": {
     "react": "^18.2 || ^19",
-    "react-dom": "^18.2 || ^19"
+    "react-dom": "^18.2 || ^19",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -56,6 +57,9 @@
     },
     "react-dom": {
       "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
     }
   },
   "devDependencies": {

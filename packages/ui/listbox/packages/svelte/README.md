@@ -55,6 +55,9 @@ import '@rozie-ui/listbox-svelte/themes/shadcn.css';    // or material.css, boot
 | `optionDisabled` | `Function` | `null` |  |  |
 | `id` | `String` | `"rozie-listbox"` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -89,5 +92,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Slot | Params |
 | --- | --- |
 | selected | selected, value |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

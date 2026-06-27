@@ -1,7 +1,18 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieAttr, rozieDisplay, useControllableState, useOutsideClick } from '@rozie/runtime-react';
+import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState, useOutsideClick } from '@rozie/runtime-react';
 import './Listbox.css';
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally
+// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
+// `virtualizer` guard so the non-virtual emitted path executes none of it
+// (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+
+// Windowing instance state (the `let table` precedent — React hoists reassigned
+// module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+// when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
+// virtualizer observes; remeasurePending dedupes the deferred sweep.
 
 interface SelectedCtx { selected: any; value: any; }
 
@@ -62,6 +73,18 @@ interface ListboxProps {
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   */
+  virtual?: boolean;
+  /**
+   * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
+   */
+  estimateRowHeight?: number;
+  /**
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   */
+  maxHeight?: string;
   onOpenChange?: (...args: any[]) => void;
   onChange?: (...args: any[]) => void;
   renderSelected?: (ctx: SelectedCtx) => ReactNode;
@@ -80,7 +103,7 @@ export interface ListboxHandle {
 
 const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props: ListboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<ListboxProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null } = {
+  const props: Omit<ListboxProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     multiple: _props.multiple ?? false,
@@ -93,12 +116,19 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     optionDisabled: _props.optionDisabled ?? null,
     id: _props.id ?? 'rozie-listbox',
     ariaLabel: _props.ariaLabel ?? null,
+    virtual: _props.virtual ?? false,
+    estimateRowHeight: _props.estimateRowHeight ?? 36,
+    maxHeight: _props.maxHeight ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
-    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void defaultValue; void onValueChange;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange;
     return rest;
   })();
+  const gridScrollEl = useRef<any>(null);
+  const virtualizer = useRef<any>(null);
+  const virtualizerCleanup = useRef<any>(null);
+  const remeasurePending = useRef(false);
   const typeTimer = useRef<any>(null);
   const [value, setValue] = useControllableState({
     value: props.value,
@@ -108,9 +138,13 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const [open$local, setOpen$local] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
+  const [rows, setRows] = useState<any[]>([]);
+  const [windowVer, setWindowVer] = useState(0);
+  const [editVer, setEditVer] = useState(0);
   const controlEl = useRef<HTMLDivElement | null>(null);
   const triggerEl = useRef<HTMLButtonElement | null>(null);
   const listEl = useRef<HTMLDivElement | null>(null);
+  const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const selectedLabel = useMemo(() => {
     const cur = value;
     if (props.multiple) {
@@ -128,6 +162,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     if (!open$local || activeIndex < 0) return null;
     return optionId(activeIndex);
   }, [activeIndex, open$local, optionId]);
+  const _watch0First = useRef(true);
 
   // Type-ahead buffer for the select-only listbox trigger. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
@@ -299,22 +334,272 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
+  function virtualItemKey(i: any) {
+    const src = windowSource();
+    return src && src[i] ? src[i].id : undefined;
+  }
+  const virtualizerOptions = useCallback((): any => ({
+    count: windowSource().length,
+    getScrollElement: () => gridScrollEl.current,
+    estimateSize: () => props.estimateRowHeight,
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: virtualItemKey,
+    onChange: () => {
+      setWindowVer(prev => prev + 1);
+      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+      // re-measure is a no-op.
+      scheduleRemeasure();
+    }
+  }), [props.estimateRowHeight, scheduleRemeasure, virtualItemKey, windowSource]);
+  function windowedRows() {
+    // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
+    // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
+    // which happens at initial render while `virtualizer` is still null (it is built in $onMount,
+    // after the first render). `virtualizer` is a non-reactive `let`, so if the windowVer read sat
+    // BELOW the `!virtualizer` guard the accessor would early-return [] without ever reading the
+    // signal → it would NEVER re-run when onChange later bumps windowVer, and the window would stay
+    // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
+    // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
+    // first re-run that picks up the now-non-null virtualizer.
+    // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+    // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
+    void windowVer;
+    void editVer;
+    if (!virtualizer.current) {
+      // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+      // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+      // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+      // rows appear on the first onChange after _didMount.
+      if (!props.virtual) {
+        const rowList = rows || [];
+        return rowList.map((r: any) => ({
+          vi: null,
+          row: r
+        }));
+      }
+      return [];
+    }
+    const items = virtualizer.current.getVirtualItems();
+    const rowList = rows || [];
+    // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+    // shrink window where the virtualizer count is stale relative to $data.rows on the async
+    // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+    // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
+    const out = items.map((vi: any) => ({
+      vi,
+      row: rowList[vi.index]
+    })).filter((wr: any) => wr.row);
+    // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+    // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+    // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+    // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+    // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+    // into the real windowing.
+    const pin = pinnedEditIndex();
+    if (pin >= 0 && rowList[pin]) {
+      let inWindow = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].index === pin) {
+          inWindow = true;
+          break;
+        }
+      }
+      if (!inWindow) {
+        const pm = pinnedMeasurement(pin);
+        const firstStart = items.length ? items[0].start : 0;
+        const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+        const pinnedEntry = {
+          vi: pm != null ? pm : {
+            index: pin
+          },
+          row: rowList[pin],
+          pinned: true
+        };
+        if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+      }
+    }
+    return out;
+  }
+  function padTop() {
+    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+    // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+    // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
+    void windowVer;
+    void editVer;
+    if (!props.virtual || !virtualizer.current) return 0;
+    const items = virtualizer.current.getVirtualItems();
+    let pad = items.length ? items[0].start : 0;
+    // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+    // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+    // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+    }
+    return pad < 0 ? 0 : pad;
+  }
+  function padBottom() {
+    // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+    // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+    // on pin/unpin.
+    void windowVer;
+    void editVer;
+    if (!props.virtual || !virtualizer.current) return 0;
+    const items = virtualizer.current.getVirtualItems();
+    if (!items.length) return 0;
+    let pad = virtualizer.current.getTotalSize() - items[items.length - 1].end;
+    // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+    // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+      // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+      // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+      // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+      // the offset comparison only if the measurement lacks an index (defensive).
+      const lastItemIdx = items[items.length - 1].index;
+      const below = pm && pm.index != null ? pm.index > lastItemIdx : pm && pm.start >= items[0].start;
+      if (pm && !inWindow && below) {
+        // below the window → it trailed the slice; subtract its height from the trailing spacer.
+        if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+      }
+    }
+    return pad < 0 ? 0 : pad;
+  }
+  function pmIndexInWindow(items: any, idx: any) {
+    for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+    return false;
+  }
+  function rowIsOutsideWindow(r: any) {
+    if (!props.virtual || !virtualizer.current) return false;
+    const items = virtualizer.current.getVirtualItems();
+    for (const it of items as any) if (it.index === r) return false;
+    return true;
+  }
+  function windowSource() {
+    return visibleOptions();
+  }
+  function pinnedEditIndex() {
+    return -1;
+  }
+  function pinnedMeasurement(pin: any) {
+    return null;
+  }
+  const syncRows = useCallback(() => {
+    setRows(windowSource());
+  }, [windowSource]);
+  function scheduleRemeasure() {
+    if (remeasurePending.current) return;
+    remeasurePending.current = true;
+    let ranMicro = false;
+    const microPass = () => {
+      remeasureWindow();
+    };
+    const rafPass = () => {
+      remeasurePending.current = false;
+      remeasureWindow();
+    };
+    if (typeof queueMicrotask !== 'undefined') {
+      ranMicro = true;
+      queueMicrotask(microPass);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending.current = false;else setTimeout(rafPass, 0);
+  }
+  function remeasureWindow() {
+    if (!virtualizer.current || !gridScrollEl.current) return;
+    if (virtualizer.current.scrollState) return;
+    const els = gridScrollEl.current.querySelectorAll('.rozie-listbox-option[data-index]');
+    for (const el of els as any) virtualizer.current.measureElement(el);
+  }
   function focusControl() {
     triggerEl.current?.focus();
   }
   function scrollActiveIntoView() {
-    if (!listEl.current || activeIndex < 0) return;
+    if (activeIndex < 0) return;
+    if (props.virtual && virtualizer.current) {
+      // 'center' (not 'auto'): keep the active option well inside the rendered slice as the
+      // window scrolls — 'auto' lands it at the viewport edge where the overscan band can
+      // leave it just-unrendered for a frame on the fine-grained targets (Solid).
+      virtualizer.current.scrollToIndex(activeIndex, {
+        align: 'center'
+      });
+      scheduleRemeasure();
+      return;
+    }
+    if (!listEl.current) return;
     const el = listEl.current!.querySelector('#' + CSS.escape(optionId(activeIndex)));
     el?.scrollIntoView({
       block: 'nearest'
     });
   }
+  const kickWindow = useCallback((attempts: any) => {
+    if (!virtualizer.current) return;
+    gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-listbox-list') : gridScrollEl.current;
+    // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
+    // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
+    // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
+    // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
+    if (windowSource().length > 0) {
+      syncRows();
+      virtualizer.current.setOptions(virtualizerOptions());
+    }
+    virtualizer.current._willUpdate();
+    setWindowVer(prev => prev + 1);
+    remeasureWindow();
+    if (windowedRows().length === 0 && attempts > 0) {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
+    }
+  }, [remeasureWindow, syncRows, virtualizerOptions, windowSource, windowedRows]);
 
+  useEffect(() => {
+    syncRows();
+    if (props.virtual) {
+      // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
+      // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
+      // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
+      // Solid/Lit, which leaves the virtualizer with no scroll element.
+      gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-listbox-list') : null;
+      virtualizer.current = new Virtualizer(virtualizerOptions());
+      virtualizerCleanup.current = virtualizer.current._didMount();
+      setWindowVer(prev => prev + 1);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {
       if (typeTimer.current !== null) clearTimeout(typeTimer.current);
+      // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
+      if (virtualizerCleanup.current) virtualizerCleanup.current();
     };
   }, []);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    syncRows();
+    if (props.virtual && virtualizer.current) {
+      gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-listbox-list') : gridScrollEl.current;
+      virtualizer.current.setOptions(virtualizerOptions());
+      virtualizer.current._willUpdate();
+      setWindowVer(prev => prev + 1);
+      scheduleRemeasure();
+    }
+  }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useOutsideClick(
     [controlEl, listEl],
@@ -328,7 +613,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": open$local, "rozie-listbox-disabled": props.disabled, "rozie-listbox-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-listbox", { "rozie-listbox-open": open$local, "rozie-listbox-disabled": props.disabled, "rozie-listbox-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-b576227a="">
 
       
       <div className={"rozie-listbox-control"} ref={controlEl} data-rozie-s-b576227a="">
@@ -339,12 +624,23 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       </div>
 
       
-      {(open$local) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
+      {(open$local && !props.virtual) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
         {visibleOptions().map((opt, index) => <div key={optionId(index)} id={rozieAttr(optionId(index))} className={clsx("rozie-listbox-option", { "is-active": activeIndex === index, "is-selected": isSelected(opt), "is-disabled": disabledOf(opt) })} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a="">
           {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) }) : rozieDisplay(labelOf(opt))}
         </div>)}
 
         {(visibleOptions().length === 0) && <div className={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
+          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
+        </div>}</div>}{(props.virtual) && <div ref={listEl} className={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} style={parseInlineStyle(props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto')} data-rozie-s-b576227a="">
+        <div className={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
+
+        {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-listbox-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row), "is-disabled": disabledOf(wr.row) })} role="option" aria-selected={!!isSelected(wr.row)} aria-disabled={!!disabledOf(wr.row)} onClick={($event) => { select(wr.row); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
+          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }) : rozieDisplay(labelOf(wr.row))}
+        </div>)}
+
+        <div className={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-b576227a="" />
+
+        {(windowSource().length === 0) && <div className={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
         </div>}</div>}</div>
     </>

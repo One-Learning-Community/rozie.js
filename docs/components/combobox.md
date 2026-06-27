@@ -78,6 +78,9 @@ const frameworks = [
 | `optionLabel` | `Function` | `null` | yes | Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property. |
 | `optionValue` | `Function` | `null` | yes | Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. |
 | `optionDisabled` | `Function` | `null` | yes | Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property. |
+| `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling popup (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed combobox. Pair with `inline` + `maxHeight`. |
+| `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
+| `maxHeight` | `String` | `''` | yes | A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
 
 ### Events
 

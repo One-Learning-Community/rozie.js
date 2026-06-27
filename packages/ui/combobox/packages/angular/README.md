@@ -100,6 +100,9 @@ export class ComboboxFormComponent {
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -130,5 +133,7 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

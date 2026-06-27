@@ -55,6 +55,9 @@ import '@rozie-ui/listbox-react/themes/shadcn.css';    // or material.css, boots
 | `optionDisabled` | `Function` | `null` |  |  |
 | `id` | `String` | `"rozie-listbox"` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -90,5 +93,7 @@ lb.current?.clear();
 | Slot | Params |
 | --- | --- |
 | selected | selected, value |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

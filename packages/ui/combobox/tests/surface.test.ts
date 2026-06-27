@@ -29,7 +29,8 @@ const EXPECT = {
   name: 'Combobox',
   // P3 (D-06): grown to absorb command-palette — resolver props, `inline`,
   // `closeOnSelect`, + an `empty` slot; resolvers consumed from listCore.rzts.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled'],
+  // P4 (SC-5): + windowing props (virtual/estimateRowHeight/maxHeight) consuming windowing.rzts.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight'],
   models: ['value'],
   emits: ['change', 'search'],
   slots: ['option', 'empty'] as string[],
@@ -70,7 +71,9 @@ describe('Combobox.rozie surface gate', () => {
   });
 
   it('declares the option scoped slot', () => {
-    const slotNames = ir.slots.map((s: { name: string }) => s.name);
+    // Dedup: `option`/`empty` are declared in BOTH the non-virtual and windowed (P4)
+    // template branches, so ir.slots lists each twice — the public slot API is the unique set.
+    const slotNames = [...new Set(ir.slots.map((s: { name: string }) => s.name))];
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 

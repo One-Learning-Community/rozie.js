@@ -172,6 +172,44 @@
         'Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).',
     },
   },
+
+  // ── Vertical option windowing (Phase 64 P4, SC-5) ──────────────────────
+  // Opt-in long-list windowing. When `true`, only the visible slice of options
+  // renders inside the bounded, scrolling list (with leading/trailing spacer
+  // rows preserving total scroll height), windowing over the FILTERED option set
+  // via the shared @rozie-ui/headless-core/windowing.rzts math (the same
+  // virtual-core bridge data-table uses, wired here per-consumer with a no-op pin
+  // hook). Default `false` is byte-identical to a non-windowed listbox.
+  virtual:        {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.',
+    },
+  },
+
+  // Estimated option row height (px) seeding the windowing engine before
+  // measureElement refines actual heights. Only consulted when `virtual` is on.
+  estimateRowHeight: {
+    type: Number,
+    default: 36,
+    docs: {
+      description:
+        'Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.',
+    },
+  },
+
+  // A CSS length string bounding the list scroll container when `virtual` is on
+  // (e.g. '320px'). Mirrored to the --rozie-listbox-max-height token.
+  maxHeight:      {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.",
+    },
+  },
 }
 </props>
 
@@ -184,6 +222,14 @@
   // identity path when empty) and the `#empty` slot exposes it. No <input> writes
   // it now that the editable-input mode is retired (P3/D-03).
   query: '',
+  // ── Windowing host state (Phase 64 P4) — the windowing.rzts host contract ──
+  // `rows` is the indexable full model the windowing math maps the slice over
+  // (kept === windowSource() / visibleOptions()); windowVer/editVer are the
+  // window/edit version reactivity bumps (editVer is inert here — the no-op pin
+  // hook never bumps it — but the shared math reads it, so it must exist).
+  rows: [],
+  windowVer: 0,
+  editVer: 0,
 }
 </data>
 
@@ -208,6 +254,80 @@ let typeTimer = null
 // (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
 import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
 
+// ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
+// The PURE windowing math (the windowed slice + spacer geometry) is the SAME
+// virtual-core bridge data-table consumes. It is a compile-time `.rzts` partial:
+// the imported symbols DISSOLVE into this leaf via inlineScriptPartials() before
+// IR lowering (zero runtime dep). The math closes over this host's pieces BY
+// CONVENTION (D-04/D-05): windowSource(), the virtualizer instance + gridScrollEl +
+// the virtual-core fns, scheduleRemeasure(), $data.windowVer/$data.editVer, and the
+// no-op pin hook pinnedEditIndex()/pinnedMeasurement() defined below. The impure
+// DOM/refs pieces stay HERE per-consumer (ROZ123). NB the pin hooks are defined in
+// THIS host (not the shared partial) so data-table's A==B byte-identity is untouched.
+import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow } from '@rozie-ui/headless-core/windowing.rzts'
+
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally
+// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
+// `virtualizer` guard so the non-virtual emitted path executes none of it
+// (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core'
+
+// Windowing instance state (the `let table` precedent — React hoists reassigned
+// module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+// when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
+// virtualizer observes; remeasurePending dedupes the deferred sweep.
+let virtualizer = null
+let virtualizerCleanup = null
+let gridScrollEl = null
+let remeasurePending = false
+
+// windowSource(): the windowing.rzts host-contract row source — the FILTERED option
+// set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
+// resolves to the same option the count windows over.
+const windowSource = () => visibleOptions()
+
+// D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
+// A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
+// pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these
+// reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
+// to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
+const pinnedEditIndex = () => -1
+const pinnedMeasurement = (pin) => null
+
+// Keep $data.rows === windowSource() so the windowing math indexes the live option set.
+const syncRows = () => { $data.rows = windowSource() }
+
+// Defer remeasureWindow() until AFTER the framework commits the recycled window
+// (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
+// behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
+// per-consumer per D-04/D-09): the microtask catches Solid's <For> / Svelte's {#each}
+// SYNCHRONOUS commit (the Phase 63 Solid under-convergence hazard — D-09 rAF-defer
+// budget), the rAF catches React's async commit. measureElement is idempotent on an
+// already-observed node, so running both is cheap and loop-free.
+const scheduleRemeasure = () => {
+  if (remeasurePending) return
+  remeasurePending = true
+  let ranMicro = false
+  const microPass = () => { remeasureWindow() }
+  const rafPass = () => { remeasurePending = false; remeasureWindow() }
+  if (typeof queueMicrotask !== 'undefined') { ranMicro = true; queueMicrotask(microPass) }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass)
+  else if (ranMicro) remeasurePending = false
+  else setTimeout(rafPass, 0)
+}
+
+// measureElement sweep: hand every rendered windowed option to the virtualizer so its
+// true (variable) height is observed (virtual-core measures ONLY nodes passed to
+// measureElement, keyed by the data-index attribute). Bails during a programmatic
+// scroll (scrollToIndex) so a measure can't starve the scroll target.
+const remeasureWindow = () => {
+  if (!virtualizer || !gridScrollEl) return
+  if (virtualizer.scrollState) return
+  const els = gridScrollEl.querySelectorAll('.rozie-listbox-option[data-index]')
+  for (const el of els) virtualizer.measureElement(el)
+}
+
 // ---- focus / scroll helpers (post-mount $refs only) --------------------
 // Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
 // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
@@ -217,14 +337,90 @@ const focusControl = () => {
 }
 
 // Keep the active option visible inside the scrolling listbox. Reads $refs in
-// a post-mount callback only (never eagerly — ROZ123).
+// a post-mount callback only (never eagerly — ROZ123). When windowing, route through
+// the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
+// scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
 const scrollActiveIntoView = () => {
-  if (!$refs.listEl || $data.activeIndex < 0) return
+  if ($data.activeIndex < 0) return
+  if ($props.virtual && virtualizer) {
+    // 'center' (not 'auto'): keep the active option well inside the rendered slice as the
+    // window scrolls — 'auto' lands it at the viewport edge where the overscan band can
+    // leave it just-unrendered for a frame on the fine-grained targets (Solid).
+    virtualizer.scrollToIndex($data.activeIndex, { align: 'center' })
+    scheduleRemeasure()
+    return
+  }
+  if (!$refs.listEl) return
   const el = $refs.listEl.querySelector('#' + CSS.escape(optionId($data.activeIndex)))
   el?.scrollIntoView({ block: 'nearest' })
 }
 
-$onUnmount(() => { if (typeTimer !== null) clearTimeout(typeTimer) })
+// ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
+// kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
+// re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
+// (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
+// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+// (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
+// scrollElement stale), and (c) the consumer often seeds options AFTER the listbox mounts
+// (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
+// paints (or attempts run out) — idempotent + loop-free.
+const kickWindow = (attempts) => {
+  if (!virtualizer) return
+  gridScrollEl = $el ? $el.querySelector('.rozie-listbox-list') : gridScrollEl
+  // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
+  // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
+  // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
+  // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
+  if (windowSource().length > 0) {
+    syncRows()
+    virtualizer.setOptions(virtualizerOptions())
+  }
+  virtualizer._willUpdate()
+  $data.windowVer = $data.windowVer + 1
+  remeasureWindow()
+  if (windowedRows().length === 0 && attempts > 0) {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1))
+    else setTimeout(() => kickWindow(attempts - 1), 16)
+  }
+}
+
+$onMount(() => {
+  syncRows()
+  if ($props.virtual) {
+    // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
+    // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
+    // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
+    // Solid/Lit, which leaves the virtualizer with no scroll element.
+    gridScrollEl = $el ? $el.querySelector('.rozie-listbox-list') : null
+    virtualizer = new Virtualizer(virtualizerOptions())
+    virtualizerCleanup = virtualizer._didMount()
+    $data.windowVer = $data.windowVer + 1
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8))
+    else setTimeout(() => kickWindow(8), 0)
+  }
+})
+
+// Reactive re-feed: when the option set (or the query filter) changes, re-sync the
+// indexable rows + push fresh options into the virtualizer and re-pull the window
+// (the data-table setOptions+_willUpdate re-feed precedent). Watch a derived primitive
+// (length + query), never a freshly-built array (the stale-array Pitfall).
+$watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.query), () => {
+  syncRows()
+  if ($props.virtual && virtualizer) {
+    gridScrollEl = $el ? $el.querySelector('.rozie-listbox-list') : gridScrollEl
+    virtualizer.setOptions(virtualizerOptions())
+    virtualizer._willUpdate()
+    $data.windowVer = $data.windowVer + 1
+    scheduleRemeasure()
+  }
+})
+
+$onUnmount(() => {
+  if (typeTimer !== null) clearTimeout(typeTimer)
+  // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
+  if (virtualizerCleanup) virtualizerCleanup()
+})
 
 // Imperative handle. Shorthand keys (aliased `{ open: fn }` keys are dropped by
 // the React emitter) — every function is named exactly as its verb.
@@ -264,10 +460,12 @@ $expose({ open, close, toggle, clear, focusControl })
     </button>
   </div>
 
-  <!-- Popup listbox. aria-activedescendant on the control points at the
-       highlighted option id; DOM focus never leaves the control. -->
+  <!-- Popup listbox (NON-VIRTUAL). aria-activedescendant on the control points at the
+       highlighted option id; DOM focus never leaves the control. Byte-identical to the
+       pre-windowing render — the `&& !$props.virtual` only routes virtual usage to the
+       windowed branch below; with virtual off this is exactly the prior behavior. -->
   <div
-    r-if="$data.open"
+    r-if="$data.open && !$props.virtual"
     ref="listEl"
     class="rozie-listbox-list"
     role="listbox"
@@ -293,6 +491,50 @@ $expose({ open, close, toggle, clear, focusControl })
     </div>
 
     <div r-if="visibleOptions().length === 0" class="rozie-listbox-empty" role="presentation">
+      <slot name="empty" :query="$data.query">No options</slot>
+    </div>
+  </div>
+
+  <!-- ══ WINDOWED listbox (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
+       Always rendered when virtual (so the .rozie-listbox-list scroll container exists at
+       mount for the virtualizer — ROZ123-safe). Renders a leading spacer, the windowed
+       { vi, row } slice keyed on the full-model option.id, and a trailing spacer; the
+       option's full-model index is wr.vi.index. The container is bounded/scrolling via the
+       base .rozie-listbox-list CSS (max-height from the --rozie-listbox-max-height token,
+       mirrored from the maxHeight prop). -->
+  <div
+    r-if="$props.virtual"
+    ref="listEl"
+    class="rozie-listbox-list rozie-listbox-list--virtual"
+    role="listbox"
+    :id="$props.id + '-list'"
+    :aria-label="$props.ariaLabel"
+    :aria-multiselectable="$props.multiple"
+    :style="$props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + $props.maxHeight) : 'overflow-y:auto'"
+  >
+    <div class="rozie-listbox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
+
+    <div
+      r-for="wr in windowedRows()"
+      :key="wr.row.id"
+      :id="optionId(wr.vi.index)"
+      :data-index="wr.vi.index"
+      class="rozie-listbox-option"
+      :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) }"
+      role="option"
+      :aria-selected="!!isSelected(wr.row)"
+      :aria-disabled="!!disabledOf(wr.row)"
+      @click="select(wr.row)"
+      @mousemove="onOptionPointerMove(wr.vi.index)"
+    >
+      <slot name="option" :option="wr.row" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row)" :disabled="disabledOf(wr.row)">
+        {{ labelOf(wr.row) }}
+      </slot>
+    </div>
+
+    <div class="rozie-listbox-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
+
+    <div r-if="windowSource().length === 0" class="rozie-listbox-empty" role="presentation">
       <slot name="empty" :query="$data.query">No options</slot>
     </div>
   </div>
@@ -409,6 +651,9 @@ $expose({ open, close, toggle, clear, focusControl })
 }
 .rozie-listbox-option.is-disabled { opacity: var(--rozie-listbox-disabled-opacity, 0.45); cursor: not-allowed; }
 .rozie-listbox-empty { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }
+/* Windowing spacer rows (Phase 64 P4): zero-chrome blocks whose inline height keeps the
+   total scroll height === virtual-core getTotalSize() (the windowed slice sits between). */
+.rozie-listbox-spacer { margin: 0; padding: 0; border: 0; flex: none; }
 </style>
 
 </rozie>

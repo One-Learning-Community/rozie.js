@@ -1,6 +1,17 @@
 import type { JSX } from 'solid-js';
-import { For, Show, createMemo, createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+import { For, Show, createEffect, createMemo, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { __rozieInjectStyle, createControllableSignal, createOutsideClick, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally
+// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
+// `virtualizer` guard so the non-virtual emitted path executes none of it
+// (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+
+// Windowing instance state (the `let table` precedent — React hoists reassigned
+// module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+// when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
+// virtualizer observes; remeasurePending dedupes the deferred sweep.
 
 __rozieInjectStyle('Listbox-b576227a', `.rozie-listbox[data-rozie-s-b576227a] {
   position: relative;
@@ -94,7 +105,8 @@ __rozieInjectStyle('Listbox-b576227a', `.rozie-listbox[data-rozie-s-b576227a] {
   color: var(--rozie-listbox-check-color, var(--rozie-listbox-accent, #0066cc));
 }
 .rozie-listbox-option.is-disabled[data-rozie-s-b576227a] { opacity: var(--rozie-listbox-disabled-opacity, 0.45); cursor: not-allowed; }
-.rozie-listbox-empty[data-rozie-s-b576227a] { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }`);
+.rozie-listbox-empty[data-rozie-s-b576227a] { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }
+.rozie-listbox-spacer[data-rozie-s-b576227a] { margin: 0; padding: 0; border: 0; flex: none; }`);
 
 interface SelectedSlotCtx { selected: any; value: any; }
 
@@ -155,6 +167,18 @@ interface ListboxProps {
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   */
+  virtual?: boolean;
+  /**
+   * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
+   */
+  estimateRowHeight?: number;
+  /**
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-listbox-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   */
+  maxHeight?: string;
   onOpenChange?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
   selectedSlot?: (ctx: SelectedSlotCtx) => JSX.Element;
@@ -173,14 +197,17 @@ export interface ListboxHandle {
 }
 
 export default function Listbox(_props: ListboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])(), multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'ref']);
+  const _merged = mergeProps({ options: (() => [])(), multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight', 'ref']);
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
   const [open$local, setOpen$local] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [query, setQuery] = createSignal('');
+  const [rows, setRows] = createSignal([]);
+  const [windowVer, setWindowVer] = createSignal(0);
+  const [editVer, setEditVer] = createSignal(0);
   const selectedLabel = createMemo(() => {
     const cur = value();
     if (local.multiple) {
@@ -198,12 +225,39 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     if (!open$local() || activeIndex() < 0) return null;
     return optionId(activeIndex());
   });
+  onMount(() => {
+    syncRows();
+    if (local.virtual) {
+      // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
+      // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
+      // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
+      // Solid/Lit, which leaves the virtualizer with no scroll element.
+      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-listbox-list') : null;
+      virtualizer = new Virtualizer(virtualizerOptions());
+      virtualizerCleanup = virtualizer._didMount();
+      setWindowVer(windowVer() + 1);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+    }
+  });
   onCleanup(() => {
     if (typeTimer !== null) clearTimeout(typeTimer);
+    // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
+    if (virtualizerCleanup) virtualizerCleanup();
   });
+  createEffect(on(() => (() => (local.options ? local.options.length : 0) + '|' + query())(), (v) => untrack(() => (() => {
+    syncRows();
+    if (local.virtual && virtualizer) {
+      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-listbox-list') : gridScrollEl;
+      virtualizer.setOptions(virtualizerOptions());
+      virtualizer._willUpdate();
+      setWindowVer(windowVer() + 1);
+      scheduleRemeasure();
+    }
+  })()), { defer: true }));
   let controlElRef: HTMLElement | null = null;
   let triggerElRef: HTMLElement | null = null;
   let listElRef: HTMLElement | null = null;
+  let __rozieRootRef: HTMLElement | null = null;
 
   // Type-ahead buffer for the select-only listbox trigger. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
@@ -468,6 +522,282 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     if (activeIndex() !== index) setActiveIndex(index);
   }
 
+  // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
+  // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
+  // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
+  // in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
+  // compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
+  //
+  // HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
+  // by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
+  //   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
+  //                             returns its pre-pagination row model, listbox/combobox return the
+  //                             filtered options). This partial MUST NOT reach into the host data engine
+  //                             directly — rows arrive ONLY through windowSource().
+  //   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
+  //   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
+  //   - gridScrollEl              — the scroll-container element handle.
+  //   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
+  //   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
+  //   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
+  //   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
+  //                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
+  //                             listbox passes nothing. Routing pinning through this host hook (NOT
+  //                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
+
+  // getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
+  // React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
+  // id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
+  function virtualItemKey(i: any) {
+    const src = windowSource();
+    return src && src[i] ? src[i].id : undefined;
+  }
+
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
+  // increment the React emitter lowers to functional setState — correct even from a mount closure.
+  function virtualizerOptions(): any {
+    return {
+      count: windowSource().length,
+      getScrollElement: () => gridScrollEl,
+      estimateSize: () => local.estimateRowHeight,
+      observeElementRect,
+      observeElementOffset,
+      scrollToFn: elementScroll,
+      measureElement,
+      overscan: 8,
+      getItemKey: virtualItemKey,
+      onChange: () => {
+        setWindowVer(windowVer() + 1);
+        // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+        // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+        // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+        // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+        // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+        // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+        // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+        // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+        // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+        // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+        // re-measure is a no-op.
+        scheduleRemeasure();
+      }
+    };
+  }
+
+  // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
+  // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
+  // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
+  // full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
+  // `rows` binding → TS2448 self-shadow, line ~1149 lesson).
+  function windowedRows() {
+    // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
+    // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
+    // which happens at initial render while `virtualizer` is still null (it is built in $onMount,
+    // after the first render). `virtualizer` is a non-reactive `let`, so if the windowVer read sat
+    // BELOW the `!virtualizer` guard the accessor would early-return [] without ever reading the
+    // signal → it would NEVER re-run when onChange later bumps windowVer, and the window would stay
+    // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
+    // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
+    // first re-run that picks up the now-non-null virtualizer.
+    // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+    // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
+    void windowVer();
+    void editVer();
+    if (!virtualizer) {
+      // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+      // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+      // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+      // rows appear on the first onChange after _didMount.
+      if (!local.virtual) {
+        const rowList = rows() || [];
+        return rowList.map((r: any) => ({
+          vi: null,
+          row: r
+        }));
+      }
+      return [];
+    }
+    const items = virtualizer.getVirtualItems();
+    const rowList = rows() || [];
+    // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+    // shrink window where the virtualizer count is stale relative to $data.rows on the async
+    // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+    // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
+    const out = items.map((vi: any) => ({
+      vi,
+      row: rowList[vi.index]
+    })).filter((wr: any) => wr.row);
+    // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+    // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+    // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+    // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+    // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+    // into the real windowing.
+    const pin = pinnedEditIndex();
+    if (pin >= 0 && rowList[pin]) {
+      let inWindow = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].index === pin) {
+          inWindow = true;
+          break;
+        }
+      }
+      if (!inWindow) {
+        const pm = pinnedMeasurement(pin);
+        const firstStart = items.length ? items[0].start : 0;
+        const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+        const pinnedEntry = {
+          vi: pm != null ? pm : {
+            index: pin
+          },
+          row: rowList[pin],
+          pinned: true
+        };
+        if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+      }
+    }
+    return out;
+  }
+
+  // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
+  // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
+  // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
+  function padTop() {
+    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+    // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+    // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
+    void windowVer();
+    void editVer();
+    if (!local.virtual || !virtualizer) return 0;
+    const items = virtualizer.getVirtualItems();
+    let pad = items.length ? items[0].start : 0;
+    // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+    // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+    // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+    }
+    return pad < 0 ? 0 : pad;
+  }
+  function padBottom() {
+    // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+    // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+    // on pin/unpin.
+    void windowVer();
+    void editVer();
+    if (!local.virtual || !virtualizer) return 0;
+    const items = virtualizer.getVirtualItems();
+    if (!items.length) return 0;
+    let pad = virtualizer.getTotalSize() - items[items.length - 1].end;
+    // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+    // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+    const pin = pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = pinnedMeasurement(pin);
+      const inWindow = pmIndexInWindow(items, pin);
+      // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+      // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+      // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+      // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+      // the offset comparison only if the measurement lacks an index (defensive).
+      const lastItemIdx = items[items.length - 1].index;
+      const below = pm && pm.index != null ? pm.index > lastItemIdx : pm && pm.start >= items[0].start;
+      if (pm && !inWindow && below) {
+        // below the window → it trailed the slice; subtract its height from the trailing spacer.
+        if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+      }
+    }
+    return pad < 0 ? 0 : pad;
+  }
+  // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
+  function pmIndexInWindow(items: any, idx: any) {
+    for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+    return false;
+  }
+  // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
+  // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
+  function rowIsOutsideWindow(r: any) {
+    if (!local.virtual || !virtualizer) return false;
+    const items = virtualizer.getVirtualItems();
+    for (const it of items as any) if (it.index === r) return false;
+    return true;
+  }
+  // Windowing instance state (the `let table` precedent — React hoists reassigned
+  // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+  // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
+  // virtualizer observes; remeasurePending dedupes the deferred sweep.
+  let virtualizer: any = null;
+  let virtualizerCleanup: any = null;
+  let gridScrollEl: any = null;
+  let remeasurePending = false;
+
+  // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
+  // set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
+  // resolves to the same option the count windows over.
+  function windowSource() {
+    return visibleOptions();
+  }
+
+  // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
+  // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
+  // pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these
+  // reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
+  // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
+  function pinnedEditIndex() {
+    return -1;
+  }
+  function pinnedMeasurement(pin: any) {
+    return null;
+  }
+
+  // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
+  function syncRows() {
+    setRows(windowSource());
+  }
+
+  // Defer remeasureWindow() until AFTER the framework commits the recycled window
+  // (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
+  // behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
+  // per-consumer per D-04/D-09): the microtask catches Solid's <For> / Svelte's {#each}
+  // SYNCHRONOUS commit (the Phase 63 Solid under-convergence hazard — D-09 rAF-defer
+  // budget), the rAF catches React's async commit. measureElement is idempotent on an
+  // already-observed node, so running both is cheap and loop-free.
+  function scheduleRemeasure() {
+    if (remeasurePending) return;
+    remeasurePending = true;
+    let ranMicro = false;
+    const microPass = () => {
+      remeasureWindow();
+    };
+    const rafPass = () => {
+      remeasurePending = false;
+      remeasureWindow();
+    };
+    if (typeof queueMicrotask !== 'undefined') {
+      ranMicro = true;
+      queueMicrotask(microPass);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending = false;else setTimeout(rafPass, 0);
+  }
+
+  // measureElement sweep: hand every rendered windowed option to the virtualizer so its
+  // true (variable) height is observed (virtual-core measures ONLY nodes passed to
+  // measureElement, keyed by the data-index attribute). Bails during a programmatic
+  // scroll (scrollToIndex) so a measure can't starve the scroll target.
+  function remeasureWindow() {
+    if (!virtualizer || !gridScrollEl) return;
+    if (virtualizer.scrollState) return;
+    const els = gridScrollEl.querySelectorAll('.rozie-listbox-option[data-index]');
+    for (const el of els as any) virtualizer.measureElement(el);
+  }
+
   // ---- focus / scroll helpers (post-mount $refs only) --------------------
   // Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
   // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
@@ -477,13 +807,55 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   }
 
   // Keep the active option visible inside the scrolling listbox. Reads $refs in
-  // a post-mount callback only (never eagerly — ROZ123).
+  // a post-mount callback only (never eagerly — ROZ123). When windowing, route through
+  // the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
+  // scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
   function scrollActiveIntoView() {
-    if (!listElRef || activeIndex() < 0) return;
+    if (activeIndex() < 0) return;
+    if (local.virtual && virtualizer) {
+      // 'center' (not 'auto'): keep the active option well inside the rendered slice as the
+      // window scrolls — 'auto' lands it at the viewport edge where the overscan band can
+      // leave it just-unrendered for a frame on the fine-grained targets (Solid).
+      virtualizer.scrollToIndex(activeIndex(), {
+        align: 'center'
+      });
+      scheduleRemeasure();
+      return;
+    }
+    if (!listElRef) return;
     const el = listElRef.querySelector('#' + CSS.escape(optionId(activeIndex())));
     el?.scrollIntoView({
       block: 'nearest'
     });
+  }
+
+  // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
+  // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
+  // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
+  // (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
+  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+  // (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
+  // scrollElement stale), and (c) the consumer often seeds options AFTER the listbox mounts
+  // (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
+  // paints (or attempts run out) — idempotent + loop-free.
+  function kickWindow(attempts: any) {
+    if (!virtualizer) return;
+    gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-listbox-list') : gridScrollEl;
+    // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
+    // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
+    // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
+    // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
+    if (windowSource().length > 0) {
+      syncRows();
+      virtualizer.setOptions(virtualizerOptions());
+    }
+    virtualizer._willUpdate();
+    setWindowVer(windowVer() + 1);
+    remeasureWindow();
+    if (windowedRows().length === 0 && attempts > 0) {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
+    }
   }
 
   createOutsideClick(
@@ -494,7 +866,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} class={"rozie-listbox" + " " + rozieClass({ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled, 'rozie-listbox-inline': local.inline }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
+    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-listbox" + " " + rozieClass({ 'rozie-listbox-open': open$local(), 'rozie-listbox-disabled': local.disabled, 'rozie-listbox-inline': local.inline }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-b576227a="">
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">
@@ -505,12 +877,23 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       </div>
 
       
-      {<Show when={open$local()}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
+      {<Show when={open$local() && !local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
         <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) })} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index()); }} data-rozie-s-b576227a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt, index: index(), active: activeIndex() === index(), selected: isSelected(opt), disabled: disabledOf(opt) }) ?? rozieDisplay(labelOf(opt))}
         </div>}</For>
 
         {<Show when={visibleOptions().length === 0}><div class={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
+          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No options"}
+        </div></Show>}</div></Show>}{<Show when={local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} style={parseInlineStyle(local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + local.maxHeight : 'overflow-y:auto')} data-rozie-s-b576227a="">
+        <div class={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
+
+        <For each={windowedRows()}>{(wr) => <div data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={!!isSelected(wr.row)} aria-disabled={!!disabledOf(wr.row)} id={rozieAttr(optionId(wr.vi.index))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) })} onClick={($event) => { select(wr.row); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
+          {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr.row, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }) ?? rozieDisplay(labelOf(wr.row))}
+        </div>}</For>
+
+        <div class={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-b576227a="" />
+
+        {<Show when={windowSource().length === 0}><div class={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No options"}
         </div></Show>}</div></Show>}</div>
     </>

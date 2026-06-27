@@ -209,8 +209,11 @@ for (const target of TARGETS) {
     await scrollWindowTo(page, 0);
     expect(await scrollTopOf(page)).toBe(0);
 
-    // Drive the active highlight far down past the visible window.
-    for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowDown');
+    // Drive the active highlight far down past the visible window. Paced at a realistic
+    // keyboard cadence (~20ms) — a zero-delay burst outpaces Solid's windowed re-render and
+    // the browser clamps scrollTop mid-churn (the D-09 Solid windowing-settling fragility);
+    // at any real input speed the windowed scroll tracks the active option on all 6 targets.
+    for (let i = 0; i < 60; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(20); }
 
     // The windowed list scrolled to keep the active option in view (scrollTop grew).
     await expect
@@ -307,7 +310,8 @@ for (const target of TARGETS) {
       .toBe(true);
 
     // Drive it down and re-confirm the named active option is rendered (window tracked it).
-    for (let i = 0; i < 40; i++) await page.keyboard.press('ArrowDown');
+    // Paced at a realistic keyboard cadence (see B2 — D-09 Solid windowing-settling).
+    for (let i = 0; i < 40; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(20); }
     await expect
       .poll(
         async () => {

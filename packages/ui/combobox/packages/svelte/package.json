@@ -48,11 +48,15 @@
     "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
-    "svelte": "^5"
+    "svelte": "^5",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "svelte": {
       "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
     }
   },
   "scripts": {

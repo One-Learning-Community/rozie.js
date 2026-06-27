@@ -56,6 +56,9 @@ import '@rozie-ui/combobox-lit/themes/shadcn.css';    // or material.css, bootst
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -86,5 +89,7 @@ el.clear();
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

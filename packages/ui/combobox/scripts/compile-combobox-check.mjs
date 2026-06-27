@@ -25,8 +25,9 @@ const EXPECT = {
   // P3 (D-06): grown to absorb command-palette — resolver props (optionLabel/
   // optionValue/optionDisabled), `inline` embedded render mode, `closeOnSelect`,
   // plus an `empty` slot. The option resolvers are consumed from the shared
-  // @rozie-ui/headless-core/listCore.rzts spine.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled'],
+  // @rozie-ui/headless-core/listCore.rzts spine. P4 (SC-5): + windowing props
+  // (virtual/estimateRowHeight/maxHeight) consuming @rozie-ui/headless-core/windowing.rzts.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight'],
   models: ['value'],
   emits: ['change', 'search'],
   slots: ['option', 'empty'],
@@ -52,7 +53,10 @@ if (!setEq(modelNames, EXPECT.models)) fail(`model:true props: got [${modelNames
 
 if (!setEq(ir.emits, EXPECT.emits)) fail(`emits mismatch:\n  got:  ${[...ir.emits].sort().join(', ')}\n  want: ${[...EXPECT.emits].sort().join(', ')}`);
 
-const slotNames = ir.slots.map((s) => s.name);
+// Dedup: the same public slot (`option`/`empty`) is declared in BOTH the non-virtual and
+// the windowed (P4) template branches, so ir.slots lists each name twice — the public slot
+// API is the unique set.
+const slotNames = [...new Set(ir.slots.map((s) => s.name))];
 if (!setEq(slotNames, EXPECT.slots)) fail(`slots mismatch: got [${slotNames.sort()}], want [${[...EXPECT.slots].sort()}]`);
 
 const exposeNames = ir.expose.map((e) => e.name);

@@ -49,11 +49,15 @@
     "@rozie/runtime-vue": "workspace:^"
   },
   "peerDependencies": {
-    "vue": "^3.4"
+    "vue": "^3.4",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "vue": {
       "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
     }
   },
   "scripts": {

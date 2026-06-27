@@ -66,6 +66,9 @@ import '@rozie-ui/combobox-vue/themes/shadcn.css';    // or material.css, bootst
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -99,5 +102,7 @@ const cb = ref();          // template ref
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

@@ -91,3 +91,4 @@
 }
 .rozie-listbox-option.is-disabled[data-rozie-s-b576227a] { opacity: var(--rozie-listbox-disabled-opacity, 0.45); cursor: not-allowed; }
 .rozie-listbox-empty[data-rozie-s-b576227a] { padding: var(--rozie-listbox-option-padding, 0.5rem 0.6rem); color: var(--rozie-listbox-empty-fg, rgba(0, 0, 0, 0.5)); }
+.rozie-listbox-spacer[data-rozie-s-b576227a] { margin: 0; padding: 0; border: 0; flex: none; }

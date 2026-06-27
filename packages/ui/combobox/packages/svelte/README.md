@@ -65,6 +65,9 @@ import '@rozie-ui/combobox-svelte/themes/shadcn.css';    // or material.css, boo
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -95,5 +98,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

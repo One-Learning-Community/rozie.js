@@ -93,6 +93,9 @@ export class PickFormComponent {
 | `optionDisabled` | `Function` | `null` |  |  |
 | `id` | `String` | `"rozie-listbox"` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `virtual` | `Boolean` | `false` |  |  |
+| `estimateRowHeight` | `Number` | `36` |  |  |
+| `maxHeight` | `String` | `''` |  |  |
 
 ## Events
 
@@ -127,5 +130,7 @@ export class DemoComponent {
 | Slot | Params |
 | --- | --- |
 | selected | selected, value |
+| option | option, index, active, selected, disabled |
+| empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

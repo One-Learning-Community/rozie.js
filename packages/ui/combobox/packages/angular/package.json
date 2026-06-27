@@ -48,7 +48,8 @@
   "peerDependencies": {
     "@angular/core": "^19",
     "@angular/common": "^19",
-    "@angular/forms": "^19"
+    "@angular/forms": "^19",
+    "@tanstack/virtual-core": "^3"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
@@ -59,6 +60,9 @@
     },
     "@angular/forms": {
       "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
     }
   },
   "scripts": {

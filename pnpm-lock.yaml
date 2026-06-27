@@ -2306,6 +2306,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       typescript:
         specifier: ~5.6.0
         version: 5.6.3
@@ -3670,6 +3673,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       typescript:
         specifier: ~5.6.0
         version: 5.6.3

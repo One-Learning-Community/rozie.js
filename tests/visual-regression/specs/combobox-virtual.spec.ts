@@ -195,7 +195,10 @@ for (const target of TARGETS) {
     await scrollWindowTo(page, 0);
     expect(await scrollTopOf(page)).toBe(0);
 
-    for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowDown');
+    // Paced at a realistic keyboard cadence (~20ms) — a zero-delay burst outpaces Solid's
+    // windowed re-render and the browser clamps scrollTop mid-churn (the D-09 Solid
+    // windowing-settling fragility); at any real input speed the scroll tracks on all 6.
+    for (let i = 0; i < 60; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(20); }
 
     await expect
       .poll(async () => scrollTopOf(page), { timeout: 15_000 })
@@ -272,8 +275,9 @@ for (const target of TARGETS) {
 
     await openCombobox(page);
 
-    // Drive the active highlight down; the named active option stays rendered.
-    for (let i = 0; i < 40; i++) await page.keyboard.press('ArrowDown');
+    // Drive the active highlight down; the named active option stays rendered. Paced at a
+    // realistic keyboard cadence (see B2 — D-09 Solid windowing-settling).
+    for (let i = 0; i < 40; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(20); }
     await expect
       .poll(
         async () => {
