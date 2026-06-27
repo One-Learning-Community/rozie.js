@@ -120,17 +120,9 @@ interface ListboxProps {
    */
   multiple?: boolean;
   /**
-   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-   */
-  combobox?: boolean;
-  /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   inline?: boolean;
-  /**
-   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-   */
-  filterable?: boolean;
   /**
    * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -165,7 +157,6 @@ interface ListboxProps {
   ariaLabel?: (string) | null;
   onOpenChange?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
-  onSearch?: (...args: unknown[]) => void;
   selectedSlot?: (ctx: SelectedSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
@@ -182,8 +173,8 @@ export interface ListboxHandle {
 }
 
 export default function Listbox(_props: ListboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])(), multiple: false, combobox: false, inline: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'combobox', 'inline', 'filterable', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'ref']);
+  const _merged = mergeProps({ options: (() => [])(), multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'ref']);
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
@@ -211,11 +202,10 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     if (typeTimer !== null) clearTimeout(typeTimer);
   });
   let controlElRef: HTMLElement | null = null;
-  let inputElRef: HTMLElement | null = null;
   let triggerElRef: HTMLElement | null = null;
   let listElRef: HTMLElement | null = null;
 
-  // Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
+  // Type-ahead buffer for the select-only listbox trigger. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
   // so they persist across renders (the setup-once guarantee); no-op elsewhere.
   // They STAY in this host (not the shared spine) per the A==B rule: reassigned
@@ -251,10 +241,11 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
   //     activedescendant model.
   //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
-  //     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
-  //     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
-  //     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
-  //     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+  //     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+  //     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+  //     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+  //     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+  //     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
   //
   // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
   //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
@@ -264,11 +255,11 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
   //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
   //     HOST functions; this partial only closes over them (it reads NO refs itself).
-  //   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
-  //     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
-  //     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
-  //     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
-  //     `$data.query`).
+  //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+  //     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+  //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+  //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+  //     `$data.query`), NOT a discriminant prop.
 
   // ---- option resolvers --------------------------------------------------
   function labelOf(opt: any) {
@@ -298,8 +289,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
   // plain function is identical everywhere.
   function visibleOptions() {
-    if (!local.combobox || !local.filterable) return local.options;
-    const q = query().trim().toLowerCase();
+    const q = (query() || '').trim().toLowerCase();
     if (q === '') return local.options;
     return local.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
   }
@@ -458,36 +448,20 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
         focusControl();
       }
     } else if (key === ' ' || key === 'Spacebar') {
-      // Space toggles / commits in select-only mode; a combobox input needs the
-      // literal space, so do nothing there.
-      if (!local.combobox) {
-        $event.preventDefault();
-        if (!open$local()) open();else commitActive();
-      }
+      // Space toggles / commits in a select-only host (a button trigger). A
+      // filter-input host types the literal space into its <input> and does NOT
+      // route Space through this reducer, so this branch is select-only by use.
+      $event.preventDefault();
+      if (!open$local()) open();else commitActive();
     } else if (key === 'Tab') {
       if (open$local()) close();
-    } else if (!local.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+    } else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       onTypeahead(key);
     }
   }
 
   // Combobox input handler: keep the popup open while typing, reset the active
   // highlight to the first match, and surface the query for remote filtering.
-  function fireSearch(query: any) {
-    return _props.onSearch?.({
-      query
-    });
-  }
-  function onInput($event: any) {
-    // Use the fresh input value throughout — a re-read of `$data.query` right
-    // after writing it is STALE on React (setState is async; the closure's
-    // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
-    const q = $event.target.value;
-    setQuery(q);
-    if (!open$local()) open();
-    setActiveIndex(nextEnabled(-1, 1));
-    fireSearch(q);
-  }
 
   // Pointer hover sets the virtual highlight (matches native <select> feel).
   function onOptionPointerMove(index: any) {
@@ -499,7 +473,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
   // verb would override the inherited HTMLElement.focus method on the Lit element.
   function focusControl() {
-    if (local.combobox) inputElRef?.focus();else triggerElRef?.focus();
+    triggerElRef?.focus();
   }
 
   // Keep the active option visible inside the scrolling listbox. Reads $refs in
@@ -524,10 +498,11 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">
-        {<Show when={local.combobox} fallback={<button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(_props.selectedSlot ?? _props.slots?.['selected'])?.({ selected: selectedLabel(), value: value() }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{local.placeholder}</span>}><span class={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel())}</span></Show>}
           <span class={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
-        </button>}><input type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={local.ariaLabel} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-listbox-input"} disabled={local.disabled} placeholder={local.placeholder} value={query()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /></Show>}</div>
+        </button>
+      </div>
 
       
       {<Show when={open$local()}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">

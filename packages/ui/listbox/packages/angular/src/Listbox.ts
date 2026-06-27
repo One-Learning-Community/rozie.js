@@ -52,10 +52,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       <div class="rozie-listbox-control" #controlEl>
-        @if (combobox()) {
-    <input #inputEl class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" [placeholder]="placeholder()" [value]="query()" (input)="onInput($event)" (keydown)="onControlKeyDown($event)" (focus)="open()" />
-    } @else {
-    <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
+        <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
           @if ((selectedTpl ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -68,7 +65,7 @@ function __rozieAttr(v: unknown): string | null {
     }
           <span class="rozie-listbox-arrow" aria-hidden="true">▾</span>
         </button>
-    }</div>
+      </div>
 
       
       @if (open$local()) {
@@ -217,17 +214,9 @@ export class Listbox {
    */
   multiple = input<boolean>(false);
   /**
-   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-   */
-  combobox = input<boolean>(false);
-  /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   inline = input<boolean>(false);
-  /**
-   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-   */
-  filterable = input<boolean>(true);
   /**
    * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -264,12 +253,10 @@ export class Listbox {
   activeIndex = signal(-1);
   query = signal('');
   controlEl = viewChild<ElementRef<HTMLDivElement>>('controlEl');
-  inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   triggerEl = viewChild<ElementRef<HTMLButtonElement>>('triggerEl');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
   openChange = output<unknown>({ alias: 'open-change' });
   change = output<unknown>();
-  search = output<unknown>();
   @ContentChild('selected', { read: TemplateRef }) selectedTpl?: TemplateRef<SelectedCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
@@ -337,8 +324,7 @@ export class Listbox {
   optionId = (index: any) => this.id() + '-opt-' + index;
   visibleOptions = () => {
     const __options = this.options();
-    if (!this.combobox() || !this.filterable()) return __options;
-    const q = this.query().trim().toLowerCase();
+    const q = (this.query() || '').trim().toLowerCase();
     if (q === '') return __options;
     return __options.filter((opt: any) => this.labelOf(opt).toLowerCase().includes(q));
   };
@@ -442,7 +428,6 @@ export class Listbox {
   };
   onControlKeyDown = ($event: any) => {
     const __open$local = this.open$local();
-    const __combobox = this.combobox();
     const key = $event.key;
     if (key === 'ArrowDown') {
       $event.preventDefault();
@@ -468,36 +453,22 @@ export class Listbox {
         this.focusControl();
       }
     } else if (key === ' ' || key === 'Spacebar') {
-      // Space toggles / commits in select-only mode; a combobox input needs the
-      // literal space, so do nothing there.
-      if (!__combobox) {
-        $event.preventDefault();
-        if (!__open$local) this.open();else this.commitActive();
-      }
+      // Space toggles / commits in a select-only host (a button trigger). A
+      // filter-input host types the literal space into its <input> and does NOT
+      // route Space through this reducer, so this branch is select-only by use.
+      $event.preventDefault();
+      if (!__open$local) this.open();else this.commitActive();
     } else if (key === 'Tab') {
       if (__open$local) this.close();
-    } else if (!__combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+    } else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       this.onTypeahead(key);
     }
-  };
-  fireSearch = (query: any) => this.search.emit({
-    query: this.query()
-  });
-  onInput = ($event: any) => {
-    // Use the fresh input value throughout — a re-read of `$data.query` right
-    // after writing it is STALE on React (setState is async; the closure's
-    // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
-    const q = $event.target.value;
-    this.query.set(q);
-    if (!this.open$local()) this.open();
-    this.activeIndex.set(this.nextEnabled(-1, 1));
-    this.fireSearch(q);
   };
   onOptionPointerMove = (index: any) => {
     if (this.activeIndex() !== index) this.activeIndex.set(index);
   };
   focusControl = () => {
-    if (this.combobox()) this.inputEl()?.nativeElement?.focus();else this.triggerEl()?.nativeElement?.focus();
+    this.triggerEl()?.nativeElement?.focus();
   };
   scrollActiveIntoView = () => {
     const __activeIndex = this.activeIndex();

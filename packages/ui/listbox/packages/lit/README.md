@@ -1,6 +1,6 @@
 # @rozie-ui/listbox-lit
 
-Idiomatic **lit** `Listbox` — a headless, fully-accessible (WAI-ARIA) listbox / combobox (single + multi-select, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **lit** `Listbox` — a headless, fully-accessible (WAI-ARIA) select-only listbox (single + multi-select, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -23,7 +23,6 @@ el.options = [
     { label: 'Banana', value: 'banana' },
     { label: 'Cherry', value: 'cherry' },
   ];
-el.combobox = true;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });
@@ -44,9 +43,7 @@ import '@rozie-ui/listbox-lit/themes/shadcn.css';    // or material.css, bootstr
 | `options` | `Array` | `[]` |  |  |
 | `value` | `unknown` | `null` | ✓ |  |
 | `multiple` | `Boolean` | `false` |  |  |
-| `combobox` | `Boolean` | `false` |  |  |
 | `inline` | `Boolean` | `false` |  |  |
-| `filterable` | `Boolean` | `true` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `placeholder` | `String` | `''` |  |  |
 | `closeOnSelect` | `Boolean` | `true` |  |  |
@@ -62,7 +59,6 @@ import '@rozie-ui/listbox-lit/themes/shadcn.css';    // or material.css, bootstr
 | --- | --- |
 | `open-change` | Fired whenever the popup opens or closes. Payload `{ open: boolean }`. |
 | `change` | Fired after the selection changes. Payload `{ value, option }` — `value` is the new selected value (an array in multi-select), `option` is the toggled option (`null` when cleared). |
-| `search` | Fired on every combobox keystroke with the current query. Payload `{ query: string }`. Use it to drive remote/async filtering (set `:filterable="false"` and replace `options` yourself). |
 
 ## Imperative handle
 

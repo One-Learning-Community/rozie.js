@@ -20,17 +20,9 @@ export interface ListboxProps {
    */
   multiple?: boolean;
   /**
-   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-   */
-  combobox?: boolean;
-  /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   inline?: boolean;
-  /**
-   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-   */
-  filterable?: boolean;
   /**
    * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -65,7 +57,6 @@ export interface ListboxProps {
   ariaLabel?: (string) | null;
   onOpenChange?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
-  onSearch?: (...args: unknown[]) => void;
   renderSelected?: (params: { selected: () => void; value: unknown }) => ReactNode;
   renderOption?: (params: { option: () => void; index: () => void; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

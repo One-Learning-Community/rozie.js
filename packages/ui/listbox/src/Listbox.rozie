@@ -1,11 +1,13 @@
 <!--
-  Listbox.rozie — a headless, WAI-ARIA Listbox / Combobox.
+  Listbox.rozie — a headless, WAI-ARIA select-only Listbox.
 
   The first @rozie-ui family with NO third-party vanilla engine: every line of
   behaviour — roving virtual focus (aria-activedescendant), full keyboard
-  navigation, type-ahead, combobox type-to-filter, single + multi select — is
-  authored in Rozie itself. It exists to stress the *native* author-side
-  primitives the engine-wrapper families never exercise on their own:
+  navigation, type-ahead, single + multi select — is authored in Rozie itself.
+  (Type-to-filter is owned by the sibling @rozie-ui/combobox family — P3/D-03
+  retired Listbox's editable-input mode; both families share the
+  @rozie-ui/headless-core/listCore.rzts spine.) It exists to stress the *native*
+  author-side primitives the engine-wrapper families never exercise on their own:
 
     - $computed-derived state          → the filtered + active-resolved option list
     - parameterized @keydown modifiers → arrow/home/end/enter/escape navigation
@@ -14,9 +16,9 @@
     - scoped slots                     → #option / #selected / #empty render props
     - $expose imperative handle        → open / close / toggle / clear / focusControl
 
-  It follows the ARIA APG "Select-Only Combobox" and "Editable Combobox"
-  patterns: DOM focus stays on the control, the highlighted option is tracked
-  virtually via `aria-activedescendant`, and selection commits a fresh value.
+  It follows the ARIA APG "Select-Only Combobox" pattern (the trigger keeps
+  role="combobox"): DOM focus stays on the control, the highlighted option is
+  tracked virtually via `aria-activedescendant`, and selection commits a fresh value.
 
   Authoring notes (collision classes a no-engine component is the first to hit):
     - `$data.open` collides with the `open` $expose verb — Phase 46 ITEM-5 now
@@ -33,9 +35,9 @@
     - Every event is fired through ONE wrapper fn so its prop-destructure hoists
       once (a duplicate-emit-site would emit two `const … = props` in React).
 
-  Consumer example (combobox):
+  Consumer example (select-only):
 
-    <Listbox r-model:value="$data.fruit" :options="$data.fruits" combobox placeholder="Search fruit…">
+    <Listbox r-model:value="$data.fruit" :options="$data.fruits" placeholder="Pick a fruit…">
       <template #option="{ option, active, selected }">
         <span :class="{ active, selected }">{{ option.label }}</span>
       </template>
@@ -83,17 +85,6 @@
     },
   },
 
-  // Combobox mode: render a text <input role="combobox"> and filter options by
-  // the typed query. Off → a select-only combobox (a button trigger).
-  combobox:       {
-    type: Boolean,
-    default: false,
-    docs: {
-      description:
-        'Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.',
-    },
-  },
-
   // Render the results list IN FLOW (static) instead of as an absolute popup.
   // Use when the listbox is embedded inside a fixed-size, overflow-clipped
   // container (e.g. a command-palette panel) where an absolute popup would be
@@ -104,17 +95,6 @@
     docs: {
       description:
         'Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).',
-    },
-  },
-
-  // Whether combobox mode filters the options client-side. Turn off for
-  // remote/async filtering — listen to the `search` event and update `options`.
-  filterable:     {
-    type: Boolean,
-    default: true,
-    docs: {
-      description:
-        'Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.',
     },
   },
 
@@ -198,15 +178,17 @@
 <data>
 {
   open: false,
-  // Virtual focus: index into the *visible* (filtered) option list, or -1.
+  // Virtual focus: index into the visible option list, or -1.
   activeIndex: -1,
-  // Combobox filter query.
+  // Kept at '' for select-only: the shared spine's `visibleOptions` reads it (the
+  // identity path when empty) and the `#empty` slot exposes it. No <input> writes
+  // it now that the editable-input mode is retired (P3/D-03).
   query: '',
 }
 </data>
 
 <script>
-// Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
+// Type-ahead buffer for the select-only listbox trigger. Module-scope
 // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
 // so they persist across renders (the setup-once guarantee); no-op elsewhere.
 // They STAY in this host (not the shared spine) per the A==B rule: reassigned
@@ -224,15 +206,14 @@ let typeTimer = null
 // input-mode `select-only` + multi + type-ahead. The spine closes over this
 // host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
 // (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
-import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, fireSearch, onInput, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
+import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
 
 // ---- focus / scroll helpers (post-mount $refs only) --------------------
 // Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
 // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
 // verb would override the inherited HTMLElement.focus method on the Lit element.
 const focusControl = () => {
-  if ($props.combobox) $refs.inputEl?.focus()
-  else $refs.triggerEl?.focus()
+  $refs.triggerEl?.focus()
 }
 
 // Keep the active option visible inside the scrolling listbox. Reads $refs in
@@ -257,30 +238,11 @@ $expose({ open, close, toggle, clear, focusControl })
 <template>
 <div class="rozie-listbox" :class="{ 'rozie-listbox-open': $data.open, 'rozie-listbox-disabled': $props.disabled, 'rozie-listbox-inline': $props.inline }">
 
-  <!-- Control: an editable combobox input OR a select-only button. Both carry
-       role="combobox" per the modern ARIA APG. -->
+  <!-- Control: the select-only trigger button. It carries role="combobox" per the
+       ARIA APG "Select-Only Combobox" pattern (DOM focus stays here; the active
+       option is tracked virtually via aria-activedescendant). -->
   <div class="rozie-listbox-control" ref="controlEl">
-    <input
-      r-if="$props.combobox"
-      ref="inputEl"
-      class="rozie-listbox-input"
-      type="text"
-      role="combobox"
-      autocomplete="off"
-      aria-autocomplete="list"
-      :aria-expanded="$data.open"
-      :aria-controls="$props.id + '-list'"
-      :aria-activedescendant="activeDescendant"
-      :aria-label="$props.ariaLabel"
-      :disabled="$props.disabled"
-      :placeholder="$props.placeholder"
-      :value="$data.query"
-      @input="onInput($event)"
-      @keydown="onControlKeyDown($event)"
-      @focus="open"
-    />
     <button
-      r-else
       ref="triggerEl"
       type="button"
       class="rozie-listbox-trigger"

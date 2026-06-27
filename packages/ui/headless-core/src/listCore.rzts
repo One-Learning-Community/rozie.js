@@ -16,10 +16,11 @@
 //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
 //     activedescendant model.
 //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
-//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
-//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
-//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
-//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+//     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+//     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+//     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+//     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
 //
 // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
 //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
@@ -29,11 +30,11 @@
 //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
 //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
 //     HOST functions; this partial only closes over them (it reads NO refs itself).
-//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
-//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
-//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
-//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
-//     `$data.query`).
+//   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+//     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+//     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+//     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+//     `$data.query`), NOT a discriminant prop.
 
 // ---- option resolvers --------------------------------------------------
 const labelOf = (opt) => {
@@ -61,8 +62,7 @@ const optionId = (index) => $props.id + '-opt-' + index
 // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
 // plain function is identical everywhere.
 const visibleOptions = () => {
-  if (!$props.combobox || !$props.filterable) return $props.options
-  const q = $data.query.trim().toLowerCase()
+  const q = ($data.query || '').trim().toLowerCase()
   if (q === '') return $props.options
   return $props.options.filter((opt) => labelOf(opt).toLowerCase().includes(q))
 }
@@ -208,16 +208,15 @@ const onControlKeyDown = ($event) => {
   else if (key === 'Enter') { if ($data.open) { $event.preventDefault(); commitActive() } }
   else if (key === 'Escape') { if ($data.open) { $event.preventDefault(); close(); focusControl() } }
   else if (key === ' ' || key === 'Spacebar') {
-    // Space toggles / commits in select-only mode; a combobox input needs the
-    // literal space, so do nothing there.
-    if (!$props.combobox) {
-      $event.preventDefault()
-      if (!$data.open) open()
-      else commitActive()
-    }
+    // Space toggles / commits in a select-only host (a button trigger). A
+    // filter-input host types the literal space into its <input> and does NOT
+    // route Space through this reducer, so this branch is select-only by use.
+    $event.preventDefault()
+    if (!$data.open) open()
+    else commitActive()
   }
   else if (key === 'Tab') { if ($data.open) close() }
-  else if (!$props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+  else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     onTypeahead(key)
   }
 }

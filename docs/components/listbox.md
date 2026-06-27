@@ -1,8 +1,8 @@
-# Listbox — the cross-framework headless select / combobox
+# Listbox — the cross-framework headless select
 
-`Listbox` is Rozie's **headless, fully-accessible** listbox and combobox — and the first `@rozie-ui` component with **no third-party engine** behind it. Every behaviour (roving virtual focus, full keyboard navigation, type-ahead, combobox type-to-filter, single + multi select) is authored once in `Listbox.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Listbox` is Rozie's **headless, fully-accessible** select-only listbox — and the first `@rozie-ui` component with **no third-party engine** behind it. Every behaviour (roving virtual focus, full keyboard navigation, type-ahead, single + multi select) is authored once in `Listbox.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit. (For a type-to-filter editable input, reach for the sibling [`@rozie-ui/combobox`](/components/combobox) — it shares the same `@rozie-ui/headless-core` list spine.)
 
-Because there is no vanilla-JS dependency, it is the purest demonstration of Rozie's native author-side primitives: `$computed`-derived filtering, parameterized `@keydown` modifiers, `$refs`-driven focus management, two-way `r-model:value`, scoped slots, and an `$expose` imperative handle. And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Because there is no vanilla-JS dependency, it is the purest demonstration of Rozie's native author-side primitives: `$computed`-derived state, parameterized `@keydown` modifiers, `$refs`-driven focus management, two-way `r-model:value`, scoped slots, and an `$expose` imperative handle. And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/listbox` packages
 
@@ -21,7 +21,7 @@ Each package carries only its framework peer (`react + react-dom`, `vue`, `svelt
 
 ## Quick start
 
-Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobox` to get a filterable text input instead of a select-only button:
+Pass an `options` array and two-way bind `value`:
 
 ```rozie
 <components>
@@ -42,7 +42,7 @@ Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobo
 </data>
 
 <template>
-  <Listbox r-model:value="$data.fruit" :options="$data.fruits" combobox placeholder="Search fruit…">
+  <Listbox r-model:value="$data.fruit" :options="$data.fruits" placeholder="Pick a fruit…">
     <template #option="{ option, active, selected }">
       <span :class="{ active, selected }">{{ option.label }}</span>
     </template>
@@ -61,9 +61,7 @@ Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobo
 | `options` | `Array` | `[]` | yes | The option set. Each entry is a primitive (`string`/`number`) or an object resolved via the `option*` props (falling back to `.label` / `.value` / `.disabled`). |
 | `value` | `unknown` | `null` | yes (via `r-model`) | The selected value. `model: true` — scalar in single-select, an array of values in multi-select. The sole model prop, so Angular emits a `ControlValueAccessor`. |
 | `multiple` | `Boolean` | `false` | yes | Multi-select: `value` becomes an array; selecting toggles membership and keeps the popup open. |
-| `combobox` | `Boolean` | `false` | yes | Render a text `<input role="combobox">` and filter options by the typed query, instead of a select-only button trigger. |
 | `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as an absolute popup, so an `overflow:hidden` ancestor (e.g. a command palette) can't clip it. Defaults to the standalone dropdown behavior. |
-| `filterable` | `Boolean` | `true` | yes | Whether combobox mode filters client-side. Turn off for remote/async filtering — listen to `search` and replace `options` yourself. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control (also sets the Angular CVA disabled state). |
 | `placeholder` | `String` | `''` | yes | Placeholder text for the empty control. |
 | `closeOnSelect` | `Boolean` | `true` | yes | Close the popup after a single-select commit. Multi-select keeps it open regardless. |
@@ -79,7 +77,6 @@ Pass an `options` array, two-way bind `value`, and (optionally) flip on `combobo
 | --- | --- |
 | `open-change` | Fired whenever the popup opens or closes. Payload `{ open: boolean }`. |
 | `change` | Fired after the selection changes. Payload `{ value, option }` (`option` is `null` when cleared). |
-| `search` | Fired on every combobox keystroke. Payload `{ query: string }`. Drive remote filtering with `:filterable="false"`. |
 
 ### Imperative handle
 
@@ -90,7 +87,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `open` | Open the popup (no-op when disabled or already open). |
 | `close` | Close the popup. |
 | `toggle` | Toggle the popup open/closed. |
-| `clear` | Clear the selection and reset the combobox query. |
+| `clear` | Clear the selection and reset the internal query state. |
 | `focusControl` | Move DOM focus to the control. (Named `focusControl`, not `focus`, so it does not override the native `HTMLElement.focus` on the Lit element.) |
 
 ### Slots
@@ -129,7 +126,7 @@ The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learn
 
 ## Keyboard
 
-Both modes follow the [ARIA APG combobox patterns](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/): DOM focus stays on the control while the highlighted option is tracked virtually via `aria-activedescendant`.
+It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/): DOM focus stays on the control while the highlighted option is tracked virtually via `aria-activedescendant`.
 
 | Key | Action |
 | --- | --- |

@@ -469,10 +469,8 @@ export const EXAMPLES = [
   // listbox.spec.ts. Built for all 6 targets but NOT a screenshot cell —
   // deliberately NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
   'ListboxBehavior',
-  // @rozie-ui/listbox combobox mode — the type-to-filter BEHAVIORAL cell (loader →
-  // examples/demos/ListboxComboboxDemo.rozie). Drives the $computed-derived filter,
-  // the <input role="combobox">, the search event, and a two-way r-model:value.
-  'ListboxCombobox',
+  // (P3/D-03: Listbox's editable combobox mode was retired — type-to-filter now
+  // lives in @rozie-ui/combobox; the former ListboxCombobox cell is removed.)
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1072,8 +1070,6 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
   // 'rozie-listbox'). Behavioral-only, no screenshot cell.
   ListboxBehavior: 'rozie-listbox-behavior',
-  // '-demo' appended → 'rozie-listbox-combobox-demo' = kebab of ListboxComboboxDemo.
-  ListboxCombobox: 'rozie-listbox-combobox',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -1434,7 +1430,6 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxBehavior: {},
-  ListboxCombobox: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.

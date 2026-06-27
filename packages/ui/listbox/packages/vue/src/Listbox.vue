@@ -4,11 +4,12 @@
 
   
   <div class="rozie-listbox-control" ref="controlElRef">
-    <input v-if="props.combobox" ref="inputElRef" class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" :placeholder="props.placeholder" :value="query" @input="onInput($event)" @keydown="onControlKeyDown($event)" @focus="open" /><button v-else ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
+    <button ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
       <slot name="selected" :selected="selectedLabel" :value="value">
         <span v-if="selectedLabel" class="rozie-listbox-selected">{{ selectedLabel }}</span><span v-else class="rozie-listbox-placeholder">{{ props.placeholder }}</span></slot>
       <span class="rozie-listbox-arrow" aria-hidden="true">▾</span>
-    </button></div>
+    </button>
+  </div>
 
   
   <div v-if="open$local" ref="listElRef" class="rozie-listbox-list" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple">
@@ -39,17 +40,9 @@ const props = withDefaults(
      */
     multiple?: boolean;
     /**
-     * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-     */
-    combobox?: boolean;
-    /**
      * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
      */
     inline?: boolean;
-    /**
-     * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-     */
-    filterable?: boolean;
     /**
      * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
      */
@@ -83,7 +76,7 @@ const props = withDefaults(
      */
     ariaLabel?: string | null;
   }>(),
-  { options: () => [], multiple: false, combobox: false, inline: false, filterable: true, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null }
 );
 
 /**
@@ -96,7 +89,6 @@ const value = defineModel<unknown>('value', { default: null });
 const emit = defineEmits<{
   'open-change': [...args: any[]];
   change: [...args: any[]];
-  search: [...args: any[]];
 }>();
 
 defineSlots<{
@@ -110,7 +102,6 @@ const activeIndex = ref(-1);
 const query = ref('');
 
 const controlElRef = ref<HTMLElement>();
-const inputElRef = ref<HTMLInputElement>();
 const triggerElRef = ref<HTMLButtonElement>();
 const listElRef = ref<HTMLElement>();
 
@@ -132,7 +123,7 @@ const activeDescendant = computed(() => {
   return optionId(activeIndex.value);
 });
 
-// Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
+// Type-ahead buffer for the select-only listbox trigger. Module-scope
 // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
 // so they persist across renders (the setup-once guarantee); no-op elsewhere.
 // They STAY in this host (not the shared spine) per the A==B rule: reassigned
@@ -168,10 +159,11 @@ let typeTimer: any = null;
 //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
 //     activedescendant model.
 //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
-//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
-//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
-//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
-//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+//     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+//     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+//     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+//     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
 //
 // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
 //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
@@ -181,11 +173,11 @@ let typeTimer: any = null;
 //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
 //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
 //     HOST functions; this partial only closes over them (it reads NO refs itself).
-//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
-//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
-//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
-//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
-//     `$data.query`).
+//   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+//     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+//     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+//     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+//     `$data.query`), NOT a discriminant prop.
 
 // ---- option resolvers --------------------------------------------------
 // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
@@ -206,10 +198,11 @@ let typeTimer: any = null;
 //     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
 //     activedescendant model.
 //   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
-//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
-//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
-//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
-//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
+//     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
+//     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
+//     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
+//     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
 //
 // ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
 //   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
@@ -219,11 +212,11 @@ let typeTimer: any = null;
 //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
 //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
 //     HOST functions; this partial only closes over them (it reads NO refs itself).
-//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
-//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
-//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
-//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
-//     `$data.query`).
+//   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
+//     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+//     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
+//     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
+//     `$data.query`), NOT a discriminant prop.
 
 // ---- option resolvers --------------------------------------------------
 const labelOf = (opt: any) => {
@@ -258,8 +251,7 @@ const optionId = (index: any) => props.id + '-opt-' + index;
 // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
 // plain function is identical everywhere.
 const visibleOptions = () => {
-  if (!props.combobox || !props.filterable) return props.options;
-  const q = query.value.trim().toLowerCase();
+  const q = (query.value || '').trim().toLowerCase();
   if (q === '') return props.options;
   return props.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
 };
@@ -423,36 +415,20 @@ const onControlKeyDown = ($event: any) => {
       focusControl();
     }
   } else if (key === ' ' || key === 'Spacebar') {
-    // Space toggles / commits in select-only mode; a combobox input needs the
-    // literal space, so do nothing there.
-    if (!props.combobox) {
-      $event.preventDefault();
-      if (!open$local.value) open();else commitActive();
-    }
+    // Space toggles / commits in a select-only host (a button trigger). A
+    // filter-input host types the literal space into its <input> and does NOT
+    // route Space through this reducer, so this branch is select-only by use.
+    $event.preventDefault();
+    if (!open$local.value) open();else commitActive();
   } else if (key === 'Tab') {
     if (open$local.value) close();
-  } else if (!props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+  } else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     onTypeahead(key);
   }
 };
 
 // Combobox input handler: keep the popup open while typing, reset the active
 // highlight to the first match, and surface the query for remote filtering.
-// Combobox input handler: keep the popup open while typing, reset the active
-// highlight to the first match, and surface the query for remote filtering.
-const fireSearch = (query: any) => emit('search', {
-  query
-});
-const onInput = ($event: any) => {
-  // Use the fresh input value throughout — a re-read of `$data.query` right
-  // after writing it is STALE on React (setState is async; the closure's
-  // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
-  const q = $event.target.value;
-  query.value = q;
-  if (!open$local.value) open();
-  activeIndex.value = nextEnabled(-1, 1);
-  fireSearch(q);
-};
 
 // Pointer hover sets the virtual highlight (matches native <select> feel).
 // Pointer hover sets the virtual highlight (matches native <select> feel).
@@ -469,7 +445,7 @@ const onOptionPointerMove = (index: any) => {
 // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
 // verb would override the inherited HTMLElement.focus method on the Lit element.
 const focusControl = () => {
-  if (props.combobox) inputElRef.value?.focus();else triggerElRef.value?.focus();
+  triggerElRef.value?.focus();
 };
 
 // Keep the active option visible inside the scrolling listbox. Reads $refs in

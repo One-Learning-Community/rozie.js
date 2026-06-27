@@ -126,57 +126,7 @@ for (const target of TARGETS) {
 }
 
 // ---------------------------------------------------------------------------
-// Combobox mode — the type-to-filter path ($computed-derived `visibleOptions`
-// filter + the search event + two-way value), proven across all 6 targets.
+// (P3/D-03: Listbox's editable combobox / type-to-filter mode was retired — that
+// behavior now lives in the @rozie-ui/combobox family and is covered by
+// combobox.spec.ts. The former `listbox-combobox` cell + demo were removed.)
 // ---------------------------------------------------------------------------
-for (const target of TARGETS) {
-  const built = existsSync(
-    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
-  );
-  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`listbox-combobox [${target}]: typing filters options, search event fires, Enter commits the filtered match`, async ({
-    page,
-  }) => {
-    await page.goto(`/?example=ListboxCombobox&target=${target}`);
-    await expect(page.getByTestId('rozie-mount')).toBeVisible();
-
-    const input = page.locator('input[role="combobox"]').first();
-    await expect(input).toBeVisible({ timeout: 15_000 });
-
-    const value = page.getByTestId('readout-value');
-    const query = page.getByTestId('readout-query');
-    await expect(value).toHaveText('');
-    await expect(query).toHaveText('');
-
-    // Type "ch" → opens + filters to the single label containing it (Cherry),
-    // and each keystroke fires the `search` event (echoed into readout-query).
-    await input.focus();
-    await input.pressSequentially('ch', { delay: 30 });
-    await expect
-      .poll(async () => (await query.textContent())?.trim() ?? '', {
-        timeout: 10_000,
-      })
-      .toBe('ch');
-    await expect
-      .poll(async () => page.locator('[role="option"]').count(), {
-        timeout: 10_000,
-      })
-      .toBe(1);
-    await expect(page.locator('[role="option"]').first()).toContainText('Cherry');
-
-    // The first match is auto-highlighted on filter — Enter commits it.
-    await page.keyboard.press('Enter');
-    await expect
-      .poll(async () => (await value.textContent())?.trim() ?? '', {
-        timeout: 10_000,
-        intervals: [100, 200, 400, 800],
-      })
-      .toBe('cherry');
-    // closeOnSelect → the popup closed.
-    await expect
-      .poll(async () => page.locator('[role="option"]').count(), {
-        timeout: 10_000,
-      })
-      .toBe(0);
-  });
-}

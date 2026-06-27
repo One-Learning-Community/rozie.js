@@ -27,17 +27,9 @@ interface ListboxProps {
    */
   multiple?: boolean;
   /**
-   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-   */
-  combobox?: boolean;
-  /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   inline?: boolean;
-  /**
-   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-   */
-  filterable?: boolean;
   /**
    * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -72,7 +64,6 @@ interface ListboxProps {
   ariaLabel?: (string) | null;
   onOpenChange?: (...args: any[]) => void;
   onChange?: (...args: any[]) => void;
-  onSearch?: (...args: any[]) => void;
   renderSelected?: (ctx: SelectedCtx) => ReactNode;
   renderOption?: (ctx: OptionCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
@@ -89,13 +80,11 @@ export interface ListboxHandle {
 
 const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props: ListboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<ListboxProps, 'options' | 'multiple' | 'combobox' | 'inline' | 'filterable' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel'> & { options: any[]; multiple: boolean; combobox: boolean; inline: boolean; filterable: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null } = {
+  const props: Omit<ListboxProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'id' | 'ariaLabel'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; id: string; ariaLabel: (string) | null } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     multiple: _props.multiple ?? false,
-    combobox: _props.combobox ?? false,
     inline: _props.inline ?? false,
-    filterable: _props.filterable ?? true,
     disabled: _props.disabled ?? false,
     placeholder: _props.placeholder ?? '',
     closeOnSelect: _props.closeOnSelect ?? true,
@@ -106,8 +95,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, combobox, inline, filterable, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
-    void options; void value; void multiple; void combobox; void inline; void filterable; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void defaultValue; void onValueChange;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void defaultValue; void onValueChange;
     return rest;
   })();
   const typeTimer = useRef<any>(null);
@@ -120,7 +109,6 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
   const controlEl = useRef<HTMLDivElement | null>(null);
-  const inputEl = useRef<HTMLInputElement | null>(null);
   const triggerEl = useRef<HTMLButtonElement | null>(null);
   const listEl = useRef<HTMLDivElement | null>(null);
   const selectedLabel = useMemo(() => {
@@ -141,7 +129,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return optionId(activeIndex);
   }, [activeIndex, open$local, optionId]);
 
-  // Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
+  // Type-ahead buffer for the select-only listbox trigger. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
   // so they persist across renders (the setup-once guarantee); no-op elsewhere.
   // They STAY in this host (not the shared spine) per the A==B rule: reassigned
@@ -166,8 +154,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return props.id + '-opt-' + index;
   }
   function visibleOptions() {
-    if (!props.combobox || !props.filterable) return props.options;
-    const q = query.trim().toLowerCase();
+    const q = (query || '').trim().toLowerCase();
     if (q === '') return props.options;
     return props.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
   }
@@ -192,7 +179,9 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       open: next
     });
   }
-  const open = useCallback(() => applyExpanded(true), [applyExpanded]);
+  function open() {
+    return applyExpanded(true);
+  }
   const close = useCallback(() => applyExpanded(false), [applyExpanded]);
   const toggle = useCallback(() => applyExpanded(!open$local), [applyExpanded, open$local]);
   function fireChange(value: any, option: any) {
@@ -296,38 +285,22 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
         focusControl();
       }
     } else if (key === ' ' || key === 'Spacebar') {
-      // Space toggles / commits in select-only mode; a combobox input needs the
-      // literal space, so do nothing there.
-      if (!props.combobox) {
-        $event.preventDefault();
-        if (!open$local) open();else commitActive();
-      }
+      // Space toggles / commits in a select-only host (a button trigger). A
+      // filter-input host types the literal space into its <input> and does NOT
+      // route Space through this reducer, so this branch is select-only by use.
+      $event.preventDefault();
+      if (!open$local) open();else commitActive();
     } else if (key === 'Tab') {
       if (open$local) close();
-    } else if (!props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+    } else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
       onTypeahead(key);
     }
-  }, [close, commitActive, focusControl, move, moveEdge, onTypeahead, open, open$local, props.combobox]);
-  function fireSearch(query: any) {
-    return props.onSearch && props.onSearch({
-      query
-    });
-  }
-  const onInput = useCallback(($event: any) => {
-    // Use the fresh input value throughout — a re-read of `$data.query` right
-    // after writing it is STALE on React (setState is async; the closure's
-    // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
-    const q = $event.target.value;
-    setQuery(q);
-    if (!open$local) open();
-    setActiveIndex(nextEnabled(-1, 1));
-    fireSearch(q);
-  }, [fireSearch, nextEnabled, open, open$local]);
+  }, [close, commitActive, focusControl, move, moveEdge, onTypeahead, open, open$local]);
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
   function focusControl() {
-    if (props.combobox) inputEl.current?.focus();else triggerEl.current?.focus();
+    triggerEl.current?.focus();
   }
   function scrollActiveIntoView() {
     if (!listEl.current || activeIndex < 0) return;
@@ -359,10 +332,11 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
       
       <div className={"rozie-listbox-control"} ref={controlEl} data-rozie-s-b576227a="">
-        {(props.combobox) ? <input ref={inputEl} className={"rozie-listbox-input"} type="text" role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} placeholder={props.placeholder} value={query} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onControlKeyDown($event); }} onFocus={open} data-rozie-s-b576227a="" /> : <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={props.ariaLabel} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : (selectedLabel) ? <span className={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{props.placeholder}</span>}
           <span className={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
-        </button>}</div>
+        </button>
+      </div>
 
       
       {(open$local) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">

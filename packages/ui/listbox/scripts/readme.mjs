@@ -82,7 +82,7 @@ export function Demo() {
   const [value, setValue] = useState<string | null>(null);
   const options = ${FRUITS};
   return (
-    <Listbox value={value} onValueChange={setValue} options={options} combobox placeholder="Search fruit…">
+    <Listbox value={value} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
       {{ /* optional custom option render via the \`option\` slot */ }}
     </Listbox>
   );
@@ -99,7 +99,7 @@ const options = ${FRUITS};
 </script>
 
 <template>
-  <Listbox v-model:value="value" :options="options" combobox placeholder="Search fruit…">
+  <Listbox v-model:value="value" :options="options" placeholder="Pick a fruit…">
     <template #option="{ option, active, selected }">
       <span :class="{ active, selected }">{{ option.label }}</span>
     </template>
@@ -115,7 +115,7 @@ const options = ${FRUITS};
   const options = ${FRUITS};
 </script>
 
-<Listbox bind:value {options} combobox placeholder="Search fruit…">
+<Listbox bind:value {options} placeholder="Pick a fruit…">
   {#snippet option({ option, active, selected })}
     <span class:active class:selected>{option.label}</span>
   {/snippet}
@@ -131,7 +131,7 @@ import { Listbox } from '@rozie-ui/listbox-angular';
   standalone: true,
   imports: [Listbox],
   template: \`
-    <Listbox [(value)]="value" [options]="options" combobox placeholder="Search fruit…">
+    <Listbox [(value)]="value" [options]="options" placeholder="Pick a fruit…">
       <ng-template #option let-option="option" let-selected="selected">
         <span [class.selected]="selected">{{ option.label }}</span>
       </ng-template>
@@ -152,7 +152,7 @@ export function Demo() {
   const [value, setValue] = createSignal<string | null>(null);
   const options = ${FRUITS};
   return (
-    <Listbox value={value()} onValueChange={setValue} options={options} combobox placeholder="Search fruit…">
+    <Listbox value={value()} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
       {({ option, selected }) => <span classList={{ selected: selected() }}>{option().label}</span>}
     </Listbox>
   );
@@ -166,7 +166,6 @@ export function Demo() {
 // listen for the \`value-change\` event to receive the new selection.
 const el = document.querySelector('rozie-listbox');
 el.options = ${FRUITS};
-el.combobox = true;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });`,
@@ -282,7 +281,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(
     `Idiomatic **${target}** \`Listbox\` — a headless, fully-accessible (WAI-ARIA) ` +
-      `listbox / combobox (single + multi-select, type-ahead, full keyboard navigation) ` +
+      `select-only listbox (single + multi-select, type-ahead, full keyboard navigation) ` +
       `compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. ` +
       `No third-party engine; every value is a CSS custom property, so it re-skins to any ` +
       `design system. This package is generated; do not edit \`src/\` by hand.`,

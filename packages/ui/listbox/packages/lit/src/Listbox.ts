@@ -135,17 +135,9 @@ export default class Listbox extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) multiple: boolean = false;
   /**
-   * Render an editable text `<input role="combobox">` that filters options by the typed query. When off, the control is a select-only button trigger.
-   */
-  @property({ type: Boolean, reflect: true }) combobox: boolean = false;
-  /**
    * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the listbox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   @property({ type: Boolean, reflect: true }) inline: boolean = false;
-  /**
-   * Whether combobox mode filters the options client-side. Turn this off for remote/async filtering — listen to the `search` event and replace `options` yourself.
-   */
-  @property({ type: Boolean, reflect: true }) filterable: boolean = true;
   /**
    * Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -182,7 +174,6 @@ export default class Listbox extends SignalWatcher(LitElement) {
   private _activeIndex = signal(-1);
   private _query = signal('');
   @query('[data-rozie-ref="controlEl"]') private _refControlEl!: HTMLElement;
-  @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
   @query('[data-rozie-ref="triggerEl"]') private _refTriggerEl!: HTMLElement;
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
 
@@ -276,11 +267,12 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   
   <div class="rozie-listbox-control" data-rozie-ref="controlEl" data-rozie-s-b576227a>
-    ${this.combobox ? html`<input class="rozie-listbox-input" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded=${this._open$local.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} @focus=${this.open} data-rozie-ref="inputEl" data-rozie-s-b576227a />` : html`<button class="rozie-listbox-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${this._open$local.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-b576227a>
+    <button class="rozie-listbox-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${this._open$local.value} aria-controls=${rozieAttr(this.id + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${this.ariaLabel} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: Event) => { this.onControlKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-b576227a>
       ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
         ${this.selectedLabel ? html`<span class="rozie-listbox-selected" data-rozie-s-b576227a>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-listbox-placeholder" data-rozie-s-b576227a>${this.placeholder}</span>`}</slot>`}
       <span class="rozie-listbox-arrow" aria-hidden="true" data-rozie-s-b576227a>▾</span>
-    </button>`}</div>
+    </button>
+  </div>
 
   
   ${this._open$local.value ? html`<div class="rozie-listbox-list" role="listbox" id=${rozieAttr(this.id + '-list')} aria-label=${this.ariaLabel} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-b576227a>
@@ -321,8 +313,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   optionId = (index: any) => this.id + '-opt-' + index;
 
   visibleOptions = () => {
-  if (!this.combobox || !this.filterable) return this.options;
-  const q = this._query.value.trim().toLowerCase();
+  const q = (this._query.value || '').trim().toLowerCase();
   if (q === '') return this.options;
   return this.options.filter((opt: any) => this.labelOf(opt).toLowerCase().includes(q));
 };
@@ -491,36 +482,16 @@ export default class Listbox extends SignalWatcher(LitElement) {
       this.focusControl();
     }
   } else if (key === ' ' || key === 'Spacebar') {
-    // Space toggles / commits in select-only mode; a combobox input needs the
-    // literal space, so do nothing there.
-    if (!this.combobox) {
-      $event.preventDefault();
-      if (!this._open$local.value) this.open();else this.commitActive();
-    }
+    // Space toggles / commits in a select-only host (a button trigger). A
+    // filter-input host types the literal space into its <input> and does NOT
+    // route Space through this reducer, so this branch is select-only by use.
+    $event.preventDefault();
+    if (!this._open$local.value) this.open();else this.commitActive();
   } else if (key === 'Tab') {
     if (this._open$local.value) this.close();
-  } else if (!this.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+  } else if (key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
     this.onTypeahead(key);
   }
-};
-
-  fireSearch = (query: any) => this.dispatchEvent(new CustomEvent("search", {
-  detail: {
-    query
-  },
-  bubbles: true,
-  composed: true
-}));
-
-  onInput = ($event: any) => {
-  // Use the fresh input value throughout — a re-read of `$data.query` right
-  // after writing it is STALE on React (setState is async; the closure's
-  // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
-  const q = $event.target.value;
-  this._query.value = q;
-  if (!this._open$local.value) this.open();
-  this._activeIndex.value = this.nextEnabled(-1, 1);
-  this.fireSearch(q);
 };
 
   onOptionPointerMove = (index: any) => {
@@ -528,7 +499,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
 };
 
   focusControl = () => {
-  if (this.combobox) this._refInputEl?.focus();else this._refTriggerEl?.focus();
+  this._refTriggerEl?.focus();
 };
 
   scrollActiveIntoView = () => {
@@ -555,7 +526,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['options', 'value', 'multiple', 'combobox', 'inline', 'filterable', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id', 'aria-label', 'arialabel']);
+    const __skip = new Set<string>(['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id', 'aria-label', 'arialabel']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;
