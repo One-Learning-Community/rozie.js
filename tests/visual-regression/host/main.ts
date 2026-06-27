@@ -471,6 +471,19 @@ export const EXAMPLES = [
   'ListboxBehavior',
   // (P3/D-03: Listbox's editable combobox mode was retired — type-to-filter now
   // lives in @rozie-ui/combobox; the former ListboxCombobox cell is removed.)
+  // Phase 64 P4 (headless windowing, SC-5) — the WINDOWED long-list cells (loaders →
+  // examples/demos/{Listbox,Combobox}VirtualDemo.rozie, importing
+  // packages/ui/{listbox,combobox}/src/<Component>.rozie). Each feeds a 1,000-option
+  // list with :virtual (inline, bounded) so ONLY a small windowed [role="option"]
+  // slice renders — backed by @rozie-ui/headless-core/windowing.rzts (the shared
+  // virtual-core bridge, wired per-consumer with a no-op pin hook). Behavioral-only
+  // (DOM assert, NOT in matrix.spec.ts — no pixel baseline); they live under
+  // examples/demos/ so no Angular 3-file registration is needed (prebuildExtraRoots
+  // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos
+  // sweep already cover them, importing the listbox/combobox source pkgs + the
+  // headless-core src root already registered for Angular cross-tree AOT).
+  'ListboxVirtual',
+  'ComboboxVirtual',
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1070,6 +1083,10 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
   // 'rozie-listbox'). Behavioral-only, no screenshot cell.
   ListboxBehavior: 'rozie-listbox-behavior',
+  // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-listbox-virtual-demo'
+  // / 'rozie-combobox-virtual-demo' = kebab of {Listbox,Combobox}VirtualDemo.
+  ListboxVirtual: 'rozie-listbox-virtual',
+  ComboboxVirtual: 'rozie-combobox-virtual',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -1430,6 +1447,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxBehavior: {},
+  // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
+  // 1,000-option list in $onMount and binds r-model:value internally (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
+  ListboxVirtual: {},
+  ComboboxVirtual: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.

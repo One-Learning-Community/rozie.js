@@ -1,0 +1,107 @@
+<!--
+  ListboxVirtualDemo.rozie — WINDOWED long-list fixture for the pure-Rozie Listbox
+  (Phase 64 P4, SC-5). The listbox analog of DataTableVirtualDemo.rozie: a long
+  option list (1,000 entries) fed to the family with `:virtual="true"` so ONLY a
+  small windowed slice of `[role="option"]` renders inside the bounded, scrolling
+  list — backed by the shared @rozie-ui/headless-core/windowing.rzts math (the same
+  virtual-core bridge data-table uses, wired per-consumer with a no-op pin hook).
+
+    - 1,000 options seeded in $onMount (deterministic content/ids — no clock/random
+      — so the window + measured total are stable across the six targets + the Linux
+      VR baselines).
+    - `:virtual="true"` opts into the windowing engine; the list renders a leading +
+      trailing spacer plus the windowed `[role="option"]` slice.
+    - `:multiple="true"` + `:close-on-select="false"` keep the popup open after a
+      commit so the selection-survives-windowing behavior is observable (the checked
+      option scrolls out of and back into the window and stays aria-selected).
+    - `inline` renders the list IN FLOW (bounded by --rozie-listbox-max-height) so
+      the windowed scroll container exists at mount (the virtualizer attaches to it
+      in $onMount — ROZ123-safe).
+
+  listbox-virtual.spec.ts (P4) asserts: the rendered option count stays small
+  (< 100 for 1,000 options); ArrowDown past the visible window scrolls the window so
+  the newly-active option renders; a selection survives scrolling out and back; and
+  aria-activedescendant points at the active option id as the window scrolls. Static
+  dataset (no clock/random) for VR determinism.
+-->
+
+<rozie name="ListboxVirtualDemo">
+
+<components>
+{
+  Listbox: '../../packages/ui/listbox/src/Listbox.rozie',
+}
+</components>
+
+<data>
+{
+  options: [],
+  optionCount: 0,
+  value: [],
+}
+</data>
+
+<script>
+// Seed 1,000 deterministic options (stable ids + labels) so the window + measured
+// total are reproducible across the six targets and the Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 1000; i++) {
+    out.push({ id: i, label: 'Option ' + i, value: 'opt-' + i })
+  }
+  $data.options = out
+  $data.optionCount = out.length
+})
+</script>
+
+<template>
+<div class="listbox-virtual-demo">
+  <h3>Listbox — virtual (1000 options)</h3>
+
+  <div class="controls">
+    <span class="label">options:</span>
+    <span class="readout" data-testid="option-count">{{ $data.optionCount }}</span>
+    <span class="label">selected:</span>
+    <span class="readout" data-testid="selected-count">{{ $data.value.length }}</span>
+  </div>
+
+  <div data-testid="virtual-listbox">
+    <Listbox
+      :options="$data.options"
+      r-model:value="$data.value"
+      :virtual="true"
+      :multiple="true"
+      :close-on-select="false"
+      inline
+      maxHeight="320px"
+      id="virtual-listbox"
+      aria-label="Pick options"
+    >
+      <template #option="{ option, selected }">
+        <span class="opt" :class="{ 'opt-selected': selected }">{{ option.label }}</span>
+      </template>
+    </Listbox>
+  </div>
+</div>
+</template>
+
+<style>
+.listbox-virtual-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.listbox-virtual-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+</style>
+
+</rozie>
