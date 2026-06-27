@@ -360,18 +360,6 @@ export default class Listbox extends SignalWatcher(LitElement) {
   return opts.findIndex((o: any) => !this.disabledOf(o));
 };
 
-  focusControl = () => {
-  if (this.combobox) this._refInputEl?.focus();else this._refTriggerEl?.focus();
-};
-
-  scrollActiveIntoView = () => {
-  if (!this._refListEl || this._activeIndex.value < 0) return;
-  const el = this._refListEl.querySelector('#' + CSS.escape(this.optionId(this._activeIndex.value)));
-  el?.scrollIntoView({
-    block: 'nearest'
-  });
-};
-
   applyExpanded = (next: any) => {
   if (next && this.disabled) return;
   if (this._open$local.value === next) return;
@@ -537,6 +525,18 @@ export default class Listbox extends SignalWatcher(LitElement) {
 
   onOptionPointerMove = (index: any) => {
   if (this._activeIndex.value !== index) this._activeIndex.value = index;
+};
+
+  focusControl = () => {
+  if (this.combobox) this._refInputEl?.focus();else this._refTriggerEl?.focus();
+};
+
+  scrollActiveIntoView = () => {
+  if (!this._refListEl || this._activeIndex.value < 0) return;
+  const el = this._refListEl.querySelector('#' + CSS.escape(this.optionId(this._activeIndex.value)));
+  el?.scrollIntoView({
+    block: 'nearest'
+  });
 };
 
   get value(): unknown { return this._valueControllable.read(); }

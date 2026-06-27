@@ -135,10 +135,96 @@ const activeDescendant = computed(() => {
 // Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
 // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
 // so they persist across renders (the setup-once guarantee); no-op elsewhere.
+// They STAY in this host (not the shared spine) per the A==B rule: reassigned
+// module-`let`s + sigils live in the host; the partial only closes over them.
 let typeBuffer = '';
 let typeTimer: any = null;
 
+// ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
+// The option resolvers, client filter, enabled-index navigation, the keyboard
+// reducer, type-ahead, single+multi selection, open/close state, and
+// activeDescendant derivation now live in the shared, focus-/input-mode
+// parameterized list spine. It is a compile-time `.rzts` script-partial: it
+// dissolves into this leaf via inlineScriptPartials() before IR lowering (zero
+// runtime dep). Listbox consumes it in focus-model `activedescendant` +
+// input-mode `select-only` + multi + type-ahead. The spine closes over this
+// host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
+// (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
+// ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+// Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+// partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+// navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+// selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+// script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+// IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+//
+// ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+// The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+// windowing.rzts uses) along two axes:
+//   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+//     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+//     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+//     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+//     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+//     activedescendant model.
+//   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
+//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
+//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
+//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//
+// ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+//   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+//     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+//     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+//     over them (in `onTypeahead`).
+//   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+//     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+//     HOST functions; this partial only closes over them (it reads NO refs itself).
+//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
+//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
+//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
+//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
+//     `$data.query`).
+
 // ---- option resolvers --------------------------------------------------
+// ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+// Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+// partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+// navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+// selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+// script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+// IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+//
+// ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+// The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+// windowing.rzts uses) along two axes:
+//   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+//     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+//     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+//     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+//     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+//     activedescendant model.
+//   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
+//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
+//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
+//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//
+// ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+//   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+//     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+//     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+//     over them (in `onTypeahead`).
+//   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+//     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+//     HOST functions; this partial only closes over them (it reads NO refs itself).
+//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
+//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
+//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
+//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
+//     `$data.query`).
+
 // ---- option resolvers --------------------------------------------------
 const labelOf = (opt: any) => {
   if (props.optionLabel !== null) return props.optionLabel(opt);
@@ -181,6 +267,8 @@ const visibleOptions = () => {
 // The label shown in the (select-only) trigger when closed. A real `$computed`
 // — read bare in the template, never aliased in script, so the per-target
 // accessor form stays uniform.
+
+// Is a given option currently selected? Multi compares array membership.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
   const v = valueOf(opt);
@@ -196,28 +284,6 @@ const resolveInitialActive = () => {
   const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
   if (sel !== -1) return sel;
   return opts.findIndex((o: any) => !disabledOf(o));
-};
-
-// ---- focus / scroll helpers (post-mount $refs only) --------------------
-// Named `focusControl` (not `focus`): a `focus` $expose verb would override the
-// inherited HTMLElement.focus method on the Lit custom element.
-// ---- focus / scroll helpers (post-mount $refs only) --------------------
-// Named `focusControl` (not `focus`): a `focus` $expose verb would override the
-// inherited HTMLElement.focus method on the Lit custom element.
-const focusControl = () => {
-  if (props.combobox) inputElRef.value?.focus();else triggerElRef.value?.focus();
-};
-
-// Keep the active option visible inside the scrolling listbox. Reads $refs in
-// a post-mount callback only (never eagerly — ROZ123).
-// Keep the active option visible inside the scrolling listbox. Reads $refs in
-// a post-mount callback only (never eagerly — ROZ123).
-const scrollActiveIntoView = () => {
-  if (!listElRef.value || activeIndex.value < 0) return;
-  const el = listElRef.value!.querySelector('#' + CSS.escape(optionId(activeIndex.value)));
-  el?.scrollIntoView({
-    block: 'nearest'
-  });
 };
 
 // ---- open / close ------------------------------------------------------
@@ -392,6 +458,30 @@ const onInput = ($event: any) => {
 // Pointer hover sets the virtual highlight (matches native <select> feel).
 const onOptionPointerMove = (index: any) => {
   if (activeIndex.value !== index) activeIndex.value = index;
+};
+
+// ---- focus / scroll helpers (post-mount $refs only) --------------------
+// Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
+// only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
+// verb would override the inherited HTMLElement.focus method on the Lit element.
+// ---- focus / scroll helpers (post-mount $refs only) --------------------
+// Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
+// only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
+// verb would override the inherited HTMLElement.focus method on the Lit element.
+const focusControl = () => {
+  if (props.combobox) inputElRef.value?.focus();else triggerElRef.value?.focus();
+};
+
+// Keep the active option visible inside the scrolling listbox. Reads $refs in
+// a post-mount callback only (never eagerly — ROZ123).
+// Keep the active option visible inside the scrolling listbox. Reads $refs in
+// a post-mount callback only (never eagerly — ROZ123).
+const scrollActiveIntoView = () => {
+  if (!listElRef.value || activeIndex.value < 0) return;
+  const el = listElRef.value!.querySelector('#' + CSS.escape(optionId(activeIndex.value)));
+  el?.scrollIntoView({
+    block: 'nearest'
+  });
 };
 
 onBeforeUnmount(() => {

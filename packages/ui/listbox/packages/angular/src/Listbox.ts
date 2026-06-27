@@ -354,17 +354,6 @@ export class Listbox {
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !this.disabledOf(o));
   };
-  focusControl = () => {
-    if (this.combobox()) this.inputEl()?.nativeElement?.focus();else this.triggerEl()?.nativeElement?.focus();
-  };
-  scrollActiveIntoView = () => {
-    const __activeIndex = this.activeIndex();
-    if (!this.listEl()?.nativeElement || __activeIndex < 0) return;
-    const el = this.listEl()!.nativeElement.querySelector('#' + CSS.escape(this.optionId(__activeIndex)));
-    el?.scrollIntoView({
-      block: 'nearest'
-    });
-  };
   applyExpanded = (next: any) => {
     if (next && (this.disabled() || this.__rozieCvaDisabled())) return;
     if (this.open$local() === next) return;
@@ -506,6 +495,17 @@ export class Listbox {
   };
   onOptionPointerMove = (index: any) => {
     if (this.activeIndex() !== index) this.activeIndex.set(index);
+  };
+  focusControl = () => {
+    if (this.combobox()) this.inputEl()?.nativeElement?.focus();else this.triggerEl()?.nativeElement?.focus();
+  };
+  scrollActiveIntoView = () => {
+    const __activeIndex = this.activeIndex();
+    if (!this.listEl()?.nativeElement || __activeIndex < 0) return;
+    const el = this.listEl()!.nativeElement.querySelector('#' + CSS.escape(this.optionId(__activeIndex)));
+    el?.scrollIntoView({
+      block: 'nearest'
+    });
   };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};

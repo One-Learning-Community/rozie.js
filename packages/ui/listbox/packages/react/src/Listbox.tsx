@@ -144,6 +144,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   // Type-ahead buffer for select-only (non-combobox) listboxes. Module-scope
   // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
   // so they persist across renders (the setup-once guarantee); no-op elsewhere.
+  // They STAY in this host (not the shared spine) per the A==B rule: reassigned
+  // module-`let`s + sigils live in the host; the partial only closes over them.
   let typeBuffer = '';
   function labelOf(opt: any) {
     if (props.optionLabel !== null) return props.optionLabel(opt);
@@ -180,16 +182,6 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !disabledOf(o));
-  }
-  function focusControl() {
-    if (props.combobox) inputEl.current?.focus();else triggerEl.current?.focus();
-  }
-  function scrollActiveIntoView() {
-    if (!listEl.current || activeIndex < 0) return;
-    const el = listEl.current!.querySelector('#' + CSS.escape(optionId(activeIndex)));
-    el?.scrollIntoView({
-      block: 'nearest'
-    });
   }
   function applyExpanded(next: any) {
     if (next && props.disabled) return;
@@ -334,6 +326,16 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
   }, [activeIndex]);
+  function focusControl() {
+    if (props.combobox) inputEl.current?.focus();else triggerEl.current?.focus();
+  }
+  function scrollActiveIntoView() {
+    if (!listEl.current || activeIndex < 0) return;
+    const el = listEl.current!.querySelector('#' + CSS.escape(optionId(activeIndex)));
+    el?.scrollIntoView({
+      block: 'nearest'
+    });
+  }
 
   useEffect(() => {
     return () => {
