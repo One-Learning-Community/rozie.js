@@ -1,0 +1,244 @@
+// ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+// Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+// partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+// navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+// selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+// script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+// IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+//
+// ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+// The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+// windowing.rzts uses) along two axes:
+//   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+//     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+//     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+//     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+//     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+//     activedescendant model.
+//   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
+//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
+//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
+//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//
+// ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+//   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+//     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+//     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+//     over them (in `onTypeahead`).
+//   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+//     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+//     HOST functions; this partial only closes over them (it reads NO refs itself).
+//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
+//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
+//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
+//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
+//     `$data.query`).
+
+// ---- option resolvers --------------------------------------------------
+const labelOf = (opt) => {
+  if ($props.optionLabel !== null) return $props.optionLabel(opt)
+  if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label
+  return String(opt)
+}
+const valueOf = (opt) => {
+  if ($props.optionValue !== null) return $props.optionValue(opt)
+  if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value
+  return opt
+}
+const disabledOf = (opt) => {
+  if ($props.optionDisabled !== null) return !!$props.optionDisabled(opt)
+  if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled
+  return false
+}
+const optionId = (index) => $props.id + '-opt-' + index
+
+// ---- derived state -----------------------------------------------------
+// The visible option list: identity in select-only / non-filtering mode,
+// a case-insensitive substring filter when a combobox query is present.
+// A plain function (not `$computed`) so it reads uniformly across all six
+// targets — a `$computed` is a value on React but an accessor on Solid, so
+// aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
+// plain function is identical everywhere.
+const visibleOptions = () => {
+  if (!$props.combobox || !$props.filterable) return $props.options
+  const q = $data.query.trim().toLowerCase()
+  if (q === '') return $props.options
+  return $props.options.filter((opt) => labelOf(opt).toLowerCase().includes(q))
+}
+
+// The label shown in the (select-only) trigger when closed. A real `$computed`
+// — read bare in the template, never aliased in script, so the per-target
+// accessor form stays uniform.
+const selectedLabel = $computed(() => {
+  const cur = $props.value
+  if ($props.multiple) {
+    // Read the model value into a local before narrowing: `$props.value` lowers
+    // to a `value()` accessor on Solid, and Array.isArray() can't narrow two
+    // separate calls — narrowing one stable local works on every target.
+    const arr = Array.isArray(cur) ? cur : []
+    if (arr.length === 0) return ''
+    return $props.options.filter((o) => arr.includes(valueOf(o))).map(labelOf).join(', ')
+  }
+  const match = $props.options.find((o) => valueOf(o) === cur)
+  return match === undefined ? '' : labelOf(match)
+})
+
+// The id of the active option, for aria-activedescendant. null when none.
+const activeDescendant = $computed(() => {
+  if (!$data.open || $data.activeIndex < 0) return null
+  return optionId($data.activeIndex)
+})
+
+// Is a given option currently selected? Multi compares array membership.
+const isSelected = (opt) => {
+  const v = valueOf(opt)
+  const cur = $props.value
+  if ($props.multiple) return Array.isArray(cur) && cur.includes(v)
+  return cur === v
+}
+
+// First enabled visible index, preferring the currently-selected option.
+const resolveInitialActive = () => {
+  const opts = visibleOptions()
+  const sel = opts.findIndex((o) => isSelected(o) && !disabledOf(o))
+  if (sel !== -1) return sel
+  return opts.findIndex((o) => !disabledOf(o))
+}
+
+// ---- open / close ------------------------------------------------------
+// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
+// React prop-destructure for `onOpenChange` hoists exactly once.
+const applyExpanded = (next) => {
+  if (next && $props.disabled) return
+  if ($data.open === next) return
+  $data.open = next
+  $data.activeIndex = next ? resolveInitialActive() : -1
+  $emit('open-change', { open: next })
+}
+const open = () => applyExpanded(true)
+const close = () => applyExpanded(false)
+const toggle = () => applyExpanded(!$data.open)
+
+// ---- selection ---------------------------------------------------------
+// Single `$emit('change')` site (called from both select + clear).
+const fireChange = (value, option) => $emit('change', { value, option })
+
+const select = (opt) => {
+  if (disabledOf(opt)) return
+  const v = valueOf(opt)
+  if ($props.multiple) {
+    const cur = $props.value
+    const arr = Array.isArray(cur) ? cur : []
+    // Fresh array on every commit — in-place mutation is dropped by the
+    // React/Solid/Lit/Angular change detectors.
+    const next = arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
+    $model.value = next
+    fireChange(next, opt)
+  } else {
+    $model.value = v
+    fireChange(v, opt)
+    if ($props.closeOnSelect) { close(); focusControl() }
+  }
+}
+
+const clear = () => {
+  const empty = $props.multiple ? [] : null
+  $model.value = empty
+  $data.query = ''
+  fireChange(empty, null)
+}
+
+// ---- keyboard navigation over the VISIBLE list -------------------------
+const nextEnabled = (from, dir) => {
+  const opts = visibleOptions()
+  if (opts.length === 0) return -1
+  let i = from
+  for (let step = 0; step < opts.length; step++) {
+    i += dir
+    if (i < 0) i = opts.length - 1
+    else if (i >= opts.length) i = 0
+    if (!disabledOf(opts[i])) return i
+  }
+  return from
+}
+
+const move = (dir) => {
+  if (!$data.open) { open(); return }
+  const start = $data.activeIndex < 0 ? (dir > 0 ? -1 : 0) : $data.activeIndex
+  $data.activeIndex = nextEnabled(start, dir)
+  scrollActiveIntoView()
+}
+
+const moveEdge = (toEnd) => {
+  if (!$data.open) open()
+  $data.activeIndex = toEnd ? nextEnabled(-1, -1) : nextEnabled(-1, 1)
+  scrollActiveIntoView()
+}
+
+const commitActive = () => {
+  const opts = visibleOptions()
+  if ($data.activeIndex >= 0 && $data.activeIndex < opts.length) select(opts[$data.activeIndex])
+}
+
+// Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
+// first option whose label starts with the buffer.
+const onTypeahead = (ch) => {
+  if (typeTimer !== null) clearTimeout(typeTimer)
+  typeBuffer += ch.toLowerCase()
+  typeTimer = setTimeout(() => { typeBuffer = '' }, 600)
+  const opts = visibleOptions()
+  const idx = opts.findIndex((o) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer))
+  if (idx !== -1) {
+    if (!$data.open) open()
+    $data.activeIndex = idx
+    scrollActiveIntoView()
+  }
+}
+
+// Key handler shared by the trigger and the combobox input. The printable-
+// character branch is reached only in select-only mode (the combobox input
+// types through @input).
+const onControlKeyDown = ($event) => {
+  const key = $event.key
+  if (key === 'ArrowDown') { $event.preventDefault(); move(1) }
+  else if (key === 'ArrowUp') { $event.preventDefault(); move(-1) }
+  else if (key === 'Home') { $event.preventDefault(); moveEdge(false) }
+  else if (key === 'End') { $event.preventDefault(); moveEdge(true) }
+  else if (key === 'Enter') { if ($data.open) { $event.preventDefault(); commitActive() } }
+  else if (key === 'Escape') { if ($data.open) { $event.preventDefault(); close(); focusControl() } }
+  else if (key === ' ' || key === 'Spacebar') {
+    // Space toggles / commits in select-only mode; a combobox input needs the
+    // literal space, so do nothing there.
+    if (!$props.combobox) {
+      $event.preventDefault()
+      if (!$data.open) open()
+      else commitActive()
+    }
+  }
+  else if (key === 'Tab') { if ($data.open) close() }
+  else if (!$props.combobox && key.length === 1 && !$event.metaKey && !$event.ctrlKey && !$event.altKey) {
+    onTypeahead(key)
+  }
+}
+
+// Combobox input handler: keep the popup open while typing, reset the active
+// highlight to the first match, and surface the query for remote filtering.
+const fireSearch = (query) => $emit('search', { query })
+const onInput = ($event) => {
+  // Use the fresh input value throughout — a re-read of `$data.query` right
+  // after writing it is STALE on React (setState is async; the closure's
+  // `query` is the pre-write value), so emit + filter off `q`, not `$data.query`.
+  const q = $event.target.value
+  $data.query = q
+  if (!$data.open) open()
+  $data.activeIndex = nextEnabled(-1, 1)
+  fireSearch(q)
+}
+
+// Pointer hover sets the virtual highlight (matches native <select> feel).
+const onOptionPointerMove = (index) => {
+  if ($data.activeIndex !== index) $data.activeIndex = index
+}
+
+export { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, fireSearch, onInput, onOptionPointerMove }
