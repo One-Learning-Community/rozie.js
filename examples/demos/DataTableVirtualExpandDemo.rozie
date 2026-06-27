@@ -17,8 +17,8 @@
       isExpanderColumn chevron branch + the #detail <tr> + that the detail row does NOT
       shift the data-row / data-index of the windowed body rows.
     - subrow-table: 250 parent rows each with 2 children (500 leaves), :virtual +
-      :expandable + :getSubRows, first parents expanded at mount (treeExpanded) → depth-1
-      child rows render in the window. Proves the windowed <td> uses bodyCellStyle()
+      :expandable + :getSubRows; clicking the first parent's windowed chevron flattens its
+      depth-1 children into the window. Proves the windowed <td> uses bodyCellStyle()
       (a depth-proportional padding-left on the expander cell) NOT pinStyle() — measurable
       indent at depth > 0 (the pre-fix pinStyle path has NO indent).
 
@@ -43,8 +43,8 @@
   rowCount: 0,
   // Hierarchical dataset for the getSubRows region (parents + 2 children each).
   treeRows: [],
-  // Controlled expanded set for the sub-row tree region — seed the first few parents open
-  // so depth-1 children render inside the initial window.
+  // Controlled expanded set for the sub-row tree region (model:true two-way; empty at mount —
+  // the spec clicks the first parent's chevron to reveal its depth-1 children in the window).
   treeExpanded: {},
 }
 </data>
@@ -77,10 +77,6 @@ $onMount(() => {
     })
   }
   $data.treeRows = tree
-  // Expand the first five parents so their depth-1 children sit inside the initial window.
-  const seed: Record<string, boolean> = {}
-  for (let p = 1; p <= 5; p++) seed['p' + p] = true
-  $data.treeExpanded = seed
 })
 </script>
 

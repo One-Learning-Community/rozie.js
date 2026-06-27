@@ -203,7 +203,13 @@ for (const target of TARGETS) {
     await scrollScopeTo(page, 'subrow-table', 0);
     await expect.poll(async () => windowedRows(scope).count(), { timeout: 15_000 }).toBeGreaterThan(0);
 
-    // The first five parents are expanded at mount → depth-1 child rows sit in the window.
+    // Expand the first parent (top of the window) via its chevron → its depth-1 children
+    // flatten into the windowed row model right below it (the windowed isExpanderColumn branch
+    // must render a working chevron — pre-fix it was absent so this click target would not exist).
+    const firstChevron = scope.locator('.rdt-scroll tbody.rdt-tbody [data-expander]').first();
+    await expect(firstChevron).toBeVisible({ timeout: 10_000 });
+    await firstChevron.click();
+
     const depthRow = scope.locator('.rdt-scroll tbody.rdt-tbody > tr[data-depth="1"]');
     await expect.poll(async () => depthRow.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     await expect(depthRow.first()).toContainText('Child');
