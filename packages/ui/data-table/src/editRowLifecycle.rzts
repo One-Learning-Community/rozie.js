@@ -19,9 +19,33 @@ const editableColumnsForRow = (rowIndex) => {
     if (colId == null || !columnEditable(colId)) continue
     const d = defFor(colId)
     const field = d ? (d.accessorKey != null ? d.accessorKey : colId) : colId
-    out.push({ colId, field })
+    // colIndex = the VISIBLE-cell index (the data-col-index the editor cell renders under).
+    // Carried so the row-mode Tab containment (B21) + the validation-failure focus (B22)
+    // can address a SPECIFIC editor by column, not just the first [data-editing-cell].
+    out.push({ colId, field, colIndex: c })
   }
   return out
+}
+
+// B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
+// editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
+// focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
+// so a React re-render that recreates the input across the focus call still lands it. select-
+// all on text/number editors (a no-op try/catch on select/checkbox).
+const focusRowEditorAt = (rowIndex, colIndex) => {
+  if (!gridRoot) return
+  let attempts = 0
+  const tryFocus = () => {
+    const cellEl = resolveCellEl(String(rowIndex), colIndex)
+    const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null
+    if (ed) { ed.focus(); if (ed.select) { try { ed.select() } catch (e) {} } return }
+    attempts = attempts + 1
+    if (attempts >= 30) return
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+    else setTimeout(tryFocus, 16)
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+  else setTimeout(tryFocus, 0)
 }
 
 // beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
@@ -77,7 +101,10 @@ const commitRow = () => {
     const err = runValidator(ec.colId, draft[ec.colId], rowOriginal)
     if (err !== true) {
       setInvalid(err)
-      focusEditorWhenReady()
+      // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
+      // unconditionally the first editor (focusEditorWhenReady resolves the first
+      // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+      focusRowEditorAt(rowIndex, ec.colIndex)
       return false
     }
   }
@@ -192,4 +219,4 @@ const prevEditableCell = (fromRow, fromCol) => {
   return null
 }
 
-export { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell }
+export { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell }

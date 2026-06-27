@@ -41,6 +41,26 @@ const setRowDraft = (colId, value) => {
   $data.rowDraft = next
 }
 
+// B21: contain a Tab WITHIN the editing row (editMode='row'). Resolve the editable cells'
+// visible col indices for the editing row, find the current editor's col (off the blurring
+// editor's owning [data-grid-cell]), then move to the next/prev editable col WITH WRAP so
+// focus never leaves the row. A no-op when no row is editing / the row has no editable cells.
+const rowEditTab = (target, backward) => {
+  const rowIndex = $data.editingRowIndex
+  if (rowIndex == null) return
+  const editable = editableColumnsForRow(rowIndex)
+  if (editable.length === 0) return
+  const cols = editable.map((ec) => ec.colIndex)
+  const cell = target && target.closest ? target.closest('[data-grid-cell]') : null
+  const curAttr = cell ? cell.getAttribute('data-col-index') : null
+  const cur = curAttr != null ? parseInt(curAttr, 10) : -1
+  let pos = cols.indexOf(cur)
+  if (pos < 0) pos = 0
+  const len = cols.length
+  const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len
+  focusRowEditorAt(rowIndex, cols[nextPos])
+}
+
 // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
 // to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
 // revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
@@ -54,6 +74,12 @@ const onEditorKeyDown = (e) => {
   if (inRowEdit()) {
     if (key === 'Enter') { e.preventDefault(); commitRow() }
     else if (key === 'Escape') { e.preventDefault(); cancelRow() }
+    // B21: CONTAIN Tab within the editing row. Native Tab escapes the row at its first/last
+    // editor (leaving editingRowIndex set so onGridKeyDown stays frozen → keyboard trap). Take
+    // Tab over entirely and cycle between the row's editors WITH WRAP (forward off the last →
+    // first; Shift+Tab off the first → last). Cross-target-safe (no reliance on the native DOM
+    // tab order across a Lit shadow boundary).
+    else if (key === 'Tab') { e.preventDefault(); rowEditTab(e.target, e.shiftKey) }
     return
   }
   if (key === 'Enter') {
@@ -189,4 +215,4 @@ const editRow = (rowIndex) => {
   beginRowEdit(row)
 }
 
-export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, onEditorKeyDown, onEditorBlur, editCell, commitEditing, editRow }
+export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorBlur, editCell, commitEditing, editRow }

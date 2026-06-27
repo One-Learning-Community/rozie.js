@@ -247,6 +247,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const table = useRef<any>(null);
   const refreshRowModel = useRef<any>(null);
   const virtualizer = useRef<any>(null);
+  const pendingEditFollow = useRef<any>(null);
   const gridRoot = useRef<any>(null);
   const gridScrollEl = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
@@ -1339,9 +1340,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (c && c.pin) c.pin(side);
     }
   }
-  function isGrid() {
-    return props.interactionMode === 'grid';
-  }
+  const isGrid = useCallback(() => props.interactionMode === 'grid', [props.interactionMode]);
   function tableRole() {
     return isGrid() ? 'grid' : 'table';
   }
@@ -2244,7 +2243,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // seeded char so subsequent typing appends instead of replacing it.
     focusEditorWhenReady(seed == null);
   }
-  function focusCellWhenReady(row: any, col: any) {
+  const focusCellWhenReady = useCallback((row: any, col: any) => {
     if (!gridRoot.current) return;
     let attempts = 0;
     const tryFocus = () => {
@@ -2258,7 +2257,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
-  }
+  }, [resolveCellEl]);
+  const indexOfRowIn = useCallback((rows: any, rowOriginal: any, rowId: any) => {
+    const list = rows || [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r) continue;
+      if (rowId != null && r.id === rowId) return i;
+      if (rowOriginal != null && r.original === rowOriginal) return i;
+    }
+    return -1;
+  }, [rows]);
   function endEdit() {
     setEditingRow(-1);
     setEditingCol(-1);
@@ -2328,7 +2337,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
     // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
     // Tab-advance (the caller immediately opens the next editor and focuses THAT).
-    if (skipFocusReturn !== true) focusCellWhenReady(focusRow, focusCol);
+    // B23: do NOT focus the FIXED old index here — under an active sort/filter the committed row
+    // RELOCATES, and focusCellWhenReady(oldRow,col) would land on whatever row now sits at the old
+    // index (or drop to <body>). Instead record a pending follow-request the refreshRowModel pass
+    // consumes AFTER the row model re-derives: it resolves the row's NEW display index from the
+    // fresh model (React-stale-safe) and focuses THAT cell; the @focusin sync then re-seats the
+    // active-cell state so it and DOM focus stay coherent. With no sort/filter the row keeps its
+    // index → byte-behaviorally identical to before.
+    if (skipFocusReturn !== true) pendingEditFollow.current = {
+      rowOriginal,
+      rowId,
+      col: focusCol
+    };
     return true;
   }
   function cancelEdit() {
@@ -2356,12 +2376,37 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (colId == null || !columnEditable(colId)) continue;
       const d = defFor(colId);
       const field = d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+      // colIndex = the VISIBLE-cell index (the data-col-index the editor cell renders under).
+      // Carried so the row-mode Tab containment (B21) + the validation-failure focus (B22)
+      // can address a SPECIFIC editor by column, not just the first [data-editing-cell].
       out.push({
         colId,
-        field
+        field,
+        colIndex: c
       });
     }
     return out;
+  }
+  function focusRowEditorAt(rowIndex: any, colIndex: any) {
+    if (!gridRoot.current) return;
+    let attempts = 0;
+    const tryFocus = () => {
+      const cellEl = resolveCellEl(String(rowIndex), colIndex);
+      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      if (ed) {
+        ed.focus();
+        if (ed.select) {
+          try {
+            ed.select();
+          } catch (e: any) {}
+        }
+        return;
+      }
+      attempts = attempts + 1;
+      if (attempts >= 30) return;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
   function beginRowEdit(row: any) {
     const rowIndex = rowIndexOf(row);
@@ -2407,7 +2452,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const err = runValidator(ec.colId, draft[ec.colId], rowOriginal);
       if (err !== true) {
         setInvalid(err);
-        focusEditorWhenReady();
+        // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
+        // unconditionally the first editor (focusEditorWhenReady resolves the first
+        // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+        focusRowEditorAt(rowIndex, ec.colIndex);
         return false;
       }
     }
@@ -2571,6 +2619,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     next[colId] = value;
     setRowDraft(next);
   }
+  function rowEditTab(target: any, backward: any) {
+    const rowIndex = editingRowIndex;
+    if (rowIndex == null) return;
+    const editable = editableColumnsForRow(rowIndex);
+    if (editable.length === 0) return;
+    const cols = editable.map((ec: any) => ec.colIndex);
+    const cell = target && target.closest ? target.closest('[data-grid-cell]') : null;
+    const curAttr = cell ? cell.getAttribute('data-col-index') : null;
+    const cur = curAttr != null ? parseInt(curAttr, 10) : -1;
+    let pos = cols.indexOf(cur);
+    if (pos < 0) pos = 0;
+    const len = cols.length;
+    const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len;
+    focusRowEditorAt(rowIndex, cols[nextPos]);
+  }
   const onEditorKeyDown = useCallback((e: any) => {
     if (!e) return;
     const key = e.key;
@@ -2585,6 +2648,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       } else if (key === 'Escape') {
         e.preventDefault();
         cancelRow();
+      }
+      // B21: CONTAIN Tab within the editing row. Native Tab escapes the row at its first/last
+      // editor (leaving editingRowIndex set so onGridKeyDown stays frozen → keyboard trap). Take
+      // Tab over entirely and cycle between the row's editors WITH WRAP (forward off the last →
+      // first; Shift+Tab off the first → last). Cross-target-safe (no reliance on the native DOM
+      // tab order across a Lit shadow boundary).
+      else if (key === 'Tab') {
+        e.preventDefault();
+        rowEditTab(e.target, e.shiftKey);
       }
       return;
     }
@@ -2618,7 +2690,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       e.preventDefault();
       cancelEdit();
     }
-  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, nextEditableCell, prevEditableCell]);
+  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, nextEditableCell, prevEditableCell, rowEditTab]);
   const onEditorBlur = useCallback((e: any) => {
     // Full-row mode (req-6): blur NEVER commits — the row commits as a UNIT only on an
     // explicit Enter / save / editRow-driven flow (a per-cell blur-commit would split the row
@@ -2898,6 +2970,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
       // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
       clampActiveCell();
+      // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
+      // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
+      // indices), so resolve the committed row's NEW index by identity HERE (never from the React-
+      // stale state) and re-seat focus on that cell via the DOM-only poll (focusCellWhenReady reads
+      // gridRoot only → React-safe). Consumed ONCE (cleared) so a multi-render re-feed focuses once;
+      // a no-relocation commit resolves the same index → byte-behaviorally identical to before.
+      if (pendingEditFollow.current && isGrid()) {
+        const follow = pendingEditFollow.current;
+        pendingEditFollow.current = null;
+        const followIdx = indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId);
+        if (followIdx >= 0) focusCellWhenReady(followIdx, follow.col);
+      }
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.

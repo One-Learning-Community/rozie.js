@@ -809,6 +809,18 @@ $onMount(() => {
     // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
     // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
     clampActiveCell()
+    // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
+    // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
+    // indices), so resolve the committed row's NEW index by identity HERE (never from the React-
+    // stale state) and re-seat focus on that cell via the DOM-only poll (focusCellWhenReady reads
+    // gridRoot only → React-safe). Consumed ONCE (cleared) so a multi-render re-feed focuses once;
+    // a no-relocation commit resolves the same index → byte-behaviorally identical to before.
+    if (pendingEditFollow && isGrid()) {
+      const follow = pendingEditFollow
+      pendingEditFollow = null
+      const followIdx = indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId)
+      if (followIdx >= 0) focusCellWhenReady(followIdx, follow.col)
+    }
     // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
     // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
     // across selection changes; a microtask defer covers React's post-render DOM patch.
@@ -1107,15 +1119,22 @@ let fillDragMove = null
 let fillDragUp = null
 import { teardownFillDrag, cellIndexFromPoint, onFillHandlePointerDown } from './fillDrag.rzts'
 
-import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit } from './editCellLifecycle.rzts'
+import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit } from './editCellLifecycle.rzts'
 
-import { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
+import { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
 
 // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
 // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
 // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
 // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
 let editTransition = false
+
+// B23: a pending "follow the committed row's focus" request, set by commitEdit (a single-cell
+// commit that may relocate the row under an active sort/filter) and consumed ONCE by the next
+// refreshRowModel pass — which runs with the FRESH re-derived row model, so it can resolve the
+// committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
+// { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
+let pendingEditFollow = null
 
 // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
 // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode

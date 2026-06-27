@@ -667,6 +667,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
       // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
       clampActiveCell();
+      // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
+      // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
+      // indices), so resolve the committed row's NEW index by identity HERE (never from the React-
+      // stale state) and re-seat focus on that cell via the DOM-only poll (focusCellWhenReady reads
+      // gridRoot only → React-safe). Consumed ONCE (cleared) so a multi-render re-feed focuses once;
+      // a no-relocation commit resolves the same index → byte-behaviorally identical to before.
+      if (pendingEditFollow && isGrid()) {
+        const follow = pendingEditFollow;
+        pendingEditFollow = null;
+        const followIdx = indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId);
+        if (followIdx >= 0) focusCellWhenReady(followIdx, follow.col);
+      }
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.
@@ -3390,6 +3402,23 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
 
+  // B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
+  // row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
+  // across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
+  // via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
+  // only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
+  // the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
+  function indexOfRowIn(rows: any, rowOriginal: any, rowId: any) {
+    const list = rows || [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r) continue;
+      if (rowId != null && r.id === rowId) return i;
+      if (rowOriginal != null && r.original === rowOriginal) return i;
+    }
+    return -1;
+  }
+
   // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
   // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
   // decide where focus lands — commit/cancel return it to the owning cell).
@@ -3483,7 +3512,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
     // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
     // Tab-advance (the caller immediately opens the next editor and focuses THAT).
-    if (skipFocusReturn !== true) focusCellWhenReady(focusRow, focusCol);
+    // B23: do NOT focus the FIXED old index here — under an active sort/filter the committed row
+    // RELOCATES, and focusCellWhenReady(oldRow,col) would land on whatever row now sits at the old
+    // index (or drop to <body>). Instead record a pending follow-request the refreshRowModel pass
+    // consumes AFTER the row model re-derives: it resolves the row's NEW display index from the
+    // fresh model (React-stale-safe) and focuses THAT cell; the @focusin sync then re-seats the
+    // active-cell state so it and DOM focus stay coherent. With no sort/filter the row keeps its
+    // index → byte-behaviorally identical to before.
+    if (skipFocusReturn !== true) pendingEditFollow = {
+      rowOriginal,
+      rowId,
+      col: focusCol
+    };
     return true;
   }
 
@@ -3524,12 +3564,43 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       if (colId == null || !columnEditable(colId)) continue;
       const d = defFor(colId);
       const field = d ? d.accessorKey != null ? d.accessorKey : colId : colId;
+      // colIndex = the VISIBLE-cell index (the data-col-index the editor cell renders under).
+      // Carried so the row-mode Tab containment (B21) + the validation-failure focus (B22)
+      // can address a SPECIFIC editor by column, not just the first [data-editing-cell].
       out.push({
         colId,
-        field
+        field,
+        colIndex: c
       });
     }
     return out;
+  }
+
+  // B21/B22: focus the row-mode editor at a given VISIBLE col index. In full-row edit every
+  // editable cell is already mounted as an editor, so this resolves the cell off gridRoot and
+  // focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
+  // so a React re-render that recreates the input across the focus call still lands it. select-
+  // all on text/number editors (a no-op try/catch on select/checkbox).
+  function focusRowEditorAt(rowIndex: any, colIndex: any) {
+    if (!gridRoot) return;
+    let attempts = 0;
+    const tryFocus = () => {
+      const cellEl = resolveCellEl(String(rowIndex), colIndex);
+      const ed = cellEl && cellEl.querySelector ? cellEl.querySelector('[data-editing-cell]') : null;
+      if (ed) {
+        ed.focus();
+        if (ed.select) {
+          try {
+            ed.select();
+          } catch (e: any) {}
+        }
+        return;
+      }
+      attempts = attempts + 1;
+      if (attempts >= 30) return;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
 
   // beginRowEdit(row): enter full-row edit on a body row (req-6). Seeds rowDraft from each
@@ -3588,7 +3659,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       const err = runValidator(ec.colId, draft[ec.colId], rowOriginal);
       if (err !== true) {
         setInvalid(err);
-        focusEditorWhenReady();
+        // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
+        // unconditionally the first editor (focusEditorWhenReady resolves the first
+        // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+        focusRowEditorAt(rowIndex, ec.colIndex);
         return false;
       }
     }
@@ -3725,6 +3799,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
   let editTransition = false;
 
+  // B23: a pending "follow the committed row's focus" request, set by commitEdit (a single-cell
+  // commit that may relocate the row under an active sort/filter) and consumed ONCE by the next
+  // refreshRowModel pass — which runs with the FRESH re-derived row model, so it can resolve the
+  // committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
+  // { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
+  let pendingEditFollow: any = null;
+
   // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
   // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
   // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -3797,6 +3878,26 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setRowDraft(next);
   }
 
+  // B21: contain a Tab WITHIN the editing row (editMode='row'). Resolve the editable cells'
+  // visible col indices for the editing row, find the current editor's col (off the blurring
+  // editor's owning [data-grid-cell]), then move to the next/prev editable col WITH WRAP so
+  // focus never leaves the row. A no-op when no row is editing / the row has no editable cells.
+  function rowEditTab(target: any, backward: any) {
+    const rowIndex = editingRowIndex();
+    if (rowIndex == null) return;
+    const editable = editableColumnsForRow(rowIndex);
+    if (editable.length === 0) return;
+    const cols = editable.map((ec: any) => ec.colIndex);
+    const cell = target && target.closest ? target.closest('[data-grid-cell]') : null;
+    const curAttr = cell ? cell.getAttribute('data-col-index') : null;
+    const cur = curAttr != null ? parseInt(curAttr, 10) : -1;
+    let pos = cols.indexOf(cur);
+    if (pos < 0) pos = 0;
+    const len = cols.length;
+    const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len;
+    focusRowEditorAt(rowIndex, cols[nextPos]);
+  }
+
   // onEditorKeyDown: the editor-LOCAL keymap (req-3). Enter → commit + stay (focus returns
   // to the cell); Tab → commit + advance to the next editable cell; Escape → cancel +
   // revert. preventDefault on handled keys so the grid keymap / native Tab don't double-act.
@@ -3814,6 +3915,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       } else if (key === 'Escape') {
         e.preventDefault();
         cancelRow();
+      }
+      // B21: CONTAIN Tab within the editing row. Native Tab escapes the row at its first/last
+      // editor (leaving editingRowIndex set so onGridKeyDown stays frozen → keyboard trap). Take
+      // Tab over entirely and cycle between the row's editors WITH WRAP (forward off the last →
+      // first; Shift+Tab off the first → last). Cross-target-safe (no reliance on the native DOM
+      // tab order across a Lit shadow boundary).
+      else if (key === 'Tab') {
+        e.preventDefault();
+        rowEditTab(e.target, e.shiftKey);
       }
       return;
     }

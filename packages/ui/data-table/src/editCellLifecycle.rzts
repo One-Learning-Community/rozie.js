@@ -235,6 +235,23 @@ const focusCellWhenReady = (row, col) => {
   else setTimeout(tryFocus, 0)
 }
 
+// B23: the index of a committed row WITHIN a given (fresh) visible-model array, resolved by
+// row IDENTITY. table-core's default getRowId is source-index-based, so a row's id is stable
+// across a re-sort (only its VISIBLE position moves); a committed edit replaces the row object
+// via a fresh spread (the `original` reference changes), so match by `id` FIRST, `original`
+// only as a fallback. Returns -1 when the row filtered out of the view. PURE (the caller passes
+// the FRESH row list — refreshRowModel's just-pulled `nextRows`, never the React-stale state).
+const indexOfRowIn = (rows, rowOriginal, rowId) => {
+  const list = rows || []
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i]
+    if (!r) continue
+    if (rowId != null && r.id === rowId) return i
+    if (rowOriginal != null && r.original === rowOriginal) return i
+  }
+  return -1
+}
+
 // endEdit: tear down the editor (shared by commit/cancel). Clears the editing pair +
 // draft + invalid state and returns to navigation mode. Does NOT move focus (callers
 // decide where focus lands — commit/cancel return it to the owning cell).
@@ -320,7 +337,14 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
   // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
   // Tab-advance (the caller immediately opens the next editor and focuses THAT).
-  if (skipFocusReturn !== true) focusCellWhenReady(focusRow, focusCol)
+  // B23: do NOT focus the FIXED old index here — under an active sort/filter the committed row
+  // RELOCATES, and focusCellWhenReady(oldRow,col) would land on whatever row now sits at the old
+  // index (or drop to <body>). Instead record a pending follow-request the refreshRowModel pass
+  // consumes AFTER the row model re-derives: it resolves the row's NEW display index from the
+  // fresh model (React-stale-safe) and focuses THAT cell; the @focusin sync then re-seats the
+  // active-cell state so it and DOM focus stay coherent. With no sort/filter the row keeps its
+  // index → byte-behaviorally identical to before.
+  if (skipFocusReturn !== true) pendingEditFollow = { rowOriginal, rowId, col: focusCol }
   return true
 }
 
@@ -340,4 +364,4 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol)
 }
 
-export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit }
+export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit }
