@@ -2300,6 +2300,9 @@ importers:
 
   packages/ui/combobox:
     devDependencies:
+      '@rozie-ui/headless-core':
+        specifier: workspace:*
+        version: link:../headless-core
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core

@@ -58,3 +58,19 @@
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
 }
+.rozie-combobox-empty[data-rozie-s-9546115a] {
+  padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
+  color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
+  list-style: none;
+}
+.rozie-combobox--inline[data-rozie-s-9546115a] {
+  display: block;
+  width: 100%;
+}
+.rozie-combobox--inline[data-rozie-s-9546115a] .rozie-combobox-list[data-rozie-s-9546115a] {
+  position: static;
+  margin-top: var(--rozie-combobox-list-gap, 0.25rem);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}

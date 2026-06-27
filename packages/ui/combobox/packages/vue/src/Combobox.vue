@@ -1,13 +1,16 @@
 <template>
 
-<div :class="['rozie-combobox', { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': props.disabled }]" v-bind="$attrs">
+<div :class="['rozie-combobox', { 'rozie-combobox--open': isOpen, 'rozie-combobox--disabled': props.disabled, 'rozie-combobox--inline': props.inline }]" v-bind="$attrs">
   <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="activeId()" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
 
-  <ul v-if="isOpen && filteredOptions().length > 0" class="rozie-combobox-list" :id="listId()" role="listbox">
+  <ul v-if="isOpen" class="rozie-combobox-list" :id="listId()" role="listbox">
     <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
-      <slot name="option" :option="opt" :active="opt._i === activeIndex" :selected="opt.value === value">{{ opt.label }}</slot>
+      <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
     </li>
-  </ul></div>
+
+    <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+      <slot name="empty" :query="query">No results</slot>
+    </li></ul></div>
 
 </template>
 
@@ -40,8 +43,28 @@ const props = withDefaults(
      * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
      */
     idBase?: string;
+    /**
+     * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+     */
+    inline?: boolean;
+    /**
+     * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+     */
+    closeOnSelect?: boolean;
+    /**
+     * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+     */
+    optionLabel?: ((...args: any[]) => any) | null;
+    /**
+     * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+     */
+    optionValue?: ((...args: any[]) => any) | null;
+    /**
+     * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+     */
+    optionDisabled?: ((...args: any[]) => any) | null;
   }>(),
-  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox' }
+  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null }
 );
 
 /**
@@ -57,7 +80,8 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-  option(props: { option: any; active: any; selected: any }): any;
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  empty(props: { query: any }): any;
 }>();
 
 const query = ref('');
@@ -66,21 +90,83 @@ const activeIndex = ref(-1);
 
 const inputElRef = ref<HTMLInputElement>();
 
+// ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
+// Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
+// partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
+// navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
+// selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
+// script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
+// IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
+//
+// ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
+// The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
+// windowing.rzts uses) along two axes:
+//   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
+//     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
+//     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
+//     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
+//     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
+//     activedescendant model.
+//   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
+//     (Combobox — a text <input> that filters by the typed query). The mode discriminant is read
+//     from the HOST by convention via `$props.combobox` / `$props.filterable`: a `select-only` host
+//     leaves them false/absent (the `visibleOptions` identity path, the type-ahead printable-char
+//     branch); a `filter-input` host sets them (the `visibleOptions` substring filter, `onInput`).
+//
+// ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
+//   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
+//     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
+//     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
+//     over them (in `onTypeahead`).
+//   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
+//     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
+//     HOST functions; this partial only closes over them (it reads NO refs itself).
+//   - the input-mode discriminant props (`$props.combobox` / `$props.filterable`) + the option set
+//     (`$props.options` / `$props.value` (model) / `$props.multiple` / `$props.id` /
+//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` / `$props.closeOnSelect`
+//     / `$props.disabled`) and the reactive state (`$data.open` / `$data.activeIndex` /
+//     `$data.query`).
+
+// ---- option resolvers --------------------------------------------------
+const labelOf = (opt: any) => {
+  if (props.optionLabel !== null) return props.optionLabel(opt);
+  if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
+  return String(opt);
+};
+const valueOf = (opt: any) => {
+  if (props.optionValue !== null) return props.optionValue(opt);
+  if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
+  return opt;
+};
+const disabledOf = (opt: any) => {
+  if (props.optionDisabled !== null) return !!props.optionDisabled(opt);
+  if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
+  return false;
+};
+
 // ---- derived view (plain functions, uniform ×6) ------------------------
-// The filtered option list, each carrying its filtered-list index `_i`. A plain
-// function (called in the r-for AND handlers) — never $computed.
+// The filtered option list, each carrying its filtered-list index `_i` and the
+// RAW source option (`option`) so `@change` + the `#option` slot expose the
+// original object (CP reads `e.option.id` / `option.group`). A plain function
+// (called in the r-for AND handlers) — never $computed.
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The filtered option list, each carrying its filtered-list index `_i` and the
+// RAW source option (`option`) so `@change` + the `#option` slot expose the
+// original object (CP reads `e.option.id` / `option.group`). A plain function
+// (called in the r-for AND handlers) — never $computed.
 const filteredOptions = () => {
   const opts = Array.isArray(props.options) ? props.options : [];
   let list = opts;
   if (!props.disableFilter) {
     const q = query.value.toLowerCase();
-    if (q) list = opts.filter((o: any) => String(o.label).toLowerCase().indexOf(q) !== -1);
+    if (q) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(q) !== -1);
   }
   return list.map((o: any, i: any) => ({
-    value: o.value,
-    label: o.label,
-    disabled: !!o.disabled,
-    _i: i
+    value: valueOf(o),
+    label: labelOf(o),
+    disabled: disabledOf(o),
+    _i: i,
+    option: o
   }));
 };
 const optId = (i: any) => props.idBase + '-opt-' + i;
@@ -109,15 +195,24 @@ const nextEnabled = (list: any, from: any, dir: any) => {
 };
 
 // ---- selection (writes the model + syncs query) ------------------------
+// `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
+// `@change` with BOTH the committed value AND the raw source `option` (CP reads
+// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
+// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
 // ---- selection (writes the model + syncs query) ------------------------
+// `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
+// `@change` with BOTH the committed value AND the raw source `option` (CP reads
+// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
+// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
 const selectOption = (opt: any) => {
   if (!opt || opt.disabled) return;
   value.value = opt.value;
   query.value = String(opt.label);
-  isOpen.value = false;
+  if (props.closeOnSelect) isOpen.value = false;
   activeIndex.value = -1;
   emit('change', {
-    value: opt.value
+    value: opt.value,
+    option: opt.option
   });
 };
 
@@ -282,5 +377,21 @@ defineExpose({ focus, clear });
 .rozie-combobox-option--disabled {
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
+}
+.rozie-combobox-empty {
+  padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
+  color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
+  list-style: none;
+}
+.rozie-combobox--inline {
+  display: block;
+  width: 100%;
+}
+.rozie-combobox--inline .rozie-combobox-list {
+  position: static;
+  margin-top: var(--rozie-combobox-list-gap, 0.25rem);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 </style>

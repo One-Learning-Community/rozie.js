@@ -22,10 +22,14 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Combobox',
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase'],
+  // P3 (D-06): grown to absorb command-palette — resolver props (optionLabel/
+  // optionValue/optionDisabled), `inline` embedded render mode, `closeOnSelect`,
+  // plus an `empty` slot. The option resolvers are consumed from the shared
+  // @rozie-ui/headless-core/listCore.rzts spine.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option'],
+  slots: ['option', 'empty'],
   expose: ['focus', 'clear'],
 };
 

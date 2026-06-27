@@ -3,10 +3,17 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 interface OptionCtx {
-  $implicit: { option: any; active: any; selected: any };
+  $implicit: { option: any; index: any; active: any; selected: any; disabled: any };
   option: any;
+  index: any;
   active: any;
   selected: any;
+  disabled: any;
+}
+
+interface EmptyCtx {
+  $implicit: { query: any };
+  query: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -35,21 +42,30 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()) }" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline() }" #rozieSpread_0 #rozieListenersTarget_1>
       <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="ariaLabel()" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
 
-      @if (isOpen() && filteredOptions().length > 0) {
+      @if (isOpen()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
         @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
           @if ((optionTpl ?? templates()?.['option'])) {
-    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: opt, active: opt._i === activeIndex(), selected: opt.value === value() }, option: opt, active: opt._i === activeIndex(), selected: opt.value === value() }" />
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
     } @else {
     {{ rozieDisplay(opt.label) }}
     }
         </li>
     }
-      </ul>
+
+        @if (filteredOptions().length === 0) {
+    <li class="rozie-combobox-empty" role="presentation">
+          @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    No results
+    }
+        </li>
+    }</ul>
     }</div>
 
   `,
@@ -114,6 +130,22 @@ function __rozieAttr(v: unknown): string | null {
       cursor: not-allowed;
       opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
     }
+    .rozie-combobox-empty {
+      padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
+      color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
+      list-style: none;
+    }
+    .rozie-combobox--inline {
+      display: block;
+      width: 100%;
+    }
+    .rozie-combobox--inline .rozie-combobox-list {
+      position: static;
+      margin-top: var(--rozie-combobox-list-gap, 0.25rem);
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
   `],
   providers: [
     {
@@ -155,6 +187,26 @@ export class Combobox {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase = input<string>('rozie-combobox');
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline = input<boolean>(false);
+  /**
+   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   */
+  closeOnSelect = input<boolean>(true);
+  /**
+   * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+   */
+  optionLabel = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   */
+  optionValue = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+   */
+  optionDisabled = input<((...args: unknown[]) => unknown) | null>(null);
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);
@@ -162,6 +214,7 @@ export class Combobox {
   change = output<unknown>();
   search = output<unknown>();
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
+  @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
 
@@ -175,19 +228,38 @@ export class Combobox {
     this.syncQueryToValue();
   }
 
+  labelOf = (opt: any) => {
+    const __optionLabel = this.optionLabel();
+    if (__optionLabel !== null) return __optionLabel(opt);
+    if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
+    return String(opt);
+  };
+  valueOf$local = (opt: any) => {
+    const __optionValue = this.optionValue();
+    if (__optionValue !== null) return __optionValue(opt);
+    if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
+    return opt;
+  };
+  disabledOf = (opt: any) => {
+    const __optionDisabled = this.optionDisabled();
+    if (__optionDisabled !== null) return !!__optionDisabled(opt);
+    if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
+    return false;
+  };
   filteredOptions = () => {
     const __options = this.options();
     const opts = Array.isArray(__options) ? __options : [];
     let list = opts;
     if (!this.disableFilter()) {
       const q = this.query().toLowerCase();
-      if (q) list = opts.filter((o: any) => String(o.label).toLowerCase().indexOf(q) !== -1);
+      if (q) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(q) !== -1);
     }
     return list.map((o: any, i: any) => ({
-      value: o.value,
-      label: o.label,
-      disabled: !!o.disabled,
-      _i: i
+      value: this.valueOf$local(o),
+      label: this.labelOf(o),
+      disabled: this.disabledOf(o),
+      _i: i,
+      option: o
     }));
   };
   optId = (i: any) => this.idBase() + '-opt-' + i;
@@ -213,10 +285,11 @@ export class Combobox {
     if (!opt || opt.disabled) return;
     this.value.set(opt.value), this.__rozieCvaOnChange(opt.value);
     this.query.set(String(opt.label));
-    this.isOpen.set(false);
+    if (this.closeOnSelect()) this.isOpen.set(false);
     this.activeIndex.set(-1);
     this.change.emit({
-      value: opt.value
+      value: opt.value,
+      option: opt.option
     });
   };
   syncQueryToValue = () => {
@@ -319,7 +392,7 @@ export class Combobox {
   static ngTemplateContextGuard(
     _dir: Combobox,
     _ctx: unknown,
-  ): _ctx is OptionCtx {
+  ): _ctx is OptionCtx | EmptyCtx {
     return true;
   }
 

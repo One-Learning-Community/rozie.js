@@ -9,8 +9,10 @@
     "test": "vitest run",
     "typecheck": "echo 'meta-pkg: pure-Rozie source; the emitted leaves typecheck individually, the surface gate runs under vitest'"
   },
+  "comment:headless-core-devdep": "Phase 64 (D-06 / P3): @rozie-ui/headless-core is a SOURCE-ONLY workspace package whose `listCore.rzts` script-partial (the option resolvers) DISSOLVES into this family's compiled leaves via inlineScriptPartials() at compile — zero runtime dependency. devDependency (cross-package bare-specifier import resolved at compile-time via the producer exports map; the 64-01 mechanism, no tsconfig paths needed).",
   "devDependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie-ui/headless-core": "workspace:*",
     "typescript": "~5.6.0",
     "vitest": "^4.1.0"
   }

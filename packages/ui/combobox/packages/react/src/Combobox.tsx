@@ -3,7 +3,9 @@ import type { ReactNode } from 'react';
 import { clsx, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Combobox.css';
 
-interface OptionCtx { option: any; active: any; selected: any; }
+interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; }
+
+interface EmptyCtx { query: any; }
 
 interface ComboboxProps {
   /**
@@ -38,9 +40,30 @@ interface ComboboxProps {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
+   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   */
+  closeOnSelect?: boolean;
+  /**
+   * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+   */
+  optionLabel?: ((...args: any[]) => any) | null;
+  /**
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   */
+  optionValue?: ((...args: any[]) => any) | null;
+  /**
+   * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+   */
+  optionDisabled?: ((...args: any[]) => any) | null;
   onChange?: (...args: any[]) => void;
   onSearch?: (...args: any[]) => void;
   renderOption?: (ctx: OptionCtx) => ReactNode;
+  renderEmpty?: (ctx: EmptyCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -51,7 +74,7 @@ export interface ComboboxHandle {
 
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string } = {
+  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     placeholder: _props.placeholder ?? '',
@@ -59,10 +82,15 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     disableFilter: _props.disableFilter ?? false,
     ariaLabel: _props.ariaLabel ?? null,
     idBase: _props.idBase ?? 'rozie-combobox',
+    inline: _props.inline ?? false,
+    closeOnSelect: _props.closeOnSelect ?? true,
+    optionLabel: _props.optionLabel ?? null,
+    optionValue: _props.optionValue ?? null,
+    optionDisabled: _props.optionDisabled ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
-    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void defaultValue; void onValueChange;
+    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
+    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void defaultValue; void onValueChange;
     return rest;
   })();
   const [value, setValue] = useControllableState({
@@ -76,18 +104,34 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const inputEl = useRef<HTMLInputElement | null>(null);
   const _watch0First = useRef(true);
 
+  function labelOf(opt: any) {
+    if (props.optionLabel !== null) return props.optionLabel(opt);
+    if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
+    return String(opt);
+  }
+  function valueOf(opt: any) {
+    if (props.optionValue !== null) return props.optionValue(opt);
+    if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
+    return opt;
+  }
+  function disabledOf(opt: any) {
+    if (props.optionDisabled !== null) return !!props.optionDisabled(opt);
+    if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
+    return false;
+  }
   function filteredOptions() {
     const opts = Array.isArray(props.options) ? props.options : [];
     let list = opts;
     if (!props.disableFilter) {
       const q = query.toLowerCase();
-      if (q) list = opts.filter((o: any) => String(o.label).toLowerCase().indexOf(q) !== -1);
+      if (q) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(q) !== -1);
     }
     return list.map((o: any, i: any) => ({
-      value: o.value,
-      label: o.label,
-      disabled: !!o.disabled,
-      _i: i
+      value: valueOf(o),
+      label: labelOf(o),
+      disabled: disabledOf(o),
+      _i: i,
+      option: o
     }));
   }
   function optId(i: any) {
@@ -117,12 +161,13 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     if (!opt || opt.disabled) return;
     setValue(opt.value);
     setQuery(String(opt.label));
-    setIsOpen(false);
+    if (props.closeOnSelect) setIsOpen(false);
     setActiveIndex(-1);
     _rozieProp_onChange && _rozieProp_onChange({
-      value: opt.value
+      value: opt.value,
+      option: opt.option
     });
-  }, [_rozieProp_onChange, setValue]);
+  }, [_rozieProp_onChange, props.closeOnSelect, setValue]);
   const syncQueryToValue = useCallback(() => {
     const opts = Array.isArray(props.options) ? props.options : [];
     const opt = opts.find((o: any) => o.value === value);
@@ -216,14 +261,17 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
+    <div {...attrs} className={clsx(clsx("rozie-combobox", { "rozie-combobox--open": isOpen, "rozie-combobox--disabled": props.disabled, "rozie-combobox--inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-9546115a="">
       <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={props.ariaLabel} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
-      {(isOpen && filteredOptions().length > 0) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+      {(isOpen) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         {filteredOptions().map((opt) => <li key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
-          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, active: opt._i === activeIndex, selected: opt.value === value }) : rozieDisplay(opt.label)}
+          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
         </li>)}
-      </ul>}</div>
+
+        {(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
+        </li>}</ul>}</div>
     </>
   );
 });

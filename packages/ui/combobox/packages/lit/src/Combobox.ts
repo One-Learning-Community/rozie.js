@@ -6,8 +6,14 @@ import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieOptionSlotCtx {
   option: unknown;
+  index: unknown;
   active: unknown;
   selected: unknown;
+  disabled: unknown;
+}
+
+interface RozieEmptySlotCtx {
+  query: unknown;
 }
 
 @customElement('rozie-combobox')
@@ -73,6 +79,22 @@ export default class Combobox extends SignalWatcher(LitElement) {
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
 }
+.rozie-combobox-empty[data-rozie-s-9546115a] {
+  padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
+  color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
+  list-style: none;
+}
+.rozie-combobox--inline[data-rozie-s-9546115a] {
+  display: block;
+  width: 100%;
+}
+.rozie-combobox--inline[data-rozie-s-9546115a] .rozie-combobox-list[data-rozie-s-9546115a] {
+  position: static;
+  margin-top: var(--rozie-combobox-list-gap, 0.25rem);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 `;
 
   /**
@@ -106,6 +128,26 @@ export default class Combobox extends SignalWatcher(LitElement) {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true }) idBase: string = 'rozie-combobox';
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  @property({ type: Boolean, reflect: true }) inline: boolean = false;
+  /**
+   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   */
+  @property({ type: Boolean, reflect: true }) closeOnSelect: boolean = true;
+  /**
+   * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+   */
+  @property({ type: Function }) optionLabel: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   */
+  @property({ type: Function }) optionValue: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+   */
+  @property({ type: Function }) optionDisabled: ((...args: unknown[]) => unknown) | null = null;
   private _query = signal('');
   private _isOpen = signal(false);
   private _activeIndex = signal(-1);
@@ -114,7 +156,10 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: unknown; active: unknown; selected: unknown }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => unknown;
+  @state() private _hasSlotEmpty = false;
+  @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
+  @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -132,11 +177,23 @@ private __rozieWatchInitial_0 = true;
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="empty"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotEmpty = this._slotEmptyElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
+    this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -168,29 +225,51 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9546115a>
+<div class="${Object.entries({ "rozie-combobox": true, 'rozie-combobox--open': this._isOpen.value, 'rozie-combobox--disabled': this.disabled, 'rozie-combobox--inline': this.inline }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9546115a>
   <input class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded=${!!this._isOpen.value} aria-controls=${rozieAttr(this.listId())} aria-activedescendant=${rozieAttr(this.activeId())} aria-label=${this.ariaLabel} .value=${this._query.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled} autocomplete="off" @input=${($event: Event) => { this.onInput($event); }} @focus=${($event: Event) => { this.onFocus($event); }} @blur=${($event: Event) => { this.onBlur(); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-ref="inputEl" data-rozie-s-9546115a />
 
-  ${this._isOpen.value && this.filteredOptions().length > 0 ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
+  ${this._isOpen.value ? html`<ul class="rozie-combobox-list" id=${rozieAttr(this.listId())} role="listbox" data-rozie-s-9546115a>
     ${repeat<any>(this.filteredOptions(), (opt, _idx) => opt.value, (opt, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': opt._i === this._activeIndex.value, 'rozie-combobox-option--selected': opt.value === this.value, 'rozie-combobox-option--disabled': opt.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(opt.value)} id=${rozieAttr(this.optId(opt._i))} role="option" aria-selected=${opt.value === this.value} aria-disabled=${!!opt.disabled} @mousedown=${($event: MouseEvent) => { $event.preventDefault(); this.selectOption(opt); }} @mouseenter=${($event: Event) => { this._activeIndex.value = opt._i; }} data-rozie-s-9546115a>
-      ${this.option !== undefined ? this.option({option: opt, active: opt._i === this._activeIndex.value, selected: opt.value === this.value}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt, active: opt._i === this._activeIndex.value, selected: opt.value === this.value}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
+      ${this.option !== undefined ? this.option({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt.option, index: opt._i, active: opt._i === this._activeIndex.value, selected: opt.value === this.value, disabled: opt.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(opt.label)}</slot>`}
     </li>`)}
-  </ul>` : nothing}</div>
+
+    ${this.filteredOptions().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
+      ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
+    </li>` : nothing}</ul>` : nothing}</div>
 `;
   }
+
+  labelOf = (opt: any) => {
+  if (this.optionLabel !== null) return this.optionLabel(opt);
+  if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
+  return String(opt);
+};
+
+  valueOf$local = (opt: any) => {
+  if (this.optionValue !== null) return this.optionValue(opt);
+  if (opt !== null && typeof opt === 'object' && 'value' in opt) return opt.value;
+  return opt;
+};
+
+  disabledOf = (opt: any) => {
+  if (this.optionDisabled !== null) return !!this.optionDisabled(opt);
+  if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
+  return false;
+};
 
   filteredOptions = () => {
   const opts = Array.isArray(this.options) ? this.options : [];
   let list = opts;
   if (!this.disableFilter) {
     const q = this._query.value.toLowerCase();
-    if (q) list = opts.filter((o: any) => String(o.label).toLowerCase().indexOf(q) !== -1);
+    if (q) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(q) !== -1);
   }
   return list.map((o: any, i: any) => ({
-    value: o.value,
-    label: o.label,
-    disabled: !!o.disabled,
-    _i: i
+    value: this.valueOf$local(o),
+    label: this.labelOf(o),
+    disabled: this.disabledOf(o),
+    _i: i,
+    option: o
   }));
 };
 
@@ -220,11 +299,12 @@ private __rozieWatchInitial_0 = true;
   if (!opt || opt.disabled) return;
   this._valueControllable.write(opt.value);
   this._query.value = String(opt.label);
-  this._isOpen.value = false;
+  if (this.closeOnSelect) this._isOpen.value = false;
   this._activeIndex.value = -1;
   this.dispatchEvent(new CustomEvent("change", {
     detail: {
-      value: opt.value
+      value: opt.value,
+      option: opt.option
     },
     bubbles: true,
     composed: true
@@ -337,7 +417,7 @@ private __rozieWatchInitial_0 = true;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase']);
+    const __skip = new Set<string>(['value', 'options', 'placeholder', 'disabled', 'disable-filter', 'disablefilter', 'aria-label', 'arialabel', 'id-base', 'idbase', 'inline', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

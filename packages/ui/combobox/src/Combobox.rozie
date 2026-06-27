@@ -116,6 +116,62 @@
         'Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
     },
   },
+
+  // Render the results list IN FLOW (static) instead of as an absolute popup. Use
+  // when the combobox is embedded inside a fixed-size, overflow-clipped container
+  // (e.g. a command-palette panel) where an absolute popup would be culled. Off
+  // (default) keeps the standalone dropdown behavior unchanged. (Grown in P3 to
+  // absorb command-palette — the Listbox `inline` prop it is copied from.)
+  inline: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).',
+    },
+  },
+
+  // Close the popup after a selection. DEFAULT TRUE — a justified, intentional
+  // deviation from the project rule `feedback_boolean_props_default_false`
+  // (negative opt-out / default false), taken here for cross-family API parity
+  // with the `@rozie-ui/listbox` sibling's `closeOnSelect` prop this is copied
+  // from (command-palette + existing consumers rely on the default-true close).
+  closeOnSelect: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.',
+    },
+  },
+
+  // Resolver overrides for object options. Fall back to `.label` / `.value` /
+  // `.disabled`. (Grown in P3 + lifted to the shared listCore spine so callers
+  // can drive non-`{label,value}`-shaped option objects, e.g. command items.)
+  optionLabel: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.",
+    },
+  },
+  optionValue: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.",
+    },
+  },
+  optionDisabled: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.",
+    },
+  },
 }
 </props>
 
@@ -131,17 +187,31 @@
 </data>
 
 <script lang="ts">
+// ---- shared list spine (P3: @rozie-ui/headless-core/listCore.rzts) ------
+// The option resolvers (label/value/disabled, with the optionLabel/optionValue/
+// optionDisabled prop overrides) now live in the shared, focus-/input-mode
+// parameterized list spine that Listbox also consumes (D-06). It is a
+// compile-time `.rzts` script-partial: only the imported symbols are inlined and
+// they DISSOLVE into this leaf via inlineScriptPartials() before IR lowering
+// (zero runtime dep). Combobox consumes it in focus-model `activedescendant` +
+// input-mode `filter-input`, single-select. The open/active/query state machine
+// + the combobox <input> wiring stay host-local (Combobox's `$data.isOpen` /
+// `idBase` / query-on-select shape differs from Listbox's `$data.open` / `id`).
+import { labelOf, valueOf, disabledOf } from '@rozie-ui/headless-core/listCore.rzts'
+
 // ---- derived view (plain functions, uniform ×6) ------------------------
-// The filtered option list, each carrying its filtered-list index `_i`. A plain
-// function (called in the r-for AND handlers) — never $computed.
+// The filtered option list, each carrying its filtered-list index `_i` and the
+// RAW source option (`option`) so `@change` + the `#option` slot expose the
+// original object (CP reads `e.option.id` / `option.group`). A plain function
+// (called in the r-for AND handlers) — never $computed.
 const filteredOptions = () => {
   const opts = Array.isArray($props.options) ? $props.options : []
   let list = opts
   if (!$props.disableFilter) {
     const q = $data.query.toLowerCase()
-    if (q) list = opts.filter((o) => String(o.label).toLowerCase().indexOf(q) !== -1)
+    if (q) list = opts.filter((o) => String(labelOf(o)).toLowerCase().indexOf(q) !== -1)
   }
-  return list.map((o, i) => ({ value: o.value, label: o.label, disabled: !!o.disabled, _i: i }))
+  return list.map((o, i) => ({ value: valueOf(o), label: labelOf(o), disabled: disabledOf(o), _i: i, option: o }))
 }
 
 const optId = (i) => $props.idBase + '-opt-' + i
@@ -168,13 +238,17 @@ const nextEnabled = (list, from, dir) => {
 }
 
 // ---- selection (writes the model + syncs query) ------------------------
+// `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
+// `@change` with BOTH the committed value AND the raw source `option` (CP reads
+// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
+// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
 const selectOption = (opt) => {
   if (!opt || opt.disabled) return
   $model.value = opt.value
   $data.query = String(opt.label)
-  $data.isOpen = false
+  if ($props.closeOnSelect) $data.isOpen = false
   $data.activeIndex = -1
-  $emit('change', { value: opt.value })
+  $emit('change', { value: opt.value, option: opt.option })
 }
 
 // Reflect the externally-selected value into the input text.
@@ -277,7 +351,7 @@ $expose({ focus, clear })
 <template>
 <div
   class="rozie-combobox"
-  :class="{ 'rozie-combobox--open': $data.isOpen, 'rozie-combobox--disabled': $props.disabled }"
+  :class="{ 'rozie-combobox--open': $data.isOpen, 'rozie-combobox--disabled': $props.disabled, 'rozie-combobox--inline': $props.inline }"
 >
   <input
     ref="inputEl"
@@ -300,7 +374,7 @@ $expose({ focus, clear })
   />
 
   <ul
-    r-if="$data.isOpen && filteredOptions().length > 0"
+    r-if="$data.isOpen"
     class="rozie-combobox-list"
     :id="listId()"
     role="listbox"
@@ -317,7 +391,11 @@ $expose({ focus, clear })
       @mousedown.prevent="selectOption(opt)"
       @mouseenter="$data.activeIndex = opt._i"
     >
-      <slot name="option" :option="opt" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value">{{ opt.label }}</slot>
+      <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === $data.activeIndex" :selected="opt.value === $props.value" :disabled="opt.disabled">{{ opt.label }}</slot>
+    </li>
+
+    <li r-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+      <slot name="empty" :query="$data.query">No results</slot>
     </li>
   </ul>
 </div>
@@ -388,6 +466,26 @@ $expose({ focus, clear })
 .rozie-combobox-option--disabled {
   cursor: not-allowed;
   opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
+}
+.rozie-combobox-empty {
+  padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
+  color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
+  list-style: none;
+}
+
+/* Inline mode: the root fills its container and the list renders IN FLOW so an
+   overflow-clipped ancestor (e.g. a command-palette panel) can't cull it. Mirrors
+   the listbox `inline` prop this is copied from (P3 — command-palette absorb). */
+.rozie-combobox--inline {
+  display: block;
+  width: 100%;
+}
+.rozie-combobox--inline .rozie-combobox-list {
+  position: static;
+  margin-top: var(--rozie-combobox-list-gap, 0.25rem);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 </style>
 

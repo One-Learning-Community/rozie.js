@@ -60,6 +60,11 @@ import '@rozie-ui/combobox-svelte/themes/shadcn.css';    // or material.css, boo
 | `disableFilter` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `idBase` | `String` | `"rozie-combobox"` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
+| `closeOnSelect` | `Boolean` | `true` |  |  |
+| `optionLabel` | `Function` | `null` |  |  |
+| `optionValue` | `Function` | `null` |  |  |
+| `optionDisabled` | `Function` | `null` |  |  |
 
 ## Events
 
@@ -90,4 +95,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
-| option | option, active, selected |
+| option | option, index, active, selected, disabled |
+| empty | query |

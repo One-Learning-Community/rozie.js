@@ -73,12 +73,17 @@ const frameworks = [
 | `disableFilter` | `Boolean` | `false` | yes | Opt **out** of built-in client filtering (async / server-side mode): render `options` as supplied and rely on the `search` event to refetch. Default: filter `options` by `label` against the typed query. |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the input when there is no visible `<label for>` (reflected onto `aria-label`). |
 | `idBase` | `String` | `"rozie-combobox"` | yes | id base for the listbox + option elements (`aria-activedescendant` needs real ids). Set a **distinct** value per instance when more than one combobox is on a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
+| `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as an absolutely-positioned popup — use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. |
+| `closeOnSelect` | `Boolean` | `true` | yes | Close the popup after a selection commits (default `true`, standard autocomplete behavior); set `false` to keep it open after a selection — e.g. in a multi-action surface. |
+| `optionLabel` | `Function` | `null` | yes | Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property. |
+| `optionValue` | `Function` | `null` | yes | Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. |
+| `optionDisabled` | `Function` | `null` | yes | Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property. |
 
 ### Events
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired when the selected value changes — a user picks an option, or `clear()` resets it. Payload `{ value }` — the newly-selected option value (or `null` after a clear). |
+| `change` | Fired when the selected value changes — a user picks an option, or `clear()` resets it. Payload `{ value, option }` — the newly-selected option value plus the raw source option object (`null`/`null` after a clear). |
 | `search` | Fired on every keystroke in the input. Payload `{ query }` — the current text. Pair it with `disableFilter` to drive async / server-side filtering. |
 
 ### Imperative handle
@@ -94,7 +99,8 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `option` | `option, active, selected` | Custom per-option rendering. `option` is the `{ value, label, disabled }` record, `active` is whether it is the active-descendant (keyboard-highlighted), `selected` is whether its value equals the bound `value`. Omit it to render the plain `option.label`. |
+| `option` | `option, index, active, selected, disabled` | Custom per-option rendering. `option` is the raw source option object, `index` is its position in the filtered list, `active` is whether it is the active-descendant (keyboard-highlighted), `selected` is whether its value equals the bound `value`, `disabled` is the resolved disabled state. Omit it to render the plain resolved label. |
+| `empty` | `query` | Rendered inside the open popup when the filtered list is empty. `query` is the current input text. Omit it to render the default "No results". |
 
 ## Filtering: client vs. async
 

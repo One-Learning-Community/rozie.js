@@ -95,6 +95,11 @@ export class ComboboxFormComponent {
 | `disableFilter` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `idBase` | `String` | `"rozie-combobox"` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
+| `closeOnSelect` | `Boolean` | `true` |  |  |
+| `optionLabel` | `Function` | `null` |  |  |
+| `optionValue` | `Function` | `null` |  |  |
+| `optionDisabled` | `Function` | `null` |  |  |
 
 ## Events
 
@@ -125,4 +130,5 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
-| option | option, active, selected |
+| option | option, index, active, selected, disabled |
+| empty | query |

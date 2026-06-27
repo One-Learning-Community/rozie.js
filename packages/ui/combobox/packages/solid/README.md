@@ -57,6 +57,11 @@ import '@rozie-ui/combobox-solid/themes/shadcn.css';    // or material.css, boot
 | `disableFilter` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `idBase` | `String` | `"rozie-combobox"` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
+| `closeOnSelect` | `Boolean` | `true` |  |  |
+| `optionLabel` | `Function` | `null` |  |  |
+| `optionValue` | `Function` | `null` |  |  |
+| `optionDisabled` | `Function` | `null` |  |  |
 
 ## Events
 
@@ -87,4 +92,5 @@ handle?.clear();
 
 | Slot | Params |
 | --- | --- |
-| option | option, active, selected |
+| option | option, index, active, selected, disabled |
+| empty | query |

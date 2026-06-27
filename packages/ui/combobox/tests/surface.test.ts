@@ -27,10 +27,12 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Combobox',
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase'],
+  // P3 (D-06): grown to absorb command-palette — resolver props, `inline`,
+  // `closeOnSelect`, + an `empty` slot; resolvers consumed from listCore.rzts.
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option'] as string[],
+  slots: ['option', 'empty'] as string[],
   expose: ['focus', 'clear'],
 } as const;
 
@@ -51,7 +53,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (7 props)', () => {
+  it('props surface matches (12 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

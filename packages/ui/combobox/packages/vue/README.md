@@ -61,6 +61,11 @@ import '@rozie-ui/combobox-vue/themes/shadcn.css';    // or material.css, bootst
 | `disableFilter` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `idBase` | `String` | `"rozie-combobox"` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
+| `closeOnSelect` | `Boolean` | `true` |  |  |
+| `optionLabel` | `Function` | `null` |  |  |
+| `optionValue` | `Function` | `null` |  |  |
+| `optionDisabled` | `Function` | `null` |  |  |
 
 ## Events
 
@@ -94,4 +99,5 @@ const cb = ref();          // template ref
 
 | Slot | Params |
 | --- | --- |
-| option | option, active, selected |
+| option | option, index, active, selected, disabled |
+| empty | query |

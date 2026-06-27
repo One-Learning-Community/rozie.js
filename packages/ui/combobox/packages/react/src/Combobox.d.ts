@@ -35,9 +35,30 @@ export interface ComboboxProps {
    * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one combobox shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
+  /**
+   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the combobox inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   */
+  inline?: boolean;
+  /**
+   * Close the popup after a selection commits. Defaults `true` (standard autocomplete behavior); set to `false` to keep the popup open after a selection — e.g. when the combobox is embedded in a multi-action surface like a command palette.
+   */
+  closeOnSelect?: boolean;
+  /**
+   * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
+   */
+  optionLabel?: ((...args: unknown[]) => unknown) | null;
+  /**
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   */
+  optionValue?: ((...args: unknown[]) => unknown) | null;
+  /**
+   * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
+   */
+  optionDisabled?: ((...args: unknown[]) => unknown) | null;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
-  renderOption?: (params: { option: () => void; active: unknown; selected: unknown }) => ReactNode;
+  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
+  renderEmpty?: (params: { query: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
