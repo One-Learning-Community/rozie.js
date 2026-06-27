@@ -1,0 +1,195 @@
+<!--
+  DataTableGridEditDemo.rozie — Phase 63 Wave-1 (cell-edit-under-grid-nav) RED-first fixture.
+
+  Drives the cell-edit cluster bugs (B1 click-away wedge, B2 type-to-edit char loss,
+  B3 number/empty coercion, B4 Shift+Tab backward, B5 last-cell Tab containment, B24
+  checkbox/select draft-seed guard, B26 drop-in vs built-in click-away parity) across all
+  six targets via data-table-grid-edit.spec.ts.
+
+  A SINGLE DataTable in interactionMode='grid' with five editable columns:
+    0 name   — built-in text editor
+    1 qty    — built-in number editor  (B3 numeric/empty coercion)
+    2 note   — CUSTOM #editor drop-in (EditorText, owns its OWN onBlur commit) (B26)
+    3 status — built-in select editor  (B24 no garbage draft)
+    4 active — built-in checkbox editor (B24 no forced-checked seed; LAST editable col → B5)
+
+  `r-model:data` binds the dataset so the spec asserts the COMMITTED model values + types
+  through the `model-readout` JSON dump. activecell-readout / getactivecell-readout mirror
+  the grid demos so the spec can prove the grid stays navigable after a commit (B1).
+
+  Static dataset (no clock/random) for VR determinism. No loop var / slot named row/cell/
+  header (the Svelte mount-throw discipline) — the #cell slot binds value/columnId; the
+  #editor slot binds value/columnId/commit/cancel.
+-->
+
+<rozie name="DataTableGridEditDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+}
+</components>
+
+<data>
+{
+  // Static dataset — one field per editor type + the #editor-slot field (`note`).
+  rows: [
+    { id: 1, name: 'Alpha', qty: 3, note: 'a-note', status: 'active',   active: false },
+    { id: 2, name: 'Beta',  qty: 7, note: 'b-note', status: 'archived', active: true  },
+    { id: 3, name: 'Gamma', qty: 1, note: 'c-note', status: 'active',   active: false },
+    { id: 4, name: 'Delta', qty: 5, note: 'd-note', status: 'pending',  active: true  },
+  ],
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ],
+  // Last cell-edit-commit payload "columnId=newValue" + a counter (one per commit, D-07).
+  lastCommit: '',
+  commitCount: 0,
+  // Last activecell-change "r,c" + a counter (B1: the grid stays navigable after a commit).
+  lastActiveCell: '',
+  activeCellChangeCount: 0,
+  // getActiveCell() handle readout.
+  getActiveResult: '',
+}
+</data>
+
+<script lang="ts">
+// cell-edit-commit → "columnId=newValue" readout + counter. Payload arrives as arg0
+// directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// activecell-change → "r,c" readout + counter (so the spec proves the grid did not wedge
+// after an editor commit/close — B1: an ArrowDown still moves the active cell).
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+  $data.activeCellChangeCount = $data.activeCellChangeCount + 1
+}
+
+// Read $refs.dt LIVE in the handler (the GridNavDemo idiom — never cache the handle).
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
+  }
+}
+</script>
+
+<template>
+<div class="dt-grid-edit-demo">
+  <h3>DataTable — grid-mode cell editing</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <span class="label">last commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">activecell-change:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">emit-count:</span>
+    <span class="readout" data-testid="activecell-count">{{ $data.activeCellChangeCount }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+  </div>
+
+  <!-- The COMMITTED model, JSON-dumped, so the spec asserts both VALUES and TYPES
+       (B3: typeof qty === 'number'; emptied number commits null). -->
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      @cell-edit-commit="onCellEditCommit($event)"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="name"   header="Name"   :editable="true" editor="text" />
+      <Column field="qty"    header="Qty"    :editable="true" editor="number" />
+      <!-- The #editor-slot column (B26): a real drop-in editor that owns its own onBlur
+           commit. editor='custom' routes it through the #editor scoped slot. -->
+      <Column field="note"   header="Note"   :editable="true" editor="custom" />
+      <Column
+        field="status"
+        header="Status"
+        :editable="true"
+        editor="select"
+        :editorOptions="$data.statusOptions"
+      />
+      <Column field="active" header="Active" :editable="true" editor="checkbox" />
+
+      <!-- Read-only display slot. -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- Custom #editor drop-in (B26): the `note` column renders an EditorText drop-in
+           that commits on its own blur; every other editable column uses its built-in
+           editor. The slot receives { value, columnId, commit, cancel }. -->
+      <template #editor="{ columnId, value, commit, cancel }">
+        <EditorText
+          r-if="columnId === 'note'"
+          data-testid="note-dropin"
+          :value="value"
+          :columnId="columnId"
+          :commit="commit"
+          :cancel="cancel"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-edit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 620px;
+}
+.dt-grid-edit-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>

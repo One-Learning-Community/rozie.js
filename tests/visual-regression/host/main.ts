@@ -636,6 +636,18 @@ export const EXAMPLES = [
   // already registered for Angular cross-tree AOT in phase 48).
   'DataTableEdit',
   'DataTableEditVirtual',
+  // Phase 63 Wave-1 (grid-mode cell-edit correctness) — the cell-edit-under-grid-nav
+  // RED-first fixture (loader → examples/demos/DataTableGridEditDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column,EditorText}.rozie). ONE grid-mode
+  // DataTable with five editable columns (text/number/select/checkbox built-ins + a
+  // `note` #editor drop-in) bound r-model:data, with a model-readout JSON dump so
+  // data-table-grid-edit.spec.ts asserts the committed model values + types (B1/B2/B3/
+  // B4/B5/B24/B26). Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  // Lives under examples/demos/ so no new Angular 3-file registration is needed
+  // (prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the glob-driven
+  // build-cells demos sweep already cover it, importing the data-table source pkg already
+  // registered for Angular cross-tree AOT in phase 48).
+  'DataTableGridEdit',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -989,6 +1001,9 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTablePinProbe: 'rozie-data-table-pin-probe',
   DataTableEdit: 'rozie-data-table-edit',
   DataTableEditVirtual: 'rozie-data-table-edit-virtual',
+  // Phase 63 grid-mode cell-edit — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-edit-demo' = kebab of DataTableGridEditDemo.
+  DataTableGridEdit: 'rozie-data-table-grid-edit',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
