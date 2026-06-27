@@ -1,0 +1,112 @@
+<!--
+  DataTableVirtualGroupDemo.rozie — Phase 63 Wave-7 (B13 LOCKED: full parity) VIRTUAL +
+  GROUPING fixture. The behavioral fixture the virtual↔grouping parity assertions in
+  data-table-grid-virtual-parity.spec.ts grow into.
+
+  Combines the DataTableVirtualDemo windowing config (:virtual + maxHeight, a large
+  seeded-in-$onMount dataset) with the DataTableGroupDemo grouping surface (:groupable,
+  r-model:grouping, aggregationFn) so GROUP-HEADER rows + leaf rows appear INSIDE the
+  windowed <tbody> slice. Today (pre-63-07) the windowed <tbody> (DataTable.rozie
+  ~1408-1545) DROPS the cellIsGrouped branch + the data-group-header/leaf/depth markers +
+  the rdt-group-header class — group rows render as bare cells with no toggle/(n)/depth.
+  This fixture proves that gap RED, then GREEN after the windowed-body parity fix.
+
+    - 600 rows across 6 category groups seeded in $onMount (deterministic; no clock/random
+      → VR-stable). Grouped by `category` at mount (groupingModel = ['category']) so the
+      first windowed rows ARE a group-header row + its depth-1 leaves.
+    - :virtual + maxHeight="400px" opts into row-windowing (pagination chrome auto-
+      suppressed, windowing sources from getPrePaginationRowModel — the grouped+expanded
+      row model). Grouping auto-expands by default (currentState) so the leaves are
+      visible under each header.
+    - `units` uses the built-in aggregationFn='sum'; the group-header cell shows the
+      rolled-up total + the `(n)` member count + the toggle (the cellIsGrouped branch).
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot
+  named `cell` — the #cell display slot binds `value`/`row`/`columnId`. The grouping model
+  field is named `groupingModel` (NOT `grouping`) to avoid the Angular slot-var/signal
+  shadow (the DataTableGroupDemo footgun). Static dataset for VR determinism.
+-->
+
+<rozie name="DataTableVirtualGroupDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [],
+  rowCount: 0,
+  // Grouped by category at mount so group-header rows appear within the initial window.
+  groupingModel: ['category'],
+}
+</data>
+
+<script lang="ts">
+// Seed 600 rows across 6 category groups (100 each). Deterministic content (no clock /
+// no random) so the window + grouped row model are stable across the six targets and the
+// Linux VR baselines.
+$onMount(() => {
+  const cats = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta']
+  const out = []
+  for (let i = 1; i <= 600; i++) {
+    const cat = cats[(i - 1) % cats.length]
+    out.push({ id: i, name: 'Row ' + i, category: cat, units: (i % 7) + 1 })
+  }
+  $data.rows = out
+  $data.rowCount = out.length
+})
+</script>
+
+<template>
+<div class="dt-virtual-group-demo">
+  <h3>DataTable — virtual + grouping</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+  </div>
+
+  <div data-testid="virtual-group-table">
+    <DataTable
+      :groupable="true"
+      :data="$data.rows"
+      r-model:grouping="$data.groupingModel"
+      :virtual="true"
+      maxHeight="400px"
+    >
+      <Column field="category" header="Category" />
+      <Column field="name" header="Name" />
+      <Column field="units" header="Units" aggregationFn="sum" />
+
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-virtual-group-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+.dt-virtual-group-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+</style>
+
+</rozie>

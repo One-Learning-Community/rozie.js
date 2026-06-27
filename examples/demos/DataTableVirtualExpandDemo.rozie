@@ -1,0 +1,168 @@
+<!--
+  DataTableVirtualExpandDemo.rozie — Phase 63 Wave-7 (B13 LOCKED: full parity) VIRTUAL +
+  EXPANDABLE fixture. The behavioral fixture the virtual↔expand/#detail parity assertions
+  in data-table-grid-virtual-parity.spec.ts grow into.
+
+  Combines the DataTableVirtualDemo windowing config (:virtual + maxHeight, a large
+  seeded-in-$onMount dataset) with the DataTableExpandDemo expand surface so an EXPANDER
+  CHEVRON + a #detail <tr> appear INSIDE the windowed <tbody> slice. Today (pre-63-07) the
+  windowed <tbody> (DataTable.rozie ~1408-1545) DROPS the isExpanderColumn branch (no
+  chevron), the #detail <tr> (rowShowsDetail), and uses pinStyle() not bodyCellStyle() (no
+  depth indent). This fixture proves that gap RED, then GREEN after the parity fix.
+
+  TWO windowed regions (mirroring the non-virtual DataTableExpandDemo):
+    - detail-table: 500 FLAT rows, :virtual + :expandable + a #detail scoped slot (NO
+      getSubRows) → every row canExpand, the auto-injected chevron expander column renders,
+      and toggling reveals a #detail <tr> (rowShowsDetail) within the window. Proves the
+      isExpanderColumn chevron branch + the #detail <tr> + that the detail row does NOT
+      shift the data-row / data-index of the windowed body rows.
+    - subrow-table: 250 parent rows each with 2 children (500 leaves), :virtual +
+      :expandable + :getSubRows, first parents expanded at mount (treeExpanded) → depth-1
+      child rows render in the window. Proves the windowed <td> uses bodyCellStyle()
+      (a depth-proportional padding-left on the expander cell) NOT pinStyle() — measurable
+      indent at depth > 0 (the pre-fix pinStyle path has NO indent).
+
+  Loop-var / slot discipline (DataTable.rozie Svelte mount-throw): NO loop var or slot named
+  `cell` — the #cell slot binds `value`/`row`/`columnId`; the detail slot is `detail`.
+  Static dataset for VR determinism.
+-->
+
+<rozie name="DataTableVirtualExpandDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Flat dataset for the #detail-slot region (no getSubRows).
+  rows: [],
+  rowCount: 0,
+  // Hierarchical dataset for the getSubRows region (parents + 2 children each).
+  treeRows: [],
+  // Controlled expanded set for the sub-row tree region — seed the first few parents open
+  // so depth-1 children render inside the initial window.
+  treeExpanded: {},
+}
+</data>
+
+<script lang="ts">
+// getSubRows accessor (pattern b): pull child rows from each row's `children` field.
+const getSubRows = (row: { children?: unknown[] }): unknown[] | undefined => row.children
+
+// Seed both datasets. Deterministic content (no clock / no random) so the window + the
+// expand row model are stable across the six targets and the Linux VR baselines.
+$onMount(() => {
+  const flat = []
+  for (let i = 1; i <= 500; i++) {
+    flat.push({ id: i, name: 'Row ' + i, region: 'R' + ((i % 4) + 1), score: (i % 100) + 1 })
+  }
+  $data.rows = flat
+  $data.rowCount = flat.length
+
+  const tree = []
+  for (let p = 1; p <= 250; p++) {
+    tree.push({
+      id: 'p' + p,
+      name: 'Parent ' + p,
+      region: 'R' + ((p % 4) + 1),
+      score: (p % 100) + 1,
+      children: [
+        { id: 'p' + p + 'a', name: 'Child ' + p + 'a', region: 'R' + ((p % 4) + 1), score: (p % 50) + 1 },
+        { id: 'p' + p + 'b', name: 'Child ' + p + 'b', region: 'R' + ((p % 4) + 1), score: (p % 50) + 2 },
+      ],
+    })
+  }
+  $data.treeRows = tree
+  // Expand the first five parents so their depth-1 children sit inside the initial window.
+  const seed: Record<string, boolean> = {}
+  for (let p = 1; p <= 5; p++) seed['p' + p] = true
+  $data.treeExpanded = seed
+})
+</script>
+
+<template>
+<div class="dt-virtual-expand-demo">
+  <h3>DataTable — virtual + expandable rows</h3>
+
+  <div class="controls">
+    <span class="label">rows:</span>
+    <span class="readout" data-testid="row-count">{{ $data.rowCount }}</span>
+  </div>
+
+  <!-- (a) #detail-slot region: virtual + expandable + #detail (no getSubRows). -->
+  <div data-testid="detail-table">
+    <DataTable
+      :expandable="true"
+      :data="$data.rows"
+      :virtual="true"
+      maxHeight="400px"
+    >
+      <Column field="name"   header="Name" />
+      <Column field="region" header="Region" />
+      <Column field="score"  header="Score" />
+
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <template #detail="{ row }">
+        <div class="dt-detail-panel" data-testid="detail-panel">
+          Detail for {{ row.name }} — region {{ row.region }}, score {{ row.score }}
+        </div>
+      </template>
+    </DataTable>
+  </div>
+
+  <!-- (b) getSubRows region: virtual + expandable + getSubRows (depth-indented children). -->
+  <div data-testid="subrow-table">
+    <DataTable
+      :expandable="true"
+      :data="$data.treeRows"
+      :getSubRows="getSubRows"
+      r-model:expanded="$data.treeExpanded"
+      :virtual="true"
+      maxHeight="400px"
+    >
+      <Column field="name"   header="Name" />
+      <Column field="region" header="Region" />
+      <Column field="score"  header="Score" />
+
+      <template #cell="{ value }">
+        <span data-testid="subrow-cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-virtual-expand-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+.dt-virtual-expand-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+.dt-detail-panel {
+  padding: 0.5rem 0.75rem;
+  background: #f5f7fa;
+  border-left: 3px solid #6b9bd1;
+  font-size: 0.8125rem;
+}
+[data-testid="subrow-table"] { margin-top: 1.25rem; }
+</style>
+
+</rozie>

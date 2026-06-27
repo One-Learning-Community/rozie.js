@@ -721,6 +721,22 @@ export const EXAMPLES = [
   // already cover it, importing the data-table source pkg already registered for Angular
   // cross-tree AOT in phase 48).
   'DataTableGridAbsIndex',
+  // Phase 63 Wave-7 (B13 LOCKED: full parity — windowed-tbody grouping/expand) — the two
+  // virtual+feature RED-first fixtures (loaders → examples/demos/DataTableVirtual{Group,
+  // Expand}Demo.rozie, each importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie).
+  // DataTableVirtualGroup combines :virtual + maxHeight with :groupable + r-model:grouping so
+  // GROUP-HEADER rows (toggle + (n) count + data-group-header/leaf/depth markers + the
+  // rdt-group-header class) appear within the windowed <tbody> slice; DataTableVirtualExpand
+  // combines :virtual + maxHeight with :expandable (#detail slot + a getSubRows sub-region) so
+  // the expander chevron + a #detail <tr> + a depth-1 bodyCellStyle indent appear within the
+  // window — so data-table-grid-virtual-parity.spec.ts asserts the windowed body is at full
+  // parity with the non-virtual body (B13). Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no
+  // pixel baseline). They live under examples/demos/ so no new Angular 3-file registration is
+  // needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the glob-driven
+  // build-cells demos sweep already cover them, importing the data-table source pkg already
+  // registered for Angular cross-tree AOT in phase 48).
+  'DataTableVirtualGroup',
+  'DataTableVirtualExpand',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1094,6 +1110,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 wave-6 abs-index — '-demo' appended on Lit →
   // 'rozie-data-table-grid-abs-index-demo' = kebab of DataTableGridAbsIndexDemo.
   DataTableGridAbsIndex: 'rozie-data-table-grid-abs-index',
+  // Phase 63 wave-7 windowed-body parity — '-demo' appended on Lit → tags
+  // 'rozie-data-table-virtual-group-demo' / 'rozie-data-table-virtual-expand-demo' =
+  // kebab of DataTableVirtualGroupDemo / DataTableVirtualExpandDemo.
+  DataTableVirtualGroup: 'rozie-data-table-virtual-group',
+  DataTableVirtualExpand: 'rozie-data-table-virtual-expand',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
@@ -1415,6 +1436,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableVirtualGrid: {},
   DataTableVirtualStickySelect: {},
   DataTableVirtualWarn: {},
+  // Phase 63 wave-7 windowed-body parity — both virtual+feature demos are self-contained:
+  // each seeds its own rows in $onMount and mounts the DataTable inline with its props. No
+  // parent-supplied props.
+  DataTableVirtualGroup: {},
+  DataTableVirtualExpand: {},
   // Phase 50 round-out — all three behavioral demos are self-contained: each seeds its
   // own rows + readouts in <data> and mounts the DataTable inline with its props. No
   // parent-supplied props.
