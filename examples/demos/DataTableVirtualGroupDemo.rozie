@@ -40,8 +40,10 @@
 {
   rows: [],
   rowCount: 0,
-  // Grouped by category at mount so group-header rows appear within the initial window.
-  groupingModel: ['category'],
+  // Grouping is APPLIED in $onMount (after the rows are seeded) — a post-data grouping write,
+  // which rebuilds the grouped row model uniformly across all six targets (Solid's fine-grained
+  // grouped-model rebuild keys on the grouping change, not the initial-prop value). [] at mount.
+  groupingModel: [],
 }
 </data>
 
@@ -58,6 +60,12 @@ $onMount(() => {
   }
   $data.rows = out
   $data.rowCount = out.length
+  // Apply grouping AFTER the rows land + one frame later (so the child DataTable's virtualizer
+  // is constructed and Solid's fine-grained reactive graph has settled) — the grouped row model
+  // then rebuilds + re-windows on all six. Falls back to a microtask where rAF is unavailable.
+  const applyGrouping = () => { $data.groupingModel = ['category'] }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
+  else applyGrouping()
 })
 </script>
 
