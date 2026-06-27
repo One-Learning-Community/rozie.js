@@ -1484,6 +1484,8 @@ $expose({
       :data-depth="wr.row.depth"
       :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : null"
       :data-group-leaf="(groupingActive() && !rowIsGrouped(wr.row)) ? wr.row.id : null"
+      :aria-expanded="rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null"
+      :aria-level="groupingActive() ? (wr.row.depth + 1) : null"
       :class="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }"
     >
       <td
@@ -1840,6 +1842,8 @@ $expose({
       :aria-rowindex="isGrid() ? (absRowIndexOf(row) + 1) : null"
       :data-group-header="rowIsGrouped(row) ? row.id : null"
       :data-group-leaf="(groupingActive() && !rowIsGrouped(row)) ? row.id : null"
+      :aria-expanded="rowIsGrouped(row) ? !!rowIsExpanded(row) : null"
+      :aria-level="groupingActive() ? (row.depth + 1) : null"
     >
       <td
         class="rdt-td"

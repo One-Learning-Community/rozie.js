@@ -171,6 +171,23 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * ARIA attributes whose JSX prop type is `Booleanish | undefined` (the boolean-enumerated
+ * ARIA shape `boolean | "true" | "false" | undefined`) and which a `.rozie` author may bind
+ * with a NULLISH-droppable form — e.g. `aria-expanded` on a treegrid group row:
+ * `rowIsGrouped(row) ? !!rowIsExpanded(row) : null` (drop the attribute on non-group rows).
+ * Routing that ternary through `rozieAttr` widens it to `string | undefined`, which fails the
+ * `Booleanish` slot (TS2322 — the BOOLEAN sibling of the `aria-rowindex`/`aria-level` NUMERIC
+ * class in NUMERIC_HTML_ATTRS). The `?? undefined` form preserves `boolean | undefined` AND the
+ * nullish-drop (a `null`/`undefined` value → `undefined` → JSX omits the attribute), matching
+ * `rozieAttr`'s drop semantics without the string widening. A PROVABLY-boolean binding (`!!x`)
+ * is `wrapForDisplay=false` and emits raw without reaching this branch, so the always-present
+ * expander-button `aria-expanded={!!rowIsExpanded(row)}` form is byte-unchanged.
+ */
+const BOOLEAN_NULLISH_ARIA_ATTRS: ReadonlySet<string> = new Set([
+  'aria-expanded',
+]);
+
+/**
  * A numeric-attribute binding that is SYNTACTICALLY provably non-nullish — a numeric literal,
  * an arithmetic BinaryExpression (`a + 1`, `i * 2`), or a unary `+`/`-`. These already type as
  * `number`, so the numeric-attr emit must NOT append `?? undefined` (the right operand would be
@@ -1040,6 +1057,15 @@ function emitNonClassAttribute(
         // top-level `||`/`&&` adjacent to `??` is a JS SyntaxError
         // (`span || 1 ?? undefined` fails to parse), so wrap `exprCode` so the
         // `?? undefined` nullish-drop is always well-formed.
+        return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
+      }
+      // Phase 63 wave-8 (C2) — a NULLISH-droppable boolean-enumerated ARIA attribute
+      // (`aria-expanded` on a treegrid group row) types `Booleanish | undefined`, which
+      // `rozieAttr` would string-widen (TS2322). Emit the `?? undefined` form (same shape as
+      // the numeric path above) to preserve `boolean | undefined` AND the nullish-drop. The
+      // normalized expr already maps a branch-position `: null` → `undefined`, so `?? undefined`
+      // is reachable (no TS2869); a provably-boolean `!!x` form never reaches here (raw emit).
+      if (BOOLEAN_NULLISH_ARIA_ATTRS.has(attr.name.toLowerCase())) {
         return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
       }
       ctx.collectors.runtime.add('rozieAttr');

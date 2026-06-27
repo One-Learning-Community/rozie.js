@@ -60,7 +60,7 @@
     </tr>
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
-    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined" :aria-level="groupingActive() ? wr.row.depth + 1 : undefined">
       <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))" :style="bodyCellStyle(wr.row, cellCtx.column.id)" :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
         
         <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
@@ -133,7 +133,7 @@
   <tbody class="rdt-tbody" role="rowgroup">
     
     <template v-for="row in rows" :key="row.id">
-    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="isGrid() ? absRowIndexOf(row) + 1 : undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="isGrid() ? absRowIndexOf(row) + 1 : undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined" :aria-level="groupingActive() ? row.depth + 1 : undefined">
       <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))" :style="bodyCellStyle(row, cellCtx.column.id)" :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
         
         <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
@@ -2936,6 +2936,19 @@ const onGridKeyDown = (e: any) => {
     const editType = editorTypeOf(activeCellColumnId());
     const seed = editType === 'text' || editType === 'number' ? key : null;
     beginEdit(activeRow.value, activeColIndex.value, seed);
+    return;
+  }
+  // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+  // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
+  // verified invariant) so it never hits the edit branches above and would otherwise fall to
+  // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
+  // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
+  // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+  // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+  // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+  else if (key === 'Enter' && !activeIsHeader.value && rowIsGrouped((rows.value || [])[activeRow.value])) {
+    e.preventDefault();
+    onToggleExpand((rows.value || [])[activeRow.value], e);
     return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();

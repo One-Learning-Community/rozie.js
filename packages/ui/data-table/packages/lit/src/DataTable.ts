@@ -1045,7 +1045,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     </tr>
     
     ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`
-    <tr class="${Object.entries({ "rdt-tr": true, 'rdt-group-header': this.rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="row" data-row=${rozieAttr(wr.vi.index)} aria-rowindex=${rozieAttr(wr.vi.index + 1)} data-index=${rozieAttr(wr.vi.index)} data-pinned=${rozieAttr(wr.pinned ? 'true' : null)} data-depth=${rozieAttr(wr.row.depth)} data-group-header=${rozieAttr(this.rowIsGrouped(wr.row) ? wr.row.id : null)} data-group-leaf=${rozieAttr(this.groupingActive() && !this.rowIsGrouped(wr.row) ? wr.row.id : null)} data-rozie-s-d5dcab4c>
+    <tr class="${Object.entries({ "rdt-tr": true, 'rdt-group-header': this.rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="row" data-row=${rozieAttr(wr.vi.index)} aria-rowindex=${rozieAttr(wr.vi.index + 1)} data-index=${rozieAttr(wr.vi.index)} data-pinned=${rozieAttr(wr.pinned ? 'true' : null)} data-depth=${rozieAttr(wr.row.depth)} data-group-header=${rozieAttr(this.rowIsGrouped(wr.row) ? wr.row.id : null)} data-group-leaf=${rozieAttr(this.groupingActive() && !this.rowIsGrouped(wr.row) ? wr.row.id : null)} aria-expanded=${rozieAttr(this.rowIsGrouped(wr.row) ? !!this.rowIsExpanded(wr.row) : null)} aria-level=${rozieAttr(this.groupingActive() ? wr.row.depth + 1 : null)} data-rozie-s-d5dcab4c>
       ${repeat<any>(this.visibleCellsFor(wr.row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(wr.vi.index)} data-col-index=${rozieAttr(this.colIndexOf(wr.row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(wr.vi.index), this.colIndexOf(wr.row, cellCtx)))} style=${rozieStyle(this.bodyCellStyle(wr.row, cellCtx.column.id))} aria-invalid=${rozieAttr(this.cellAriaInvalid(wr.vi.index, this.colIndexOf(wr.row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(wr.vi.index, this.colIndexOf(wr.row, cellCtx)) ? 'true' : null)} data-agg-cell=${rozieAttr(this.cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c>
         
         ${this.isExpanderColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
@@ -1118,7 +1118,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
     
     ${repeat<any>(this._rows.value, (row, _idx) => row.id, (row, _idx) => html`
-    <tr class="${Object.entries({ "rdt-tr": true, 'rdt-group-header': this.rowIsGrouped(row) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="row" data-depth=${rozieAttr(row.depth)} aria-rowindex=${rozieAttr(this.isGrid() ? this.absRowIndexOf(row) + 1 : null)} data-group-header=${rozieAttr(this.rowIsGrouped(row) ? row.id : null)} data-group-leaf=${rozieAttr(this.groupingActive() && !this.rowIsGrouped(row) ? row.id : null)} data-rozie-s-d5dcab4c>
+    <tr class="${Object.entries({ "rdt-tr": true, 'rdt-group-header': this.rowIsGrouped(row) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="row" data-depth=${rozieAttr(row.depth)} aria-rowindex=${rozieAttr(this.isGrid() ? this.absRowIndexOf(row) + 1 : null)} data-group-header=${rozieAttr(this.rowIsGrouped(row) ? row.id : null)} data-group-leaf=${rozieAttr(this.groupingActive() && !this.rowIsGrouped(row) ? row.id : null)} aria-expanded=${rozieAttr(this.rowIsGrouped(row) ? !!this.rowIsExpanded(row) : null)} aria-level=${rozieAttr(this.groupingActive() ? row.depth + 1 : null)} data-rozie-s-d5dcab4c>
       ${repeat<any>(this.visibleCellsFor(row), (cellCtx, _idx) => cellCtx.id, (cellCtx, _idx) => html`<td class="${Object.entries({ "rdt-td": true, 'rdt-select-td': this.isSelectColumn(cellCtx.column.id), 'rdt-in-range': this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.cellRole())} key=${rozieAttr(cellCtx.id)} data-col=${rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row=${rozieAttr(this.rowIndexOf(row))} data-col-index=${rozieAttr(this.colIndexOf(row, cellCtx))} tabindex=${rozieAttr(this.cellTabindex(String(this.rowIndexOf(row)), this.colIndexOf(row, cellCtx)))} style=${rozieStyle(this.bodyCellStyle(row, cellCtx.column.id))} aria-invalid=${rozieAttr(this.cellAriaInvalid(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)))} data-in-range=${rozieAttr(this.inRange(this.rowIndexOf(row), this.colIndexOf(row, cellCtx)) ? 'true' : null)} data-agg-cell=${rozieAttr(this.cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c>
         
         ${this.isExpanderColumn(cellCtx.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
@@ -2772,6 +2772,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const editType = this.editorTypeOf(this.activeCellColumnId());
     const seed = editType === 'text' || editType === 'number' ? key : null;
     this.beginEdit(this._activeRow.value, this._activeColIndex.value, seed);
+    return;
+  }
+  // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+  // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
+  // verified invariant) so it never hits the edit branches above and would otherwise fall to
+  // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
+  // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
+  // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+  // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+  // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+  else if (key === 'Enter' && !this._activeIsHeader.value && this.rowIsGrouped((this._rows.value || [])[this._activeRow.value])) {
+    e.preventDefault();
+    this.onToggleExpand((this._rows.value || [])[this._activeRow.value], e);
     return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();

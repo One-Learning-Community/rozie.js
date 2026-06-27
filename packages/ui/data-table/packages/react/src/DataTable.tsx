@@ -1872,6 +1872,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const seed = editType === 'text' || editType === 'number' ? key : null;
       beginEdit(activeRow, activeColIndex, seed);
       return;
+    }
+    // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+    // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
+    // verified invariant) so it never hits the edit branches above and would otherwise fall to
+    // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
+    // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
+    // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+    // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+    // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+    else if (key === 'Enter' && !activeIsHeader && rowIsGrouped((rows || [])[activeRow])) {
+      e.preventDefault();
+      onToggleExpand((rows || [])[activeRow], e);
+      return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
       enterControl();
@@ -1894,7 +1907,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows, toAbsRow]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, rowIsGrouped, rows, toAbsRow]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -3741,7 +3754,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
         
         {windowedRows().map((wr) => <Fragment key={wr.row.id}>
-        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-rozie-s-d5dcab4c="">
+        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} aria-expanded={(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined} aria-level={(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(wr.row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -3810,7 +3823,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         {rows.map((row) => <Fragment key={row.id}>
-        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
+        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} aria-expanded={(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined} aria-level={(groupingActive() ? row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

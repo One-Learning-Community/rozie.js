@@ -116,6 +116,17 @@ const onGridKeyDown = (e) => {
     const seed = (editType === 'text' || editType === 'number') ? key : null
     beginEdit($data.activeRow, $data.activeColIndex, seed); return
   }
+  // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+  // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
+  // verified invariant) so it never hits the edit branches above and would otherwise fall to
+  // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
+  // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
+  // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+  // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+  // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+  else if (key === 'Enter' && !$data.activeIsHeader && rowIsGrouped(($data.rows || [])[$data.activeRow])) {
+    e.preventDefault(); onToggleExpand(($data.rows || [])[$data.activeRow], e); return
+  }
   else if (key === 'Enter' || key === 'F2') { e.preventDefault(); enterControl(); return }
   else return
   // THE seam — built from the SAME fresh post-write locals (Pitfall 2). Always re-assert

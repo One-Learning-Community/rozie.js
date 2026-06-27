@@ -244,7 +244,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         
         @for (wr of windowedRows(); track wr.row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
           @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="bodyCellStyle(wr.row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
             
@@ -393,7 +393,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         
         @for (row of rows(); track row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
           @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="bodyCellStyle(row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
             
@@ -2429,6 +2429,7 @@ export class DataTable {
     const __activeRow = this.activeRow();
     const __activeColIndex = this.activeColIndex();
     const __activeIsHeader = this.activeIsHeader();
+    const __rows = this.rows();
     if (!this.isGrid() || !e) return;
     const key = e.key;
     // Editing mode (phase 51, Pitfall 5): an OPEN editor owns Tab/Enter/Escape (+ caret keys)
@@ -2581,7 +2582,7 @@ export class DataTable {
     // at least the active editable column); a non-editable active cell falls through unchanged.
     else if (key === 'F2' && e.shiftKey && this.isActiveCellEditable()) {
       e.preventDefault();
-      this.beginRowEdit((this.rows() || [])[__activeRow]);
+      this.beginRowEdit((__rows || [])[__activeRow]);
       return;
     }
     // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
@@ -2601,6 +2602,19 @@ export class DataTable {
       const editType = this.editorTypeOf(this.activeCellColumnId());
       const seed = editType === 'text' || editType === 'number' ? key : null;
       this.beginEdit(__activeRow, __activeColIndex, seed);
+      return;
+    }
+    // ── C2 (phase 63 wave-8): Enter on a GROUP-HEADER cell toggles that group's collapse/
+    // expand (APG treegrid). A group cell is NON-editable (isActiveCellEditable=false, the
+    // verified invariant) so it never hits the edit branches above and would otherwise fall to
+    // enterControl() — which merely FOCUSES the group-toggle button (requiring a second key).
+    // Route it to the SAME onToggleExpand path the chevron uses (group rows ride the expand
+    // model) so one Enter toggles the group. Body cells only (a header-active Enter is unchanged);
+    // ($data.rows || [])[$data.activeRow] is the active flattened row (page-relative non-virtual /
+    // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
+    else if (key === 'Enter' && !__activeIsHeader && this.rowIsGrouped((__rows || [])[__activeRow])) {
+      e.preventDefault();
+      this.onToggleExpand((__rows || [])[__activeRow], e);
       return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
