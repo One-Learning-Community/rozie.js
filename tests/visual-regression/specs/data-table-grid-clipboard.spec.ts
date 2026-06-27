@@ -373,4 +373,121 @@ for (const target of TARGETS) {
     await page.waitForTimeout(400);
     expect(await readoutText(page, 'model-readout')).toBe(before);
   });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // C3 (single→range fill) — pasting a SINGLE copied cell into a selected RANGE fills the
+  //   WHOLE range (spreadsheet semantics). Copy qty (0,1) = 10, select a 3×2 range over the
+  //   two numeric columns (qty+cost, rows 0..2), paste → all six cells == 10 (Number).
+  //   Pre-fix: pasteRange lands a 1×1 block at the range top-left, leaving the other 5 cells
+  //   untouched (RED). Numeric columns keep the assertion type-clean.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: C3 single cell pasted into a range fills the whole range`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Copy the single qty cell (0,1) = 10.
+    await focusBodyCellStable(page, 0, 1);
+    await page.keyboard.press('Control+c');
+    await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 }).toBe('10');
+
+    // Select a 3×2 range over the two numeric columns: rows 0..2 (Shift+Down ×2), cols 1..2 (Shift+Right ×1).
+    await extendRangeBy(page, 'Down', 2, 2, 1);
+    await extendRangeBy(page, 'Right', 1, 2, 2);
+    await page.waitForTimeout(200); // settle React's internal range commit before the synchronous paste read
+
+    await page.keyboard.press('Control+v');
+
+    // All six cells in the 3×2 range == 10 (Number) — the single cell FILLED the range, not a 1×1 block.
+    await expect
+      .poll(async () => { const m = await modelRows(page); return JSON.stringify([m[0]?.qty, m[1]?.qty, m[2]?.qty, m[0]?.cost, m[1]?.cost, m[2]?.cost]); }, { timeout: 10_000 })
+      .toBe(JSON.stringify([10, 10, 10, 10, 10, 10]));
+    const m = await modelRows(page);
+    expect(typeof m[2]?.cost).toBe('number');
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // C3 (tiling) — a SMALLER clipboard block TILES into a LARGER selection. Copy a 2×2 block
+  //   (qty+cost, rows 0..1) = [[10,20],[11,21]], extend to a 4×2 range (rows 0..3), paste → the
+  //   2×2 block REPEATS down the four rows: row r mirrors source[r % 2] (row 2 repeats row 0,
+  //   row 3 repeats row 1). Pre-fix: a single 2×2 block lands at the top, rows 2..3 untouched
+  //   (RED). Numeric columns keep the tiling assertion type-clean.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: C3 a 2x2 clipboard tiling into a 4x2 selection repeats`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Build + copy the 2×2 source (qty+cost rows 0..1). From (0,1): Shift+Right (→0,2), Shift+Down (→1,2).
+    await focusBodyCellStable(page, 0, 1);
+    await extendRangeBy(page, 'Right', 1, 0, 2);
+    await extendRangeBy(page, 'Down', 1, 1, 2);
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Control+c');
+    await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 }).toBe('10\t20\n11\t21');
+
+    // Extend the SAME range down to a 4×2 destination (rows 0..3): Shift+Down ×2 → focus (3,2).
+    await extendRangeBy(page, 'Down', 2, 3, 2);
+    await page.waitForTimeout(200);
+
+    await page.keyboard.press('Control+v');
+
+    // The 2×2 block tiled down the four rows: row 2 repeats row 0, row 3 repeats row 1.
+    await expect
+      .poll(async () => { const m = await modelRows(page); return JSON.stringify([m[2]?.qty, m[2]?.cost, m[3]?.qty, m[3]?.cost]); }, { timeout: 10_000 })
+      .toBe(JSON.stringify([10, 20, 11, 21]));
+    const m = await modelRows(page);
+    // Source rows unchanged; every tiled numeric cell committed as a Number.
+    expect([m[0]?.qty, m[0]?.cost, m[1]?.qty, m[1]?.cost]).toEqual([10, 20, 11, 21]);
+    expect(typeof m[2]?.qty).toBe('number');
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // C3 (Cut) — Ctrl+X copies the source range THEN clears the source cells through the SAME
+  //   write-funnel as paste (one writeData). Select a 2×1 range (qty rows 0..1 = [10,11]),
+  //   Ctrl+X → qty rows 0+1 cleared to null (a numeric column's empty); the clipboard holds
+  //   "10\n11"; a paste at qty rows 3..4 RESTORES them. Pre-fix: Cut does not exist — Ctrl+X
+  //   is unhandled, so the source is never cleared and the clipboard is never written (RED).
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: C3 Cut clears the source through the write-funnel and the clipboard restores on paste`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Select a 2×1 range over qty rows 0..1.
+    await focusBodyCellStable(page, 0, 1);
+    await extendRangeBy(page, 'Down', 1, 1, 1);
+    await page.waitForTimeout(200);
+
+    await page.keyboard.press('Control+x');
+
+    // Source cells cleared to null (a numeric column's empty), committed in a single writeData.
+    await expect.poll(async () => (await modelRows(page))[0]?.qty, { timeout: 10_000 }).toBeNull();
+    expect((await modelRows(page))[1]?.qty).toBeNull();
+    // The clipboard holds the cut values (a subsequent paste can restore them).
+    await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 }).toBe('10\n11');
+
+    // Paste the cut values elsewhere (qty rows 3..4) — restored.
+    await focusBodyCellStable(page, 3, 1);
+    await page.keyboard.press('Control+v');
+    await expect.poll(async () => (await modelRows(page))[3]?.qty, { timeout: 10_000 }).toBe(10);
+    expect((await modelRows(page))[4]?.qty).toBe(11);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // C3 (Cut header no-op) — Ctrl+X is a NO-OP while a HEADER cell is active (extends the B11
+  //   clipboardActiveAllowed() guard to Cut, so Cut can never silently clear a body cell from a
+  //   header anchor). Guard non-regression: GREEN both pre- and post-fix (pre-fix Ctrl+X is
+  //   unhandled; post-fix the guard blocks it) — it cements the guard the way B11 cements copy/paste.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: C3 Cut is a no-op on a header cell (no body mutation)`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await focusBodyCellStable(page, 0, 1);
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 }).toBe('__header');
+
+    const before = await readoutText(page, 'model-readout');
+    await page.keyboard.press('Control+x');
+    await page.waitForTimeout(400);
+    expect(await readoutText(page, 'model-readout')).toBe(before);
+  });
 }

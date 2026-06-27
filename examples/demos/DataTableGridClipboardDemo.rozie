@@ -14,6 +14,13 @@
           newline, or quote corrupts/smears into adjacent cells.
     B11 — Ctrl+C / Ctrl+V fire while a HEADER cell is active → silent body mutation.
 
+  Phase 63 Wave-9 (C3 — LOCKED: range tiling + Cut) extends this same fixture:
+    C3a — pasting a SINGLE copied cell into a selected RANGE fills the whole range, and a
+          SMALLER clipboard block TILES into a LARGER selection (cell [r][c] == src[r%R][c%C]).
+    C3b — Cut (Ctrl+X or the cut() $expose verb) = copy the range THEN clear the source cells
+          through the SAME write-funnel as paste (one writeData), reusing the B11 header guard
+          so Cut/Copy/Paste are all no-ops while a header cell is active.
+
   A SINGLE DataTable in interactionMode='grid' (range selection + fill handle are
   unconditional in grid mode) with FOUR editable columns:
     0 label — built-in text editor    (row 0 holds a tab+newline+quote value → B10)
@@ -97,6 +104,15 @@ const callGetSelectedRange = (): void => {
 const sortByQtyAsc = (): void => {
   $data.sorting = [{ id: 'qty', desc: false }]
 }
+
+// C3 (Cut) — drive the cut() $expose verb off the live $refs.dt handle (the GridNavDemo idiom).
+// cut() reads the persisted $data range/active cell, so it cuts the current selection even though
+// the button click moved DOM focus off the grid. Exercises the exposeStateVerbs Cut path; the
+// behavioral spec primarily drives Cut via Ctrl+X (keeps focus on the cell).
+const callCut = (): void => {
+  const api = $refs.dt
+  if (api && api.cut) api.cut()
+}
 </script>
 
 <template>
@@ -106,6 +122,7 @@ const sortByQtyAsc = (): void => {
   <div class="controls">
     <button type="button" data-testid="sort-qty" @click="sortByQtyAsc">sort qty ↑</button>
     <button type="button" data-testid="get-range" @click="callGetSelectedRange">getSelectedRange()</button>
+    <button type="button" data-testid="cut-btn" @click="callCut">cut()</button>
     <input
       class="gf"
       type="text"
