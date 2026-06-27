@@ -4407,9 +4407,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const rowId = r ? r.id : null;
     const draft = rowDraft() || {};
     // Validate every edited column FIRST (D-01: a single failure blocks the whole row commit).
+    // B3 (Rule 1): coerce each draft by the column's editor type BEFORE validation + write — a
+    // 'number' editor must commit a real Number/null, never the raw editor STRING (the single-cell
+    // commitEdit already coerces via coerceCellValue; the row path silently committed strings →
+    // a number column ended up holding '99'). Coerce once here so the validator and the model both
+    // see the typed value, identical to the single-cell funnel.
     for (let i = 0; i < editable.length; i++) {
       const ec = editable[i];
-      const err = runValidator(ec.colId, draft[ec.colId], rowOriginal);
+      const err = runValidator(ec.colId, coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal);
       if (err !== true) {
         setInvalid(err);
         // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
@@ -4426,7 +4431,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const fieldValues = {};
     for (let i = 0; i < editable.length; i++) {
       const ec = editable[i];
-      const newValue = draft[ec.colId];
+      // B3 (Rule 1): commit the TYPE-COERCED value (number editor → Number/null), not the raw draft
+      // string — matches the single-cell commitEdit funnel so a row column never holds a stray string.
+      const newValue = coerceCellValue(ec.colId, draft[ec.colId]);
       const oldValue = rowOriginal ? rowOriginal[ec.field] : null;
       fieldValues[ec.field] = newValue;
       if (oldValue !== newValue) changes.push({
@@ -4438,7 +4445,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
     const srcIndex = sourceIndexOfRow(rowIndex);
     const next = replaceRowValues(currentData(), srcIndex, fieldValues);
-    const focusRow = rowIndex;
+    // Snapshot the active COLUMN to return focus to (the whole row is in edit, so the
+    // active-cell column is the roving focus target), BEFORE endRowEdit clears editing state.
     const focusCol = activeColIndex();
     editTransition = true;
     writeData(next);
@@ -4449,7 +4457,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     });
     endRowEdit();
     editTransition = false;
-    focusCellWhenReady(focusRow, focusCol);
+    // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
+    // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
+    // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave
+    // $data.activeRow stale, so the @focusin sync writes the WRONG activeRow (IN-02 — roving model +
+    // DOM focus incoherent on the next keystroke). Instead record a pending follow-request the
+    // refreshRowModel pass consumes AFTER the row model re-derives: it resolves the committed row's NEW
+    // display index by IDENTITY (rowId FIRST — stable across a re-sort; rowOriginal as fallback, since
+    // the fresh-spread replace changes the row object) and re-seats focus on THAT cell via the DOM-only
+    // poll (React-stale-safe). With no sort/filter the row keeps its index → byte-behaviorally identical.
+    pendingEditFollow = {
+      rowOriginal,
+      rowId,
+      col: focusCol
+    };
     return true;
   }
 
