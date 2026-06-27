@@ -2499,7 +2499,9 @@ const moveRow = (delta: any) => {
   if (activeIsHeader.value) {
     if (delta > 0) {
       // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
-      // level down); from the LEAF header level, drop into the body (row 0).
+      // level down); from the LEAF header level, drop into the body (row 0). A header-level
+      // move re-targets activeColIndex (parent↔child column indices differ), so the fresh
+      // col is RETURNED for the caller to thread into the focus seam (NOT re-read from $data).
       if (activeHeaderLevel.value < leafLevel) {
         const childCol = firstChildHeaderColIndex(activeHeaderLevel.value, activeColIndex.value);
         if (childCol >= 0) {
@@ -2508,6 +2510,7 @@ const moveRow = (delta: any) => {
           activeColIndex.value = childCol;
           return {
             row: activeRow.value,
+            col: childCol,
             isHeader: true,
             level: nextLevel
           };
@@ -2516,6 +2519,7 @@ const moveRow = (delta: any) => {
       // At the leaf header: an empty grid has no body to drop into → stay put.
       if (bodyRowCount() === 0) return {
         row: activeRow.value,
+        col: activeColIndex.value,
         isHeader: true,
         level: activeHeaderLevel.value
       };
@@ -2523,12 +2527,14 @@ const moveRow = (delta: any) => {
       activeRow.value = 0;
       return {
         row: 0,
+        col: activeColIndex.value,
         isHeader: false,
         level: 0
       };
     }
     // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
-    // spans the active column; at the top level (or no real parent) stay put.
+    // spans the active column; at the top level (or no real parent) stay put. The parent col
+    // index differs from the leaf's, so the fresh col is RETURNED (threaded into focus).
     const parentCol = parentHeaderColIndex(activeHeaderLevel.value, activeColIndex.value);
     if (parentCol >= 0) {
       const nextLevel = activeHeaderLevel.value - 1;
@@ -2536,12 +2542,14 @@ const moveRow = (delta: any) => {
       activeColIndex.value = parentCol;
       return {
         row: activeRow.value,
+        col: parentCol,
         isHeader: true,
         level: nextLevel
       };
     }
     return {
       row: activeRow.value,
+      col: activeColIndex.value,
       isHeader: true,
       level: activeHeaderLevel.value
     };
@@ -2554,6 +2562,7 @@ const moveRow = (delta: any) => {
     activeHeaderLevel.value = leafLevel;
     return {
       row: activeRow.value,
+      col: activeColIndex.value,
       isHeader: true,
       level: leafLevel
     };
@@ -2563,6 +2572,7 @@ const moveRow = (delta: any) => {
   activeIsHeader.value = false;
   return {
     row: nextRow,
+    col: activeColIndex.value,
     isHeader: false,
     level: 0
   };
@@ -2748,6 +2758,7 @@ const onGridKeyDown = (e: any) => {
     clearRange();
     const m = moveRow(1);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'ArrowUp') {
@@ -2755,18 +2766,21 @@ const onGridKeyDown = (e: any) => {
     clearRange();
     const m = moveRow(-1);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'PageDown') {
     e.preventDefault();
     const m = moveRow(GRID_PAGE_STEP);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'PageUp') {
     e.preventDefault();
     const m = moveRow(-GRID_PAGE_STEP);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'Home') {

@@ -2244,7 +2244,9 @@ export class DataTable {
     if (this.activeIsHeader()) {
       if (delta > 0) {
         // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
-        // level down); from the LEAF header level, drop into the body (row 0).
+        // level down); from the LEAF header level, drop into the body (row 0). A header-level
+        // move re-targets activeColIndex (parent↔child column indices differ), so the fresh
+        // col is RETURNED for the caller to thread into the focus seam (NOT re-read from $data).
         if (this.activeHeaderLevel() < leafLevel) {
           const childCol = this.firstChildHeaderColIndex(this.activeHeaderLevel(), this.activeColIndex());
           if (childCol >= 0) {
@@ -2253,6 +2255,7 @@ export class DataTable {
             this.activeColIndex.set(childCol);
             return {
               row: this.activeRow(),
+              col: childCol,
               isHeader: true,
               level: nextLevel
             };
@@ -2261,6 +2264,7 @@ export class DataTable {
         // At the leaf header: an empty grid has no body to drop into → stay put.
         if (this.bodyRowCount() === 0) return {
           row: this.activeRow(),
+          col: this.activeColIndex(),
           isHeader: true,
           level: this.activeHeaderLevel()
         };
@@ -2268,12 +2272,14 @@ export class DataTable {
         this.activeRow.set(0);
         return {
           row: 0,
+          col: this.activeColIndex(),
           isHeader: false,
           level: 0
         };
       }
       // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
-      // spans the active column; at the top level (or no real parent) stay put.
+      // spans the active column; at the top level (or no real parent) stay put. The parent col
+      // index differs from the leaf's, so the fresh col is RETURNED (threaded into focus).
       const parentCol = this.parentHeaderColIndex(this.activeHeaderLevel(), this.activeColIndex());
       if (parentCol >= 0) {
         const nextLevel = this.activeHeaderLevel() - 1;
@@ -2281,12 +2287,14 @@ export class DataTable {
         this.activeColIndex.set(parentCol);
         return {
           row: this.activeRow(),
+          col: parentCol,
           isHeader: true,
           level: nextLevel
         };
       }
       return {
         row: this.activeRow(),
+        col: this.activeColIndex(),
         isHeader: true,
         level: this.activeHeaderLevel()
       };
@@ -2299,6 +2307,7 @@ export class DataTable {
       this.activeHeaderLevel.set(leafLevel);
       return {
         row: this.activeRow(),
+        col: this.activeColIndex(),
         isHeader: true,
         level: leafLevel
       };
@@ -2308,6 +2317,7 @@ export class DataTable {
     this.activeIsHeader.set(false);
     return {
       row: nextRow,
+      col: this.activeColIndex(),
       isHeader: false,
       level: 0
     };
@@ -2454,6 +2464,7 @@ export class DataTable {
       this.clearRange();
       const m = this.moveRow(1);
       nextRow = m.row;
+      nextCol = m.col;
       nextIsHeader = m.isHeader;
       nextLevel = m.level;
     } else if (key === 'ArrowUp') {
@@ -2461,18 +2472,21 @@ export class DataTable {
       this.clearRange();
       const m = this.moveRow(-1);
       nextRow = m.row;
+      nextCol = m.col;
       nextIsHeader = m.isHeader;
       nextLevel = m.level;
     } else if (key === 'PageDown') {
       e.preventDefault();
       const m = this.moveRow(this.GRID_PAGE_STEP);
       nextRow = m.row;
+      nextCol = m.col;
       nextIsHeader = m.isHeader;
       nextLevel = m.level;
     } else if (key === 'PageUp') {
       e.preventDefault();
       const m = this.moveRow(-this.GRID_PAGE_STEP);
       nextRow = m.row;
+      nextCol = m.col;
       nextIsHeader = m.isHeader;
       nextLevel = m.level;
     } else if (key === 'Home') {

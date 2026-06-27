@@ -248,32 +248,35 @@ const moveRow = (delta) => {
   if ($data.activeIsHeader) {
     if (delta > 0) {
       // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
-      // level down); from the LEAF header level, drop into the body (row 0).
+      // level down); from the LEAF header level, drop into the body (row 0). A header-level
+      // move re-targets activeColIndex (parent↔child column indices differ), so the fresh
+      // col is RETURNED for the caller to thread into the focus seam (NOT re-read from $data).
       if ($data.activeHeaderLevel < leafLevel) {
         const childCol = firstChildHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
         if (childCol >= 0) {
           const nextLevel = $data.activeHeaderLevel + 1
           $data.activeHeaderLevel = nextLevel
           $data.activeColIndex = childCol
-          return { row: $data.activeRow, isHeader: true, level: nextLevel }
+          return { row: $data.activeRow, col: childCol, isHeader: true, level: nextLevel }
         }
       }
       // At the leaf header: an empty grid has no body to drop into → stay put.
-      if (bodyRowCount() === 0) return { row: $data.activeRow, isHeader: true, level: $data.activeHeaderLevel }
+      if (bodyRowCount() === 0) return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: $data.activeHeaderLevel }
       $data.activeIsHeader = false
       $data.activeRow = 0
-      return { row: 0, isHeader: false, level: 0 }
+      return { row: 0, col: $data.activeColIndex, isHeader: false, level: 0 }
     }
     // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
-    // spans the active column; at the top level (or no real parent) stay put.
+    // spans the active column; at the top level (or no real parent) stay put. The parent col
+    // index differs from the leaf's, so the fresh col is RETURNED (threaded into focus).
     const parentCol = parentHeaderColIndex($data.activeHeaderLevel, $data.activeColIndex)
     if (parentCol >= 0) {
       const nextLevel = $data.activeHeaderLevel - 1
       $data.activeHeaderLevel = nextLevel
       $data.activeColIndex = parentCol
-      return { row: $data.activeRow, isHeader: true, level: nextLevel }
+      return { row: $data.activeRow, col: parentCol, isHeader: true, level: nextLevel }
     }
-    return { row: $data.activeRow, isHeader: true, level: $data.activeHeaderLevel }
+    return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: $data.activeHeaderLevel }
   }
   // In the body: an upward move from row 0 crosses into the LEAF header level (the header row
   // adjacent to the body). The body col index aligns 1:1 with the leaf header col index, so
@@ -281,12 +284,12 @@ const moveRow = (delta) => {
   if (delta < 0 && $data.activeRow === 0) {
     $data.activeIsHeader = true
     $data.activeHeaderLevel = leafLevel
-    return { row: $data.activeRow, isHeader: true, level: leafLevel }
+    return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: leafLevel }
   }
   const nextRow = clamp($data.activeRow + delta, 0, maxRow)
   $data.activeRow = nextRow
   $data.activeIsHeader = false
-  return { row: nextRow, isHeader: false, level: 0 }
+  return { row: nextRow, col: $data.activeColIndex, isHeader: false, level: 0 }
 }
 
 // Home/End within the current row → col 0 / max. Returns the fresh colIndex.

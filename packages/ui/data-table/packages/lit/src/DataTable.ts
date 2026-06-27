@@ -2418,7 +2418,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this._activeIsHeader.value) {
     if (delta > 0) {
       // B12 — Down: from a PARENT header level, descend to its FIRST child leaf header (one
-      // level down); from the LEAF header level, drop into the body (row 0).
+      // level down); from the LEAF header level, drop into the body (row 0). A header-level
+      // move re-targets activeColIndex (parent↔child column indices differ), so the fresh
+      // col is RETURNED for the caller to thread into the focus seam (NOT re-read from $data).
       if (this._activeHeaderLevel.value < leafLevel) {
         const childCol = this.firstChildHeaderColIndex(this._activeHeaderLevel.value, this._activeColIndex.value);
         if (childCol >= 0) {
@@ -2427,6 +2429,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           this._activeColIndex.value = childCol;
           return {
             row: this._activeRow.value,
+            col: childCol,
             isHeader: true,
             level: nextLevel
           };
@@ -2435,6 +2438,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       // At the leaf header: an empty grid has no body to drop into → stay put.
       if (this.bodyRowCount() === 0) return {
         row: this._activeRow.value,
+        col: this._activeColIndex.value,
         isHeader: true,
         level: this._activeHeaderLevel.value
       };
@@ -2442,12 +2446,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       this._activeRow.value = 0;
       return {
         row: 0,
+        col: this._activeColIndex.value,
         isHeader: false,
         level: 0
       };
     }
     // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
-    // spans the active column; at the top level (or no real parent) stay put.
+    // spans the active column; at the top level (or no real parent) stay put. The parent col
+    // index differs from the leaf's, so the fresh col is RETURNED (threaded into focus).
     const parentCol = this.parentHeaderColIndex(this._activeHeaderLevel.value, this._activeColIndex.value);
     if (parentCol >= 0) {
       const nextLevel = this._activeHeaderLevel.value - 1;
@@ -2455,12 +2461,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       this._activeColIndex.value = parentCol;
       return {
         row: this._activeRow.value,
+        col: parentCol,
         isHeader: true,
         level: nextLevel
       };
     }
     return {
       row: this._activeRow.value,
+      col: this._activeColIndex.value,
       isHeader: true,
       level: this._activeHeaderLevel.value
     };
@@ -2473,6 +2481,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._activeHeaderLevel.value = leafLevel;
     return {
       row: this._activeRow.value,
+      col: this._activeColIndex.value,
       isHeader: true,
       level: leafLevel
     };
@@ -2482,6 +2491,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._activeIsHeader.value = false;
   return {
     row: nextRow,
+    col: this._activeColIndex.value,
     isHeader: false,
     level: 0
   };
@@ -2632,6 +2642,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.clearRange();
     const m = this.moveRow(1);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'ArrowUp') {
@@ -2639,18 +2650,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.clearRange();
     const m = this.moveRow(-1);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'PageDown') {
     e.preventDefault();
     const m = this.moveRow(this.GRID_PAGE_STEP);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'PageUp') {
     e.preventDefault();
     const m = this.moveRow(-this.GRID_PAGE_STEP);
     nextRow = m.row;
+    nextCol = m.col;
     nextIsHeader = m.isHeader;
     nextLevel = m.level;
   } else if (key === 'Home') {

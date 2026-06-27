@@ -64,10 +64,10 @@ const onGridKeyDown = (e) => {
   else if (key === 'ArrowUp' && e.shiftKey && !$data.activeIsHeader) { e.preventDefault(); extendRange(-1, 0); return }
   else if (key === 'ArrowRight') { e.preventDefault(); clearRange(); nextCol = moveCol(1) }
   else if (key === 'ArrowLeft') { e.preventDefault(); clearRange(); nextCol = moveCol(-1) }
-  else if (key === 'ArrowDown') { e.preventDefault(); clearRange(); const m = moveRow(1); nextRow = m.row; nextIsHeader = m.isHeader; nextLevel = m.level }
-  else if (key === 'ArrowUp') { e.preventDefault(); clearRange(); const m = moveRow(-1); nextRow = m.row; nextIsHeader = m.isHeader; nextLevel = m.level }
-  else if (key === 'PageDown') { e.preventDefault(); const m = moveRow(GRID_PAGE_STEP); nextRow = m.row; nextIsHeader = m.isHeader; nextLevel = m.level }
-  else if (key === 'PageUp') { e.preventDefault(); const m = moveRow(-GRID_PAGE_STEP); nextRow = m.row; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'ArrowDown') { e.preventDefault(); clearRange(); const m = moveRow(1); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'ArrowUp') { e.preventDefault(); clearRange(); const m = moveRow(-1); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'PageDown') { e.preventDefault(); const m = moveRow(GRID_PAGE_STEP); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
+  else if (key === 'PageUp') { e.preventDefault(); const m = moveRow(-GRID_PAGE_STEP); nextRow = m.row; nextCol = m.col; nextIsHeader = m.isHeader; nextLevel = m.level }
   else if (key === 'Home') {
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) { const s = gotoStart(); nextRow = s.row; nextCol = s.col; nextIsHeader = false }
