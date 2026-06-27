@@ -13,7 +13,19 @@ const inRange = (rIdx, cIdx) => {
 // { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
 // data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
 // (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
-const getSelectedRange = () => ({ anchor: $data.rangeAnchor, focus: $data.rangeFocus })
+const getSelectedRange = () => {
+  // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
+  // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
+  // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a && !f) return { anchor: null, focus: null }
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return { anchor: null, focus: null }
+  const clampCorner = (c) => (c == null ? null : { rowIndex: clamp(c.rowIndex, 0, maxRow), colIndex: clamp(c.colIndex, 0, maxCol) })
+  return { anchor: clampCorner(a), focus: clampCorner(f) }
+}
 
 // isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
 // That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
@@ -93,4 +105,37 @@ const clearRange = () => {
   $data.rangeFocus = null
 }
 
-export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange }
+// B8: clamp the range corners to the current grid bounds after an underlying-data change
+// (sort/filter/paginate/page-size all re-derive the row model). A range whose rows now exceed
+// the shrunken model would otherwise leave STALE/phantom corners → a copy serializes empty
+// rows past the model's end (and getSelectedRange reports out-of-bounds corners). We CLAMP each
+// corner into [0,maxRow]×[0,maxCol] (preserving a valid rectangle — a corner that clamps onto
+// another keeps the range non-empty); when no selectable body cell remains the rectangle is
+// dropped. Does NOT emit range-change here — the clamp is a reconcile, not a user selection
+// move (the emit-on-change work, B18/B19, lands in plan 63-05). Called from clampActiveCell.
+const clampRange = (maxRowArg, maxColArg) => {
+  const a = $data.rangeAnchor
+  const f = $data.rangeFocus
+  if (!a && !f) return
+  // Bounds passed from the FRESH model (clampActiveCell → refreshRowModel's nextRows) so the
+  // shrink-clamp is React-stale-safe; fall back to the live helpers for a direct call.
+  const maxRow = maxRowArg != null ? maxRowArg : (bodyRowCount() - 1)
+  const maxCol = maxColArg != null ? maxColArg : (visibleColCount() - 1)
+  if (maxRow < 0 || maxCol < 0) {
+    $data.rangeAnchor = null
+    $data.rangeFocus = null
+    return
+  }
+  if (a) {
+    const ar = clamp(a.rowIndex, 0, maxRow)
+    const ac = clamp(a.colIndex, 0, maxCol)
+    if (ar !== a.rowIndex || ac !== a.colIndex) $data.rangeAnchor = { rowIndex: ar, colIndex: ac }
+  }
+  if (f) {
+    const fr = clamp(f.rowIndex, 0, maxRow)
+    const fc = clamp(f.colIndex, 0, maxCol)
+    if (fr !== f.rowIndex || fc !== f.colIndex) $data.rangeFocus = { rowIndex: fr, colIndex: fc }
+  }
+}
+
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange }

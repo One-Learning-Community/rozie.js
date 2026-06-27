@@ -2613,12 +2613,15 @@ const onGridKeyDown = (e: any) => {
   // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
   // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
   // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
-  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
-  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). B11:
+  // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
+  // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
+  // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault();
     copyRange();
     return;
-  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+  } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault();
     pasteRange();
     return;
@@ -2787,17 +2790,28 @@ const onGridFocusOut = (e: any) => {
 // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
 // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
 // mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
-const clampActiveCell = () => {
+const clampActiveCell = (rowCount: any, colCount: any) => {
   if (!isGrid()) return;
-  const maxCol = visibleColCount() - 1;
+  // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
+  // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
+  // async useState on React, so bodyRowCount()/visibleColCount() would see the PRE-change model
+  // and SKIP a legitimate shrink-clamp (a filter-to-fewer left the active cell / range corners
+  // out of bounds on React only). Falls back to the live helpers when called without bounds.
+  const colN = colCount != null ? colCount : visibleColCount();
+  const rowN = rowCount != null ? rowCount : bodyRowCount();
+  const maxCol = colN - 1;
   const col = clamp(activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== activeColIndex.value) activeColIndex.value = col;
   if (!activeIsHeader.value) {
-    const lastRow = bodyRowCount() - 1;
+    const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
     const row = clamp(activeRow.value, 0, maxRow);
     if (row !== activeRow.value) activeRow.value = row;
   }
+  // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
+  // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
+  // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
+  clampRange(rowN - 1, colN - 1);
 };
 
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
@@ -2859,10 +2873,31 @@ const inRange = (rIdx: any, cIdx: any) => {
 // { rowIndex, colIndex } pair (or null when no range). T-49-02: positions only, no row
 // data, no DOM node. Used by the getSelectedRange $expose verb AND every range-change emit
 // (the single payload source) AND copyRange/fillRange (the rectangle they operate over).
-const getSelectedRange = () => ({
-  anchor: rangeAnchor.value,
-  focus: rangeFocus.value
-});
+const getSelectedRange = () => {
+  // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
+  // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
+  // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
+  const a = rangeAnchor.value;
+  const f = rangeFocus.value;
+  if (!a && !f) return {
+    anchor: null,
+    focus: null
+  };
+  const maxRow = bodyRowCount() - 1;
+  const maxCol = visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return {
+    anchor: null,
+    focus: null
+  };
+  const clampCorner = (c: any) => c == null ? null : {
+    rowIndex: clamp(c.rowIndex, 0, maxRow),
+    colIndex: clamp(c.colIndex, 0, maxCol)
+  };
+  return {
+    anchor: clampCorner(a),
+    focus: clampCorner(f)
+  };
+};
 
 // isFillHandleCell(rIdx, cIdx): is this cell the BOTTOM-RIGHT corner of the current range?
 // That corner hosts the fill-handle affordance (req-8 / D-04). False without a range — the
@@ -2981,6 +3016,53 @@ const clearRange = () => {
   rangeFocus.value = null;
 };
 
+// B8: clamp the range corners to the current grid bounds after an underlying-data change
+// (sort/filter/paginate/page-size all re-derive the row model). A range whose rows now exceed
+// the shrunken model would otherwise leave STALE/phantom corners → a copy serializes empty
+// rows past the model's end (and getSelectedRange reports out-of-bounds corners). We CLAMP each
+// corner into [0,maxRow]×[0,maxCol] (preserving a valid rectangle — a corner that clamps onto
+// another keeps the range non-empty); when no selectable body cell remains the rectangle is
+// dropped. Does NOT emit range-change here — the clamp is a reconcile, not a user selection
+// move (the emit-on-change work, B18/B19, lands in plan 63-05). Called from clampActiveCell.
+// B8: clamp the range corners to the current grid bounds after an underlying-data change
+// (sort/filter/paginate/page-size all re-derive the row model). A range whose rows now exceed
+// the shrunken model would otherwise leave STALE/phantom corners → a copy serializes empty
+// rows past the model's end (and getSelectedRange reports out-of-bounds corners). We CLAMP each
+// corner into [0,maxRow]×[0,maxCol] (preserving a valid rectangle — a corner that clamps onto
+// another keeps the range non-empty); when no selectable body cell remains the rectangle is
+// dropped. Does NOT emit range-change here — the clamp is a reconcile, not a user selection
+// move (the emit-on-change work, B18/B19, lands in plan 63-05). Called from clampActiveCell.
+const clampRange = (maxRowArg: any, maxColArg: any) => {
+  const a = rangeAnchor.value;
+  const f = rangeFocus.value;
+  if (!a && !f) return;
+  // Bounds passed from the FRESH model (clampActiveCell → refreshRowModel's nextRows) so the
+  // shrink-clamp is React-stale-safe; fall back to the live helpers for a direct call.
+  const maxRow = maxRowArg != null ? maxRowArg : bodyRowCount() - 1;
+  const maxCol = maxColArg != null ? maxColArg : visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) {
+    rangeAnchor.value = null;
+    rangeFocus.value = null;
+    return;
+  }
+  if (a) {
+    const ar = clamp(a.rowIndex, 0, maxRow);
+    const ac = clamp(a.colIndex, 0, maxCol);
+    if (ar !== a.rowIndex || ac !== a.colIndex) rangeAnchor.value = {
+      rowIndex: ar,
+      colIndex: ac
+    };
+  }
+  if (f) {
+    const fr = clamp(f.rowIndex, 0, maxRow);
+    const fc = clamp(f.colIndex, 0, maxCol);
+    if (fr !== f.rowIndex || fc !== f.colIndex) rangeFocus.value = {
+      rowIndex: fr,
+      colIndex: fc
+    };
+  }
+};
+
 // ══ Clipboard (TSV copy/paste) + drag-fill (phase 51 plan 04 / req-8 / D-03 / D-04) ══════
 // The async Clipboard API (grantPermissions confirmed in 51-01). Copy = range→TSV; paste =
 // TSV→cells under the D-03 skip rule (editable AND validator-passing cells only) with an
@@ -3007,6 +3089,20 @@ const announce = (msg: any) => {
   pasteAnnounce.value = msg != null ? msg : '';
 };
 
+// B11: copy / paste (and the Cut verb plan 63-09 adds) are NO-OPS while a HEADER cell is
+// active. A header has no body value to copy, and a paste anchored at a header would silently
+// write body row 0 at the header's column (a silent body mutation, borderline P0). This is the
+// SINGLE reusable guard every clipboard entry path checks — copyRange/pasteRange self-guard
+// with it AND the onGridKeyDown Ctrl+C/Ctrl+V branches gate on it (so the native shortcut is
+// left untouched on a header). Plan 63-09's Cut reuses this exact predicate.
+// B11: copy / paste (and the Cut verb plan 63-09 adds) are NO-OPS while a HEADER cell is
+// active. A header has no body value to copy, and a paste anchored at a header would silently
+// write body row 0 at the header's column (a silent body mutation, borderline P0). This is the
+// SINGLE reusable guard every clipboard entry path checks — copyRange/pasteRange self-guard
+// with it AND the onGridKeyDown Ctrl+C/Ctrl+V branches gate on it (so the native shortcut is
+// left untouched on a header). Plan 63-09's Cut reuses this exact predicate.
+const clipboardActiveAllowed = () => !activeIsHeader.value;
+
 // fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
 // accessorKey-or-id rule the edit funnels use. Used by paste/fill to apply values by field.
 // fieldOfColId: the row-object key (accessorKey) to write for a column id — the same
@@ -3017,27 +3113,59 @@ const fieldOfColId = (colId: any) => {
 };
 
 // normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
-// or null when no range. The shared rectangle source for copy/paste/fill.
+// or null when no range. The shared rectangle source for copy/paste/fill. B8: the corners are
+// CLAMPED to the CURRENT grid bounds ON READ (read at call time → React-stale-safe), so a copy
+// after a filter-to-fewer can never serialize phantom rows past the shrunken model even when
+// the stored corners were not eagerly re-clamped (refreshRowModel's clamp is async-defeated on
+// React; this read-time clamp is the cross-target guarantee). Returns null when no body cell
+// remains.
 // normalizedRange(): the current rectangle as { r0, r1, c0, c1 } (min/max of anchor+focus),
-// or null when no range. The shared rectangle source for copy/paste/fill.
+// or null when no range. The shared rectangle source for copy/paste/fill. B8: the corners are
+// CLAMPED to the CURRENT grid bounds ON READ (read at call time → React-stale-safe), so a copy
+// after a filter-to-fewer can never serialize phantom rows past the shrunken model even when
+// the stored corners were not eagerly re-clamped (refreshRowModel's clamp is async-defeated on
+// React; this read-time clamp is the cross-target guarantee). Returns null when no body cell
+// remains.
 const normalizedRange = () => {
   const a = rangeAnchor.value;
   const f = rangeFocus.value;
   if (!a || !f) return null;
+  const maxRow = bodyRowCount() - 1;
+  const maxCol = visibleColCount() - 1;
+  if (maxRow < 0 || maxCol < 0) return null;
+  const ar = clamp(a.rowIndex, 0, maxRow);
+  const ac = clamp(a.colIndex, 0, maxCol);
+  const fr = clamp(f.rowIndex, 0, maxRow);
+  const fc = clamp(f.colIndex, 0, maxCol);
   return {
-    r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
-    r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
-    c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
-    c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+    r0: ar < fr ? ar : fr,
+    r1: ar > fr ? ar : fr,
+    c0: ac < fc ? ac : fc,
+    c1: ac > fc ? ac : fc
   };
+};
+
+// B10: escape a TSV field per the spreadsheet convention — a field containing a tab, a CR/LF,
+// or a double-quote is wrapped in double-quotes with internal quotes DOUBLED; an ordinary
+// field is emitted verbatim. parseTsv() unescapes symmetrically, so a cell carrying a tab /
+// newline / quote round-trips without smearing into adjacent cells (T-63-03-02).
+// B10: escape a TSV field per the spreadsheet convention — a field containing a tab, a CR/LF,
+// or a double-quote is wrapped in double-quotes with internal quotes DOUBLED; an ordinary
+// field is emitted verbatim. parseTsv() unescapes symmetrically, so a cell carrying a tab /
+// newline / quote round-trips without smearing into adjacent cells (T-63-03-02).
+const escapeTsvField = (s: any) => {
+  if (s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
 };
 
 // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
 // reading each cell's value off the visible model by index (cellValueAt). A single active
-// cell (no range) serializes that one cell. Pure read — never writes.
+// cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
 // rangeToTsv(): serialize the current range to TSV — rows joined by '\n', cells by '\t',
 // reading each cell's value off the visible model by index (cellValueAt). A single active
-// cell (no range) serializes that one cell. Pure read — never writes.
+// cell (no range) serializes that one cell. Each field is B10-escaped. Pure read — never writes.
 const rangeToTsv = () => {
   const box = normalizedRange();
   const r0 = box ? box.r0 : activeRow.value;
@@ -3049,7 +3177,7 @@ const rangeToTsv = () => {
     const cells = [];
     for (let c = c0; c <= c1; c++) {
       const v = cellValueAt(r, c);
-      cells.push(v == null ? '' : String(v));
+      cells.push(escapeTsvField(v == null ? '' : String(v)));
     }
     lines.push(cells.join('\t'));
   }
@@ -3064,15 +3192,77 @@ const rangeToTsv = () => {
 // the cells are NEVER eval'd / interpolated into a selector / rendered as markup).
 const parseTsv = (text: any) => {
   const str = text != null ? String(text) : '';
-  // CR-03: length guard BEFORE the normalize/split allocations — an empty string is a no-op,
-  // and a pathologically large clipboard payload (>2M chars) is rejected outright rather than
-  // forcing two full-string regex passes + a split into millions of cells (DoS-shaped input).
+  // CR-03: length guard BEFORE the parse — an empty string is a no-op, and a pathologically
+  // large clipboard payload (>2M chars) is rejected outright (DoS-shaped input) before the
+  // single-pass scan allocates a cell-per-character grid.
   if (str === '' || str.length > 2000000) return [];
-  const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const rawLines = norm.split('\n');
-  // Drop a single trailing empty line (a TSV that ends with a newline).
-  if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
-  return rawLines.map((line: any) => line.split('\t'));
+  // B10: a quote-aware single-pass state machine (replaces the naive split, which corrupted a
+  // cell containing a tab/newline). A field that OPENS with a double-quote is "quoted": tabs,
+  // newlines, and doubled quotes ("") inside it are literal content until the closing quote;
+  // an unquoted field ends at the next tab/newline. CR/LF and CRLF all delimit a row.
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  const n = str.length;
+  while (i < n) {
+    const ch = str[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < n && str[i + 1] === '"') {
+          field = field + '"';
+          i = i + 2;
+          continue;
+        }
+        inQuotes = false;
+        i = i + 1;
+        continue;
+      }
+      field = field + ch;
+      i = i + 1;
+      continue;
+    }
+    if (ch === '"' && field === '') {
+      inQuotes = true;
+      i = i + 1;
+      continue;
+    }
+    if (ch === '\t') {
+      row.push(field);
+      field = '';
+      i = i + 1;
+      continue;
+    }
+    if (ch === '\r') {
+      if (i + 1 < n && str[i + 1] === '\n') i = i + 1;
+      row.push(field);
+      field = '';
+      rows.push(row);
+      row = [];
+      i = i + 1;
+      continue;
+    }
+    if (ch === '\n') {
+      row.push(field);
+      field = '';
+      rows.push(row);
+      row = [];
+      i = i + 1;
+      continue;
+    }
+    field = field + ch;
+    i = i + 1;
+  }
+  // Flush the trailing field + row.
+  row.push(field);
+  rows.push(row);
+  // Drop a single trailing empty row (a TSV that ends with a newline → a phantom [''] row).
+  if (rows.length > 1) {
+    const last = rows[rows.length - 1];
+    if (last.length === 1 && last[0] === '') rows.pop();
+  }
+  return rows;
 };
 
 // copyRange(): write the current range as TSV to the clipboard (async). No-op when the
@@ -3080,6 +3270,8 @@ const parseTsv = (text: any) => {
 // copyRange(): write the current range as TSV to the clipboard (async). No-op when the
 // async Clipboard API is unavailable (older/insecure contexts) — a copy is best-effort.
 const copyRange = () => {
+  // B11: never copy from a header-active state (the reusable clipboard guard).
+  if (!clipboardActiveAllowed()) return;
   if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return;
   try {
     const p = navigator.clipboard.writeText(rangeToTsv());
@@ -3126,8 +3318,12 @@ const applyGridToRange = (grid: any, originRow: any, originCol: any) => {
       const colId = columnIdAt(r, c);
       if (colId == null || !columnEditable(colId)) continue;
       const rowObj = rowOriginalAt(r);
-      const value = cols[gc];
-      // T-51-01: validate the pasted value as plain string DATA before any write.
+      // B9: coerce the raw TSV string to the target column's type at commit (mirrors B3's
+      // single-cell commit coercion) — a numeric column commits a real Number, an empty cell
+      // commits null; every other editor type passes through verbatim. No mixed/garbage types
+      // ever reach the model (T-63-03-01). Validation then runs on the COERCED value.
+      const value = coerceCellValue(colId, cols[gc]);
+      // T-51-01: validate the pasted value as plain DATA before any write.
       if (runValidator(colId, value, rowObj) !== true) continue;
       const field = fieldOfColId(colId);
       const srcIndex = sourceIndexOfRow(r);
@@ -3179,6 +3375,9 @@ const rowIdAt = (rowIndex: any) => {
 // active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
 // failed/empty read is a silent no-op.
 const pasteRange = () => {
+  // B11: never paste into a header-active state (the reusable clipboard guard) — a header
+  // anchor would silently write body row 0 at the header's column.
+  if (!clipboardActiveAllowed()) return;
   if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
   // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
   // On React these are useState-backed; re-reading $data inside the async .then() returns the
@@ -3200,27 +3399,81 @@ const pasteRange = () => {
   }).catch(() => {});
 };
 
-// fillRange(): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). Propagate the anchor
-// cell's value across the whole current rectangle, honoring the SAME editable + validation
-// skip rule as paste (D-03). The anchor cell is the rectangle's top-left (r0,c0); its value
-// fills every cell of the box. One writeData + one cell-edit-commit per committed cell + the
-// N-of-M announce (via the shared applyGridToRange path). No-op without a range.
-// fillRange(): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). Propagate the anchor
-// cell's value across the whole current rectangle, honoring the SAME editable + validation
-// skip rule as paste (D-03). The anchor cell is the rectangle's top-left (r0,c0); its value
-// fills every cell of the box. One writeData + one cell-edit-commit per committed cell + the
-// N-of-M announce (via the shared applyGridToRange path). No-op without a range.
-const fillRange = () => {
-  const box = normalizedRange();
+// tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
+// the source block), handling indices below lo (negative offset) correctly. A 1-wide source
+// (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
+// cell it copies — so each column copies its OWN source value down its OWN column.
+// tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
+// the source block), handling indices below lo (negative offset) correctly. A 1-wide source
+// (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
+// cell it copies — so each column copies its OWN source value down its OWN column.
+const tileIndex = (i: any, lo: any, hi: any) => {
+  const span = hi - lo + 1;
+  if (span <= 1) return lo;
+  let k = (i - lo) % span;
+  if (k < 0) k = k + span;
+  return lo + k;
+};
+
+// fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
+// SOURCE is the PRE-DRAG rectangle (`sourceBox`, captured at pointerdown before the drag grew
+// the range); each target cell copies the source cell in its OWN column (and row, when the
+// source spans rows), TILED across the source dimensions. This fixes two data-loss bugs: (1) a
+// single-scalar broadcast clobbered the other columns' data, and (2) reading box.r0/box.c0
+// flipped to the WRONG corner on an up/left drag (the box top-left is a TARGET cell there, not
+// the source). `sourceBox` falls back to the box's top-left 1×1 for a no-source fill. Honors the
+// SAME editable + validation + type-coercion skip rule as paste (via applyGridToRange): one
+// writeData + one cell-edit-commit per committed cell + the N-of-M announce. No-op without a range.
+// fillRange(sourceBox): drag-fill (D-04 — VALUE-COPY ONLY, no series detection). B7: the fill
+// SOURCE is the PRE-DRAG rectangle (`sourceBox`, captured at pointerdown before the drag grew
+// the range); each target cell copies the source cell in its OWN column (and row, when the
+// source spans rows), TILED across the source dimensions. This fixes two data-loss bugs: (1) a
+// single-scalar broadcast clobbered the other columns' data, and (2) reading box.r0/box.c0
+// flipped to the WRONG corner on an up/left drag (the box top-left is a TARGET cell there, not
+// the source). `sourceBox` falls back to the box's top-left 1×1 for a no-source fill. Honors the
+// SAME editable + validation + type-coercion skip rule as paste (via applyGridToRange): one
+// writeData + one cell-edit-commit per committed cell + the N-of-M announce. No-op without a range.
+const fillRange = (sourceBox: any, endCell: any) => {
+  // B7 (React-stale-safe): compute the EXTENDED rectangle from the gesture's FRESH endpoints —
+  // the pre-drag sourceBox (∪) the drag's final end cell — NOT a $data.rangeFocus re-read. On
+  // React the `up` closure captured at pointerdown reads the PRE-move range (the rectangle never
+  // grows), so deriving the box from the threaded endpoints is what makes the fill cover the
+  // dragged cells on React. Falls back to normalizedRange() for a no-gesture (programmatic) call.
+  let box;
+  if (sourceBox && sourceBox.r0 != null && endCell) {
+    let r0 = sourceBox.r0;
+    let r1 = sourceBox.r1;
+    let c0 = sourceBox.c0;
+    let c1 = sourceBox.c1;
+    if (endCell.r < r0) r0 = endCell.r;
+    if (endCell.r > r1) r1 = endCell.r;
+    if (endCell.c < c0) c0 = endCell.c;
+    if (endCell.c > c1) c1 = endCell.c;
+    box = {
+      r0,
+      r1,
+      c0,
+      c1
+    };
+  } else {
+    box = normalizedRange();
+  }
   if (!box) return;
-  const anchorVal = cellValueAt(box.r0, box.c0);
-  const fillStr = anchorVal == null ? '' : String(anchorVal);
-  // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
-  // numeric/date series, D-04), anchored at (r0,c0).
+  const src = sourceBox && sourceBox.r0 != null ? sourceBox : {
+    r0: box.r0,
+    r1: box.r0,
+    c0: box.c0,
+    c1: box.c0
+  };
   const grid = [];
   for (let r = box.r0; r <= box.r1; r++) {
     const cols = [];
-    for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr);
+    for (let c = box.c0; c <= box.c1; c++) {
+      const sr = tileIndex(r, src.r0, src.r1);
+      const sc = tileIndex(c, src.c0, src.c1);
+      const v = cellValueAt(sr, sc);
+      cols.push(v == null ? '' : String(v));
+    }
     grid.push(cols);
   }
   applyGridToRange(grid, box.r0, box.c0);
@@ -3254,7 +3507,16 @@ const teardownFillDrag = () => {
 };
 const cellIndexFromPoint = (clientX: any, clientY: any) => {
   if (typeof document === 'undefined' || !document.elementFromPoint) return null;
-  const el = document.elementFromPoint(clientX, clientY);
+  let el = document.elementFromPoint(clientX, clientY);
+  // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
+  // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
+  // and the fill never extends. Descend into each shadowRoot's own elementFromPoint until the
+  // deepest element. No-op on the 5 light-DOM targets (el.shadowRoot is null).
+  while (el && el.shadowRoot && el.shadowRoot.elementFromPoint) {
+    const inner = el.shadowRoot.elementFromPoint(clientX, clientY);
+    if (!inner || inner === el) break;
+    el = inner;
+  }
   if (!el || !el.closest) return null;
   const cellEl = el.closest('[data-grid-cell]');
   if (!cellEl) return null;
@@ -3274,15 +3536,29 @@ const onFillHandlePointerDown = (e: any) => {
   if (e.preventDefault) e.preventDefault();
   if (e.stopPropagation) e.stopPropagation();
   fillDragging = true;
+  // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
+  // range via setRangeFocus. fillRange reads each source column's own value off THIS box, so an
+  // up/left drag copies from the real origin (not the post-drag corner that would flip to a
+  // target cell). Captured per-gesture in the closure (no module-let needed).
+  const sourceBox = normalizedRange();
+  // B7: track the LAST cell the drag reached so fillRange computes the extended rectangle from
+  // the gesture's fresh endpoint (React's `up` closure can't re-read the grown $data range).
+  let lastCell = sourceBox ? {
+    r: sourceBox.r1,
+    c: sourceBox.c1
+  } : null;
   const move = (ev: any) => {
     if (!fillDragging) return;
     const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
-    if (cell) setRangeFocus(cell.r, cell.c);
+    if (cell) {
+      lastCell = cell;
+      setRangeFocus(cell.r, cell.c);
+    }
   };
   const up = () => {
     // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
     teardownFillDrag();
-    fillRange();
+    fillRange(sourceBox, lastCell);
   };
   // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
   fillDragMove = move;
@@ -4717,7 +4993,12 @@ onMounted(() => {
     // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
     // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
     // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
-    clampActiveCell();
+    // B8/B23: pass the FRESH bounds derived from `nextRows` (NOT $data.rows, which is the
+    // async-stale useState snapshot on React) so a filter-to-fewer clamps the active cell AND
+    // the range corners on React too — never re-reading the pre-change model.
+    const nextRowCount = nextRows.length;
+    const nextColCount = nextRows.length ? nextRows[0].getVisibleCells().length : nextGroups.length ? (nextGroups[nextGroups.length - 1].headers || []).length : 0;
+    clampActiveCell(nextRowCount, nextColCount);
     // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
     // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
     // indices), so resolve the committed row's NEW index by identity HERE (never from the React-

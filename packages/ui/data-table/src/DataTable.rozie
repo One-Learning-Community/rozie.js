@@ -808,7 +808,14 @@ $onMount(() => {
     // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
     // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
     // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
-    clampActiveCell()
+    // B8/B23: pass the FRESH bounds derived from `nextRows` (NOT $data.rows, which is the
+    // async-stale useState snapshot on React) so a filter-to-fewer clamps the active cell AND
+    // the range corners on React too — never re-reading the pre-change model.
+    const nextRowCount = nextRows.length
+    const nextColCount = nextRows.length
+      ? nextRows[0].getVisibleCells().length
+      : (nextGroups.length ? ((nextGroups[nextGroups.length - 1].headers || []).length) : 0)
+    clampActiveCell(nextRowCount, nextColCount)
     // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
     // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
     // indices), so resolve the committed row's NEW index by identity HERE (never from the React-
@@ -1103,9 +1110,9 @@ let rangeTransition = false
 // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
 let rangeClickPending = false
 
-import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange } from './rangeSelection.rzts'
+import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange } from './rangeSelection.rzts'
 
-import { announce, fieldOfColId, normalizedRange, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, pasteRange, fillRange } from './clipboardFill.rzts'
+import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, pasteRange, tileIndex, fillRange } from './clipboardFill.rzts'
 
 // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
 // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the

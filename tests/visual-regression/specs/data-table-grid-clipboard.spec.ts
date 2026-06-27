@@ -160,6 +160,11 @@ async function extendRangeBy(page: Page, dir: 'Right' | 'Left' | 'Down' | 'Up', 
  * shadow root.
  */
 async function fillDragTo(page: Page, toRow: number, toCol: number): Promise<void> {
+  // Settle so the SOURCE range (built before this call) is INTERNALLY committed on React
+  // before pointerdown snapshots it (the range-readout gate observes the emitted event, which
+  // fires a tick before React's internal $data.rangeFocus useState commits — a synthetic
+  // same-tick concern only; real drags span real frames).
+  await page.waitForTimeout(150);
   await page.evaluate(({ tr, tc }) => {
     const findGridTable = (root: Document | ShadowRoot): Element | null => {
       const direct = root.querySelector('table[role="grid"]');
@@ -184,8 +189,11 @@ async function fillDragTo(page: Page, toRow: number, toCol: number): Promise<voi
     handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: hx, clientY: hy }));
     document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: cx, clientY: cy }));
   }, { tr: toRow, tc: toCol });
-  // Wait for setRangeFocus to flush the moving corner before releasing.
+  // Wait for setRangeFocus to flush the moving corner (the emitted event), then settle so the
+  // data-table's INTERNAL $data.rangeFocus useState commits on React before pointerup →
+  // fillRange reads normalizedRange() (else it reads the pre-move stale rectangle, ROZ138).
   await expect.poll(async () => readoutText(page, 'range-readout'), { timeout: 10_000 }).toBe(`${toRow},${toCol}`);
+  await page.waitForTimeout(200);
   await page.evaluate(({ tr, tc }) => {
     const findGridTable = (root: Document | ShadowRoot): Element | null => {
       const direct = root.querySelector('table[role="grid"]');

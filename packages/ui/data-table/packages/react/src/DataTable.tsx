@@ -1647,12 +1647,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
     // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
     // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
-    // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
-    else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+    // type-to-edit char. Copy/paste act on the whole range (or the single active cell). B11:
+    // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
+    // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
+    // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
+    else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
       e.preventDefault();
       copyRange();
       return;
-    } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+    } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
       e.preventDefault();
       pasteRange();
       return;
@@ -1702,7 +1705,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -1761,18 +1764,29 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const cellEl = currentCellEl();
     if (!cellEl || !next || !cellEl.contains(next)) setActiveInControl(false);
   }, [activeInControl, currentCellEl, isGrid]);
-  const clampActiveCell = useCallback(() => {
+  const clampActiveCell = useCallback((rowCount: any, colCount: any) => {
     if (!isGrid()) return;
-    const maxCol = visibleColCount() - 1;
+    // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
+    // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
+    // async useState on React, so bodyRowCount()/visibleColCount() would see the PRE-change model
+    // and SKIP a legitimate shrink-clamp (a filter-to-fewer left the active cell / range corners
+    // out of bounds on React only). Falls back to the live helpers when called without bounds.
+    const colN = colCount != null ? colCount : visibleColCount();
+    const rowN = rowCount != null ? rowCount : bodyRowCount();
+    const maxCol = colN - 1;
     const col = clamp(activeColIndex, 0, maxCol < 0 ? 0 : maxCol);
     if (col !== activeColIndex) setActiveColIndex(col);
     if (!activeIsHeader) {
-      const lastRow = bodyRowCount() - 1;
+      const lastRow = rowN - 1;
       const maxRow = lastRow < 0 ? 0 : lastRow;
       const row = clamp(activeRow, 0, maxRow);
       if (row !== activeRow) setActiveRow(row);
     }
-  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, isGrid, visibleColCount]);
+    // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
+    // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
+    // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
+    clampRange(rowN - 1, colN - 1);
+  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, isGrid, visibleColCount]);
   // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
   // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
   // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
@@ -1808,9 +1822,28 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return rIdx >= r0 && rIdx <= r1 && cIdx >= c0 && cIdx <= c1;
   }
   function getSelectedRange() {
+    // B8: clamp the corners to the CURRENT bounds ON READ so the verb (and the range-change emit
+    // payload) never reports a corner past a shrunken model — React-stale-safe (the eager
+    // refreshRowModel clamp is async-defeated on React; this read-time clamp is the guarantee).
+    const a = rangeAnchor;
+    const f = rangeFocus;
+    if (!a && !f) return {
+      anchor: null,
+      focus: null
+    };
+    const maxRow = bodyRowCount() - 1;
+    const maxCol = visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return {
+      anchor: null,
+      focus: null
+    };
+    const clampCorner = (c: any) => c == null ? null : {
+      rowIndex: clamp(c.rowIndex, 0, maxRow),
+      colIndex: clamp(c.colIndex, 0, maxCol)
+    };
     return {
-      anchor: rangeAnchor,
-      focus: rangeFocus
+      anchor: clampCorner(a),
+      focus: clampCorner(f)
     };
   }
   function isFillHandleCell(rIdx: any, cIdx: any) {
@@ -1887,8 +1920,41 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setRangeAnchor(null);
     setRangeFocus(null);
   }
+  function clampRange(maxRowArg: any, maxColArg: any) {
+    const a = rangeAnchor;
+    const f = rangeFocus;
+    if (!a && !f) return;
+    // Bounds passed from the FRESH model (clampActiveCell → refreshRowModel's nextRows) so the
+    // shrink-clamp is React-stale-safe; fall back to the live helpers for a direct call.
+    const maxRow = maxRowArg != null ? maxRowArg : bodyRowCount() - 1;
+    const maxCol = maxColArg != null ? maxColArg : visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) {
+      setRangeAnchor(null);
+      setRangeFocus(null);
+      return;
+    }
+    if (a) {
+      const ar = clamp(a.rowIndex, 0, maxRow);
+      const ac = clamp(a.colIndex, 0, maxCol);
+      if (ar !== a.rowIndex || ac !== a.colIndex) setRangeAnchor({
+        rowIndex: ar,
+        colIndex: ac
+      });
+    }
+    if (f) {
+      const fr = clamp(f.rowIndex, 0, maxRow);
+      const fc = clamp(f.colIndex, 0, maxCol);
+      if (fr !== f.rowIndex || fc !== f.colIndex) setRangeFocus({
+        rowIndex: fr,
+        colIndex: fc
+      });
+    }
+  }
   function announce(msg: any) {
     setPasteAnnounce(msg != null ? msg : '');
+  }
+  function clipboardActiveAllowed() {
+    return !activeIsHeader;
   }
   function fieldOfColId(colId: any) {
     const d = defFor(colId);
@@ -1898,12 +1964,25 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const a = rangeAnchor;
     const f = rangeFocus;
     if (!a || !f) return null;
+    const maxRow = bodyRowCount() - 1;
+    const maxCol = visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return null;
+    const ar = clamp(a.rowIndex, 0, maxRow);
+    const ac = clamp(a.colIndex, 0, maxCol);
+    const fr = clamp(f.rowIndex, 0, maxRow);
+    const fc = clamp(f.colIndex, 0, maxCol);
     return {
-      r0: a.rowIndex < f.rowIndex ? a.rowIndex : f.rowIndex,
-      r1: a.rowIndex > f.rowIndex ? a.rowIndex : f.rowIndex,
-      c0: a.colIndex < f.colIndex ? a.colIndex : f.colIndex,
-      c1: a.colIndex > f.colIndex ? a.colIndex : f.colIndex
+      r0: ar < fr ? ar : fr,
+      r1: ar > fr ? ar : fr,
+      c0: ac < fc ? ac : fc,
+      c1: ac > fc ? ac : fc
     };
+  }
+  function escapeTsvField(s: any) {
+    if (s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
   }
   function rangeToTsv() {
     const box = normalizedRange();
@@ -1916,7 +1995,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const cells = [];
       for (let c = c0; c <= c1; c++) {
         const v = cellValueAt(r, c);
-        cells.push(v == null ? '' : String(v));
+        cells.push(escapeTsvField(v == null ? '' : String(v)));
       }
       lines.push(cells.join('\t'));
     }
@@ -1924,17 +2003,81 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function parseTsv(text: any) {
     const str = text != null ? String(text) : '';
-    // CR-03: length guard BEFORE the normalize/split allocations — an empty string is a no-op,
-    // and a pathologically large clipboard payload (>2M chars) is rejected outright rather than
-    // forcing two full-string regex passes + a split into millions of cells (DoS-shaped input).
+    // CR-03: length guard BEFORE the parse — an empty string is a no-op, and a pathologically
+    // large clipboard payload (>2M chars) is rejected outright (DoS-shaped input) before the
+    // single-pass scan allocates a cell-per-character grid.
     if (str === '' || str.length > 2000000) return [];
-    const norm = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const rawLines = norm.split('\n');
-    // Drop a single trailing empty line (a TSV that ends with a newline).
-    if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
-    return rawLines.map((line: any) => line.split('\t'));
+    // B10: a quote-aware single-pass state machine (replaces the naive split, which corrupted a
+    // cell containing a tab/newline). A field that OPENS with a double-quote is "quoted": tabs,
+    // newlines, and doubled quotes ("") inside it are literal content until the closing quote;
+    // an unquoted field ends at the next tab/newline. CR/LF and CRLF all delimit a row.
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    let i = 0;
+    const n = str.length;
+    while (i < n) {
+      const ch = str[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < n && str[i + 1] === '"') {
+            field = field + '"';
+            i = i + 2;
+            continue;
+          }
+          inQuotes = false;
+          i = i + 1;
+          continue;
+        }
+        field = field + ch;
+        i = i + 1;
+        continue;
+      }
+      if (ch === '"' && field === '') {
+        inQuotes = true;
+        i = i + 1;
+        continue;
+      }
+      if (ch === '\t') {
+        row.push(field);
+        field = '';
+        i = i + 1;
+        continue;
+      }
+      if (ch === '\r') {
+        if (i + 1 < n && str[i + 1] === '\n') i = i + 1;
+        row.push(field);
+        field = '';
+        rows.push(row);
+        row = [];
+        i = i + 1;
+        continue;
+      }
+      if (ch === '\n') {
+        row.push(field);
+        field = '';
+        rows.push(row);
+        row = [];
+        i = i + 1;
+        continue;
+      }
+      field = field + ch;
+      i = i + 1;
+    }
+    // Flush the trailing field + row.
+    row.push(field);
+    rows.push(row);
+    // Drop a single trailing empty row (a TSV that ends with a newline → a phantom [''] row).
+    if (rows.length > 1) {
+      const last = rows[rows.length - 1];
+      if (last.length === 1 && last[0] === '') rows.pop();
+    }
+    return rows;
   }
   function copyRange() {
+    // B11: never copy from a header-active state (the reusable clipboard guard).
+    if (!clipboardActiveAllowed()) return;
     if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) return;
     try {
       const p = navigator.clipboard.writeText(rangeToTsv());
@@ -1964,8 +2107,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         const colId = columnIdAt(r, c);
         if (colId == null || !columnEditable(colId)) continue;
         const rowObj = rowOriginalAt(r);
-        const value = cols[gc];
-        // T-51-01: validate the pasted value as plain string DATA before any write.
+        // B9: coerce the raw TSV string to the target column's type at commit (mirrors B3's
+        // single-cell commit coercion) — a numeric column commits a real Number, an empty cell
+        // commits null; every other editor type passes through verbatim. No mixed/garbage types
+        // ever reach the model (T-63-03-01). Validation then runs on the COERCED value.
+        const value = coerceCellValue(colId, cols[gc]);
+        // T-51-01: validate the pasted value as plain DATA before any write.
         if (runValidator(colId, value, rowObj) !== true) continue;
         const field = fieldOfColId(colId);
         const srcIndex = sourceIndexOfRow(r);
@@ -2007,6 +2154,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return row ? row.id : null;
   }
   function pasteRange() {
+    // B11: never paste into a header-active state (the reusable clipboard guard) — a header
+    // anchor would silently write body row 0 at the header's column.
+    if (!clipboardActiveAllowed()) return;
     if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
     // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
     // On React these are useState-backed; re-reading $data inside the async .then() returns the
@@ -2027,17 +2177,54 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       applyGridToRange(grid, anchorRow, anchorCol);
     }).catch(() => {});
   }
-  function fillRange() {
-    const box = normalizedRange();
+  function tileIndex(i: any, lo: any, hi: any) {
+    const span = hi - lo + 1;
+    if (span <= 1) return lo;
+    let k = (i - lo) % span;
+    if (k < 0) k = k + span;
+    return lo + k;
+  }
+  function fillRange(sourceBox: any, endCell: any) {
+    // B7 (React-stale-safe): compute the EXTENDED rectangle from the gesture's FRESH endpoints —
+    // the pre-drag sourceBox (∪) the drag's final end cell — NOT a $data.rangeFocus re-read. On
+    // React the `up` closure captured at pointerdown reads the PRE-move range (the rectangle never
+    // grows), so deriving the box from the threaded endpoints is what makes the fill cover the
+    // dragged cells on React. Falls back to normalizedRange() for a no-gesture (programmatic) call.
+    let box;
+    if (sourceBox && sourceBox.r0 != null && endCell) {
+      let r0 = sourceBox.r0;
+      let r1 = sourceBox.r1;
+      let c0 = sourceBox.c0;
+      let c1 = sourceBox.c1;
+      if (endCell.r < r0) r0 = endCell.r;
+      if (endCell.r > r1) r1 = endCell.r;
+      if (endCell.c < c0) c0 = endCell.c;
+      if (endCell.c > c1) c1 = endCell.c;
+      box = {
+        r0,
+        r1,
+        c0,
+        c1
+      };
+    } else {
+      box = normalizedRange();
+    }
     if (!box) return;
-    const anchorVal = cellValueAt(box.r0, box.c0);
-    const fillStr = anchorVal == null ? '' : String(anchorVal);
-    // Build a grid of the anchor value spanning the rectangle (value-copy only — NEVER a
-    // numeric/date series, D-04), anchored at (r0,c0).
+    const src = sourceBox && sourceBox.r0 != null ? sourceBox : {
+      r0: box.r0,
+      r1: box.r0,
+      c0: box.c0,
+      c1: box.c0
+    };
     const grid = [];
     for (let r = box.r0; r <= box.r1; r++) {
       const cols = [];
-      for (let c = box.c0; c <= box.c1; c++) cols.push(fillStr);
+      for (let c = box.c0; c <= box.c1; c++) {
+        const sr = tileIndex(r, src.r0, src.r1);
+        const sc = tileIndex(c, src.c0, src.c1);
+        const v = cellValueAt(sr, sc);
+        cols.push(v == null ? '' : String(v));
+      }
       grid.push(cols);
     }
     applyGridToRange(grid, box.r0, box.c0);
@@ -2053,7 +2240,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }, []);
   function cellIndexFromPoint(clientX: any, clientY: any) {
     if (typeof document === 'undefined' || !document.elementFromPoint) return null;
-    const el = document.elementFromPoint(clientX, clientY);
+    let el = document.elementFromPoint(clientX, clientY);
+    // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
+    // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
+    // and the fill never extends. Descend into each shadowRoot's own elementFromPoint until the
+    // deepest element. No-op on the 5 light-DOM targets (el.shadowRoot is null).
+    while (el && el.shadowRoot && el.shadowRoot.elementFromPoint) {
+      const inner = el.shadowRoot.elementFromPoint(clientX, clientY);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
     if (!el || !el.closest) return null;
     const cellEl = el.closest('[data-grid-cell]');
     if (!cellEl) return null;
@@ -2073,15 +2269,29 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (e.preventDefault) e.preventDefault();
     if (e.stopPropagation) e.stopPropagation();
     fillDragging.current = true;
+    // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
+    // range via setRangeFocus. fillRange reads each source column's own value off THIS box, so an
+    // up/left drag copies from the real origin (not the post-drag corner that would flip to a
+    // target cell). Captured per-gesture in the closure (no module-let needed).
+    const sourceBox = normalizedRange();
+    // B7: track the LAST cell the drag reached so fillRange computes the extended rectangle from
+    // the gesture's fresh endpoint (React's `up` closure can't re-read the grown $data range).
+    let lastCell = sourceBox ? {
+      r: sourceBox.r1,
+      c: sourceBox.c1
+    } : null;
     const move = (ev: any) => {
       if (!fillDragging.current) return;
       const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
-      if (cell) setRangeFocus$local(cell.r, cell.c);
+      if (cell) {
+        lastCell = cell;
+        setRangeFocus$local(cell.r, cell.c);
+      }
     };
     const up = () => {
       // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
       teardownFillDrag();
-      fillRange();
+      fillRange(sourceBox, lastCell);
     };
     // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
     fillDragMove.current = move;
@@ -2090,7 +2300,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       document.addEventListener('pointermove', move);
       document.addEventListener('pointerup', up);
     }
-  }, [cellIndexFromPoint, fillRange, setRangeFocus$local, teardownFillDrag]);
+  }, [cellIndexFromPoint, fillRange, normalizedRange, setRangeFocus$local, teardownFillDrag]);
   function activeCellColumnId() {
     if (activeIsHeader) return null;
     const rowList = rows || [];
@@ -2969,7 +3179,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
       // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
       // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
-      clampActiveCell();
+      // B8/B23: pass the FRESH bounds derived from `nextRows` (NOT $data.rows, which is the
+      // async-stale useState snapshot on React) so a filter-to-fewer clamps the active cell AND
+      // the range corners on React too — never re-reading the pre-change model.
+      const nextRowCount = nextRows.length;
+      const nextColCount = nextRows.length ? nextRows[0].getVisibleCells().length : nextGroups.length ? (nextGroups[nextGroups.length - 1].headers || []).length : 0;
+      clampActiveCell(nextRowCount, nextColCount);
       // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
       // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
       // indices), so resolve the committed row's NEW index by identity HERE (never from the React-

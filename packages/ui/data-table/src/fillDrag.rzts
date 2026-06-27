@@ -9,7 +9,16 @@ const teardownFillDrag = () => {
 }
 const cellIndexFromPoint = (clientX, clientY) => {
   if (typeof document === 'undefined' || !document.elementFromPoint) return null
-  const el = document.elementFromPoint(clientX, clientY)
+  let el = document.elementFromPoint(clientX, clientY)
+  // Pierce OPEN shadow roots (Lit): document.elementFromPoint retargets to the shadow HOST, so
+  // a drag over the Lit data-table's shadow content would otherwise resolve the host (no cell)
+  // and the fill never extends. Descend into each shadowRoot's own elementFromPoint until the
+  // deepest element. No-op on the 5 light-DOM targets (el.shadowRoot is null).
+  while (el && el.shadowRoot && el.shadowRoot.elementFromPoint) {
+    const inner = el.shadowRoot.elementFromPoint(clientX, clientY)
+    if (!inner || inner === el) break
+    el = inner
+  }
   if (!el || !el.closest) return null
   const cellEl = el.closest('[data-grid-cell]')
   if (!cellEl) return null
@@ -26,15 +35,23 @@ const onFillHandlePointerDown = (e) => {
   if (e.preventDefault) e.preventDefault()
   if (e.stopPropagation) e.stopPropagation()
   fillDragging = true
+  // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
+  // range via setRangeFocus. fillRange reads each source column's own value off THIS box, so an
+  // up/left drag copies from the real origin (not the post-drag corner that would flip to a
+  // target cell). Captured per-gesture in the closure (no module-let needed).
+  const sourceBox = normalizedRange()
+  // B7: track the LAST cell the drag reached so fillRange computes the extended rectangle from
+  // the gesture's fresh endpoint (React's `up` closure can't re-read the grown $data range).
+  let lastCell = sourceBox ? { r: sourceBox.r1, c: sourceBox.c1 } : null
   const move = (ev) => {
     if (!fillDragging) return
     const cell = cellIndexFromPoint(ev.clientX, ev.clientY)
-    if (cell) setRangeFocus(cell.r, cell.c)
+    if (cell) { lastCell = cell; setRangeFocus(cell.r, cell.c) }
   }
   const up = () => {
     // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
     teardownFillDrag()
-    fillRange()
+    fillRange(sourceBox, lastCell)
   }
   // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
   fillDragMove = move

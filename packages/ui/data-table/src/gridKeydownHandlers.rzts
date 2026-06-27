@@ -76,11 +76,14 @@ const onGridKeyDown = (e) => {
   // ── Clipboard (phase 51 req-8 / D-03) — Ctrl/Cmd+C copies the range as TSV; Ctrl/Cmd+V
   // pastes TSV into the range under the D-03 skip rule. Placed BEFORE the printable-key
   // edit-entry branch (which excludes ctrl/meta) so the shortcuts are never swallowed as a
-  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). ──────
-  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey)) {
+  // type-to-edit char. Copy/paste act on the whole range (or the single active cell). B11:
+  // gated by clipboardActiveAllowed() (== !activeIsHeader) so a header-active Ctrl+C/Ctrl+V
+  // falls through to NATIVE behavior — never preventDefault'd, never a silent body mutation
+  // (copyRange/pasteRange also self-guard; the verb guard is what plan 63-09's Cut reuses). ──
+  else if ((key === 'c' || key === 'C') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault(); copyRange(); return
   }
-  else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey)) {
+  else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault(); pasteRange(); return
   }
   // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
@@ -210,17 +213,28 @@ const onGridFocusOut = (e) => {
 // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
 // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
 // mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
-const clampActiveCell = () => {
+const clampActiveCell = (rowCount, colCount) => {
   if (!isGrid()) return
-  const maxCol = visibleColCount() - 1
+  // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
+  // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
+  // async useState on React, so bodyRowCount()/visibleColCount() would see the PRE-change model
+  // and SKIP a legitimate shrink-clamp (a filter-to-fewer left the active cell / range corners
+  // out of bounds on React only). Falls back to the live helpers when called without bounds.
+  const colN = colCount != null ? colCount : visibleColCount()
+  const rowN = rowCount != null ? rowCount : bodyRowCount()
+  const maxCol = colN - 1
   const col = clamp($data.activeColIndex, 0, (maxCol < 0 ? 0 : maxCol))
   if (col !== $data.activeColIndex) $data.activeColIndex = col
   if (!$data.activeIsHeader) {
-    const lastRow = bodyRowCount() - 1
+    const lastRow = rowN - 1
     const maxRow = lastRow < 0 ? 0 : lastRow
     const row = clamp($data.activeRow, 0, maxRow)
     if (row !== $data.activeRow) $data.activeRow = row
   }
+  // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
+  // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
+  // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
+  clampRange(rowN - 1, colN - 1)
 }
 
 export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridFocusOut, clampActiveCell }
