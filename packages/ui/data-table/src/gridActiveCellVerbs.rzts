@@ -10,11 +10,23 @@
 // Threads the SAME fresh clamped locals into focusActiveCell AND activecell-change (no $data
 // re-read — consistent with the Task-1 fresh-local rule).
 const focusCell = (rowIndex, colIndex) => {
+  // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
+  // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
+  // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
+  // instance does not leak a spurious activecell-change.
+  if (!isGrid()) return
   const lastRow = bodyRowCount() - 1
   const maxRow = lastRow < 0 ? 0 : lastRow
   const maxCol = visibleColCount() - 1
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
+  // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
+  // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
+  // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
+  // not a navigation). A header→body landing (prevIsHeader) is a real move.
+  const prevRow = $data.activeRow
+  const prevCol = $data.activeColIndex
+  const prevIsHeader = $data.activeIsHeader
   $data.activeIsHeader = false
   $data.activeInControl = false
   $data.activeRow = r
@@ -24,18 +36,31 @@ const focusCell = (rowIndex, colIndex) => {
   // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
   // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
   // last clicked, so a stale read would resolve focus to the header instead of body row r.
+  // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
+  // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
   focusActiveCell(r, c, false)
-  $emit('activecell-change', { rowIndex: r, colIndex: c })
+  if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    $emit('activecell-change', { rowIndex: r, colIndex: c })
+  }
 }
 
 // getActiveCell() — return the current active-cell position. Integers only — no row data,
 // no DOM node (T-49-02 Information-Disclosure: return the screen position, nothing else).
-const getActiveCell = () => ({ rowIndex: $data.activeRow, colIndex: $data.activeColIndex })
+// B15: reflect the HEADER-active state. When a header cell is active the roving position is
+// NOT a body row — return the header sentinel (rowIndex null + isHeader true, colIndex the
+// header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
+// returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
+// is unchanged for the body case).
+const getActiveCell = () => ($data.activeIsHeader
+  ? { rowIndex: null, colIndex: $data.activeColIndex, isHeader: true }
+  : { rowIndex: $data.activeRow, colIndex: $data.activeColIndex, isHeader: false })
 
 // clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
 // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
-// (no move to a new addressable cell — a reset, not a navigation).
+// (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
+// table-mode instance has no roving active cell, so the verb is a no-op there.
 const clearActiveCell = () => {
+  if (!isGrid()) return
   $data.activeIsHeader = false
   $data.activeInControl = false
   $data.activeRow = 0

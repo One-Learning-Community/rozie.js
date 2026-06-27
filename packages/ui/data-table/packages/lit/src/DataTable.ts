@@ -2442,10 +2442,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         isHeader: true,
         level: this._activeHeaderLevel.value
       };
+      // B17: crossing from the leaf header INTO the body consumes ONE step; the REMAINING
+      // (delta-1) continues the descent, so PageDown (delta=GRID_PAGE_STEP) lands a real
+      // page-down body row, NOT row 0 (== ArrowDown). ArrowDown (delta=1) still lands row 0
+      // (delta-1 = 0); clamped to the page-last body row.
+      const landRow = this.clamp(delta - 1, 0, maxRow);
       this._activeIsHeader.value = false;
-      this._activeRow.value = 0;
+      this._activeRow.value = landRow;
       return {
-        row: 0,
+        row: landRow,
         col: this._activeColIndex.value,
         isHeader: false,
         level: 0
@@ -2824,6 +2829,22 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!cellEl || !next || !cellEl.contains(next)) this._activeInControl.value = false;
 };
 
+  recoverGridFocus = (rowKey: any, col: any, level: any) => {
+  if (!this.gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = this.resolveCellEl(rowKey, col, level);
+    if (el) {
+      el.focus();
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
   clampActiveCell = (rowCount: any, colCount: any) => {
   if (!this.isGrid()) return;
   // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
@@ -2833,9 +2854,36 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // out of bounds on React only). Falls back to the live helpers when called without bounds.
   const colN = colCount != null ? colCount : this.visibleColCount();
   const rowN = rowCount != null ? rowCount : this.bodyRowCount();
+  // B25: BEFORE re-indexing, detect whether DOM focus currently rests on a BODY cell that the
+  // shrink will REMOVE (its row index exceeds the new bounds). We run synchronously BEFORE the
+  // framework commits the new tbody (refreshRowModel calls us right after `$data.rows = nextRows`
+  // — true on all six, incl React's async setState), so the doomed cell + its focus are still
+  // observable in the OLD DOM. Only then do we arm a focus RECOVERY (after the re-render), so a
+  // programmatic shrink (collapseAll/pageSize/data swap) never drops keyboard focus to <body>.
+  // Focus elsewhere — a header sort button, an external control, an unfocused grid — is NOT a
+  // doomed body cell, so recovery never STEALS focus on a routine re-sort/filter.
+  let recoverFocus = false;
+  if (this.gridRoot) {
+    const rootNode = this.gridRoot.getRootNode ? this.gridRoot.getRootNode() : null;
+    const focusedEl = rootNode ? rootNode.activeElement : null;
+    const focusedCell = focusedEl && focusedEl.closest ? focusedEl.closest('[data-grid-cell]') : null;
+    if (focusedCell && this.gridRoot.contains(focusedCell)) {
+      const fRowAttr = focusedCell.getAttribute('data-row');
+      if (fRowAttr != null && fRowAttr !== '__header') {
+        const fr = parseInt(fRowAttr, 10);
+        if (Number.isFinite(fr) && fr > rowN - 1) recoverFocus = true;
+      }
+    }
+  }
   const maxCol = colN - 1;
   const col = this.clamp(this._activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== this._activeColIndex.value) this._activeColIndex.value = col;
+  // Track the FINAL resolved active-cell as LOCALS (never re-read $data after a write — React
+  // setState is async, ROZ138) so the B25 focus recovery targets the correct re-indexed cell.
+  let finalCol = col;
+  let finalRow = this._activeRow.value;
+  let finalIsHeader = this._activeIsHeader.value;
+  const finalLevel = this._activeHeaderLevel.value;
   // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
   // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
   // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
@@ -2846,6 +2894,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._activeColIndex.value = 0;
     this._gridEmptyFallback.value = true;
     this.clampRange(rowN - 1, colN - 1);
+    // B25: every body cell vanished — recover focus onto the leaf-header fallback tab-stop.
+    if (recoverFocus) this.recoverGridFocus('__header', 0, this.headerLeafLevel());
     return;
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
@@ -2855,17 +2905,26 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._gridEmptyFallback.value = false;
     this._activeIsHeader.value = false;
     this._activeRow.value = 0;
+    finalIsHeader = false;
+    finalRow = 0;
   }
-  if (!this._activeIsHeader.value) {
+  if (!finalIsHeader) {
     const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
-    const row = this.clamp(this._activeRow.value, 0, maxRow);
+    const row = this.clamp(finalRow, 0, maxRow);
     if (row !== this._activeRow.value) this._activeRow.value = row;
+    finalRow = row;
   }
   // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
   // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
   // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
   this.clampRange(rowN - 1, colN - 1);
+  // B25: recover DOM focus onto the re-indexed valid cell (deferred until the new model renders)
+  // when the shrink removed the focused cell. Uses the FRESH locals (not the React-stale $data).
+  if (recoverFocus) {
+    const rowKey = finalIsHeader ? '__header' : String(finalRow);
+    this.recoverGridFocus(rowKey, finalCol, finalIsHeader ? finalLevel : null);
+  }
 };
 
   rangeTransition = false;
@@ -2937,6 +2996,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
   let anchor = this._rangeAnchor.value;
   let focus = this._rangeFocus.value;
+  const hadRange = !!(anchor && focus);
   if (!anchor || !focus) {
     anchor = {
       rowIndex: this._activeRow.value,
@@ -2963,7 +3023,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
   this.rangeTransition = true;
   this.focusActiveCell(nextRow, nextCol, false);
-  this.emitRangeChange(anchor, nextFocus);
+  // B18: emit range-change ONLY on an actual change. A clamped no-op (a range already exists
+  // and the focus corner did not move — Shift+Arrow into the grid boundary) is not a selection
+  // change → no emit. Seeding a brand-new range (no prior range) is always a change (the
+  // rectangle came into existence) even if its first corner is a degenerate 1×1.
+  if (!hadRange || nextRow !== focus.rowIndex || nextCol !== focus.colIndex) {
+    this.emitRangeChange(anchor, nextFocus);
+  }
 };
 
   setRangeFocus = (rIdx: any, cIdx: any) => {
@@ -2990,6 +3056,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (this._rangeAnchor.value == null && this._rangeFocus.value == null) return;
   this._rangeAnchor.value = null;
   this._rangeFocus.value = null;
+  this.emitRangeChange(null, null);
 };
 
   clampRange = (maxRowArg: any, maxColArg: any) => {
@@ -3380,7 +3447,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const move = (ev: any) => {
     if (!this.fillDragging) return;
     const cell = this.cellIndexFromPoint(ev.clientX, ev.clientY);
-    if (cell) {
+    // B20: dedup by target cell. setRangeFocus emits range-change, so calling it on EVERY
+    // pointermove (the pointer fires many per cell) spams the event with identical payloads.
+    // Only extend (and emit) when the pointer enters a DIFFERENT cell than the last — lastCell
+    // seeds from the pre-drag bottom-right corner, so a move that stays on the source corner
+    // or re-enters the same cell is suppressed (the range is unchanged).
+    if (cell && (!lastCell || cell.r !== lastCell.r || cell.c !== lastCell.c)) {
       lastCell = cell;
       this.setRangeFocus(cell.r, cell.c);
     }
@@ -4127,11 +4199,23 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   focusCell = (rowIndex: any, colIndex: any) => {
+  // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
+  // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
+  // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
+  // instance does not leak a spurious activecell-change.
+  if (!this.isGrid()) return;
   const lastRow = this.bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const maxCol = this.visibleColCount() - 1;
   const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
   const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
+  // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
+  // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
+  // not a navigation). A header→body landing (prevIsHeader) is a real move.
+  const prevRow = this._activeRow.value;
+  const prevCol = this._activeColIndex.value;
+  const prevIsHeader = this._activeIsHeader.value;
   this._activeIsHeader.value = false;
   this._activeInControl.value = false;
   this._activeRow.value = r;
@@ -4141,23 +4225,33 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
   // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
   // last clicked, so a stale read would resolve focus to the header instead of body row r.
+  // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
+  // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
   this.focusActiveCell(r, c, false);
-  this.dispatchEvent(new CustomEvent("activecell-change", {
-    detail: {
-      rowIndex: r,
-      colIndex: c
-    },
-    bubbles: true,
-    composed: true
-  }));
+  if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    this.dispatchEvent(new CustomEvent("activecell-change", {
+      detail: {
+        rowIndex: r,
+        colIndex: c
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
 };
 
-  getActiveCell = () => ({
+  getActiveCell = () => this._activeIsHeader.value ? {
+  rowIndex: null,
+  colIndex: this._activeColIndex.value,
+  isHeader: true
+} : {
   rowIndex: this._activeRow.value,
-  colIndex: this._activeColIndex.value
-});
+  colIndex: this._activeColIndex.value,
+  isHeader: false
+};
 
   clearActiveCell = () => {
+  if (!this.isGrid()) return;
   this._activeIsHeader.value = false;
   this._activeInControl.value = false;
   this._activeRow.value = 0;

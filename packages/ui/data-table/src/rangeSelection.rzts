@@ -59,6 +59,7 @@ const extendRange = (dRow, dCol) => {
   // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
   let anchor = $data.rangeAnchor
   let focus = $data.rangeFocus
+  const hadRange = !!(anchor && focus)
   if (!anchor || !focus) {
     anchor = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
     focus = { rowIndex: $data.activeRow, colIndex: $data.activeColIndex }
@@ -76,7 +77,13 @@ const extendRange = (dRow, dCol) => {
   // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
   rangeTransition = true
   focusActiveCell(nextRow, nextCol, false)
-  emitRangeChange(anchor, nextFocus)
+  // B18: emit range-change ONLY on an actual change. A clamped no-op (a range already exists
+  // and the focus corner did not move — Shift+Arrow into the grid boundary) is not a selection
+  // change → no emit. Seeding a brand-new range (no prior range) is always a change (the
+  // rectangle came into existence) even if its first corner is a degenerate 1×1.
+  if (!hadRange || nextRow !== focus.rowIndex || nextCol !== focus.colIndex) {
+    emitRangeChange(anchor, nextFocus)
+  }
 }
 
 // setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
@@ -97,12 +104,16 @@ const setRangeFocus = (rIdx, cIdx) => {
 }
 
 // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
-// range back to a single active cell). No emit on a clear (a collapse is not a selection
-// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+// range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
+// plain navigation with no active range from emitting). B19: when a range DID exist, emit
+// range-change with null corners so a consumer mirroring the selection through the event sees
+// the drop — without this they hold a STALE rectangle after every non-shift navigation /
+// edit-entry collapse (getSelectedRange already reports null, but the event never fired).
 const clearRange = () => {
   if ($data.rangeAnchor == null && $data.rangeFocus == null) return
   $data.rangeAnchor = null
   $data.rangeFocus = null
+  emitRangeChange(null, null)
 }
 
 // B8: clamp the range corners to the current grid bounds after an underlying-data change

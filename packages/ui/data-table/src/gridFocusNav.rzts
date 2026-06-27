@@ -262,9 +262,14 @@ const moveRow = (delta) => {
       }
       // At the leaf header: an empty grid has no body to drop into → stay put.
       if (bodyRowCount() === 0) return { row: $data.activeRow, col: $data.activeColIndex, isHeader: true, level: $data.activeHeaderLevel }
+      // B17: crossing from the leaf header INTO the body consumes ONE step; the REMAINING
+      // (delta-1) continues the descent, so PageDown (delta=GRID_PAGE_STEP) lands a real
+      // page-down body row, NOT row 0 (== ArrowDown). ArrowDown (delta=1) still lands row 0
+      // (delta-1 = 0); clamped to the page-last body row.
+      const landRow = clamp(delta - 1, 0, maxRow)
       $data.activeIsHeader = false
-      $data.activeRow = 0
-      return { row: 0, col: $data.activeColIndex, isHeader: false, level: 0 }
+      $data.activeRow = landRow
+      return { row: landRow, col: $data.activeColIndex, isHeader: false, level: 0 }
     }
     // B12 — Up: from the leaf (or any non-top) header level, ascend to the PARENT header that
     // spans the active column; at the top level (or no real parent) stay put. The parent col

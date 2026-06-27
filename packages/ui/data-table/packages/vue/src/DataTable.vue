@@ -2523,10 +2523,15 @@ const moveRow = (delta: any) => {
         isHeader: true,
         level: activeHeaderLevel.value
       };
+      // B17: crossing from the leaf header INTO the body consumes ONE step; the REMAINING
+      // (delta-1) continues the descent, so PageDown (delta=GRID_PAGE_STEP) lands a real
+      // page-down body row, NOT row 0 (== ArrowDown). ArrowDown (delta=1) still lands row 0
+      // (delta-1 = 0); clamped to the page-last body row.
+      const landRow = clamp(delta - 1, 0, maxRow);
       activeIsHeader.value = false;
-      activeRow.value = 0;
+      activeRow.value = landRow;
       return {
-        row: 0,
+        row: landRow,
         col: activeColIndex.value,
         isHeader: false,
         level: 0
@@ -2984,6 +2989,32 @@ const onGridFocusOut = (e: any) => {
   if (!cellEl || !next || !cellEl.contains(next)) activeInControl.value = false;
 };
 
+// B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+// runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+// resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+// targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+// focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+// B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+// runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+// resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+// targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+// focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+const recoverGridFocus = (rowKey: any, col: any, level: any) => {
+  if (!gridRoot) return;
+  let attempts = 0;
+  const tryFocus = () => {
+    const el = resolveCellEl(rowKey, col, level);
+    if (el) {
+      el.focus();
+      return;
+    }
+    attempts = attempts + 1;
+    if (attempts >= 30) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
 // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
 // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
 // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
@@ -3001,9 +3032,36 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
   // out of bounds on React only). Falls back to the live helpers when called without bounds.
   const colN = colCount != null ? colCount : visibleColCount();
   const rowN = rowCount != null ? rowCount : bodyRowCount();
+  // B25: BEFORE re-indexing, detect whether DOM focus currently rests on a BODY cell that the
+  // shrink will REMOVE (its row index exceeds the new bounds). We run synchronously BEFORE the
+  // framework commits the new tbody (refreshRowModel calls us right after `$data.rows = nextRows`
+  // — true on all six, incl React's async setState), so the doomed cell + its focus are still
+  // observable in the OLD DOM. Only then do we arm a focus RECOVERY (after the re-render), so a
+  // programmatic shrink (collapseAll/pageSize/data swap) never drops keyboard focus to <body>.
+  // Focus elsewhere — a header sort button, an external control, an unfocused grid — is NOT a
+  // doomed body cell, so recovery never STEALS focus on a routine re-sort/filter.
+  let recoverFocus = false;
+  if (gridRoot) {
+    const rootNode = gridRoot.getRootNode ? gridRoot.getRootNode() : null;
+    const focusedEl = rootNode ? rootNode.activeElement : null;
+    const focusedCell = focusedEl && focusedEl.closest ? focusedEl.closest('[data-grid-cell]') : null;
+    if (focusedCell && gridRoot.contains(focusedCell)) {
+      const fRowAttr = focusedCell.getAttribute('data-row');
+      if (fRowAttr != null && fRowAttr !== '__header') {
+        const fr = parseInt(fRowAttr, 10);
+        if (Number.isFinite(fr) && fr > rowN - 1) recoverFocus = true;
+      }
+    }
+  }
   const maxCol = colN - 1;
   const col = clamp(activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== activeColIndex.value) activeColIndex.value = col;
+  // Track the FINAL resolved active-cell as LOCALS (never re-read $data after a write — React
+  // setState is async, ROZ138) so the B25 focus recovery targets the correct re-indexed cell.
+  let finalCol = col;
+  let finalRow = activeRow.value;
+  let finalIsHeader = activeIsHeader.value;
+  const finalLevel = activeHeaderLevel.value;
   // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
   // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
   // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
@@ -3014,6 +3072,8 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     activeColIndex.value = 0;
     gridEmptyFallback.value = true;
     clampRange(rowN - 1, colN - 1);
+    // B25: every body cell vanished — recover focus onto the leaf-header fallback tab-stop.
+    if (recoverFocus) recoverGridFocus('__header', 0, headerLeafLevel());
     return;
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
@@ -3023,17 +3083,26 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     gridEmptyFallback.value = false;
     activeIsHeader.value = false;
     activeRow.value = 0;
+    finalIsHeader = false;
+    finalRow = 0;
   }
-  if (!activeIsHeader.value) {
+  if (!finalIsHeader) {
     const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
-    const row = clamp(activeRow.value, 0, maxRow);
+    const row = clamp(finalRow, 0, maxRow);
     if (row !== activeRow.value) activeRow.value = row;
+    finalRow = row;
   }
   // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
   // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
   // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
   clampRange(rowN - 1, colN - 1);
+  // B25: recover DOM focus onto the re-indexed valid cell (deferred until the new model renders)
+  // when the shrink removed the focused cell. Uses the FRESH locals (not the React-stale $data).
+  if (recoverFocus) {
+    const rowKey = finalIsHeader ? '__header' : String(finalRow);
+    recoverGridFocus(rowKey, finalCol, finalIsHeader ? finalLevel : null);
+  }
 };
 
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
@@ -3171,6 +3240,7 @@ const extendRange = (dRow: any, dCol: any) => {
   // Seed the anchor + focus from the active cell on the FIRST extend (no range yet).
   let anchor = rangeAnchor.value;
   let focus = rangeFocus.value;
+  const hadRange = !!(anchor && focus);
   if (!anchor || !focus) {
     anchor = {
       rowIndex: activeRow.value,
@@ -3197,7 +3267,13 @@ const extendRange = (dRow: any, dCol: any) => {
   // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
   rangeTransition = true;
   focusActiveCell(nextRow, nextCol, false);
-  emitRangeChange(anchor, nextFocus);
+  // B18: emit range-change ONLY on an actual change. A clamped no-op (a range already exists
+  // and the focus corner did not move — Shift+Arrow into the grid boundary) is not a selection
+  // change → no emit. Seeding a brand-new range (no prior range) is always a change (the
+  // rectangle came into existence) even if its first corner is a degenerate 1×1.
+  if (!hadRange || nextRow !== focus.rowIndex || nextCol !== focus.colIndex) {
+    emitRangeChange(anchor, nextFocus);
+  }
 };
 
 // setRangeFocus(rIdx, cIdx): set the moving corner to an explicit cell (Shift+Click),
@@ -3227,15 +3303,22 @@ const setRangeFocus = (rIdx: any, cIdx: any) => {
 };
 
 // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
-// range back to a single active cell). No emit on a clear (a collapse is not a selection
-// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+// range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
+// plain navigation with no active range from emitting). B19: when a range DID exist, emit
+// range-change with null corners so a consumer mirroring the selection through the event sees
+// the drop — without this they hold a STALE rectangle after every non-shift navigation /
+// edit-entry collapse (getSelectedRange already reports null, but the event never fired).
 // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
-// range back to a single active cell). No emit on a clear (a collapse is not a selection
-// move — the same posture as clearActiveCell). Cheap no-op when no range is set.
+// range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
+// plain navigation with no active range from emitting). B19: when a range DID exist, emit
+// range-change with null corners so a consumer mirroring the selection through the event sees
+// the drop — without this they hold a STALE rectangle after every non-shift navigation /
+// edit-entry collapse (getSelectedRange already reports null, but the event never fired).
 const clearRange = () => {
   if (rangeAnchor.value == null && rangeFocus.value == null) return;
   rangeAnchor.value = null;
   rangeFocus.value = null;
+  emitRangeChange(null, null);
 };
 
 // B8: clamp the range corners to the current grid bounds after an underlying-data change
@@ -3772,7 +3855,12 @@ const onFillHandlePointerDown = (e: any) => {
   const move = (ev: any) => {
     if (!fillDragging) return;
     const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
-    if (cell) {
+    // B20: dedup by target cell. setRangeFocus emits range-change, so calling it on EVERY
+    // pointermove (the pointer fires many per cell) spams the event with identical payloads.
+    // Only extend (and emit) when the pointer enters a DIFFERENT cell than the last — lastCell
+    // seeds from the pre-drag bottom-right corner, so a move that stays on the source corner
+    // or re-enters the same cell is suppressed (the range is unchanged).
+    if (cell && (!lastCell || cell.r !== lastCell.r || cell.c !== lastCell.c)) {
       lastCell = cell;
       setRangeFocus(cell.r, cell.c);
     }
@@ -4903,11 +4991,23 @@ const editRow = (rowIndex: any) => {
 // Threads the SAME fresh clamped locals into focusActiveCell AND activecell-change (no $data
 // re-read — consistent with the Task-1 fresh-local rule).
 const focusCell = (rowIndex: any, colIndex: any) => {
+  // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
+  // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
+  // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
+  // instance does not leak a spurious activecell-change.
+  if (!isGrid()) return;
   const lastRow = bodyRowCount() - 1;
   const maxRow = lastRow < 0 ? 0 : lastRow;
   const maxCol = visibleColCount() - 1;
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
+  // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
+  // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
+  // not a navigation). A header→body landing (prevIsHeader) is a real move.
+  const prevRow = activeRow.value;
+  const prevCol = activeColIndex.value;
+  const prevIsHeader = activeIsHeader.value;
   activeIsHeader.value = false;
   activeInControl.value = false;
   activeRow.value = r;
@@ -4917,29 +5017,51 @@ const focusCell = (rowIndex: any, colIndex: any) => {
   // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
   // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
   // last clicked, so a stale read would resolve focus to the header instead of body row r.
+  // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
+  // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
   focusActiveCell(r, c, false);
-  emit('activecell-change', {
-    rowIndex: r,
-    colIndex: c
-  });
+  if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    emit('activecell-change', {
+      rowIndex: r,
+      colIndex: c
+    });
+  }
 };
 
 // getActiveCell() — return the current active-cell position. Integers only — no row data,
 // no DOM node (T-49-02 Information-Disclosure: return the screen position, nothing else).
+// B15: reflect the HEADER-active state. When a header cell is active the roving position is
+// NOT a body row — return the header sentinel (rowIndex null + isHeader true, colIndex the
+// header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
+// returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
+// is unchanged for the body case).
 // getActiveCell() — return the current active-cell position. Integers only — no row data,
 // no DOM node (T-49-02 Information-Disclosure: return the screen position, nothing else).
-const getActiveCell = () => ({
+// B15: reflect the HEADER-active state. When a header cell is active the roving position is
+// NOT a body row — return the header sentinel (rowIndex null + isHeader true, colIndex the
+// header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
+// returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
+// is unchanged for the body case).
+const getActiveCell = () => activeIsHeader.value ? {
+  rowIndex: null,
+  colIndex: activeColIndex.value,
+  isHeader: true
+} : {
   rowIndex: activeRow.value,
-  colIndex: activeColIndex.value
-});
+  colIndex: activeColIndex.value,
+  isHeader: false
+};
 
 // clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
 // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
-// (no move to a new addressable cell — a reset, not a navigation).
+// (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
+// table-mode instance has no roving active cell, so the verb is a no-op there.
 // clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
 // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit
-// (no move to a new addressable cell — a reset, not a navigation).
+// (no move to a new addressable cell — a reset, not a navigation). B16: isGrid()-gated — a
+// table-mode instance has no roving active cell, so the verb is a no-op there.
 const clearActiveCell = () => {
+  if (!isGrid()) return;
   activeIsHeader.value = false;
   activeInControl.value = false;
   activeRow.value = 0;

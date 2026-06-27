@@ -222,6 +222,26 @@ const onGridFocusOut = (e) => {
   if (!cellEl || !next || !cellEl.contains(next)) $data.activeInControl = false
 }
 
+// B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
+// runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
+// resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
+// targets land on attempt 1; React/Solid retry across the async commit). Mirrors
+// focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+const recoverGridFocus = (rowKey, col, level) => {
+  if (!gridRoot) return
+  let attempts = 0
+  const tryFocus = () => {
+    const el = resolveCellEl(rowKey, col, level)
+    if (el) { el.focus(); return }
+    attempts = attempts + 1
+    if (attempts >= 30) return
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+    else setTimeout(tryFocus, 16)
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
+  else setTimeout(tryFocus, 0)
+}
+
 // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
 // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
 // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
@@ -235,9 +255,36 @@ const clampActiveCell = (rowCount, colCount) => {
   // out of bounds on React only). Falls back to the live helpers when called without bounds.
   const colN = colCount != null ? colCount : visibleColCount()
   const rowN = rowCount != null ? rowCount : bodyRowCount()
+  // B25: BEFORE re-indexing, detect whether DOM focus currently rests on a BODY cell that the
+  // shrink will REMOVE (its row index exceeds the new bounds). We run synchronously BEFORE the
+  // framework commits the new tbody (refreshRowModel calls us right after `$data.rows = nextRows`
+  // — true on all six, incl React's async setState), so the doomed cell + its focus are still
+  // observable in the OLD DOM. Only then do we arm a focus RECOVERY (after the re-render), so a
+  // programmatic shrink (collapseAll/pageSize/data swap) never drops keyboard focus to <body>.
+  // Focus elsewhere — a header sort button, an external control, an unfocused grid — is NOT a
+  // doomed body cell, so recovery never STEALS focus on a routine re-sort/filter.
+  let recoverFocus = false
+  if (gridRoot) {
+    const rootNode = gridRoot.getRootNode ? gridRoot.getRootNode() : null
+    const focusedEl = rootNode ? rootNode.activeElement : null
+    const focusedCell = focusedEl && focusedEl.closest ? focusedEl.closest('[data-grid-cell]') : null
+    if (focusedCell && gridRoot.contains(focusedCell)) {
+      const fRowAttr = focusedCell.getAttribute('data-row')
+      if (fRowAttr != null && fRowAttr !== '__header') {
+        const fr = parseInt(fRowAttr, 10)
+        if (Number.isFinite(fr) && fr > rowN - 1) recoverFocus = true
+      }
+    }
+  }
   const maxCol = colN - 1
   const col = clamp($data.activeColIndex, 0, (maxCol < 0 ? 0 : maxCol))
   if (col !== $data.activeColIndex) $data.activeColIndex = col
+  // Track the FINAL resolved active-cell as LOCALS (never re-read $data after a write — React
+  // setState is async, ROZ138) so the B25 focus recovery targets the correct re-indexed cell.
+  let finalCol = col
+  let finalRow = $data.activeRow
+  let finalIsHeader = $data.activeIsHeader
+  const finalLevel = $data.activeHeaderLevel
   // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
   // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
   // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
@@ -248,6 +295,8 @@ const clampActiveCell = (rowCount, colCount) => {
     $data.activeColIndex = 0
     $data.gridEmptyFallback = true
     clampRange(rowN - 1, colN - 1)
+    // B25: every body cell vanished — recover focus onto the leaf-header fallback tab-stop.
+    if (recoverFocus) recoverGridFocus('__header', 0, headerLeafLevel())
     return
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
@@ -257,17 +306,26 @@ const clampActiveCell = (rowCount, colCount) => {
     $data.gridEmptyFallback = false
     $data.activeIsHeader = false
     $data.activeRow = 0
+    finalIsHeader = false
+    finalRow = 0
   }
-  if (!$data.activeIsHeader) {
+  if (!finalIsHeader) {
     const lastRow = rowN - 1
     const maxRow = lastRow < 0 ? 0 : lastRow
-    const row = clamp($data.activeRow, 0, maxRow)
+    const row = clamp(finalRow, 0, maxRow)
     if (row !== $data.activeRow) $data.activeRow = row
+    finalRow = row
   }
   // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
   // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
   // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
   clampRange(rowN - 1, colN - 1)
+  // B25: recover DOM focus onto the re-indexed valid cell (deferred until the new model renders)
+  // when the shrink removed the focused cell. Uses the FRESH locals (not the React-stale $data).
+  if (recoverFocus) {
+    const rowKey = finalIsHeader ? '__header' : String(finalRow)
+    recoverGridFocus(rowKey, finalCol, finalIsHeader ? finalLevel : null)
+  }
 }
 
 export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridFocusOut, clampActiveCell }

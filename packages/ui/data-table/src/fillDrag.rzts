@@ -46,7 +46,15 @@ const onFillHandlePointerDown = (e) => {
   const move = (ev) => {
     if (!fillDragging) return
     const cell = cellIndexFromPoint(ev.clientX, ev.clientY)
-    if (cell) { lastCell = cell; setRangeFocus(cell.r, cell.c) }
+    // B20: dedup by target cell. setRangeFocus emits range-change, so calling it on EVERY
+    // pointermove (the pointer fires many per cell) spams the event with identical payloads.
+    // Only extend (and emit) when the pointer enters a DIFFERENT cell than the last — lastCell
+    // seeds from the pre-drag bottom-right corner, so a move that stays on the source corner
+    // or re-enters the same cell is suppressed (the range is unchanged).
+    if (cell && (!lastCell || cell.r !== lastCell.r || cell.c !== lastCell.c)) {
+      lastCell = cell
+      setRangeFocus(cell.r, cell.c)
+    }
   }
   const up = () => {
     // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
