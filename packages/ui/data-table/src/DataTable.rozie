@@ -1307,7 +1307,7 @@ $expose({
     <tr
       class="rdt-tr"
       role="row"
-      r-for="hg in $data.headerGroups"
+      r-for="(hg, hgLevel) in $data.headerGroups"
       :key="hg.id"
     >
       <th
@@ -1318,8 +1318,10 @@ $expose({
         :data-col="header.column.id"
         data-grid-cell
         data-row="__header"
+        :data-header-level="hgLevel"
+        :colspan="header.colSpan > 1 ? header.colSpan : null"
         :data-col-index="headerColIndexOf(hg, header)"
-        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header))"
+        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header.column.id)"
@@ -1588,7 +1590,7 @@ $expose({
     <tr
       class="rdt-tr"
       role="row"
-      r-for="hg in $data.headerGroups"
+      r-for="(hg, hgLevel) in $data.headerGroups"
       :key="hg.id"
     >
       <th
@@ -1599,8 +1601,10 @@ $expose({
         :data-col="header.column.id"
         data-grid-cell
         data-row="__header"
+        :data-header-level="hgLevel"
+        :colspan="header.colSpan > 1 ? header.colSpan : null"
         :data-col-index="headerColIndexOf(hg, header)"
-        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header))"
+        :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
         :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header.column.id)"

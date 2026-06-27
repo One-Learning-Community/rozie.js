@@ -1,0 +1,119 @@
+<!--
+  DataTableGridGroupedHeaderDemo.rozie — Phase 63 Wave-4 (nav-edge correctness) RED-first fixture.
+
+  Drives B12 across all six targets via data-table-grid-navedge.spec.ts:
+    B12 — a grouped MULTI-LEVEL column header must preserve the roving single-tab-stop
+          invariant (exactly ONE tabindex=0 across BOTH the parent header row and the
+          leaf header row + the body — never multiple), and ArrowUp from a leaf header
+          must resolve to the CORRECT PARENT header (the one spanning that leaf), with
+          ArrowDown returning to the matching leaf / body cell.
+
+  A SINGLE DataTable in interactionMode='grid' whose `:columns` config declares TWO
+  2-level header GROUPS (no ungrouped columns → no placeholder headers):
+      Identity → { Name, City }      (parent col 0; leaf cols 0,1)
+      Metrics  → { Qty,  Cost }      (parent col 1; leaf cols 2,3)
+  getHeaderGroups() therefore yields TWO header-row levels: the parent row
+  [Identity(colSpan 2), Metrics(colSpan 2)] and the leaf row [Name, City, Qty, Cost].
+
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline). The
+  grouped columns are declared via the `:columns` config-array grouped-header form
+  (an entry carrying a `columns` array → a table-core group column).
+-->
+
+<rozie name="DataTableGridGroupedHeaderDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, name: 'Alpha', city: 'Oslo',  qty: 10, cost: 20 },
+    { id: 2, name: 'Beta',  city: 'Lima',  qty: 11, cost: 21 },
+    { id: 3, name: 'Gamma', city: 'Cairo', qty: 12, cost: 22 },
+  ],
+  // The grouped-header column config (the columnBuilders grouped-header form). Each
+  // entry with a `columns` array is a 2-level header group spanning its leaf children.
+  cols: [
+    {
+      id: 'identity',
+      header: 'Identity',
+      columns: [
+        { field: 'name', header: 'Name', sortable: true },
+        { field: 'city', header: 'City' },
+      ],
+    },
+    {
+      id: 'metrics',
+      header: 'Metrics',
+      columns: [
+        { field: 'qty',  header: 'Qty', sortable: true },
+        { field: 'cost', header: 'Cost' },
+      ],
+    },
+  ],
+  // Last activecell-change "r,c" readout.
+  activeReadout: '',
+}
+</data>
+
+<script lang="ts">
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.activeReadout = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+</script>
+
+<template>
+<div class="dt-grid-grouped-demo">
+  <h3>DataTable — grid-mode grouped multi-level header</h3>
+
+  <div class="controls">
+    <span class="label">active:</span>
+    <span class="readout" data-testid="active-readout">{{ $data.activeReadout }}</span>
+  </div>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      :columns="$data.cols"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-grouped-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-grid-grouped-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>

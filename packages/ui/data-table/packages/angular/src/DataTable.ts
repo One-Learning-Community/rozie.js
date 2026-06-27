@@ -179,10 +179,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="rdt-scroll" [style]="__style">
     <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rows().length" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)">
       <thead class="rdt-thead" role="rowgroup">
-        @for (hg of headerGroups(); track hg.id) {
+        @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             @if (isSelectColumn(header.column.id)) {
     <span style="display:contents">
               @if ((selectAllTpl ?? templates()?.['selectAll'])) {
@@ -299,10 +299,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
     } @else {
     <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(totalRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)">
       <thead class="rdt-thead" role="rowgroup">
-        @for (hg of headerGroups(); track hg.id) {
+        @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header)))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             
             
             @if (isSelectColumn(header.column.id)) {
@@ -1219,46 +1219,73 @@ export class DataTable {
       }
     };
   };
+  buildConfigDef = (c: any) => {
+    if (!c) return null;
+    // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
+    // getHeaderGroups() yields ONE extra header-row level per group depth — the parent group
+    // header spans its leaf children (B12). The group id falls back to its header text so it
+    // stays addressable (no accessor; group columns carry no data).
+    if (Array.isArray(c.columns)) {
+      const gid = c.id != null ? c.id : c.header;
+      if (gid == null) return null;
+      const id = String(gid);
+      if (!this.isSafeKey(id)) return null;
+      const kids = [];
+      for (const child of c.columns as any) {
+        const cd = this.buildConfigDef(child);
+        if (cd) kids.push(cd);
+      }
+      if (!kids.length) return null;
+      return {
+        id,
+        header: c.header != null ? c.header : id,
+        columns: kids
+      };
+    }
+    const rawId = c.id != null ? c.id : c.field;
+    if (rawId == null) return null;
+    const id = String(rawId);
+    if (!this.isSafeKey(id)) return null;
+    return {
+      id,
+      accessorKey: c.field != null ? c.field : id,
+      header: c.header != null ? c.header : id,
+      enableSorting: c.sortable === true,
+      // per-column filter opt-in (req-5). table-core gates the filter input + value
+      // funnel on enableColumnFilter; a column with filterable !== true cannot be
+      // filtered (and renders no per-column filter input in the chrome below).
+      enableColumnFilter: c.filterable === true,
+      filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
+      // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+      // so every data column is offered to the headless #groupBar by default; the per-column
+      // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+      // a custom fn defensively wrapped (T-50-04).
+      groupable: c.groupable !== false,
+      aggregationFn: this.wrapAggregationFn(c.aggregationFn),
+      pinned: c.pinned != null ? c.pinned : '',
+      width: c.width != null ? c.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+      // metadata carrier the display↔editor branch + runValidator read. Off by default.
+      meta: {
+        editable: c.editable === true,
+        editor: c.editor != null ? c.editor : 'text',
+        editorOptions: c.editorOptions != null ? c.editorOptions : [],
+        validate: typeof c.validate === 'function' ? c.validate : null
+      }
+    };
+  };
   columnDefs = () => {
     const byId = Object.create(null);
     const order = [];
     const cfg = this.columns() || [];
     for (const c of cfg as any) {
-      if (!c) continue;
-      const rawId = c.id != null ? c.id : c.field;
-      if (rawId == null) continue;
-      const id = String(rawId);
-      if (!this.isSafeKey(id)) continue;
+      const def = this.buildConfigDef(c);
+      if (!def) continue;
+      const id = def.id;
       if (!(id in byId)) order.push(id);
-      byId[id] = {
-        id,
-        accessorKey: c.field != null ? c.field : id,
-        header: c.header != null ? c.header : id,
-        enableSorting: c.sortable === true,
-        // per-column filter opt-in (req-5). table-core gates the filter input + value
-        // funnel on enableColumnFilter; a column with filterable !== true cannot be
-        // filtered (and renders no per-column filter input in the chrome below).
-        enableColumnFilter: c.filterable === true,
-        filterable: c.filterable === true,
-        // Expandable-rows reserved per-column metadata (phase 50, D-04).
-        expandable: c.expandable === true,
-        // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
-        // so every data column is offered to the headless #groupBar by default; the per-column
-        // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
-        // a custom fn defensively wrapped (T-50-04).
-        groupable: c.groupable !== false,
-        aggregationFn: this.wrapAggregationFn(c.aggregationFn),
-        pinned: c.pinned != null ? c.pinned : '',
-        width: c.width != null ? c.width : '',
-        // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
-        // metadata carrier the display↔editor branch + runValidator read. Off by default.
-        meta: {
-          editable: c.editable === true,
-          editor: c.editor != null ? c.editor : 'text',
-          editorOptions: c.editorOptions != null ? c.editorOptions : [],
-          validate: typeof c.validate === 'function' ? c.validate : null
-        }
-      };
+      byId[id] = def;
     }
     const reg = this.colReg() || {};
     for (const id in reg) {

@@ -675,6 +675,23 @@ export const EXAMPLES = [
   // already cover it, importing the data-table source pkg already registered for Angular
   // cross-tree AOT in phase 48).
   'DataTableGridClipboard',
+  // Phase 63 Wave-4 (grid-mode nav-edge correctness) — the nav-edge-cluster RED-first
+  // fixtures (loaders → examples/demos/DataTableGridEmptyDemo.rozie /
+  // DataTableGridGroupedHeaderDemo.rozie, each importing
+  // ../../packages/ui/data-table/src/DataTable.rozie). DataTableGridEmpty is the
+  // empty/all-filtered grid (a bound r-model:globalFilter shrinks the body to zero rows)
+  // so data-table-grid-navedge.spec.ts asserts B6 (the grid keeps exactly one keyboard
+  // tab-stop on a header fallback + recovers a body active cell on filter-clear);
+  // DataTableGridGroupedHeader declares two 2-level header groups via the :columns
+  // grouped-header form so the spec asserts B12 (the roving single-tab-stop invariant
+  // holds across parent+leaf header rows + ArrowUp resolves the correct parent header).
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). They live under
+  // examples/demos/ so no new Angular 3-file registration is needed (prebuildExtraRoots
+  // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos
+  // sweep already cover them, importing the data-table source pkg already registered for
+  // Angular cross-tree AOT in phase 48).
+  'DataTableGridEmpty',
+  'DataTableGridGroupedHeader',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1037,6 +1054,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid-mode clipboard/fill — '-demo' appended on Lit →
   // 'rozie-data-table-grid-clipboard-demo' = kebab of DataTableGridClipboardDemo.
   DataTableGridClipboard: 'rozie-data-table-grid-clipboard',
+  // Phase 63 grid-mode nav-edge — '-demo' appended on Lit → tags
+  // 'rozie-data-table-grid-empty-demo' / 'rozie-data-table-grid-grouped-header-demo' =
+  // kebab of DataTableGridEmptyDemo / DataTableGridGroupedHeaderDemo.
+  DataTableGridEmpty: 'rozie-data-table-grid-empty',
+  DataTableGridGroupedHeader: 'rozie-data-table-grid-grouped-header',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /

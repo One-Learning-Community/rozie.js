@@ -445,46 +445,73 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       }
     };
   }
+  function buildConfigDef(c: any) {
+    if (!c) return null;
+    // Grouped (multi-level) header column: an entry carrying a `columns` array. table-core's
+    // getHeaderGroups() yields ONE extra header-row level per group depth — the parent group
+    // header spans its leaf children (B12). The group id falls back to its header text so it
+    // stays addressable (no accessor; group columns carry no data).
+    if (Array.isArray(c.columns)) {
+      const gid = c.id != null ? c.id : c.header;
+      if (gid == null) return null;
+      const id = String(gid);
+      if (!isSafeKey(id)) return null;
+      const kids = [];
+      for (const child of c.columns as any) {
+        const cd = buildConfigDef(child);
+        if (cd) kids.push(cd);
+      }
+      if (!kids.length) return null;
+      return {
+        id,
+        header: c.header != null ? c.header : id,
+        columns: kids
+      };
+    }
+    const rawId = c.id != null ? c.id : c.field;
+    if (rawId == null) return null;
+    const id = String(rawId);
+    if (!isSafeKey(id)) return null;
+    return {
+      id,
+      accessorKey: c.field != null ? c.field : id,
+      header: c.header != null ? c.header : id,
+      enableSorting: c.sortable === true,
+      // per-column filter opt-in (req-5). table-core gates the filter input + value
+      // funnel on enableColumnFilter; a column with filterable !== true cannot be
+      // filtered (and renders no per-column filter input in the chrome below).
+      enableColumnFilter: c.filterable === true,
+      filterable: c.filterable === true,
+      // Expandable-rows reserved per-column metadata (phase 50, D-04).
+      expandable: c.expandable === true,
+      // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
+      // so every data column is offered to the headless #groupBar by default; the per-column
+      // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
+      // a custom fn defensively wrapped (T-50-04).
+      groupable: c.groupable !== false,
+      aggregationFn: wrapAggregationFn(c.aggregationFn),
+      pinned: c.pinned != null ? c.pinned : '',
+      width: c.width != null ? c.width : '',
+      // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
+      // metadata carrier the display↔editor branch + runValidator read. Off by default.
+      meta: {
+        editable: c.editable === true,
+        editor: c.editor != null ? c.editor : 'text',
+        editorOptions: c.editorOptions != null ? c.editorOptions : [],
+        validate: typeof c.validate === 'function' ? c.validate : null
+      }
+    };
+  }
   function columnDefs() {
     const byId = Object.create(null);
     const order = [];
     const cfg = props.columns || [];
     for (const c of cfg as any) {
-      if (!c) continue;
-      const rawId = c.id != null ? c.id : c.field;
-      if (rawId == null) continue;
-      const id = String(rawId);
-      if (!isSafeKey(id)) continue;
+      const def = buildConfigDef(c);
+      if (!def) continue;
+      const id = def.id;
       if (!(id in byId)) order.push(id);
-      byId[id] = {
-        id,
-        accessorKey: c.field != null ? c.field : id,
-        header: c.header != null ? c.header : id,
-        enableSorting: c.sortable === true,
-        // per-column filter opt-in (req-5). table-core gates the filter input + value
-        // funnel on enableColumnFilter; a column with filterable !== true cannot be
-        // filtered (and renders no per-column filter input in the chrome below).
-        enableColumnFilter: c.filterable === true,
-        filterable: c.filterable === true,
-        // Expandable-rows reserved per-column metadata (phase 50, D-04).
-        expandable: c.expandable === true,
-        // Grouping (phase 50 reqs 4-7): groupable defaults TRUE (opt-OUT via groupable:false)
-        // so every data column is offered to the headless #groupBar by default; the per-column
-        // aggregationFn (built-in name OR custom fn) flows straight onto the ColumnDef (D-05),
-        // a custom fn defensively wrapped (T-50-04).
-        groupable: c.groupable !== false,
-        aggregationFn: wrapAggregationFn(c.aggregationFn),
-        pinned: c.pinned != null ? c.pinned : '',
-        width: c.width != null ? c.width : '',
-        // Editable-cell config (Phase 51) → ColumnDef.meta, the table-core per-column
-        // metadata carrier the display↔editor branch + runValidator read. Off by default.
-        meta: {
-          editable: c.editable === true,
-          editor: c.editor != null ? c.editor : 'text',
-          editorOptions: c.editorOptions != null ? c.editorOptions : [],
-          validate: typeof c.validate === 'function' ? c.validate : null
-        }
-      };
+      byId[id] = def;
     }
     const reg = colReg || {};
     for (const id in reg) {
@@ -3339,8 +3366,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     </div>}{(props.virtual) ? <div className={"rdt-scroll"} style={parseInlineStyle(props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
     <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        {headerGroups.map((hg) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header))) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+          {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : (props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
             </span> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -3392,8 +3419,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     </table>
     </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rozieAttr(totalRowCount())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        {headerGroups.map((hg) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header))) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+          {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             
             
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

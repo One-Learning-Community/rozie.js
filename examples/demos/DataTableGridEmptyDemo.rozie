@@ -1,0 +1,132 @@
+<!--
+  DataTableGridEmptyDemo.rozie — Phase 63 Wave-4 (nav-edge correctness) RED-first fixture.
+
+  Drives B6 across all six targets via data-table-grid-navedge.spec.ts:
+    B6 — an EMPTY / all-filtered grid must still expose exactly ONE keyboard tab-stop
+         (the roving tabindex falls back to a header cell) so the grid stays
+         keyboard-reachable; filtering the body down to zero rows must NOT leave the
+         grid with zero tab-stops (a keyboard trap / unreachable a11y defect) nor lose
+         DOM focus into <body>. Clearing the filter back to a non-empty model must
+         recover a valid BODY active cell + single tab-stop.
+
+  A SINGLE flat-header DataTable in interactionMode='grid' with two text columns
+  (name / city). A bound r-model:globalFilter + a filter <input> (OUTSIDE the grid)
+  shrinks the body model; a "clear" button restores it. `r-model:data` binds the
+  dataset. No loop var / slot named row/cell/header (the Svelte mount-throw discipline).
+-->
+
+<rozie name="DataTableGridEmptyDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // A small static dataset. A global filter of 'zzzzz' matches NO row → the body model
+  // shrinks to zero (the B6 empty-grid transition). 'clear' restores all rows.
+  rows: [
+    { id: 1, name: 'Alpha', city: 'Oslo'  },
+    { id: 2, name: 'Beta',  city: 'Lima'  },
+    { id: 3, name: 'Gamma', city: 'Cairo' },
+  ],
+  // Two-way global filter — the body-shrink driver (B6).
+  globalFilter: '',
+  // Last activecell-change "r,c" readout (a recovery probe).
+  rangeReadout: '',
+}
+</data>
+
+<script lang="ts">
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.rangeReadout = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+
+// Reduce the body to zero rows (the B6 empty transition) via the global filter.
+const filterToEmpty = (): void => {
+  $data.globalFilter = 'zzzzz'
+}
+
+// Restore the full model (the B6 recovery).
+const clearFilter = (): void => {
+  $data.globalFilter = ''
+}
+</script>
+
+<template>
+<div class="dt-grid-empty-demo">
+  <h3>DataTable — grid-mode empty / all-filtered tab-stop</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="filter-empty" @click="filterToEmpty">filter → empty</button>
+    <button type="button" data-testid="clear-filter" @click="clearFilter">clear</button>
+    <input
+      class="gf"
+      type="text"
+      data-testid="global-filter"
+      placeholder="filter"
+      r-model="$data.globalFilter"
+    />
+    <span class="label">active:</span>
+    <span class="readout" data-testid="active-readout">{{ $data.rangeReadout }}</span>
+  </div>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      r-model:globalFilter="$data.globalFilter"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="name" header="Name" sortable />
+      <Column field="city" header="City" sortable />
+
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-empty-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-grid-empty-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button,
+.controls .gf {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .gf { cursor: text; }
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>
