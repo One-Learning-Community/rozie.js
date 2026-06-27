@@ -63,6 +63,7 @@
   color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
   list-style: none;
 }
+.rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox--inline[data-rozie-s-9546115a] {
   display: block;
   width: 100%;

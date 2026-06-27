@@ -603,7 +603,6 @@ $expose({ focus, clear })
        --rozie-combobox-list-max-height token, mirrored from the maxHeight prop). -->
   <ul
     r-if="$props.virtual"
-    ref="listEl"
     class="rozie-combobox-list rozie-combobox-list--virtual"
     :id="listId()"
     role="listbox"

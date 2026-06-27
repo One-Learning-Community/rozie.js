@@ -2,6 +2,16 @@ import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally;
+// every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
+// the non-virtual emitted path executes none of it (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+
+// Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
+// const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
+// captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
+
 interface OptionCtx {
   $implicit: { option: any; index: any; active: any; selected: any; disabled: any };
   option: any;
@@ -42,10 +52,11 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline() }" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-combobox" [ngClass]="{ 'rozie-combobox--open': isOpen(), 'rozie-combobox--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-combobox--inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="ariaLabel()" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
 
-      @if (isOpen()) {
+      
+      @if (isOpen() && !virtual()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
         @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
@@ -58,6 +69,31 @@ function __rozieAttr(v: unknown): string | null {
     }
 
         @if (filteredOptions().length === 0) {
+    <li class="rozie-combobox-empty" role="presentation">
+          @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    No results
+    }
+        </li>
+    }</ul>
+    }@if (virtual()) {
+    <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [style]="__style">
+        <li class="rozie-combobox-spacer" aria-hidden="true" [style]="'height:' + padTop() + 'px'"></li>
+
+        @for (wr of windowedRows(); track wr.row.id) {
+    <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': wr.vi.index === activeIndex(), 'rozie-combobox-option--selected': wr.row.value === value(), 'rozie-combobox-option--disabled': wr.row.disabled }" [attr.id]="rozieAttr(optId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" role="option" [attr.aria-selected]="wr.row.value === value()" [attr.aria-disabled]="!!wr.row.disabled" (mousedown)="$event.preventDefault(); selectOption(wr.row)" (mouseenter)="activeIndex.set(wr.vi.index)">
+          @if ((optionTpl ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }, option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }" />
+    } @else {
+    {{ rozieDisplay(wr.row.label) }}
+    }
+        </li>
+    }
+
+        <li class="rozie-combobox-spacer" aria-hidden="true" [style]="'height:' + padBottom() + 'px'"></li>
+
+        @if (windowSource().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
           @if ((emptyTpl ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
@@ -135,6 +171,7 @@ function __rozieAttr(v: unknown): string | null {
       color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
       list-style: none;
     }
+    .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
     .rozie-combobox--inline {
       display: block;
       width: 100%;
@@ -207,25 +244,71 @@ export class Combobox {
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
   optionDisabled = input<((...args: unknown[]) => unknown) | null>(null);
+  /**
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling popup (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed combobox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   */
+  virtual = input<boolean>(false);
+  /**
+   * Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.
+   */
+  estimateRowHeight = input<number>(36);
+  /**
+   * A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   */
+  maxHeight = input<string>('');
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);
+  rows = signal<any[]>([]);
+  windowVer = signal(0);
+  editVer = signal(0);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
+  __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   change = output<unknown>();
   search = output<unknown>();
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.virtualizerCleanup) this.virtualizerCleanup();
+    });
     effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.syncQueryToValue();
+    })(); }); });
+    effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      this.syncRows();
+      if (this.virtual() && this.virtualizer) {
+        this.virtualizer.setOptions(this.virtualizerOptions());
+        this.virtualizer._willUpdate();
+        this.windowVer.set(this.windowVer() + 1);
+        this.scheduleRemeasure();
+      }
     })(); }); });
   }
 
   ngAfterViewInit() {
     this.syncQueryToValue();
+    this.syncRows();
+    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
+    // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
+    // the .rozie-combobox-list scroll container exists here.
+    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
+    // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
+    // the .rozie-combobox-list scroll container exists here.
+    if (this.virtual()) {
+      // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+      // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+      // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
+      this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-combobox-list') : null;
+      this.virtualizer = new Virtualizer(this.virtualizerOptions());
+      this.virtualizerCleanup = this.virtualizer._didMount();
+      this.windowVer.set(this.windowVer() + 1);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
+    }
   }
 
   labelOf = (opt: any) => {
@@ -246,6 +329,170 @@ export class Combobox {
     if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
     return false;
   };
+  virtualItemKey = (i: any) => {
+    const src = this.windowSource();
+    return src && src[i] ? src[i].id : undefined;
+  };
+  virtualizerOptions = (): any => ({
+    count: this.windowSource().length,
+    getScrollElement: () => this.gridScrollEl,
+    estimateSize: () => this.estimateRowHeight(),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: this.virtualItemKey,
+    onChange: () => {
+      this.windowVer.set(this.windowVer() + 1);
+      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+      // re-measure is a no-op.
+      this.scheduleRemeasure();
+    }
+  });
+  windowedRows = () => {
+    const __rows = this.rows();
+    // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
+    // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
+    // which happens at initial render while `virtualizer` is still null (it is built in $onMount,
+    // after the first render). `virtualizer` is a non-reactive `let`, so if the windowVer read sat
+    // BELOW the `!virtualizer` guard the accessor would early-return [] without ever reading the
+    // signal → it would NEVER re-run when onChange later bumps windowVer, and the window would stay
+    // blank forever (the Solid/Svelte fine-grained bug). Coarse targets re-render wholesale so the
+    // placement is a no-op for them. The post-construction windowVer bump in $onMount fires the
+    // first re-run that picks up the now-non-null virtualizer.
+    // ALSO subscribe to editVer here so the slice re-derives when an editor opens/closes (the
+    // pin/unpin transition), mirroring the probe's windowVer bump on pin (Solid/Svelte fine-grained).
+    void this.windowVer();
+    void this.editVer();
+    if (!this.virtualizer) {
+      // Virtual OFF → full set (the r-else table never calls this, but keep it total). Virtual ON
+      // but the virtualizer is not yet constructed (pre-$onMount first paint) → render NOTHING so
+      // the template never dereferences a null `vi` (the windowed bindings read wr.vi.index); the
+      // rows appear on the first onChange after _didMount.
+      if (!this.virtual()) {
+        const rowList = __rows || [];
+        return rowList.map((r: any) => ({
+          vi: null,
+          row: r
+        }));
+      }
+      return [];
+    }
+    const items = this.virtualizer.getVirtualItems();
+    const rowList = __rows || [];
+    // WR-01: drop any virtual item whose index outruns the current full-model rows (a brief
+    // shrink window where the virtualizer count is stale relative to $data.rows on the async
+    // onChange→windowVer path). The template keys on wr.row.id, so a row:undefined entry would
+    // throw "Cannot read properties of undefined"; filter it here so the template never sees it.
+    const out = items.map((vi: any) => ({
+      vi,
+      row: rowList[vi.index]
+    })).filter((wr: any) => wr.row);
+    // ── D-02 pin-row union (req-9): if an editor is open on a row that is NOT in the current
+    // window, UNION it into the slice (keyed on row.id so Lit repeat / Solid For never recycle it
+    // into another full-model row), LEADING the slice when it sits above the window and TRAILING
+    // it when below — so DOM order matches visual/aria order. The spacer subtraction (padTop/
+    // padBottom) keeps the total exactly getTotalSize(). This is the 51-01-proven mechanism wired
+    // into the real windowing.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0 && rowList[pin]) {
+      let inWindow = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].index === pin) {
+          inWindow = true;
+          break;
+        }
+      }
+      if (!inWindow) {
+        const pm = this.pinnedMeasurement(pin);
+        const firstStart = items.length ? items[0].start : 0;
+        const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
+        const pinnedEntry = {
+          vi: pm != null ? pm : {
+            index: pin
+          },
+          row: rowList[pin],
+          pinned: true
+        };
+        if (above) out.unshift(pinnedEntry);else out.push(pinnedEntry);
+      }
+    }
+    return out;
+  };
+  padTop = () => {
+    // SUBSCRIBE FIRST (the windowedRows() discipline): touch windowVer + editVer at the TOP so the
+    // spacer-<td> :style binding subscribes on the fine-grained targets before the early return,
+    // and re-derives on the pin/unpin transition (the D-02 spacer subtraction below).
+    void this.windowVer();
+    void this.editVer();
+    if (!this.virtual() || !this.virtualizer) return 0;
+    const items = this.virtualizer.getVirtualItems();
+    let pad = items.length ? items[0].start : 0;
+    // D-02 spacer subtraction: when the pinned editing row sits ABOVE the window it is rendered
+    // in-flow as the slice's LEADING <tr> (its measured height is now a real <tr>), so subtract
+    // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = this.pinnedMeasurement(pin);
+      const inWindow = this.pmIndexInWindow(items, pin);
+      if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
+    }
+    return pad < 0 ? 0 : pad;
+  };
+  padBottom = () => {
+    // subscribe-first, see windowedRows() (IN-04): touch windowVer + editVer before the early
+    // return so the fine-grained spacer :style binding subscribes on its first eval + re-derives
+    // on pin/unpin.
+    void this.windowVer();
+    void this.editVer();
+    if (!this.virtual() || !this.virtualizer) return 0;
+    const items = this.virtualizer.getVirtualItems();
+    if (!items.length) return 0;
+    let pad = this.virtualizer.getTotalSize() - items[items.length - 1].end;
+    // D-02 spacer subtraction: when the pinned editing row sits BELOW the window it is rendered
+    // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
+    const pin = this.pinnedEditIndex();
+    if (pin >= 0) {
+      const pm = this.pinnedMeasurement(pin);
+      const inWindow = this.pmIndexInWindow(items, pin);
+      // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
+      // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
+      // index is actually ABOVE the window, mis-subtracting its height from the trailing spacer.
+      // The pinned full-model index vs the last rendered item's index is drift-proof. Fall back to
+      // the offset comparison only if the measurement lacks an index (defensive).
+      const lastItemIdx = items[items.length - 1].index;
+      const below = pm && pm.index != null ? pm.index > lastItemIdx : pm && pm.start >= items[0].start;
+      if (pm && !inWindow && below) {
+        // below the window → it trailed the slice; subtract its height from the trailing spacer.
+        if (pm.end > items[items.length - 1].end) pad = pad - pm.size;
+      }
+    }
+    return pad < 0 ? 0 : pad;
+  };
+  pmIndexInWindow = (items: any, idx: any) => {
+    for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
+    return false;
+  };
+  rowIsOutsideWindow = (r: any) => {
+    if (!this.virtual() || !this.virtualizer) return false;
+    const items = this.virtualizer.getVirtualItems();
+    for (const it of items as any) if (it.index === r) return false;
+    return true;
+  };
+  virtualizer: any = null;
+  virtualizerCleanup: any = null;
+  gridScrollEl: any = null;
+  remeasurePending = false;
   filteredOptions = () => {
     const __options = this.options();
     const opts = Array.isArray(__options) ? __options : [];
@@ -259,8 +506,49 @@ export class Combobox {
       label: this.labelOf(o),
       disabled: this.disabledOf(o),
       _i: i,
+      id: this.valueOf$local(o),
       option: o
     }));
+  };
+  windowSource = () => this.filteredOptions();
+  pinnedEditIndex = () => -1;
+  pinnedMeasurement = (pin: any) => null;
+  syncRows = () => {
+    this.rows.set(this.windowSource());
+  };
+  scheduleRemeasure = () => {
+    if (this.remeasurePending) return;
+    this.remeasurePending = true;
+    let ranMicro = false;
+    const microPass = () => {
+      this.remeasureWindow();
+    };
+    const rafPass = () => {
+      this.remeasurePending = false;
+      this.remeasureWindow();
+    };
+    if (typeof queueMicrotask !== 'undefined') {
+      ranMicro = true;
+      queueMicrotask(microPass);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) this.remeasurePending = false;else setTimeout(rafPass, 0);
+  };
+  remeasureWindow = () => {
+    if (!this.virtualizer || !this.gridScrollEl) return;
+    if (this.virtualizer.scrollState) return;
+    const els = this.gridScrollEl.querySelectorAll('.rozie-combobox-option[data-index]');
+    for (const el of els as any) this.virtualizer.measureElement(el);
+  };
+  scrollActiveIntoView = () => {
+    const __activeIndex = this.activeIndex();
+    if (!this.virtual() || !this.virtualizer || __activeIndex < 0) return;
+    // 'center' (not 'auto'): keep the active option well inside the rendered slice — 'auto'
+    // lands it at the viewport edge where the overscan band can leave it just-unrendered for
+    // a frame on the fine-grained targets (Solid).
+    this.virtualizer.scrollToIndex(__activeIndex, {
+      align: 'center'
+    });
+    this.scheduleRemeasure();
   };
   optId = (i: any) => this.idBase() + '-opt-' + i;
   listId = () => this.idBase() + '-list';
@@ -357,6 +645,26 @@ export class Combobox {
         if (e) e.preventDefault();
         this.activeIndex.set(this.nextEnabled(list, list.length, -1));
       }
+    }
+    // Keep the (new) active option in view when windowing — no-op when not virtual.
+    this.scrollActiveIntoView();
+  };
+  kickWindow = (attempts: any) => {
+    if (!this.virtualizer) return;
+    this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-combobox-list') : this.gridScrollEl;
+    // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
+    // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
+    // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
+    // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
+    if (this.windowSource().length > 0) {
+      this.syncRows();
+      this.virtualizer.setOptions(this.virtualizerOptions());
+    }
+    this.virtualizer._willUpdate();
+    this.windowVer.set(this.windowVer() + 1);
+    this.remeasureWindow();
+    if (this.windowedRows().length === 0 && attempts > 0) {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(attempts - 1));else setTimeout(() => this.kickWindow(attempts - 1), 16);
     }
   };
   focus = () => this.inputEl()?.nativeElement?.focus();
@@ -519,6 +827,11 @@ export class Combobox {
       });
     }
   });
+
+  protected get __style() {
+      const __maxHeight = this.maxHeight();
+      return __maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + __maxHeight : 'overflow-y:auto';
+    }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

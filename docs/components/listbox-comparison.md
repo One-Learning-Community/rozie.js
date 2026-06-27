@@ -1,5 +1,5 @@
 ---
-surface_hash: aed903b8bc6f
+surface_hash: 5054dd895273
 ---
 
 # Headless select / combobox comparison
@@ -36,6 +36,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Type-ahead (printable keys) | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Client filter **+ remote hook** | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ `filterable` + `search` event |
 | Scoped option rendering | ✅ render-prop | ✅ slot | ✅ snippet | ✅ | ⚠️ template | — | ✅ `option` / `selected` / `empty` slots |
+| Windowing for long lists | ✅ (wire a virtualizer) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ opt-in `virtual` (virtual-core, ×6) |
 | Imperative handle | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ | hand-roll | ✅ uniform 5-verb `$expose` |
 | Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -55,7 +56,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **React Aria's accessibility depth.** [React Aria](https://react-spectrum.adobe.com/react-aria/) is the gold standard: locale-aware type-ahead collation, RTL, exhaustive touch / pointer / virtual-cursor handling, and screen-reader testing across a large browser × AT matrix. `@rozie-ui/listbox` implements the APG patterns faithfully and is gate-verified across all six targets, but it does not match the breadth of React Aria's edge-case coverage. On React specifically, React Aria is the right call when that depth is the priority.
 - **It's a single component, not a primitive suite.** Headless UI, Radix, Ariakit, Kobalte, and Melt ship whole families — Menu, Dialog, Tabs, Popover, Tooltip, and more. Rozie ships listbox/combobox (alongside its other `@rozie-ui` components), not a unified headless-primitive system.
-- **Virtualization for very large lists.** React Aria and others integrate list virtualizers for thousands of options. `@rozie-ui/listbox` renders the (filtered) option list directly — for very large datasets, filter server-side via `:filterable="false"` + the `search` event rather than shipping every row to the client.
+- **Deep virtualization edge cases.** React Aria and others integrate full-featured list virtualizers (variable heights, sticky sections, horizontal scroll). `@rozie-ui/listbox` ships **opt-in vertical windowing** for long lists via `:virtual` (the same `@tanstack/virtual-core` engine the `@rozie-ui/data-table` family uses, wired in cross-framework) — only the visible slice renders, backed by behavioral specs across all six targets — but it does not yet cover the more exotic virtualization modes.
 - **Batteries-included async combobox.** downshift and React Aria have mature async/remote-data patterns (loading states, debounce, cancellation). Rozie gives you the `search` event and `filterable="false"` hook; the loading/debounce/cancellation policy is yours to wire.
 - **`@rozie-ui/listbox` is `0.1.0`.** The surface (13 props / 3 events / single + multi / combobox / 5-verb handle / 3 slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
 

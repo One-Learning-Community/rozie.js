@@ -1,5 +1,5 @@
 ---
-surface_hash: 3d83e8021be7
+surface_hash: 169ce6383704
 ---
 
 # Headless combobox / autocomplete comparison
@@ -38,7 +38,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Custom option rendering | ✅ render-prop | ✅ slot | ✅ snippet | ✅ component | ✅ template | ⚠️ | ✅ `#option` slot |
 | Idiomatic **component** surface | ⚠️ hooks/components | ✅ | ✅ | ✅ | ✅ | ⚠️ hand-roll | ✅ `<Combobox>` |
 | Multi-select / tags | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| List virtualization | ✅ (Headless UI v2) | ✅ (PrimeVue) | ⚠️ | ⚠️ | ⚠️ (cdk-virtual-scroll) | ❌ | ❌ |
+| List virtualization | ✅ (Headless UI v2) | ✅ (PrimeVue) | ⚠️ | ⚠️ | ⚠️ (cdk-virtual-scroll) | ❌ | ✅ opt-in `virtual` (virtual-core, ×6) |
 | Floating-positioned popup (auto-flip/shift) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 | Free-text / creatable | ✅ (react-select) | ✅ (`taggable`) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ |
 | Zero-config styling, re-skinnable | ⚠️ unstyled | ⚠️ themed/CSS | ⚠️ | ⚠️ | styled-only | ❌ | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
@@ -73,7 +73,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **Floating-positioned popup.** The popup is positioned directly below the input (`position: absolute`); there is **no floating-ui-style auto-flip/shift/collision handling** to keep it on-screen near a viewport edge. Nearly every incumbent wraps Floating UI (Headless UI v2, Ariakit, Bits/Melt, Kobalte, Ark) or the CDK Overlay (Angular) to flip and shift automatically. This is a deliberate no-engine v1 limitation.
 - **Multi-select / tags.** `@rozie-ui/combobox` is single-select (one `value` model). Tag/token multi-select inputs — `downshift`'s `useMultipleSelection`, `react-select`'s `isMulti`, `vue-select` `multiple`, Headless UI / Kobalte / Bits / Ark `multiple`, `@angular/aria/multiselect` — are not modeled today.
-- **Virtualization.** A flat option list, rendered in full. Windowed rendering of very large lists (built in to Headless UI v2 and PrimeVue, a documented pattern elsewhere via TanStack Virtual) is not built into the combobox yet.
+- **Deep virtualization edge cases.** `@rozie-ui/combobox` ships **opt-in vertical windowing** for long option lists via `:virtual` (the same `@tanstack/virtual-core` engine `@rozie-ui/data-table` uses, wired in cross-framework so only the visible slice renders, backed by behavioral specs across all six targets). The more exotic virtualization modes (variable heights, grouped/sticky sections) that Headless UI v2 and PrimeVue expose are not built in yet.
 - **Free-text / create-on-the-fly.** The value is always one of the supplied options; there is no creatable / "allow arbitrary text as the value" mode (`react-select`'s creatable, `vue-select`'s `taggable`, React Aria's `allowsCustomValue`, Ark's `allowCustomValue`).
 - **Option groups.** Grouped headings (`<optgroup>`-style sections) are not surfaced yet.
 - **`@rozie-ui/combobox` is `0.1.0`.** The surface (7 props / 2 events / 2-verb handle / `#option` slot / client + async filtering) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.

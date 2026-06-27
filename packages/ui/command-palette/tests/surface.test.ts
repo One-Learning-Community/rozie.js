@@ -20,7 +20,7 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src', 'CommandPalette.rozie');
 // Use the ABSOLUTE source path as the compile filename so the <components>
-// producer resolution (threadParamTypes) finds the vendored ./Listbox.rozie
+// producer resolution (threadParamTypes) finds the vendored ./Combobox.rozie
 // sibling on disk next to it.
 const FILENAME = SRC;
 const source = readFileSync(SRC, 'utf8');
@@ -43,13 +43,13 @@ const EXPECT = {
 // sibling under Option B) and NEVER the relative form. This is the byte-identity
 // invariant — switching B→A touches only codegen + the drift guard, never the
 // authored source.
-const STABLE_LISTBOX_SPECIFIER = '@rozie-ui/listbox/Listbox.rozie';
-const RELATIVE_LISTBOX_SPECIFIER = './Listbox.rozie';
+const STABLE_COMBOBOX_SPECIFIER = '@rozie-ui/combobox/Combobox.rozie';
+const RELATIVE_COMBOBOX_SPECIFIER = './Combobox.rozie';
 
 // The compiled shape: under Option B the codegen rewrites the stable specifier to
 // the local vendored sibling BEFORE compile (so producer resolution finds it on
 // disk). The surface gate must compile the SAME remapped source the leaves do.
-const composedSource = source.replaceAll(STABLE_LISTBOX_SPECIFIER, RELATIVE_LISTBOX_SPECIFIER);
+const composedSource = source.replaceAll(STABLE_COMBOBOX_SPECIFIER, RELATIVE_COMBOBOX_SPECIFIER);
 
 const sorted = (a: readonly string[]) => [...a].sort();
 
@@ -94,8 +94,8 @@ describe('CommandPalette.rozie surface gate', () => {
     // Encodes the D-07 acceptance check at the source level: the authored file is
     // byte-identical between Option B (vendored) and a future Option A (published).
     // Only the codegen vendor-remap + the D-04 drift guard are B-specific.
-    expect(source).toContain(`'${STABLE_LISTBOX_SPECIFIER}'`);
-    expect(source).not.toContain(`'${RELATIVE_LISTBOX_SPECIFIER}'`);
+    expect(source).toContain(`'${STABLE_COMBOBOX_SPECIFIER}'`);
+    expect(source).not.toContain(`'${RELATIVE_COMBOBOX_SPECIFIER}'`);
   });
 
   it('expose surface matches (show/close/toggle/focus)', () => {

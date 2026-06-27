@@ -1,9 +1,10 @@
 // vendor-drift.test.ts — the D-04 cross-family-vendoring drift guard.
 //
-// command-palette composes the shipped @rozie-ui/listbox primitive by VENDORING
-// its `.rozie` source at codegen time (Option B, phase 999.4): the canonical
-// `packages/ui/listbox/src/Listbox.rozie` is copied (with a generated banner)
-// into `packages/ui/command-palette/src/Listbox.rozie`, which is committed-
+// command-palette composes the shipped @rozie-ui/combobox primitive by VENDORING
+// its `.rozie` source at codegen time (Option B; Phase 64 P3/D-03 migrated CP from
+// the retired Listbox combobox-mode to the canonical @rozie-ui/combobox family): the
+// canonical `packages/ui/combobox/src/Combobox.rozie` is copied (with a generated
+// banner) into `packages/ui/command-palette/src/Combobox.rozie`, which is committed-
 // generated and recompiled as a sibling into every leaf. That makes the
 // vendored copy the machine half of "fix listbox once → re-vendor everywhere":
 // a forgotten re-codegen OR a hand-edit drifts the committed copy and would
@@ -31,8 +32,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Canonical primitive source stays in-place in its own family (D-01); the
 // vendored copy lives next to CommandPalette.rozie in this package's src/ (D-03).
-const CANONICAL = resolve(HERE, '..', '..', 'listbox', 'src', 'Listbox.rozie');
-const VENDORED = resolve(HERE, '..', 'src', 'Listbox.rozie');
+const CANONICAL = resolve(HERE, '..', '..', 'combobox', 'src', 'Combobox.rozie');
+const VENDORED = resolve(HERE, '..', 'src', 'Combobox.rozie');
 
 // Match the `<rozie>…</rozie>` envelope span only — greedy to the LAST closing
 // tag so the full body (script/template/style) is hashed, while any banner or
@@ -44,14 +45,14 @@ const ENVELOPE = /<rozie[\s\S]*<\/rozie>/;
 const hash = (p: string): string =>
   createHash('sha256').update(ENVELOPE.exec(readFileSync(p, 'utf8'))![0]).digest('hex');
 
-describe('vendored Listbox drift guard (D-04)', () => {
-  it('vendored command-palette/src/Listbox.rozie envelope matches canonical @rozie-ui/listbox', () => {
+describe('vendored Combobox drift guard (D-04)', () => {
+  it('vendored command-palette/src/Combobox.rozie envelope matches canonical @rozie-ui/combobox', () => {
     expect(
       hash(VENDORED),
-      'vendored Listbox drifted from @rozie-ui/listbox — the committed ' +
-        'packages/ui/command-palette/src/Listbox.rozie envelope no longer matches the ' +
-        'canonical packages/ui/listbox/src/Listbox.rozie. Do NOT hand-edit the vendored ' +
-        'copy (it is GENERATED): edit the canonical listbox source, then re-vendor with ' +
+      'vendored Combobox drifted from @rozie-ui/combobox — the committed ' +
+        'packages/ui/command-palette/src/Combobox.rozie envelope no longer matches the ' +
+        'canonical packages/ui/combobox/src/Combobox.rozie. Do NOT hand-edit the vendored ' +
+        'copy (it is GENERATED): edit the canonical combobox source, then re-vendor with ' +
         '`pnpm --filter @rozie-ui/command-palette build` and commit the regenerated copy.',
     ).toBe(hash(CANONICAL));
   });

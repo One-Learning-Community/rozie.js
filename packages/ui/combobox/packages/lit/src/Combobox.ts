@@ -177,7 +177,6 @@ export default class Combobox extends SignalWatcher(LitElement) {
   private _windowVer = signal(0);
   private _editVer = signal(0);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
-  @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
@@ -293,7 +292,7 @@ private __rozieWatchInitial_1 = true;
 
     ${this.filteredOptions().length === 0 ? html`<li class="rozie-combobox-empty" role="presentation" data-rozie-s-9546115a>
       ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No results</slot>`}
-    </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" style=${rozieStyle(this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto')} data-rozie-ref="listEl" data-rozie-s-9546115a>
+    </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" style=${rozieStyle(this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto')} data-rozie-s-9546115a>
     <li class="rozie-combobox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-9546115a></li>
 
     ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': wr.vi.index === this._activeIndex.value, 'rozie-combobox-option--selected': wr.row.value === this.value, 'rozie-combobox-option--disabled': wr.row.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(wr.row.id)} id=${rozieAttr(this.optId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${wr.row.value === this.value} aria-disabled=${!!wr.row.disabled} @mousedown=${($event: MouseEvent) => { $event.preventDefault(); this.selectOption(wr.row); }} @mouseenter=${($event: Event) => { this._activeIndex.value = wr.vi.index; }} data-rozie-s-9546115a>

@@ -216,7 +216,6 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     }
   })()), { defer: true }));
   let inputElRef: HTMLElement | null = null;
-  let listElRef: HTMLElement | null = null;
   let __rozieRootRef: HTMLElement | null = null;
 
   // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
@@ -755,7 +754,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
         {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle(local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto')} data-rozie-s-9546115a="">
+        </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle(local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto')} data-rozie-s-9546115a="">
         <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
         <For each={windowedRows()}>{(wr) => <li data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value()} aria-disabled={!!wr.row.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': wr.vi.index === activeIndex(), 'rozie-combobox-option--selected': wr.row.value === value(), 'rozie-combobox-option--disabled': wr.row.disabled })} id={rozieAttr(optId(wr.vi.index))} onMouseDown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onMouseEnter={($event) => { setActiveIndex(wr.vi.index); }} data-rozie-s-9546115a="">

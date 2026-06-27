@@ -11,7 +11,7 @@
 
     <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
       <slot name="empty" :query="query">No results</slot>
-    </li></ul><ul v-if="props.virtual" ref="listElRef" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'">
+    </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'">
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
 
     <li v-for="wr in windowedRows()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="wr.row.value === value" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
@@ -118,7 +118,6 @@ const windowVer = ref(0);
 const editVer = ref(0);
 
 const inputElRef = ref<HTMLInputElement>();
-const listElRef = ref<HTMLElement>();
 const __rozieRootRef = ref<HTMLElement>();
 
 // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══

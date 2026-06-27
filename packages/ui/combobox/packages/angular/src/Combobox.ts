@@ -78,7 +78,7 @@ function __rozieAttr(v: unknown): string | null {
         </li>
     }</ul>
     }@if (virtual()) {
-    <ul #listEl class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [style]="__style">
+    <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [style]="__style">
         <li class="rozie-combobox-spacer" aria-hidden="true" [style]="'height:' + padTop() + 'px'"></li>
 
         @for (wr of windowedRows(); track wr.row.id) {
@@ -263,7 +263,6 @@ export class Combobox {
   windowVer = signal(0);
   editVer = signal(0);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
-  listEl = viewChild<ElementRef<HTMLElement>>('listEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   change = output<unknown>();
   search = output<unknown>();
