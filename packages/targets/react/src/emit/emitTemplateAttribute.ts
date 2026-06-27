@@ -208,17 +208,42 @@ function hasNullishBranch(expr: t.Expression): boolean {
 }
 
 /**
- * A numeric-attribute binding that is SYNTACTICALLY provably non-nullish — a numeric literal,
- * an arithmetic BinaryExpression (`a + 1`, `i * 2`), or a unary `+`/`-`. These already type as
- * `number`, so the numeric-attr emit must NOT append `?? undefined` (the right operand would be
- * unreachable → TS2869). Nullish-capable forms (a `x ? n : null` ternary normalized to
- * `undefined`, a `number | null`-returning call) fall through to the `?? undefined` drop.
+ * A numeric-attribute binding the emitter should emit RAW (`name={expr}`) rather than wrapping in
+ * the `?? undefined` nullish-drop. The `?? undefined` rescue exists ONLY to keep a PROVABLY-nullish
+ * numeric binding (a `x ? n : null` ternary, normalized to `x ? n : undefined`) typed
+ * `number | undefined` while dropping the attribute on the nullish branch. For every OTHER shape we
+ * prefer RAW: appending `?? undefined` to an operand that is statically `number` (never nullish)
+ * makes the right operand unreachable → TS2869 (WR-02 — the shipped
+ * `aria-rowcount={(totalRowCount()) ?? undefined}` only dodged it by `any`-inference; a strictly-
+ * typed `number`-returning helper, or a strict re-typecheck of the leaf, would break).
+ *
+ * Recognized as non-nullish (→ raw), mirroring the `.length` member that already emits raw via
+ * `wrapForDisplay=false`:
+ *   - a numeric literal, an arithmetic BinaryExpression (`a + 1`, `i * 2`), a unary `+`/`-`;
+ *   - a CallExpression / MemberExpression (`totalRowCount()`, `rows.length`) — the IR cannot prove
+ *     these nullable from the AST; React's `number | undefined` slot accepts a bare `number`, and
+ *     a runtime `null`/`undefined` is still dropped by React (IN-01 — the non-virtual
+ *     `aria-rowcount={totalRowCount()}` now matches the virtual `aria-rowcount={rows.length}`);
+ *   - a LogicalExpression `a || n` / `a ?? n` / `a && n` whose RHS is itself non-nullish
+ *     (`span || 1`) — the `||`/`??` fallback (and a non-nullish `&&` RHS) yields a non-nullish result.
+ * The genuinely-nullish ConditionalExpression form (`x ? n : null`) is deliberately NOT recognized
+ * here, so it still falls through to the `?? undefined` drop (its `: undefined` branch makes the
+ * right operand reachable → no TS2869).
  */
 const ARITHMETIC_BINARY_OPS: ReadonlySet<string> = new Set(['+', '-', '*', '/', '%', '**']);
+const NON_NULLISH_LOGICAL_OPS: ReadonlySet<string> = new Set(['||', '&&', '??']);
 function isProvablyNonNullishNumeric(expr: t.Expression): boolean {
   if (t.isNumericLiteral(expr)) return true;
   if (t.isBinaryExpression(expr)) return ARITHMETIC_BINARY_OPS.has(expr.operator);
   if (t.isUnaryExpression(expr)) return expr.operator === '+' || expr.operator === '-';
+  // A bald call / member access — nullability is unprovable from the AST; prefer RAW over an
+  // unconditional `?? undefined` that is TS2869 when the value is statically `number`.
+  if (t.isCallExpression(expr) || t.isOptionalCallExpression(expr)) return true;
+  if (t.isMemberExpression(expr) || t.isOptionalMemberExpression(expr)) return true;
+  // `a || 1` / `a ?? 1` / `a && 1` — a non-nullish RHS fallback yields a non-nullish result.
+  if (t.isLogicalExpression(expr) && NON_NULLISH_LOGICAL_OPS.has(expr.operator)) {
+    return isProvablyNonNullishNumeric(expr.right);
+  }
   return false;
 }
 
@@ -1064,12 +1089,12 @@ function emitNonClassAttribute(
       // JSX omits the attribute), matching the `rozieAttr` drop semantics for
       // the numeric case without the string widening.
       if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase())) {
-        // A provably non-nullish numeric expression (`wr.vi.index + 1`, a numeric literal,
-        // a unary `+`/`-`) is already `number` — appending `?? undefined` makes the right
-        // operand unreachable (TS2869). Emit it RAW (still `number`, typechecks against the
-        // `number | undefined` ARIA/HTML slot). Only nullish-capable forms (a `x ? n : null`
-        // ternary normalized to `undefined`, a `number | null`-returning call like
-        // `cellTabindex()`) need the `?? undefined` nullish-drop.
+        // WR-02: emit RAW whenever nullability is NOT provable from the AST — a numeric literal,
+        // arithmetic, unary `+`/`-`, a bald call/member (`totalRowCount()`, `rows.length`), or a
+        // `|| n`/`?? n` fallback. These are `number`(-ish); appending `?? undefined` to a static
+        // `number` makes the right operand unreachable (TS2869). Only the genuinely-nullish
+        // ConditionalExpression form (`x ? n : null` → normalized `: undefined`) falls through to
+        // the `?? undefined` drop below (reachable → no TS2869), preserving the attribute-drop.
         if (isProvablyNonNullishNumeric(normalizedAttrExpr)) {
           return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
         }

@@ -208,18 +208,18 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     <>
     <nav ref={nav} aria-label={props.ariaLabel} {...attrs} className={clsx(clsx("rozie-pagination", { "rozie-pagination--disabled": props.disabled }), (attrs.className as string | undefined))} onKeyDown={($event) => { onControlKeydown($event); }} data-rozie-s-de247ae2="">
       
-      {(props.renderPrevControl ?? props.slots?.['prevControl']) ? ((props.renderPrevControl ?? props.slots?.['prevControl']) as Function)({ disabled: !canPrev() || props.disabled, goto: goPrev, page: currentPage() - 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-prev"} data-page-control="" tabIndex={(tabIndexFor(true)) ?? undefined} disabled={!canPrev() || props.disabled} aria-disabled={!!(!canPrev() || props.disabled)} aria-label="Previous page" onClick={goPrev} data-rozie-s-de247ae2="">‹</button>}
+      {(props.renderPrevControl ?? props.slots?.['prevControl']) ? ((props.renderPrevControl ?? props.slots?.['prevControl']) as Function)({ disabled: !canPrev() || props.disabled, goto: goPrev, page: currentPage() - 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-prev"} data-page-control="" tabIndex={tabIndexFor(true)} disabled={!canPrev() || props.disabled} aria-disabled={!!(!canPrev() || props.disabled)} aria-label="Previous page" onClick={goPrev} data-rozie-s-de247ae2="">‹</button>}
 
       
       {model().pages.map((item, index) => <Fragment key={item + '-' + index}>
         {(item === 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(props.renderEllipsis ?? props.slots?.['ellipsis']) ? ((props.renderEllipsis ?? props.slots?.['ellipsis']) as Function)({ index }) : "…"}
         </span>}{(item !== 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
-          {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: item, selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={(tabIndexFor(isActive(item))) ?? undefined} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
+          {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: item, selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={tabIndexFor(isActive(item))} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
         </span>}</Fragment>)}
 
       
-      {(props.renderNextControl ?? props.slots?.['nextControl']) ? ((props.renderNextControl ?? props.slots?.['nextControl']) as Function)({ disabled: !canNext() || props.disabled, goto: goNext, page: currentPage() + 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-next"} data-page-control="" tabIndex={(tabIndexFor(true)) ?? undefined} disabled={!canNext() || props.disabled} aria-disabled={!!(!canNext() || props.disabled)} aria-label="Next page" onClick={goNext} data-rozie-s-de247ae2="">›</button>}
+      {(props.renderNextControl ?? props.slots?.['nextControl']) ? ((props.renderNextControl ?? props.slots?.['nextControl']) as Function)({ disabled: !canNext() || props.disabled, goto: goNext, page: currentPage() + 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-next"} data-page-control="" tabIndex={tabIndexFor(true)} disabled={!canNext() || props.disabled} aria-disabled={!!(!canNext() || props.disabled)} aria-label="Next page" onClick={goNext} data-rozie-s-de247ae2="">›</button>}
     </nav>
     </>
   );
