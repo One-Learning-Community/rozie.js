@@ -2194,6 +2194,20 @@ const getRowIndexRelativeToPage = (absRow: any) => {
   return abs - pageRowOffset();
 };
 
+// C3 (phase 63 wave-9) — the PUBLIC Cut verb: copy the current cell range to the clipboard then
+// clear the source cells through the write-funnel (one writeData), delegating to cutRange (the
+// clipboardFill funnel that also backs the Ctrl+X shortcut). Reads the persisted $data range /
+// active cell, so it cuts the current selection even when the call arrives off a control that
+// moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
+// inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
+// C3 (phase 63 wave-9) — the PUBLIC Cut verb: copy the current cell range to the clipboard then
+// clear the source cells through the write-funnel (one writeData), delegating to cutRange (the
+// clipboardFill funnel that also backs the Ctrl+X shortcut). Reads the persisted $data range /
+// active cell, so it cuts the current selection even when the call arrives off a control that
+// moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
+// inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
+const cut = () => cutRange();
+
 // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
 // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
 // the active-cell index-pair state, the data-* cell markers, and the SINGLE
@@ -2907,6 +2921,16 @@ const onGridKeyDown = (e: any) => {
   } else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault();
     pasteRange();
+    return;
+  }
+  // ── C3 (phase 63 wave-9) — Ctrl/Cmd+X CUTS the range: copy the range as TSV then clear the
+  // source cells through the SAME write-funnel as paste (one writeData). Same B11 gate as
+  // Ctrl+C/Ctrl+V (clipboardActiveAllowed) so a header-active Ctrl+X falls through to NATIVE cut
+  // and never silently clears a body cell (cutRange also self-guards). Placed beside the C/V
+  // shortcuts, BEFORE the printable-key edit-entry branch (which excludes ctrl/meta). ──
+  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+    e.preventDefault();
+    cutRange();
     return;
   }
   // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
@@ -3808,23 +3832,69 @@ const rowIdAt = (rowIndex: any) => {
   return row ? row.id : null;
 };
 
-// pasteRange(): read TSV from the clipboard (async), parse it, and apply it anchored at the
-// active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
-// failed/empty read is a silent no-op.
-// pasteRange(): read TSV from the clipboard (async), parse it, and apply it anchored at the
-// active cell under the D-03 skip rule. The grid is clamped to the grid bounds (T-51-02). A
-// failed/empty read is a silent no-op.
+// C3: tile a parsed clipboard `grid` (string[][]) to fill a destination `box` — the spreadsheet
+// paste-into-range semantics. The target rectangle is the MAX of the box dims and the source
+// dims per axis, so a SMALLER clipboard TILES across a LARGER selection (a single 1×1 cell fills
+// the whole range; a 2×2 block repeats — tiled[dr][dc] = src[dr % srcRows][dc % srcCols]), while a
+// clipboard LARGER than the selection pastes its full block from the top-left (preserving the
+// no-range "clipboard-sized block at the active cell" behavior — a 1×1 destBox + a 1×N clipboard
+// yields the full 1×N block, byte-for-byte the prior path). Pure — returns a fresh grid; applies
+// nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
+// C3: tile a parsed clipboard `grid` (string[][]) to fill a destination `box` — the spreadsheet
+// paste-into-range semantics. The target rectangle is the MAX of the box dims and the source
+// dims per axis, so a SMALLER clipboard TILES across a LARGER selection (a single 1×1 cell fills
+// the whole range; a 2×2 block repeats — tiled[dr][dc] = src[dr % srcRows][dc % srcCols]), while a
+// clipboard LARGER than the selection pastes its full block from the top-left (preserving the
+// no-range "clipboard-sized block at the active cell" behavior — a 1×1 destBox + a 1×N clipboard
+// yields the full 1×N block, byte-for-byte the prior path). Pure — returns a fresh grid; applies
+// nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
+const tileGridToBox = (grid: any, box: any) => {
+  const srcRows = grid.length;
+  const srcCols = srcRows > 0 ? grid[0].length : 0;
+  if (srcRows <= 0 || srcCols <= 0) return grid;
+  const boxRows = box.r1 - box.r0 + 1;
+  const boxCols = box.c1 - box.c0 + 1;
+  const rows = boxRows > srcRows ? boxRows : srcRows;
+  const cols = boxCols > srcCols ? boxCols : srcCols;
+  const out = [];
+  for (let r = 0; r < rows; r++) {
+    const srcLine = grid[r % srcRows] || [];
+    const line = [];
+    for (let c = 0; c < cols; c++) {
+      const v = srcLine[c % srcCols];
+      line.push(v != null ? v : '');
+    }
+    out.push(line);
+  }
+  return out;
+};
+
+// pasteRange(): read TSV from the clipboard (async), parse it, TILE it over the destination
+// (C3), and apply it anchored at the destination top-left under the D-03 skip rule. The grid is
+// clamped to the grid bounds (T-51-02). A failed/empty read is a silent no-op.
+// pasteRange(): read TSV from the clipboard (async), parse it, TILE it over the destination
+// (C3), and apply it anchored at the destination top-left under the D-03 skip rule. The grid is
+// clamped to the grid bounds (T-51-02). A failed/empty read is a silent no-op.
 const pasteRange = () => {
   // B11: never paste into a header-active state (the reusable clipboard guard) — a header
   // anchor would silently write body row 0 at the header's column.
   if (!clipboardActiveAllowed()) return;
   if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.readText) return;
-  // CR-02 (ROZ138): SNAPSHOT the anchor cell SYNCHRONOUSLY, before the clipboard read resolves.
-  // On React these are useState-backed; re-reading $data inside the async .then() returns the
-  // mount-render stale value, so a cell move between Ctrl+V and the read resolving would anchor
-  // the paste at the wrong cell. Capture the locals now and pass them into applyGridToRange.
-  const anchorRow = activeRow.value;
-  const anchorCol = activeColIndex.value;
+  // CR-02 (ROZ138): SNAPSHOT the destination SYNCHRONOUSLY, before the clipboard read resolves.
+  // C3: the destination is the SELECTED RANGE (the tiling target) when one exists, else the
+  // single active cell. $data.rangeAnchor/rangeFocus + activeRow/activeColIndex are useState-backed
+  // on React; re-reading them inside the async .then() returns the mount-render stale value, so a
+  // selection/cell move between Ctrl+V and the read resolving would anchor the paste wrong. Capture
+  // the box + anchor now and pass them into tileGridToBox / applyGridToRange.
+  const box = normalizedRange();
+  const anchorRow = box ? box.r0 : activeRow.value;
+  const anchorCol = box ? box.c0 : activeColIndex.value;
+  const destBox = box || {
+    r0: anchorRow,
+    r1: anchorRow,
+    c0: anchorCol,
+    c1: anchorCol
+  };
   let p: any = null;
   try {
     p = navigator.clipboard.readText();
@@ -3835,8 +3905,54 @@ const pasteRange = () => {
   p.then((text: any) => {
     const grid = parseTsv(text);
     if (!grid.length) return;
-    applyGridToRange(grid, anchorRow, anchorCol);
+    // C3: tile the clipboard block to fill the destination range (single→range fill,
+    // smaller-tiles-into-larger); a clipboard larger than the box pastes its full block.
+    const tiled = tileGridToBox(grid, destBox);
+    applyGridToRange(tiled, anchorRow, anchorCol);
   }).catch(() => {});
+};
+
+// cutRange(): C3 Cut — copy the current range to the clipboard (rangeToTsv — the SAME escaped
+// serialization copyRange uses) THEN CLEAR the source cells through the SAME write-funnel as
+// paste/fill: applyGridToRange of an empty-string grid sized to the range → coerceCellValue('')
+// per column (null on a numeric column, '' on text) + the D-03 editable/validator skip rule +
+// ONE writeData + one cell-edit-commit per cleared cell + the N-of-M announce. A read-only /
+// required cell is left intact (the funnel skips it). B11: a no-op while a header cell is active
+// (reuses clipboardActiveAllowed — Cut can never silently clear a body cell from a header anchor).
+// The clear is SYNCHRONOUS and runs AFTER rangeToTsv has already serialized, so the copy reads the
+// pre-clear values; the clipboard write is best-effort/async and never blocks the clear.
+// cutRange(): C3 Cut — copy the current range to the clipboard (rangeToTsv — the SAME escaped
+// serialization copyRange uses) THEN CLEAR the source cells through the SAME write-funnel as
+// paste/fill: applyGridToRange of an empty-string grid sized to the range → coerceCellValue('')
+// per column (null on a numeric column, '' on text) + the D-03 editable/validator skip rule +
+// ONE writeData + one cell-edit-commit per cleared cell + the N-of-M announce. A read-only /
+// required cell is left intact (the funnel skips it). B11: a no-op while a header cell is active
+// (reuses clipboardActiveAllowed — Cut can never silently clear a body cell from a header anchor).
+// The clear is SYNCHRONOUS and runs AFTER rangeToTsv has already serialized, so the copy reads the
+// pre-clear values; the clipboard write is best-effort/async and never blocks the clear.
+const cutRange = () => {
+  if (!clipboardActiveAllowed()) return;
+  // Snapshot the source rectangle synchronously (same ROZ138 concern as pasteRange).
+  const box = normalizedRange();
+  const r0 = box ? box.r0 : activeRow.value;
+  const r1 = box ? box.r1 : activeRow.value;
+  const c0 = box ? box.c0 : activeColIndex.value;
+  const c1 = box ? box.c1 : activeColIndex.value;
+  // Copy first (best-effort) — rangeToTsv() reads the CURRENT range/active cell NOW, before the clear.
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      const cp = navigator.clipboard.writeText(rangeToTsv());
+      if (cp && cp.catch) cp.catch(() => {});
+    } catch (err: any) {/* best-effort copy */}
+  }
+  // Clear the source: a grid of empty strings sized to the range, applied at the top-left.
+  const grid = [];
+  for (let r = r0; r <= r1; r++) {
+    const cols = [];
+    for (let c = c0; c <= c1; c++) cols.push('');
+    grid.push(cols);
+  }
+  applyGridToRange(grid, r0, c0);
 };
 
 // tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
@@ -5654,7 +5770,7 @@ data.value, dataDefault.value, colReg.value], () => {
   reFeed();
 });
 
-defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange });
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut });
 </script>
 
 <style scoped>

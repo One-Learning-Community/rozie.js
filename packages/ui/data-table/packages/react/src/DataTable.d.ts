@@ -188,6 +188,7 @@ export interface DataTableHandle {
   commitEditing: (...args: any[]) => any;
   editRow: (...args: any[]) => any;
   getSelectedRange: (...args: any[]) => any;
+  cut: (...args: any[]) => any;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;

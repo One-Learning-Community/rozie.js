@@ -1093,7 +1093,7 @@ $provide('data-table:columns', {
   },
 })
 
-import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage } from './exposeStateVerbs.rzts'
+import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut } from './exposeStateVerbs.rzts'
 
 import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
@@ -1132,7 +1132,7 @@ let rangeActive = false
 
 import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange } from './rangeSelection.rzts'
 
-import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, pasteRange, tileIndex, fillRange } from './clipboardFill.rzts'
+import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, tileIndex, fillRange } from './clipboardFill.rzts'
 
 // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
 // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
@@ -1207,6 +1207,7 @@ $expose({
   commitEditing,
   editRow,
   getSelectedRange,
+  cut,
 })
 </script>
 

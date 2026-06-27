@@ -48,4 +48,12 @@ const getRowIndexRelativeToPage = (absRow) => {
   return abs - pageRowOffset()
 }
 
-export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage }
+// C3 (phase 63 wave-9) — the PUBLIC Cut verb: copy the current cell range to the clipboard then
+// clear the source cells through the write-funnel (one writeData), delegating to cutRange (the
+// clipboardFill funnel that also backs the Ctrl+X shortcut). Reads the persisted $data range /
+// active cell, so it cuts the current selection even when the call arrives off a control that
+// moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
+// inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
+const cut = () => cutRange()
+
+export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut }

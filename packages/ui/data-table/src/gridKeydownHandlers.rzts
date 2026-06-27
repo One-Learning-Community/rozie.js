@@ -91,6 +91,14 @@ const onGridKeyDown = (e) => {
   else if ((key === 'v' || key === 'V') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
     e.preventDefault(); pasteRange(); return
   }
+  // ── C3 (phase 63 wave-9) — Ctrl/Cmd+X CUTS the range: copy the range as TSV then clear the
+  // source cells through the SAME write-funnel as paste (one writeData). Same B11 gate as
+  // Ctrl+C/Ctrl+V (clipboardActiveAllowed) so a header-active Ctrl+X falls through to NATIVE cut
+  // and never silently clears a body cell (cutRange also self-guards). Placed beside the C/V
+  // shortcuts, BEFORE the printable-key edit-entry branch (which excludes ctrl/meta). ──
+  else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && clipboardActiveAllowed()) {
+    e.preventDefault(); cutRange(); return
+  }
   // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
   // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
   // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
