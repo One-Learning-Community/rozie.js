@@ -1897,7 +1897,22 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // full-model virtual — both index $data.rows). Placed BEFORE the reserved enterControl branch.
     else if (key === 'Enter' && !activeIsHeader && rowIsGrouped((rows || [])[activeRow])) {
       e.preventDefault();
+      // C2 (phase 63 wave-11) — re-seat focus after the group collapse/expand re-render so the
+      // active cell never drops focus OUT of the grid. onToggleExpand flips the expand model →
+      // the tbody re-renders (the group's leaf rows appear/disappear). The active GROUP-HEADER
+      // row index is UNCHANGED (a group header is never hidden by its OWN collapse), but on the
+      // fine-grained-reactive targets (Solid especially) that re-render REPLACES the active cell's
+      // DOM node, dropping keyboard focus into <body> — the active STATE stays on the group header
+      // while DOM focus is lost (the treegrid collapsed-coherence gap; the 63-07 Solid grouping-
+      // settling fragility class). Capture the active coords BEFORE the toggle (React-stale-safe —
+      // onToggleExpand's expand-model write is an async setState on React) and re-seat focus via the
+      // SAME deferred rAF-poll recovery B25 uses (resolveCellEl retries across the async re-render
+      // until the group-header cell re-commits). The 5 sync targets resolve on attempt 1 (focus is
+      // already there → a harmless no-op re-focus); Solid retries until its grouping graph settles.
+      const grpRow = activeRow;
+      const grpCol = activeColIndex;
       onToggleExpand((rows || [])[activeRow], e);
+      recoverGridFocus(String(grpRow), grpCol, null);
       return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
@@ -1921,7 +1936,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, rowIsGrouped, rows, toAbsRow]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, recoverGridFocus, rowIsGrouped, rows, toAbsRow]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
