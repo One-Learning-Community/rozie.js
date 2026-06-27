@@ -1107,9 +1107,9 @@ let fillDragMove = null
 let fillDragUp = null
 import { teardownFillDrag, cellIndexFromPoint, onFillHandlePointerDown } from './fillDrag.rzts'
 
-import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, commitEdit, cancelEdit } from './editCellLifecycle.rzts'
+import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit } from './editCellLifecycle.rzts'
 
-import { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell } from './editRowLifecycle.rzts'
+import { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
 
 // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
 // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this

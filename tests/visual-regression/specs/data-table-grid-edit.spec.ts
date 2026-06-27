@@ -112,6 +112,44 @@ async function openEditor(
   });
 }
 
+/** The deepest shadow-pierced active element's tagName (Lit nests the drop-in editor in its
+ *  OWN shadow root, so the editor <input> is below the grid's root activeElement). Copied
+ *  from data-table-edit.spec.ts. */
+async function focusedTag(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    let active: Element | null = document.activeElement;
+    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
+      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
+      if (!sr.activeElement) break;
+      active = sr.activeElement;
+    }
+    return active ? active.tagName.toLowerCase() : null;
+  });
+}
+
+/** Focus the open editor's [data-editing-cell] control directly (deep shadow-pierced). On
+ *  Lit a #editor drop-in renders its <input> in its OWN nested shadow root which the
+ *  component's gridRoot.querySelector auto-focus can't reach, so the spec focuses it the way
+ *  a user clicking into the editor would, isolating the blur→commit parity check (B26). */
+async function focusEditorInput(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-editing-cell]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = find(sr);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const el = find(document) as HTMLElement | null;
+    if (el) el.focus();
+  });
+}
+
 /** Read a readout testid's trimmed text (shadow-pierced), '' when absent. */
 async function readoutText(page: Page, testid: string): Promise<string> {
   return page.evaluate((id) => {
@@ -372,20 +410,35 @@ for (const target of TARGETS) {
   //   Pre-fix: the drop-in (EditorText) commits on ANY blur, but the built-in only
   //   commits on blur-leaving-grid → click-away to another cell is inconsistent.
   // ════════════════════════════════════════════════════════════════════════════════
-  runnerFor(target)(`data-table-grid-edit [${target}]: B26 drop-in and built-in editors commit click-away identically`, async ({ page }) => {
+  // B26a — a BUILT-IN editor commits + closes on click-away to another grid cell (the
+  // parity baseline). Single navigation per test so the click-away focus teardown is not
+  // coupled across the two editor kinds.
+  runnerFor(target)(`data-table-grid-edit [${target}]: B26 built-in editor commits on click-away`, async ({ page }) => {
     await gotoGrid(page, target);
-    // Built-in (name, col 0) → click-away commits.
-    await enterEditAt(page, 0, 0);
-    const beforeBuiltin = await commitCount(page);
+    await enterEditAt(page, 0, 0); // built-in text editor
+    const before = await commitCount(page);
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
-    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforeBuiltin + 1);
-    // Drop-in (note, col 2) → click-away commits IDENTICALLY (one commit, editor closed).
-    await enterEditAt(page, 0, 2);
-    expect((await openEditor(page))?.col).toBe('2'); // the EditorText drop-in (it carries data-editing-cell).
-    const beforeDropin = await commitCount(page);
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+  });
+
+  // B26b — a #editor DROP-IN editor (EditorText) commits + closes on click-away IDENTICALLY
+  // to the built-in (same one-commit-then-closed semantics).
+  runnerFor(target)(`data-table-grid-edit [${target}]: B26 #editor drop-in commits on click-away identically`, async ({ page }) => {
+    const mount = await gotoGrid(page, target);
+    // Open the note (col 2) #editor drop-in via the editCell handle (deterministic open).
+    // Assert by TAG, not the owning-cell col: on Lit the EditorText drop-in renders its
+    // <input> in its OWN nested shadow root, so input.closest('[data-grid-cell]') can't cross
+    // that boundary to read data-col-index (the col is read fine on the 5 light-DOM targets).
+    await mount.getByTestId('edit-note').click();
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
+    // The drop-in commits on BLUR — focus its <input> (as a user editing it would) and confirm
+    // focus landed, else the click-away produces no blur (and no commit).
+    await focusEditorInput(page);
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    const before = await commitCount(page);
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
-    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforeDropin + 1);
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
   });
 }

@@ -2603,8 +2603,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       beginEdit(activeRow(), activeColIndex(), null);
       return;
     } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
+      // checkbox/select/date editor must NOT take the typed char as its value (it would
+      // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
+      // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
       e.preventDefault();
-      beginEdit(activeRow(), activeColIndex(), key);
+      const editType = editorTypeOf(activeCellColumnId());
+      const seed = editType === 'text' || editType === 'number' ? key : null;
+      beginEdit(activeRow(), activeColIndex(), seed);
       return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
@@ -3292,14 +3298,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
   // [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
   // on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
-  function focusEditorWhenReady() {
+  // B2: selectAll gates the post-focus el.select(). Select-all is right when entering
+  // edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
+  // retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
+  // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
+  // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
+  // AFTER the seeded char; every other caller keeps the default select-all.
+  function focusEditorWhenReady(selectAll = true) {
     if (!gridRoot) return;
     let attempts = 0;
     const tryFocus = () => {
       const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null;
       if (el) {
         el.focus();
-        if (el.select) {
+        if (selectAll && el.select) {
           try {
             el.select();
           } catch (e: any) {}
@@ -3351,7 +3363,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setDraftValue(seed != null ? seed : cellValueAt(rowIndex, colIndex));
     setActiveInControl(true);
     setEditVer(editVer() + 1);
-    focusEditorWhenReady();
+    // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
+    // seeded char so subsequent typing appends instead of replacing it.
+    focusEditorWhenReady(seed == null);
   }
 
   // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
@@ -3399,6 +3413,21 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setEditVer(editVer() + 1);
   }
 
+  // B3: coerce the committed value by the column's built-in editor type at the single
+  // commit funnel. A 'number' editor commits a real Number; an empty/whitespace/non-numeric
+  // draft commits null (never '' / never NaN — Number('') === 0 is a silent footgun). Every
+  // other editor type commits the value verbatim. Idempotent for the #editor drop-in path
+  // (an already-numeric override passes through; an explicit null stays null).
+  function coerceCellValue(colId: any, raw: any) {
+    if (editorTypeOf(colId) !== 'number') return raw;
+    if (raw == null) return null;
+    if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw;
+    const s = String(raw).trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isNaN(n) ? null : n;
+  }
+
   // commitEdit: validate the draft (req-5); on success replace one row in a fresh array,
   // funnel it through writeData (the controlled r-model:data write, req-4), emit EXACTLY
   // ONE cell-edit-commit from THIS single call site (React multi-emit dedup, D-07), then
@@ -3420,7 +3449,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     const oldValue = editingCellValue();
     const rowOriginal = editingRowOriginal();
     const rowId = editingRowId();
-    const newValue = overrideValue !== undefined ? overrideValue : draftValue();
+    // B3: coerce by the column's editor type BEFORE validation + write so the validator
+    // and the model both see the typed value (number/null), not the raw draft string.
+    const rawValue = overrideValue !== undefined ? overrideValue : draftValue();
+    const newValue = coerceCellValue(colId, rawValue);
     const err = runValidator(colId, newValue, rowOriginal);
     if (err !== true) {
       // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
@@ -3655,6 +3687,38 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return null;
   }
 
+  // B4: the mirror of nextEditableCell — the PREVIOUS editable cell for a Shift+Tab
+  // backward move. Skips non-editable columns leftward within the row; wraps to the END
+  // of the prior row; stops (returns null) at grid start. Pure index math over the visible
+  // model. Returns { row, col } or null.
+  function prevEditableCell(fromRow: any, fromCol: any) {
+    const rowList = rows() || [];
+    const rowCount = rowList.length;
+    if (rowCount === 0) return null;
+    let r = fromRow;
+    let c = fromCol - 1;
+    while (r >= 0) {
+      const row = rowList[r];
+      const cells = row ? visibleCellsFor(row) : [];
+      while (c >= 0) {
+        const cell = cells[c];
+        const cid = cell && cell.column ? cell.column.id : null;
+        if (cid != null && columnEditable(cid)) return {
+          row: r,
+          col: c
+        };
+        c = c - 1;
+      }
+      r = r - 1;
+      if (r >= 0) {
+        const prow = rowList[r];
+        const pcells = prow ? visibleCellsFor(prow) : [];
+        c = pcells.length - 1;
+      }
+    }
+    return null;
+  }
+
   // Transient guard: true while an editor commit/cancel/Tab-advance is tearing the current
   // editor down. The unmounting editor fires a `blur` as it leaves the DOM — without this
   // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
@@ -3759,8 +3823,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     } else if (key === 'Tab') {
       e.preventDefault();
       // Resolve the advance target from the EDITING pair (the cell that is open), not the
-      // active cell (they match here, but the editing pair is authoritative).
-      const target = nextEditableCell(editingRow(), editingCol());
+      // active cell (they match here, but the editing pair is authoritative). B4: Shift+Tab
+      // moves BACKWARD (prevEditableCell), a plain Tab FORWARD (nextEditableCell). Snapshot
+      // the editing pair BEFORE commit (commitEdit resets it to -1).
+      const fromRow = editingRow();
+      const fromCol = editingCol();
+      const target = e.shiftKey ? prevEditableCell(fromRow, fromCol) : nextEditableCell(fromRow, fromCol);
       // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
       // straight into the next editable cell's editor below. Use the RETURN value (not a
       // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
@@ -3770,6 +3838,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         setActiveRow(target.row);
         setActiveColIndex(target.col);
         beginEdit(target.row, target.col, null);
+      } else if (committed) {
+        // B5: no editable cell in the Tab direction (grid start/end) — keep focus INSIDE the
+        // grid by returning it to the just-committed cell instead of letting it drop to <body>.
+        focusCellWhenReady(fromRow, fromCol);
       }
     } else if (key === 'Escape') {
       e.preventDefault();
@@ -3792,23 +3864,34 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (inRowEdit()) return;
     if (editingRow() < 0 || editTransition) return;
     const next = e ? e.relatedTarget : null;
-    // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
-    // another widget). Skip when:
-    //  - relatedTarget is inside gridRoot — a controlled move (Tab-advance to the next editor,
-    //    Enter/Escape focus-return to the cell); the keyboard handler already acted, AND
-    //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
-    //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
-    //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
-    // WR-04 (BACKED OUT): committing on a null relatedTarget here to catch a touch focus-away
-    // also double-commits on the Tab-advance path — the OLD editor's blur fires with a TRANSIENT
-    // null relatedTarget while it unmounts and BEFORE the next editor is focusable, and at that
-    // instant editTransition is already cleared + the new editor's editingRow>=0, so a commit here
-    // fires a SECOND cell-edit-commit (data-table-edit VR: commitCount 4 vs 3, vue/svelte/angular/
-    // lit). Distinguishing a genuine touch focus-drop from a transient remount focus-drop needs a
-    // deferred "is focus still outside gridRoot after a tick" heuristic (the review's harder
-    // alternative), out of scope here — keep the conservative null=skip behavior.
+    // A null relatedTarget is an unmount-blur (the editor left the DOM) or a focus drop the
+    // keyboard path owns; committing here would double-count (WR-04: the OLD editor's blur on
+    // a Tab-advance fires with a TRANSIENT null relatedTarget while it unmounts). Keep the
+    // conservative null=skip behavior.
     if (next == null) return;
-    if (gridRoot && gridRoot.contains && gridRoot.contains(next)) return;
+    // Focus moving OUTSIDE the grid (a click into another widget) → commit (D-01 reject keeps
+    // the editor open on an invalid value).
+    if (!(gridRoot && gridRoot.contains && gridRoot.contains(next))) {
+      commitEdit(undefined);
+      return;
+    }
+    // Focus stays INSIDE the grid. B1: distinguish a controlled keyboard transition (the
+    // keyboard handler already committed) from a genuine click-away to ANOTHER grid cell
+    // (which must commit + close so the grid is not wedged with an open editor).
+    const nextCell = next.closest ? next.closest('[data-grid-cell]') : null;
+    const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null;
+    // Same cell (an inner control / the editing cell itself on an Enter focus-return) → a
+    // controlled move; skip. Also skip when either cell can't be resolved (an unmounting
+    // editor has no owning cell — the Tab-advance remount-blur path, never a click-away).
+    if (!nextCell || !fromCell || nextCell === fromCell) return;
+    // A Tab-advance already committed the old editor and opened the next one, so the live
+    // editing pair has MOVED off the blurring editor's cell; only a click-away leaves the
+    // editing pair still ON fromCell. Skip when they differ (the keyboard path owns it — no
+    // double commit, WR-04).
+    const fromRow = fromCell.getAttribute('data-row');
+    const fromCol = fromCell.getAttribute('data-col-index');
+    if (fromRow !== String(editingRow()) || fromCol !== String(editingCol())) return;
+    // Genuine click-away to another grid cell → commit + close.
     commitEdit(undefined);
   }
 

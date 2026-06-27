@@ -1677,8 +1677,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       beginEdit(activeRow, activeColIndex, null);
       return;
     } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
+      // checkbox/select/date editor must NOT take the typed char as its value (it would
+      // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
+      // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
       e.preventDefault();
-      beginEdit(activeRow, activeColIndex, key);
+      const editType = editorTypeOf(activeCellColumnId());
+      const seed = editType === 'text' || editType === 'number' ? key : null;
+      beginEdit(activeRow, activeColIndex, seed);
       return;
     } else if (key === 'Enter' || key === 'F2') {
       e.preventDefault();
@@ -1697,7 +1703,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2185,14 +2191,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const row = rowList[editingRow];
     return row ? row.id : null;
   }
-  function focusEditorWhenReady() {
+  function focusEditorWhenReady(selectAll = true) {
     if (!gridRoot.current) return;
     let attempts = 0;
     const tryFocus = () => {
       const el = gridRoot.current ? gridRoot.current.querySelector('[data-editing-cell]') : null;
       if (el) {
         el.focus();
-        if (el.select) {
+        if (selectAll && el.select) {
           try {
             el.select();
           } catch (e: any) {}
@@ -2234,7 +2240,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setDraftValue(seed != null ? seed : cellValueAt(rowIndex, colIndex));
     setActiveInControl(true);
     setEditVer(prev => prev + 1);
-    focusEditorWhenReady();
+    // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
+    // seeded char so subsequent typing appends instead of replacing it.
+    focusEditorWhenReady(seed == null);
   }
   function focusCellWhenReady(row: any, col: any) {
     if (!gridRoot.current) return;
@@ -2266,6 +2274,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setActiveInControl(false);
     setEditVer(prev => prev + 1);
   }
+  function coerceCellValue(colId: any, raw: any) {
+    if (editorTypeOf(colId) !== 'number') return raw;
+    if (raw == null) return null;
+    if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw;
+    const s = String(raw).trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isNaN(n) ? null : n;
+  }
   function commitEdit(overrideValue = undefined, skipFocusReturn = false) {
     if (editingRow < 0) return false;
     const colId = editingColumnId();
@@ -2277,7 +2294,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const oldValue = editingCellValue();
     const rowOriginal = editingRowOriginal();
     const rowId = editingRowId();
-    const newValue = overrideValue !== undefined ? overrideValue : draftValue;
+    // B3: coerce by the column's editor type BEFORE validation + write so the validator
+    // and the model both see the typed value (number/null), not the raw draft string.
+    const rawValue = overrideValue !== undefined ? overrideValue : draftValue;
+    const newValue = coerceCellValue(colId, rawValue);
     const err = runValidator(colId, newValue, rowOriginal);
     if (err !== true) {
       // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
@@ -2474,6 +2494,33 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return null;
   }
+  function prevEditableCell(fromRow: any, fromCol: any) {
+    const rowList = rows || [];
+    const rowCount = rowList.length;
+    if (rowCount === 0) return null;
+    let r = fromRow;
+    let c = fromCol - 1;
+    while (r >= 0) {
+      const row = rowList[r];
+      const cells = row ? visibleCellsFor(row) : [];
+      while (c >= 0) {
+        const cell = cells[c];
+        const cid = cell && cell.column ? cell.column.id : null;
+        if (cid != null && columnEditable(cid)) return {
+          row: r,
+          col: c
+        };
+        c = c - 1;
+      }
+      r = r - 1;
+      if (r >= 0) {
+        const prow = rowList[r];
+        const pcells = prow ? visibleCellsFor(prow) : [];
+        c = pcells.length - 1;
+      }
+    }
+    return null;
+  }
   function inRowEdit() {
     return editingRowIndex != null;
   }
@@ -2547,8 +2594,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     } else if (key === 'Tab') {
       e.preventDefault();
       // Resolve the advance target from the EDITING pair (the cell that is open), not the
-      // active cell (they match here, but the editing pair is authoritative).
-      const target = nextEditableCell(editingRow, editingCol);
+      // active cell (they match here, but the editing pair is authoritative). B4: Shift+Tab
+      // moves BACKWARD (prevEditableCell), a plain Tab FORWARD (nextEditableCell). Snapshot
+      // the editing pair BEFORE commit (commitEdit resets it to -1).
+      const fromRow = editingRow;
+      const fromCol = editingCol;
+      const target = e.shiftKey ? prevEditableCell(fromRow, fromCol) : nextEditableCell(fromRow, fromCol);
       // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
       // straight into the next editable cell's editor below. Use the RETURN value (not a
       // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
@@ -2558,12 +2609,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         setActiveRow(target.row);
         setActiveColIndex(target.col);
         beginEdit(target.row, target.col, null);
+      } else if (committed) {
+        // B5: no editable cell in the Tab direction (grid start/end) — keep focus INSIDE the
+        // grid by returning it to the just-committed cell instead of letting it drop to <body>.
+        focusCellWhenReady(fromRow, fromCol);
       }
     } else if (key === 'Escape') {
       e.preventDefault();
       cancelEdit();
     }
-  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, inRowEdit, nextEditableCell]);
+  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, nextEditableCell, prevEditableCell]);
   const onEditorBlur = useCallback((e: any) => {
     // Full-row mode (req-6): blur NEVER commits — the row commits as a UNIT only on an
     // explicit Enter / save / editRow-driven flow (a per-cell blur-commit would split the row
@@ -2572,25 +2627,36 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (inRowEdit()) return;
     if (editingRow < 0 || editTransition.current) return;
     const next = e ? e.relatedTarget : null;
-    // Commit ONLY on a genuine focus-away to a real element OUTSIDE the grid (click into
-    // another widget). Skip when:
-    //  - relatedTarget is inside gridRoot — a controlled move (Tab-advance to the next editor,
-    //    Enter/Escape focus-return to the cell); the keyboard handler already acted, AND
-    //  - relatedTarget is null — an unmount-blur (the editor left the DOM) or a focus drop the
-    //    keyboard path owns; committing here would double-count. The explicit Enter/Tab/Escape
-    //    keymap covers every keyboard commit, so a null-relatedTarget blur is never a commit.
-    // WR-04 (BACKED OUT): committing on a null relatedTarget here to catch a touch focus-away
-    // also double-commits on the Tab-advance path — the OLD editor's blur fires with a TRANSIENT
-    // null relatedTarget while it unmounts and BEFORE the next editor is focusable, and at that
-    // instant editTransition is already cleared + the new editor's editingRow>=0, so a commit here
-    // fires a SECOND cell-edit-commit (data-table-edit VR: commitCount 4 vs 3, vue/svelte/angular/
-    // lit). Distinguishing a genuine touch focus-drop from a transient remount focus-drop needs a
-    // deferred "is focus still outside gridRoot after a tick" heuristic (the review's harder
-    // alternative), out of scope here — keep the conservative null=skip behavior.
+    // A null relatedTarget is an unmount-blur (the editor left the DOM) or a focus drop the
+    // keyboard path owns; committing here would double-count (WR-04: the OLD editor's blur on
+    // a Tab-advance fires with a TRANSIENT null relatedTarget while it unmounts). Keep the
+    // conservative null=skip behavior.
     if (next == null) return;
-    if (gridRoot.current && gridRoot.current.contains && gridRoot.current.contains(next)) return;
+    // Focus moving OUTSIDE the grid (a click into another widget) → commit (D-01 reject keeps
+    // the editor open on an invalid value).
+    if (!(gridRoot.current && gridRoot.current.contains && gridRoot.current.contains(next))) {
+      commitEdit(undefined);
+      return;
+    }
+    // Focus stays INSIDE the grid. B1: distinguish a controlled keyboard transition (the
+    // keyboard handler already committed) from a genuine click-away to ANOTHER grid cell
+    // (which must commit + close so the grid is not wedged with an open editor).
+    const nextCell = next.closest ? next.closest('[data-grid-cell]') : null;
+    const fromCell = e && e.target && e.target.closest ? e.target.closest('[data-grid-cell]') : null;
+    // Same cell (an inner control / the editing cell itself on an Enter focus-return) → a
+    // controlled move; skip. Also skip when either cell can't be resolved (an unmounting
+    // editor has no owning cell — the Tab-advance remount-blur path, never a click-away).
+    if (!nextCell || !fromCell || nextCell === fromCell) return;
+    // A Tab-advance already committed the old editor and opened the next one, so the live
+    // editing pair has MOVED off the blurring editor's cell; only a click-away leaves the
+    // editing pair still ON fromCell. Skip when they differ (the keyboard path owns it — no
+    // double commit, WR-04).
+    const fromRow = fromCell.getAttribute('data-row');
+    const fromCol = fromCell.getAttribute('data-col-index');
+    if (fromRow !== String(editingRow) || fromCol !== String(editingCol)) return;
+    // Genuine click-away to another grid cell → commit + close.
     commitEdit(undefined);
-  }, [commitEdit, editingRow, inRowEdit]);
+  }, [commitEdit, editingCol, editingRow, inRowEdit]);
   function editCell(rowIndex: any, colIndex: any) {
     const lastRow = bodyRowCount() - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;

@@ -80,6 +80,14 @@ const callGetActiveCell = (): void => {
     $data.getActiveResult = r ? r.rowIndex + ',' + r.colIndex : ''
   }
 }
+
+// Programmatically open the editor on the `note` (#editor drop-in) cell (0,2) via the
+// editCell $expose handle — a deterministic open path for the B26 drop-in parity check
+// (avoids Lit's nested-editor focus-timing fragility in the keyboard F2 path).
+const editNoteCell = (): void => {
+  const api = $refs.dt
+  if (api && api.editCell) api.editCell(0, 2)
+}
 </script>
 
 <template>
@@ -88,6 +96,7 @@ const callGetActiveCell = (): void => {
 
   <div class="controls">
     <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="edit-note" @click="editNoteCell">editCell(0,2)</button>
     <span class="label">last commit:</span>
     <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
     <span class="label">commit-count:</span>

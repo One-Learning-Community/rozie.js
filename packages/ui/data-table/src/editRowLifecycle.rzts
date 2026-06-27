@@ -163,4 +163,33 @@ const nextEditableCell = (fromRow, fromCol) => {
   return null
 }
 
-export { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell }
+// B4: the mirror of nextEditableCell — the PREVIOUS editable cell for a Shift+Tab
+// backward move. Skips non-editable columns leftward within the row; wraps to the END
+// of the prior row; stops (returns null) at grid start. Pure index math over the visible
+// model. Returns { row, col } or null.
+const prevEditableCell = (fromRow, fromCol) => {
+  const rowList = $data.rows || []
+  const rowCount = rowList.length
+  if (rowCount === 0) return null
+  let r = fromRow
+  let c = fromCol - 1
+  while (r >= 0) {
+    const row = rowList[r]
+    const cells = row ? visibleCellsFor(row) : []
+    while (c >= 0) {
+      const cell = cells[c]
+      const cid = cell && cell.column ? cell.column.id : null
+      if (cid != null && columnEditable(cid)) return { row: r, col: c }
+      c = c - 1
+    }
+    r = r - 1
+    if (r >= 0) {
+      const prow = rowList[r]
+      const pcells = prow ? visibleCellsFor(prow) : []
+      c = pcells.length - 1
+    }
+  }
+  return null
+}
+
+export { editableColumnsForRow, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell }

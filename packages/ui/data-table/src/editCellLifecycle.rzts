@@ -150,12 +150,18 @@ const editingRowId = () => {
 // (React setState async; Solid/Lit/Svelte next reactive tick). Poll for the
 // [data-editing-cell] element off gridRoot for ~30 frames — the five fast targets resolve
 // on attempt 1, React retries across its async commit. NEVER read $refs eagerly.
-const focusEditorWhenReady = () => {
+// B2: selectAll gates the post-focus el.select(). Select-all is right when entering
+// edit IN PLACE (F2/Enter/click/row-edit/validation-reject — no seeded char, the user
+// retypes), but WRONG on a type-to-edit entry where a printable key already seeded the
+// draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
+// beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
+// AFTER the seeded char; every other caller keeps the default select-all.
+const focusEditorWhenReady = (selectAll = true) => {
   if (!gridRoot) return
   let attempts = 0
   const tryFocus = () => {
     const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null
-    if (el) { el.focus(); if (el.select) { try { el.select() } catch (e) {} } return }
+    if (el) { el.focus(); if (selectAll && el.select) { try { el.select() } catch (e) {} } return }
     attempts = attempts + 1
     if (attempts >= 30) return
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus)
@@ -203,7 +209,9 @@ const beginEdit = (rowIndex, colIndex, seed) => {
   $data.draftValue = seed != null ? seed : cellValueAt(rowIndex, colIndex)
   $data.activeInControl = true
   $data.editVer = $data.editVer + 1
-  focusEditorWhenReady()
+  // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
+  // seeded char so subsequent typing appends instead of replacing it.
+  focusEditorWhenReady(seed == null)
 }
 
 // Return focus to a body cell AFTER the editor unmounts (commit/cancel). The display↔
@@ -250,6 +258,21 @@ const endRowEdit = () => {
   $data.editVer = $data.editVer + 1
 }
 
+// B3: coerce the committed value by the column's built-in editor type at the single
+// commit funnel. A 'number' editor commits a real Number; an empty/whitespace/non-numeric
+// draft commits null (never '' / never NaN — Number('') === 0 is a silent footgun). Every
+// other editor type commits the value verbatim. Idempotent for the #editor drop-in path
+// (an already-numeric override passes through; an explicit null stays null).
+const coerceCellValue = (colId, raw) => {
+  if (editorTypeOf(colId) !== 'number') return raw
+  if (raw == null) return null
+  if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw
+  const s = String(raw).trim()
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isNaN(n) ? null : n
+}
+
 // commitEdit: validate the draft (req-5); on success replace one row in a fresh array,
 // funnel it through writeData (the controlled r-model:data write, req-4), emit EXACTLY
 // ONE cell-edit-commit from THIS single call site (React multi-emit dedup, D-07), then
@@ -268,7 +291,10 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   const oldValue = editingCellValue()
   const rowOriginal = editingRowOriginal()
   const rowId = editingRowId()
-  const newValue = overrideValue !== undefined ? overrideValue : $data.draftValue
+  // B3: coerce by the column's editor type BEFORE validation + write so the validator
+  // and the model both see the typed value (number/null), not the raw draft string.
+  const rawValue = overrideValue !== undefined ? overrideValue : $data.draftValue
+  const newValue = coerceCellValue(colId, rawValue)
   const err = runValidator(colId, newValue, rowOriginal)
   if (err !== true) {
     // D-01: reject — keep the editor open, announce, re-trap focus, NEVER write the model.
@@ -314,4 +340,4 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol)
 }
 
-export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, commitEdit, cancelEdit }
+export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit }

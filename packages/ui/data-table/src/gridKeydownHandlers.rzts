@@ -99,7 +99,14 @@ const onGridKeyDown = (e) => {
     e.preventDefault(); beginEdit($data.activeRow, $data.activeColIndex, null); return
   }
   else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault(); beginEdit($data.activeRow, $data.activeColIndex, key); return
+    // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
+    // checkbox/select/date editor must NOT take the typed char as its value (it would
+    // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
+    // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
+    e.preventDefault()
+    const editType = editorTypeOf(activeCellColumnId())
+    const seed = (editType === 'text' || editType === 'number') ? key : null
+    beginEdit($data.activeRow, $data.activeColIndex, seed); return
   }
   else if (key === 'Enter' || key === 'F2') { e.preventDefault(); enterControl(); return }
   else return
