@@ -224,7 +224,16 @@ docker run --rm \
     set -e
     corepack enable
     pnpm install --frozen-lockfile
-    pnpm turbo run build
+    # --force is mandatory, not an optimization opt-out. The mirror reuses its
+    # .turbo cache + dist across runs (both are rsync-excluded so a host edit
+    # never overwrites them). CI, by contrast, always builds cold in a fresh
+    # container. Without --force, a cross-package source edit (e.g. a data-table
+    # .rzts/.rozie change) that is not hashed into the VR-host build task gets a
+    # stale turbo cache hit, so the container silently tests the PREVIOUS build —
+    # producing phantom greens/reds that do not match CI. --force restores CI
+    # parity (cold build every run). node_modules is still reused, so the
+    # expensive `pnpm install` is unaffected — only the build recompiles.
+    pnpm turbo run build --force
     cd tests/visual-regression
     ARGS=(--reporter=list)
     if [ -n "${VR_GREP:-}" ]; then
