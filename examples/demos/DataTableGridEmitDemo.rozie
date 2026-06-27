@@ -1,0 +1,262 @@
+<!--
+  DataTableGridEmitDemo.rozie — Phase 63 Wave-5 (grid emit-hygiene / gating / re-focus)
+  RED-first fixture.
+
+  Drives the eight P2 bugs across all six targets via data-table-grid-emit.spec.ts:
+    B14 — focusCell() emits activecell-change on a clamped/no-op move (should only emit on a
+          real index change — mirror the keyboard path's WR-06 suppression).
+    B15 — getActiveCell() is blind to the header-active state → reports a false body row 0
+          (should report the header sentinel: rowIndex null + isHeader true).
+    B16 — the exposed focusCell/clearActiveCell verbs are not isGrid()-gated → a spurious
+          activecell-change emit in TABLE mode (should be no-ops).
+    B17 — PageDown from a header lands body row 0 (== ArrowDown) instead of a real page-down
+          body cell.
+    B18 — extendRange emits range-change on a clamped no-op (should only emit on a real change).
+    B19 — clearRange never emits range-change → a consumer mirroring the range via the event
+          holds a stale rectangle (should emit on the drop).
+    B20 — a fill-drag pointermove over the SAME cell repeatedly spams range-change (should
+          dedup to one emit per distinct cell).
+    B25 — a programmatic shrink (pageSize / data swap) re-indexes the active cell but never
+          re-focuses → DOM focus is dropped to <body> (should recover focus onto a valid cell).
+
+  TWO DataTable instances:
+    (A) getTestId="grid-table" — interactionMode='grid'. 8 rows × 3 columns
+        (name/qty/cost; qty+cost editable numbers so the fill handle behaves), bound
+        r-model:data so the B25 data-swap can shrink the model, :pagination so the B25
+        pageSize shrink + the B17 PageDown have a real page. @activecell-change /
+        @range-change feed NET-COUNT readouts (the WR-06 pattern). The $refs.dt handle
+        drives focusCell / getActiveCell / setRowsPerPage.
+    (B) getTestId="table-table" — the SAME columns with NO interactionMode → phase-48
+        table mode. The $refs.dtTable handle drives focusCell/clearActiveCell; its
+        @activecell-change feeds a SEPARATE count readout that must stay 0 (B16).
+
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline) — the #cell
+  slot binds value/columnId. The dataset is static (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableGridEmitDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // 8 rows so PageDown from the header lands a DEEP body row (not row 0 == ArrowDown, B17)
+  // and a programmatic shrink to 3 leaves the active cell out of bounds (B25).
+  rows: [
+    { id: 1, name: 'Alpha',   qty: 10, cost: 20 },
+    { id: 2, name: 'Beta',    qty: 11, cost: 21 },
+    { id: 3, name: 'Gamma',   qty: 12, cost: 22 },
+    { id: 4, name: 'Delta',   qty: 13, cost: 23 },
+    { id: 5, name: 'Epsilon', qty: 14, cost: 24 },
+    { id: 6, name: 'Zeta',    qty: 15, cost: 25 },
+    { id: 7, name: 'Eta',     qty: 16, cost: 26 },
+    { id: 8, name: 'Theta',   qty: 17, cost: 27 },
+  ],
+  // The B25 data-swap target — a 3-row subset (the active deep cell's row disappears).
+  smallRows: [
+    { id: 1, name: 'Alpha', qty: 10, cost: 20 },
+    { id: 2, name: 'Beta',  qty: 11, cost: 21 },
+    { id: 3, name: 'Gamma', qty: 12, cost: 22 },
+  ],
+  // Static table-mode sibling data (B16 — focusCell/clearActiveCell must be no-ops here).
+  tableRows: [
+    { id: 1, name: 'Alpha', qty: 10, cost: 20 },
+    { id: 2, name: 'Beta',  qty: 11, cost: 21 },
+    { id: 3, name: 'Gamma', qty: 12, cost: 22 },
+  ],
+  // Controlled pagination — a large pageSize so all 8 rows show (B17 PageDown lands deep);
+  // the B25 pageSize driver calls setRowsPerPage(3) to shrink the page to 3 rows.
+  pageConfig: { pageIndex: 0, pageSize: 10 },
+  // Last activecell-change "r,c" + a NET COUNT (WR-06 pattern: a clamped no-op move must NOT
+  // bump the count; a real move does).
+  lastActiveCell: '',
+  activeCellCount: 0,
+  // Last range-change focus corner "r,c" (or '' when cleared) + a NET COUNT (B18/B19/B20).
+  rangeReadout: '',
+  rangeCount: 0,
+  // getActiveCell() dump: "r,c" for a body cell, "header,c" for a header-active cell (B15).
+  getActiveResult: '',
+  // Table-mode sibling activecell-change count — MUST stay 0 (B16: isGrid-gated no-op).
+  tableActiveCount: 0,
+}
+</data>
+
+<script lang="ts">
+// activecell-change → "r,c" readout + a net counter. WR-06 / B14: a clamped no-op focusCell
+// must leave the count unchanged.
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+  $data.activeCellCount = $data.activeCellCount + 1
+}
+
+// range-change → the moving focus corner "r,c" (or '' when the rectangle is dropped) + a net
+// counter. B18 (no-op extend), B19 (clear emits), B20 (fill-drag same-cell dedup) all assert
+// against this count.
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  const f = payload ? payload.focus : null
+  $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
+  $data.rangeCount = $data.rangeCount + 1
+}
+
+// The TABLE-mode sibling's activecell-change — must NEVER fire (B16: focusCell/clearActiveCell
+// are isGrid()-gated no-ops in table mode). The counter staying 0 is the green proof.
+const onTableActiveChange = (): void => {
+  $data.tableActiveCount = $data.tableActiveCount + 1
+}
+
+// Read $refs.dt LIVE in the handler (never cached — a cached handle can pre-date the child's
+// $expose publish on Solid; the GridNavDemo idiom).
+const callFocusCell11 = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(1, 1)
+}
+const callFocusCell22 = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(2, 2)
+}
+
+// getActiveCell() → "r,c" for a body cell; "header,c" when a header cell is active (B15: the
+// header sentinel is rowIndex == null + isHeader == true, NOT a false body row 0).
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    if (!r) { $data.getActiveResult = ''; return }
+    if (r.isHeader || r.rowIndex == null) $data.getActiveResult = 'header,' + r.colIndex
+    else $data.getActiveResult = r.rowIndex + ',' + r.colIndex
+  }
+}
+
+// B16 — drive the TABLE-mode sibling's exposed verbs; both must be no-ops (no emit).
+const callTableFocusCell = (): void => {
+  const api = $refs.dtTable
+  if (api && api.focusCell) api.focusCell(1, 1)
+}
+const callTableClearActive = (): void => {
+  const api = $refs.dtTable
+  if (api && api.clearActiveCell) api.clearActiveCell()
+}
+
+// B25 — programmatic shrink via PAGE SIZE: focus a DEEP body cell (which the shrink removes),
+// then setRowsPerPage(3). clampActiveCell must re-index AND re-focus a valid cell (not drop
+// focus to <body>). focusCell lands DOM focus on the grid cell synchronously; the page shrink
+// then runs through refreshRowModel → clampActiveCell.
+const shrinkViaPageSize = (): void => {
+  const api = $refs.dt
+  if (!api) return
+  if (api.focusCell) api.focusCell(6, 0)
+  if (api.setRowsPerPage) api.setRowsPerPage(3)
+}
+
+// B25 — programmatic shrink via DATA SWAP: focus a deep body cell, then replace the bound
+// dataset with the 3-row subset (its row disappears).
+const shrinkViaDataSwap = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(6, 0)
+  $data.rows = $data.smallRows
+}
+</script>
+
+<template>
+<div class="dt-grid-emit-demo">
+  <h3>DataTable — grid emit hygiene / gating / re-focus</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-focuscell-11" @click="callFocusCell11">focusCell(1,1)</button>
+    <button type="button" data-testid="call-focuscell-22" @click="callFocusCell22">focusCell(2,2)</button>
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="shrink-pagesize" @click="shrinkViaPageSize">shrink pageSize</button>
+    <button type="button" data-testid="shrink-dataswap" @click="shrinkViaDataSwap">shrink data</button>
+    <button type="button" data-testid="call-table-focuscell" @click="callTableFocusCell">table focusCell</button>
+    <button type="button" data-testid="call-table-clearactive" @click="callTableClearActive">table clearActiveCell</button>
+  </div>
+  <div class="controls">
+    <span class="label">activecell:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">activecell-count:</span>
+    <span class="readout" data-testid="activecell-count">{{ $data.activeCellCount }}</span>
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
+    <span class="label">range-count:</span>
+    <span class="readout" data-testid="range-count">{{ $data.rangeCount }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+    <span class="label">table-count:</span>
+    <span class="readout" data-testid="table-activecell-count">{{ $data.tableActiveCount }}</span>
+  </div>
+
+  <!-- (A) GRID mode — range selection + fill handle; activecell-change/range-change readouts. -->
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      :pagination="$data.pageConfig"
+      @activecell-change="onActiveCellChange($event)"
+      @range-change="onRangeChange($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="qty"  header="Qty"  :editable="true" editor="number" />
+      <Column field="cost" header="Cost" :editable="true" editor="number" />
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+
+  <!-- (B) TABLE mode — NO interactionMode → focusCell/clearActiveCell must be no-ops (B16). -->
+  <div data-testid="table-table">
+    <DataTable
+      ref="dtTable"
+      :data="$data.tableRows"
+      @activecell-change="onTableActiveChange($event)"
+    >
+      <Column field="name" header="Name" />
+      <Column field="qty"  header="Qty" />
+      <Column field="cost" header="Cost" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-emit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 640px;
+}
+.dt-grid-emit-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>
