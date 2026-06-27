@@ -904,6 +904,15 @@ export const EXAMPLES = [
   'DatePickerScreenshot',
   'ResizableScreenshot',
   'CommandPaletteScreenshot',
+  // Phase 64 P0 — @rozie-ui/headless-core CROSS-PACKAGE `.rzts` boundary proof
+  // (loader → examples/demos/HeadlessCoreSmokeDemo.rozie, which imports the smoke
+  // partial via the BARE specifier `@rozie-ui/headless-core/smoke.rzts`). The
+  // load-bearing demo that proves a cross-package bare-specifier script-partial
+  // inlines + builds + mounts ×6 BEFORE any real windowing/listCore code moves.
+  // Behavioral/mount-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  // headless-core registers its src root for the Angular cross-tree AOT prebuild
+  // (vite.config.ts + tsconfig.app.json + build-cells.mjs) per D-08.
+  'HeadlessCoreSmoke',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1202,6 +1211,9 @@ export const LIT_TAGS: Record<Example, string> = {
   DatePickerRangeComplete: 'rozie-date-picker-range-complete',
   DatePickerPresetActive: 'rozie-date-picker-preset-active',
   DatePickerRangeBehavior: 'rozie-date-picker-range-behavior',
+  // Phase 64 P0 — the Lit entry appends '-demo' → tag
+  // 'rozie-headless-core-smoke-demo' = kebab of HeadlessCoreSmokeDemo.
+  HeadlessCoreSmoke: 'rozie-headless-core-smoke',
 };
 
 export interface HostQuery {
@@ -1537,6 +1549,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DatePickerRangeComplete: {},
   DatePickerPresetActive: {},
   DatePickerRangeBehavior: {},
+  // Phase 64 P0 — self-contained cross-package boundary demo; no parent-supplied
+  // props (the inlined probe is computed in <script>).
+  HeadlessCoreSmoke: {},
 };
 
 /**
