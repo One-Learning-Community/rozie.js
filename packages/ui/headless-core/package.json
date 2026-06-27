@@ -1,0 +1,26 @@
+{
+  "name": "@rozie-ui/headless-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "comment:source-only": "Phase 64 (D-01): a SOURCE-ONLY package. NO codegen, NO compiled per-framework leaves. It carries shared `.rzts` script-partials (windowing.rzts P1, listCore.rzts P2) that DISSOLVE into each consumer's compiled leaf via inlineScriptPartials() before IR lowering — leaving ZERO runtime dependency on this package. Consumers add it as a `devDependency` and import via BARE specifier (e.g. `import { windowedRows } from '@rozie-ui/headless-core/windowing.rzts'`).",
+  "comment:exports": "The `.rzts` subpaths are declared via the literal-extension `exports` shape (mirror @rozie-ui/listbox's `./Listbox.rozie` map) so ProducerResolver (enhanced-resolve, exportsFields:['exports'], `.rzts` ahead of `.ts`) resolves a cross-package bare specifier. windowing.rzts + listCore.rzts are declared NOW (before their files exist) so P1/P2 only ADD source files, never edit this manifest. The smoke.rzts probe is the P0 boundary-proof partial.",
+  "exports": {
+    "./smoke.rzts": "./src/smoke.rzts",
+    "./windowing.rzts": "./src/windowing.rzts",
+    "./listCore.rzts": "./src/listCore.rzts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "echo 'source-only: no codegen, no compiled leaves (.rzts dissolve at consumer compile)'",
+    "test": "vitest run",
+    "typecheck": "echo 'source-only .rzts partials; consumers typecheck the inlined output'"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "@tanstack/virtual-core": "^3",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
+  }
+}

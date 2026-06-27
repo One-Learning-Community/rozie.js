@@ -1,0 +1,10 @@
+// smoke.rzts — Phase 64 P0 cross-package `.rzts` boundary probe.
+//
+// ONE trivial pure exported function: zero sigils, zero host-state contract. Its
+// only job is to isolate the cross-package resolve+inline MECHANISM (a bare
+// specifier `@rozie-ui/headless-core/smoke.rzts` inlined by inlineScriptPartials)
+// from any host-state coupling, so P0 can prove the boundary works ×6 BEFORE any
+// real windowing/listCore code moves here (P1/P2).
+const headlessCoreSmoke = (n) => n + 1;
+
+export { headlessCoreSmoke };
