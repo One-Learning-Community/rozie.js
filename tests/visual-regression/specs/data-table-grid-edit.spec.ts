@@ -305,6 +305,9 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-grid-edit [${target}]: B1 click-away to another grid cell commits+closes; grid stays navigable`, async ({ page }) => {
     await gotoGrid(page, target);
     await enterEditAt(page, 0, 0); // open the name editor
+    // Confirm the editor <input> actually holds focus before the click-away, else the blur
+    // (and the commit that rides it) never fires under container/worker load.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
     const before = await commitCount(page);
     await clickBodyCell(page, 1, 1); // click a DIFFERENT grid cell
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull(); // editor closed
@@ -325,6 +328,9 @@ for (const target of TARGETS) {
     await focusBodyCellStable(page, 0, 0);
     await page.keyboard.press('Z'); // type-to-edit: seeds the editor draft with 'Z'
     await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('0');
+    // Confirm the seeded editor <input> holds focus (caret AFTER the seeded char) before
+    // typing the rest, else the appended chars go nowhere under container/worker load.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
     await page.keyboard.type('eta'); // append into the now-open editor
     await expect.poll(async () => (await openEditor(page))?.value, { timeout: 10_000 }).toBe('Zeta');
     await mount.locator('[data-editing-cell]').press('Enter');
@@ -416,6 +422,8 @@ for (const target of TARGETS) {
   runnerFor(target)(`data-table-grid-edit [${target}]: B26 built-in editor commits on click-away`, async ({ page }) => {
     await gotoGrid(page, target);
     await enterEditAt(page, 0, 0); // built-in text editor
+    // Confirm the editor <input> holds focus before the click-away (else no blur → no commit).
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
     const before = await commitCount(page);
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
