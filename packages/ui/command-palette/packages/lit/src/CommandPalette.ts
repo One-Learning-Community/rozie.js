@@ -3,16 +3,16 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { adoptConsumerStyles, createLitControllableProperty, rozieDisplay } from '@rozie/runtime-lit';
 import { ref } from 'lit/directives/ref.js';
-import './Listbox';
+import './Combobox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// The filtered command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
 // substring and would drop the keyword matching + source-order grouping. A plain
 // function (called from the template binding AND handlers) — never $computed (the
-// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 
 interface RozieOptionSlotCtx {
@@ -146,7 +146,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) ariaLabel: string = 'Command palette';
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true }) idBase: string = 'rozie-command-palette';
   private _activeValue = signal(null);
@@ -242,13 +242,13 @@ private __rozieWatchInitial_0 = true;
 ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) => { this.onBackdropClick($event); }} data-rozie-s-768cad96>
   <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: Event) => { this.onPanelKeydown($event); }} data-rozie-ref="panel" data-rozie-s-768cad96>
     
-    <rozie-listbox .combobox=${true} .inline=${true} .filterable=${false} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .id=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onListboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onListboxSearch($event); }} data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onComboboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onComboboxSearch($event); }} data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}); } catch { return '{}'; } })()}>
           <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
           ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</slot>`}
       `} .empty=${(scope: { query: unknown }) => html`
         ${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}
-      `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-listbox>
+      `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>
 
     
     ${this._hasSlotFooter ? html`<div class="rozie-command-palette-footer" data-rozie-s-768cad96>
@@ -274,7 +274,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
   this._openControllable.write(false);
 };
 
-  onListboxChange = (e: any) => {
+  onComboboxChange = (e: any) => {
   const item = e ? e.option : null;
   if (!item || item.disabled) return;
   this.dispatchEvent(new CustomEvent("select", {
@@ -291,7 +291,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
   if (this.closeOnSelect) this.closePalette();
 };
 
-  onListboxSearch = (e: any) => {
+  onComboboxSearch = (e: any) => {
   this._queryControllable.write(e && e.query !== undefined ? e.query : '');
 };
 
@@ -302,14 +302,14 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
   focusInput = () => {
   const panel = this._refPanel;
   if (!panel) return;
-  const input = panel.querySelector('input') || panel.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
+  const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
   if (input && input.focus) input.focus();
 };
 
   onOpen = () => {
   this._queryControllable.write('');
   this._activeValue.value = null;
-  // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+  // Defer a tick so the overlay + <Combobox> are mounted before focusing.
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       this.focusInput();

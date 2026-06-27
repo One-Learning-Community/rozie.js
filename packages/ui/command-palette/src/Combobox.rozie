@@ -1,3 +1,6 @@
+<!-- GENERATED — do not edit. Vendored from @rozie-ui/combobox by codegen.
+     Re-run `pnpm --filter @rozie-ui/command-palette codegen` to refresh.
+     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->
 <!--
   Combobox.rozie — a headless, WAI-ARIA accessible combobox / autocomplete.
 

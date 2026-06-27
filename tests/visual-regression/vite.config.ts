@@ -501,24 +501,24 @@ export default defineConfig(async () => {
   resolve: {
     alias: [
       { find: /^@fullcalendar\/list$/, replacement: fullCalendarListEsm },
-      // Phase 999.4 — cross-family composition (Option B). command-palette's
-      // CommandPalette.rozie composes the listbox primitive via the STABLE D-07
-      // specifier `@rozie-ui/listbox/Listbox.rozie`. Compile-time `<components>`
+      // Phase 999.4 / P3 — cross-family composition (Option B). command-palette's
+      // CommandPalette.rozie composes the combobox primitive via the STABLE D-07
+      // specifier `@rozie-ui/combobox/Combobox.rozie`. Compile-time `<components>`
       // type-threading resolves that through the primitive's `exports` map
-      // (@rozie-ui/listbox devDep). But the EMITTED per-target import is
-      // ext-swapped to a cross-package specifier (`@rozie-ui/listbox/Listbox`,
-      // `…/Listbox.vue`, `…/Listbox.svelte`), and @rozie/unplugin's composition
+      // (@rozie-ui/combobox devDep). But the EMITTED per-target import is
+      // ext-swapped to a cross-package specifier (`@rozie-ui/combobox/Combobox`,
+      // `…/Combobox.vue`, `…/Combobox.svelte`), and @rozie/unplugin's composition
       // resolveId only routes LOCAL sibling `.rozie` imports — it has no
       // cross-package branch. Under codegen the specifier is remapped to the
       // LOCAL vendored sibling before compile, so the shipped leaf never hits
       // this; the VR harness compiles the RAW authored source, so we reproduce
-      // that vendoring here by aliasing every emitted `@rozie-ui/listbox/Listbox*`
+      // that vendoring here by aliasing every emitted `@rozie-ui/combobox/Combobox*`
       // import to command-palette's vendored copy (byte-identical to canonical
       // per the D-04 drift guard). The aliased `.rozie` path then flows through
       // the unplugin's standard `.rozie` → synthetic-id resolveId branch ×6.
       {
-        find: /^@rozie-ui\/listbox\/Listbox(\.\w+)?$/,
-        replacement: resolve(commandPaletteSrc, 'Listbox.rozie'),
+        find: /^@rozie-ui\/combobox\/Combobox(\.\w+)?$/,
+        replacement: resolve(commandPaletteSrc, 'Combobox.rozie'),
       },
     ],
   },

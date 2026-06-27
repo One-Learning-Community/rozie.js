@@ -2430,9 +2430,12 @@ importers:
 
   packages/ui/command-palette:
     devDependencies:
-      '@rozie-ui/listbox':
+      '@rozie-ui/combobox':
         specifier: workspace:*
-        version: link:../listbox
+        version: link:../combobox
+      '@rozie-ui/headless-core':
+        specifier: workspace:*
+        version: link:../headless-core
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core

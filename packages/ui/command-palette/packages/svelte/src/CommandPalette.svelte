@@ -1,5 +1,5 @@
 <script lang="ts">
-import Listbox from './Listbox.svelte';
+import Combobox from './Combobox.svelte';
 import { rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
@@ -37,7 +37,7 @@ interface Props {
    */
   ariaLabel?: string;
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any }]>;
@@ -78,33 +78,33 @@ let panel = $state<HTMLElement | undefined>(undefined);
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// The filtered command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
 // substring and would drop the keyword matching + source-order grouping. A plain
 // function (called from the template binding AND handlers) — never $computed (the
-// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// The filtered command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
 // substring and would drop the keyword matching + source-order grouping. A plain
 // function (called from the template binding AND handlers) — never $computed (the
-// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 const filteredItems = () => {
   const src = Array.isArray(items) ? items : [];
   return filterCommands(src, query);
 };
 
-// The vendored <Listbox> commits the OPTION's value; resolve each command's value
+// The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
-// the item's own `disabled` flag (listbox's default `.disabled` fallback already
+// the item's own `disabled` flag (combobox's default `.disabled` fallback already
 // handles it, but we pass an explicit resolver for clarity + safety on primitives).
-// The vendored <Listbox> commits the OPTION's value; resolve each command's value
+// The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
-// the item's own `disabled` flag (listbox's default `.disabled` fallback already
+// the item's own `disabled` flag (combobox's default `.disabled` fallback already
 // handles it, but we pass an explicit resolver for clarity + safety on primitives).
 const commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
 const commandDisabled = (it: any) => !!(it && it.disabled);
@@ -129,16 +129,16 @@ const closePalette = () => {
 };
 
 // ---- selection ---------------------------------------------------------
-// Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+// Combobox's `@change` fires `{ value, option }` on each commit. Re-emit the
 // PUBLIC `select` event with the chosen command and (optionally) close. The
 // `option` IS the original command item (we feed items straight through as
-// listbox options), so read its id/label/group directly.
+// combobox options), so read its id/label/group directly.
 // ---- selection ---------------------------------------------------------
-// Listbox's `@change` fires `{ value, option }` on each commit. Re-emit the
+// Combobox's `@change` fires `{ value, option }` on each commit. Re-emit the
 // PUBLIC `select` event with the chosen command and (optionally) close. The
 // `option` IS the original command item (we feed items straight through as
-// listbox options), so read its id/label/group directly.
-const onListboxChange = (e: any) => {
+// combobox options), so read its id/label/group directly.
+const onComboboxChange = (e: any) => {
   const item = e ? e.option : null;
   if (!item || item.disabled) return;
   onselect?.({
@@ -151,15 +151,15 @@ const onListboxChange = (e: any) => {
   if (closeOnSelect) closePalette();
 };
 
-// Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+// Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
 // then re-filters via filterCommands (keyword-aware). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
-// Listbox's `@search` fires `{ query }` as the user types in its combobox input.
+// Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
 // then re-filters via filterCommands (keyword-aware). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
-const onListboxSearch = (e: any) => {
+const onComboboxSearch = (e: any) => {
   query = e && e.query !== undefined ? e.query : '';
 };
 
@@ -170,33 +170,33 @@ const onBackdropClick = (e: any) => {
 };
 
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Listbox>'s combobox <input>; focusing it fires the
-// listbox's `@focus="open"` → the popup opens (the screenshot demo seeds the
+// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
 // palette open, so this runs on mount). The five light-DOM targets render the
 // input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Listbox> compiles to a `<rozie-listbox>` CUSTOM ELEMENT whose input
+// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
 // lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
 // palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.listbox.focusControl()` handle call
+// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
 // would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ListboxHandle).
+// component ref types inconsistently across targets, not as the ComboboxHandle).
 // $refs read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Listbox>'s combobox <input>; focusing it fires the
-// listbox's `@focus="open"` → the popup opens (the screenshot demo seeds the
+// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
 // palette open, so this runs on mount). The five light-DOM targets render the
 // input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Listbox> compiles to a `<rozie-listbox>` CUSTOM ELEMENT whose input
+// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
 // lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
 // palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.listbox.focusControl()` handle call
+// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
 // would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ListboxHandle).
+// component ref types inconsistently across targets, not as the ComboboxHandle).
 // $refs read in a post-mount callback only (ROZ123-safe).
 const focusInput = () => {
   const panel$local = panel;
   if (!panel$local) return;
-  const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
+  const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
   if (input && input.focus) input.focus();
 };
 
@@ -207,7 +207,7 @@ const focusInput = () => {
 const onOpen = () => {
   query = '';
   activeValue = null;
-  // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+  // Defer a tick so the overlay + <Combobox> are mounted before focusing.
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       focusInput();
@@ -218,7 +218,7 @@ const onOpen = () => {
 };
 
 // ---- lifecycle ---------------------------------------------------------
-// Escape closes from anywhere in the panel (the vendored <Listbox> only closes
+// Escape closes from anywhere in the panel (the vendored <Combobox> only closes
 // its own popup on Escape; the palette overlay close is command-palette's).
 const onPanelKeydown = (e: any) => {
   if (e && e.key === 'Escape') {
@@ -230,13 +230,13 @@ const onPanelKeydown = (e: any) => {
 // ---- imperative handle -------------------------------------------------
 // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
-// onto the generated open/setOpen state). focus() focuses the vendored listbox's
+// onto the generated open/setOpen state). focus() focuses the vendored combobox's
 // control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
 // $refs safe.
 // ---- imperative handle -------------------------------------------------
 // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
-// onto the generated open/setOpen state). focus() focuses the vendored listbox's
+// onto the generated open/setOpen state). focus() focuses the vendored combobox's
 // control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
 // $refs safe.
 export const show = () => {
@@ -260,7 +260,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Listbox combobox={true} inline={true} filterable={false} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} id={idBase} bind:value={activeValue} onchange={($event) => { onListboxChange($event); }} onsearch={($event) => { onListboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Listbox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {

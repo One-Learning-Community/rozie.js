@@ -1,17 +1,17 @@
 import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
-import { Listbox } from './Listbox';
+import { Combobox } from './Combobox';
 
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// The filtered command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
 // substring and would drop the keyword matching + source-order grouping. A plain
 // function (called from the template binding AND handlers) — never $computed (the
-// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 
 interface OptionCtx {
@@ -53,14 +53,14 @@ function __rozieAttr(v: unknown): string | null {
 @Component({
   selector: 'rozie-command-palette',
   standalone: true,
-  imports: [NgTemplateOutlet, Listbox],
+  imports: [NgTemplateOutlet, Combobox],
   template: `
 
     @if (open()) {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onPanelKeydown($event)">
         
-        <rozie-listbox [combobox]="true" [inline]="true" [filterable]="false" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [id]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onListboxChange($event)" (search)="onListboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+        <rozie-combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled }, option: option, index: index, active: active, selected: selected, disabled: disabled }" />
     } @else {
@@ -76,7 +76,7 @@ function __rozieAttr(v: unknown): string | null {
     } @else {
     {{ emptyText() }}
     }
-          </ng-template></rozie-listbox>
+          </ng-template></rozie-combobox>
 
         
         @if ((footerTpl ?? templates()?.['footer'])) {
@@ -205,7 +205,7 @@ export class CommandPalette {
    */
   ariaLabel = input<string>('Command palette');
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase = input<string>('rozie-command-palette');
   activeValue = signal<any>(null);
@@ -239,7 +239,7 @@ export class CommandPalette {
   closePalette = () => {
     this.open.set(false);
   };
-  onListboxChange = (e: any) => {
+  onComboboxChange = (e: any) => {
     const item = e ? e.option : null;
     if (!item || item.disabled) return;
     this.select.emit({
@@ -251,7 +251,7 @@ export class CommandPalette {
     this.activeValue.set(null);
     if (this.closeOnSelect()) this.closePalette();
   };
-  onListboxSearch = (e: any) => {
+  onComboboxSearch = (e: any) => {
     this.query.set(e && e.query !== undefined ? e.query : '');
   };
   onBackdropClick = (e: any) => {
@@ -260,13 +260,13 @@ export class CommandPalette {
   focusInput = () => {
     const panel = this.panel()?.nativeElement;
     if (!panel) return;
-    const input = panel.querySelector('input') || panel.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
+    const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
     if (input && input.focus) input.focus();
   };
   onOpen = () => {
     this.query.set('');
     this.activeValue.set(null);
-    // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+    // Defer a tick so the overlay + <Combobox> are mounted before focusing.
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         this.focusInput();

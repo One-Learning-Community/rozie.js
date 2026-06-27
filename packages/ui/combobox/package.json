@@ -4,6 +4,11 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "comment:exports": "vendorable: true (D-02 / P3). A vendorable primitive exposes its canonical .rozie source under a STABLE subpath so the D-07 <components> specifier `@rozie-ui/combobox/Combobox.rozie` resolves via ProducerResolver (enhanced-resolve, exportsFields:['exports']) for every NON-codegen consumer — the VR harness, the IDE LSP, and any consumer that compiles the composite from raw source. command-palette vendors this primitive (P3/D-03). Codegen itself remaps the specifier to the local vendored sibling in-memory before compile.",
+  "exports": {
+    "./Combobox.rozie": "./src/Combobox.rozie",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "node scripts/codegen.mjs",
     "test": "vitest run",

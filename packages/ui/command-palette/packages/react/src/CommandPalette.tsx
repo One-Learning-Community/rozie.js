@@ -2,16 +2,16 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ReactNode } from 'react';
 import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './CommandPalette.css';
-import Listbox from './Listbox';
+import Combobox from './Combobox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Listbox> as its `:options`.
+// The filtered command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Listbox :filterable="false"> — listbox's built-in filter is label-only
+// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
 // substring and would drop the keyword matching + source-order grouping. A plain
 // function (called from the template binding AND handlers) — never $computed (the
-// listbox value-vs-accessor split). Each item is passed through verbatim; listbox
+// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 
 interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; }
@@ -54,7 +54,7 @@ interface CommandPaletteProps {
    */
   ariaLabel?: string;
   /**
-   * Id base for the listbox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   onSelect?: (...args: any[]) => void;
@@ -123,7 +123,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setOpen(false);
   }
   const { onSelect: _rozieProp_onSelect } = props;
-    const onListboxChange = useCallback((e: any) => {
+    const onComboboxChange = useCallback((e: any) => {
     const item = e ? e.option : null;
     if (!item || item.disabled) return;
     _rozieProp_onSelect && _rozieProp_onSelect({
@@ -135,7 +135,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setActiveValue(null);
     if (props.closeOnSelect) closePalette();
   }, [_rozieProp_onSelect, closePalette, props.closeOnSelect]);
-  const onListboxSearch = useCallback((e: any) => {
+  const onComboboxSearch = useCallback((e: any) => {
     setQuery(e && e.query !== undefined ? e.query : '');
   }, [setQuery]);
   const onBackdropClick = useCallback((e: any) => {
@@ -144,13 +144,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function focusInput() {
     const panel$local = panel.current;
     if (!panel$local) return;
-    const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-listbox')?.shadowRoot?.querySelector('input');
+    const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
     if (input && input.focus) input.focus();
   }
   const onOpen = useCallback(() => {
     setQuery('');
     setActiveValue(null);
-    // Defer a tick so the overlay + <Listbox> are mounted before focusing.
+    // Defer a tick so the overlay + <Combobox> are mounted before focusing.
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         focusInput();
@@ -196,7 +196,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     {(open) && <div className={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       <div ref={panel} className={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={props.ariaLabel} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
-        <Listbox combobox={true} inline={true} filterable={false} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={props.placeholder} aria-label={props.ariaLabel} id={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onListboxChange($event); }} onSearch={($event) => { onListboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        <Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={props.placeholder} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled }) : <><span className={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>{(groupText(option)) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</>}
           </>)} renderEmpty={({ query }) => (<>
             {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : props.emptyText}
