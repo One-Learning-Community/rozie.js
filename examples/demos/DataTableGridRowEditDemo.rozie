@@ -1,0 +1,212 @@
+<!--
+  DataTableGridRowEditDemo.rozie — Phase 63 Wave-2 (row-mode-edit + commit-under-sort)
+  RED-first fixture.
+
+  Drives the three row-edit-cluster bugs across all six targets via
+  data-table-grid-rowedit.spec.ts:
+    B21 — row-mode Tab escapes the editing row → editingRowIndex stays set, grid nav frozen.
+    B22 — a row-mode validation failure focuses the FIRST editor, not the OFFENDING cell.
+    B23 — a single-cell commit under an active sort relocates the row but DROPS/loses
+          DOM focus (the index-addressed focus return lands on the OLD visible index).
+
+  A SINGLE DataTable in interactionMode='grid' with FOUR editable columns:
+    0 name   — built-in text editor    (sortable)
+    1 qty    — built-in number editor   (sortable; carries a `validate` rule rejecting 13)
+    2 status — built-in select editor
+    3 city   — built-in text editor     (LAST editable col → B21 Tab-cycle boundary)
+
+  `r-model:data` binds the dataset so the spec asserts the COMMITTED model values; a
+  bound `r-model:sorting` + a "sort qty ↑" button drives an ACTIVE sort (B23); a global
+  filter input is wired for completeness. `editRow(0)` enters full-row edit (the API twin
+  of Shift+F2) so B21/B22 can exercise the multi-editor row deterministically.
+
+  Static dataset (no clock/random) for VR determinism. No loop var / slot named
+  row/cell/header (the Svelte mount-throw discipline) — the #cell slot binds value/columnId.
+-->
+
+<rozie name="DataTableGridRowEditDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Static dataset — qty chosen so an asc sort reorders the rows and a single edit can
+  // relocate a row to the bottom (B23). Source order A,B,C,D (row.id = source index).
+  rows: [
+    { id: 1, name: 'Alpha', qty: 5, status: 'active',   city: 'Oslo'   },
+    { id: 2, name: 'Beta',  qty: 8, status: 'archived', city: 'Lima'   },
+    { id: 3, name: 'Gamma', qty: 2, status: 'active',   city: 'Cairo'  },
+    { id: 4, name: 'Delta', qty: 9, status: 'pending',  city: 'Tokyo'  },
+  ],
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'archived', label: 'Archived' },
+    { value: 'pending',  label: 'Pending' },
+  ],
+  // Two-way sort slice — the "sort qty ↑" button writes it so the spec runs B23 under an
+  // ACTIVE sort.
+  sorting: [],
+  // Two-way global filter (wired for completeness; the spec's B23 uses the sort).
+  globalFilter: '',
+  // Last cell-edit-commit "columnId=newValue" + a counter (one per commit, D-07).
+  lastCommit: '',
+  commitCount: 0,
+  // Last row-edit-commit "col=value;…" (changed cols, sorted) + a counter.
+  lastRowCommit: '',
+  rowCommitCount: 0,
+  // Best-effort editing-row readout: the demo sets it when it drives editRow(N) and clears
+  // it on a row-edit-commit (the child's internal editingRowIndex is not exposed). The spec
+  // primarily reads the DOM (the live [data-editing-cell] editors), this is a convenience.
+  rowEditing: '',
+}
+</data>
+
+<script lang="ts">
+// cell-edit-commit → "columnId=newValue" readout + counter. Payload arrives as arg0
+// directly (the @emit consumer contract — NOT a wrapped CustomEvent).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// row-edit-commit → "col=value;col=value" (changed cols only, SORTED for determinism) +
+// a counter. Clears the editing-row readout (the row committed → no longer editing).
+const onRowEditCommit = (payload: { rowId: unknown; changes: { columnId: string; oldValue: unknown; newValue: unknown }[] }): void => {
+  const changes = payload && payload.changes ? payload.changes : []
+  const parts = changes.map((c) => c.columnId + '=' + String(c.newValue))
+  parts.sort()
+  $data.lastRowCommit = parts.join(';')
+  $data.rowCommitCount = $data.rowCommitCount + 1
+  $data.rowEditing = ''
+}
+
+// qty validator (B22 / D-01): reject the sentinel value 13. Returns true | string. The
+// row-mode draft carries the raw editor string, so coerce via Number first.
+const validateQty = (value: unknown): true | string => {
+  return Number(value) === 13 ? 'no 13' : true
+}
+
+// Enter full-row edit on visible row 0 via the editRow $expose verb (the API twin of
+// Shift+F2). Resolve the handle at CALL time (never cache — the GridNavDemo lesson).
+const callEditRow = (): void => {
+  const api = $refs.dt
+  if (api && api.editRow) { api.editRow(0); $data.rowEditing = '0' }
+}
+
+// Apply an ascending sort on qty (the ACTIVE sort B23 commits under). Writing the bound
+// sorting slice re-derives the row model.
+const sortByQtyAsc = (): void => {
+  $data.sorting = [{ id: 'qty', desc: false }]
+}
+</script>
+
+<template>
+<div class="dt-grid-rowedit-demo">
+  <h3>DataTable — grid-mode row editing</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="edit-row" @click="callEditRow">editRow(0)</button>
+    <button type="button" data-testid="sort-qty" @click="sortByQtyAsc">sort qty ↑</button>
+    <input
+      class="gf"
+      type="text"
+      data-testid="global-filter"
+      placeholder="filter"
+      r-model="$data.globalFilter"
+    />
+    <span class="label">commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+    <span class="label">row-commit:</span>
+    <span class="readout" data-testid="row-commit-readout">{{ $data.lastRowCommit }}</span>
+    <span class="label">row-commit-count:</span>
+    <span class="readout" data-testid="row-commit-count">{{ $data.rowCommitCount }}</span>
+    <span class="label">row-editing:</span>
+    <span class="readout" data-testid="row-editing">{{ $data.rowEditing }}</span>
+  </div>
+
+  <!-- The COMMITTED model, JSON-dumped, so the spec asserts VALUES + relocation. -->
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      r-model:sorting="$data.sorting"
+      r-model:globalFilter="$data.globalFilter"
+      @cell-edit-commit="onCellEditCommit($event)"
+      @row-edit-commit="onRowEditCommit($event)"
+    >
+      <Column field="name"   header="Name"   sortable :editable="true" editor="text" />
+      <Column field="qty"    header="Qty"    sortable :editable="true" editor="number" :validate="validateQty" />
+      <Column
+        field="status"
+        header="Status"
+        :editable="true"
+        editor="select"
+        :editorOptions="$data.statusOptions"
+      />
+      <Column field="city"   header="City"   :editable="true" editor="text" />
+
+      <!-- Read-only display slot. -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-rowedit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 640px;
+}
+.dt-grid-rowedit-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button,
+.controls .gf {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .gf { cursor: text; }
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>

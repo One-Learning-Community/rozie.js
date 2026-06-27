@@ -648,6 +648,18 @@ export const EXAMPLES = [
   // build-cells demos sweep already cover it, importing the data-table source pkg already
   // registered for Angular cross-tree AOT in phase 48).
   'DataTableGridEdit',
+  // Phase 63 Wave-2 (grid-mode row-edit + commit-under-sort correctness) — the
+  // row-edit-cluster RED-first fixture (loader → examples/demos/DataTableGridRowEditDemo.rozie,
+  // importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie). ONE grid-mode
+  // DataTable with four editable columns (name/qty/status/city) + a `validate` rule on qty +
+  // a bound r-model:sorting driving an active sort, so data-table-grid-rowedit.spec.ts asserts
+  // B21 (row Tab containment), B22 (validation focuses the offending cell), B23 (commit under
+  // sort follows the relocated row's focus). Behavioral-only; NOT in matrix.spec.ts EXAMPLES
+  // (no pixel baseline). Lives under examples/demos/ so no new Angular 3-file registration is
+  // needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig include + the glob-driven
+  // build-cells demos sweep already cover it, importing the data-table source pkg already
+  // registered for Angular cross-tree AOT in phase 48).
+  'DataTableGridRowEdit',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1004,6 +1016,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid-mode cell-edit — '-demo' appended on Lit →
   // 'rozie-data-table-grid-edit-demo' = kebab of DataTableGridEditDemo.
   DataTableGridEdit: 'rozie-data-table-grid-edit',
+  // Phase 63 grid-mode row-edit — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-row-edit-demo' = kebab of DataTableGridRowEditDemo.
+  DataTableGridRowEdit: 'rozie-data-table-grid-row-edit',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
