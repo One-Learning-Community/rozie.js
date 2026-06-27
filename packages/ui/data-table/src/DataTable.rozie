@@ -526,11 +526,10 @@
   // activeIsHeader is true; a flat grid has a single level (0), so the flat/table path is
   // unchanged. Pairs with activeColIndex (the index within THAT level's headers).
   activeHeaderLevel: 0,
-  // gridEmptyFallback: true while the active cell is parked on the empty-grid header fallback
-  // (B6 — an all-filtered body has no cell to hold the roving tab-stop). Set by clampActiveCell
-  // when the body shrinks to zero; cleared (and a body cell re-seated) on the next non-empty
-  // refresh so the roving tab-stop recovers onto a real body cell.
-  gridEmptyFallback: false,
+  // NB: the B6 empty-grid header-fallback flag is NOT a $data field — it is the plain
+  // component-scope `let gridEmptyFallback` (declared after the gridKeydownHandlers import).
+  // clampActiveCell is reached via the mount-time refreshRowModel closure, so a $data read there
+  // is async-stale on React (it skipped the empty→non-empty recovery); a plain `let` reads fresh.
   // activeInControl: navigation (false) vs interaction (true) mode (D-07). Plan 03 drives
   // the Enter/F2-to-enter / Escape-to-exit transition; this field reserves the state.
   activeInControl: false,
@@ -1098,6 +1097,20 @@ import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection,
 import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
+
+// B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
+// flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
+// plain component-scope `let` (React hoists to useRef), NOT a $data reactive field: clampActiveCell
+// is reached through the mount-time refreshRowModel closure, so a `$data.gridEmptyFallback` READ
+// there binds the async-stale mount-time value on React (setState is async — the rangeActive /
+// pendingEditFollow / B23-nextRows stale-read class). With the body re-populated after a filter
+// CLEAR, that stale read skipped the recovery branch on React → the roving tab-stop stayed on the
+// header fallback (columnheader) instead of re-seating a body cell (the B6 recovery gap). A
+// synchronously-written plain `let` is read fresh on all six → the empty→non-empty recovery
+// re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
+// already read reactive $data synchronously). A top-level reassigned `let` referenced from the
+// refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
+let gridEmptyFallback = false
 
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
 // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS

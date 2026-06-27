@@ -499,7 +499,6 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _activeColIndex = signal(0);
   private _activeIsHeader = signal(false);
   private _activeHeaderLevel = signal(0);
-  private _gridEmptyFallback = signal(false);
   private _activeInControl = signal(false);
   private _editingRow = signal(-1);
   private _editingCol = signal(-1);
@@ -2978,7 +2977,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._activeIsHeader.value = true;
     this._activeHeaderLevel.value = this.headerLeafLevel();
     this._activeColIndex.value = 0;
-    this._gridEmptyFallback.value = true;
+    // B6 — `gridEmptyFallback` is a plain component-scope `let` (NOT $data): clampActiveCell is
+    // reached through the mount-time refreshRowModel closure, so a `$data` READ here binds the
+    // async-stale mount-time value on React (setState is async — the rangeActive / B23-nextRows
+    // class). A synchronously-written plain `let` is read FRESH on all six so the empty→non-empty
+    // recovery branch below actually runs on React too.
+    this.gridEmptyFallback = true;
     this.clampRange(rowN - 1, colN - 1);
     // B25 does NOT actively focus in the EMPTY-grid case: B6 already keeps the grid keyboard-
     // reachable via the roving tab-stop on the header fallback (a tabindex=0, not a focus grab).
@@ -2990,8 +2994,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
   // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
   // cell. A user-driven header position (not the empty fallback) is left untouched.
-  if (this._gridEmptyFallback.value) {
-    this._gridEmptyFallback.value = false;
+  if (this.gridEmptyFallback) {
+    this.gridEmptyFallback = false;
     this._activeIsHeader.value = false;
     this._activeRow.value = 0;
   }
@@ -3014,6 +3018,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.recoverGridFocus(String(recRow), recCol, null);
   }
 };
+
+  gridEmptyFallback = false;
 
   rangeTransition = false;
 

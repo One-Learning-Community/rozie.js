@@ -256,6 +256,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const expandedTouched = useRef(false);
   const programmatic = useRef(0);
   const remeasurePending = useRef(false);
+  const gridEmptyFallback = useRef(false);
   const rangeActive = useRef(false);
   const selectAllBox = useRef<any>(null);
   const fillDragMove = useRef<any>(null);
@@ -373,7 +374,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [activeColIndex, setActiveColIndex] = useState(0);
   const [activeIsHeader, setActiveIsHeader] = useState(false);
   const [activeHeaderLevel, setActiveHeaderLevel] = useState(0);
-  const [gridEmptyFallback, setGridEmptyFallback] = useState(false);
   const [activeInControl, setActiveInControl] = useState(false);
   const [editingRow, setEditingRow] = useState(-1);
   const [editingCol, setEditingCol] = useState(-1);
@@ -2070,7 +2070,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setActiveIsHeader(true);
       setActiveHeaderLevel(headerLeafLevel());
       setActiveColIndex(0);
-      setGridEmptyFallback(true);
+      // B6 — `gridEmptyFallback` is a plain component-scope `let` (NOT $data): clampActiveCell is
+      // reached through the mount-time refreshRowModel closure, so a `$data` READ here binds the
+      // async-stale mount-time value on React (setState is async — the rangeActive / B23-nextRows
+      // class). A synchronously-written plain `let` is read FRESH on all six so the empty→non-empty
+      // recovery branch below actually runs on React too.
+      gridEmptyFallback.current = true;
       clampRange(rowN - 1, colN - 1);
       // B25 does NOT actively focus in the EMPTY-grid case: B6 already keeps the grid keyboard-
       // reachable via the roving tab-stop on the header fallback (a tabindex=0, not a focus grab).
@@ -2082,8 +2087,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
     // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
     // cell. A user-driven header position (not the empty fallback) is left untouched.
-    if (gridEmptyFallback) {
-      setGridEmptyFallback(false);
+    if (gridEmptyFallback.current) {
+      gridEmptyFallback.current = false;
       setActiveIsHeader(false);
       setActiveRow(0);
     }
@@ -2105,7 +2110,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const recCol = clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
       recoverGridFocus(String(recRow), recCol, null);
     }
-  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, gridEmptyFallback, headerLeafLevel, isGrid, recoverGridFocus, visibleColCount]);
+  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, headerLeafLevel, isGrid, recoverGridFocus, visibleColCount]);
   // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
   // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
   // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the

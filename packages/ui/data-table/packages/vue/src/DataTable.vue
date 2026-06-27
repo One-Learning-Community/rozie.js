@@ -367,7 +367,6 @@ const activeRow = ref(0);
 const activeColIndex = ref(0);
 const activeIsHeader = ref(false);
 const activeHeaderLevel = ref(0);
-const gridEmptyFallback = ref(false);
 const activeInControl = ref(false);
 const editingRow = ref(-1);
 const editingCol = ref(-1);
@@ -3216,7 +3215,12 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     activeIsHeader.value = true;
     activeHeaderLevel.value = headerLeafLevel();
     activeColIndex.value = 0;
-    gridEmptyFallback.value = true;
+    // B6 — `gridEmptyFallback` is a plain component-scope `let` (NOT $data): clampActiveCell is
+    // reached through the mount-time refreshRowModel closure, so a `$data` READ here binds the
+    // async-stale mount-time value on React (setState is async — the rangeActive / B23-nextRows
+    // class). A synchronously-written plain `let` is read FRESH on all six so the empty→non-empty
+    // recovery branch below actually runs on React too.
+    gridEmptyFallback = true;
     clampRange(rowN - 1, colN - 1);
     // B25 does NOT actively focus in the EMPTY-grid case: B6 already keeps the grid keyboard-
     // reachable via the roving tab-stop on the header fallback (a tabindex=0, not a focus grab).
@@ -3228,8 +3232,8 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
   // re-seat a valid BODY active cell (row 0) so the roving tab-stop lands back on a real body
   // cell. A user-driven header position (not the empty fallback) is left untouched.
-  if (gridEmptyFallback.value) {
-    gridEmptyFallback.value = false;
+  if (gridEmptyFallback) {
+    gridEmptyFallback = false;
     activeIsHeader.value = false;
     activeRow.value = 0;
   }
@@ -3252,6 +3256,32 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     recoverGridFocus(String(recRow), recCol, null);
   }
 };
+
+// B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
+// flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
+// plain component-scope `let` (React hoists to useRef), NOT a $data reactive field: clampActiveCell
+// is reached through the mount-time refreshRowModel closure, so a `$data.gridEmptyFallback` READ
+// there binds the async-stale mount-time value on React (setState is async — the rangeActive /
+// pendingEditFollow / B23-nextRows stale-read class). With the body re-populated after a filter
+// CLEAR, that stale read skipped the recovery branch on React → the roving tab-stop stayed on the
+// header fallback (columnheader) instead of re-seating a body cell (the B6 recovery gap). A
+// synchronously-written plain `let` is read fresh on all six → the empty→non-empty recovery
+// re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
+// already read reactive $data synchronously). A top-level reassigned `let` referenced from the
+// refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
+// B6 (phase 63 wave-11) — "the active cell is parked on the empty-grid header fallback" control
+// flag, written + read ONLY inside clampActiveCell (never bound in the template). It MUST be a
+// plain component-scope `let` (React hoists to useRef), NOT a $data reactive field: clampActiveCell
+// is reached through the mount-time refreshRowModel closure, so a `$data.gridEmptyFallback` READ
+// there binds the async-stale mount-time value on React (setState is async — the rangeActive /
+// pendingEditFollow / B23-nextRows stale-read class). With the body re-populated after a filter
+// CLEAR, that stale read skipped the recovery branch on React → the roving tab-stop stayed on the
+// header fallback (columnheader) instead of re-seating a body cell (the B6 recovery gap). A
+// synchronously-written plain `let` is read fresh on all six → the empty→non-empty recovery
+// re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
+// already read reactive $data synchronously). A top-level reassigned `let` referenced from the
+// refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
+let gridEmptyFallback = false;
 
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
 // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
