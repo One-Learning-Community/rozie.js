@@ -3289,6 +3289,26 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setActiveRow(r);
     beginRowEdit(row);
   }
+  function focusAbsCellWhenReady(absRow: any, localRow: any, col: any) {
+    if (!gridRoot.current) return;
+    let attempts = 0;
+    const want = String(absRow + 1);
+    const tryFocus = () => {
+      const el = resolveCellEl(String(localRow), col);
+      if (el) {
+        const rowEl = el.closest ? el.closest('[role="row"]') : null;
+        const ari = rowEl ? rowEl.getAttribute('aria-rowindex') : null;
+        if (ari === want) {
+          el.focus();
+          return;
+        }
+      }
+      attempts = attempts + 1;
+      if (attempts >= 60) return;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+  }
   function focusCell(rowIndex: any, colIndex: any) {
     // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
     // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
@@ -3328,9 +3348,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setActiveRow(localRow);
       setActiveColIndex(c);
       if (switched) {
-        // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
-        // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
-        focusCellWhenReady(localRow, c);
+        // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
+        // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
+        // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+        focusAbsCellWhenReady(absRow, localRow, c);
       } else {
         // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
         // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular
@@ -3719,7 +3740,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           <td colSpan={(visibleColCount()) ?? undefined} style={parseInlineStyle('height:' + padTop() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />
         </tr>
         
-        {windowedRows().map((wr) => <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={rozieAttr(wr.vi.index + 1)} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
+        {windowedRows().map((wr) => <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(wr.row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cellCtx))} tabIndex={(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined} style={parseInlineStyle(pinStyle(cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined)} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectCell ?? props.slots?.['selectCell']) ? ((props.renderSelectCell ?? props.slots?.['selectCell']) as Function)({ row: wr.row.original, checked: rowIsSelected(wr.row), toggle: e => onToggleRow(wr.row, e) }) : <input className={"rdt-select-row"} type="checkbox" aria-label="Select row" checked={rowIsSelected(wr.row)} onChange={($event) => { onToggleRow(wr.row, $event); }} data-rozie-s-d5dcab4c="" />}
@@ -3738,7 +3759,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
       </tbody>
     </table>
-    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rozieAttr(totalRowCount())} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
+    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={(totalRowCount()) ?? undefined} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
@@ -3774,7 +3795,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         {rows.map((row) => <Fragment key={row.id}>
-        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : undefined)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
+        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

@@ -5079,6 +5079,51 @@ const editRow = (rowIndex: any) => {
 // `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
 // any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
 
+// focusAbsCellWhenReady — paginated page-switch focus poll (C1). After a programmatic page
+// switch the in-page (localRow, col) cell is ambiguous: EVERY page renders a row at the same
+// page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
+// cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
+// REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
+// the cell at (localRow, col) carries aria-rowindex === absRow+1 (i.e. the TARGET page has
+// actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works for both
+// controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames (~1s) to
+// cover the controlled-state parent round-trip on React/Solid/Lit.
+// ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
+// existing 12 (→ 15). Collision-safe names (Pitfall 1): focusCell NOT `focus` (would shadow
+// HTMLElement.focus on Lit — ROZ137); clearActiveCell NOT `clear` (listbox already exposes
+// `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
+// any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
+
+// focusAbsCellWhenReady — paginated page-switch focus poll (C1). After a programmatic page
+// switch the in-page (localRow, col) cell is ambiguous: EVERY page renders a row at the same
+// page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
+// cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
+// REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
+// the cell at (localRow, col) carries aria-rowindex === absRow+1 (i.e. the TARGET page has
+// actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works for both
+// controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames (~1s) to
+// cover the controlled-state parent round-trip on React/Solid/Lit.
+const focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
+  if (!gridRoot) return;
+  let attempts = 0;
+  const want = String(absRow + 1);
+  const tryFocus = () => {
+    const el = resolveCellEl(String(localRow), col);
+    if (el) {
+      const rowEl = el.closest ? el.closest('[role="row"]') : null;
+      const ari = rowEl ? rowEl.getAttribute('aria-rowindex') : null;
+      if (ari === want) {
+        el.focus();
+        return;
+      }
+    }
+    attempts = attempts + 1;
+    if (attempts >= 60) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
 // focusCell(rowIndex, colIndex) — move + focus the active cell. C1 (phase 63 wave-6): rowIndex
 // is the ABSOLUTE display-order position in getPrePaginationRowModel().rows (filter+sort+expand
 // applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes — REVERSING the old
@@ -5086,12 +5131,6 @@ const editRow = (rowIndex: any) => {
 // data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
 // the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
 // speak the SAME absolute language (toAbsRow).
-// ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
-// existing 12 (→ 15). Collision-safe names (Pitfall 1): focusCell NOT `focus` (would shadow
-// HTMLElement.focus on Lit — ROZ137); clearActiveCell NOT `clear` (listbox already exposes
-// `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
-// any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
-
 // focusCell(rowIndex, colIndex) — move + focus the active cell. C1 (phase 63 wave-6): rowIndex
 // is the ABSOLUTE display-order position in getPrePaginationRowModel().rows (filter+sort+expand
 // applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes — REVERSING the old
@@ -5138,9 +5177,10 @@ const focusCell = (rowIndex: any, colIndex: any) => {
     activeRow.value = localRow;
     activeColIndex.value = c;
     if (switched) {
-      // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
-      // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
-      focusCellWhenReady(localRow, c);
+      // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
+      // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
+      // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+      focusAbsCellWhenReady(absRow, localRow, c);
     } else {
       // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
       // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular

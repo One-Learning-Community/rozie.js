@@ -1,6 +1,10 @@
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+
+// tests/visual-regression/package.json sets "type": "module".
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Phase 63 Wave-6 (C1 LOCKED) — ABSOLUTE-INDEX addressing, cross-mode parity battery.
@@ -149,26 +153,26 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => activeReadout.textContent(), { timeout: 15_000 })
       .toBe('7,1');
-    // DOM focus landed on a real gridcell of the switched-in page.
+    // DOM focus landed on a real gridcell of the switched-in page, and that focused cell's
+    // owning row is abs row 7 → aria-rowindex 8 (read BEFORE the handle buttons steal focus).
     await expect
       .poll(async () => (await activeCellCoords(page))?.role, { timeout: 15_000 })
       .toBe('gridcell');
-
-    // getActiveCell() reads the same ABSOLUTE index pair back through the handle.
-    await page.getByTestId('call-getactivecell').click();
     await expect
-      .poll(async () => getActiveReadout.textContent(), { timeout: 15_000 })
-      .toBe('7,1');
+      .poll(async () => (await activeCellCoords(page))?.ariaRowIndex, { timeout: 15_000 })
+      .toBe('8');
 
     // B27: page-3 rows carry ABSOLUTE aria-rowindex 7/8/9 (RED pre-fix: non-virtual rows have
     // NO aria-rowindex at all → null).
     await expect
       .poll(async () => bodyAriaRowIndices(page), { timeout: 15_000 })
       .toEqual(['7', '8', '9']);
-    // The focused cell's owning row is abs row 7 → aria-rowindex 8.
+
+    // getActiveCell() reads the same ABSOLUTE index pair back through the handle.
+    await page.getByTestId('call-getactivecell').click();
     await expect
-      .poll(async () => (await activeCellCoords(page))?.ariaRowIndex, { timeout: 15_000 })
-      .toBe('8');
+      .poll(async () => getActiveReadout.textContent(), { timeout: 15_000 })
+      .toBe('7,1');
 
     // converter: getRowIndexRelativeToPage() → 7 - 2*3 = 1 (RED pre-fix: verb undefined → '').
     await page.getByTestId('call-relindex').click();

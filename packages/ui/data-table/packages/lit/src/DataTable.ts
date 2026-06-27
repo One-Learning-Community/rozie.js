@@ -4242,6 +4242,27 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this.beginRowEdit(row);
 };
 
+  focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
+  if (!this.gridRoot) return;
+  let attempts = 0;
+  const want = String(absRow + 1);
+  const tryFocus = () => {
+    const el = this.resolveCellEl(String(localRow), col);
+    if (el) {
+      const rowEl = el.closest ? el.closest('[role="row"]') : null;
+      const ari = rowEl ? rowEl.getAttribute('aria-rowindex') : null;
+      if (ari === want) {
+        el.focus();
+        return;
+      }
+    }
+    attempts = attempts + 1;
+    if (attempts >= 60) return;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 16);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
+};
+
   focusCell = (rowIndex: any, colIndex: any) => {
   // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
   // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
@@ -4281,9 +4302,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._activeRow.value = localRow;
     this._activeColIndex.value = c;
     if (switched) {
-      // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
-      // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
-      this.focusCellWhenReady(localRow, c);
+      // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
+      // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
+      // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+      this.focusAbsCellWhenReady(absRow, localRow, c);
     } else {
       // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
       // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular

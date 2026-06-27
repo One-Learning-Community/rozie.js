@@ -156,7 +156,34 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
   'rows',
   'span',
   'start',
+  // Numeric grid/treegrid ARIA attributes — React's `AriaAttributes` types these
+  // `number | undefined`. A nullish-droppable binding (`x ? n : null`) routed through
+  // `rozieAttr` widens to `string | undefined` → TS2322 against the `number` slot (the
+  // data-table `aria-rowindex` class — same shape as the resizable `aria-valuenow` backlog,
+  // which is left to its own slider/resizable re-emit). The `?? undefined` numeric path
+  // preserves the `number | undefined` type AND the nullish-drop (a `null`/`undefined` value
+  // → the JSX omits the attribute), matching the `rozieAttr` drop without the string widening.
+  'aria-rowindex',
+  'aria-colindex',
+  'aria-rowcount',
+  'aria-colcount',
+  'aria-level',
 ]);
+
+/**
+ * A numeric-attribute binding that is SYNTACTICALLY provably non-nullish — a numeric literal,
+ * an arithmetic BinaryExpression (`a + 1`, `i * 2`), or a unary `+`/`-`. These already type as
+ * `number`, so the numeric-attr emit must NOT append `?? undefined` (the right operand would be
+ * unreachable → TS2869). Nullish-capable forms (a `x ? n : null` ternary normalized to
+ * `undefined`, a `number | null`-returning call) fall through to the `?? undefined` drop.
+ */
+const ARITHMETIC_BINARY_OPS: ReadonlySet<string> = new Set(['+', '-', '*', '/', '%', '**']);
+function isProvablyNonNullishNumeric(expr: t.Expression): boolean {
+  if (t.isNumericLiteral(expr)) return true;
+  if (t.isBinaryExpression(expr)) return ARITHMETIC_BINARY_OPS.has(expr.operator);
+  if (t.isUnaryExpression(expr)) return expr.operator === '+' || expr.operator === '-';
+  return false;
+}
 
 /**
  * HTML attributes whose JSX prop type is `boolean`. A valueless boolean
@@ -977,10 +1004,8 @@ function emitNonClassAttribute(
     // `undefined` so React's `string | undefined` attr types accept it
     // (quick task 260520-w18). `style`/`class` already handled above.
     const jsxName = colonPropToJsxName(attr.name);
-    const exprCode = renderExpr(
-      normalizeNullAttrBinding(attr.expression),
-      ctx.ir,
-    );
+    const normalizedAttrExpr = normalizeNullAttrBinding(attr.expression);
+    const exprCode = renderExpr(normalizedAttrExpr, ctx.ir);
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. When the IR flags this
     // binding `wrapForDisplay` AND the position renders as attribute text on an
     // HTML host (not a structural component prop / controlled-input property), a
@@ -1002,6 +1027,15 @@ function emitNonClassAttribute(
       // JSX omits the attribute), matching the `rozieAttr` drop semantics for
       // the numeric case without the string widening.
       if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase())) {
+        // A provably non-nullish numeric expression (`wr.vi.index + 1`, a numeric literal,
+        // a unary `+`/`-`) is already `number` — appending `?? undefined` makes the right
+        // operand unreachable (TS2869). Emit it RAW (still `number`, typechecks against the
+        // `number | undefined` ARIA/HTML slot). Only nullish-capable forms (a `x ? n : null`
+        // ternary normalized to `undefined`, a `number | null`-returning call like
+        // `cellTabindex()`) need the `?? undefined` nullish-drop.
+        if (isProvablyNonNullishNumeric(normalizedAttrExpr)) {
+          return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
+        }
         // WR-01 (260618-ao9) — parenthesize the expression. An unparenthesized
         // top-level `||`/`&&` adjacent to `??` is a JS SyntaxError
         // (`span || 1 ?? undefined` fails to parse), so wrap `exprCode` so the
