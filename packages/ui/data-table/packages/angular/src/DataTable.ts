@@ -366,7 +366,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         
         @for (row of rows(); track row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)">
           @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="bodyCellStyle(row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
             
@@ -2087,12 +2087,28 @@ export class DataTable {
       if (c && c.pin) c.pin(side);
     }
   };
+  getRowIndexRelativeToPage = (absRow: any) => {
+    const abs = absRow == null ? this.toAbsRow(this.activeRow()) : Math.trunc(Number(absRow)) || 0;
+    if (this.virtual()) return abs;
+    return abs - this.pageRowOffset();
+  };
   isGrid = () => this.interactionMode() === 'grid';
   tableRole = () => this.isGrid() ? 'grid' : 'table';
   cellRole = () => this.isGrid() ? 'gridcell' : 'cell';
   rowIndexOf = (row: any) => this.tick() >= 0 ? (this.rows() || []).indexOf(row) : -1;
   colIndexOf = (row: any, cellCtx: any) => this.tick() >= 0 ? this.visibleCellsFor(row).indexOf(cellCtx) : -1;
   headerColIndexOf = (hg: any, header: any) => (hg && hg.headers ? hg.headers : []).indexOf(header);
+  pageRowOffset = () => {
+    if (!this.isGrid() || this.virtual()) return 0;
+    return this.pageIndex() * this.pageSize();
+  };
+  toAbsRow = (localRow: any) => localRow + this.pageRowOffset();
+  absRowIndexOf = (row: any) => this.rowIndexOf(row) + this.pageRowOffset();
+  prePaginationRowCount = () => {
+    if (!this.table || this.virtual()) return this.bodyRowCount();
+    const pm = this.table.getPrePaginationRowModel();
+    return pm && pm.rows ? pm.rows.length : this.bodyRowCount();
+  };
   cellTabindex = (rowKey: any, colIndex: any, level: any = null) => {
     const __activeColIndex = this.activeColIndex();
     if (!this.isGrid()) return null;
@@ -2571,9 +2587,13 @@ export class DataTable {
     // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
     // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
     // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+    // C1 (phase 63 wave-6): the emitted rowIndex is the ABSOLUTE display-order index (toAbsRow) —
+    // keyboard nav never crosses a page (D-06), so nextRow is in the current page slice and
+    // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
+    // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
     if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
       this.activecellChange.emit({
-        rowIndex: nextRow,
+        rowIndex: this.toAbsRow(nextRow),
         colIndex: nextCol
       });
     }
@@ -3947,33 +3967,52 @@ export class DataTable {
     // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
     // instance does not leak a spurious activecell-change.
     if (!this.isGrid()) return;
-    const lastRow = this.bodyRowCount() - 1;
-    const maxRow = lastRow < 0 ? 0 : lastRow;
     const maxCol = this.visibleColCount() - 1;
-    const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
     const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
-    // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
-    // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
-    // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
-    // not a navigation). A header→body landing (prevIsHeader) is a real move.
-    const prevRow = this.activeRow();
-    const prevCol = this.activeColIndex();
+    // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.
+    const absLast = this.prePaginationRowCount() - 1;
+    const absRow = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, absLast < 0 ? 0 : absLast);
+    // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
+    // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
+    // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+    const prevAbs = this.toAbsRow(this.activeRow());
     const prevIsHeader = this.activeIsHeader();
-    this.activeIsHeader.set(false);
-    this.activeInControl.set(false);
-    this.activeRow.set(r);
-    this.activeColIndex.set(c);
-    // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
-    // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
-    // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
-    // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
-    // last clicked, so a stale read would resolve focus to the header instead of body row r.
-    // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
-    // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
-    this.focusActiveCell(r, c, false);
-    if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    if (this.virtual()) {
+      // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
+      // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
+      // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.
+      this.activeIsHeader.set(false);
+      this.activeInControl.set(false);
+      this.activeRow.set(absRow);
+      this.activeColIndex.set(c);
+      this.focusActiveCell(absRow, c, false);
+    } else {
+      // Paginated mode: resolve the page that HOLDS the absolute row, switch to it, then focus the
+      // in-page cell. The page-relative local row = absRow - page*pageSize is what the non-virtual
+      // body's data-row markers (and the roving tabindex) address.
+      const size = this.pageSize();
+      const targetPage = size > 0 ? Math.floor(absRow / size) : 0;
+      const localRow = absRow - targetPage * size;
+      const switched = targetPage !== this.pageIndex();
+      if (switched) this.setPage(targetPage);
+      this.activeIsHeader.set(false);
+      this.activeInControl.set(false);
+      this.activeRow.set(localRow);
+      this.activeColIndex.set(c);
+      if (switched) {
+        // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
+        // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
+        this.focusCellWhenReady(localRow, c);
+      } else {
+        // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
+        // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular
+        // async-stale $data.activeIsHeader, landing on a header when a sort button was last clicked).
+        this.focusActiveCell(localRow, c, false);
+      }
+    }
+    if (absRow !== prevAbs || prevIsHeader) {
       this.activecellChange.emit({
-        rowIndex: r,
+        rowIndex: absRow,
         colIndex: c
       });
     }
@@ -3983,7 +4022,7 @@ export class DataTable {
     colIndex: this.activeColIndex(),
     isHeader: true
   } : {
-    rowIndex: this.activeRow(),
+    rowIndex: this.toAbsRow(this.activeRow()),
     colIndex: this.activeColIndex(),
     isHeader: false
   };

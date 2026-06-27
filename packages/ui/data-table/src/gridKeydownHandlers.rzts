@@ -125,8 +125,12 @@ const onGridKeyDown = (e) => {
   // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
   // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
   // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+  // C1 (phase 63 wave-6): the emitted rowIndex is the ABSOLUTE display-order index (toAbsRow) —
+  // keyboard nav never crosses a page (D-06), so nextRow is in the current page slice and
+  // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
+  // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
   if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
-    $emit('activecell-change', { rowIndex: nextRow, colIndex: nextCol })
+    $emit('activecell-change', { rowIndex: toAbsRow(nextRow), colIndex: nextCol })
   }
 }
 

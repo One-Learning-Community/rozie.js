@@ -221,6 +221,7 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  getRowIndexRelativeToPage: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
   editRow: (...args: any[]) => any;
@@ -1370,6 +1371,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (c && c.pin) c.pin(side);
     }
   }
+  function getRowIndexRelativeToPage(absRow: any) {
+    const abs = absRow == null ? toAbsRow(activeRow) : Math.trunc(Number(absRow)) || 0;
+    if (props.virtual) return abs;
+    return abs - pageRowOffset();
+  }
   const isGrid = useCallback(() => props.interactionMode === 'grid', [props.interactionMode]);
   function tableRole() {
     return isGrid() ? 'grid' : 'table';
@@ -1385,6 +1391,21 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function headerColIndexOf(hg: any, header: any) {
     return (hg && hg.headers ? hg.headers : []).indexOf(header);
+  }
+  function pageRowOffset() {
+    if (!isGrid() || props.virtual) return 0;
+    return pageIndex() * pageSize();
+  }
+  function toAbsRow(localRow: any) {
+    return localRow + pageRowOffset();
+  }
+  function absRowIndexOf(row: any) {
+    return rowIndexOf(row) + pageRowOffset();
+  }
+  function prePaginationRowCount() {
+    if (!table.current || props.virtual) return bodyRowCount();
+    const pm = table.current.getPrePaginationRowModel();
+    return pm && pm.rows ? pm.rows.length : bodyRowCount();
   }
   function cellTabindex(rowKey: any, colIndex: any, level = null) {
     if (!isGrid()) return null;
@@ -1863,13 +1884,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
     // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
     // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+    // C1 (phase 63 wave-6): the emitted rowIndex is the ABSOLUTE display-order index (toAbsRow) —
+    // keyboard nav never crosses a page (D-06), so nextRow is in the current page slice and
+    // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
+    // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
     if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
       _rozieProp_onActivecellChange && _rozieProp_onActivecellChange({
-        rowIndex: nextRow,
+        rowIndex: toAbsRow(nextRow),
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, pasteRange, rows, toAbsRow]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -3270,33 +3295,52 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
     // instance does not leak a spurious activecell-change.
     if (!isGrid()) return;
-    const lastRow = bodyRowCount() - 1;
-    const maxRow = lastRow < 0 ? 0 : lastRow;
     const maxCol = visibleColCount() - 1;
-    const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
     const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
-    // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
-    // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
-    // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
-    // not a navigation). A header→body landing (prevIsHeader) is a real move.
-    const prevRow = activeRow;
-    const prevCol = activeColIndex;
+    // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.
+    const absLast = prePaginationRowCount() - 1;
+    const absRow = clamp(Math.trunc(Number(rowIndex)) || 0, 0, absLast < 0 ? 0 : absLast);
+    // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
+    // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
+    // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+    const prevAbs = toAbsRow(activeRow);
     const prevIsHeader = activeIsHeader;
-    setActiveIsHeader(false);
-    setActiveInControl(false);
-    setActiveRow(r);
-    setActiveColIndex(c);
-    // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
-    // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
-    // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
-    // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
-    // last clicked, so a stale read would resolve focus to the header instead of body row r.
-    // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
-    // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
-    focusActiveCell(r, c, false);
-    if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    if (props.virtual) {
+      // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
+      // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
+      // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.
+      setActiveIsHeader(false);
+      setActiveInControl(false);
+      setActiveRow(absRow);
+      setActiveColIndex(c);
+      focusActiveCell(absRow, c, false);
+    } else {
+      // Paginated mode: resolve the page that HOLDS the absolute row, switch to it, then focus the
+      // in-page cell. The page-relative local row = absRow - page*pageSize is what the non-virtual
+      // body's data-row markers (and the roving tabindex) address.
+      const size = pageSize();
+      const targetPage = size > 0 ? Math.floor(absRow / size) : 0;
+      const localRow = absRow - targetPage * size;
+      const switched = targetPage !== pageIndex();
+      if (switched) setPage(targetPage);
+      setActiveIsHeader(false);
+      setActiveInControl(false);
+      setActiveRow(localRow);
+      setActiveColIndex(c);
+      if (switched) {
+        // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
+        // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
+        focusCellWhenReady(localRow, c);
+      } else {
+        // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
+        // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular
+        // async-stale $data.activeIsHeader, landing on a header when a sort button was last clicked).
+        focusActiveCell(localRow, c, false);
+      }
+    }
+    if (absRow !== prevAbs || prevIsHeader) {
       props.onActivecellChange && props.onActivecellChange({
-        rowIndex: r,
+        rowIndex: absRow,
         colIndex: c
       });
     }
@@ -3307,7 +3351,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       colIndex: activeColIndex,
       isHeader: true
     } : {
-      rowIndex: activeRow,
+      rowIndex: toAbsRow(activeRow),
       colIndex: activeColIndex,
       isHeader: false
     };
@@ -3594,9 +3638,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     reFeed();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.expandable, props.groupable, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange });
-  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange };
-  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => _rozieExposeRef.current.applyGrouping(...args), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => _rozieExposeRef.current.clearGrouping(...args), getFacetedUniqueValues: (...args: Parameters<typeof getFacetedUniqueValues>): ReturnType<typeof getFacetedUniqueValues> => _rozieExposeRef.current.getFacetedUniqueValues(...args), getFacetedMinMaxValues: (...args: Parameters<typeof getFacetedMinMaxValues>): ReturnType<typeof getFacetedMinMaxValues> => _rozieExposeRef.current.getFacetedMinMaxValues(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
+  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange });
+  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange };
+  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => _rozieExposeRef.current.sortColumn(...args), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => _rozieExposeRef.current.clearSorting(...args), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => _rozieExposeRef.current.toggleRowExpanded(...args), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => _rozieExposeRef.current.expandAll(...args), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => _rozieExposeRef.current.collapseAll(...args), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => _rozieExposeRef.current.getExpandedRows(...args), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => _rozieExposeRef.current.applyGrouping(...args), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => _rozieExposeRef.current.clearGrouping(...args), getFacetedUniqueValues: (...args: Parameters<typeof getFacetedUniqueValues>): ReturnType<typeof getFacetedUniqueValues> => _rozieExposeRef.current.getFacetedUniqueValues(...args), getFacetedMinMaxValues: (...args: Parameters<typeof getFacetedMinMaxValues>): ReturnType<typeof getFacetedMinMaxValues> => _rozieExposeRef.current.getFacetedMinMaxValues(...args), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => _rozieExposeRef.current.getColumnDefs(...args), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => _rozieExposeRef.current.toggleAllRows(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => _rozieExposeRef.current.getSelectedRows(...args), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => _rozieExposeRef.current.setPage(...args), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => _rozieExposeRef.current.setRowsPerPage(...args), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => _rozieExposeRef.current.toggleColumnVisibility(...args), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => _rozieExposeRef.current.applyColumnOrder(...args), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => _rozieExposeRef.current.resetColumnSizing(...args), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => _rozieExposeRef.current.pinColumn(...args), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => _rozieExposeRef.current.focusCell(...args), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => _rozieExposeRef.current.getActiveCell(...args), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => _rozieExposeRef.current.clearActiveCell(...args), getRowIndexRelativeToPage: (...args: Parameters<typeof getRowIndexRelativeToPage>): ReturnType<typeof getRowIndexRelativeToPage> => _rozieExposeRef.current.getRowIndexRelativeToPage(...args), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => _rozieExposeRef.current.editCell(...args), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => _rozieExposeRef.current.commitEditing(...args), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => _rozieExposeRef.current.editRow(...args), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => _rozieExposeRef.current.getSelectedRange(...args) }), []);
 
   return (
     <__ctx_data_table_columns.Provider value={{
@@ -3730,7 +3774,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         {rows.map((row) => <Fragment key={row.id}>
-        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
+        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : undefined)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(row).map((cellCtx) => <td key={cellCtx.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cellCtx.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cellCtx.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

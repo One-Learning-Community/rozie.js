@@ -472,6 +472,7 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  getRowIndexRelativeToPage: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
   editRow: (...args: any[]) => any;
@@ -482,7 +483,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -2207,6 +2208,18 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       if (c && c.pin) c.pin(side);
     }
   }
+  // getRowIndexRelativeToPage(absRow?) — C1 (phase 63 wave-6) converter: an ABSOLUTE display-order
+  // index (the focusCell/getActiveCell/activecell-change space) → the PAGE-RELATIVE index. Mirrors
+  // MUI getRowIndexRelativeToVisibleRows. With NO argument it converts the CURRENT active cell
+  // (toAbsRow($data.activeRow) - pageRowOffset() collapses to $data.activeRow). In virtual mode
+  // there is no page (windowing replaces pagination) → the windowed model IS the full model, so it
+  // returns the absolute index unchanged. Collision-safe: no *-change event, prop, React auto-setter,
+  // or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
+  function getRowIndexRelativeToPage(absRow: any) {
+    const abs = absRow == null ? toAbsRow(activeRow()) : Math.trunc(Number(absRow)) || 0;
+    if (local.virtual) return abs;
+    return abs - pageRowOffset();
+  }
 
   // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
   // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
@@ -2244,6 +2257,40 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // headerColIndexOf: a header cell's position in its header group's leaf headers.
   function headerColIndexOf(hg: any, header: any) {
     return (hg && hg.headers ? hg.headers : []).indexOf(header);
+  }
+
+  // ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
+  // The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
+  // display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
+  // pagination/windowing), in BOTH paginated and virtual modes — reversing the old page-relative
+  // paginated meaning. INTERNALLY $data.activeRow stays PAGE-RELATIVE in the non-virtual paginated
+  // body (the data-row markers + the nav math index the page slice) and FULL-MODEL in virtual mode
+  // (the wr.vi.index space). pageRowOffset() bridges the two so the API speaks one absolute language.
+  //   - virtual mode: activeRow is already the full pre-pagination index → offset 0.
+  //   - non-virtual:  activeRow is page-relative → offset = pageIndex * pageSize.
+  // isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
+  // state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
+  function pageRowOffset() {
+    if (!isGrid() || local.virtual) return 0;
+    return pageIndex() * pageSize();
+  }
+  // page-relative active row → absolute (display-order) index.
+  function toAbsRow(localRow: any) {
+    return localRow + pageRowOffset();
+  }
+  // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
+  // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
+  // directly (already absolute). Reactive via rowIndexOf's tick().
+  function absRowIndexOf(row: any) {
+    return rowIndexOf(row) + pageRowOffset();
+  }
+  // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
+  // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
+  // non-virtual paginated body $data.rows is only the page slice, so read the live model.
+  function prePaginationRowCount() {
+    if (!table || local.virtual) return bodyRowCount();
+    const pm = table.getPrePaginationRowModel();
+    return pm && pm.rows ? pm.rows.length : bodyRowCount();
   }
 
   // Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
@@ -2825,9 +2872,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     // changed. A clamped no-op edge move (ArrowLeft at col 0, ArrowDown at the page-last
     // row, …) leaves the indices identical → no spurious emit (a no-op is not a navigation).
     // B12: a header-LEVEL move (leaf↔parent, same colIndex) is a real navigation too.
+    // C1 (phase 63 wave-6): the emitted rowIndex is the ABSOLUTE display-order index (toAbsRow) —
+    // keyboard nav never crosses a page (D-06), so nextRow is in the current page slice and
+    // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
+    // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
     if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
       _props.onActivecellChange?.({
-        rowIndex: nextRow,
+        rowIndex: toAbsRow(nextRow),
         colIndex: nextCol
       });
     }
@@ -4628,44 +4679,65 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
   // any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
 
-  // focusCell(rowIndex, colIndex) — move + focus the active cell, addressed BY INDEX over the
-  // visible model (D-03 — no id overload). Args are COERCED to integers and CLAMPED to [0,max]
-  // before the data-* selector is built (T-49-01: never interpolate a raw consumer string).
-  // Threads the SAME fresh clamped locals into focusActiveCell AND activecell-change (no $data
-  // re-read — consistent with the Task-1 fresh-local rule).
+  // focusCell(rowIndex, colIndex) — move + focus the active cell. C1 (phase 63 wave-6): rowIndex
+  // is the ABSOLUTE display-order position in getPrePaginationRowModel().rows (filter+sort+expand
+  // applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes — REVERSING the old
+  // page-relative-when-paginated meaning. Args are COERCED to integers and CLAMPED before the
+  // data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
+  // the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
+  // speak the SAME absolute language (toAbsRow).
   function focusCell(rowIndex: any, colIndex: any) {
     // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
     // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
     // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
     // instance does not leak a spurious activecell-change.
     if (!isGrid()) return;
-    const lastRow = bodyRowCount() - 1;
-    const maxRow = lastRow < 0 ? 0 : lastRow;
     const maxCol = visibleColCount() - 1;
-    const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
     const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
-    // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
-    // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
-    // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
-    // not a navigation). A header→body landing (prevIsHeader) is a real move.
-    const prevRow = activeRow();
-    const prevCol = activeColIndex();
+    // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.
+    const absLast = prePaginationRowCount() - 1;
+    const absRow = clamp(Math.trunc(Number(rowIndex)) || 0, 0, absLast < 0 ? 0 : absLast);
+    // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
+    // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
+    // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+    const prevAbs = toAbsRow(activeRow());
     const prevIsHeader = activeIsHeader();
-    setActiveIsHeader(false);
-    setActiveInControl(false);
-    setActiveRow(r);
-    setActiveColIndex(c);
-    // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
-    // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
-    // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
-    // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
-    // last clicked, so a stale read would resolve focus to the header instead of body row r.
-    // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
-    // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
-    focusActiveCell(r, c, false);
-    if (r !== prevRow || c !== prevCol || prevIsHeader) {
+    if (local.virtual) {
+      // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
+      // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
+      // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.
+      setActiveIsHeader(false);
+      setActiveInControl(false);
+      setActiveRow(absRow);
+      setActiveColIndex(c);
+      focusActiveCell(absRow, c, false);
+    } else {
+      // Paginated mode: resolve the page that HOLDS the absolute row, switch to it, then focus the
+      // in-page cell. The page-relative local row = absRow - page*pageSize is what the non-virtual
+      // body's data-row markers (and the roving tabindex) address.
+      const size = pageSize();
+      const targetPage = size > 0 ? Math.floor(absRow / size) : 0;
+      const localRow = absRow - targetPage * size;
+      const switched = targetPage !== pageIndex();
+      if (switched) setPage(targetPage);
+      setActiveIsHeader(false);
+      setActiveInControl(false);
+      setActiveRow(localRow);
+      setActiveColIndex(c);
+      if (switched) {
+        // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
+        // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
+        focusCellWhenReady(localRow, c);
+      } else {
+        // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
+        // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular
+        // async-stale $data.activeIsHeader, landing on a header when a sort button was last clicked).
+        focusActiveCell(localRow, c, false);
+      }
+    }
+    if (absRow !== prevAbs || prevIsHeader) {
       _props.onActivecellChange?.({
-        rowIndex: r,
+        rowIndex: absRow,
         colIndex: c
       });
     }
@@ -4678,13 +4750,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
   // returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
   // is unchanged for the body case).
+  // C1: a body cell returns the ABSOLUTE display-order rowIndex (toAbsRow) — matching focusCell's
+  // addressing + the activecell-change payload — in BOTH paginated and virtual modes.
   function getActiveCell() {
     return activeIsHeader() ? {
       rowIndex: null,
       colIndex: activeColIndex(),
       isHeader: true
     } : {
-      rowIndex: activeRow(),
+      rowIndex: toAbsRow(activeRow()),
       colIndex: activeColIndex(),
       isHeader: false
     };
@@ -4871,7 +4945,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         <For each={rows()}>{(row) => <>
-        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)} data-rozie-s-d5dcab4c="">
+        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)} data-rozie-s-d5dcab4c="">
           <For each={visibleCellsFor(row)}>{(cellCtx) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cellCtx.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cellCtx))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))} style={parseInlineStyle(bodyCellStyle(row, cellCtx.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)} data-rozie-s-d5dcab4c="">
             
             {<Show when={isExpanderColumn(cellCtx.column.id)} fallback={<Show when={isSelectColumn(cellCtx.column.id)} fallback={<Show when={cellIsGrouped(cellCtx)} fallback={<Show when={isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">

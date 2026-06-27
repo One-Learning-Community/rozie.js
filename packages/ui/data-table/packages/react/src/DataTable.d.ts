@@ -181,6 +181,7 @@ export interface DataTableHandle {
   focusCell: (...args: any[]) => any;
   getActiveCell: (...args: any[]) => any;
   clearActiveCell: (...args: any[]) => any;
+  getRowIndexRelativeToPage: (...args: any[]) => any;
   editCell: (...args: any[]) => any;
   commitEditing: (...args: any[]) => any;
   editRow: (...args: any[]) => any;

@@ -12,5 +12,5 @@ export { default as FilterSelect } from './FilterSelect';
 export { default as GroupBar } from './GroupBar';
 export { default as DetailPanel } from './DetailPanel';
 
-/** The `$expose` imperative handle received via `ref` — { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, editCell, commitEditing, editRow, getSelectedRange }. */
+/** The `$expose` imperative handle received via `ref` — { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange }. */
 export type { DataTableHandle } from './DataTable';

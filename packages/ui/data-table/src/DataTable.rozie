@@ -1093,9 +1093,9 @@ $provide('data-table:columns', {
   },
 })
 
-import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn } from './exposeStateVerbs.rzts'
+import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage } from './exposeStateVerbs.rzts'
 
-import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
+import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 
@@ -1202,6 +1202,7 @@ $expose({
   focusCell,
   getActiveCell,
   clearActiveCell,
+  getRowIndexRelativeToPage,
   editCell,
   commitEditing,
   editRow,
@@ -1769,6 +1770,7 @@ $expose({
       :class="{ 'rdt-group-header': rowIsGrouped(row) }"
       role="row"
       :data-depth="row.depth"
+      :aria-rowindex="isGrid() ? (absRowIndexOf(row) + 1) : null"
       :data-group-header="rowIsGrouped(row) ? row.id : null"
       :data-group-leaf="(groupingActive() && !rowIsGrouped(row)) ? row.id : null"
     >

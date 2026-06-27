@@ -24,6 +24,36 @@ const colIndexOf = (row, cellCtx) => (tick() >= 0 ? visibleCellsFor(row).indexOf
 // headerColIndexOf: a header cell's position in its header group's leaf headers.
 const headerColIndexOf = (hg, header) => ((hg && hg.headers ? hg.headers : []).indexOf(header))
 
+// ── C1 (phase 63 wave-6) absolute-index bridge ─────────────────────────────────────────
+// The PUBLIC active-cell rowIndex (focusCell/getActiveCell/activecell-change) is the ABSOLUTE
+// display-order position in getPrePaginationRowModel().rows (filter+sort+expand applied, BEFORE
+// pagination/windowing), in BOTH paginated and virtual modes — reversing the old page-relative
+// paginated meaning. INTERNALLY $data.activeRow stays PAGE-RELATIVE in the non-virtual paginated
+// body (the data-row markers + the nav math index the page slice) and FULL-MODEL in virtual mode
+// (the wr.vi.index space). pageRowOffset() bridges the two so the API speaks one absolute language.
+//   - virtual mode: activeRow is already the full pre-pagination index → offset 0.
+//   - non-virtual:  activeRow is page-relative → offset = pageIndex * pageSize.
+// isGrid()-gated (the active-cell API is grid-only); pageIndex()/pageSize() read live table-core
+// state through the reactive tick (filterPaginationRowChrome), so this re-derives on a page change.
+const pageRowOffset = () => {
+  if (!isGrid() || $props.virtual) return 0
+  return pageIndex() * pageSize()
+}
+// page-relative active row → absolute (display-order) index.
+const toAbsRow = (localRow) => localRow + pageRowOffset()
+// A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
+// aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
+// directly (already absolute). Reactive via rowIndexOf's tick().
+const absRowIndexOf = (row) => rowIndexOf(row) + pageRowOffset()
+// Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
+// In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
+// non-virtual paginated body $data.rows is only the page slice, so read the live model.
+const prePaginationRowCount = () => {
+  if (!table || $props.virtual) return bodyRowCount()
+  const pm = table.getPrePaginationRowModel()
+  return pm && pm.rows ? pm.rows.length : bodyRowCount()
+}
+
 // Roving tabindex (RESEARCH Code Examples). Reads ONLY reactive $data (ROZ123-safe,
 // fine-grained-reactive). Returns null in 'table' mode → the bound numeric attribute
 // DROPS entirely (IN-01: on React via the `cellTabindex(...) ?? undefined` numeric-attr
@@ -366,4 +396,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

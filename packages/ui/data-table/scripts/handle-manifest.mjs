@@ -53,11 +53,13 @@ export const handleManifest = {
   pinColumn:
     "Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` | `'right'` | `false`. Fires `pin-change` with the fresh `ColumnPinningState`.",
   focusCell:
-    'Move + focus the active cell (grid interaction mode) — `focusCell(rowIndex, colIndex)`, addressed by index over the visible model (D-03; args coerced to integers and clamped to bounds). Fires `activecell-change`. (Named `focusCell`, not `focus`: a bare `focus` verb shadows the inherited `HTMLElement.focus` on Lit — ROZ137.)',
+    'Move + focus the active cell (grid interaction mode) — `focusCell(rowIndex, colIndex)`. `rowIndex` is the ABSOLUTE display-order position in `getPrePaginationRowModel().rows` (filter+sort+expand applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes (C1): a paginated `focusCell(abs)` switches to `Math.floor(abs/pageSize)` then focuses; a virtual `focusCell(abs)` scrolls-then-focuses. Args coerced to integers + clamped to bounds. Fires `activecell-change` with the absolute `rowIndex`. (Named `focusCell`, not `focus`: a bare `focus` verb shadows the inherited `HTMLElement.focus` on Lit — ROZ137.)',
   getActiveCell:
-    'Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex }` integers (no row data, no DOM node).',
+    'Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex, isHeader }`. For a body cell `rowIndex` is the ABSOLUTE display-order index (C1, matching `focusCell` / `activecell-change`) and `isHeader` is `false`; for a header-active cell `rowIndex` is `null` and `isHeader` is `true` (integers only — no row data, no DOM node).',
   clearActiveCell:
     'Reset the roving active-cell position to the entry cell and exit interaction mode — `clearActiveCell()`. The next Tab-in re-enters at the entry cell (D-01). (Named `clearActiveCell`, not `clear`: distinct from the listbox `clear` selection verb.)',
+  getRowIndexRelativeToPage:
+    'Convert an ABSOLUTE display-order row index (the `focusCell` / `getActiveCell` / `activecell-change` space, C1) to the PAGE-RELATIVE index — `getRowIndexRelativeToPage(absRow?)` → `number`. With no argument it converts the current active cell (`abs - pageIndex*pageSize`). In virtual mode (no pagination) it returns the absolute index unchanged. Mirrors MUI `getRowIndexRelativeToVisibleRows`. (Named `getRowIndexRelativeToPage`: collision-clean against the verb/event/prop and Lit ROZ137 reserved sets.)',
   editCell:
     'Programmatically open the editor on a cell (Phase 51) — `editCell(rowIndex, colIndex)`, addressed by index over the visible model (args coerced to integers + clamped). No-op on a non-editable cell. (Named `editCell`, not `edit`: collision-clean against the verb/event/prop and Lit ROZ137 reserved sets.)',
   commitEditing:

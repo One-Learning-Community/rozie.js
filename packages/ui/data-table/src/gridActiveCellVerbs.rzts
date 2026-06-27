@@ -4,43 +4,64 @@
 // `clear`); getActiveCell is a read-style getter. None collide with the 9 *-change events,
 // any prop, or a React auto-setter (ROZ121/137/524 clear). ──────────────────────────────────
 
-// focusCell(rowIndex, colIndex) — move + focus the active cell, addressed BY INDEX over the
-// visible model (D-03 — no id overload). Args are COERCED to integers and CLAMPED to [0,max]
-// before the data-* selector is built (T-49-01: never interpolate a raw consumer string).
-// Threads the SAME fresh clamped locals into focusActiveCell AND activecell-change (no $data
-// re-read — consistent with the Task-1 fresh-local rule).
+// focusCell(rowIndex, colIndex) — move + focus the active cell. C1 (phase 63 wave-6): rowIndex
+// is the ABSOLUTE display-order position in getPrePaginationRowModel().rows (filter+sort+expand
+// applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes — REVERSING the old
+// page-relative-when-paginated meaning. Args are COERCED to integers and CLAMPED before the
+// data-* selector is built (T-49-01/T-63-06-01: never interpolate a raw consumer string; clamp
+// the abs index into getPrePaginationRowModel bounds). The activecell-change payload + getActiveCell
+// speak the SAME absolute language (toAbsRow).
 const focusCell = (rowIndex, colIndex) => {
   // B16: isGrid()-gate the verb. In 'table' mode there is no roving active cell, so focusCell
   // is a NO-OP (never an activecell-change emit) — the keyboard path (onGridKeyDown) is already
   // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
   // instance does not leak a spurious activecell-change.
   if (!isGrid()) return
-  const lastRow = bodyRowCount() - 1
-  const maxRow = lastRow < 0 ? 0 : lastRow
   const maxCol = visibleColCount() - 1
-  const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
-  // B14: snapshot the PRE-write position so the activecell-change emit fires ONLY on a real
-  // move — mirrors the keyboard path's WR-06 suppression. A clamped/no-op focusCell to the
-  // cell that is already active (same row+col, already in the body) must NOT emit (a no-op is
-  // not a navigation). A header→body landing (prevIsHeader) is a real move.
-  const prevRow = $data.activeRow
-  const prevCol = $data.activeColIndex
+  // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.
+  const absLast = prePaginationRowCount() - 1
+  const absRow = clamp(Math.trunc(Number(rowIndex)) || 0, 0, (absLast < 0 ? 0 : absLast))
+  // B14: snapshot the PRE-write ABSOLUTE position so the activecell-change emit fires ONLY on a
+  // real move (mirrors the keyboard path's WR-06 suppression). A no-op focusCell to the already-
+  // active cell must NOT emit; a header→body landing (prevIsHeader) is a real move.
+  const prevAbs = toAbsRow($data.activeRow)
   const prevIsHeader = $data.activeIsHeader
-  $data.activeIsHeader = false
-  $data.activeInControl = false
-  $data.activeRow = r
-  $data.activeColIndex = c
-  // Thread isHeader=false EXPLICITLY (focusCell always lands in the body). Without it
-  // focusActiveCell re-reads $data.activeIsHeader, which on React (setState async, ROZ138)
-  // / Angular (async signal) returns the PRE-write value — and WR-03's @focusin sync sets
-  // activeIsHeader=true whenever an inner control inside a HEADER cell (a sort button) was
-  // last clicked, so a stale read would resolve focus to the header instead of body row r.
-  // ALWAYS re-asserts DOM focus (even on a no-op move — re-seats focus after a button click,
-  // the REQ-5 idiom); only the EMIT is suppressed on a no-op.
-  focusActiveCell(r, c, false)
-  if (r !== prevRow || c !== prevCol || prevIsHeader) {
-    $emit('activecell-change', { rowIndex: r, colIndex: c })
+  if ($props.virtual) {
+    // Virtual mode: $data.activeRow IS the full pre-pagination index (the wr.vi.index space), so
+    // the absolute index maps 1:1. focusActiveCell already runs the D-12 off-window scroll-then-
+    // focus path (scrollToIndex(absRow) → deferred-rAF focus) when the row is outside the window.
+    $data.activeIsHeader = false
+    $data.activeInControl = false
+    $data.activeRow = absRow
+    $data.activeColIndex = c
+    focusActiveCell(absRow, c, false)
+  } else {
+    // Paginated mode: resolve the page that HOLDS the absolute row, switch to it, then focus the
+    // in-page cell. The page-relative local row = absRow - page*pageSize is what the non-virtual
+    // body's data-row markers (and the roving tabindex) address.
+    const size = pageSize()
+    const targetPage = size > 0 ? Math.floor(absRow / size) : 0
+    const localRow = absRow - targetPage * size
+    const switched = targetPage !== pageIndex()
+    if (switched) setPage(targetPage)
+    $data.activeIsHeader = false
+    $data.activeInControl = false
+    $data.activeRow = localRow
+    $data.activeColIndex = c
+    if (switched) {
+      // The switched-in page renders ASYNC on React/Solid/Lit — poll the in-page cell then focus
+      // (the B23 focusCellWhenReady idiom; DOM-only off gridRoot, so React-stale-safe).
+      focusCellWhenReady(localRow, c)
+    } else {
+      // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
+      // Thread isHeader=false explicitly (focusActiveCell would otherwise re-read the React/Angular
+      // async-stale $data.activeIsHeader, landing on a header when a sort button was last clicked).
+      focusActiveCell(localRow, c, false)
+    }
+  }
+  if (absRow !== prevAbs || prevIsHeader) {
+    $emit('activecell-change', { rowIndex: absRow, colIndex: c })
   }
 }
 
@@ -51,9 +72,11 @@ const focusCell = (rowIndex, colIndex) => {
 // header column) so a consumer never mistakes a header focus for body 'row 0'. A body cell
 // returns the integer rowIndex + isHeader false (back-compatible: the rowIndex/colIndex pair
 // is unchanged for the body case).
+// C1: a body cell returns the ABSOLUTE display-order rowIndex (toAbsRow) — matching focusCell's
+// addressing + the activecell-change payload — in BOTH paginated and virtual modes.
 const getActiveCell = () => ($data.activeIsHeader
   ? { rowIndex: null, colIndex: $data.activeColIndex, isHeader: true }
-  : { rowIndex: $data.activeRow, colIndex: $data.activeColIndex, isHeader: false })
+  : { rowIndex: toAbsRow($data.activeRow), colIndex: $data.activeColIndex, isHeader: false })
 
 // clearActiveCell() — reset the roving position to the D-04 entry cell (row 0, col 0) and
 // exit interaction mode; the next Tab-in re-enters at the entry cell (D-01). Does NOT emit

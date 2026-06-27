@@ -35,5 +35,17 @@ const resetColumnSizing = () => { if (table) table.resetColumnSizing(true) }
 const pinColumn = (colId, side) => {
   if (table) { const c = table.getColumn(colId); if (c && c.pin) c.pin(side) }
 }
+// getRowIndexRelativeToPage(absRow?) — C1 (phase 63 wave-6) converter: an ABSOLUTE display-order
+// index (the focusCell/getActiveCell/activecell-change space) → the PAGE-RELATIVE index. Mirrors
+// MUI getRowIndexRelativeToVisibleRows. With NO argument it converts the CURRENT active cell
+// (toAbsRow($data.activeRow) - pageRowOffset() collapses to $data.activeRow). In virtual mode
+// there is no page (windowing replaces pagination) → the windowed model IS the full model, so it
+// returns the absolute index unchanged. Collision-safe: no *-change event, prop, React auto-setter,
+// or inherited Lit DOM method named getRowIndexRelativeToPage (ROZ121/124/137 clear).
+const getRowIndexRelativeToPage = (absRow) => {
+  const abs = absRow == null ? toAbsRow($data.activeRow) : (Math.trunc(Number(absRow)) || 0)
+  if ($props.virtual) return abs
+  return abs - pageRowOffset()
+}
 
-export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn }
+export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage }
