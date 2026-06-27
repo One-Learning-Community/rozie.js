@@ -1,0 +1,184 @@
+<!--
+  DataTableGridAbsIndexDemo.rozie — Phase 63 Wave-6 (C1 LOCKED: absolute-index addressing)
+  RED-first fixture.
+
+  Drives the C1 contract across all six targets via data-table-grid-absindex.spec.ts:
+    C1 — focusCell(abs)/getActiveCell()/activecell-change rowIndex is the ABSOLUTE
+         display-order position in getPrePaginationRowModel().rows (filter+sort+expand
+         applied, BEFORE pagination/windowing), in BOTH paginated and virtual modes.
+         Paginated: focusCell(7) on a pageSize=3 grid switches to page 3 (floor(7/3)=2)
+         then focuses the absolute-row-7 cell; the previous PAGE-RELATIVE meaning is
+         REVERSED to absolute.
+    converter — getRowIndexRelativeToPage() returns the page-relative index (7 - 2*3 = 1),
+         mirroring MUI getRowIndexRelativeToVisibleRows.
+    B27 — every rendered body row carries aria-rowindex == its absolute index + 1 in the
+         paginated non-virtual grid (page 3 rows = aria-rowindex 7/8/9), closing B27.
+
+  ONE paginated grid (pageSize=3, 9 rows = 3 pages) bound r-model:pagination (two-way, so a
+  programmatic page switch round-trips on React — the 63-05 controlled-state lesson). A sort
+  button (api.sortColumn) proves absolute addressing holds over the SORTED display order. The
+  $refs.dt handle drives focusCell / getActiveCell / getRowIndexRelativeToPage. The virtual
+  half of the cross-mode parity (focusCell(4000) absolute + aria-rowindex) is asserted against
+  the existing DataTableVirtualGrid cell in the same spec.
+
+  No loop var / slot named row/cell/header (the Svelte mount-throw discipline) — the #cell slot
+  binds value/columnId. The dataset is static (no clock/random) for VR determinism.
+-->
+
+<rozie name="DataTableGridAbsIndexDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // 9 rows at pageSize 3 = 3 pages, so focusCell(7) targets the MIDDLE row of page 3
+  // (abs 6/7/8 on page index 2). Distinct scores so a desc sort visibly reorders the
+  // display order (proving absolute addressing tracks the SORTED model, not source order).
+  rows: [
+    { id: 1, label: 'Row 1', score: 50 },
+    { id: 2, label: 'Row 2', score: 90 },
+    { id: 3, label: 'Row 3', score: 10 },
+    { id: 4, label: 'Row 4', score: 70 },
+    { id: 5, label: 'Row 5', score: 30 },
+    { id: 6, label: 'Row 6', score: 100 },
+    { id: 7, label: 'Row 7', score: 20 },
+    { id: 8, label: 'Row 8', score: 80 },
+    { id: 9, label: 'Row 9', score: 40 },
+  ],
+  // Two-way controlled pagination (pageSize=3) so a programmatic setPageIndex round-trips
+  // through page-change on React (Radix controllable state — the 63-05 demo-wiring lesson).
+  pageConfig: { pageIndex: 0, pageSize: 3 },
+  // Last activecell-change "r,c" (the ABSOLUTE rowIndex) + a net counter.
+  lastActiveCell: '',
+  activeCellCount: 0,
+  // getActiveCell() dump: "r,c" (absolute) for a body cell, "header,c" for a header cell.
+  getActiveResult: '',
+  // getRowIndexRelativeToPage() readout — the page-relative converter result.
+  relIndexResult: '',
+}
+</data>
+
+<script lang="ts">
+// activecell-change → "r,c" readout (the ABSOLUTE rowIndex per C1) + a net counter.
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+  $data.activeCellCount = $data.activeCellCount + 1
+}
+
+// Read $refs.dt LIVE in the handler (never cached — a cached handle can pre-date the child's
+// $expose publish on Solid; the GridNavDemo idiom).
+// focusCell(7, 1): absolute row 7 lives on page index 2 (floor(7/3)) → the grid must switch
+// to page 3 and focus the absolute-row-7 cell.
+const callFocusCellPage3 = (): void => {
+  const api = $refs.dt
+  if (api && api.focusCell) api.focusCell(7, 1)
+}
+
+// getActiveCell() → "r,c" with the ABSOLUTE rowIndex; "header,c" when a header cell is active.
+const callGetActiveCell = (): void => {
+  const api = $refs.dt
+  if (api && api.getActiveCell) {
+    const r = api.getActiveCell()
+    if (!r) { $data.getActiveResult = ''; return }
+    if (r.isHeader || r.rowIndex == null) $data.getActiveResult = 'header,' + r.colIndex
+    else $data.getActiveResult = r.rowIndex + ',' + r.colIndex
+  }
+}
+
+// getRowIndexRelativeToPage() → the page-relative index of the current active cell (abs 7 on a
+// pageSize=3 grid → 7 - 2*3 = 1). The C1 converter (mirrors MUI getRowIndexRelativeToVisibleRows).
+const callRelIndex = (): void => {
+  const api = $refs.dt
+  if (api && api.getRowIndexRelativeToPage) {
+    const v = api.getRowIndexRelativeToPage()
+    $data.relIndexResult = v == null ? '' : String(v)
+  }
+}
+
+// Sort the score column DESCENDING via the $expose handle — proves absolute addressing tracks
+// the SORTED display order (page 3 after sort still carries aria-rowindex 7/8/9).
+const callSortScore = (): void => {
+  const api = $refs.dt
+  if (api && api.sortColumn) api.sortColumn('score', true)
+}
+</script>
+
+<template>
+<div class="dt-absindex-demo">
+  <h3>DataTable — grid absolute-index addressing (C1)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="call-focuscell-page3" @click="callFocusCellPage3">focusCell(7,1)</button>
+    <button type="button" data-testid="call-getactivecell" @click="callGetActiveCell">getActiveCell()</button>
+    <button type="button" data-testid="call-relindex" @click="callRelIndex">getRowIndexRelativeToPage()</button>
+    <button type="button" data-testid="call-sort-score" @click="callSortScore">sort score desc</button>
+  </div>
+  <div class="controls">
+    <span class="label">activecell:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+    <span class="label">activecell-count:</span>
+    <span class="readout" data-testid="activecell-count">{{ $data.activeCellCount }}</span>
+    <span class="label">getActiveCell:</span>
+    <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+    <span class="label">relIndex:</span>
+    <span class="readout" data-testid="relindex-readout">{{ $data.relIndexResult }}</span>
+  </div>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      :data="$data.rows"
+      r-model:pagination="$data.pageConfig"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="label" header="Label" />
+      <Column field="score" header="Score" />
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-absindex-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-absindex-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>

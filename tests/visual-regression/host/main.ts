@@ -705,6 +705,22 @@ export const EXAMPLES = [
   // tsconfig include + the glob-driven build-cells demos sweep already cover it, importing
   // the data-table source pkg already registered for Angular cross-tree AOT in phase 48).
   'DataTableGridEmit',
+  // Phase 63 Wave-6 (C1 LOCKED: absolute-index addressing) — the abs-index RED-first fixture
+  // (loader → examples/demos/DataTableGridAbsIndexDemo.rozie, importing
+  // ../../packages/ui/data-table/src/DataTable.rozie). A paginated grid (pageSize=3, 9 rows =
+  // 3 pages, bound r-model:pagination) so data-table-grid-absindex.spec.ts asserts C1
+  // (focusCell(7)/getActiveCell()/activecell-change rowIndex is the ABSOLUTE display-order
+  // position over getPrePaginationRowModel().rows — paginated focusCell(7) switches to page 3
+  // then focuses; the previously page-relative meaning reversed to absolute), the
+  // getRowIndexRelativeToPage() converter (abs → page-relative), and B27 (every body row
+  // carries aria-rowindex == abs+1 → page 3 rows = aria-rowindex 7/8/9). The virtual half of
+  // the cross-mode parity is asserted against the existing DataTableVirtualGrid cell.
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). Lives under
+  // examples/demos/ so no new Angular 3-file registration is needed (prebuildExtraRoots
+  // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos sweep
+  // already cover it, importing the data-table source pkg already registered for Angular
+  // cross-tree AOT in phase 48).
+  'DataTableGridAbsIndex',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1075,6 +1091,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid emit-hygiene — '-demo' appended on Lit →
   // 'rozie-data-table-grid-emit-demo' = kebab of DataTableGridEmitDemo.
   DataTableGridEmit: 'rozie-data-table-grid-emit',
+  // Phase 63 wave-6 abs-index — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-abs-index-demo' = kebab of DataTableGridAbsIndexDemo.
+  DataTableGridAbsIndex: 'rozie-data-table-grid-abs-index',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /
