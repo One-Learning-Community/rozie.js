@@ -1120,6 +1120,15 @@ let rangeTransition = false
 // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
 // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
 let rangeClickPending = false
+// B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
+// true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
+// arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
+// on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
+// `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
+// range-change. This module-let is written synchronously (no setState async), so the second
+// clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
+// across all six targets. A top-level let → React hoists to useRef.
+let rangeActive = false
 
 import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange } from './rangeSelection.rzts'
 

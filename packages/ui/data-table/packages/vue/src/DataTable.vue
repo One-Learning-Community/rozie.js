@@ -3040,28 +3040,34 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
   // programmatic shrink (collapseAll/pageSize/data swap) never drops keyboard focus to <body>.
   // Focus elsewhere — a header sort button, an external control, an unfocused grid — is NOT a
   // doomed body cell, so recovery never STEALS focus on a routine re-sort/filter.
+  // The recovery TARGET is derived from the doomed cell's OWN DOM coords (doomedRow/doomedCol),
+  // NOT $data.activeRow/activeColIndex — those are React-stale (ROZ138) when a focusCell + the
+  // shrink run inside one synchronous handler (focusCell's setActiveRow has not committed). The
+  // DOM coords are always fresh.
   let recoverFocus = false;
+  let doomedRow = -1;
+  let doomedCol = 0;
   if (gridRoot) {
     const rootNode = gridRoot.getRootNode ? gridRoot.getRootNode() : null;
     const focusedEl = rootNode ? rootNode.activeElement : null;
     const focusedCell = focusedEl && focusedEl.closest ? focusedEl.closest('[data-grid-cell]') : null;
     if (focusedCell && gridRoot.contains(focusedCell)) {
       const fRowAttr = focusedCell.getAttribute('data-row');
+      const fColAttr = focusedCell.getAttribute('data-col-index');
       if (fRowAttr != null && fRowAttr !== '__header') {
         const fr = parseInt(fRowAttr, 10);
-        if (Number.isFinite(fr) && fr > rowN - 1) recoverFocus = true;
+        const fc = parseInt(fColAttr, 10);
+        if (Number.isFinite(fr) && fr > rowN - 1) {
+          recoverFocus = true;
+          doomedRow = fr;
+          doomedCol = Number.isFinite(fc) ? fc : 0;
+        }
       }
     }
   }
   const maxCol = colN - 1;
   const col = clamp(activeColIndex.value, 0, maxCol < 0 ? 0 : maxCol);
   if (col !== activeColIndex.value) activeColIndex.value = col;
-  // Track the FINAL resolved active-cell as LOCALS (never re-read $data after a write — React
-  // setState is async, ROZ138) so the B25 focus recovery targets the correct re-indexed cell.
-  let finalCol = col;
-  let finalRow = activeRow.value;
-  let finalIsHeader = activeIsHeader.value;
-  const finalLevel = activeHeaderLevel.value;
   // B6: an empty / all-filtered grid has NO body cell to hold the active cell. Park the active
   // cell on the leaf-header fallback (col 0) so the roving tab-stop stays on a REAL cell (never
   // an absent body cell → focus lost into <body>), and flag it so the next non-empty refresh
@@ -3072,8 +3078,11 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     activeColIndex.value = 0;
     gridEmptyFallback.value = true;
     clampRange(rowN - 1, colN - 1);
-    // B25: every body cell vanished — recover focus onto the leaf-header fallback tab-stop.
-    if (recoverFocus) recoverGridFocus('__header', 0, headerLeafLevel());
+    // B25 does NOT actively focus in the EMPTY-grid case: B6 already keeps the grid keyboard-
+    // reachable via the roving tab-stop on the header fallback (a tabindex=0, not a focus grab).
+    // Moving DOM focus here would steal focus AND — on React — the fallback's @focusin
+    // (setActiveIsHeader true) races the next clear-filter re-seat, leaving the tab-stop stuck on
+    // the header. Focus recovery is for a shrink that leaves a VALID BODY cell to land on (below).
     return;
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
@@ -3083,25 +3092,24 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
     gridEmptyFallback.value = false;
     activeIsHeader.value = false;
     activeRow.value = 0;
-    finalIsHeader = false;
-    finalRow = 0;
   }
-  if (!finalIsHeader) {
+  if (!activeIsHeader.value) {
     const lastRow = rowN - 1;
     const maxRow = lastRow < 0 ? 0 : lastRow;
-    const row = clamp(finalRow, 0, maxRow);
+    const row = clamp(activeRow.value, 0, maxRow);
     if (row !== activeRow.value) activeRow.value = row;
-    finalRow = row;
   }
   // B8: clamp the range-selection corners to the same FRESH bounds (a sort/filter/paginate that
   // shrank the model would otherwise leave a stale rectangle → phantom copy rows + an
   // out-of-bounds getSelectedRange). Reconcile-only (no range-change emit here, B18/B19).
   clampRange(rowN - 1, colN - 1);
   // B25: recover DOM focus onto the re-indexed valid cell (deferred until the new model renders)
-  // when the shrink removed the focused cell. Uses the FRESH locals (not the React-stale $data).
+  // when the shrink removed the focused cell. The target is the DOOMED cell's own coords clamped
+  // into the fresh bounds (React-stale-safe — see the doomedRow/doomedCol note above).
   if (recoverFocus) {
-    const rowKey = finalIsHeader ? '__header' : String(finalRow);
-    recoverGridFocus(rowKey, finalCol, finalIsHeader ? finalLevel : null);
+    const recRow = clamp(doomedRow, 0, rowN - 1);
+    const recCol = clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
+    recoverGridFocus(String(recRow), recCol, null);
   }
 };
 
@@ -3145,6 +3153,23 @@ let rangeTransition = false;
 // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
 // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
 let rangeClickPending = false;
+// B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
+// true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
+// arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
+// on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
+// `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
+// range-change. This module-let is written synchronously (no setState async), so the second
+// clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
+// across all six targets. A top-level let → React hoists to useRef.
+// B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
+// true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
+// arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
+// on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
+// `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
+// range-change. This module-let is written synchronously (no setState async), so the second
+// clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
+// across all six targets. A top-level let → React hoists to useRef.
+let rangeActive = false;
 const inRange = (rIdx: any, cIdx: any) => {
   const a = rangeAnchor.value;
   const f = rangeFocus.value;
@@ -3259,6 +3284,7 @@ const extendRange = (dRow: any, dCol: any) => {
   };
   rangeAnchor.value = anchor;
   rangeFocus.value = nextFocus;
+  rangeActive = true;
   // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
   // from the range's leading edge, the spreadsheet convention).
   activeRow.value = nextRow;
@@ -3299,6 +3325,7 @@ const setRangeFocus = (rIdx: any, cIdx: any) => {
   };
   rangeAnchor.value = anchor;
   rangeFocus.value = nextFocus;
+  rangeActive = true;
   emitRangeChange(anchor, nextFocus);
 };
 
@@ -3315,7 +3342,13 @@ const setRangeFocus = (rIdx: any, cIdx: any) => {
 // the drop — without this they hold a STALE rectangle after every non-shift navigation /
 // edit-entry collapse (getSelectedRange already reports null, but the event never fired).
 const clearRange = () => {
-  if (rangeAnchor.value == null && rangeFocus.value == null) return;
+  // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
+  // in one plain-arrow keydown (explicit collapse + the focusin after the programmatic focus
+  // move); on React `$data.rangeAnchor = null` is async, so a `$data.rangeAnchor == null` guard
+  // would let the SECOND call through and emit a duplicate range-change. rangeActive flips
+  // synchronously → the second call returns here.
+  if (!rangeActive) return;
+  rangeActive = false;
   rangeAnchor.value = null;
   rangeFocus.value = null;
   emitRangeChange(null, null);
@@ -3348,6 +3381,7 @@ const clampRange = (maxRowArg: any, maxColArg: any) => {
   if (maxRow < 0 || maxCol < 0) {
     rangeAnchor.value = null;
     rangeFocus.value = null;
+    rangeActive = false;
     return;
   }
   if (a) {

@@ -69,6 +69,7 @@ const extendRange = (dRow, dCol) => {
   const nextFocus = { rowIndex: nextRow, colIndex: nextCol }
   $data.rangeAnchor = anchor
   $data.rangeFocus = nextFocus
+  rangeActive = true
   // Keep the active cell tracking the moving focus corner (so a follow-up F2 / arrow acts
   // from the range's leading edge, the spreadsheet convention).
   $data.activeRow = nextRow
@@ -100,6 +101,7 @@ const setRangeFocus = (rIdx, cIdx) => {
   const nextFocus = { rowIndex: r, colIndex: c }
   $data.rangeAnchor = anchor
   $data.rangeFocus = nextFocus
+  rangeActive = true
   emitRangeChange(anchor, nextFocus)
 }
 
@@ -110,7 +112,13 @@ const setRangeFocus = (rIdx, cIdx) => {
 // the drop — without this they hold a STALE rectangle after every non-shift navigation /
 // edit-entry collapse (getSelectedRange already reports null, but the event never fired).
 const clearRange = () => {
-  if ($data.rangeAnchor == null && $data.rangeFocus == null) return
+  // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
+  // in one plain-arrow keydown (explicit collapse + the focusin after the programmatic focus
+  // move); on React `$data.rangeAnchor = null` is async, so a `$data.rangeAnchor == null` guard
+  // would let the SECOND call through and emit a duplicate range-change. rangeActive flips
+  // synchronously → the second call returns here.
+  if (!rangeActive) return
+  rangeActive = false
   $data.rangeAnchor = null
   $data.rangeFocus = null
   emitRangeChange(null, null)
@@ -135,6 +143,7 @@ const clampRange = (maxRowArg, maxColArg) => {
   if (maxRow < 0 || maxCol < 0) {
     $data.rangeAnchor = null
     $data.rangeFocus = null
+    rangeActive = false
     return
   }
   if (a) {

@@ -196,7 +196,7 @@ const shrinkViaDataSwap = (): void => {
       ref="dt"
       interactionMode="grid"
       r-model:data="$data.rows"
-      :pagination="$data.pageConfig"
+      r-model:pagination="$data.pageConfig"
       @activecell-change="onActiveCellChange($event)"
       @range-change="onRangeChange($event)"
     >
