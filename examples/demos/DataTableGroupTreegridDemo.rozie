@@ -52,10 +52,12 @@
     { id: 3, category: 'Veg',   name: 'Carrot', qty: 2 },
     { id: 4, category: 'Veg',   name: 'Pea',    qty: 7 },
   ],
-  // Controlled grouping state, grouped from mount (ordered single-column group by
-  // category). model:true two-way; [] = ungrouped. Named groupingModel (NOT `grouping`)
-  // per the GroupDemo Angular shadow note.
-  groupingModel: ['category'],
+  // Controlled grouping state. Seeded [] then APPLIED in $onMount (a post-mount grouping
+  // WRITE) — the grouped-model rebuild keys on the grouping CHANGE, not the initial-prop
+  // value, so React engages grouping reliably (the DataTableVirtualGroupDemo pattern; an
+  // initial-bound ['category'] renders 0 group rows on React). Named groupingModel (NOT
+  // `grouping`) per the GroupDemo Angular slot-var/signal shadow note.
+  groupingModel: [],
   // A large pageSize so all flattened rows are on one page (no page-cross nav noise).
   pageConfig: { pageIndex: 0, pageSize: 50 },
   // Last activecell-change payload (REQ-3 nav) as "r,c".
@@ -67,6 +69,15 @@
 const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
   $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
 }
+
+// Apply grouping AFTER mount (one frame later) — a post-mount grouping WRITE so the
+// grouped row-model rebuild keys on the CHANGE (reliable on React; the VirtualGroup
+// pattern). Writing the bound model field drives the child's r-model:grouping.
+$onMount(() => {
+  const applyGrouping = (): void => { $data.groupingModel = ['category'] }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
+  else applyGrouping()
+})
 </script>
 
 <template>

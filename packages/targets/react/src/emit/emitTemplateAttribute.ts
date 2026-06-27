@@ -188,6 +188,26 @@ const BOOLEAN_NULLISH_ARIA_ATTRS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Does the (normalized) attribute expression have a `null`/`undefined` branch? A boolean-
+ * enumerated ARIA attribute (`aria-expanded`) only needs the `?? undefined` rescue when its
+ * value can be `boolean | null/undefined` — `rozieAttr` widens the BOOLEAN part to `string`
+ * (TS2322). A NON-nullish form (`cond ? 'true' : 'false'`) is a STRING union that `rozieAttr`
+ * already types correctly (`'true' | 'false' | undefined` is assignable to `Booleanish`), so it
+ * stays on the existing `rozieAttr` path (no drift) — and emitting `?? undefined` on a
+ * provably-non-nullish operand would be TS2869 (unreachable right operand).
+ */
+function isNullishLiteralExpr(e: t.Expression): boolean {
+  return t.isNullLiteral(e) || (t.isIdentifier(e) && e.name === 'undefined');
+}
+function hasNullishBranch(expr: t.Expression): boolean {
+  if (isNullishLiteralExpr(expr)) return true;
+  if (t.isConditionalExpression(expr)) {
+    return hasNullishBranch(expr.consequent) || hasNullishBranch(expr.alternate);
+  }
+  return false;
+}
+
+/**
  * A numeric-attribute binding that is SYNTACTICALLY provably non-nullish — a numeric literal,
  * an arithmetic BinaryExpression (`a + 1`, `i * 2`), or a unary `+`/`-`. These already type as
  * `number`, so the numeric-attr emit must NOT append `?? undefined` (the right operand would be
@@ -1065,7 +1085,10 @@ function emitNonClassAttribute(
       // the numeric path above) to preserve `boolean | undefined` AND the nullish-drop. The
       // normalized expr already maps a branch-position `: null` → `undefined`, so `?? undefined`
       // is reachable (no TS2869); a provably-boolean `!!x` form never reaches here (raw emit).
-      if (BOOLEAN_NULLISH_ARIA_ATTRS.has(attr.name.toLowerCase())) {
+      if (
+        BOOLEAN_NULLISH_ARIA_ATTRS.has(attr.name.toLowerCase()) &&
+        hasNullishBranch(normalizedAttrExpr)
+      ) {
         return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
       }
       ctx.collectors.runtime.add('rozieAttr');

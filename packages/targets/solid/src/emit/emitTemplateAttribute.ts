@@ -187,6 +187,38 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
   'start',
 ]);
 
+/**
+ * Phase 63 wave-8 (C2) — ARIA attributes typed `Booleanish | undefined` in Solid's JSX
+ * (`boolean | "false" | "true" | undefined`) that a `.rozie` author may bind with a
+ * NULLISH-droppable form — `aria-expanded` on a treegrid group row:
+ * `rowIsGrouped(row) ? !!rowIsExpanded(row) : null`. Solid's `rozieAttr` widens that to
+ * `string | undefined`, which fails the strict `Booleanish` slot (TS2322) — unlike Solid's
+ * loosely-typed numeric ARIA (`aria-level`/`aria-rowindex` accept `string`, so they stay on
+ * the `rozieAttr` path). Emit the `(expr) ?? undefined` form so the value types
+ * `boolean | undefined` AND a `null`/`undefined` drops the attribute. A provably-boolean
+ * `!!x` binding is `wrapForDisplay=false` and never reaches here (raw emit, byte-unchanged).
+ */
+const BOOLEAN_NULLISH_ARIA_ATTRS: ReadonlySet<string> = new Set([
+  'aria-expanded',
+]);
+
+/**
+ * Does the attribute expression have a `null`/`undefined` branch? `aria-expanded` only needs
+ * the `(expr) ?? undefined` rescue when its value can be `boolean | null` — `rozieAttr` widens
+ * the BOOLEAN part to `string` (TS2322). A NON-nullish STRING form (`cond ? 'true' : 'false'`)
+ * is already correctly typed by `rozieAttr`, so it stays on the existing path (no drift).
+ */
+function isNullishLiteralExpr(e: t.Expression): boolean {
+  return t.isNullLiteral(e) || (t.isIdentifier(e) && e.name === 'undefined');
+}
+function hasNullishBranch(expr: t.Expression): boolean {
+  if (isNullishLiteralExpr(expr)) return true;
+  if (t.isConditionalExpression(expr)) {
+    return hasNullishBranch(expr.consequent) || hasNullishBranch(expr.alternate);
+  }
+  return false;
+}
+
 function htmlAttrToSolidName(name: string): string {
   const lower = name.toLowerCase();
   return HTML_TO_SOLID_ATTR[lower] ?? name;
@@ -671,6 +703,16 @@ function emitNonClassAttribute(
     // (SPEC-3). The wrap sits inside the JSX `{}` so the accessor read stays
     // tracked (A4).
     if (attr.wrapForDisplay && shouldWrapAttrBinding(attr.name, attr.expression, ctx)) {
+      // Phase 63 wave-8 (C2) — a NULLISH-droppable boolean-enumerated ARIA attribute
+      // (`aria-expanded` on a treegrid group row) types `Booleanish | undefined` in Solid's
+      // strict JSX, which `rozieAttr` would string-widen (TS2322). Emit `(expr) ?? undefined`
+      // so the value stays `boolean | undefined` AND a `null`/`undefined` drops the attribute.
+      if (
+        BOOLEAN_NULLISH_ARIA_ATTRS.has(attr.name.toLowerCase()) &&
+        hasNullishBranch(attr.expression)
+      ) {
+        return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
+      }
       // 260608-sya — whole-value attribute binding: route through `rozieAttr`
       // so a nullish value DROPS the attribute (returns `undefined` → Solid
       // skips the setAttribute) instead of rendering `attr=""`, matching Vue's
