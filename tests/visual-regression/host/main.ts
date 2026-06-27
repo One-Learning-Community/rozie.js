@@ -660,6 +660,21 @@ export const EXAMPLES = [
   // build-cells demos sweep already cover it, importing the data-table source pkg already
   // registered for Angular cross-tree AOT in phase 48).
   'DataTableGridRowEdit',
+  // Phase 63 Wave-3 (grid-mode clipboard + fill correctness) — the clipboard/fill-cluster
+  // RED-first fixture (loader → examples/demos/DataTableGridClipboardDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). ONE grid-mode DataTable with
+  // four editable columns (label/qty/cost/city) where row 0's label carries a tab+newline+
+  // quote, bound r-model:data + r-model:sorting + r-model:globalFilter, so
+  // data-table-grid-clipboard.spec.ts asserts B7 (per-column fill-down + pre-drag origin on an
+  // up-drag), B8 (range corners clamp on filter-to-fewer → no phantom copy rows), B9 (paste
+  // coerces to the column type — numbers commit as Number, empty as null), B10 (TSV round-trips
+  // a tab/newline/quote cell), B11 (Ctrl+C/Ctrl+V are no-ops while a header is active).
+  // Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline). Lives under
+  // examples/demos/ so no new Angular 3-file registration is needed (prebuildExtraRoots
+  // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos sweep
+  // already cover it, importing the data-table source pkg already registered for Angular
+  // cross-tree AOT in phase 48).
+  'DataTableGridClipboard',
   // Phase 50 (data-table TanStack round-out: expandable rows + grouping/aggregation +
   // faceted filtering) WAVE-0 behavioral fixtures (loaders →
   // examples/demos/DataTable{Expand,Group,Facet}Demo.rozie, each importing
@@ -1019,6 +1034,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid-mode row-edit — '-demo' appended on Lit →
   // 'rozie-data-table-grid-row-edit-demo' = kebab of DataTableGridRowEditDemo.
   DataTableGridRowEdit: 'rozie-data-table-grid-row-edit',
+  // Phase 63 grid-mode clipboard/fill — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-clipboard-demo' = kebab of DataTableGridClipboardDemo.
+  DataTableGridClipboard: 'rozie-data-table-grid-clipboard',
   // Phase 50 round-out — '-demo' appended on Lit → tags
   // 'rozie-data-table-expand-demo' / 'rozie-data-table-group-demo' /
   // 'rozie-data-table-facet-demo' = kebab of DataTableExpandDemo / DataTableGroupDemo /

@@ -1,0 +1,199 @@
+<!--
+  DataTableGridClipboardDemo.rozie — Phase 63 Wave-3 (clipboard + fill correctness)
+  RED-first fixture.
+
+  Drives the five clipboard/fill-cluster bugs across all six targets via
+  data-table-grid-clipboard.spec.ts:
+    B7  — fill-drag clobbers multi-column data / reads the wrong source on an up/left
+          drag (DATA LOSS). Each source column must copy its OWN value down its OWN
+          column; an up-drag must read the pre-drag origin row, not the post-drag corner.
+    B8  — range corners never clamp on sort/filter/paginate → a copy includes stale /
+          phantom rows past the shrunken model.
+    B9  — paste stores raw TSV strings (no type coercion) → mixed types in the model.
+    B10 — TSV copy/paste has no tab/newline/quote escaping → a cell containing a tab,
+          newline, or quote corrupts/smears into adjacent cells.
+    B11 — Ctrl+C / Ctrl+V fire while a HEADER cell is active → silent body mutation.
+
+  A SINGLE DataTable in interactionMode='grid' (range selection + fill handle are
+  unconditional in grid mode) with FOUR editable columns:
+    0 label — built-in text editor    (row 0 holds a tab+newline+quote value → B10)
+    1 qty   — built-in number editor  (B9 numeric coercion; B7 per-column source col 1)
+    2 cost  — built-in number editor  (B9 numeric coercion; B7 per-column source col 2)
+    3 city  — built-in text editor    (a duplicate value drives the B8 filter-to-fewer)
+
+  `r-model:data` binds the dataset so the spec asserts the COMMITTED model values + TYPES
+  via the model-readout JSON dump. A bound `r-model:sorting` + a "sort qty ↑" button and a
+  bound `r-model:globalFilter` + a filter input drive the B8 data-shrink. @range-change feeds
+  a live range-readout (the fill-drag flush gate); a getSelectedRange() button dumps the
+  current range corners (the B8 clamp assertion). No loop var / slot named row/cell/header
+  (the Svelte mount-throw discipline) — the #cell slot binds value/columnId.
+-->
+
+<rozie name="DataTableGridClipboardDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Static dataset. Row 0's label carries a tab, a newline, AND a double-quote (the B10
+  // round-trip payload). qty/cost are distinct per row so a cross-row / cross-column fill
+  // source error is detectable. Two 'Oslo' cities → a 'Oslo' global filter keeps exactly
+  // rows 0 + 4 (the B8 shrink-to-2 that should clamp a rows-0..2 range down to 0..1).
+  rows: [
+    { id: 1, label: 'a"x\ty\nz', qty: 10, cost: 20, city: 'Oslo'  },
+    { id: 2, label: 'Beta',      qty: 11, cost: 21, city: 'Lima'  },
+    { id: 3, label: 'Gamma',     qty: 12, cost: 22, city: 'Cairo' },
+    { id: 4, label: 'Delta',     qty: 13, cost: 23, city: 'Tokyo' },
+    { id: 5, label: 'Echo',      qty: 14, cost: 24, city: 'Oslo'  },
+  ],
+  // Two-way sort slice — the "sort qty ↑" button writes it (B8 driver alt).
+  sorting: [],
+  // Two-way global filter — the filter input shrinks the row model (B8 main driver).
+  globalFilter: '',
+  // Last @range-change focus "r,c" (the fill-drag flush gate: poll until the move landed).
+  rangeReadout: '',
+  // getSelectedRange() dump "ar,ac-fr,fc" (the B8 clamp assertion) or 'null'.
+  selRange: '',
+  // Last cell-edit-commit "columnId=newValue" + a counter (one per committed cell).
+  lastCommit: '',
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// @range-change → "r,c" of the moving focus corner. The fill-drag spec polls this to
+// confirm setRangeFocus flushed (React useState is async) BEFORE firing pointerup, so
+// fillRange reads the FRESH extended rectangle, not the pre-move stale one (ROZ138).
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  const f = payload ? payload.focus : null
+  $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
+}
+
+// cell-edit-commit → "columnId=newValue" readout + counter (paste/fill commit one per cell).
+const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = payload ? payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+
+// getSelectedRange() via the live $refs.dt handle (the GridNavDemo idiom — never cache).
+// Dumps "ar,ac-fr,fc" so the B8 spec can assert the corners clamped into the shrunken model.
+const callGetSelectedRange = (): void => {
+  const api = $refs.dt
+  if (api && api.getSelectedRange) {
+    const r = api.getSelectedRange()
+    const a = r ? r.anchor : null
+    const f = r ? r.focus : null
+    if (a && f) $data.selRange = a.rowIndex + ',' + a.colIndex + '-' + f.rowIndex + ',' + f.colIndex
+    else $data.selRange = 'null'
+  }
+}
+
+// Apply an ascending sort on qty (an ACTIVE sort B8 can shrink/re-derive under).
+const sortByQtyAsc = (): void => {
+  $data.sorting = [{ id: 'qty', desc: false }]
+}
+</script>
+
+<template>
+<div class="dt-grid-clip-demo">
+  <h3>DataTable — grid-mode clipboard + fill</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="sort-qty" @click="sortByQtyAsc">sort qty ↑</button>
+    <button type="button" data-testid="get-range" @click="callGetSelectedRange">getSelectedRange()</button>
+    <input
+      class="gf"
+      type="text"
+      data-testid="global-filter"
+      placeholder="filter"
+      r-model="$data.globalFilter"
+    />
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
+    <span class="label">sel-range:</span>
+    <span class="readout" data-testid="selrange-readout">{{ $data.selRange }}</span>
+    <span class="label">commit:</span>
+    <span class="readout" data-testid="commit-readout">{{ $data.lastCommit }}</span>
+    <span class="label">commit-count:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <!-- The COMMITTED model, JSON-dumped, so the spec asserts both VALUES and TYPES (B9:
+       typeof qty/cost === 'number'; an emptied pasted cell commits null). -->
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      r-model:sorting="$data.sorting"
+      r-model:globalFilter="$data.globalFilter"
+      @range-change="onRangeChange($event)"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <Column field="label" header="Label" sortable :editable="true" editor="text" />
+      <Column field="qty"   header="Qty"   sortable :editable="true" editor="number" />
+      <Column field="cost"  header="Cost"  sortable :editable="true" editor="number" />
+      <Column field="city"  header="City"  sortable :editable="true" editor="text" />
+
+      <!-- Read-only display slot. -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-clip-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 680px;
+}
+.dt-grid-clip-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button,
+.controls .gf {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .gf { cursor: text; }
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>
