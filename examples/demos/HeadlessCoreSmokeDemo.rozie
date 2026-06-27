@@ -1,0 +1,39 @@
+<!--
+  HeadlessCoreSmokeDemo.rozie — Phase 64 P0 CROSS-PACKAGE boundary proof (the
+  load-bearing demo that blocks P1–P4).
+
+  This demo lives OUTSIDE @rozie-ui/headless-core (in examples/demos), and its
+  `<script>` imports the smoke partial via a BARE specifier
+  (`@rozie-ui/headless-core/smoke.rzts`). That is the genuinely-unproven mechanism
+  P0 exists to de-risk: no cross-package bare-specifier `.rzts` import existed
+  anywhere in this repo before this phase. The Task-1 gate may self-resolve from
+  headless-core's own tree; THIS demo proves true cross-package resolution + the
+  Angular AOT cross-tree path (the partial is inlined by inlineScriptPartials()
+  BEFORE the leaf is emitted, so the compiled cell carries ZERO runtime import to
+  headless-core).
+
+  Mounts non-empty on all 6 targets (renders the inlined probe result "42"); the
+  VR matrix asserts the cell is non-empty ×6, ESPECIALLY Angular.
+-->
+
+<rozie name="HeadlessCoreSmokeDemo">
+
+<script lang="ts">
+import { headlessCoreSmoke } from '@rozie-ui/headless-core/smoke.rzts'
+
+// headlessCoreSmoke is a cross-package partial export, inlined at compile time.
+const probe = headlessCoreSmoke(41)
+</script>
+
+<template>
+  <div data-testid="headless-core-smoke" class="headless-core-smoke">
+    <span data-testid="headless-core-smoke-value">headless-core smoke: {{ probe }}</span>
+  </div>
+</template>
+
+<style>
+.headless-core-smoke {
+  font: 14px system-ui, sans-serif;
+  padding: 12px;
+}
+</style>

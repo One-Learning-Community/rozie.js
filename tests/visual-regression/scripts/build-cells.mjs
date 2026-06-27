@@ -259,6 +259,12 @@ const POPOVER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'popover', 'src');
 const DATE_PICKER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'date-picker', 'src');
 const RESIZABLE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'resizable', 'src');
 const COMMAND_PALETTE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'command-palette', 'src');
+// Phase 64 (D-08): @rozie-ui/headless-core is a SOURCE-ONLY package of shared
+// `.rzts` partials. UNLIKE the component families above it emits NO `.rozie.ts`
+// and NO `<Name>.ts` shim (the partial inlines into the CONSUMER's `.rozie.ts`),
+// so this sweep is a DEFENSIVE no-op registered per the D-08 trio. Phase 64 P0
+// Task 3 A/B-tests whether the sweep is load-bearing for a partial-only package.
+const HEADLESS_CORE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'headless-core', 'src');
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -642,6 +648,23 @@ function cleanupCrossTreeAngularArtifacts() {
       // family src always exists post-port — defensive only
     }
     rmSync(resolve(src, shim), { force: true });
+  }
+  // Phase 64 (D-08): @rozie-ui/headless-core sweep — DEFENSIVE no-op. It is a
+  // SOURCE-ONLY package of shared `.rzts` partials with NO component, so the
+  // Angular sub-build emits NO `<Name>.rozie.ts` and NO `<Name>.ts` shim here
+  // (the partial inlines into the CONSUMER's `.rozie.ts`, e.g.
+  // HeadlessCoreSmokeDemo.rozie.ts under examples/demos, which the examples sweep
+  // already handles). Registered per the D-08 trio; Phase 64 P0 Task 3
+  // A/B-confirms it is a no-op for a partial-only package (no shim rm — there is
+  // no shim to remove).
+  try {
+    for (const entry of readdirSync(HEADLESS_CORE_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(HEADLESS_CORE_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // headless-core src always exists post-P0 — defensive only
   }
 }
 
