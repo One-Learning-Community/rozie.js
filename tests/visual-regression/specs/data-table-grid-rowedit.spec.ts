@@ -403,4 +403,45 @@ for (const target of TARGETS) {
     await expect.poll(async () => cellText(page, 3, 1), { timeout: 10_000 }).toBe('99');
     expect((await modelRows(page)).find((r) => r.name === 'Alpha')?.qty).toBe(99);
   });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // WR-01 — a FULL-ROW commit under an ACTIVE sort relocates the committed row; DOM focus
+  //   FOLLOWS the row to its NEW display index by IDENTITY (the same B23 treatment the
+  //   single-cell commitEdit got, previously missing from commitRow). Pre-fix: commitRow
+  //   captures `focusRow = rowIndex` (the pre-commit visible index) and calls
+  //   focusCellWhenReady(focusRow, focusCol) with the OLD fixed index → after the row
+  //   re-sorts away, focus lands on whatever DIFFERENT row now occupies that index (or drops
+  //   to <body>), and $data.activeRow is left stale (IN-02 — the @focusin sync then writes
+  //   the WRONG activeRow). Post-fix: commitRow routes through pendingEditFollow, which
+  //   refreshRowModel resolves against the FRESH model by row id.
+  //
+  //   Data qty: A=5,B=8,C=2,D=9. Sort qty ↑ → display C(0) A(1) B(2) D(3). editRow(0) enters
+  //   FULL-ROW edit on the visible row-0 (Gamma/C, qty 2); raising its qty to 99 re-sorts to
+  //   A(0) B(1) D(2) Gamma(3): Gamma relocates from index 0 → 3, so focus must move to row 3.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-rowedit [${target}]: WR-01 full-row commit under active sort follows the relocated row's focus`, async ({ page }) => {
+    const mount = await gotoGrid(page, target);
+    // Apply the active qty-ascending sort; confirm the display reordered (row 0 qty = 2 = Gamma).
+    await mount.getByTestId('sort-qty').click();
+    await expect.poll(async () => cellText(page, 0, 1), { timeout: 10_000 }).toBe('2');
+    // Establish a deterministic active column (col 1 = qty) so the post-commit follow focuses col 1.
+    await focusBodyCellStable(page, 0, 1);
+    // Enter FULL-ROW edit on visible row 0 (Gamma, qty 2) via editRow(0); all four editors open.
+    await mount.getByTestId('edit-row').click();
+    await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(4);
+    // Raise the qty editor (col 1) to 99 → under the asc sort Gamma relocates from index 0 → 3.
+    await fillRowEditor(page, 0, 1, '99');
+    await page.keyboard.press('Enter');
+    // The whole row committed (all editors torn down).
+    await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(0);
+    // Focus FOLLOWED the committed row to its new display index (3), staying a gridcell — it
+    // did NOT strand on the old index 0 (now Alpha) or drop to <body>.
+    await expect.poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 }).toBe('3');
+    const a = await activeCellCoords(page);
+    expect(a?.col).toBe('1');
+    expect(a?.role).toBe('gridcell');
+    // The committed row (Gamma) carries qty 99 and now sits at display index 3.
+    await expect.poll(async () => cellText(page, 3, 1), { timeout: 10_000 }).toBe('99');
+    expect((await modelRows(page)).find((r) => r.name === 'Gamma')?.qty).toBe(99);
+  });
 }
