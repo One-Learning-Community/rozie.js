@@ -1,0 +1,132 @@
+<!--
+  DataTableGroupTreegridDemo.rozie — Phase 63 Wave-8 (C2 LOCKED) behavioral VR cell.
+
+  Proves the GRID active cell LANDS on group-header rows + the APG treegrid row
+  semantics, INSIDE the real DataTable.rozie:
+
+    - LAND: with interactionMode='grid' + grouping active, ArrowUp/ArrowDown do NOT
+      skip the flattened group-header rows — the active cell stops ON a group cell
+      (a real gridcell with data-row/data-col-index, the verified-correct full-cell-set
+      invariant).
+    - TREEGRID SEMANTICS: each group-header <tr> carries role=row + aria-level (the
+      group depth, 1-based) + aria-expanded reflecting expanded/collapsed; leaf rows
+      carry aria-level too (treegrid hierarchy). Collapsing flips aria-expanded → false.
+    - ENTER TOGGLE: with the active cell on a group cell, Enter toggles that group's
+      collapse/expand (leaf rows appear/disappear) — group cells stay non-editable so
+      Enter never mis-routes to cell edit.
+    - CROSS-BOUNDARY COHERENCE: ArrowDown from an EXPANDED group header lands on its
+      first leaf; ArrowUp from a group's first leaf lands back on the group header;
+      ArrowDown from a COLLAPSED group header lands on the NEXT group header.
+
+  data-table-grid-treegrid.spec.ts asserts these ×6. Each assertion is RED on the
+  pre-fix build (active cell skipped group rows; no aria-expanded/aria-level on the
+  <tr>; Enter on a group cell focused the toggle button instead of toggling) and GREEN
+  after the C2 fix (SC-1). Static dataset (no clock/random) for VR determinism. NO loop
+  var or slot named `cell`/`row`/`header` is introduced (table-core drives the columns;
+  the slot binding name is `value`). The grouping model field is `groupingModel` (NOT
+  `grouping`) to avoid the Angular slot-var/signal shadow (the GroupDemo footgun).
+-->
+
+<rozie name="DataTableGroupTreegridDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Two groups (category Fruit / Veg), two leaf rows each. Grouped + expanded at mount
+  // → the flattened row model is:
+  //   0  group Fruit  (depth 0)
+  //   1  leaf  Apple  (depth 1)
+  //   2  leaf  Banana (depth 1)
+  //   3  group Veg    (depth 0)
+  //   4  leaf  Carrot (depth 1)
+  //   5  leaf  Pea    (depth 1)
+  rows: [
+    { id: 1, category: 'Fruit', name: 'Apple',  qty: 3 },
+    { id: 2, category: 'Fruit', name: 'Banana', qty: 5 },
+    { id: 3, category: 'Veg',   name: 'Carrot', qty: 2 },
+    { id: 4, category: 'Veg',   name: 'Pea',    qty: 7 },
+  ],
+  // Controlled grouping state, grouped from mount (ordered single-column group by
+  // category). model:true two-way; [] = ungrouped. Named groupingModel (NOT `grouping`)
+  // per the GroupDemo Angular shadow note.
+  groupingModel: ['category'],
+  // A large pageSize so all flattened rows are on one page (no page-cross nav noise).
+  pageConfig: { pageIndex: 0, pageSize: 50 },
+  // Last activecell-change payload (REQ-3 nav) as "r,c".
+  lastActiveCell: '',
+}
+</data>
+
+<script lang="ts">
+const onActiveCellChange = (payload: { rowIndex: number; colIndex: number }): void => {
+  $data.lastActiveCell = payload ? payload.rowIndex + ',' + payload.colIndex : ''
+}
+</script>
+
+<template>
+<div class="dt-treegrid-demo">
+  <h3>DataTable — grid + grouping (treegrid)</h3>
+
+  <div class="controls">
+    <span class="label">grouping:</span>
+    <span class="readout" data-testid="grouping-readout">{{ $data.groupingModel.join(',') }}</span>
+    <span class="label">activecell-change:</span>
+    <span class="readout" data-testid="activecell-readout">{{ $data.lastActiveCell }}</span>
+  </div>
+
+  <!-- GRID mode + grouping → group-header rows are addressable treegrid rows. -->
+  <div data-testid="treegrid-table">
+    <DataTable
+      ref="dt"
+      :data="$data.rows"
+      interactionMode="grid"
+      :groupable="true"
+      :pagination="$data.pageConfig"
+      r-model:grouping="$data.groupingModel"
+      @activecell-change="onActiveCellChange($event)"
+    >
+      <Column field="category" header="Category" />
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+      <!-- Plain #cell display slot (no control-bearing cell needed for C2). -->
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-treegrid-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.dt-treegrid-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+/* Make the roving active cell visible (token surface; :focus-visible parity). */
+[data-testid="treegrid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="treegrid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+</style>
+
+</rozie>
