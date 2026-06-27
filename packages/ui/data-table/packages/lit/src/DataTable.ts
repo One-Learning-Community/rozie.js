@@ -3577,8 +3577,26 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const fromRow = fromCell.getAttribute('data-row');
   const fromCol = fromCell.getAttribute('data-col-index');
   if (fromRow !== String(this._editingRow.value) || fromCol !== String(this._editingCol.value)) return;
-  // Genuine click-away to another grid cell → commit + close.
-  this.commitEdit(undefined);
+  // Genuine click-away to another grid cell → commit + close. skipFocusReturn=true so the
+  // commit does NOT bounce focus back to the just-committed editing cell (which would fight
+  // the click destination). The commit's writeData re-renders the table and can DROP DOM
+  // focus on the fine-grained targets (Solid keyed-row replace). Re-seat focus on the CLICK
+  // DESTINATION cell ONLY IF the re-render actually dropped it — a single deferred check
+  // (not a 30-frame poll) so a target whose click-focus SURVIVED (Lit) is never re-focused
+  // late, which would steal focus back from a subsequent navigation.
+  const destRow = nextCell.getAttribute('data-row');
+  const destCol = nextCell.getAttribute('data-col-index');
+  this.commitEdit(undefined, true);
+  const reseatDestFocus = () => {
+    if (!this.gridRoot || destRow == null || destCol == null || destRow === '__header') return;
+    const root = this.gridRoot.getRootNode ? this.gridRoot.getRootNode() : null;
+    const act = root && root.activeElement ? root.activeElement : null;
+    // Focus already landed inside the grid (the click-focus survived the re-render) — leave it.
+    if (act && this.gridRoot.contains && this.gridRoot.contains(act)) return;
+    const el = this.resolveCellEl(destRow, parseInt(destCol, 10));
+    if (el) el.focus();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reseatDestFocus);else setTimeout(reseatDestFocus, 0);
 };
 
   editCell = (rowIndex: any, colIndex: any) => {
