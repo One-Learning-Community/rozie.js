@@ -40,6 +40,9 @@
     "@rozie-ui/headless-core": "workspace:*"
   },
   "pnpm": {
+    "overrides": {
+      "vite@^8": "8.1.0"
+    },
     "packageExtensions": {
       "@analogjs/vite-plugin-angular": {
         "peerDependencies": {
