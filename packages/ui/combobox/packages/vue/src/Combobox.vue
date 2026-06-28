@@ -11,7 +11,7 @@
 
     <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
       <slot name="empty" :query="query">No results</slot>
-    </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'">
+    </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
 
     <li v-for="wr in windowedRows()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="wr.row.value === value" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
@@ -736,8 +736,9 @@ onMounted(() => {
   syncQueryToValue();
   syncRows();
   // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-  // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
-  // the .rozie-combobox-list scroll container exists here.
+  // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
+  // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
+  // container already exists here for the virtualizer to attach to.
   if (props.virtual) {
     // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
     // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered

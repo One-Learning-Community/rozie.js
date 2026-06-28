@@ -108,12 +108,12 @@ function __rozieAttr(v: unknown): string | null {
         <div class="rozie-listbox-spacer" aria-hidden="true" [style]="'height:' + padTop() + 'px'"></div>
 
         @for (wr of windowedRows(); track wr.row.id) {
-    <div [attr.id]="rozieAttr(optionId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) }" role="option" [attr.aria-selected]="!!isSelected(wr.row)" [attr.aria-disabled]="!!disabledOf(wr.row)" (click)="select(wr.row)" (mousemove)="onOptionPointerMove(wr.vi.index)">
+    <div [attr.id]="rozieAttr(optionId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }" role="option" [attr.aria-selected]="!!isSelected(wr.row._opt)" [attr.aria-disabled]="!!disabledOf(wr.row._opt)" (click)="select(wr.row._opt)" (mousemove)="onOptionPointerMove(wr.vi.index)">
           @if ((optionTpl ?? templates()?.['option'])) {
-    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: wr.row, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }, option: wr.row, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }" />
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }, option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }" />
     } @else {
 
-            {{ rozieDisplay(labelOf(wr.row)) }}
+            {{ rozieDisplay(labelOf(wr.row._opt)) }}
           
     }
         </div>
@@ -715,7 +715,11 @@ export class Listbox {
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
   remeasurePending = false;
-  windowSource = () => this.visibleOptions();
+  windowSource = () => this.visibleOptions().map((o: any, i: any) => ({
+    id: this.valueOf$local(o),
+    _opt: o,
+    _i: i
+  }));
   pinnedEditIndex = () => -1;
   pinnedMeasurement = (pin: any) => null;
   syncRows = () => {
@@ -938,7 +942,7 @@ export class Listbox {
 
   protected get __style() {
       const __maxHeight = this.maxHeight();
-      return __maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + __maxHeight : 'overflow-y:auto';
+      return (this.open$local() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + __maxHeight : 'overflow-y:auto');
     }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

@@ -509,8 +509,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     syncQueryToValue();
     syncRows();
     // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
-    // the .rozie-combobox-list scroll container exists here.
+    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
+    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
+    // container already exists here for the virtualizer to attach to.
     if (props.virtual) {
       // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
       // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
@@ -559,7 +560,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
         {(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
-        </li>}</ul>}{(props.virtual) && <ul className={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle(props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')} data-rozie-s-9546115a="">
+        </li>}</ul>}{(props.virtual) && <ul className={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li className={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
         {windowedRows().map((wr) => <li key={wr.row.id} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": wr.vi.index === activeIndex, "rozie-combobox-option--selected": wr.row.value === value, "rozie-combobox-option--disabled": wr.row.disabled })} id={rozieAttr(optId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value} aria-disabled={!!wr.row.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onMouseEnter={($event) => { setActiveIndex(wr.vi.index); }} data-rozie-s-9546115a="">

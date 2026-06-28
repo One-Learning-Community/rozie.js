@@ -494,7 +494,11 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     return true;
   }
   function windowSource() {
-    return visibleOptions();
+    return visibleOptions().map((o: any, i: any) => ({
+      id: valueOf(o),
+      _opt: o,
+      _i: i
+    }));
   }
   function pinnedEditIndex() {
     return -1;
@@ -631,11 +635,11 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
         {(visibleOptions().length === 0) && <div className={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
-        </div>}</div>}{(props.virtual) && <div ref={listEl} className={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} style={parseInlineStyle(props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto')} data-rozie-s-b576227a="">
+        </div>}</div>}{(props.virtual) && <div ref={listEl} className={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={props.ariaLabel} aria-multiselectable={props.multiple} style={parseInlineStyle((open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
         <div className={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
 
-        {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-listbox-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row), "is-disabled": disabledOf(wr.row) })} role="option" aria-selected={!!isSelected(wr.row)} aria-disabled={!!disabledOf(wr.row)} onClick={($event) => { select(wr.row); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
-          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }) : rozieDisplay(labelOf(wr.row))}
+        {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-listbox-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row._opt), "is-disabled": disabledOf(wr.row._opt) })} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
+          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }) : rozieDisplay(labelOf(wr.row._opt))}
         </div>)}
 
         <div className={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-b576227a="" />

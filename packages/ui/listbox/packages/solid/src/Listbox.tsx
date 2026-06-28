@@ -739,10 +739,22 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   let remeasurePending = false;
 
   // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-  // set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
-  // resolves to the same option the count windows over.
+  // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+  // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+  // wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
+  // — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+  // every framework :key (and every virtual-core measurement key) to `undefined`, which
+  // recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+  // row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+  // value, `_opt` the original option (read via wr.row._opt in the windowed template),
+  // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+  // the same wrapped row the count windows over.
   function windowSource() {
-    return visibleOptions();
+    return visibleOptions().map((o: any, i: any) => ({
+      id: valueOf(o),
+      _opt: o,
+      _i: i
+    }));
   }
 
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
@@ -884,11 +896,11 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
         {<Show when={visibleOptions().length === 0}><div class={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No options"}
-        </div></Show>}</div></Show>}{<Show when={local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} style={parseInlineStyle(local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + local.maxHeight : 'overflow-y:auto')} data-rozie-s-b576227a="">
+        </div></Show>}</div></Show>}{<Show when={local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={local.ariaLabel} aria-multiselectable={local.multiple} style={parseInlineStyle((open$local() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
         <div class={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
 
-        <For each={windowedRows()}>{(wr) => <div data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={!!isSelected(wr.row)} aria-disabled={!!disabledOf(wr.row)} id={rozieAttr(optionId(wr.vi.index))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) })} onClick={($event) => { select(wr.row); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
-          {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr.row, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row), disabled: disabledOf(wr.row) }) ?? rozieDisplay(labelOf(wr.row))}
+        <For each={windowedRows()}>{(wr) => <div data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} id={rozieAttr(optionId(wr.vi.index))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) })} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
+          {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }) ?? rozieDisplay(labelOf(wr.row._opt))}
         </div>}</For>
 
         <div class={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-b576227a="" />

@@ -294,11 +294,13 @@ export class Combobox {
     this.syncQueryToValue();
     this.syncRows();
     // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
-    // the .rozie-combobox-list scroll container exists here.
+    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
+    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
+    // container already exists here for the virtualizer to attach to.
     // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
-    // the .rozie-combobox-list scroll container exists here.
+    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
+    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
+    // container already exists here for the virtualizer to attach to.
     if (this.virtual()) {
       // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
       // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
@@ -830,7 +832,7 @@ export class Combobox {
 
   protected get __style() {
       const __maxHeight = this.maxHeight();
-      return __maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + __maxHeight : 'overflow-y:auto';
+      return (this.isOpen() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + __maxHeight : 'overflow-y:auto');
     }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

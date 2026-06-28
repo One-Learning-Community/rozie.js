@@ -339,12 +339,12 @@ private __rozieWatchInitial_0 = true;
 
     ${this.visibleOptions().length === 0 ? html`<div class="rozie-listbox-empty" role="presentation" data-rozie-s-b576227a>
       ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-    </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" id=${rozieAttr(this.id + '-list')} aria-label=${this.ariaLabel} aria-multiselectable=${this.multiple} style=${rozieStyle(this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + this.maxHeight : 'overflow-y:auto')} data-rozie-ref="listEl" data-rozie-s-b576227a>
+    </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" id=${rozieAttr(this.id + '-list')} aria-label=${this.ariaLabel} aria-multiselectable=${this.multiple} style=${rozieStyle((this._open$local.value ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-b576227a>
     <div class="rozie-listbox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-b576227a></div>
 
-    ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-listbox-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row), 'is-disabled': this.disabledOf(wr.row) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(wr.row.id)} id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row)} aria-disabled=${!!this.disabledOf(wr.row)} @click=${($event: Event) => { this.select(wr.row); }} @mousemove=${($event: Event) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a>
-      ${this.option !== undefined ? this.option({option: wr.row, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row), disabled: this.disabledOf(wr.row)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: wr.row, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row), disabled: this.disabledOf(wr.row)}); } catch { return '{}'; } })()}>
-        ${rozieDisplay(this.labelOf(wr.row))}
+    ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-listbox-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row._opt), 'is-disabled': this.disabledOf(wr.row._opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(wr.row.id)} id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row._opt)} aria-disabled=${!!this.disabledOf(wr.row._opt)} @click=${($event: Event) => { this.select(wr.row._opt); }} @mousemove=${($event: Event) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a>
+      ${this.option !== undefined ? this.option({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}); } catch { return '{}'; } })()}>
+        ${rozieDisplay(this.labelOf(wr.row._opt))}
       </slot>`}
     </div>`)}
 
@@ -740,7 +740,11 @@ private __rozieWatchInitial_0 = true;
 
   remeasurePending = false;
 
-  windowSource = () => this.visibleOptions();
+  windowSource = () => this.visibleOptions().map((o: any, i: any) => ({
+  id: this.valueOf$local(o),
+  _opt: o,
+  _i: i
+}));
 
   pinnedEditIndex = () => -1;
 

@@ -21,12 +21,12 @@
 
     <div v-if="visibleOptions().length === 0" class="rozie-listbox-empty" role="presentation">
       <slot name="empty" :query="query">No options</slot>
-    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple" :style="props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto'">
+    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple" :style="(open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <div class="rozie-listbox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
-    <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-listbox-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) }]" role="option" :aria-selected="!!isSelected(wr.row)" :aria-disabled="!!disabledOf(wr.row)" @click="select(wr.row)" @mousemove="onOptionPointerMove(wr.vi.index)">
-      <slot name="option" :option="wr.row" :index="wr.vi.index" :active="activeIndex === wr.vi.index" :selected="isSelected(wr.row)" :disabled="disabledOf(wr.row)">
-        {{ labelOf(wr.row) }}
+    <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-listbox-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]" role="option" :aria-selected="!!isSelected(wr.row._opt)" :aria-disabled="!!disabledOf(wr.row._opt)" @click="select(wr.row._opt)" @mousemove="onOptionPointerMove(wr.vi.index)">
+      <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
+        {{ labelOf(wr.row._opt) }}
       </slot>
     </div>
 
@@ -742,12 +742,32 @@ let gridScrollEl: any = null;
 let remeasurePending = false;
 
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-// set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
-// resolves to the same option the count windows over.
+// set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+// (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+// wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
+// — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+// every framework :key (and every virtual-core measurement key) to `undefined`, which
+// recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+// row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+// value, `_opt` the original option (read via wr.row._opt in the windowed template),
+// `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+// the same wrapped row the count windows over.
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-// set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
-// resolves to the same option the count windows over.
-const windowSource = () => visibleOptions();
+// set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+// (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+// wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
+// — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+// every framework :key (and every virtual-core measurement key) to `undefined`, which
+// recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+// row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+// value, `_opt` the original option (read via wr.row._opt in the windowed template),
+// `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+// the same wrapped row the count windows over.
+const windowSource = () => visibleOptions().map((o: any, i: any) => ({
+  id: valueOf(o),
+  _opt: o,
+  _i: i
+}));
 
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
