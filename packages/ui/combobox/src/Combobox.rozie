@@ -487,8 +487,9 @@ $onMount(() => {
   syncQueryToValue()
   syncRows()
   // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-  // The popup renders at mount when virtual (r-if="$data.isOpen || $props.virtual"), so
-  // the .rozie-combobox-list scroll container exists here.
+  // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
+  // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
+  // container already exists here for the virtualizer to attach to.
   if ($props.virtual) {
     // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
     // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
@@ -595,18 +596,24 @@ $expose({ focus, clear })
   </ul>
 
   <!-- ══ WINDOWED popup (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
-       Always rendered when virtual (so the .rozie-combobox-list scroll container exists at
-       mount for the virtualizer — ROZ123-safe). Renders a leading spacer, the windowed
-       { vi, row } slice keyed on the full-model wrapper.id, and a trailing spacer; the
-       option's full-model (filtered) index is wr.vi.index. The container is
-       bounded/scrolling via the base .rozie-combobox-list CSS (max-height from the
+       Stays MOUNTED whenever virtual (so the .rozie-combobox-list scroll container exists
+       at mount for the virtualizer — ROZ123-safe) but is HIDDEN via display:none whenever
+       the combobox is closed (CR-01): unmounting would drop the virtualizer's scroll
+       element, so we hide-not-unmount to keep its scrollTop + measurements while still
+       honoring onBlur()/Escape close semantics (the non-virtual branch is gated on
+       $data.isOpen; this branch mirrors that via the :style display toggle). display:none
+       also drops the role="listbox" from the a11y tree when collapsed, so :aria-expanded
+       on the input stays consistent. Renders a leading spacer, the windowed { vi, row }
+       slice keyed on the full-model wrapper.id, and a trailing spacer; the option's
+       full-model (filtered) index is wr.vi.index. The container is bounded/scrolling via
+       the base .rozie-combobox-list CSS (max-height from the
        --rozie-combobox-list-max-height token, mirrored from the maxHeight prop). -->
   <ul
     r-if="$props.virtual"
     class="rozie-combobox-list rozie-combobox-list--virtual"
     :id="listId()"
     role="listbox"
-    :style="$props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + $props.maxHeight) : 'overflow-y:auto'"
+    :style="($data.isOpen ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
   >
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
 
