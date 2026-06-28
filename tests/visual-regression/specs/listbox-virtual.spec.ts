@@ -48,6 +48,29 @@ function runnerFor(target: Target) {
   return !built || KNOWN_FAILING.has(target) ? test.fixme : test;
 }
 
+// WR-02: a missing/failed target sub-build must HARD-FAIL in CI rather than
+// silently passing as a skipped (test.fixme) matrix. This windowing matrix is the
+// ONLY behavioral proof the feature has — CR-01 (hide-on-close) and CR-02 (key
+// stability) are exactly the regressions it must catch — so "no build ⇒ green" is a
+// false-confidence hazard. The per-target test.fixme on a missing entry (runnerFor
+// above) is retained ONLY for local iteration, gated behind ROZIE_VR_TARGETS — the
+// same partial-build escape hatch build-cells.mjs uses (build-cells.mjs:673-699). CI
+// leaves ROZIE_VR_TARGETS unset, so the up-front gate below asserts every target's
+// host entry was built and fails loudly if any are missing.
+const PARTIAL_LOCAL_BUILD = (process.env.ROZIE_VR_TARGETS ?? '').trim().length > 0;
+
+if (!PARTIAL_LOCAL_BUILD) {
+  test('listbox-virtual: all six target host entries are built (CI gate — no silent skip)', () => {
+    const missing = TARGETS.filter(
+      (t) => !existsSync(resolve(__dirname, `../dist/${t}/host/entry.${t}.html`)),
+    );
+    expect(
+      missing,
+      `missing VR host build(s): ${missing.join(', ') || '(none)'} — run the VR build-cells step before the windowing matrix`,
+    ).toEqual([]);
+  });
+}
+
 const SCROLL = '.rozie-listbox-list';
 
 // ── Shadow-piercing helpers (recursive open-shadow-root walker — Lit). ──────────────
