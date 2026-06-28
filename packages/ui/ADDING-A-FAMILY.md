@@ -33,6 +33,10 @@ packages/ui/<slug>/
 > Component name ≠ slug is fine: e.g. component `Toaster` in slug `toast` (mirrors `DataTable` in `data-table`). Keep `FILENAME`/emitted-file/barrel-export/Lit-tag on the **component name**, and pkg names/docs path/`docsPath` on the **slug**.
 > New leaves auto-register: `pnpm-workspace.yaml` already globs `packages/ui/*/packages/*`, so a `pnpm install` picks them up — no workspace-config edit needed.
 
+## Shared headless logic — `@rozie-ui/headless-core`
+
+Before re-implementing list navigation, keyboard handling, or vertical windowing, check whether `@rozie-ui/headless-core` already has it. It is a **source-only** package of `.rzts` script-partials (`listCore.rzts` — the headless list spine; `windowing.rzts` — virtual-core windowing math) that **dissolve** into your compiled leaf at build time (zero runtime dependency). Add it as a **`devDependency`**, define the partial's host-contract symbols, and `import` from the bare specifier (e.g. `'@rozie-ui/headless-core/windowing.rzts'`). Consumed today by listbox, combobox, command-palette, and data-table. See `packages/ui/headless-core/README.md` for the host contracts.
+
 ## Step 0 — author + validate the `.rozie` FIRST
 
 Write `src/<Name>.rozie`, then gate it before any leaf work (mirror `captcha/scripts/compile-captcha-check.mjs`): asserts `compile()×6` emits zero errors and the IR surface (props/models/emits/slots/expose) matches expectation — this is where ROZ121 (expose==emit), ROZ524 (model-setter), and Lit-lifecycle collisions surface. Adjust the `EXPECT` block to your surface.
