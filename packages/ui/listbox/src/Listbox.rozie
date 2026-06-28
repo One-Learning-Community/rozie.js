@@ -283,9 +283,17 @@ let gridScrollEl = null
 let remeasurePending = false
 
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-// set (identity in select-only). Kept === $data.rows so the math's rowList[vi.index]
-// resolves to the same option the count windows over.
-const windowSource = () => visibleOptions()
+// set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+// (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+// wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
+// — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+// every framework :key (and every virtual-core measurement key) to `undefined`, which
+// recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+// row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+// value, `_opt` the original option (read via wr.row._opt in the windowed template),
+// `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+// the same wrapped row the count windows over.
+const windowSource = () => visibleOptions().map((o, i) => ({ id: valueOf(o), _opt: o, _i: i }))
 
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
@@ -496,12 +504,18 @@ $expose({ open, close, toggle, clear, focusControl })
   </div>
 
   <!-- ══ WINDOWED listbox (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
-       Always rendered when virtual (so the .rozie-listbox-list scroll container exists at
-       mount for the virtualizer — ROZ123-safe). Renders a leading spacer, the windowed
-       { vi, row } slice keyed on the full-model option.id, and a trailing spacer; the
-       option's full-model index is wr.vi.index. The container is bounded/scrolling via the
-       base .rozie-listbox-list CSS (max-height from the --rozie-listbox-max-height token,
-       mirrored from the maxHeight prop). -->
+       Stays MOUNTED whenever virtual (so the .rozie-listbox-list scroll container exists at
+       mount for the virtualizer — ROZ123-safe) but is HIDDEN via display:none whenever the
+       listbox is closed (CR-01): unmounting would drop the virtualizer's scroll element, so
+       we hide-not-unmount to keep its scrollTop + measurements while still honoring
+       toggle()/Escape/outside-click close semantics (the non-virtual branch is gated on
+       $data.open; this branch mirrors that via the :style display toggle). display:none also
+       drops the role="listbox" from the a11y tree when collapsed, so :aria-expanded on the
+       control stays consistent. Renders a leading spacer, the windowed { vi, row } slice
+       keyed on the wrapper id (CR-02: windowSource() wraps each option into an id-bearing
+       row), and a trailing spacer; the option's full-model index is wr.vi.index. The
+       container is bounded/scrolling via the base .rozie-listbox-list CSS (max-height from
+       the --rozie-listbox-max-height token, mirrored from the maxHeight prop). -->
   <div
     r-if="$props.virtual"
     ref="listEl"
@@ -510,7 +524,7 @@ $expose({ open, close, toggle, clear, focusControl })
     :id="$props.id + '-list'"
     :aria-label="$props.ariaLabel"
     :aria-multiselectable="$props.multiple"
-    :style="$props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + $props.maxHeight) : 'overflow-y:auto'"
+    :style="($data.open ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
   >
     <div class="rozie-listbox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
@@ -520,15 +534,15 @@ $expose({ open, close, toggle, clear, focusControl })
       :id="optionId(wr.vi.index)"
       :data-index="wr.vi.index"
       class="rozie-listbox-option"
-      :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row), 'is-disabled': disabledOf(wr.row) }"
+      :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }"
       role="option"
-      :aria-selected="!!isSelected(wr.row)"
-      :aria-disabled="!!disabledOf(wr.row)"
-      @click="select(wr.row)"
+      :aria-selected="!!isSelected(wr.row._opt)"
+      :aria-disabled="!!disabledOf(wr.row._opt)"
+      @click="select(wr.row._opt)"
       @mousemove="onOptionPointerMove(wr.vi.index)"
     >
-      <slot name="option" :option="wr.row" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row)" :disabled="disabledOf(wr.row)">
-        {{ labelOf(wr.row) }}
+      <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
+        {{ labelOf(wr.row._opt) }}
       </slot>
     </div>
 
