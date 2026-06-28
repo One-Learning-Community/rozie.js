@@ -2318,6 +2318,9 @@ importers:
 
   packages/ui/combobox/packages/angular:
     dependencies:
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -2355,6 +2358,9 @@ importers:
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../../runtime/lit
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       lit:
         specifier: ^3.2
         version: 3.3.2
@@ -2364,6 +2370,9 @@ importers:
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../../../runtime/react
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       react:
         specifier: ^18.2 || ^19
         version: 19.2.6
@@ -2383,6 +2392,9 @@ importers:
       '@rozie/runtime-solid':
         specifier: workspace:*
         version: link:../../../../runtime/solid
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       solid-js:
         specifier: ^1.8
         version: 1.9.12
@@ -2392,6 +2404,9 @@ importers:
       '@rozie/runtime-svelte':
         specifier: workspace:^
         version: link:../../../../runtime/svelte
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
     devDependencies:
       '@sveltejs/package':
         specifier: ^2
@@ -2414,6 +2429,9 @@ importers:
       '@rozie/runtime-vue':
         specifier: workspace:^
         version: link:../../../../runtime/vue
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: ^6
@@ -3682,6 +3700,9 @@ importers:
 
   packages/ui/listbox/packages/angular:
     dependencies:
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -3719,6 +3740,9 @@ importers:
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../../runtime/lit
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       lit:
         specifier: ^3.2
         version: 3.3.2
@@ -3728,6 +3752,9 @@ importers:
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../../../runtime/react
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       react:
         specifier: ^18.2 || ^19
         version: 19.2.6
@@ -3747,6 +3774,9 @@ importers:
       '@rozie/runtime-solid':
         specifier: workspace:*
         version: link:../../../../runtime/solid
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
       solid-js:
         specifier: ^1.8
         version: 1.9.12
@@ -3756,6 +3786,9 @@ importers:
       '@rozie/runtime-svelte':
         specifier: workspace:^
         version: link:../../../../runtime/svelte
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
     devDependencies:
       '@sveltejs/package':
         specifier: ^2
@@ -3778,6 +3811,9 @@ importers:
       '@rozie/runtime-vue':
         specifier: workspace:*
         version: link:../../../../runtime/vue
+      '@tanstack/virtual-core':
+        specifier: ^3
+        version: 3.17.1
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: ^6
