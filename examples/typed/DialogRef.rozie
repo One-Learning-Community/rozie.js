@@ -25,11 +25,13 @@
 <script lang="ts">
 $onMount(() => {
   // Both calls are HTMLDialogElement-only — they only typecheck once the ref
-  // is typed HTMLDialogElement (not the HTMLElement default).
+  // is typed HTMLDialogElement (not the HTMLElement default). Optional-chained
+  // so the ref-may-be-null narrowing holds on every target's tsconfig (the
+  // Solid gate runs strictNullChecks).
   if ($props.open) {
-    $refs.dlg.showModal()
+    $refs.dlg?.showModal()
   } else {
-    $refs.dlg.close()
+    $refs.dlg?.close()
   }
 })
 </script>
