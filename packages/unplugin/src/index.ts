@@ -234,23 +234,80 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
     // real transform pipeline still runs at request time when Vite serves
     // the module.
     vite: {
-      config: () => ({
-        optimizeDeps: {
-          esbuildOptions: {
-            plugins: [
-              {
-                name: 'rozie:dep-scan-skip',
-                setup(build: { onResolve: (opts: { filter: RegExp }, cb: (args: { path: string }) => { path: string; external: true }) => void }) {
-                  build.onResolve({ filter: /\.rozie$/ }, (args) => ({
-                    path: args.path,
-                    external: true,
-                  }));
-                },
+      // Bundler-aware dep-scan-skip. Vite 8 defaults to the Rolldown bundler,
+      // which reads `optimizeDeps.rolldownOptions` and flags the legacy
+      // `optimizeDeps.esbuildOptions` key `@deprecated Use rolldownOptions
+      // instead` (a warning today, a hard error in a future Vite). Vite 5/6/7
+      // only read `esbuildOptions`. So this is NOT a key rename — the two keys
+      // carry DIFFERENT plugin shapes (esbuild `setup(build){ build.onResolve }`
+      // vs Rolldown/Rollup `{ name, resolveId }`) and the correct branch must
+      // be selected at runtime per host bundler.
+      //
+      // Detection is LAZY and INSIDE this hook on purpose. This `config` hook
+      // only ever runs under Vite, so `vite` is guaranteed resolvable here —
+      // but a STATIC top-level `import { rolldownVersion } from 'vite'` would
+      // throw at ESM link time on Vite <=7 (where that binding is absent) and
+      // on the Rollup/Webpack/esbuild hosts the unplugin core also loads under
+      // (where `vite` may not be installed at all). `rolldownVersion` is the
+      // canonical "this is rolldown-vite / Vite 8" marker: a named export of
+      // `vite` in v8, undefined in <=7. Vite awaits async config hooks, so the
+      // dynamic import is safe.
+      config: async () => {
+        let isRolldown = false;
+        try {
+          const viteMod = (await import('vite')) as { rolldownVersion?: string };
+          isRolldown = Boolean(viteMod.rolldownVersion);
+        } catch {
+          // `vite` unresolvable / no rolldownVersion — treat as Vite <=7.
+          isRolldown = false;
+        }
+
+        if (isRolldown) {
+          // Vite 8 (Rolldown): rolldownOptions.plugins are ROLLDOWN/Rollup
+          // plugins. Returning a `{ id, external: true }` from resolveId marks
+          // the `.rozie` import external during the dep scan so the scanner
+          // does not try to load the synthetic `<abs>/Foo.rozie.{vue,tsx}` id.
+          return {
+            optimizeDeps: {
+              rolldownOptions: {
+                plugins: [
+                  {
+                    name: 'rozie:dep-scan-skip',
+                    resolveId(id: string) {
+                      if (/\.rozie$/.test(id)) {
+                        return { id, external: true };
+                      }
+                      return null;
+                    },
+                  },
+                ],
               },
-            ],
+            },
+          };
+        }
+
+        // Vite 5/6/7 (esbuild dep scan): only esbuildOptions is honored. KEEP
+        // the esbuild plugin shape — a naive rename to rolldownOptions would be
+        // silently ignored by these versions, re-opening the original
+        // dep-scan-load failure.
+        return {
+          optimizeDeps: {
+            esbuildOptions: {
+              plugins: [
+                {
+                  name: 'rozie:dep-scan-skip',
+                  setup(build: { onResolve: (opts: { filter: RegExp }, cb: (args: { path: string }) => { path: string; external: true }) => void }) {
+                    build.onResolve({ filter: /\.rozie$/ }, (args) => ({
+                      path: args.path,
+                      external: true,
+                    }));
+                  },
+                },
+              ],
+            },
           },
-        },
-      }),
+        };
+      },
       // D-70 disk-cache: for the Angular target, eagerly emit each `.rozie`
       // → `.rozie.ts` to disk during `configResolved` so analogjs's TS
       // Program (constructed in its own `configResolved`, which fires AFTER
