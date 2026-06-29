@@ -218,6 +218,17 @@ for (const target of TARGETS) {
     await scrollWindowTo(page, 0);
     expect(await scrollTopOf(page)).toBe(0);
 
+    // ── RED-FIRST BOUNDED-WORK GUARD (perf regression protection) ──────────────────────
+    // The un-memoized filteredOptions() re-maps ALL 1,000 options into fresh wrapper objects
+    // on EVERY virtual-core getItemKey/getMeasurements call — O(count) per pass — so a 60-press
+    // ArrowDown batch costs ~16s on vue (every wrapper read trips a reactive Proxy trap). The
+    // reference-keyed memo collapses that to one map per real input change → ~1s. We measure the
+    // 60-press loop + the scroll-settle poll under one wall-clock budget: the loop itself spends
+    // 60×20ms = 1.2s in paced waits, so a 12s budget leaves ample headroom for the memo'd path
+    // while still failing HARD on the un-memo'd 16s+ path. Do NOT add a per-test setTimeout that
+    // would mask this — the budget IS the guard (default 30s timeout only kills a truly-hung run).
+    const t0 = Date.now();
+
     // Paced at a realistic keyboard cadence (~20ms) — a zero-delay burst outpaces Solid's
     // windowed re-render and the browser clamps scrollTop mid-churn (the D-09 Solid
     // windowing-settling fragility); at any real input speed the scroll tracks on all 6.
@@ -226,6 +237,14 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => scrollTopOf(page), { timeout: 15_000 })
       .toBeGreaterThan(0);
+
+    // Bounded-work budget: the full 60-press batch + settle must finish well under budget. The
+    // un-memo'd vue path (~16s+) trips this; the memo'd path (~1s) sails under it.
+    expect(Date.now() - t0).toBeLessThan(12_000);
+
+    // Bounded rendered-option count throughout: even after a deep scroll the window must stay
+    // small (a sanity bound that also catches a full-list render regression).
+    expect(await page.locator('[role="option"]').count()).toBeLessThan(100);
 
     await expect
       .poll(

@@ -449,20 +449,73 @@ let remeasurePending = false;
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
 // `#option` slot expose the original object (CP reads `e.option.id` / `option.group`).
-// A plain function (called in the r-for AND handlers) — never $computed.
+//
+// REFERENCE-KEYED MEMO, NOT $computed — this is load-bearing for windowed perf. TanStack
+// virtual-core calls getItemKey(i)/getMeasurements O(count) times per pass, and windowSource()
+// (below) aliases this, so without a memo every scroll re-`.map()`s ALL options into fresh
+// wrapper objects — O(N²). On vue each wrapper read trips a reactive Proxy trap (valueOf/labelOf/
+// disabledOf), so a 60-ArrowDown batch over 1,000 options cost ~16s. It is deliberately NOT a
+// $computed: a $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
+// unrelated reactive churn (and on vue re-trip the Proxy traps); the whole point is to AVOID
+// re-mapping when only activeIndex changed. The cache key is pure VALUE/REFERENCE comparison
+// (no reactive subscription), so it adds zero reactivity churn — it collapses virtual-core's
+// O(count) re-maps to ONE map per real (options-ref / query / disableFilter) change.
+//
+// foCache is a member-mutated FRESH-OBJECT const (NOT a reassigned `let`): the React emitter
+// lowers `const X = {…}` that is member-mutated to `useMemo(() => ({…}), [])` (per-instance,
+// stable across renders — feedback_react_const_mutinstance_not_stabilized); on the 5 setup-once
+// targets the top-level const persists for the instance lifetime naturally. A reassigned
+// `let X = null` would NOT survive React renders (filteredOptions() is reached from the TEMPLATE,
+// not a hook-root → per-render reset trap), so it MUST be a fresh-object const.
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
 // `#option` slot expose the original object (CP reads `e.option.id` / `option.group`).
-// A plain function (called in the r-for AND handlers) — never $computed.
+//
+// REFERENCE-KEYED MEMO, NOT $computed — this is load-bearing for windowed perf. TanStack
+// virtual-core calls getItemKey(i)/getMeasurements O(count) times per pass, and windowSource()
+// (below) aliases this, so without a memo every scroll re-`.map()`s ALL options into fresh
+// wrapper objects — O(N²). On vue each wrapper read trips a reactive Proxy trap (valueOf/labelOf/
+// disabledOf), so a 60-ArrowDown batch over 1,000 options cost ~16s. It is deliberately NOT a
+// $computed: a $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
+// unrelated reactive churn (and on vue re-trip the Proxy traps); the whole point is to AVOID
+// re-mapping when only activeIndex changed. The cache key is pure VALUE/REFERENCE comparison
+// (no reactive subscription), so it adds zero reactivity churn — it collapses virtual-core's
+// O(count) re-maps to ONE map per real (options-ref / query / disableFilter) change.
+//
+// foCache is a member-mutated FRESH-OBJECT const (NOT a reassigned `let`): the React emitter
+// lowers `const X = {…}` that is member-mutated to `useMemo(() => ({…}), [])` (per-instance,
+// stable across renders — feedback_react_const_mutinstance_not_stabilized); on the 5 setup-once
+// targets the top-level const persists for the instance lifetime naturally. A reassigned
+// `let X = null` would NOT survive React renders (filteredOptions() is reached from the TEMPLATE,
+// not a hook-root → per-render reset trap), so it MUST be a fresh-object const.
+const foCache = {
+  optsRef: null,
+  q: null,
+  df: null,
+  val: null,
+  hasVal: false
+};
 const filteredOptions = () => {
+  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+  // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
+  // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
+  // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
+  // them would leave the accessor un-subscribed → it would never re-run on a real input change →
+  // stale/blank window.
   const opts = Array.isArray(props.options) ? props.options : [];
+  const df = !!props.disableFilter;
+  const q = String(query.value == null ? '' : query.value);
+  // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
+  // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
+  if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df) return foCache.val;
+  // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
   let list = opts;
-  if (!props.disableFilter) {
-    const q = query.value.toLowerCase();
-    if (q) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(q) !== -1);
+  if (!df) {
+    const ql = q.toLowerCase();
+    if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
   }
-  return list.map((o: any, i: any) => ({
+  const val = list.map((o: any, i: any) => ({
     value: valueOf(o),
     label: labelOf(o),
     disabled: disabledOf(o),
@@ -470,6 +523,12 @@ const filteredOptions = () => {
     id: valueOf(o),
     option: o
   }));
+  foCache.optsRef = opts;
+  foCache.q = q;
+  foCache.df = df;
+  foCache.val = val;
+  foCache.hasVal = true;
+  return val;
 };
 
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
