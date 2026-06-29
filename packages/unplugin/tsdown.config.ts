@@ -34,6 +34,14 @@ export default defineConfig({
   // are INLINED — see file-level comment.
   external: [
     'unplugin',
+    // `vite` MUST stay external: the vite.config() hook does a lazy
+    // `await import('vite')` to read `rolldownVersion` (the rolldown-vite / Vite
+    // 8 marker) for the bundler-aware optimizeDeps branch. Bundling vite in
+    // would make that import resolve a STALE in-dist copy instead of the
+    // CONSUMER's installed vite — the detection would misfire and Vite 8 would
+    // keep getting the deprecated esbuildOptions branch. The config hook only
+    // runs under Vite, so the consumer always has vite resolvable.
+    'vite',
     '@vitejs/plugin-vue',
     'vue',
     'magic-string',
