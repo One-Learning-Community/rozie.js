@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, transformWithEsbuild, type Plugin } from 'vite';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -108,6 +108,45 @@ function resolveCrossTreeBareImports(extraRoots: readonly string[]): Plugin {
         // Let the rest of Vite's resolver chain try.
         return null;
       }
+    },
+  };
+}
+
+/**
+ * D-VR-01 (Vite 8): Lit's `@rozie/target-lit` emit uses legacy class-field
+ * decorators (`@customElement('rozie-…') class`, `@property()`, `@state()`,
+ * `@queryAssignedElements({slot})`). Vite 8 transforms with Oxc, whose legacy-
+ * decorator lowering is NOT faithful to esbuild's: it drops the getter for
+ * `@queryAssignedElements`-style decorated, initializer-less fields, so the
+ * Rozie-emitted `_armListeners()` slot wiring reads `undefined.length` and the
+ * heavy Lit cells crash at `firstUpdated`. Rather than chase Oxc's decorator
+ * semantics, lower the Lit virtual modules with esbuild — the exact, proven
+ * Vite ≤7 path — BEFORE Oxc sees them. `enforce: 'pre'` runs this ahead of the
+ * built-in Oxc transform; esbuild emits decorator-free JS, so Oxc's pass is a
+ * no-op on the result. Scoped to the Lit sub-build's `.rozie.ts` modules only.
+ */
+function lowerLitDecoratorsWithEsbuild(): Plugin {
+  return {
+    name: 'rozie-vr:lit-decorator-esbuild',
+    enforce: 'pre',
+    async transform(code, id) {
+      const cleanId = id.split('?', 1)[0];
+      if (!cleanId.endsWith('.rozie.ts')) return null;
+      // Only the decorator-bearing component modules need it; skip the rest so
+      // we don't double-transform plain helper modules.
+      if (!/@(customElement|property|state|query|eventOptions)\b/.test(code)) {
+        return null;
+      }
+      const result = await transformWithEsbuild(code, id, {
+        loader: 'ts',
+        tsconfigRaw: {
+          compilerOptions: {
+            experimentalDecorators: true,
+            useDefineForClassFields: false,
+          },
+        },
+      });
+      return { code: result.code, map: result.map };
     },
   };
 }
@@ -568,6 +607,7 @@ export default defineConfig(async () => {
       ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
+    ...(TARGET === 'lit' ? [lowerLitDecoratorsWithEsbuild()] : []),
   ],
   // FullCalendar plugin packages ship a CJS build whose interop shape is
   // `exports["default"] = plugin` WITHOUT `__esModule`. When Vite's esbuild
@@ -592,28 +632,10 @@ export default defineConfig(async () => {
       '@fullcalendar/list',
     ],
   },
-  // D-VR-01: the `@rozie/target-lit` emitter emits TC39-stage-3 *class-field*
-  // decorators (`@property() foo;`). esbuild — Vite's transform pipeline — does
-  // not read the workspace `tsconfig.json` for the `.rozie.ts` virtual modules
-  // `@rozie/unplugin` produces, so it defaulted to standard-decorator semantics
-  // and the Lit/preact-signals runtime threw `Unsupported decorator location:
-  // field` at class-construction time. Passing `tsconfigRaw` with
-  // `experimentalDecorators` (and `useDefineForClassFields: false`) tells
-  // esbuild to lower Lit's class-field decorators in the legacy form the Lit 3
-  // decorator runtime accepts. Scoped to the Lit sub-build only — the other
-  // five targets emit no class-field decorators.
-  ...(TARGET === 'lit'
-    ? {
-        esbuild: {
-          tsconfigRaw: {
-            compilerOptions: {
-              experimentalDecorators: true,
-              useDefineForClassFields: false,
-            },
-          },
-        },
-      }
-    : {}),
+  // Lit decorator lowering for Vite 8 lives in the `lowerLitDecoratorsWithEsbuild`
+  // plugin above (esbuild pre-transform), NOT here — Oxc's `oxc.decorator.legacy`
+  // path is not faithful enough (drops `@queryAssignedElements` getters). See that
+  // plugin's banner for the full rationale.
   build: {
     outDir: resolve(__dirname, 'dist', TARGET),
     // Each target build must NOT wipe sibling target builds.
