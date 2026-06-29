@@ -363,8 +363,10 @@ $expose({ show, close, toggle, focus })
           :selected="selected"
           :disabled="disabled"
         >
-          <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
-          <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
+          <div class="rozie-command-palette-option">
+            <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
+            <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
+          </div>
         </slot>
       </template>
 
@@ -443,25 +445,18 @@ $expose({ show, close, toggle, focus })
   overflow-y: auto;
 }
 
+/*
+  Layout for the default `#option` row: action label on the left, category
+  pushed to the right edge (`space-between`). This wraps the two spans inside
+  combobox's own `<li class="rozie-combobox-option">`, which already supplies the
+  row's padding/cursor/active styling — so this rule is layout-only (padding /
+  radius / cursor here would double up with the combobox option and are omitted).
+*/
 .rozie-command-palette-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
-  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-  cursor: pointer;
-  color: var(--rozie-command-palette-option-color, inherit);
-}
-
-.rozie-command-palette-option--active {
-  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-  color: var(--rozie-command-palette-option-active-color, inherit);
-}
-
-.rozie-command-palette-option--disabled {
-  cursor: not-allowed;
-  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
 }
 
 .rozie-command-palette-option-group {
