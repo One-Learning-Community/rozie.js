@@ -53,14 +53,18 @@ jobs:
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
-      # quick task 260623-jwh: the @rozie-ui Vue-leaf gate. Runs AFTER the
-      # `pnpm turbo run build` above so every Vue leaf's compiled dist (+ dist
-      # .d.ts) exists before the strict consumer-surface typecheck resolves it.
+      # quick task 260623-jwh + 260629-ksp: the @rozie-ui Vue-leaf gate. Runs
+      # AFTER the `pnpm turbo run build` above so every Vue leaf's compiled dist
+      # (+ dist .d.ts) AND each leaf's node_modules exist before the gates run.
       # Layer 1 (structural guard) asserts no Vue leaf is source-only; Layer 2
       # (strict consumer surface) typechecks a STRICT typed consumer of the
-      # compiled data-table dist with vue-tsc. A future source-only or
-      # consumer-type-broken Vue leaf fails this step.
-      - name: Vue-leaf gate — structural guard + strict consumer-surface typecheck
+      # compiled data-table dist with vue-tsc; Layer 3 (family-children,
+      # 260629-ksp) strict-vue-tsc's the family CHILD SFC *bodies* (the committed
+      # src/*.vue) against a recorded baseline so a NEW SFC-body type regression
+      # flips RED. `vitest run` auto-collects every *.test.ts here, so the
+      # family-children gate needs no dedicated step. A future source-only,
+      # consumer-type-broken, or SFC-body-regressed Vue leaf fails this step.
+      - name: Vue-leaf gate — structural + strict consumer-surface + SFC-body typecheck
         run: pnpm --filter @rozie/vue-typecheck test
 
       # WR-03: after the build has generated every in-root sidecar, a `.rozie`
