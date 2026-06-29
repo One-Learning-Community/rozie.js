@@ -20,6 +20,15 @@ export default defineConfig({
     Rozie({ target: 'react' }),
     react(),
   ],
+  // @vitejs/plugin-react 6 + Vite 8 (Rolldown) no longer auto-dedupes React the
+  // way the Babel plugin did under Vite ≤7. In a pnpm workspace a runtime
+  // package can drag in its own React copy, so both get bundled and hooks read
+  // a null `ReactCurrentDispatcher` → `Cannot read properties of null (reading
+  // 'useRef')` at first render. Force every `import 'react'` to the consumer's
+  // single copy. Mirrors vite.config.swc.ts.
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   build: {
     sourcemap: true, // DX-01 requirement — stack traces resolve to .rozie
   },

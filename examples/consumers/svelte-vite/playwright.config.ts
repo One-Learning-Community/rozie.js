@@ -13,12 +13,14 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:4175',
+    baseURL: 'http://127.0.0.1:4175',
     trace: 'on-first-retry',
   },
+  // Vite 8 (Rolldown) binds preview to IPv6 `[::1]` by default; pin server +
+  // probe + baseURL to explicit IPv4 so ambiguous `localhost` can't desync them.
   webServer: {
-    command: 'pnpm build && pnpm preview --port 4175 --strictPort',
-    port: 4175,
+    command: 'pnpm build && pnpm preview --port 4175 --strictPort --host 127.0.0.1',
+    url: 'http://127.0.0.1:4175',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

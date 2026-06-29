@@ -9,7 +9,7 @@
     "build": "vite build",
     "build:swc": "vite build --config vite.config.swc.ts",
     "build:preact": "vite build --config vite.config.preact.ts",
-    "preview": "vite preview --port 4174",
+    "preview": "vite preview --port 4174 --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:swc": "VITE_USE_SWC=1 playwright test",
@@ -33,13 +33,13 @@
     "@types/node": "^20",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^4",
+    "@vitejs/plugin-react": "^6",
     "@vitejs/plugin-react-swc": "^4",
     "eslint": "^9",
     "eslint-plugin-react-hooks": "^5",
     "playwright": "^1",
     "source-map-js": "^1.2.1",
     "typescript": "^5.6",
-    "vite": "^5"
+    "vite": "^8"
   }
 }

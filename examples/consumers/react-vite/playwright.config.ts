@@ -27,12 +27,15 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:4174',
+    baseURL: 'http://127.0.0.1:4174',
     trace: 'on-first-retry',
   },
   webServer: {
     command: buildCommand,
-    port: 4174,
+    // Vite 8 (Rolldown) binds preview to IPv6 `[::1]` by default; pin the
+    // server + readiness probe + baseURL to explicit IPv4 127.0.0.1 so the
+    // ambiguous `localhost` (IPv6-first on Node 18+/macOS) can't desync them.
+    url: 'http://127.0.0.1:4174',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
