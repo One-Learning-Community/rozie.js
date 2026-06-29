@@ -159,15 +159,22 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
   // Numeric grid/treegrid ARIA attributes — React's `AriaAttributes` types these
   // `number | undefined`. A nullish-droppable binding (`x ? n : null`) routed through
   // `rozieAttr` widens to `string | undefined` → TS2322 against the `number` slot (the
-  // data-table `aria-rowindex` class — same shape as the resizable `aria-valuenow` backlog,
-  // which is left to its own slider/resizable re-emit). The `?? undefined` numeric path
-  // preserves the `number | undefined` type AND the nullish-drop (a `null`/`undefined` value
-  // → the JSX omits the attribute), matching the `rozieAttr` drop without the string widening.
+  // data-table `aria-rowindex` class). The `?? undefined` numeric path preserves the
+  // `number | undefined` type AND the nullish-drop (a `null`/`undefined` value → the JSX
+  // omits the attribute), matching the `rozieAttr` drop without the string widening.
   'aria-rowindex',
   'aria-colindex',
   'aria-rowcount',
   'aria-colcount',
   'aria-level',
+  // LB6 SEAM 2 — the slider/resizable `aria-valuenow`/`aria-valuemin`/`aria-valuemax`
+  // re-emit (sibling of the `aria-rowindex` class above). React types these
+  // `number | undefined`; a number-typed call/member/logical expr now emits RAW
+  // instead of `rozieAttr`-widening to `string | undefined`. (`aria-valuetext` is a
+  // STRING in React and is deliberately NOT listed — it stays on the rozieAttr path.)
+  'aria-valuenow',
+  'aria-valuemin',
+  'aria-valuemax',
 ]);
 
 /**
