@@ -499,6 +499,10 @@ export default defineConfig(async () => {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
   resolve: {
+    // plugin-react 6 + Vite 8 (Rolldown) no longer auto-dedupes React; without
+    // this the react target's cells double-bundle React and crash on a null
+    // dispatcher (`useRef` of null). Mirrors the consumer demos' vite.config.
+    dedupe: ['react', 'react-dom'],
     alias: [
       { find: /^@fullcalendar\/list$/, replacement: fullCalendarListEsm },
       // Phase 999.4 / P3 — cross-family composition (Option B). command-palette's
