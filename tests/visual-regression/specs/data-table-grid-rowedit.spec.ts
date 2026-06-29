@@ -431,12 +431,46 @@ for (const target of TARGETS) {
     await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(4);
     // Raise the qty editor (col 1) to 99 → under the asc sort Gamma relocates from index 0 → 3.
     await fillRowEditor(page, 0, 1, '99');
+    // WR-01 race fix (the REAL root cause): editRow() calls focusEditorWhenReady(), a DEFERRED
+    // (rAF-poll) auto-focus of the FIRST editor (col 0). fillRowEditor() focuses the qty editor
+    // (col 1), but if the component's deferred col-0 auto-focus fires AFTER it, focus is stolen
+    // back to col 0 → @focusin writes $data.activeColIndex = 0 → commitRow snapshots focusCol = 0
+    // → the post-commit follow lands on col 0 (and STAYS there — it is not a transient that
+    // settles). That is the ~1/6 flake. Wait for the col-1 editor focus to WIN and stay stable
+    // (2 consecutive hits, mirroring focusBodyCellStable) BEFORE committing, so activeColIndex is
+    // deterministically 1 at Enter. Re-assert the focus each non-hit iteration (idempotent — the
+    // value is already 99) to out-race the deferred auto-focus.
+    let editorFocusHits = 0;
+    await expect
+      .poll(
+        async () => {
+          const c = await activeCellCoords(page);
+          if (c?.col === '1' && c?.tag === 'input') {
+            editorFocusHits += 1;
+          } else {
+            editorFocusHits = 0;
+            await fillRowEditor(page, 0, 1, '99');
+          }
+          return editorFocusHits;
+        },
+        { timeout: 5_000, intervals: [40, 40, 40, 60, 100] },
+      )
+      .toBeGreaterThanOrEqual(2);
     await page.keyboard.press('Enter');
     // The whole row committed (all editors torn down).
     await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(0);
     // Focus FOLLOWED the committed row to its new display index (3), staying a gridcell — it
-    // did NOT strand on the old index 0 (now Alpha) or drop to <body>.
-    await expect.poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 }).toBe('3');
+    // did NOT strand on the old index 0 (now Alpha) or drop to <body>. Poll the FULL coordinate
+    // tuple (row:col:role) so the snapshot only fires on a fully settled frame.
+    await expect
+      .poll(
+        async () => {
+          const c = await activeCellCoords(page);
+          return c ? `${c.row}:${c.col}:${c.role}` : null;
+        },
+        { timeout: 10_000 },
+      )
+      .toBe('3:1:gridcell');
     const a = await activeCellCoords(page);
     expect(a?.col).toBe('1');
     expect(a?.role).toBe('gridcell');
