@@ -770,6 +770,9 @@ function emitRefDecls(refs: RefDecl[]): string[] {
       case 'form':
         domType = 'HTMLFormElement';
         break;
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
     }
     lines.push(`let ${r.name} = $state<${domType} | undefined>(undefined);`);
   }

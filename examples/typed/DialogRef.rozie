@@ -1,0 +1,51 @@
+<!--
+  typed/DialogRef.rozie
+
+  Red-first typed fixture for LB6 SEAM 1 — `<dialog>` ref typing.
+
+  A `ref` on a native `<dialog>` element must type to HTMLDialogElement on every
+  target so the dialog-only DOM methods `.showModal()` / `.close()` typecheck.
+  Before the SEAM-1 ref-type-map entries, the emitted ref types `HTMLElement`,
+  on which `showModal`/`close` do not exist → the react/vue/svelte/angular tsc
+  gates fail with TS2339/TS2551. After the map entries land they pass.
+
+  $refs reads are confined to $onMount (the `refs_only_safe_in_onmount` ROZ123
+  invariant — $refs elsewhere crashes Solid + is null on Lit). The single
+  $onMount body exercises BOTH `.showModal()` and `.close()` on the ref.
+-->
+
+<rozie name="DialogRef">
+
+<props>
+{
+  open: { type: Boolean, default: false, model: true },
+}
+</props>
+
+<script lang="ts">
+$onMount(() => {
+  // Both calls are HTMLDialogElement-only — they only typecheck once the ref
+  // is typed HTMLDialogElement (not the HTMLElement default).
+  if ($props.open) {
+    $refs.dlg.showModal()
+  } else {
+    $refs.dlg.close()
+  }
+})
+</script>
+
+<template>
+<dialog ref="dlg" class="dialog">
+  <slot />
+</dialog>
+</template>
+
+<style>
+.dialog {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 1rem;
+}
+</style>
+
+</rozie>

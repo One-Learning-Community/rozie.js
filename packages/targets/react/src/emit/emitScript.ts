@@ -2373,6 +2373,9 @@ export function emitScript(
       case 'div':
         domType = 'HTMLDivElement';
         break;
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
     }
     hookLines.push(`const ${r.name} = useRef<${domType} | null>(null);`);
   }

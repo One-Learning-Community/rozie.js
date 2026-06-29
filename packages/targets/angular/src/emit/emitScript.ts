@@ -1020,6 +1020,9 @@ export function emitScript(
       case 'div':
         domType = 'HTMLDivElement';
         break;
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
     }
     fieldLines.push(`${r.name} = viewChild<ElementRef<${domType}>>('${r.name}');`);
   }

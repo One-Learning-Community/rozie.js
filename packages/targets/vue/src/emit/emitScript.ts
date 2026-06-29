@@ -647,6 +647,9 @@ function emitTemplateRefs(ir: IRComponent, imports: VueImportCollector): string[
       case 'form':
         domType = 'HTMLFormElement';
         break;
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
     }
     lines.push(`const ${r.name}Ref = ref<${domType}>();`);
   }

@@ -49,7 +49,7 @@ const EXAMPLES = [
 // workspace) as its per-target gate. typed/TypedCard exercises the
 // statement-position interface/type module-scope hoist (Plan 09-04 OQ-3) on
 // this class-based target.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
 
 describe('LIT-T-06 — eslint-plugin-lit + eslint-plugin-wc clean (--max-warnings 0)', () => {
   it('all 8 emitted Lit .ts files lint clean', () => {

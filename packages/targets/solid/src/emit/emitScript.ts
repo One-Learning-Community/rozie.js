@@ -629,7 +629,12 @@ export function emitScript(
   // Solid uses plain let variables (not useRef objects) for DOM refs.
   // Using HTMLElement (not Element) so DOM properties like .style, .focus() are accessible.
   for (const ref of ir.refs) {
-    hookLines.push(`let ${ref.name}Ref: HTMLElement | null = null;`);
+    // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
+    // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
+    // Every other tag keeps the byte-identical `HTMLElement | null` default.
+    const domType =
+      ref.elementTag.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
+    hookLines.push(`let ${ref.name}Ref: ${domType} | null = null;`);
   }
 
   // 5. Emit user-authored top-level statements from the rewritten program.

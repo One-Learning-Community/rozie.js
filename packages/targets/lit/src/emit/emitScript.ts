@@ -349,9 +349,12 @@ function emitRefField(refName: string, elementTag: string): string {
   // @query targets refs by data-rozie-ref="<name>" (Plan 06.4-02 inference).
   // The selector pinned by data attribute keeps shadow-DOM scoping correct.
   // Mark with definite-assignment in case the consumer hasn't yet rendered.
-  void elementTag;
+  // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
+  // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
+  // Every other tag keeps the byte-identical `HTMLElement` default.
+  const domType = elementTag.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
   const field = `_ref${refName.charAt(0).toUpperCase()}${refName.slice(1)}`;
-  return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: HTMLElement;`;
+  return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${domType};`;
 }
 
 function isLifecycleCall(stmt: t.Statement): {

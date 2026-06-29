@@ -645,7 +645,13 @@ function emitNonClassAttribute(
     const refNames = new Set(ctx.ir.refs.map((r) => r.name));
     if (refNames.has(attr.value)) {
       const varName = attr.value + 'Ref';
-      return { jsx: `ref={(el) => { ${varName} = el as HTMLElement; }}`, diagnostics };
+      // LB6 SEAM 1 — keep the cast consistent with the emitScript ref-type
+      // carve-out: a ref on a native `<dialog>` declares `HTMLDialogElement |
+      // null`, so the callback cast must match (else the assignment is a type
+      // error). Every other tag keeps the byte-identical `HTMLElement` cast.
+      const castType =
+        ctx.tagName?.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
+      return { jsx: `ref={(el) => { ${varName} = el as ${castType}; }}`, diagnostics };
     }
     // Unknown ref — pass through as static
   }
