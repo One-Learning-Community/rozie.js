@@ -11,32 +11,29 @@
  *   :style="'opacity: ' + (cond ? '0.5' : '1') + '; ...'"
  *   :style="someStringProp"
  *
- * Delegates to `style-to-js` (a ~1 KB inline-style parser built on
- * `inline-style-parser`) invoked with `{ reactCompat: true }`. That single
- * call subsumes both the declaration parse and the kebab→camel key
- * conversion this helper used to perform by hand:
- *   - parses the gotchas a naive split-on-`;` misses — quoted strings with
- *     semicolons (`content: 'foo;bar'`), `url(data:…;base64,…)` data URIs,
- *     inline comments, `!important`;
- *   - camelCases keys, capitalizing vendor prefixes the way React/Solid
- *     style objects expect (`-webkit-mask` → `WebkitMask`) and passing CSS
- *     custom properties (`--foo`) through verbatim.
+ * SOLID DIFFERENCE (LB6 SEAM 3) — a CSS STRING is passed through VERBATIM and
+ * left for Solid's own `style()` runtime helper to apply. Solid applies an
+ * object-form `style` by iterating keys into `CSSStyleDeclaration.setProperty(
+ * key, value)`, which requires a KEBAB-case CSS property name — a camelCased
+ * key (`paddingLeft`) is a silent no-op (verified against solid-js@1.9.x
+ * `web.cjs` `style()`). Earlier this helper camelCased declarations (via
+ * `style-to-js`'s `reactCompat: true`), so a dynamic `:style` returning
+ * `'padding-left:1.75rem'` became `{ paddingLeft: '1.75rem' }` → DROPPED on
+ * Solid (single-word props like `overflow` survived; the data-table expander
+ * depth-indent `padding-left` did not). Solid's `style()` routes a STRING to
+ * `node.style.cssText`, where the browser's own CSS parser handles every
+ * declaration correctly — so passing the string through is both simpler and
+ * strictly more correct than re-parsing into a camelCased object the Solid
+ * runtime then mis-applies.
  *
- * Replaced postcss (2026-06-04). postcss was the ONLY dependency these
- * runtime packages leaked into a consumer bundle (~24 KB gzip) and it was
- * reachable solely through this helper; style-to-js is ~1.5 KB gzip and
- * produces byte-identical output for the inline-declaration subset. A
- * differential test (`parseInlineStyle.parity.test.ts`) pins the new output
- * to the prior postcss implementation, kept as the oracle in devDependencies.
- *
- * Crash-safety (SPEC-1): the runtime path has no diagnostic stream, so a
- * parse failure must never escape as an exception — `style-to-js` throws on
- * some malformed input, so the call is wrapped to degrade to `{}`.
+ * An already-built style OBJECT (a `$computed` returning a CSS-custom-property
+ * map such as `{ '--rozie-slider-fill-start': '50%' }`) is passed through
+ * unchanged — Solid's `setProperty` handles custom properties regardless of
+ * casing.
  *
  * @public — runtime API consumed by emitted .tsx files.
  */
 import type { JSX } from 'solid-js';
-import styleToJS from 'style-to-js';
 
 const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
 
@@ -48,9 +45,12 @@ const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
  *   --custom-prop      →  --custom-prop   (CSS custom properties pass through)
  *   font-size          →  fontSize
  *
- * Retained as a public export (and used by the differential parity test's
- * oracle); the main `parseInlineStyle` path now gets key conversion from
- * `style-to-js` directly.
+ * Retained as a public kebab→camel utility. NOTE (LB6 SEAM 3): the
+ * `parseInlineStyle` path no longer camelCases at all — a CSS string is handed
+ * to Solid's `style()` (cssText) verbatim, so this helper is no longer on that
+ * path. It stays exported for tooling / consumers that key a Solid style object
+ * directly. (Solid's `setProperty` actually wants KEBAB keys, so prefer the raw
+ * CSS property name for Solid style objects — this camelCaser is React-shaped.)
  */
 export function toStyleObjectKey(prop: string): string {
   const cached = KEBAB_TO_CAMEL_CACHE.get(prop);
@@ -81,28 +81,28 @@ export function toStyleObjectKey(prop: string): string {
  *
  * A dynamic `:style` binding's runtime value is NOT statically known to the
  * emitter, so this helper accepts the union the author may produce:
- *   - a CSS string (`'opacity: 0.5; color: red'`) → parsed via `style-to-js`;
+ *   - a CSS string (`'opacity: 0.5; color: red'`) → passed through VERBATIM so
+ *     Solid's `style()` helper applies it via `cssText` (LB6 SEAM 3);
  *   - an already-built style object (a `$computed` returning a
  *     CSS-custom-property map such as `{ '--rozie-slider-fill-start': '50%' }`,
  *     or a plain style object) → passed through verbatim;
  *   - `null` / `undefined` → `{}`.
  *
- * Returning `JSX.CSSProperties` keeps the value assignable to Solid's `style`
- * JSX prop, whose index signature permits CSS custom properties (`--x`).
- * Returns `{}` for empty, whitespace-only, or unparseable input — never throws
- * (see crash-safety note above).
+ * The return type `string | JSX.CSSProperties` is exactly Solid's `style` JSX
+ * prop type, so the emitted `style={parseInlineStyle(<expr>)}` is well-typed.
+ * Returns `{}` for empty / whitespace-only input — never throws.
  */
 export function parseInlineStyle(
   value: string | JSX.CSSProperties | Record<string, string | number> | null | undefined,
-): JSX.CSSProperties {
+): JSX.CSSProperties | string {
   if (value == null) return {};
   // Already an object (e.g. a CSS-custom-property map from a `$computed`) —
   // pass through; Solid's `style` prop accepts custom properties.
   if (typeof value === 'object') return value as JSX.CSSProperties;
   if (value.length === 0 || /^\s*$/.test(value)) return {};
-  try {
-    return styleToJS(value, { reactCompat: true }) as JSX.CSSProperties;
-  } catch {
-    return {};
-  }
+  // A CSS string — hand it to Solid's `style()` runtime, which sets it via
+  // `node.style.cssText`. The browser's CSS parser applies every (kebab-case)
+  // declaration correctly, including multi-word props like `padding-left` that
+  // a camelCased `setProperty` key would silently drop.
+  return value;
 }

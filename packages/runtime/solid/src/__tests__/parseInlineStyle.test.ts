@@ -1,39 +1,39 @@
 /**
- * Quick-task 260520-8iu Task 1 — parseInlineStyle unit tests (Solid runtime).
+ * parseInlineStyle unit tests (Solid runtime).
  *
- * Covers the Spike 004 string-form `:style` runtime-helper behavior:
- * style-to-js-driven declaration parse, kebab→camel key conversion,
- * `!important` preservation, custom-property / vendor-prefix handling,
- * quoted-semicolon resilience, empty/whitespace + malformed guards.
- *
- * The Solid copy of parseInlineStyle.ts is byte-identical to the React
- * copy (per project precedent — parallel per-target runtime packages).
+ * LB6 SEAM 3 — a CSS STRING is now passed through VERBATIM (Solid's `style()`
+ * helper applies it via `node.style.cssText`, where the browser's CSS parser
+ * handles every kebab-case declaration correctly). The prior style-to-js
+ * camelCase parse was REMOVED: Solid applies object-form styles through
+ * `CSSStyleDeclaration.setProperty(key, …)`, which silently drops a camelCased
+ * multi-word key (`paddingLeft`) — the data-table expander depth-indent bug.
+ * Object inputs (e.g. a `$computed` custom-property map) still pass through.
  */
 import { describe, it, expect } from 'vitest';
 import { parseInlineStyle, toStyleObjectKey } from '../parseInlineStyle.js';
 
-describe('parseInlineStyle (Plan 260520-8iu Task 1)', () => {
-  it('single declaration → single object key', () => {
-    expect(parseInlineStyle('background: red')).toEqual({ background: 'red' });
+describe('parseInlineStyle (LB6 SEAM 3 — string passthrough)', () => {
+  it('a CSS string is passed through verbatim (Solid applies it via cssText)', () => {
+    expect(parseInlineStyle('background: red')).toBe('background: red');
   });
 
-  it('kebab-case property names convert to camelCase keys', () => {
-    expect(parseInlineStyle('background-color: blue; font-size: 12px')).toEqual({
-      backgroundColor: 'blue',
-      fontSize: '12px',
-    });
+  it('a multi-word kebab declaration is NOT camelCased (would break Solid setProperty)', () => {
+    expect(parseInlineStyle('padding-left:1.75rem')).toBe('padding-left:1.75rem');
+    expect(parseInlineStyle('background-color: blue; font-size: 12px')).toBe(
+      'background-color: blue; font-size: 12px',
+    );
   });
 
-  it('CSS custom properties pass through verbatim', () => {
-    expect(parseInlineStyle('--custom-prop: 4px')).toEqual({ '--custom-prop': '4px' });
+  it('CSS custom-property string passes through verbatim', () => {
+    expect(parseInlineStyle('--custom-prop: 4px')).toBe('--custom-prop: 4px');
   });
 
-  it('vendor-prefixed property → leading-capital camelCase key', () => {
-    expect(parseInlineStyle('-webkit-mask: url(a.png)')).toEqual({ WebkitMask: 'url(a.png)' });
+  it('an already-built style OBJECT (custom-property map) passes through unchanged', () => {
+    expect(parseInlineStyle({ '--custom-prop': '4px' })).toEqual({ '--custom-prop': '4px' });
   });
 
-  it('!important is preserved by appending it to the value', () => {
-    expect(parseInlineStyle('color: red !important')).toEqual({ color: 'red !important' });
+  it('!important survives untouched in the string', () => {
+    expect(parseInlineStyle('color: red !important')).toBe('color: red !important');
   });
 
   it('empty input → empty object', () => {
@@ -44,11 +44,16 @@ describe('parseInlineStyle (Plan 260520-8iu Task 1)', () => {
     expect(parseInlineStyle('   ')).toEqual({});
   });
 
-  it('quoted semicolons inside values survive (style-to-js, not naive split)', () => {
-    expect(parseInlineStyle('content: "a;b"')).toEqual({ content: '"a;b"' });
+  it('null / undefined → empty object', () => {
+    expect(parseInlineStyle(null)).toEqual({});
+    expect(parseInlineStyle(undefined)).toEqual({});
   });
 
-  it('malformed style string does NOT throw — returns {} or partial object', () => {
+  it('quoted semicolons inside values survive (string is handed to the browser parser intact)', () => {
+    expect(parseInlineStyle('content: "a;b"')).toBe('content: "a;b"');
+  });
+
+  it('malformed style string does NOT throw (passed through for the browser to tolerate)', () => {
     expect(() => parseInlineStyle('color: ;;; }{[[')).not.toThrow();
   });
 });
