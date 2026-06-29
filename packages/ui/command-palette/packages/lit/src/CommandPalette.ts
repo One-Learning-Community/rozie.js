@@ -81,18 +81,6 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   align-items: center;
   justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
-  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-  cursor: pointer;
-  color: var(--rozie-command-palette-option-color, inherit);
-}
-.rozie-command-palette-option--active[data-rozie-s-768cad96] {
-  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-  color: var(--rozie-command-palette-option-active-color, inherit);
-}
-.rozie-command-palette-option--disabled[data-rozie-s-768cad96] {
-  cursor: not-allowed;
-  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
@@ -244,8 +232,10 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
     
     <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onComboboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onComboboxSearch($event); }} data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}); } catch { return '{}'; } })()}>
-          <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
-          ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</slot>`}
+          <div class="rozie-command-palette-option" data-rozie-s-768cad96>
+            <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
+            ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</div>
+        </slot>`}
       `} .empty=${(scope: { query: unknown }) => html`
         ${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}
       `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>

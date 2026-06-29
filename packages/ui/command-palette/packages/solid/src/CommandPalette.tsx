@@ -64,18 +64,6 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   align-items: center;
   justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
-  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-  cursor: pointer;
-  color: var(--rozie-command-palette-option-color, inherit);
-}
-.rozie-command-palette-option--active[data-rozie-s-768cad96] {
-  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-  color: var(--rozie-command-palette-option-active-color, inherit);
-}
-.rozie-command-palette-option--disabled[data-rozie-s-768cad96] {
-  cursor: not-allowed;
-  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
@@ -311,7 +299,9 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
         <Combobox aria-label={local.ariaLabel} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={local.placeholder} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
-            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled }) ?? <><span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>{<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</>}
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+                <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>
+                {<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</div>}
           </>)} emptySlot={({ query }) => (<>
             {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}
           </>)} />

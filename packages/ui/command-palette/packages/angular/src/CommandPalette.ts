@@ -65,10 +65,12 @@ function __rozieAttr(v: unknown): string | null {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled }, option: option, index: index, active: active, selected: selected, disabled: disabled }" />
     } @else {
 
-              <span class="rozie-command-palette-option-label">{{ rozieDisplay(labelText(option)) }}</span>
-              @if (groupText(option)) {
+              <div class="rozie-command-palette-option">
+                <span class="rozie-command-palette-option-label">{{ rozieDisplay(labelText(option)) }}</span>
+                @if (groupText(option)) {
     <span class="rozie-command-palette-option-group">{{ rozieDisplay(groupText(option)) }}</span>
-    }
+    }</div>
+            
     }
           </ng-template><ng-template #empty let-query="query">
             @if ((emptyTpl ?? templates()?.['empty'])) {
@@ -141,18 +143,6 @@ function __rozieAttr(v: unknown): string | null {
       align-items: center;
       justify-content: space-between;
       gap: var(--rozie-command-palette-option-gap, 0.75rem);
-      padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-      border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-      cursor: pointer;
-      color: var(--rozie-command-palette-option-color, inherit);
-    }
-    .rozie-command-palette-option--active {
-      background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-      color: var(--rozie-command-palette-option-active-color, inherit);
-    }
-    .rozie-command-palette-option--disabled {
-      cursor: not-allowed;
-      opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
     }
     .rozie-command-palette-option-group {
       font-size: var(--rozie-command-palette-group-font-size, 0.75rem);

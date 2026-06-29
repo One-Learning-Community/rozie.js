@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Combobox.css';
@@ -311,14 +311,33 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
+  const foCache = useMemo(() => ({
+    optsRef: null,
+    q: null,
+    df: null,
+    val: null,
+    hasVal: false
+  }), []);
   function filteredOptions() {
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+    // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
+    // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
+    // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
+    // them would leave the accessor un-subscribed → it would never re-run on a real input change →
+    // stale/blank window.
     const opts = Array.isArray(props.options) ? props.options : [];
+    const df = !!props.disableFilter;
+    const q = String(query == null ? '' : query);
+    // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
+    // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
+    if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df) return foCache.val;
+    // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
     let list = opts;
-    if (!props.disableFilter) {
-      const q = query.toLowerCase();
-      if (q) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(q) !== -1);
+    if (!df) {
+      const ql = q.toLowerCase();
+      if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
     }
-    return list.map((o: any, i: any) => ({
+    const val = list.map((o: any, i: any) => ({
       value: valueOf(o),
       label: labelOf(o),
       disabled: disabledOf(o),
@@ -326,6 +345,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       id: valueOf(o),
       option: o
     }));
+    foCache.optsRef = opts;
+    foCache.q = q;
+    foCache.df = df;
+    foCache.val = val;
+    foCache.hasVal = true;
+    return val;
   }
   function windowSource() {
     return filteredOptions();

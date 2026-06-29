@@ -260,7 +260,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {
@@ -315,18 +315,6 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
     align-items: center;
     justify-content: space-between;
     gap: var(--rozie-command-palette-option-gap, 0.75rem);
-    padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-    border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-    cursor: pointer;
-    color: var(--rozie-command-palette-option-color, inherit);
-  }
-  .rozie-command-palette-option--active[data-rozie-s-768cad96] {
-    background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-    color: var(--rozie-command-palette-option-active-color, inherit);
-  }
-  .rozie-command-palette-option--disabled[data-rozie-s-768cad96] {
-    cursor: not-allowed;
-    opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
   }
   .rozie-command-palette-option-group[data-rozie-s-768cad96] {
     font-size: var(--rozie-command-palette-group-font-size, 0.75rem);

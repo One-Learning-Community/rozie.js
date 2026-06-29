@@ -5,8 +5,10 @@
     
     <Combobox :inline="true" :disable-filter="true" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled">
-          <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
-          <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></slot>
+          <div class="rozie-command-palette-option">
+            <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
+            <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></div>
+        </slot>
       </template><template #empty="{ query }">
         <slot name="empty" :query="query">{{ props.emptyText }}</slot>
       </template></Combobox>
@@ -316,18 +318,6 @@ defineExpose({ show, close, toggle, focus });
   align-items: center;
   justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
-  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-  cursor: pointer;
-  color: var(--rozie-command-palette-option-color, inherit);
-}
-.rozie-command-palette-option--active {
-  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-  color: var(--rozie-command-palette-option-active-color, inherit);
-}
-.rozie-command-palette-option--disabled {
-  cursor: not-allowed;
-  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
 }
 .rozie-command-palette-option-group {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);

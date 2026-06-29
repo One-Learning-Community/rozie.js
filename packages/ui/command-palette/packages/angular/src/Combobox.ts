@@ -495,15 +495,35 @@ export class Combobox {
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
   remeasurePending = false;
+  foCache = {
+    optsRef: null,
+    q: null,
+    df: null,
+    val: null,
+    hasVal: false
+  };
   filteredOptions = () => {
     const __options = this.options();
+    const __query = this.query();
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+    // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
+    // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
+    // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
+    // them would leave the accessor un-subscribed → it would never re-run on a real input change →
+    // stale/blank window.
     const opts = Array.isArray(__options) ? __options : [];
+    const df = !!this.disableFilter();
+    const q = String(__query == null ? '' : __query);
+    // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
+    // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
+    if (this.foCache.hasVal && this.foCache.optsRef === opts && this.foCache.q === q && this.foCache.df === df) return this.foCache.val;
+    // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
     let list = opts;
-    if (!this.disableFilter()) {
-      const q = this.query().toLowerCase();
-      if (q) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(q) !== -1);
+    if (!df) {
+      const ql = q.toLowerCase();
+      if (ql) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(ql) !== -1);
     }
-    return list.map((o: any, i: any) => ({
+    const val = list.map((o: any, i: any) => ({
       value: this.valueOf$local(o),
       label: this.labelOf(o),
       disabled: this.disabledOf(o),
@@ -511,6 +531,12 @@ export class Combobox {
       id: this.valueOf$local(o),
       option: o
     }));
+    this.foCache.optsRef = opts;
+    this.foCache.q = q;
+    this.foCache.df = df;
+    this.foCache.val = val;
+    this.foCache.hasVal = true;
+    return val;
   };
   windowSource = () => this.filteredOptions();
   pinnedEditIndex = () => -1;

@@ -49,18 +49,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
-  padding: var(--rozie-command-palette-option-padding, 0.5rem 0.625rem);
-  border-radius: var(--rozie-command-palette-option-radius, 0.5rem);
-  cursor: pointer;
-  color: var(--rozie-command-palette-option-color, inherit);
-}
-.rozie-command-palette-option--active[data-rozie-s-768cad96] {
-  background: var(--rozie-command-palette-option-active-bg, rgba(0, 102, 204, 0.12));
-  color: var(--rozie-command-palette-option-active-color, inherit);
-}
-.rozie-command-palette-option--disabled[data-rozie-s-768cad96] {
-  cursor: not-allowed;
-  opacity: var(--rozie-command-palette-option-disabled-opacity, 0.45);
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
