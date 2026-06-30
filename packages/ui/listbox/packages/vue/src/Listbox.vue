@@ -563,6 +563,31 @@ const virtualizerOptions = (): any => ({
   }
 });
 
+// pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+// shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+// two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+// no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+// `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+// guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+// thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+// gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+// Typing-only: the runtime value (a measurement or null) is unchanged.
+// pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
+// shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
+// two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
+// no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
+// `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
+// guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
+// thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
+// gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
+// Typing-only: the runtime value (a measurement or null) is unchanged.
+const pinMeasurement = (pin: number): {
+  start: number;
+  size: number;
+  index: number;
+  end: number;
+} | null => pinnedMeasurement(pin);
+
 // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
 // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
 // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
@@ -627,7 +652,7 @@ const windowedRows = () => {
       }
     }
     if (!inWindow) {
-      const pm = pinnedMeasurement(pin);
+      const pm = pinMeasurement(pin);
       const firstStart = items.length ? items[0].start : 0;
       const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
       const pinnedEntry = {
@@ -663,7 +688,7 @@ const padTop = () => {
   // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
   const pin = pinnedEditIndex();
   if (pin >= 0) {
-    const pm = pinnedMeasurement(pin);
+    const pm = pinMeasurement(pin);
     const inWindow = pmIndexInWindow(items, pin);
     if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
   }
@@ -683,7 +708,7 @@ const padBottom = () => {
   // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
   const pin = pinnedEditIndex();
   if (pin >= 0) {
-    const pm = pinnedMeasurement(pin);
+    const pm = pinMeasurement(pin);
     const inWindow = pmIndexInWindow(items, pin);
     // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
     // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's

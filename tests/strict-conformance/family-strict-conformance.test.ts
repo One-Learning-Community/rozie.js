@@ -17,11 +17,13 @@
  * `<data>` defaults) ARE fixed and their dedicated witnesses stay GREEN — but the
  * leaf bodies still carry INHERENT residual that this phase explicitly does NOT
  * fix (65-CONTEXT scope fence):
- *   - Class 3 (TS2339 `Property … does not exist on type 'never'`) — the shared
- *     `windowing.rzts` `return null`→`never`-narrowed helper. Dominant in
- *     combobox + listbox (8 each × 3 targets). OWNED BY PLAN 04 — when Plan 04
- *     lands the windowing authoring fix those TS2339 vanish, this baseline MUST
- *     be tightened (the gate flips RED on improvement to force it).
+ *   - Class 3 (TS2339 `Property … does not exist on type 'never'`) — was the shared
+ *     `windowing.rzts` `return null`→`never`-narrowed helper, dominant in combobox +
+ *     listbox (8 each × 3 targets). CLEARED by Plan 04 (the `pinMeasurement` typed
+ *     wrapper retype in headless-core/windowing.rzts gives the host pin-hook read a
+ *     real object-or-null shape, so `pm && pm.start` keeps the object branch). The
+ *     TS2339 counts have been removed from the baselines below; listbox/lit reached
+ *     zero and is now ENFORCED CLEAN ({}).
  *   - Class 4 (TS2531 / TS18047 / TS18046 / the `… not assignable to 'null'`
  *     TS2322/TS2345 from member-mutated body consts like `const foCache = {…null}`)
  *     — body-passthrough nullability. Inherent; CONTEXT forbids blanket
@@ -80,7 +82,7 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Combobox.tsx': {
         TS2531: 5,
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04 (windowing.rzts pinMeasurement retype).
         TS2322: 4,
         TS2345: 1,
         TS18047: 4,
@@ -94,7 +96,7 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/combobox/packages/solid',
     baseline: {
       'Combobox.tsx': {
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         TS2349: 1,
         TS2322: 3,
       },
@@ -108,7 +110,7 @@ const FAMILIES: FamilySpec[] = [
       'Combobox.ts': {
         TS2769: 1,
         TS2531: 4,
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         TS2322: 5,
         TS18047: 4,
       },
@@ -153,16 +155,17 @@ const FAMILIES: FamilySpec[] = [
     },
   },
 
-  // ── listbox ── Almost entirely Class-3 windowing (TS2339 ×8/target, → Plan 04)
-  // + a single Class-6 tail (react TS7006 / solid TS2349). Closest to clean —
-  // Plan 04 should bring react/lit very near `{}`.
+  // ── listbox ── Was almost entirely Class-3 windowing (TS2339 ×8/target);
+  // Plan 04 (windowing.rzts pinMeasurement retype) CLEARED it. react keeps a
+  // single Class-6 tail (TS7006); solid a single TS2349; lit is now ENFORCED
+  // CLEAN ({}) — the first leaf to reach zero.
   {
     name: 'listbox',
     target: 'react',
     leaf: 'packages/ui/listbox/packages/react',
     baseline: {
       'Listbox.tsx': {
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         TS7006: 1,
       },
     },
@@ -173,7 +176,7 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/listbox/packages/solid',
     baseline: {
       'Listbox.tsx': {
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         TS2349: 1,
       },
     },
@@ -182,11 +185,9 @@ const FAMILIES: FamilySpec[] = [
     name: 'listbox',
     target: 'lit',
     leaf: 'packages/ui/listbox/packages/lit',
-    baseline: {
-      'Listbox.ts': {
-        TS2339: 8,
-      },
-    },
+    // ENFORCED CLEAN: Plan 04 cleared the only residual (TS2339 ×8 Class-3
+    // windowing). Empty baseline ({}) — ANY strict error now fails this leaf.
+    baseline: {},
   },
 
   // ── data-table ── the inherent-residual heavyweight (Classes 3/4/6 mixed).

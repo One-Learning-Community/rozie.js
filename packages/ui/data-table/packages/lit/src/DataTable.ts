@@ -1694,6 +1694,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   }
 });
 
+  pinMeasurement = (pin: number): {
+  start: number;
+  size: number;
+  index: number;
+  end: number;
+} | null => this.pinnedMeasurement(pin);
+
   windowedRows = () => {
   // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
   // early return — so Solid's <For>/Svelte's {#each} accessor subscribes to it on its FIRST eval,
@@ -1748,7 +1755,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       }
     }
     if (!inWindow) {
-      const pm = this.pinnedMeasurement(pin);
+      const pm = this.pinMeasurement(pin);
       const firstStart = items.length ? items[0].start : 0;
       const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
       const pinnedEntry = {
@@ -1778,7 +1785,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
   const pin = this.pinnedEditIndex();
   if (pin >= 0) {
-    const pm = this.pinnedMeasurement(pin);
+    const pm = this.pinMeasurement(pin);
     const inWindow = this.pmIndexInWindow(items, pin);
     if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
   }
@@ -1799,7 +1806,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
   const pin = this.pinnedEditIndex();
   if (pin >= 0) {
-    const pm = this.pinnedMeasurement(pin);
+    const pm = this.pinMeasurement(pin);
     const inWindow = this.pmIndexInWindow(items, pin);
     // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
     // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's

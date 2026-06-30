@@ -104,7 +104,9 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Listbox.vue': {
         TS2322: 4,
-        TS2339: 8,
+        // TS2339 ×8 (Class-3 windowing `never` narrowing) CLEARED by Phase 65 Plan 04
+        // (the headless-core/windowing.rzts pinMeasurement typed-wrapper retype dissolves
+        // into the Vue SFC too, giving the pin-hook read a real object-or-null shape).
       },
     },
   },

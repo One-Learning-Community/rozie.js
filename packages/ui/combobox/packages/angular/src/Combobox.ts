@@ -361,6 +361,12 @@ export class Combobox {
       this.scheduleRemeasure();
     }
   });
+  pinMeasurement = (pin: number): {
+    start: number;
+    size: number;
+    index: number;
+    end: number;
+  } | null => this.pinnedMeasurement(pin);
   windowedRows = () => {
     const __rows = this.rows();
     // SUBSCRIBE FIRST (fine-grained targets): touch the reactive windowVer at the TOP — BEFORE any
@@ -416,7 +422,7 @@ export class Combobox {
         }
       }
       if (!inWindow) {
-        const pm = this.pinnedMeasurement(pin);
+        const pm = this.pinMeasurement(pin);
         const firstStart = items.length ? items[0].start : 0;
         const above = pm ? pm.start < firstStart : pin < (items.length ? items[0].index : pin);
         const pinnedEntry = {
@@ -445,7 +451,7 @@ export class Combobox {
     // that height from the leading spacer to keep padTop + Σ rendered <tr> + padBottom = total.
     const pin = this.pinnedEditIndex();
     if (pin >= 0) {
-      const pm = this.pinnedMeasurement(pin);
+      const pm = this.pinMeasurement(pin);
       const inWindow = this.pmIndexInWindow(items, pin);
       if (pm && !inWindow && pm.start < pad) pad = pad - pm.size;
     }
@@ -465,7 +471,7 @@ export class Combobox {
     // in-flow as the slice's TRAILING <tr>, so subtract its height from the trailing spacer.
     const pin = this.pinnedEditIndex();
     if (pin >= 0) {
-      const pm = this.pinnedMeasurement(pin);
+      const pm = this.pinMeasurement(pin);
       const inWindow = this.pmIndexInWindow(items, pin);
       // WR-01: decide "below the window" by INDEX, not by start-OFFSET. On variable-height rows
       // measurement drift can leave pm.start at-or-past items[0].start while the pinned row's
