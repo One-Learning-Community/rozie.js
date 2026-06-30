@@ -65,15 +65,39 @@ describe('emitTemplateAttribute (Solid) — string-form `:style` (Plan 260520-8i
     expect(ctx.collectors.runtime.has('parseInlineStyle')).toBe(false);
   });
 
-  it('string LITERAL with kebab properties → camelCased object keys', () => {
+  it('string LITERAL with kebab properties → KEBAB-case quoted object keys (Solid setProperty needs kebab)', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
     const { jsx } = emitAttributes(
       [styleBinding(`'background-color: blue; font-size: 12px'`)],
       ctx,
     );
-    expect(jsx).toContain('backgroundColor: "blue"');
-    expect(jsx).toContain('fontSize: "12px"');
+    expect(jsx).toContain('"background-color": "blue"');
+    expect(jsx).toContain('"font-size": "12px"');
+    expect(jsx).not.toContain('backgroundColor');
+    expect(jsx).not.toContain('fontSize');
+  });
+
+  it('string LITERAL multi-word props (`padding-left`, `margin-top`) → kebab-case quoted keys, NOT camelCase', () => {
+    const ir = emptyIR();
+    const ctx = freshCtx(ir);
+    const { jsx, diagnostics } = emitAttributes(
+      [styleBinding(`'padding-left: 8px; margin-top: 4px'`)],
+      ctx,
+    );
+    expect(jsx).toContain('"padding-left": "8px"');
+    expect(jsx).toContain('"margin-top": "4px"');
+    expect(jsx).not.toContain('paddingLeft');
+    expect(jsx).not.toContain('marginTop');
+    expect(diagnostics).toEqual([]);
+  });
+
+  it('single-word prop stays an unquoted identifier key (byte-identity carve-out)', () => {
+    const ir = emptyIR();
+    const ctx = freshCtx(ir);
+    const { jsx } = emitAttributes([styleBinding(`'background: red'`)], ctx);
+    expect(jsx).toContain('background: "red"');
+    expect(jsx).not.toContain('"background"');
   });
 
   it('string LITERAL with `!important` → object form AND a ROZ083 WARN', () => {

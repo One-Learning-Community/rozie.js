@@ -561,22 +561,30 @@ function bucket(attrs: AttributeBinding[]): Map<string, AttributeBinding[]> {
 }
 
 /**
- * Convert a kebab-case CSS property name to a Solid style-object key.
- * Mirrors `@rozie/runtime-solid`'s `toStyleObjectKey` — kept as a small
- * self-contained emitter local (no shared home for a ~10-line converter).
+ * Derive a Solid style-object key from a kebab-case CSS property name.
  *
- *   background-color  →  backgroundColor
- *   -webkit-mask      →  WebkitMask
- *   --custom-prop     →  --custom-prop  (CSS custom properties pass through)
+ * KEBAB PASSTHROUGH (do NOT camelCase) — Solid diverges from React here.
+ * Solid applies object-form `style` keys via
+ * `CSSStyleDeclaration.setProperty(key, value)`, which requires kebab-case CSS
+ * property names. A camelCased key (`paddingLeft`) is a SILENT no-op: the
+ * declaration is dropped and nothing is applied. So the emitted Solid style
+ * object must preserve the RAW kebab property name verbatim.
+ *
+ * This is the compile-time counterpart of quick task 260629-lb6 SEAM 3, which
+ * fixed the same camelCase bug in the RUNTIME path
+ * (`@rozie/runtime-solid`'s `parseInlineStyle.ts` / `toStyleObjectKey`). That
+ * runtime camelCaser stays as-is for its React-shaped consumers; this
+ * compile-time seam (quick task 260629-rsl) must NOT camelCase.
+ *
+ * Quoting is the consumer's job: `lowerStringLiteralStyle` (the single call
+ * site) JSON.stringify-quotes any key that is not a valid JS identifier. So:
+ *   background      →  background       (identifier → unquoted, byte-identical)
+ *   padding-left    →  "padding-left"   (quoted kebab; setProperty honors it)
+ *   -webkit-mask    →  "-webkit-mask"   (quoted kebab; setProperty honors it)
+ *   --custom-prop   →  "--custom-prop"  (quoted; CSS custom property passes through)
  */
 function cssPropToStyleKey(prop: string): string {
-  if (prop.startsWith('--')) return prop;
-  if (prop.startsWith('-')) {
-    const stripped = prop.slice(1);
-    const camel = stripped.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
-    return camel.charAt(0).toUpperCase() + camel.slice(1);
-  }
-  return prop.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  return prop;
 }
 
 /**
