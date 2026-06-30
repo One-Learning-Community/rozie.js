@@ -1,0 +1,305 @@
+/**
+ * FAMILY-STRICT-CONFORMANCE — Layer-3 baseline-split strict-tsc gate over the
+ * committed @rozie-ui React/Solid/Lit family leaf bodies (Phase 65, Plan 03).
+ *
+ * Mirror of tests/vue-typecheck/family-children.test.ts (the Bundle-A
+ * reported/baseline-split pattern), but driving PLAIN `tsc --noEmit` under the
+ * THREE strict flags the leaf tsconfigs currently RELAX (`strictNullChecks` +
+ * `noImplicitAny` + `exactOptionalPropertyTypes`) over each leaf's committed
+ * `src/*.{tsx,ts}` (react/solid emit `.tsx`, lit emits `.ts`). Reuses the 65-01
+ * harness (`typecheckLeaf`: tmpdir copy + symlinked LEAF node_modules + pinned
+ * tsc, `parseErrors` keyed `file → { TScode → count }`).
+ *
+ * ── WHY EVERY LEAF CARRIES A BASELINE (none enforced-clean YET) ───────────────
+ * The empirical post-65-01/02 state (captured 2026-06-29) is that NO react/solid/
+ * lit leaf — including the combobox/slider/listbox "canaries" — is fully strict-
+ * clean. 65-01 (Class 1: nullable-prop→attr) and 65-02 (Class 2/5: narrow signal/
+ * `<data>` defaults) ARE fixed and their dedicated witnesses stay GREEN — but the
+ * leaf bodies still carry INHERENT residual that this phase explicitly does NOT
+ * fix (65-CONTEXT scope fence):
+ *   - Class 3 (TS2339 `Property … does not exist on type 'never'`) — the shared
+ *     `windowing.rzts` `return null`→`never`-narrowed helper. Dominant in
+ *     combobox + listbox (8 each × 3 targets). OWNED BY PLAN 04 — when Plan 04
+ *     lands the windowing authoring fix those TS2339 vanish, this baseline MUST
+ *     be tightened (the gate flips RED on improvement to force it).
+ *   - Class 4 (TS2531 / TS18047 / TS18046 / the `… not assignable to 'null'`
+ *     TS2322/TS2345 from member-mutated body consts like `const foCache = {…null}`)
+ *     — body-passthrough nullability. Inherent; CONTEXT forbids blanket
+ *     `as any`/`!` to zero it.
+ *   - Class 6 (TS7006 / TS7053 / TS7022/3/4 / TS2379) — the noImplicitAny /
+ *     implicit-index tail. Inherent body-passthrough; out of scope.
+ * So strict-flag RE-ENABLE in the leaf tsconfigs is (for Plan 03) EMPTY — turning
+ * the flags on would make each leaf's own typecheck RED on this inherent residual.
+ * Instead this gate LOCKS the residual: it is the durable regression boundary
+ * that keeps the inherent inventory from silently rotting and forces a baseline
+ * tightening the moment any emitter/authoring fix (Plan 04+) reduces it.
+ *
+ * ── BASELINE-SPLIT SEMANTICS (mirror of family-children.test.ts) ──────────────
+ *   - Each leaf declares a BASELINE of its current strict errors, keyed
+ *     `file → { TScode → count }` (counts, NOT line numbers — robust to the line
+ *     shifts a routine regen produces).
+ *   - The gate asserts the LIVE per-file/per-code counts EQUAL the baseline.
+ *   - MORE errors (regression: new file/code/higher count) flips RED.
+ *   - FEWER errors (an emitter/authoring fix improved a leaf) ALSO flips RED —
+ *     intentional: it forces whoever improves the emitter to TIGHTEN this
+ *     baseline (and, ideally, delete it → switch to `{}`) rather than let the
+ *     gate rot.
+ *   - A leaf with an EMPTY baseline ({}) is ENFORCED CLEAN — any error fails.
+ *     (None today; this is the target state as Plans 04+ shrink the residual.)
+ *
+ * Baselines captured 2026-06-29 from the 65-01 strict harness (strict +
+ * strictNullChecks + noImplicitAny + exactOptionalPropertyTypes) over each
+ * leaf's committed src. Tighten/delete per the IMPROVEMENT-flips-RED rule above.
+ */
+import { describe, it, expect } from 'vitest';
+import {
+  typecheckLeaf,
+  totalErrors,
+  type Inventory,
+  type LeafSpec,
+} from './strict-conformance.harness.js';
+
+interface FamilySpec extends LeafSpec {
+  /**
+   * Currently-known strict-typecheck errors, keyed file → code → count. RECORDED,
+   * NOT FIXED here (inherent Class 3/4/6 residual — see module docblock). Empty
+   * ({}) = ENFORCED CLEAN.
+   */
+  baseline: Inventory;
+}
+
+const FAMILIES: FamilySpec[] = [
+  // ── combobox ── Class-3 windowing (TS2339 ×8/target, → Plan 04) + Class-4
+  // foCache body-const nullability (TS2322 `… to 'null'`, TS2531, TS18047) +
+  // Class-6 tail (react TS7006/TS2345). NOT the Class-1/2 signatures (those are
+  // fixed; witnesses green).
+  {
+    name: 'combobox',
+    target: 'react',
+    leaf: 'packages/ui/combobox/packages/react',
+    baseline: {
+      'Combobox.tsx': {
+        TS2531: 5,
+        TS2339: 8,
+        TS2322: 4,
+        TS2345: 1,
+        TS18047: 4,
+        TS7006: 1,
+      },
+    },
+  },
+  {
+    name: 'combobox',
+    target: 'solid',
+    leaf: 'packages/ui/combobox/packages/solid',
+    baseline: {
+      'Combobox.tsx': {
+        TS2339: 8,
+        TS2349: 1,
+        TS2322: 3,
+      },
+    },
+  },
+  {
+    name: 'combobox',
+    target: 'lit',
+    leaf: 'packages/ui/combobox/packages/lit',
+    baseline: {
+      'Combobox.ts': {
+        TS2769: 1,
+        TS2531: 4,
+        TS2339: 8,
+        TS2322: 5,
+        TS18047: 4,
+      },
+    },
+  },
+
+  // ── slider ── NO windowing (no Class-3). Pure Class-4 body-passthrough
+  // nullability (TS2531/TS18047) + solid Class-6 unknown-tail (TS18046/TS2349).
+  {
+    name: 'slider',
+    target: 'react',
+    leaf: 'packages/ui/slider/packages/react',
+    baseline: {
+      'Slider.tsx': {
+        TS18047: 2,
+        TS2531: 2,
+      },
+    },
+  },
+  {
+    name: 'slider',
+    target: 'solid',
+    leaf: 'packages/ui/slider/packages/solid',
+    baseline: {
+      'Slider.tsx': {
+        TS18046: 2,
+        TS2349: 1,
+        TS18047: 2,
+        TS2531: 2,
+      },
+    },
+  },
+  {
+    name: 'slider',
+    target: 'lit',
+    leaf: 'packages/ui/slider/packages/lit',
+    baseline: {
+      'Slider.ts': {
+        TS18047: 2,
+        TS2531: 2,
+      },
+    },
+  },
+
+  // ── listbox ── Almost entirely Class-3 windowing (TS2339 ×8/target, → Plan 04)
+  // + a single Class-6 tail (react TS7006 / solid TS2349). Closest to clean —
+  // Plan 04 should bring react/lit very near `{}`.
+  {
+    name: 'listbox',
+    target: 'react',
+    leaf: 'packages/ui/listbox/packages/react',
+    baseline: {
+      'Listbox.tsx': {
+        TS2339: 8,
+        TS7006: 1,
+      },
+    },
+  },
+  {
+    name: 'listbox',
+    target: 'solid',
+    leaf: 'packages/ui/listbox/packages/solid',
+    baseline: {
+      'Listbox.tsx': {
+        TS2339: 8,
+        TS2349: 1,
+      },
+    },
+  },
+  {
+    name: 'listbox',
+    target: 'lit',
+    leaf: 'packages/ui/listbox/packages/lit',
+    baseline: {
+      'Listbox.ts': {
+        TS2339: 8,
+      },
+    },
+  },
+
+  // ── data-table ── the inherent-residual heavyweight (Classes 3/4/6 mixed).
+  // Class 3 shrinks when Plan 04 lands the windowing fix; the rest is body-
+  // passthrough Class 4/6 (TS7053 implicit-index, TS2345 narrow-default fallout,
+  // TS7006/7022/7023/7024 noImplicitAny tail). Locked, do-not-fix-here.
+  {
+    name: 'data-table',
+    target: 'react',
+    leaf: 'packages/ui/data-table/packages/react',
+    baseline: {
+      'DataTable.tsx': {
+        TS7023: 1,
+        TS7022: 1,
+        TS2345: 9,
+        TS7053: 4,
+        TS2379: 1,
+        TS7006: 10,
+        TS2322: 4,
+      },
+      'DetailPanel.tsx': {
+        TS7053: 2,
+      },
+    },
+  },
+  {
+    name: 'data-table',
+    target: 'solid',
+    leaf: 'packages/ui/data-table/packages/solid',
+    baseline: {
+      'DataTable.tsx': {
+        TS2345: 11,
+        TS2379: 1,
+        TS7023: 1,
+        TS7022: 1,
+        TS7053: 4,
+        TS2322: 2,
+        TS7006: 2,
+      },
+      'DetailPanel.tsx': {
+        TS7053: 2,
+      },
+      'GroupBar.tsx': {
+        TS2345: 1,
+        TS2322: 1,
+      },
+    },
+  },
+  {
+    name: 'data-table',
+    target: 'lit',
+    leaf: 'packages/ui/data-table/packages/lit',
+    baseline: {
+      'DataTable.ts': {
+        TS2322: 1,
+        TS2379: 1,
+        TS2345: 9,
+        TS7006: 2,
+        TS7024: 1,
+        TS7022: 1,
+        TS7053: 4,
+      },
+      'DetailPanel.ts': {
+        TS7053: 2,
+      },
+    },
+  },
+];
+
+/**
+ * Diff live inventory against baseline. Returns human-readable mismatch lines
+ * (empty = exact match). A mismatch is any of: a file with errors absent from
+ * the baseline, a missing baseline file, a new/missing error code, or a count
+ * delta. Flags BOTH directions (REGRESSION on increase, IMPROVED on decrease).
+ */
+function diffAgainstBaseline(live: Inventory, baseline: Inventory): string[] {
+  const mismatches: string[] = [];
+  const files = new Set([...Object.keys(live), ...Object.keys(baseline)]);
+  for (const file of [...files].sort()) {
+    const liveCodes = live[file] ?? {};
+    const baseCodes = baseline[file] ?? {};
+    const codes = new Set([...Object.keys(liveCodes), ...Object.keys(baseCodes)]);
+    for (const code of [...codes].sort()) {
+      const lc = liveCodes[code] ?? 0;
+      const bc = baseCodes[code] ?? 0;
+      if (lc !== bc) {
+        const verb = lc > bc ? 'REGRESSION' : 'IMPROVED (tighten baseline)';
+        mismatches.push(`  ${file} ${code}: live=${lc} baseline=${bc}  [${verb}]`);
+      }
+    }
+  }
+  return mismatches;
+}
+
+describe('FAMILY-STRICT-CONFORMANCE — strict tsc over @rozie-ui react/solid/lit family leaf bodies (Plan 03 baseline lock)', () => {
+  for (const spec of FAMILIES) {
+    const baselineTotal = totalErrors(spec.baseline);
+    const label =
+      baselineTotal === 0
+        ? `${spec.name}/${spec.target}: leaf body is strict-clean (enforced)`
+        : `${spec.name}/${spec.target}: strict errors match the recorded baseline (${baselineTotal} known, do-not-fix-here)`;
+
+    it(label, () => {
+      const { inventory } = typecheckLeaf(spec);
+      const mismatches = diffAgainstBaseline(inventory, spec.baseline);
+      expect(
+        mismatches,
+        `[${spec.name}/${spec.target}] strict-typecheck inventory drifted from the recorded baseline.\n` +
+          `If you ADDED an error, that is a regression — fix it.\n` +
+          `If you FIXED emitter/authoring residual (e.g. Plan 04 windowing), tighten/remove this leaf's baseline in family-strict-conformance.test.ts ` +
+          `(and switch it to {} once it reaches zero so it becomes enforced-clean).\n` +
+          mismatches.join('\n'),
+      ).toEqual([]);
+    });
+  }
+});
