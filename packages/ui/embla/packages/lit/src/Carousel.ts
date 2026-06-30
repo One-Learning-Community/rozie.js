@@ -179,7 +179,7 @@ export default class Carousel extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, attribute: 'selected-index' }) _selectedIndex_attr: number = 0;
   private _selectedIndexControllable = createLitControllableProperty<number>({ host: this, eventName: 'selected-index-change', defaultValue: 0, initialControlledValue: undefined });
-  private _snaps = signal([]);
+  private _snaps = signal<any[]>([]);
   private _selected = signal(0);
   private _canPrev = signal(false);
   private _canNext = signal(false);

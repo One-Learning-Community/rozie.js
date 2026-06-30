@@ -205,7 +205,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   const [open$local, setOpen$local] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [query, setQuery] = createSignal('');
-  const [rows, setRows] = createSignal([]);
+  const [rows, setRows] = createSignal<any[]>([]);
   const [windowVer, setWindowVer] = createSignal(0);
   const [editVer, setEditVer] = createSignal(0);
   const selectedLabel = createMemo(() => {

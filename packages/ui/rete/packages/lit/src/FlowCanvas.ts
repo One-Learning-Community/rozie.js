@@ -347,8 +347,8 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
    * Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.
    */
   @property({ type: Boolean, reflect: true }) nodeToolbar: boolean = false;
-  private _typeReg = signal({});
-  private _portReg = signal({});
+  private _typeReg = signal<any>({});
+  private _portReg = signal<any>({});
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
   @query('[data-rozie-ref="minimapEl"]') private _refMinimapEl!: HTMLElement;
   @query('[data-rozie-ref="marqueeEl"]') private _refMarqueeEl!: HTMLElement;

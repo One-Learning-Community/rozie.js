@@ -28,7 +28,7 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
 }))() }, _props);
   const [local, attrs] = splitProps(_merged, ['a', 'b', 'c', 'd', 'e', 'f']);
 
-  const [observed, setObserved] = createSignal(null);
+  const [observed, setObserved] = createSignal<any>(null);
   onMount(() => {
     setObserved({
       a: local.a,

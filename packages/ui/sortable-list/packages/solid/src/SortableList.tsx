@@ -135,7 +135,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
-  const [liftedIndex, setLiftedIndex] = createSignal(null);
+  const [liftedIndex, setLiftedIndex] = createSignal<any>(null);
   const [ariaLiveText, setAriaLiveText] = createSignal('');
   onMount(() => {
     const _cleanup = (() => {

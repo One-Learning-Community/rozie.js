@@ -205,7 +205,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   onMount(() => { local.ref?.({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance }); });
 
   const [selectedIndex, setSelectedIndex] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'selectedIndex', 0);
-  const [snaps, setSnaps] = createSignal([]);
+  const [snaps, setSnaps] = createSignal<any[]>([]);
   const [selected, setSelected] = createSignal(0);
   const [canPrev, setCanPrev] = createSignal(false);
   const [canNext, setCanNext] = createSignal(false);

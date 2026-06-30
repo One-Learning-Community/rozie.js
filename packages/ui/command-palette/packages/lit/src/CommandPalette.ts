@@ -137,7 +137,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true }) idBase: string = 'rozie-command-palette';
-  private _activeValue = signal(null);
+  private _activeValue = signal<any>(null);
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 

@@ -16,7 +16,7 @@ export default class CloneProbe extends SignalWatcher(LitElement) {
   count: 0,
   created: new Date(0)
 });
-  private _cloned = signal(null);
+  private _cloned = signal<any>(null);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

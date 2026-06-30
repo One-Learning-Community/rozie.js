@@ -16,7 +16,7 @@ export default function CloneProbe(_props: CloneProbeProps): JSX.Element {
     count: 0,
     created: new Date(0)
   });
-  const [cloned, setCloned] = createSignal(null);
+  const [cloned, setCloned] = createSignal<any>(null);
   onMount(() => {
     setCloned(structuredClone(state()));
   });

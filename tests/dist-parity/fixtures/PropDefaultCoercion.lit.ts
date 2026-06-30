@@ -26,7 +26,7 @@ export default class PropDefaultCoercion extends SignalWatcher(LitElement) {
   @property({ type: Object }) f: any = {
   k: 1
 };
-  private _observed = signal(null);
+  private _observed = signal<any>(null);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

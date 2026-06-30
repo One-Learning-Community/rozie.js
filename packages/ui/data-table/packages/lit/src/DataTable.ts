@@ -464,20 +464,20 @@ export default class DataTable extends SignalWatcher(LitElement) {
    * A CSS length string bounding the `rdt-scroll` container when `virtual` is on (e.g. `'400px'`). Mirrored to the `--rozie-data-table-max-height` custom property; the prop wins, the token is the fallback.
    */
   @property({ type: String, reflect: true }) maxHeight: string = '';
-  private _dataDefault = signal([]);
-  private _sortingDefault = signal([]);
+  private _dataDefault = signal<any[]>([]);
+  private _sortingDefault = signal<any[]>([]);
   private _globalFilterDefault = signal('');
-  private _columnFiltersDefault = signal([]);
+  private _columnFiltersDefault = signal<any[]>([]);
   private _paginationDefault = signal({
   pageIndex: 0,
   pageSize: 10
 });
-  private _rowSelectionDefault = signal({});
-  private _expandedDefault = signal({});
-  private _groupingDefault = signal([]);
-  private _columnVisibilityDefault = signal({});
-  private _columnSizingDefault = signal({});
-  private _columnOrderDefault = signal([]);
+  private _rowSelectionDefault = signal<any>({});
+  private _expandedDefault = signal<any>({});
+  private _groupingDefault = signal<any[]>([]);
+  private _columnVisibilityDefault = signal<any>({});
+  private _columnSizingDefault = signal<any>({});
+  private _columnOrderDefault = signal<any[]>([]);
   private _columnPinningDefault = signal({
   left: [],
   right: []
@@ -490,9 +490,9 @@ export default class DataTable extends SignalWatcher(LitElement) {
   isResizingColumn: false,
   columnSizingStart: []
 });
-  private _colReg = signal({});
-  private _rows = signal([]);
-  private _headerGroups = signal([]);
+  private _colReg = signal<any>({});
+  private _rows = signal<any[]>([]);
+  private _headerGroups = signal<any[]>([]);
   private _rowModelVer = signal(0);
   private _windowVer = signal(0);
   private _activeRow = signal(0);
@@ -502,13 +502,13 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _activeInControl = signal(false);
   private _editingRow = signal(-1);
   private _editingCol = signal(-1);
-  private _draftValue = signal(null);
+  private _draftValue = signal<any>(null);
   private _invalidMsg = signal('');
   private _editVer = signal(0);
-  private _editingRowIndex = signal(null);
-  private _rowDraft = signal({});
-  private _rangeAnchor = signal(null);
-  private _rangeFocus = signal(null);
+  private _editingRowIndex = signal<any>(null);
+  private _rowDraft = signal<any>({});
+  private _rangeAnchor = signal<any>(null);
+  private _rangeFocus = signal<any>(null);
   private _pasteAnnounce = signal('');
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;

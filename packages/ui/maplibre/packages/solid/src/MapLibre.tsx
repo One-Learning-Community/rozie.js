@@ -196,8 +196,8 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
   const [bearing, setBearing] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'bearing', 0);
   const [pitch, setPitch] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'pitch', 0);
-  const [sourceReg, setSourceReg] = createSignal({});
-  const [layerReg, setLayerReg] = createSignal({});
+  const [sourceReg, setSourceReg] = createSignal<Record<string, any>>({});
+  const [layerReg, setLayerReg] = createSignal<Record<string, any>>({});
   interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;

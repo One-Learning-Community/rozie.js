@@ -393,8 +393,8 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   }))());
   const [zoom, setZoom] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'zoom', 1);
   const [mode, setMode] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'mode', 'pan');
-  const [typeReg, setTypeReg] = createSignal({});
-  const [portReg, setPortReg] = createSignal({});
+  const [typeReg, setTypeReg] = createSignal<Record<string, any>>({});
+  const [portReg, setPortReg] = createSignal<Record<string, any>>({});
   interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;

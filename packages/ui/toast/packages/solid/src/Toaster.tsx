@@ -102,7 +102,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'ref']);
   onMount(() => { local.ref?.({ show, dismiss, clear }); });
 
-  const [toasts, setToasts] = createSignal([]);
+  const [toasts, setToasts] = createSignal<any[]>([]);
   const [seq, setSeq] = createSignal(0);
   onCleanup(() => {
     pauseTimers();

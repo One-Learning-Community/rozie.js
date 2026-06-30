@@ -180,7 +180,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   const [query, setQuery] = createSignal('');
   const [isOpen, setIsOpen] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
-  const [rows, setRows] = createSignal([]);
+  const [rows, setRows] = createSignal<any[]>([]);
   const [windowVer, setWindowVer] = createSignal(0);
   const [editVer, setEditVer] = createSignal(0);
   onMount(() => {

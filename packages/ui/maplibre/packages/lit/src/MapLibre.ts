@@ -149,8 +149,8 @@ export default class MapLibre extends SignalWatcher(LitElement) {
    * The raw `MapOptions` passthrough — spread into the `Map` constructor **before** the curated keys, so explicit props win. The MapLibre analog of an options bag for anything the curated surface doesn't special-case.
    */
   @property({ type: Object }) options: any = {};
-  private _sourceReg = signal({});
-  private _layerReg = signal({});
+  private _sourceReg = signal<any>({});
+  private _layerReg = signal<any>({});
   @query('[data-rozie-ref="containerEl"]') private _refContainerEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;

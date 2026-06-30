@@ -347,11 +347,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     pageIndex: 0,
     pageSize: 10
   });
-  const [rowSelectionDefault, setRowSelectionDefault] = useState({});
-  const [expandedDefault, setExpandedDefault] = useState({});
+  const [rowSelectionDefault, setRowSelectionDefault] = useState<Record<string, any>>({});
+  const [expandedDefault, setExpandedDefault] = useState<Record<string, any>>({});
   const [groupingDefault, setGroupingDefault] = useState<any[]>([]);
-  const [columnVisibilityDefault, setColumnVisibilityDefault] = useState({});
-  const [columnSizingDefault, setColumnSizingDefault] = useState({});
+  const [columnVisibilityDefault, setColumnVisibilityDefault] = useState<Record<string, any>>({});
+  const [columnSizingDefault, setColumnSizingDefault] = useState<Record<string, any>>({});
   const [columnOrderDefault, setColumnOrderDefault] = useState<any[]>([]);
   const [columnPinningDefault, setColumnPinningDefault] = useState({
     left: [],
@@ -365,7 +365,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     isResizingColumn: false,
     columnSizingStart: []
   });
-  const [colReg, setColReg] = useState({});
+  const [colReg, setColReg] = useState<Record<string, any>>({});
   const [rows, setRows] = useState<any[]>([]);
   const [headerGroups, setHeaderGroups] = useState<any[]>([]);
   const [rowModelVer, setRowModelVer] = useState(0);
@@ -381,7 +381,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [invalidMsg, setInvalidMsg] = useState('');
   const [editVer, setEditVer] = useState(0);
   const [editingRowIndex, setEditingRowIndex] = useState<any>(null);
-  const [rowDraft, setRowDraft] = useState({});
+  const [rowDraft, setRowDraft] = useState<Record<string, any>>({});
   const [rangeAnchor, setRangeAnchor] = useState<any>(null);
   const [rangeFocus, setRangeFocus] = useState<any>(null);
   const [pasteAnnounce, setPasteAnnounce] = useState('');

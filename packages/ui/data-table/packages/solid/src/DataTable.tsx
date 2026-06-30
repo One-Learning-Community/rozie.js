@@ -505,20 +505,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     left: [],
     right: []
   }))());
-  const [dataDefault, setDataDefault] = createSignal([]);
-  const [sortingDefault, setSortingDefault] = createSignal([]);
+  const [dataDefault, setDataDefault] = createSignal<any[]>([]);
+  const [sortingDefault, setSortingDefault] = createSignal<any[]>([]);
   const [globalFilterDefault, setGlobalFilterDefault] = createSignal('');
-  const [columnFiltersDefault, setColumnFiltersDefault] = createSignal([]);
+  const [columnFiltersDefault, setColumnFiltersDefault] = createSignal<any[]>([]);
   const [paginationDefault, setPaginationDefault] = createSignal({
     pageIndex: 0,
     pageSize: 10
   });
-  const [rowSelectionDefault, setRowSelectionDefault] = createSignal({});
-  const [expandedDefault, setExpandedDefault] = createSignal({});
-  const [groupingDefault, setGroupingDefault] = createSignal([]);
-  const [columnVisibilityDefault, setColumnVisibilityDefault] = createSignal({});
-  const [columnSizingDefault, setColumnSizingDefault] = createSignal({});
-  const [columnOrderDefault, setColumnOrderDefault] = createSignal([]);
+  const [rowSelectionDefault, setRowSelectionDefault] = createSignal<Record<string, any>>({});
+  const [expandedDefault, setExpandedDefault] = createSignal<Record<string, any>>({});
+  const [groupingDefault, setGroupingDefault] = createSignal<any[]>([]);
+  const [columnVisibilityDefault, setColumnVisibilityDefault] = createSignal<Record<string, any>>({});
+  const [columnSizingDefault, setColumnSizingDefault] = createSignal<Record<string, any>>({});
+  const [columnOrderDefault, setColumnOrderDefault] = createSignal<any[]>([]);
   const [columnPinningDefault, setColumnPinningDefault] = createSignal({
     left: [],
     right: []
@@ -531,9 +531,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     isResizingColumn: false,
     columnSizingStart: []
   });
-  const [colReg, setColReg] = createSignal({});
-  const [rows, setRows] = createSignal([]);
-  const [headerGroups, setHeaderGroups] = createSignal([]);
+  const [colReg, setColReg] = createSignal<Record<string, any>>({});
+  const [rows, setRows] = createSignal<any[]>([]);
+  const [headerGroups, setHeaderGroups] = createSignal<any[]>([]);
   const [rowModelVer, setRowModelVer] = createSignal(0);
   const [windowVer, setWindowVer] = createSignal(0);
   const [activeRow, setActiveRow] = createSignal(0);
@@ -543,13 +543,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const [activeInControl, setActiveInControl] = createSignal(false);
   const [editingRow, setEditingRow] = createSignal(-1);
   const [editingCol, setEditingCol] = createSignal(-1);
-  const [draftValue, setDraftValue] = createSignal(null);
+  const [draftValue, setDraftValue] = createSignal<any>(null);
   const [invalidMsg, setInvalidMsg] = createSignal('');
   const [editVer, setEditVer] = createSignal(0);
-  const [editingRowIndex, setEditingRowIndex] = createSignal(null);
-  const [rowDraft, setRowDraft] = createSignal({});
-  const [rangeAnchor, setRangeAnchor] = createSignal(null);
-  const [rangeFocus, setRangeFocus] = createSignal(null);
+  const [editingRowIndex, setEditingRowIndex] = createSignal<any>(null);
+  const [rowDraft, setRowDraft] = createSignal<Record<string, any>>({});
+  const [rangeAnchor, setRangeAnchor] = createSignal<any>(null);
+  const [rangeFocus, setRangeFocus] = createSignal<any>(null);
   const [pasteAnnounce, setPasteAnnounce] = createSignal('');
   onMount(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an

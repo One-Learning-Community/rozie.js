@@ -6,7 +6,7 @@ import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-attr-nullish-drop')
 export default class AttrNullishDrop extends SignalWatcher(LitElement) {
   private _cond = signal(false);
-  private _maybeNull = signal(null);
+  private _maybeNull = signal<any>(null);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

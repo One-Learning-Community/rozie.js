@@ -365,7 +365,24 @@ function emitModelGetterSetter(prop: PropDecl): string {
 
 function emitStateField(stateName: string, init: t.Expression): string {
   // Signal-backed: `private _x = signal(<init>);`
-  return `  private _${stateName} = signal(${renderExpression(init)});`;
+  // Class 2 (Phase 65-02) — a NARROW-LITERAL `<data>` default makes the signal
+  // infer a too-narrow type that breaks every downstream `.value` read:
+  //   `[]` → `Signal<never[]>`   → `.value.map` / `repeat` → TS2339/TS2769
+  //   `{}` → `Signal<{}>`        → string-key index        → TS7053
+  //   `null` → `Signal<null>`    → `.value = <value>`      → TS2322 ('null')
+  // Emit an explicit type arg widened via Lit's own renderTsType precedents
+  // (`Array → any[]`, `Object → any`) so `repeat()`/index/assignment typecheck.
+  // Narrow-literal ONLY: a non-empty literal, a call, or a factory is
+  // well-inferred and stays byte-identical (no type arg).
+  let typeArg = '';
+  if (t.isArrayExpression(init) && init.elements.length === 0) {
+    typeArg = '<any[]>';
+  } else if (t.isNullLiteral(init)) {
+    typeArg = '<any>';
+  } else if (t.isObjectExpression(init) && init.properties.length === 0) {
+    typeArg = '<any>';
+  }
+  return `  private _${stateName} = signal${typeArg}(${renderExpression(init)});`;
 }
 
 function emitRefField(refName: string, elementTag: string): string {

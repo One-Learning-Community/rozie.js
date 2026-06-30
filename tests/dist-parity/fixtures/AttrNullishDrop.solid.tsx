@@ -8,7 +8,7 @@ export default function AttrNullishDrop(_props: AttrNullishDropProps): JSX.Eleme
   const [local, attrs] = splitProps(_props, []);
 
   const [cond, setCond] = createSignal(false);
-  const [maybeNull, setMaybeNull] = createSignal(null);
+  const [maybeNull, setMaybeNull] = createSignal<any>(null);
 
   return (
     <>

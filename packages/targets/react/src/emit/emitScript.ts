@@ -2318,6 +2318,18 @@ export function emitScript(
       stateTypeArg = '<any[]>';
     } else if (t.isNullLiteral(s.initializer)) {
       stateTypeArg = '<any>';
+    } else if (
+      t.isObjectExpression(s.initializer) &&
+      s.initializer.properties.length === 0
+    ) {
+      // Class 2 (Phase 65-02) — an empty-object `<data>` default
+      // (`rowSelectionDefault: {}`) types as `useState<{}>({})`, so a later
+      // string-key index (`bag[id]`) fails TS7053 ("no index signature on type
+      // '{}'"). Widen to `Record<string, any>` — the same widening the props
+      // renderer applies to a bare `Object` type — so the narrow inference is
+      // gone. Narrow-literal ONLY: a non-empty object literal is well-inferred
+      // and stays byte-identical (no type arg).
+      stateTypeArg = '<Record<string, any>>';
     }
     // Quick 260622-siv — APPLY (a): when a top-level props-seed folded for this
     // state (all 4 gates held in the pre-pass), emit the lazy initializer

@@ -148,7 +148,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   const [query, setQuery] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'query', '');
-  const [activeValue, setActiveValue] = createSignal(null);
+  const [activeValue, setActiveValue] = createSignal<any>(null);
   onMount(() => {
     if (open()) onOpen();
   });

@@ -173,7 +173,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   private _query = signal('');
   private _isOpen = signal(false);
   private _activeIndex = signal(-1);
-  private _rows = signal([]);
+  private _rows = signal<any[]>([]);
   private _windowVer = signal(0);
   private _editVer = signal(0);
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;

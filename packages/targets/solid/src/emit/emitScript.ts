@@ -465,8 +465,29 @@ export function emitScript(
   for (const s of ir.state) {
     collectors.solidImports.add('createSignal');
     const setterName = 'set' + capitalize(s.name);
+    // Class 2 (Phase 65-02) — a NARROW-LITERAL `<data>` default makes
+    // `createSignal` infer a too-narrow type that breaks every downstream read:
+    //   `[]` → `Signal<never[]>`         → `.map`/`For each` → TS2339/TS2349/TS2769
+    //   `{}` → `Signal<{}>`              → string-key index → TS7053
+    //   `null` → `Signal<null>`          → `setX(<value>)`  → TS2322 ('null')
+    // Emit an explicit type arg so the inference is widened — the same
+    // `Array→any[]` / `Object→Record<string,any>` widening the prop renderer
+    // (renderType) already applies, and mirrors createControllableSignal<T>
+    // above. Narrow-literal ONLY: a non-empty literal, a call, or a factory is
+    // well-inferred and stays byte-identical (no type arg).
+    let stateTypeArg = '';
+    if (t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0) {
+      stateTypeArg = '<any[]>';
+    } else if (t.isNullLiteral(s.initializer)) {
+      stateTypeArg = '<any>';
+    } else if (
+      t.isObjectExpression(s.initializer) &&
+      s.initializer.properties.length === 0
+    ) {
+      stateTypeArg = '<Record<string, any>>';
+    }
     hookLines.push(
-      `const [${s.name}, ${setterName}] = createSignal(${genCode(s.initializer)});`,
+      `const [${s.name}, ${setterName}] = createSignal${stateTypeArg}(${genCode(s.initializer)});`,
     );
   }
 
