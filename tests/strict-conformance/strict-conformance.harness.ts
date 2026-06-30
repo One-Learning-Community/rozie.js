@@ -179,6 +179,74 @@ export function typecheckLeaf(spec: LeafSpec): LeafResult {
   }
 }
 
+export interface CompiledTypecheckSpec {
+  /** Compile target — drives the per-target strict tsconfig + JSX mode. */
+  target: Target;
+  /** `filename → emitted source` to write into the tmpdir and typecheck. */
+  files: Record<string, string>;
+  /**
+   * Path (from repo ROOT) to a leaf package whose `node_modules` is symlinked
+   * for type RESOLUTION (react/@types/react, solid-js, lit, @rozie/runtime-*).
+   * A per-target committed leaf (e.g. `packages/ui/combobox/packages/react`)
+   * carries exactly the right peer deps for `target`.
+   */
+  nodeModulesFrom: string;
+}
+
+/**
+ * Strict `tsc --noEmit` over a set of EMITTED (compiled) source files written
+ * to a tmpdir — the body-noise-free path for a DEDICATED `.rozie` fixture. Type
+ * resolution comes from the symlinked leaf `node_modules`. Mirrors
+ * `typecheckLeaf` but takes literal compiled source instead of a committed src/.
+ */
+export function typecheckCompiled(spec: CompiledTypecheckSpec): LeafResult {
+  const nm = resolve(ROOT, spec.nodeModulesFrom, 'node_modules');
+  if (!existsSync(nm)) {
+    throw new Error(
+      `[compiled/${spec.target}] missing node_modules for type resolution: ${nm} — install/build the workspace first.`,
+    );
+  }
+  const tscBin = resolve(HERE, 'node_modules', '.bin', 'tsc');
+  if (!existsSync(tscBin)) {
+    throw new Error(
+      `[compiled/${spec.target}] tsc not found at ${tscBin} — run pnpm install in tests/strict-conformance.`,
+    );
+  }
+
+  const tmpDir = mkdtempSync(join(tmpdir(), `rozie-strict-compiled-${spec.target}-`));
+  try {
+    for (const [name, code] of Object.entries(spec.files)) {
+      writeFileSync(join(tmpDir, name), code);
+    }
+    writeFileSync(
+      join(tmpDir, 'tsconfig.json'),
+      JSON.stringify(
+        {
+          compilerOptions: strictCompilerOptions(spec.target),
+          include: ['./**/*.ts', './**/*.tsx'],
+          exclude: ['node_modules'],
+        },
+        null,
+        2,
+      ),
+    );
+    copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
+    symlinkSync(nm, join(tmpDir, 'node_modules'), 'dir');
+
+    let output = '';
+    try {
+      execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], { cwd: tmpDir, stdio: 'pipe' });
+    } catch (err) {
+      const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+      const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+      output = stdout + '\n' + stderr;
+    }
+    return { raw: output, inventory: parseErrors(output) };
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 /** Total error count across an inventory. */
 export function totalErrors(inv: Inventory): number {
   return Object.values(inv).reduce(
