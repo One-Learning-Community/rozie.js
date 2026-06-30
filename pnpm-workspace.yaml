@@ -20,6 +20,7 @@ packages:
   - "tests/angular-typecheck"
   - "tests/vue-typecheck"
   - "tests/react-typecheck"
+  - "tests/strict-conformance"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"
