@@ -49,11 +49,11 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
    */
-  @property({ type: String, reflect: true }) handle: string = null;
+  @property({ type: String, reflect: true }) handle: string | null = null;
   /**
    * SortableJS group name enabling cross-list drag — two lists sharing a `group` accept items between each other (the source fires `remove`, the destination fires `add`). Set `cloneable: true` to flip a string group into clone-mode.
    */
-  @property({ type: String, reflect: true }) group: string = null;
+  @property({ type: String, reflect: true }) group: string | null = null;
   /**
    * Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.
    */
@@ -77,23 +77,23 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * Class name applied to the drop-placeholder (ghost) element while dragging. Forwarded live via `instance.option`, so toggling it at runtime takes effect without a remount.
    */
-  @property({ type: String, reflect: true }) ghostClass: string = null;
+  @property({ type: String, reflect: true }) ghostClass: string | null = null;
   /**
    * Class name applied to the currently-chosen item while dragging. Forwarded live via `instance.option` (no remount needed to change it).
    */
-  @property({ type: String, reflect: true }) chosenClass: string = null;
+  @property({ type: String, reflect: true }) chosenClass: string | null = null;
   /**
    * Class name applied to the dragging element. Only takes effect in fallback mode (`forceFallback: true`). Forwarded live via `instance.option`.
    */
-  @property({ type: String, reflect: true }) dragClass: string = null;
+  @property({ type: String, reflect: true }) dragClass: string | null = null;
   /**
    * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
-  @property({ type: String, reflect: true }) filter: string = null;
+  @property({ type: String, reflect: true }) filter: string | null = null;
   /**
    * CSS easing function for the reorder animation (e.g. `'ease-in'`, `'cubic-bezier(0.4, 0, 0.2, 1)'`). Runtime-updatable.
    */
-  @property({ type: String, reflect: true }) easing: string = null;
+  @property({ type: String, reflect: true }) easing: string | null = null;
   /**
    * Force SortableJS's mouse-event drag path over HTML5 DnD — useful for touch devices, consistent cross-browser behavior, and synthetic test drivers (and `dragClass` only applies in this mode). **Construction-time only**: SortableJS reads it once at construction, so re-key the `<SortableList>` to toggle it at runtime.
    */

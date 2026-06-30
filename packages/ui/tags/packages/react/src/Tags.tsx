@@ -219,14 +219,14 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
 
   return (
     <>
-    <div ref={root} role="group" aria-label={props.ariaLabel} {...attrs} className={clsx(clsx("rozie-tags", { "rozie-tags--disabled": props.disabled, "rozie-tags--readonly": props.readonly }), (attrs.className as string | undefined))} data-rozie-s-64848f8e="">
+    <div ref={root} role="group" aria-label={rozieAttr(props.ariaLabel)} {...attrs} className={clsx(clsx("rozie-tags", { "rozie-tags--disabled": props.disabled, "rozie-tags--readonly": props.readonly }), (attrs.className as string | undefined))} data-rozie-s-64848f8e="">
       <ul className={"rozie-tags-list"} data-rozie-s-64848f8e="">
         {tokens().map((t) => <li key={t + ':' + tokens().indexOf(t)} className={"rozie-tags-chip"} data-rozie-s-64848f8e="">
           {(props.renderTag ?? props.slots?.['tag']) ? ((props.renderTag ?? props.slots?.['tag']) as Function)({ tag: t, index: tokens().indexOf(t), remove: () => removeAt(tokens().indexOf(t)) }) : <><span className={"rozie-tags-chip__label"} data-rozie-s-64848f8e="">{rozieDisplay(t)}</span>{(!props.readonly) && <button type="button" className={"rozie-tags-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(removeLabel(t))} onClick={($event) => { removeAt(tokens().indexOf(t)); }} data-rozie-s-64848f8e="">×</button>}</>}
         </li>)}
       </ul>
 
-      {(!props.readonly) && <input className={"rozie-tags-input"} type="text" autoComplete="off" autoCapitalize="off" value={draft} placeholder={props.placeholder} disabled={!!props.disabled || !!atMax()} aria-label={props.ariaLabel} aria-disabled={!!props.disabled} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} onBlur={($event) => { onBlur($event); }} data-rozie-s-64848f8e="" />}<span className={"rozie-tags-count"} aria-live="polite" data-rozie-s-64848f8e="">{rozieDisplay(countLabel())}</span>
+      {(!props.readonly) && <input className={"rozie-tags-input"} type="text" autoComplete="off" autoCapitalize="off" value={draft} placeholder={props.placeholder} disabled={!!props.disabled || !!atMax()} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} onBlur={($event) => { onBlur($event); }} data-rozie-s-64848f8e="" />}<span className={"rozie-tags-count"} aria-live="polite" data-rozie-s-64848f8e="">{rozieDisplay(countLabel())}</span>
     </div>
     </>
   );

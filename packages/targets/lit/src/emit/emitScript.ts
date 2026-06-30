@@ -207,7 +207,30 @@ function renderTsType(ann: PropTypeAnnotation): string {
 function renderFieldSuffix(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
   if (prop.defaultValue != null) {
-    return `: ${tsType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
+    // Phase 65 (Class 1 / SC-1) — a `null` default on a non-null-admitting field
+    // type (`@property() ariaLabel: string = null`) is a type/init mismatch
+    // (TS2322 `'null' is not assignable to 'string'`). Widen the DECLARED type to
+    // admit the `= null` init, mirroring the React/Solid `| null` prop-interface
+    // widening (Phase 16 R1). renderDefault already emits `null` for the init.
+    //
+    // Byte-identity carve-out: skip types that ALREADY admit `null` under
+    // strictNullChecks, so their field text stays byte-identical. A type admits
+    // `null` when it contains a `null` union alternative — at the top level
+    // (Function props render `(...) | null`) OR paren-grouped within a pure
+    // union (data-table `aggregationFn: string | (((...) => unknown) | null)`
+    // flattens to include `null`) — or has a bare `any` / `unknown` union member
+    // (`any` sentinel, `any | boolean`). A genuinely null-FAILING type
+    // (`string` / `number` / `any[]` (array, not a bare `any`) / an object
+    // shape) gets the `| null` suffix. The `\bnull\b` token check is safe here
+    // because every `null` appearing in an emitted Lit field type is a pure-union
+    // alternative that bubbles to the top (no `Array<T | null>`-style nesting).
+    let fieldType = tsType;
+    const admitsNull =
+      /\bnull\b/.test(fieldType) || /(^|\|)\s*(any|unknown)\s*(\||$)/.test(fieldType);
+    if (t.isNullLiteral(prop.defaultValue) && !admitsNull) {
+      fieldType = `${fieldType} | null`;
+    }
+    return `: ${fieldType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
   }
   return prop.required ? `!: ${tsType}` : `?: ${tsType}`;
 }

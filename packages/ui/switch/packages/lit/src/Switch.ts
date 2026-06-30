@@ -79,7 +79,7 @@ export default class Switch extends SignalWatcher(LitElement) {
   /**
    * Accessible name applied to the `role="switch"` control (`aria-label`). Provide this (or an external `<label>`) so the switch is announced.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   @query('[data-rozie-ref="control"]') private _refControl!: HTMLElement;
 
   @state() private _hasSlotDefault = false;

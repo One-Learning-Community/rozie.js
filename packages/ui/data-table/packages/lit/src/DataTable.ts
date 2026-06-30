@@ -410,7 +410,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding `r-model:grouping` (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
    */
-  @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] = null;
+  @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] | null = null;
   private _groupingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'grouping-change', defaultValue: null, initialControlledValue: undefined });
   /**
    * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.

@@ -93,7 +93,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   private _toasts = signal([]);
   private _seq = signal(0);
 

@@ -334,14 +334,14 @@ export default function Tags(_props: TagsProps): JSX.Element {
 
   return (
     <>
-    <div ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={local.ariaLabel} {...attrs} class={"rozie-tags" + " " + rozieClass({ 'rozie-tags--disabled': local.disabled, 'rozie-tags--readonly': local.readonly }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-64848f8e="">
+    <div ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={rozieAttr(local.ariaLabel)} {...attrs} class={"rozie-tags" + " " + rozieClass({ 'rozie-tags--disabled': local.disabled, 'rozie-tags--readonly': local.readonly }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-64848f8e="">
       <ul class={"rozie-tags-list"} data-rozie-s-64848f8e="">
         <For each={tokens()}>{(t) => <li class={"rozie-tags-chip"} data-rozie-s-64848f8e="">
           {(_props.tagSlot ?? _props.slots?.['tag'])?.({ tag: t, index: tokens().indexOf(t), remove: () => removeAt(tokens().indexOf(t)) }) ?? <><span class={"rozie-tags-chip__label"} data-rozie-s-64848f8e="">{rozieDisplay(t)}</span>{<Show when={!local.readonly}><button type="button" aria-label={rozieAttr(removeLabel(t))} class={"rozie-tags-chip__remove"} disabled={!!local.disabled} onClick={($event) => { removeAt(tokens().indexOf(t)); }} data-rozie-s-64848f8e="">×</button></Show>}</>}
         </li>}</For>
       </ul>
 
-      {<Show when={!local.readonly}><input type="text" autocomplete="off" autocapitalize="off" aria-label={local.ariaLabel} aria-disabled={!!local.disabled} class={"rozie-tags-input"} value={draft()} placeholder={local.placeholder} disabled={!!local.disabled || !!atMax()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} onBlur={($event) => { onBlur($event); }} data-rozie-s-64848f8e="" /></Show>}<span class={"rozie-tags-count"} aria-live="polite" data-rozie-s-64848f8e="">{rozieDisplay(countLabel())}</span>
+      {<Show when={!local.readonly}><input type="text" autocomplete="off" autocapitalize="off" aria-label={rozieAttr(local.ariaLabel)} aria-disabled={!!local.disabled} class={"rozie-tags-input"} value={draft()} placeholder={local.placeholder} disabled={!!local.disabled || !!atMax()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} onBlur={($event) => { onBlur($event); }} data-rozie-s-64848f8e="" /></Show>}<span class={"rozie-tags-count"} aria-live="polite" data-rozie-s-64848f8e="">{rozieDisplay(countLabel())}</span>
     </div>
     </>
   );

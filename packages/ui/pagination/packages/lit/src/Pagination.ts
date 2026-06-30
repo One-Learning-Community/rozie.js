@@ -106,15 +106,15 @@ export default class Pagination extends SignalWatcher(LitElement) {
   /**
    * Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.
    */
-  @property({ type: Number, reflect: true }) totalPages: number = null;
+  @property({ type: Number, reflect: true }) totalPages: number | null = null;
   /**
    * Total item count. Combined with `pageSize` to derive the page count (`ceil(total / pageSize)`) when `totalPages` is not given.
    */
-  @property({ type: Number, reflect: true }) total: number = null;
+  @property({ type: Number, reflect: true }) total: number | null = null;
   /**
    * Items per page. Combined with `total` to derive the page count when `totalPages` is not given.
    */
-  @property({ type: Number, reflect: true }) pageSize: number = null;
+  @property({ type: Number, reflect: true }) pageSize: number | null = null;
   /**
    * Number of page buttons shown on each side of the current page (the sibling window). Larger values show more context around the current page.
    */

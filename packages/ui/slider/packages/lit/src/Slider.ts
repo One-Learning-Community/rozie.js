@@ -209,11 +209,11 @@ export default class Slider extends SignalWatcher(LitElement) {
   /**
    * Accessible name for each native input when there is no visible `<label for>`, reflected onto the input's `aria-label`.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   /**
    * The jump applied on `PageUp` / `PageDown`. `null` falls back to `step × 10`. Applied by a thin `@keydown` augment so it honours this value (native browsers otherwise use their own large step); arrows / `Home` / `End` stay native.
    */
-  @property({ type: Number, reflect: true }) pageStep: number = null;
+  @property({ type: Number, reflect: true }) pageStep: number | null = null;
   /**
    * A `(value) => string` formatter for the value shown in the `bubble` slot and surfaced as `aria-valuetext`. Receives the numeric value and returns a string; `null` uses the raw value.
    */

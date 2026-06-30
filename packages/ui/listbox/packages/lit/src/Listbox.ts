@@ -181,7 +181,7 @@ export default class Listbox extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   /**
    * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
    */

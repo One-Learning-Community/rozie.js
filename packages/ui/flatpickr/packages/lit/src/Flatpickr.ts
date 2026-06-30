@@ -63,11 +63,11 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * Earliest selectable date (a `dateFormat`-formatted string). Runtime-updatable via `set()`.
    */
-  @property({ type: String, reflect: true }) minDate: string = null;
+  @property({ type: String, reflect: true }) minDate: string | null = null;
   /**
    * Latest selectable date (a `dateFormat`-formatted string). Runtime-updatable via `set()`.
    */
-  @property({ type: String, reflect: true }) maxDate: string = null;
+  @property({ type: String, reflect: true }) maxDate: string | null = null;
   /**
    * Placeholder text for the rendered input when no date is selected.
    */
@@ -119,11 +119,11 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * HTML string for the previous-month navigation arrow, overriding flatpickr's built-in SVG. **Construction-time only**.
    */
-  @property({ type: String, reflect: true }) prevArrow: string = null;
+  @property({ type: String, reflect: true }) prevArrow: string | null = null;
   /**
    * HTML string for the next-month navigation arrow, overriding flatpickr's built-in SVG. **Construction-time only**.
    */
-  @property({ type: String, reflect: true }) nextArrow: string = null;
+  @property({ type: String, reflect: true }) nextArrow: string | null = null;
   /**
    * Allow the user to type a date directly into the input instead of only picking from the calendar. **Construction-time only**.
    */

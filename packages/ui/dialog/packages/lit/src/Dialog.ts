@@ -74,11 +74,11 @@ export default class Dialog extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   /**
    * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
    */
-  @property({ type: String, reflect: true }) ariaLabelledby: string = null;
+  @property({ type: String, reflect: true }) ariaLabelledby: string | null = null;
   @query('[data-rozie-ref="panelEl"]') private _refPanelEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 

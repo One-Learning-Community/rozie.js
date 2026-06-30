@@ -208,11 +208,11 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   /**
    * Inclusive lower bound as an ISO `YYYY-MM-DD` string. Days before it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no lower bound.
    */
-  @property({ type: String, reflect: true }) min: string = null;
+  @property({ type: String, reflect: true }) min: string | null = null;
   /**
    * Inclusive upper bound as an ISO `YYYY-MM-DD` string. Days after it are rendered disabled and cannot be selected or focused. `null` (the default) imposes no upper bound.
    */
-  @property({ type: String, reflect: true }) max: string = null;
+  @property({ type: String, reflect: true }) max: string | null = null;
   /**
    * An array of ISO `YYYY-MM-DD` strings to disable individually (e.g. holidays or already-booked days), in addition to the `min`/`max` bounds. Disabled days are non-interactive and marked `aria-disabled`.
    */

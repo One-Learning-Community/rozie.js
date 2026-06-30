@@ -42,7 +42,7 @@ export default class Captcha extends SignalWatcher(LitElement) {
   /**
    * Optional tab index forwarded to the rendered widget. Omitted from the render config when left unset (`null`).
    */
-  @property({ type: Number, reflect: true }) tabindex: number = null;
+  @property({ type: Number, reflect: true }) tabindex: number | null = null;
   /**
    * Escape hatch — provider-specific render options merged last (e.g. Turnstile `action`/`cData`/`retry`, hCaptcha `hl`, reCAPTCHA `badge`, Friendly Captcha `startMode`). Lets you reach keys this component does not promote to first-class props.
    */

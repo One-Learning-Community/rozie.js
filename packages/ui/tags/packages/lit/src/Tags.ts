@@ -123,7 +123,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   /**
    * Maximum number of tokens. Once the list reaches `max`, the input is disabled and further adds (type, paste, programmatic) are rejected. `null` (the default) means unlimited.
    */
-  @property({ type: Number, reflect: true }) max: number = null;
+  @property({ type: Number, reflect: true }) max: number | null = null;
   /**
    * Disable the whole control — the text input is disabled, every remove button is disabled, and no token can be added or removed. Also sets the Angular CVA disabled state.
    */
@@ -145,7 +145,7 @@ export default class Tags extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the whole control (`role="group"`). The inline text input is labelled with the same name so assistive tech announces what is being entered. A visually-hidden live region announces the current token count on change.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   private _draft = signal('');
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 

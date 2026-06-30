@@ -79,7 +79,7 @@ export default class Otp extends SignalWatcher(LitElement) {
   /**
    * Accessible name for the whole group (`role="group"`, applied as `aria-label`). Each cell additionally gets an ordinal `aria-label` (`"Digit 1 of 6"`).
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
 
   private _disconnectCleanups: Array<() => void> = [];

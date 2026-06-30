@@ -225,6 +225,32 @@ function htmlAttrToSolidName(name: string): string {
 }
 
 /**
+ * Phase 65 (Class 1 / SC-1) — is `expr` a RAW read of a `null`-defaulted prop
+ * (`$props.ariaLabel` where `<props>` declares `ariaLabel: { default: null }`)?
+ *
+ * The prop interface type is widened with `| null` (Phase 16 R1) so the
+ * `local.ariaLabel` read is `string | null`; bound RAW to Solid's
+ * `string | undefined` JSX attribute slot that produces a TS2322 — the exact gap
+ * the wrapped sibling (`aria-controls={rozieAttr(listId())}`) avoids. Gated
+ * STRICTLY on a resolved null-default prop read so a non-nullable prop read /
+ * literal stays byte-identical (dist-parity is the oracle).
+ */
+function isNullablePropRead(expr: t.Expression, ir: IRComponent): boolean {
+  if (
+    !t.isMemberExpression(expr) ||
+    expr.computed ||
+    !t.isIdentifier(expr.object, { name: '$props' }) ||
+    !t.isIdentifier(expr.property)
+  ) {
+    return false;
+  }
+  const name = expr.property.name;
+  return ir.props.some(
+    (p) => p.name === name && p.defaultValue != null && t.isNullLiteral(p.defaultValue),
+  );
+}
+
+/**
  * Phase 14 D-04 — the magic accessor whose `r-bind` spread is EXEMPT from key
  * normalization. A `$attrs` cluster already carries target-native keys.
  */
@@ -732,6 +758,28 @@ function emitNonClassAttribute(
       // skips the setAttribute) instead of rendering `attr=""`, matching Vue's
       // `:attr` semantics. `false` still stringifies (preserves aria-/data-
       // a11y). Interpolated SEGMENTS stay on `rozieDisplay`.
+      ctx.collectors.runtime.add('rozieAttr');
+      return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };
+    }
+    // Phase 65 (Class 1 / SC-1) — a RAW read of a `null`-defaulted prop typed
+    // `T | null` (`aria-label={local.ariaLabel}`) is a TS2322 against Solid's
+    // `string | undefined` attr slot. Route it through the SAME nullish-drop
+    // machinery as the wrapped sibling (`aria-controls={rozieAttr(listId())}`):
+    // `rozieAttr` (→ `T | undefined`) for string attrs, `(expr) ?? undefined`
+    // for numeric / boolean-enum ARIA. Gated on a resolved null-default prop read
+    // at an attribute-text position (shouldWrapAttrBinding) — a non-nullable prop
+    // read, literal, component prop, controlled-input value, boolean attr, or
+    // `style` stays RAW (byte-identical). wrapForDisplay reads already returned above.
+    if (
+      isNullablePropRead(attr.expression, ctx.ir) &&
+      shouldWrapAttrBinding(attr.name, attr.expression, ctx)
+    ) {
+      if (
+        NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) ||
+        BOOLEAN_NULLISH_ARIA_ATTRS.has(attr.name.toLowerCase())
+      ) {
+        return { jsx: `${jsxName}={(${exprCode}) ?? undefined}`, diagnostics };
+      }
       ctx.collectors.runtime.add('rozieAttr');
       return { jsx: `${jsxName}={rozieAttr(${exprCode})}`, diagnostics };
     }

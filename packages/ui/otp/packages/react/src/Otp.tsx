@@ -201,7 +201,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
 
   return (
     <>
-    <div ref={root} role="group" aria-label={props.ariaLabel} {...attrs} className={clsx(clsx("rozie-otp", { "rozie-otp--disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-8267d52a="">
+    <div ref={root} role="group" aria-label={rozieAttr(props.ariaLabel)} {...attrs} className={clsx(clsx("rozie-otp", { "rozie-otp--disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-8267d52a="">
       {cells().map((cell) => <input key={cell.i} className={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autoCapitalize="off" autoComplete={rozieAttr(cellAutocomplete(cell.i))} value={cell.ch} placeholder={props.placeholder} disabled={!!props.disabled} aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : undefined)} onInput={($event) => { onInput(cell.i, $event); }} onKeyDown={($event) => { onKeydown(cell.i, $event); }} onPaste={($event) => { onPaste(cell.i, $event); }} onFocus={($event) => { onFocus($event); }} data-rozie-s-8267d52a="" />)}
     </div>
     </>

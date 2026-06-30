@@ -66,16 +66,16 @@ export default class NumberField extends SignalWatcher(LitElement) {
    * @example
    * <NumberField r-model:modelValue="qty" :min="0" :max="10" />
    */
-  @property({ type: Number, attribute: 'model-value' }) _modelValue_attr: number = null;
+  @property({ type: Number, attribute: 'model-value' }) _modelValue_attr: number | null = null;
   private _modelValueControllable = createLitControllableProperty<number>({ host: this, eventName: 'model-value-change', defaultValue: null, initialControlledValue: undefined });
   /**
    * Inclusive lower bound. Every commit clamps the value to `>= min`, and the **Home** key jumps to `min`. `null` (the default) means no lower bound. Also emitted as `aria-valuemin`.
    */
-  @property({ type: Number, reflect: true }) min: number = null;
+  @property({ type: Number, reflect: true }) min: number | null = null;
   /**
    * Inclusive upper bound. Every commit clamps the value to `<= max`, and the **End** key jumps to `max`. `null` (the default) means no upper bound. Also emitted as `aria-valuemax`.
    */
-  @property({ type: Number, reflect: true }) max: number = null;
+  @property({ type: Number, reflect: true }) max: number | null = null;
   /**
    * The increment/decrement granularity. **ArrowUp** / **ArrowDown** and the +/- buttons change the value by `step`, and every commit snaps the value to the nearest multiple of `step` measured from `min` (or `0` when `min` is `null`).
    */
@@ -105,7 +105,7 @@ export default class NumberField extends SignalWatcher(LitElement) {
   /**
    * Accessible name applied to the `role="spinbutton"` input (`aria-label`). Provide this (or an external `<label>`) so the control is announced.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = null;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   private _text = signal('');
   private _focused = signal(false);
   @query('[data-rozie-ref="input"]') private _refInput!: HTMLElement;
