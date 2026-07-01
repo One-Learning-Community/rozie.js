@@ -2,8 +2,10 @@ import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
 // Map /preview/runtimes/<framework>.mjs in the iframe-served URL space to the
 // matching workspace package's built dist. The compiled output of every
@@ -13,7 +15,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Per-target runtime bundles (one each for react/solid/vue/lit) plus
 // `engine-helpers` — the framework-agnostic engine-wrapper helper bundle
 // (introduced 260526-q7s; consumed by SortableList.rozie's useSortableJS).
-const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit', 'engine-helpers'] as const;
+// `svelte` is served too: svelte-emitted output imports `@rozie/runtime-svelte`
+// (emitSvelte.ts), so the svelte iframe needs a URL to map that bare specifier
+// to. `runtimeFile('svelte')` falls through to packages/runtime/svelte/dist.
+// Angular is deliberately absent — emitAngular.ts inlines everything and asserts
+// its output never imports `@rozie/runtime-angular`, so a served angular runtime
+// would be dead weight.
+const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit', 'svelte', 'engine-helpers'] as const;
 function runtimeFile(name: string): string {
   // KEEP-THE-URL (Phase 20-03, OQ1): the `engine-helpers` runtime package was
   // retired — its sole export (`useSortableJS`) is now colocated in the
@@ -32,6 +40,43 @@ function runtimeFile(name: string): string {
   return resolve(__dirname, `../../packages/runtime/${name}/dist/index.mjs`);
 }
 
+// `@rozie/runtime-svelte` ships SOURCE (TypeScript, no dist) — every other
+// runtime has a prebuilt `dist/index.mjs`, but the svelte package deliberately
+// has a no-op build (consumers compile it with Svelte's own toolchain). The
+// svelte iframe still needs an executable ESM to map `@rozie/runtime-svelte` to,
+// so bundle its `src/index.ts` on the fly with esbuild (resolved via vite's own
+// copy — no extra playground dep), leaving `svelte*` bare specifiers external so
+// the iframe importmap resolves them. Cached after the first build.
+let svelteRuntimeCache: Buffer | null = null;
+function svelteRuntimeBytes(): Buffer {
+  if (svelteRuntimeCache) return svelteRuntimeCache;
+  const esbuildPath = require.resolve('esbuild', {
+    paths: [require.resolve('vite/package.json')],
+  });
+  const esbuild = require(esbuildPath) as typeof import('esbuild');
+  const result = esbuild.buildSync({
+    entryPoints: [resolve(__dirname, '../../packages/runtime/svelte/src/index.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
+    write: false,
+    external: ['svelte', 'svelte/*'],
+  });
+  svelteRuntimeCache = Buffer.from(result.outputFiles[0]!.contents);
+  return svelteRuntimeCache;
+}
+
+// Load the served bytes for a runtime URL. Svelte is source-bundled; every
+// other runtime is read from its prebuilt dist. Returns null when the dist is
+// missing (unbuilt) so the caller can 404-with-hint.
+function loadRuntimeBytes(name: string): Buffer | null {
+  if (name === 'svelte') return svelteRuntimeBytes();
+  const file = runtimeFile(name);
+  if (!existsSync(file)) return null;
+  return readFileSync(file);
+}
+
 function roziePreviewRuntimes(): Plugin {
   const URL_PREFIX = '/preview/runtimes/';
   return {
@@ -41,27 +86,27 @@ function roziePreviewRuntimes(): Plugin {
         if (!req.url?.startsWith(URL_PREFIX)) return next();
         const match = req.url.slice(URL_PREFIX.length).match(/^([a-z-]+)\.mjs(\?.*)?$/);
         if (!match) return next();
-        const file = runtimeFile(match[1]);
-        if (!existsSync(file)) {
+        const bytes = loadRuntimeBytes(match[1]);
+        if (bytes === null) {
           res.statusCode = 404;
           res.end(`# rozie runtime not built: ${match[1]} — run \`pnpm --filter @rozie/runtime-${match[1]} build\``);
           return;
         }
         res.setHeader('Content-Type', 'application/javascript');
         res.setHeader('Cache-Control', 'no-cache');
-        res.end(readFileSync(file));
+        res.end(bytes);
       });
     },
     // For production build, emit each runtime as a static asset under the same
     // URL the importmap expects.
     generateBundle() {
       for (const name of RUNTIME_FRAMEWORKS) {
-        const file = runtimeFile(name);
-        if (!existsSync(file)) continue;
+        const bytes = loadRuntimeBytes(name);
+        if (bytes === null) continue;
         this.emitFile({
           type: 'asset',
           fileName: `preview/runtimes/${name}.mjs`,
-          source: readFileSync(file),
+          source: bytes,
         });
       }
     },
