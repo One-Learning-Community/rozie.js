@@ -101,6 +101,21 @@ describe('isDayDisabled', () => {
   it('disables everything when the control is disabled', () => {
     expect(isDayDisabled('2026-06-15', { ...base, disabled: true })).toBe(true);
   });
+  it('disables days whose UTC weekday is in disabledDaysOfWeek', () => {
+    // 2026-06-06 is a Saturday (6), 2026-06-07 a Sunday (0), 2026-06-05 a Friday (5).
+    expect(isDayDisabled('2026-06-06', { ...base, disabledDaysOfWeek: [0, 6] })).toBe(true);
+    expect(isDayDisabled('2026-06-07', { ...base, disabledDaysOfWeek: [0, 6] })).toBe(true);
+    expect(isDayDisabled('2026-06-05', { ...base, disabledDaysOfWeek: [0, 6] })).toBe(false);
+  });
+  it('disables a day for which isDateDisabled(iso) returns true', () => {
+    const isDateDisabled = (iso: string) => iso === '2026-06-15';
+    expect(isDayDisabled('2026-06-15', { ...base, isDateDisabled })).toBe(true);
+    expect(isDayDisabled('2026-06-16', { ...base, isDateDisabled })).toBe(false);
+  });
+  it('leaves days selectable when the new gates are empty / null (backward-compatible)', () => {
+    expect(isDayDisabled('2026-06-15', { ...base, disabledDaysOfWeek: [], isDateDisabled: null })).toBe(false);
+    expect(isDayDisabled('2026-06-15', { ...base })).toBe(false);
+  });
 });
 
 describe('resolveViewIso', () => {
