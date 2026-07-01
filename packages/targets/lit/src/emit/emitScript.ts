@@ -25,6 +25,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import type {
   LitImportCollector,
   LitDecoratorImportCollector,
@@ -385,15 +386,30 @@ function emitStateField(stateName: string, init: t.Expression): string {
   return `  private _${stateName} = signal${typeArg}(${renderExpression(init)});`;
 }
 
-function emitRefField(refName: string, elementTag: string): string {
+function emitRefField(refName: string, elementTag: string, composedType?: string): string {
   // @query targets refs by data-rozie-ref="<name>" (Plan 06.4-02 inference).
   // The selector pinned by data attribute keeps shadow-DOM scoping correct.
   // Mark with definite-assignment in case the consumer hasn't yet rendered.
+  const field = `_ref${refName.charAt(0).toUpperCase()}${refName.slice(1)}`;
+  // Phase 66-04 (D-2 Lit branch, SC-3) — ELEMENT-CLASS route: a ref on a
+  // `<components>`-composed child types as the CHILD ELEMENT CLASS, not
+  // HTMLElement. Lit re-emits the child's `$expose` verbs as PUBLIC members on
+  // `class <C> extends LitElement` and the sidecar `.d.rozie.ts` declares
+  // `export declare class <C>` + `HTMLElementTagNameMap['rozie-<c>'] = <C>`, so
+  // typing the `@query` field as `<C>` makes `this._refX.exposedVerb()`
+  // typecheck without a shadow-pierce (mirrors Angular's component-instance
+  // approach). The child class name is brought into type scope via a
+  // `import type { <C> } from '<importPath>'` line appended to userImports at
+  // the call site. INERTNESS GATE: resolveComponentRefs returns nothing for a
+  // DOM ref, so `composedType` is undefined and the byte-identical
+  // HTMLElement / HTMLDialogElement branch below runs unchanged.
+  if (composedType) {
+    return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${composedType};`;
+  }
   // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
   // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
   // Every other tag keeps the byte-identical `HTMLElement` default.
   const domType = elementTag.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
-  const field = `_ref${refName.charAt(0).toUpperCase()}${refName.slice(1)}`;
   return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${domType};`;
 }
 
@@ -889,8 +905,33 @@ export function emitScript(
     fieldLines.push(emitStateField(state.name, state.initializer));
   }
 
+  // Phase 66-04 (D-2 Lit branch, SC-3) — resolve which refs point at a
+  // `<components>`-composed child (shared P1 core resolver, single source of
+  // truth). A composed ref types as the child ELEMENT CLASS; a DOM ref is
+  // ABSENT from the map (inertness carve-out → the HTMLElement branch is
+  // byte-identical). We also gather the distinct child class names that need a
+  // `import type { <C> }` line so the field annotation resolves.
+  const composedRefs = resolveComponentRefs(ir);
+  const composedTypeImports = new Set<string>();
   for (const ref of ir.refs) {
-    fieldLines.push(emitRefField(ref.name, ref.elementTag));
+    const composedType = composedRefs.get(ref.name);
+    fieldLines.push(emitRefField(ref.name, ref.elementTag, composedType));
+    // A self-recursion ref (`<Self ref="x">`) resolves to `ir.name` — the class
+    // being defined in THIS module — so it needs no import. Only cross-component
+    // children (with a distinct import path) require a type import.
+    if (composedType && composedType !== ir.name) composedTypeImports.add(composedType);
+  }
+  // Build the `import type { <C> } from '<importPath>'` lines. The child is
+  // ALREADY side-effect-imported by the shell (`import '<importPath>'`, custom-
+  // element registration); this additive TYPE-only import (erased at runtime, so
+  // registration still fires exactly once) brings the class NAME into type scope
+  // so `private _refX!: <C>` resolves. Inert when no composed ref exists.
+  const composedTypeImportLines: string[] = [];
+  for (const typeName of composedTypeImports) {
+    const decl = (ir.components ?? []).find((c) => c.localName === typeName);
+    if (decl) {
+      composedTypeImportLines.push(`import type { ${typeName} } from '${decl.importPath}';`);
+    }
   }
 
   // 2. Rewrite the script Babel AST so $props.X / $data.X / etc. become this.X
@@ -924,10 +965,17 @@ export function emitScript(
     bodyStmts: nonImportStmts,
   } = partitionUserImports(rewritten.file);
   rewritten.file.program.body = nonImportStmts;
+  // Phase 66-04 — prepend the composed-child `import type { <C> }` lines (built
+  // during ref-field emission above) so the `@query` element-class annotations
+  // resolve. Inert (empty) for any component with no composed-component ref, so
+  // userImports is byte-identical for every non-composed component.
+  const composedTypeImportsBlock =
+    composedTypeImportLines.length > 0 ? composedTypeImportLines.join('\n') + '\n' : '';
   const userImports =
-    userImportNodes.length > 0
+    composedTypeImportsBlock +
+    (userImportNodes.length > 0
       ? userImportNodes.map((imp) => generate(imp, GEN_OPTS).code).join('\n') + '\n'
-      : '';
+      : '');
   const hoistedTypeDecls = hoistedTypeNodes.map(
     (decl) => generate(decl, GEN_OPTS).code,
   );
