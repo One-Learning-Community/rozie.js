@@ -444,6 +444,58 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     ],
   },
   {
+    // Phase 70 — MONTHS drill view (monthYearNav default-on). The `./internal`
+    // helper rides as a passthrough blob sibling so all six targets live-render.
+    key: 'bundle/DatePickerMonthsViewDemo',
+    label: 'bundle/DatePickerMonthsViewDemo',
+    entryGlobPath: '../../demos/DatePickerMonthsViewDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
+  },
+  {
+    // Phase 70 — YEARS drill view (days → months → years).
+    key: 'bundle/DatePickerYearsViewDemo',
+    label: 'bundle/DatePickerYearsViewDemo',
+    entryGlobPath: '../../demos/DatePickerYearsViewDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
+  },
+  {
+    // Phase 70 — numberOfMonths=2 multi-month layout in range mode.
+    key: 'bundle/DatePickerTwoMonthDemo',
+    label: 'bundle/DatePickerTwoMonthDemo',
+    entryGlobPath: '../../demos/DatePickerTwoMonthDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
+  },
+  {
+    // Phase 70 — showFooter Today/Clear row.
+    key: 'bundle/DatePickerFooterDemo',
+    label: 'bundle/DatePickerFooterDemo',
+    entryGlobPath: '../../demos/DatePickerFooterDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
+  },
+  {
+    // Phase 70 — disabledDaysOfWeek weekday gating (this entry is what exposes the
+    // weekend-disable prop in the playground).
+    key: 'bundle/DatePickerWeekendDisableDemo',
+    label: 'bundle/DatePickerWeekendDisableDemo',
+    entryGlobPath: '../../demos/DatePickerWeekendDisableDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
+  },
+  {
     // Phase 68-03 — `./internal/paginationItems` now a passthrough blob sibling.
     key: 'bundle/PaginationBehaviorDemo',
     label: 'bundle/PaginationBehaviorDemo',
