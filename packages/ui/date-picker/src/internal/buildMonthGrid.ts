@@ -119,6 +119,26 @@ export interface MonthList {
   months: MonthCell[];
 }
 
+export interface YearCell {
+  /** Jan-1 ISO `YYYY-01-01` for this cell. */
+  iso: string;
+  /** The numeric year. */
+  year: number;
+  /** `true` when this year === the selected `value`'s year. */
+  selected: boolean;
+  /** `true` when this year === `today`'s year. */
+  current: boolean;
+  /** `true` when the whole year falls outside `[min, max]`. */
+  disabled: boolean;
+}
+
+export interface YearGrid {
+  /** Window label like `"2020–2031"` (en-dash). */
+  rangeLabel: string;
+  /** Twelve year cells spanning the decade-aligned window. */
+  years: YearCell[];
+}
+
 /** Bounds + flags input for the month/year drill models. */
 export interface DrillInput {
   /** Inclusive lower bound (ISO) or `null`. */
@@ -400,6 +420,47 @@ export function buildMonthList(viewIso: string, input: DrillInput): MonthList {
     });
   }
   return { year, months };
+}
+
+/**
+ * Build the 12-cell year-picker model for the drill "years" view. The window is
+ * decade-aligned (`floor(year/10)*10` … `+11`) so the same `viewIso` always
+ * yields the same block and `rangeLabel`. A year cell is `disabled` ONLY when its
+ * whole span (`toIso(y,0,1)` … `toIso(y,11,31)`) falls outside `[min, max]`. Pure,
+ * UTC-safe, fresh object each call.
+ */
+export function buildYearGrid(viewIso: string, input: DrillInput): YearGrid {
+  const anchor = isoToUtc(viewIso);
+  const year = (anchor == null ? new Date() : new Date(anchor)).getUTCFullYear();
+  const start = Math.floor(year / 10) * 10;
+
+  const minT = isoToUtc(input.min);
+  const maxT = isoToUtc(input.max);
+
+  const valueT = isoToUtc(isIsoDate(input.value) ? input.value : '');
+  const todayT = isoToUtc(isIsoDate(input.today) ? input.today : '');
+  const valueYear = valueT == null ? null : new Date(valueT).getUTCFullYear();
+  const todayYear = todayT == null ? null : new Date(todayT).getUTCFullYear();
+
+  const years: YearCell[] = [];
+  for (let i = 0; i < 12; i++) {
+    const y = start + i;
+    const iso = toIso(y, 0, 1);
+    const first = isoToUtc(iso) as number;
+    const last = isoToUtc(toIso(y, 11, 31)) as number;
+    let disabled = false;
+    if (minT != null && last < minT) disabled = true;
+    if (maxT != null && first > maxT) disabled = true;
+    years.push({
+      iso,
+      year: y,
+      selected: valueYear != null && valueYear === y,
+      current: todayYear != null && todayYear === y,
+      disabled,
+    });
+  }
+  // U+2013 EN DASH between the window bounds.
+  return { rangeLabel: start + '–' + (start + 11), years };
 }
 
 /**
