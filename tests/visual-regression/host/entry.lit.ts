@@ -15,6 +15,7 @@ import {
   mountWrapper,
   LIT_TAGS,
   DEFAULT_PROPS,
+  MODEL_PROPS,
   appendExternalCallerButton,
 } from './main';
 
@@ -49,6 +50,36 @@ async function main(): Promise<void> {
   // override is in play.
   if (!isDemo) {
     Object.assign(el, DEFAULT_PROPS[example] as Record<string, unknown>);
+    // Model-prop writeback — makes the compare.html 6-up interactive.
+    //
+    // The emitted Lit model-prop setter routes through
+    // `createLitControllableProperty.notifyPropertyWrite`, which flips the
+    // component into CONTROLLED mode: the `Object.assign` seed above (a public
+    // `.value=`/`.open=`/`.items=` property write) hands value ownership to the
+    // parent. A controlled Lit component's own internal `write()` (e.g. Counter's
+    // `increment`) then only DISPATCHES a `<prop>-change` event and never mutates
+    // `read()` — so without a listener the component is frozen (Counter's `+` does
+    // nothing). This mirrors React (`useControllableState`) / Solid, which the
+    // React/Solid hosts fix by mounting uncontrolled via `toUncontrolledProps`.
+    //
+    // That remap does NOT work for Lit: the Lit emitter bakes `defaultValue` into
+    // the controllable options and emits no `default<Key>` public prop, so a
+    // `value`→`defaultValue` rewrite would drop the meaningful seeds (Dropdown
+    // `open:true`, TodoList `items[]`, Modal `open:true`) and change the
+    // screenshots. Instead the host acts as the controlling PARENT: echo every
+    // `<prop>-change` back onto the property. The value round-trips through the
+    // public setter (`notifyPropertyWrite`), updating the controlled latch so
+    // `read()` reflects each interaction. The helper's one-shot round-trip
+    // suppression token means this re-assignment never re-dispatches (no loop),
+    // and first paint is unchanged (the seed value is identical), so
+    // `matrix.spec.ts` screenshots are unaffected.
+    for (const prop of MODEL_PROPS[example] ?? []) {
+      el.addEventListener(`${prop}-change`, (e: Event) => {
+        (el as unknown as Record<string, unknown>)[prop] = (
+          e as CustomEvent
+        ).detail;
+      });
+    }
   }
   mountWrapper().appendChild(el);
 

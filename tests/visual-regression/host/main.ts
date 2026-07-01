@@ -1605,9 +1605,19 @@ export const MODEL_PROPS: Partial<Record<Example, readonly string[]>> = {
  * keys it to the model identifier just like Solid), so this helper is shared
  * verbatim by `entry.react.ts` and `entry.solid.ts`.
  *
- * Vue (`defineModel`) / Svelte (`$bindable`) / Angular (`model()`) / Lit keep
- * local state even when the controlled prop is supplied without a listener, so
- * those entries pass `DEFAULT_PROPS` unchanged.
+ * Vue (`defineModel`) / Svelte (`$bindable`) / Angular (`model()`) keep local
+ * state even when the controlled prop is supplied without a listener, so those
+ * entries pass `DEFAULT_PROPS` unchanged.
+ *
+ * Lit is NOT in that list. Its emitted model-prop setter routes through
+ * `createLitControllableProperty.notifyPropertyWrite`, which flips the component
+ * into strict controlled mode on a `.prop=` write (same as React/Solid) — so a
+ * seed supplied without a listener freezes it. It also cannot use this helper:
+ * the Lit emitter bakes `defaultValue` into the controllable and emits no
+ * `default<Key>` public prop, so a `value`→`defaultValue` remap would drop the
+ * seed. `entry.lit.ts` instead keeps `DEFAULT_PROPS` verbatim and wires a
+ * per-model-prop `<prop>-change` writeback listener so the host acts as the
+ * controlling parent (see the comment there).
  */
 export function toUncontrolledProps(
   example: Example,
