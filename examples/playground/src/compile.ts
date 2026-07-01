@@ -25,6 +25,22 @@ function seedPartials(vfs: Map<string, string>): void {
   }
 }
 
+/**
+ * Phase 68-05 — seed a bundle's RELATIVE `.rzts`/`.rzjs` partials (the
+ * `vfsPartials` map, basename-keyed) into the VFS under `/vfs/<basename>`. That
+ * is the path @rozie/core's resolver computes for a component's relative partial
+ * import (`./stateAssembly.rzts` from a `/vfs/DataTable.rozie` host →
+ * `/vfs/stateAssembly.rzts`). Like `seedPartials`, these are compile-time
+ * inlines held in the VFS map ONLY — never in `snippet.files` — so the
+ * sibling-compile loop never emits them as blob siblings.
+ */
+function seedVfsPartials(vfs: Map<string, string>, snippet: Snippet): void {
+  if (!snippet.vfsPartials) return;
+  for (const [basename, source] of Object.entries(snippet.vfsPartials)) {
+    vfs.set('/vfs/' + basename, source);
+  }
+}
+
 export type CompileOutcome =
   | { ok: true; code: string; css: string }
   | { ok: false; errorText: string };
@@ -65,6 +81,7 @@ export function compileBundle(snippet: Snippet, target: CompileTarget): CompileO
     vfs.set('/vfs/' + filename, source);
   }
   seedPartials(vfs);
+  seedVfsPartials(vfs, snippet);
   globalThis.__rozieVfs = vfs;
 
   const entrySource = snippet.files[snippet.entry];
@@ -198,6 +215,7 @@ export function compileBundleRuntime(
     vfs.set('/vfs/' + filename, source);
   }
   seedPartials(vfs);
+  seedVfsPartials(vfs, snippet);
   globalThis.__rozieVfs = vfs;
 
   const entrySource = snippet.files[snippet.entry];

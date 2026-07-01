@@ -112,6 +112,48 @@ export const PARTIAL_SOURCES: Record<string, string> = (() => {
   return out;
 })();
 
+/**
+ * Phase 68-05 — the SAME `.rzts`/`.rzjs` glob, re-keyed by `<family-dir>` →
+ * `{ <basename.rzts>: source }`. Unlike `PARTIAL_SOURCES` (keyed by the
+ * cross-package BARE specifier for a partial imported as
+ * `@rozie-ui/<pkg>/<name>.rzts`), this map serves partials a family imports via
+ * a RELATIVE specifier (`import … from './stateAssembly.rzts'`). The largest,
+ * most partial-heavy family — data-table — inlines 20 such relative `./*.rzts`
+ * partials from `DataTable.rozie`. From a `/vfs/DataTable.rozie` host the
+ * resolver computes `/vfs/stateAssembly.rzts` for `./stateAssembly.rzts`, so
+ * each must be seeded into the VFS under its BASENAME (`stateAssembly.rzts`),
+ * NOT the bare-specifier key.
+ *
+ * These are compile-time inlines: like `PARTIAL_SOURCES` they belong in the VFS
+ * map ONLY (never in a bundle's `files`), so the sibling-compile loop never
+ * double-compiles them as components and the emitted leaf carries zero import.
+ */
+const FAMILY_PARTIAL_SOURCES: Record<string, Record<string, string>> = (() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [path, source] of Object.entries(partialFiles)) {
+    const m = path.match(/packages\/ui\/([^/]+)\/src\/(.+\.(?:rzts|rzjs))$/);
+    if (!m) continue;
+    const [, family, basename] = m;
+    (out[family] ??= {})[basename] = source;
+  }
+  return out;
+})();
+
+/**
+ * Auto-include a family's FULL relative `.rzts`/`.rzjs` partial set as VFS
+ * source, keyed by basename. A data-table bundle decl names `data-table` in
+ * `partialFamilies` and gets all 20 partials without hand-listing them — the
+ * set cannot drift when a partial is added/removed under
+ * `packages/ui/<family>/src`. Returns `{}` for a family with no partials.
+ */
+function familyPartialSources(families: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const family of families) {
+    Object.assign(out, FAMILY_PARTIAL_SOURCES[family] ?? {});
+  }
+  return out;
+}
+
 export interface Snippet {
   /** Display label shown in the dropdown. */
   label: string;
@@ -126,6 +168,16 @@ export interface Snippet {
    * a `<components>` block.
    */
   files: Record<string, string>;
+  /**
+   * Phase 68-05 — compile-time `.rzts`/`.rzjs` partials this bundle needs seeded
+   * into the VFS under their BASENAME (`stateAssembly.rzts`) so a component's
+   * RELATIVE partial import (`./stateAssembly.rzts`) resolves. Distinct from
+   * `files` (runtime siblings, blob-emitted) — these are compile-time inlines
+   * that must NEVER become blob siblings. compile.ts seeds them into
+   * `globalThis.__rozieVfs` alongside the global cross-package `PARTIAL_SOURCES`.
+   * Absent for bundles with no relative partials.
+   */
+  vfsPartials?: Record<string, string>;
   /**
    * D-2 "unsupported-with-reason". When set, the family compiles cleanly (the
    * Output pane still shows its emitted code) but cannot yet LIVE-RENDER in the
@@ -174,6 +226,13 @@ interface BundleDecl {
   label: string;
   entryGlobPath: string;
   dependencyGlobPaths: string[];
+  /**
+   * Phase 68-05 — family dirs under `packages/ui/` whose FULL relative
+   * `.rzts`/`.rzjs` partial set this bundle auto-includes as VFS source
+   * (basename-keyed). E.g. `['data-table']` pulls in all 20 `./*.rzts` partials
+   * `DataTable.rozie` inlines, declaratively — no hand-listing, no drift.
+   */
+  partialFamilies?: readonly string[];
 }
 
 const BUNDLE_DECLS: readonly BundleDecl[] = [
@@ -600,11 +659,15 @@ function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
     }
     files[filenameFromGlob(depPath)] = depSource;
   }
+  const vfsPartials = decl.partialFamilies
+    ? familyPartialSources(decl.partialFamilies)
+    : undefined;
   return {
     key: decl.key,
     label: decl.label,
     entry: filenameFromGlob(decl.entryGlobPath),
     files,
+    ...(vfsPartials && Object.keys(vfsPartials).length > 0 ? { vfsPartials } : {}),
   };
 }
 
