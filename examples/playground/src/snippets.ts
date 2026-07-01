@@ -624,6 +624,77 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
       '../../../packages/ui/captcha/src/internal/loadRecaptchaV3.ts',
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Phase 68-05 — WS1 SC-1/SC-2: the data-table family (the largest + most
+  // partial-heavy). `DataTable.rozie` imports `@tanstack/table-core` +
+  // `@tanstack/virtual-core` at runtime (both added to the six harness
+  // importmaps in this plan; virtual-core landed in 68-04) AND inlines 20
+  // relative `./*.rzts` partials + the cross-package
+  // `@rozie-ui/headless-core/windowing.rzts` at COMPILE time (zero runtime
+  // import). `partialFamilies: ['data-table']` auto-includes all 20 relative
+  // partials as basename-keyed VFS source (compile.ts seedVfsPartials); the
+  // cross-package windowing.rzts is seeded globally by seedPartials (68-02).
+  //
+  // These five cover the distinct capabilities — sort / columns / edit /
+  // virtual / grid-nav — each importing DataTable + Column. Every emitted
+  // runtime import now resolves (the @tanstack engines are in the importmaps,
+  // exactly as combobox/listbox's virtual-core render proves), so all five
+  // LIVE-RENDER (exempted from the `DataTable` token mark via RENDERED_KEYS).
+  // The remaining ~29 DataTable* picker entries are NOT given a bundle decl and
+  // stay marked unsupported-with-reason (the `DataTable` token) — never a
+  // silent ROZ945.
+  // ---------------------------------------------------------------------------
+  {
+    key: 'bundle/DataTableSortDemo',
+    label: 'bundle/DataTableSortDemo',
+    entryGlobPath: '../../demos/DataTableSortDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/data-table/src/DataTable.rozie',
+      '../../../packages/ui/data-table/src/Column.rozie',
+    ],
+    partialFamilies: ['data-table'],
+  },
+  {
+    key: 'bundle/DataTableColumnsDemo',
+    label: 'bundle/DataTableColumnsDemo',
+    entryGlobPath: '../../demos/DataTableColumnsDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/data-table/src/DataTable.rozie',
+      '../../../packages/ui/data-table/src/Column.rozie',
+    ],
+    partialFamilies: ['data-table'],
+  },
+  {
+    key: 'bundle/DataTableEditDemo',
+    label: 'bundle/DataTableEditDemo',
+    entryGlobPath: '../../demos/DataTableEditDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/data-table/src/DataTable.rozie',
+      '../../../packages/ui/data-table/src/Column.rozie',
+    ],
+    partialFamilies: ['data-table'],
+  },
+  {
+    key: 'bundle/DataTableVirtualDemo',
+    label: 'bundle/DataTableVirtualDemo',
+    entryGlobPath: '../../demos/DataTableVirtualDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/data-table/src/DataTable.rozie',
+      '../../../packages/ui/data-table/src/Column.rozie',
+    ],
+    partialFamilies: ['data-table'],
+  },
+  {
+    key: 'bundle/DataTableGridNavDemo',
+    label: 'bundle/DataTableGridNavDemo',
+    entryGlobPath: '../../demos/DataTableGridNavDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/data-table/src/DataTable.rozie',
+      '../../../packages/ui/data-table/src/Column.rozie',
+    ],
+    partialFamilies: ['data-table'],
+  },
 ];
 
 // Bundle entry/dep paths can resolve against either glob root: top-level
@@ -739,11 +810,32 @@ const UNSUPPORTED: Record<string, string> = {
     'compiles ×6 and its `pdfjs-dist` dynamic import now resolves from the importmap, but PDF.js sets GlobalWorkerOptions.workerSrc to a cross-origin jsDelivr worker URL and that web worker is not loadable from the sandboxed null-origin preview iframe — live render blocked by the harness sandbox, not by an unwired engine (bundled-worker support is WS3/Phase 69)',
   Captcha:
     'compiles ×6, but loads an EXTERNAL provider script (recaptcha/hcaptcha/turnstile) at runtime and its `sitekey` prop is required with no valid sample — it needs a real provider site key + network + a non-sandboxed origin, so it cannot live-render in the sandboxed preview iframe',
-  // Still pending its own plan — DataTable is the multi-partial engine family wired
-  // separately in 68-05 (TanStack table-core), not part of this single-engine slice.
+  // Phase 68-05 wired the data-table family's engines (@tanstack/table-core +
+  // @tanstack/virtual-core) into the six importmaps and made a data-table bundle
+  // carry all 20 relative `.rzts` partials in the VFS. FIVE representative demos
+  // (sort/columns/edit/virtual/grid-nav) are fully wired as bundles and RENDER
+  // (exempted below via RENDERED_KEYS). The `DataTable` token still marks the
+  // ~29 long-tail DataTable* picker entries that are NOT wired into a bundle —
+  // they'd otherwise ROZ945 on their un-satisfied `<components>` import. The
+  // reason points authors at the representative subset (no silent failure, D-2).
   DataTable:
-    'engine-backed (TanStack table-core) — the multi-partial data-table family is wired separately in 68-05',
+    'data-table demo not wired into the playground — see the representative subset (bundle/DataTable{Sort,Columns,Edit,Virtual,GridNav}Demo), which render with the full 20-partial VFS set + the @tanstack table-core/virtual-core engines',
 };
+
+// Phase 68-05 — exact snippet keys that RENDER despite matching a family token
+// in UNSUPPORTED (which matches by substring). The five representative
+// data-table bundles are fully wired — DataTable + Column siblings + the
+// 20-partial `.rzts` VFS set (partialFamilies) + the @tanstack engines in the
+// importmaps — so every emitted runtime import resolves and they live-render;
+// they must NOT inherit the `DataTable` token mark that covers the un-wired long
+// tail. Exact-key exemption checked FIRST in `unsupportedReason`.
+const RENDERED_KEYS = new Set<string>([
+  'bundle/DataTableSortDemo',
+  'bundle/DataTableColumnsDemo',
+  'bundle/DataTableEditDemo',
+  'bundle/DataTableVirtualDemo',
+  'bundle/DataTableGridNavDemo',
+]);
 
 /**
  * Resolve the unsupported reason for a snippet key. Exact-key match wins; then
@@ -751,6 +843,9 @@ const UNSUPPORTED: Record<string, string> = {
  * families (which render normally).
  */
 function unsupportedReason(key: string): string | undefined {
+  // Phase 68-05 — a wired-and-rendering bundle is exempt from any family-token
+  // substring mark (e.g. bundle/DataTableSortDemo vs the `DataTable` token).
+  if (RENDERED_KEYS.has(key)) return undefined;
   const exact = UNSUPPORTED[key];
   if (exact !== undefined) return exact;
   for (const [token, reason] of Object.entries(UNSUPPORTED)) {

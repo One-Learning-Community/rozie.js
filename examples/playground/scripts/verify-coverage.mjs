@@ -64,6 +64,19 @@ const FAMILIES = [
   // captcha has NO examples/demos wrapper — compile its package `Captcha.rozie`
   // directly (the same entry the playground bundles), via an `entryPath` override.
   { family: 'captcha', entryPath: 'packages/ui/captcha/src/Captcha.rozie' },
+  // Phase 68-05 — the data-table family (the largest, most partial-heavy). Its
+  // DataTable.rozie inlines 20 relative `./*.rzts` partials + the cross-package
+  // `@rozie-ui/headless-core/windowing.rzts`, and imports `@tanstack/table-core`
+  // + `@tanstack/virtual-core` (both added to the six harness importmaps in this
+  // plan). This gate compiles a REPRESENTATIVE subset — sort / columns / edit /
+  // virtual / grid-nav — ×6 clean off the real on-disk workspace (which resolves
+  // every relative partial from disk). The remaining ~29 DataTable* picker
+  // entries stay marked unsupported-with-reason in snippets.ts (not silent).
+  { family: 'data-table:sort', demo: 'DataTableSortDemo' },
+  { family: 'data-table:columns', demo: 'DataTableColumnsDemo' },
+  { family: 'data-table:edit', demo: 'DataTableEditDemo' },
+  { family: 'data-table:virtual', demo: 'DataTableVirtualDemo' },
+  { family: 'data-table:grid-nav', demo: 'DataTableGridNavDemo' },
 ];
 
 let failures = 0;
