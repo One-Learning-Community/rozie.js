@@ -27,20 +27,17 @@
  * `import { <localName> } from …` with NO alias — emitAngular.ts — and the self
  * type is the locally-defined class `ir.name`). A plain HTML-element ref is
  * absent from the Map.
+ *
+ * Phase 66 (D-1): the match itself was LIFTED into the shared core resolver
+ * `resolveComponentRefs`. This function is now a pure internal redirect that
+ * preserves the exported `collectComponentRefTypes` name + `Map<string,string>`
+ * return so its sole consumer (emitScript.ts) is untouched. The returned Map is
+ * identical to the pre-lift output for the same input (behavior-preserving —
+ * Angular leaf output must stay byte-identical, CONTEXT P1).
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 
 export function collectComponentRefTypes(ir: IRComponent): Map<string, string> {
-  // Defensive nullish-fallbacks (D-08): `compile()` always populates these, but
-  // partial IRs hand-built in unit tests may omit `components`/`refs`.
-  const componentTags = new Set<string>((ir.components ?? []).map((c) => c.localName));
-  // Self-recursion: a `<Self ref="x">` resolves to the locally-defined class.
-  if (ir.name) componentTags.add(ir.name);
-  const out = new Map<string, string>();
-  for (const ref of ir.refs ?? []) {
-    if (componentTags.has(ref.elementTag)) {
-      out.set(ref.name, ref.elementTag);
-    }
-  }
-  return out;
+  return resolveComponentRefs(ir);
 }
