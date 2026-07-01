@@ -905,16 +905,17 @@ export const EXAMPLES = [
   'DatePickerRangeBehavior',
   // @rozie-ui/date-picker NAV + ERGONOMICS cells (Phase 70, loaders →
   // examples/demos/DatePicker{MonthsView,YearsView,TwoMonth,Footer,WeekendDisable,SingleMonth}Demo.rozie).
-  // MonthsView/YearsView/TwoMonth/Footer/WeekendDisable are deterministic INLINE
-  // SCREENSHOT cells (drilled months/years panel, 2-month layout, footer row, greyed
-  // weekends) → standard mount-clipped matrix cells (matrix.spec.ts), each auto-fixme
-  // on baselineExists() until the Linux-Docker PNGs land in Plan 70-05
-  // (feedback_vr_linux_baselines). They are ALSO the DRIVEN behavioral targets of
+  // TwoMonth/Footer/WeekendDisable are deterministic INLINE SCREENSHOT cells (2-month
+  // layout, footer row, greyed weekends) — they seed their target state on mount →
+  // standard mount-clipped matrix cells (matrix.spec.ts), whose Linux baselines landed
+  // in Plan 70-05.
+  // MonthsView/YearsView/SingleMonth are BEHAVIORAL-ONLY (NO pixel baseline): the
+  // months/years DRILL panels sit behind the heading button and cannot be seeded
+  // statically (viewMode is private $data, not a prop), so a static shot would only
+  // re-capture the default days grid. All six are DRIVEN behavioral targets of
   // specs/date-picker-drill-footer.spec.ts (drill day→month→year, range spanning two
-  // months, footer Today/Clear, weekend click-rejection) — asserted at the DOM level
-  // with NO pixel baseline. DatePickerSingleMonth is BEHAVIORAL-ONLY (no baseline —
-  // Plan 70-05 must NOT add a PNG): it exists solely for the numberOfMonths=1
-  // byte-identity DOM-shape assertion. All live under examples/demos/ (covered by the
+  // months, footer Today/Clear, weekend click-rejection, numberOfMonths=1 DOM shape) —
+  // asserted at the DOM level. All live under examples/demos/ (covered by the
   // date-picker src root already registered for the Angular cross-tree AOT prebuild).
   'DatePickerMonthsView',
   'DatePickerYearsView',

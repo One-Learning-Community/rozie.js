@@ -411,6 +411,21 @@ const EXAMPLES = [
   // behavioral-only (date-picker-range-behavior.spec.ts) — deliberately NOT in this list.
   'DatePickerRangeComplete',
   'DatePickerPresetActive',
+  // @rozie-ui/date-picker NAV + ERGONOMICS screenshot cells (Phase 70). Each seeds
+  // its target state on mount — a 2-month RANGE layout, the Today/Clear footer row,
+  // and a greyed-weekend calendar — so a static mount-clipped shot is deterministic.
+  // They diff the shared `${name}.png` per D-10 and baseline-gate to test.fixme via
+  // baselineExists() until the Linux-Docker PNGs land (Plan 70-05).
+  //
+  // DatePickerMonthsView / DatePickerYearsView / DatePickerSingleMonth are deliberately
+  // NOT in this list: they are behavioral-only cells driven by clicks in
+  // date-picker-drill-footer.spec.ts. The months/years DRILL panels live behind the
+  // heading button and cannot be seeded statically (viewMode is private $data, not a
+  // prop), so a static shot would only re-capture the default days grid — the drill
+  // behavior is asserted at the DOM level instead, with no pixel baseline.
+  'DatePickerTwoMonth',
+  'DatePickerFooter',
+  'DatePickerWeekendDisable',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
