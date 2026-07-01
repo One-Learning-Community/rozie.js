@@ -1,0 +1,53 @@
+<!--
+  DatePickerMonthsViewDemo — VR cell for the @rozie-ui/date-picker MONTHS drill
+  view (monthYearNav default-on). Pure-Rozie, no engine.
+
+  Renders a DEFAULT DatePicker (monthYearNav is on by default, so the heading is a
+  clickable drill button). The months-view panel is NOT seeded via the inner
+  component's $data.viewMode — a demo can't reach the inner component's private
+  view state; instead date-picker-drill-footer.spec.ts DRIVES the drill by clicking
+  the heading button, mirroring DatePickerRangeBehaviorDemo (which drives range
+  state via clicks rather than seeding <data>).
+
+  DETERMINISM: value is pinned to '2025-06-15' (the default view month otherwise
+  tracks TODAY — DatePicker seeds $data.viewIso from value/today in $onMount), so
+  the JUNE 2025 grid renders run-to-run and the drilled months panel shows the 2025
+  month cells addressable by their stable [data-month] ISO attribute. :locale +
+  :weekStartsOn pin the labels. This is BOTH a screenshot cell (its Linux baseline
+  lands in Plan 70-05) and the target of the drill behavioral assertion.
+-->
+
+<rozie name="DatePickerMonthsViewDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+}
+</data>
+
+<template>
+<div class="date-picker-months-view-demo">
+  <DatePicker
+    r-model:value="$data.date"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-months-view-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>

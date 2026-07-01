@@ -1,0 +1,71 @@
+<!--
+  DatePickerFooterDemo — VR cell for the @rozie-ui/date-picker Today/Clear FOOTER
+  (showFooter=true), single mode. Pure-Rozie, no engine.
+
+  Two purposes (specs load the cell URL fresh):
+    1. A deterministic SCREENSHOT of the footer row beneath the grid (Linux baseline
+       in Plan 70-05).
+    2. The FOOTER behavioral target: date-picker-drill-footer.spec.ts clicks Today
+       (→ selects the current date, single mode) and asserts the @change readout
+       becomes non-empty, then clicks Clear (→ deselects) and asserts the readout
+       empties.
+
+  DETERMINISM (screenshot): value pinned to '2025-06-15' so the JUNE 2025 grid +
+  footer render run-to-run. NOTE the behavioral Today click intentionally moves the
+  view to the wall-clock month (single-mode Today commits todayIso()) — that is the
+  behavior under test, not a screenshot concern (the baseline captures the seeded
+  June state before any click).
+
+  READOUT: a @change readout (data-testid="footer-readout") mirrors $data.date so the
+  spec can assert selection/deselection at the DOM level without a pixel baseline.
+-->
+
+<rozie name="DatePickerFooterDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+}
+</data>
+
+<template>
+<div class="date-picker-footer-demo">
+  <div class="controls">
+    <span class="readout" data-testid="footer-readout">{{ $data.date }}</span>
+  </div>
+
+  <DatePicker
+    r-model:value="$data.date"
+    :showFooter="true"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-footer-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+.date-picker-footer-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.date-picker-footer-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

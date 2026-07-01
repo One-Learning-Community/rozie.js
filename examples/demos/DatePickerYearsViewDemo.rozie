@@ -1,0 +1,50 @@
+<!--
+  DatePickerYearsViewDemo — VR cell for the @rozie-ui/date-picker YEARS drill view
+  (monthYearNav default-on). Pure-Rozie, no engine.
+
+  Renders a DEFAULT DatePicker. The years panel is reached by the behavior spec
+  clicking the heading button (days → months) and then the year label (months →
+  years) — a demo can't seed the inner component's $data.viewMode, so the drill is
+  DRIVEN by clicks in date-picker-drill-footer.spec.ts (mirroring
+  DatePickerRangeBehaviorDemo).
+
+  DETERMINISM: value pinned to '2025-06-15' so the JUNE 2025 view anchors the
+  decade-aligned year window (the years panel shows a stable set of [data-year]
+  cells), and :locale + :weekStartsOn pin all labels. BOTH a screenshot cell (Linux
+  baseline in Plan 70-05) and the target of the drill-to-years behavioral assertion.
+-->
+
+<rozie name="DatePickerYearsViewDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+}
+</data>
+
+<template>
+<div class="date-picker-years-view-demo">
+  <DatePicker
+    r-model:value="$data.date"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-years-view-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>

@@ -1,0 +1,87 @@
+<!--
+  DatePickerTwoMonthDemo — VR cell for the @rozie-ui/date-picker MULTI-MONTH
+  (numberOfMonths=2) layout in RANGE mode. Pure-Rozie, no engine.
+
+  Two purposes in one cell (the specs load the cell URL fresh, so it backs both):
+    1. A deterministic 2-month-layout SCREENSHOT (June + July 2025 side by side);
+       its Linux baseline lands in Plan 70-05.
+    2. The MULTI-MONTH RANGE-SPANNING behavioral target: date-picker-drill-footer.spec.ts
+       clicks a start day in the FIRST rendered month (June) then an end day in the
+       SECOND rendered month (July) and asserts the in-range band spans BOTH month
+       columns (.is-in-range cells present in each of the two [role=grid] day grids).
+
+  RANGE MODE is required so the spec can drive a start/end selection whose band
+  crosses the month boundary. The value is a { start, end } object.
+
+  DETERMINISTIC VIEW MONTH: <data>.range is seeded to a COMPLETED June-2025 range
+  ({ start: '2025-06-10', end: '2025-06-15' }). The inner DatePicker pins its view to
+  the range's `start` month (viewAnchor() fallback) → the JUNE 2025 grid renders as
+  the first month and JULY 2025 as the second (numberOfMonths=2 steps forward),
+  run-to-run. Day cells are addressable by their stable [data-day="2025-0M-NN"] ISO.
+  Re-clicking any June day re-anchors within June (the seeded range is complete →
+  the first click restarts the anchor), so the spec drives a fresh June→July range.
+
+  COLLISION NOTE: the readout helper is `applyRange`, NOT `setRange` (a set<X> helper
+  collapses onto the generated $data.range setter on React/Solid, ROZ524).
+-->
+<rozie name="DatePickerTwoMonthDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  range: { start: '2025-06-10', end: '2025-06-15' },
+  lastComplete: '',
+}
+</data>
+
+<script>
+const onRangeComplete = (e) => {
+  const v = e && e.value ? e.value : { start: '', end: '' }
+  $data.lastComplete = (v.start || '') + '…' + (v.end || '')
+}
+</script>
+
+<template>
+<div class="date-picker-two-month-demo">
+  <div class="controls">
+    <span class="readout" data-testid="readout-start">{{ $data.range.start }}</span>
+    <span class="readout" data-testid="readout-end">{{ $data.range.end }}</span>
+    <span class="readout" data-testid="readout-complete">{{ $data.lastComplete }}</span>
+  </div>
+
+  <DatePicker
+    r-model:value="$data.range"
+    selectionMode="range"
+    :numberOfMonths="2"
+    :weekStartsOn="0"
+    locale="en-US"
+    @rangeComplete="onRangeComplete($event)"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-two-month-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 620px;
+}
+.date-picker-two-month-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.date-picker-two-month-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

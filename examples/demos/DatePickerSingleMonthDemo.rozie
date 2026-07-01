@@ -1,0 +1,57 @@
+<!--
+  DatePickerSingleMonthDemo — BEHAVIORAL-ONLY byte-identity fixture for the
+  @rozie-ui/date-picker numberOfMonths=1 DOM-shape assertion. Pure-Rozie, no engine.
+
+  This cell exists ONLY so date-picker-drill-footer.spec.ts can compare the
+  EXPLICIT numberOfMonths=1 render against the unset-default render and against the
+  numberOfMonths=2 render — proving mechanically that:
+    - numberOfMonths=1 (and the unset default) render EXACTLY ONE .rozie-datepicker-grid
+      day grid and the root does NOT carry the .rozie-datepicker--multi modifier class
+      (no multi-month layout), while
+    - numberOfMonths=2 adds a second grid + the --multi modifier.
+  That catches a non-visual multi-month wrapper/layout regression a screenshot cannot.
+
+  IT TAKES NO SCREENSHOT BASELINE — Plan 70-05 must NOT add a PNG for it. It is a
+  test-only fixture, so it is also NOT exposed in the playground (unlike the five
+  feature demos).
+
+  DETERMINISM: value pinned to '2025-06-15' (JUNE 2025 grid), :locale + :weekStartsOn
+  pin the labels. numberOfMonths=1 is the DEFAULT, so this render is byte-identical to
+  the default single-month path — the explicit =1 is what the spec addresses.
+-->
+
+<rozie name="DatePickerSingleMonthDemo">
+
+<components>
+{
+  DatePicker: '../../packages/ui/date-picker/src/DatePicker.rozie',
+}
+</components>
+
+<data>
+{
+  date: '2025-06-15',
+}
+</data>
+
+<template>
+<div class="date-picker-single-month-demo">
+  <DatePicker
+    r-model:value="$data.date"
+    :numberOfMonths="1"
+    :weekStartsOn="0"
+    locale="en-US"
+  />
+</div>
+</template>
+
+<style>
+.date-picker-single-month-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 340px;
+}
+</style>
+
+</rozie>
