@@ -255,6 +255,90 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
       '../../../packages/ui/rete/src/Port.rozie',
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Phase 68-01 — the 11 dependency-free PURE-ROZIE families (no vanilla-JS
+  // engine). Each demo's `<components>` block imports exactly one sibling from
+  // `packages/ui/<fam>/src`, already covered by the `uiPackageFiles` glob. All
+  // 11 compile ×6 with zero error diagnostics (see scripts/verify-coverage.mjs).
+  //
+  // Seven live-render immediately (dialog/slider/tags/switch/otp/number-field/
+  // toast). Four (date-picker/pagination/popover/resizable) COMPILE clean but
+  // emit a `./internal/*` helper import the iframe VFS can't resolve yet — they
+  // are marked unsupported-with-reason in the UNSUPPORTED registry below
+  // (render pending 68-03), never left to fail with a raw error.
+  // ---------------------------------------------------------------------------
+  {
+    key: 'bundle/DialogBehaviorDemo',
+    label: 'bundle/DialogBehaviorDemo',
+    entryGlobPath: '../../demos/DialogBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/dialog/src/Dialog.rozie'],
+  },
+  {
+    key: 'bundle/SliderBehaviorDemo',
+    label: 'bundle/SliderBehaviorDemo',
+    entryGlobPath: '../../demos/SliderBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/slider/src/Slider.rozie'],
+  },
+  {
+    key: 'bundle/TagsBehaviorDemo',
+    label: 'bundle/TagsBehaviorDemo',
+    entryGlobPath: '../../demos/TagsBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/tags/src/Tags.rozie'],
+  },
+  {
+    key: 'bundle/SwitchBehaviorDemo',
+    label: 'bundle/SwitchBehaviorDemo',
+    entryGlobPath: '../../demos/SwitchBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/switch/src/Switch.rozie'],
+  },
+  {
+    key: 'bundle/OtpBehaviorDemo',
+    label: 'bundle/OtpBehaviorDemo',
+    entryGlobPath: '../../demos/OtpBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/otp/src/Otp.rozie'],
+  },
+  {
+    key: 'bundle/NumberFieldBehaviorDemo',
+    label: 'bundle/NumberFieldBehaviorDemo',
+    entryGlobPath: '../../demos/NumberFieldBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/number-field/src/NumberField.rozie'],
+  },
+  {
+    key: 'bundle/ToasterBehaviorDemo',
+    label: 'bundle/ToasterBehaviorDemo',
+    entryGlobPath: '../../demos/ToasterBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/toast/src/Toaster.rozie'],
+  },
+  {
+    // COMPILE-clean but emits `./internal/buildMonthGrid` — marked unsupported
+    // (render pending 68-03 internal-partial VFS wiring).
+    key: 'bundle/DatePickerBehaviorDemo',
+    label: 'bundle/DatePickerBehaviorDemo',
+    entryGlobPath: '../../demos/DatePickerBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/date-picker/src/DatePicker.rozie'],
+  },
+  {
+    // COMPILE-clean but emits `./internal/paginationItems` — marked unsupported.
+    key: 'bundle/PaginationBehaviorDemo',
+    label: 'bundle/PaginationBehaviorDemo',
+    entryGlobPath: '../../demos/PaginationBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/pagination/src/Pagination.rozie'],
+  },
+  {
+    // COMPILE-clean but emits `./internal/middleware` — marked unsupported.
+    key: 'bundle/PopoverBehaviorDemo',
+    label: 'bundle/PopoverBehaviorDemo',
+    entryGlobPath: '../../demos/PopoverBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/popover/src/Popover.rozie'],
+  },
+  {
+    // COMPILE-clean but emits `./internal/resizeMath` — marked unsupported.
+    key: 'bundle/ResizableBehaviorDemo',
+    label: 'bundle/ResizableBehaviorDemo',
+    entryGlobPath: '../../demos/ResizableBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/resizable/src/Resizable.rozie'],
+  },
 ];
 
 // Bundle entry/dep paths can resolve against either glob root: top-level
@@ -338,6 +422,17 @@ const matchSnippets: Snippet[] = (() => {
 // take precedence over family-token substring entries.
 // ---------------------------------------------------------------------------
 const UNSUPPORTED: Record<string, string> = {
+  // Wired ×6-clean (Task 3 bundles), but the emitted component pulls a
+  // `./internal/*` helper the iframe VFS can't resolve yet — render pending the
+  // internal-partial VFS wiring in 68-03. Exact-key entries (win over tokens).
+  'bundle/DatePickerBehaviorDemo':
+    'compiles ×6, but emits a ./internal/buildMonthGrid helper import not yet in the playground VFS — live render pending 68-03',
+  'bundle/PaginationBehaviorDemo':
+    'compiles ×6, but emits a ./internal/paginationItems helper import not yet in the playground VFS — live render pending 68-03',
+  'bundle/PopoverBehaviorDemo':
+    'compiles ×6, but emits a ./internal/middleware helper import not yet in the playground VFS — live render pending 68-03',
+  'bundle/ResizableBehaviorDemo':
+    'compiles ×6, but emits a ./internal/resizeMath helper import not yet in the playground VFS — live render pending 68-03',
   // Not-yet-wired families whose demos consume @rozie-ui/headless-core `.rzts`
   // partials — the snippet VFS can't glob `.rzts` yet (pending 68-02).
   Combobox:
