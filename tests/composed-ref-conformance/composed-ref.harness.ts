@@ -173,6 +173,27 @@ export function runWitness(target: Target): WitnessResult {
       // (custom-element registration). Declare the module so TS2307 doesn't mask
       // the TS2339 the witness is looking for.
       writeFileSync(join(tmpDir, 'rozie-modules.d.ts'), "declare module '*.rozie';\n");
+      // Phase 66-04 (D-2 Lit branch, SC-3) — the post-fix Lit emitter types a
+      // composed-component ref as the child ELEMENT CLASS and emits
+      // `import type { ExposeChild } from './ExposeChild.rozie'`. In production the
+      // `.rozie` specifier resolves (via the unplugin sidecar) to the child's
+      // `.d.rozie.ts` — `export declare class ExposeChild { ping(): string }`. The
+      // ambient `declare module '*.rozie'` above CANNOT stand in for that: a named
+      // import off a bare `declare module` is a NAMESPACE, so `!: ExposeChild`
+      // raises TS2709 ("Cannot use namespace as a type") — a real error the
+      // ping/HTMLElement counter would silently miss (false green). Resolve the
+      // child's `.rozie` type import to the REAL compiled element class (the
+      // sibling `ExposeChild.ts` this harness already writes, whose `export
+      // default class ExposeChild` carries the `$expose`d `ping(): string` public
+      // member) via a concrete `ExposeChild.rozie.d.ts` re-export. A concrete file
+      // wins over the ambient wildcard, so the witness green PROVES the exposed
+      // member resolves through the element-class type — not a hollow `any`.
+      // Pre-fix the ref is still hardcoded `HTMLElement`, so the RED anchor holds.
+      writeFileSync(
+        join(tmpDir, 'ExposeChild.rozie.d.ts'),
+        "export { default as ExposeChild } from './ExposeChild';\n" +
+          "export { default } from './ExposeChild';\n",
+      );
     }
     symlinkSync(siblingNodeModules, join(tmpDir, 'node_modules'), 'dir');
 

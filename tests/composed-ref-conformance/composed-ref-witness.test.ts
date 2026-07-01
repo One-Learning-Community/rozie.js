@@ -41,13 +41,14 @@
 import { describe, it, expect } from 'vitest';
 import { runWitness, type Target } from './composed-ref.harness.js';
 
-/**
- * Targets that STILL mis-type a composed-component ref as HTMLElement (RED).
- * Phase 66 P2 (this plan) FIXED react + solid (D-2 Handle-INTERFACE route). Each
- * fixed target moves to the unconditionally-GREEN block below and drops its
- * `it.fails` gating. vue/svelte (P3) and lit (P4) remain RED here.
- */
-const BROKEN_TARGETS: Target[] = ['lit'];
+/** All six compile targets — used by the compile-without-crash smoke test. */
+const ALL_TARGETS: Target[] = ['react', 'solid', 'vue', 'svelte', 'lit', 'angular'];
+
+// NOTE: there is no longer a BROKEN_TARGETS list. lit was the final RED target
+// and is now fixed via the D-2 element-class route (FIXED_ELEMENT_CLASS_TARGETS
+// below). react+solid (P2, Handle-INTERFACE) and vue+svelte (P3, component-
+// INSTANCE) were fixed earlier. The full witness now has NO `.fails`-gated
+// target: 7/7 green.
 
 /**
  * Targets FIXED by P2 (the Handle-INTERFACE route): a composed-component ref
@@ -67,9 +68,23 @@ const FIXED_HANDLE_TARGETS: Target[] = ['react', 'solid'];
  */
 const FIXED_INSTANCE_TARGETS: Target[] = ['vue', 'svelte'];
 
+/**
+ * Targets FIXED by P4 (the ELEMENT-CLASS route, D-2 Lit branch): a composed-
+ * component ref types as the child ELEMENT CLASS — Lit re-emits the child's
+ * `$expose` verbs as PUBLIC members on `class Child extends LitElement` and the
+ * sidecar `.d.rozie.ts` declares `export declare class Child` +
+ * `HTMLElementTagNameMap['rozie-child'] = Child`, so the `@query` ref field typed
+ * as `Child` resolves the exposed member without a shadow-pierce. The parent
+ * imports the child class by name (`import type { Child } from '<child>'`). NO
+ * `<Name>Handle` interface (Lit's handle IS the element class), NO `codegen.mjs`
+ * change. `$refs.child.ping()` typechecks, so the "ping does not exist on
+ * HTMLElement" count is 0. Plain GREEN `it` (no `.fails`).
+ */
+const FIXED_ELEMENT_CLASS_TARGETS: Target[] = ['lit'];
+
 describe('composed-component ref → Handle typing witness (D-4)', () => {
   it('both fixtures compile to all 6 targets without a compiler crash', () => {
-    for (const t of [...BROKEN_TARGETS, 'angular'] as Target[]) {
+    for (const t of ALL_TARGETS) {
       // runWitness compiles ExposeChild + ComposedRefParent and throws on a
       // compiler-error diagnostic; reaching a checker result means both compiled.
       expect(() => runWitness(t)).not.toThrow();
@@ -125,25 +140,34 @@ describe('composed-component ref → Handle typing witness (D-4)', () => {
     );
   }
 
-  // RED-FIRST: each broken target asserts the DESIRED end state (count === 0),
-  // which currently FAILS (count >= 1). `it.fails` inverts → committable green.
-  // P2-P4 emitter fixes flip these to a real pass, forcing removal of `.fails`.
-  for (const target of BROKEN_TARGETS) {
-    it.fails(
-      `${target}: composed ref should type as child handle, not HTMLElement (RED pre-fix)`,
+  // GREEN (P4 fix landed): lit types the composed ref as the child ELEMENT CLASS
+  // (`@query(...) private _refChild!: ExposeChild`), importing the child class by
+  // name. `$refs.child.ping()` typechecks, so the "ping on HTMLElement" count is
+  // 0. This target's checker output must ALSO be fully clean (zero `error TS`):
+  // the element-class route resolves the child's `.rozie` type import to the real
+  // declared class, so any residual error (e.g. TS2709 "cannot use namespace as a
+  // type", or TS2304 "cannot find name") would be a real regression the narrow
+  // ping/HTMLElement counter cannot see. Plain GREEN `it` (no `.fails`).
+  for (const target of FIXED_ELEMENT_CLASS_TARGETS) {
+    it(
+      `${target}: composed ref types as child element class, not HTMLElement (GREEN — P4 fix)`,
       () => {
         const r = runWitness(target);
-        // Emit the observed anchor to the raw log (bypasses vitest console
-        // interception) so the red-first gate can grep the real, observed error
-        // text — never assumed. `it.fails` still inverts the failing assertion
-        // below to a committable green while the RED persists.
-        const anchor =
-          r.raw
-            .split('\n')
-            .find((l) => /Property 'ping' does not exist on type 'HTMLElement'/.test(l))
-            ?.trim() ?? '(no ping/HTMLElement line captured)';
-        process.stdout.write(`\n[RED-WITNESS ${target}] ${anchor}\n`);
-        expect(r.pingHtmlElementCount).toBe(0);
+        expect(
+          r.pingHtmlElementCount,
+          `[${target}] expected 0 "ping does not exist on HTMLElement" errors ` +
+            `(GREEN — the ref is typed as the child element class). ` +
+            `Got ${r.pingHtmlElementCount}.\n${r.raw}`,
+        ).toBe(0);
+        const errorLines = r.raw
+          .split('\n')
+          .filter((l) => /error TS\d+/.test(l))
+          .map((l) => l.trim());
+        expect(
+          errorLines,
+          `[${target}] expected a fully clean typecheck (the element-class type ` +
+            `resolves the exposed member); got:\n${errorLines.join('\n')}`,
+        ).toEqual([]);
       },
       180000,
     );
