@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
-import Combobox from './Combobox';
+import Combobox, { type ComboboxHandle } from './Combobox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
@@ -156,6 +156,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     if (isOpen) onOpen();
   })(v)), { defer: true }));
   let panelRef: HTMLElement | null = null;
+  let comboboxRef: ComboboxHandle | null = null;
 
   // ---- derived views (plain functions, uniform ×6) -----------------------
   // The filtered command list fed to the vendored <Combobox> as its `:options`.
@@ -230,22 +231,18 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   }
 
   // ---- open/close reconcile ----------------------------------------------
-  // Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+  // Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+  // verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
   // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-  // palette open, so this runs on mount). The five light-DOM targets render the
-  // input directly under the panel, so a plain `querySelector('input')` finds it.
-  // On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
-  // lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
-  // palette never opened and rendered 0 options. Fall back to piercing the child
-  // element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
-  // would be cleaner but is blocked by the refs-lowering type gap (a composed-
-  // component ref types inconsistently across targets, not as the ComboboxHandle).
+  // palette open, so this runs on mount). `$refs.combobox` is the composed child's
+  // TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+  // typing), so `focus()` typechecks and resolves to the child's exposed verb —
+  // including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+  // root DOM pierce that only existed because the composed ref used to type as a
+  // bare HTMLElement.
   // $refs read in a post-mount callback only (ROZ123-safe).
   function focusInput() {
-    const panel = panelRef;
-    if (!panel) return;
-    const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-    if (input && input.focus) input.focus();
+    comboboxRef?.focus();
   }
 
   // On open: clear the query + internal selection, then focus the search input.
@@ -298,7 +295,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
-        <Combobox aria-label={local.ariaLabel} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={local.placeholder} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
+        <Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={local.placeholder} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>
                 {<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</div>}

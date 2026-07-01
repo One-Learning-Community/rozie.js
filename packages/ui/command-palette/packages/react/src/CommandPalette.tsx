@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ReactNode } from 'react';
 import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './CommandPalette.css';
-import Combobox from './Combobox';
+import Combobox, { type ComboboxHandle } from './Combobox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
@@ -101,6 +101,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   _openRef.current = open;
   const [activeValue, setActiveValue] = useState<any>(null);
   const panel = useRef<HTMLDivElement | null>(null);
+  const combobox = useRef<ComboboxHandle | null>(null);
   const _watch0First = useRef(true);
 
   function filteredItems() {
@@ -142,10 +143,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     if (e && e.target === e.currentTarget) closePalette();
   }, [closePalette]);
   function focusInput() {
-    const panel$local = panel.current;
-    if (!panel$local) return;
-    const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-    if (input && input.focus) input.focus();
+    combobox.current?.focus();
   }
   const onOpen = useCallback(() => {
     setQuery('');
@@ -196,7 +194,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     {(open) && <div className={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       <div ref={panel} className={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={props.ariaLabel} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
-        <Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={props.placeholder} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={props.placeholder} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 <span className={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>
                 {(groupText(option)) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</div>}

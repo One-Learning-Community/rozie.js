@@ -3,7 +3,7 @@
 <div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onPanelKeydown($event)">
     
-    <Combobox :inline="true" :disable-filter="true" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+    <Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled">
           <div class="rozie-command-palette-option">
             <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
@@ -79,6 +79,7 @@ defineSlots<{
 const activeValue = ref<any>(null);
 
 const panelRef = ref<HTMLElement>();
+const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
 import { filterCommands } from './internal/filterCommands';
 
@@ -175,34 +176,29 @@ const onBackdropClick = (e: any) => {
 };
 
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+// verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
 // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-// palette open, so this runs on mount). The five light-DOM targets render the
-// input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
-// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
-// palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
-// would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ComboboxHandle).
+// palette open, so this runs on mount). `$refs.combobox` is the composed child's
+// TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+// typing), so `focus()` typechecks and resolves to the child's exposed verb —
+// including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+// root DOM pierce that only existed because the composed ref used to type as a
+// bare HTMLElement.
 // $refs read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+// verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
 // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-// palette open, so this runs on mount). The five light-DOM targets render the
-// input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
-// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
-// palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
-// would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ComboboxHandle).
+// palette open, so this runs on mount). `$refs.combobox` is the composed child's
+// TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+// typing), so `focus()` typechecks and resolves to the child's exposed verb —
+// including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+// root DOM pierce that only existed because the composed ref used to type as a
+// bare HTMLElement.
 // $refs read in a post-mount callback only (ROZ123-safe).
 const focusInput = () => {
-  const panel = panelRef.value;
-  if (!panel) return;
-  const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-  if (input && input.focus) input.focus();
+  comboboxRef.value?.focus();
 };
 
 // On open: clear the query + internal selection, then focus the search input.

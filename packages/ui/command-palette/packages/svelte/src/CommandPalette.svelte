@@ -74,6 +74,7 @@ const footer = $derived(__footerProp ?? snippets?.footer);
 let activeValue: any = $state(null);
 
 let panel = $state<HTMLElement | undefined>(undefined);
+let combobox = $state<ReturnType<typeof Combobox> | undefined>(undefined);
 
 import { filterCommands } from './internal/filterCommands';
 
@@ -170,34 +171,29 @@ const onBackdropClick = (e: any) => {
 };
 
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+// verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
 // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-// palette open, so this runs on mount). The five light-DOM targets render the
-// input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
-// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
-// palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
-// would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ComboboxHandle).
+// palette open, so this runs on mount). `$refs.combobox` is the composed child's
+// TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+// typing), so `focus()` typechecks and resolves to the child's exposed verb —
+// including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+// root DOM pierce that only existed because the composed ref used to type as a
+// bare HTMLElement.
 // $refs read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Combobox>'s combobox <input>; focusing it fires the
+// Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
+// verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
 // combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-// palette open, so this runs on mount). The five light-DOM targets render the
-// input directly under the panel, so a plain `querySelector('input')` finds it.
-// On Lit the <Combobox> compiles to a `<rozie-combobox>` CUSTOM ELEMENT whose input
-// lives in its (open) SHADOW ROOT — a panel-level query can't reach it, so the
-// palette never opened and rendered 0 options. Fall back to piercing the child
-// element's open shadow root on Lit. A `$refs.combobox.focusControl()` handle call
-// would be cleaner but is blocked by the refs-lowering type gap (a composed-
-// component ref types inconsistently across targets, not as the ComboboxHandle).
+// palette open, so this runs on mount). `$refs.combobox` is the composed child's
+// TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
+// typing), so `focus()` typechecks and resolves to the child's exposed verb —
+// including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
+// root DOM pierce that only existed because the composed ref used to type as a
+// bare HTMLElement.
 // $refs read in a post-mount callback only (ROZ123-safe).
 const focusInput = () => {
-  const panel$local = panel;
-  if (!panel$local) return;
-  const input = panel$local.querySelector('input') || panel$local.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-  if (input && input.focus) input.focus();
+  combobox?.focus();
 };
 
 // On open: clear the query + internal selection, then focus the search input.
@@ -260,7 +256,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {

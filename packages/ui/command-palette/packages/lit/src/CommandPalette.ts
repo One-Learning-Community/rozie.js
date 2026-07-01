@@ -4,6 +4,7 @@ import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signa
 import { adoptConsumerStyles, createLitControllableProperty, rozieDisplay } from '@rozie/runtime-lit';
 import { ref } from 'lit/directives/ref.js';
 import './Combobox';
+import type Combobox from './Combobox';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
@@ -139,6 +140,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) idBase: string = 'rozie-command-palette';
   private _activeValue = signal<any>(null);
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
+  @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
 private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotOption = false;
@@ -230,7 +232,7 @@ private __rozieWatchInitial_0 = true;
 ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) => { this.onBackdropClick($event); }} data-rozie-s-768cad96>
   <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: Event) => { this.onPanelKeydown($event); }} data-rozie-ref="panel" data-rozie-s-768cad96>
     
-    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onComboboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onComboboxSearch($event); }} data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${($event: Event) => { this.onComboboxChange($event); }} @search=${(__rozieEv: CustomEvent) => { const $event = __rozieEv.detail; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
             <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
@@ -290,10 +292,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: Event) =
 };
 
   focusInput = () => {
-  const panel = this._refPanel;
-  if (!panel) return;
-  const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-  if (input && input.focus) input.focus();
+  this._refCombobox?.focus();
 };
 
   onOpen = () => {

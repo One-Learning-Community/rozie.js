@@ -60,7 +60,7 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onPanelKeydown($event)">
         
-        <rozie-combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+        <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled }, option: option, index: index, active: active, selected: selected, disabled: disabled }" />
     } @else {
@@ -200,6 +200,7 @@ export class CommandPalette {
   idBase = input<string>('rozie-command-palette');
   activeValue = signal<any>(null);
   panel = viewChild<ElementRef<HTMLDivElement>>('panel');
+  combobox = viewChild<Combobox>('combobox');
   select = output<unknown>();
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
@@ -248,10 +249,7 @@ export class CommandPalette {
     if (e && e.target === e.currentTarget) this.closePalette();
   };
   focusInput = () => {
-    const panel = this.panel()?.nativeElement;
-    if (!panel) return;
-    const input = panel.querySelector('input') || panel.querySelector('rozie-combobox')?.shadowRoot?.querySelector('input');
-    if (input && input.focus) input.focus();
+    this.combobox()?.focus();
   };
   onOpen = () => {
     this.query.set('');

@@ -189,9 +189,28 @@ function main() {
       // what the react/solid/angular leaves already import. Lit-only; the bare
       // side-effect form is unique to Lit composition, so this never touches
       // binding imports or the canonical/consumer `.rozie` contract.
+      //
+      // Phase 66 (composed-component-ref → element-class typing): when the parent
+      // `ref`s the composed child, the Lit emitter ALSO emits a NAMED TYPE import
+      // `import type { Combobox } from './Combobox.rozie';` (the element-class type
+      // for the `@query` ref field). In the production unplugin flow that named
+      // import resolves against the child's `.d.rozie.ts` sidecar (emitLitTypes:
+      // `export declare class Combobox`). The STANDALONE leaf, however, has no
+      // sidecar — only the compiled sibling `Combobox.ts`, which (like every other
+      // target's compiled leaf) exports the class as `export default class Combobox`
+      // (react/solid default-import it too). So collapse the named type import to a
+      // DEFAULT type import off the extensionless sibling. Then strip any residual
+      // relative `.rozie` specifier. Still Lit-only, still sibling-relative only;
+      // leaves the canonical/consumer `.rozie` contract untouched.
       const code =
         target === 'lit'
-          ? r.code.replace(/import '\.\/([A-Za-z0-9_]+)\.rozie';/g, "import './$1';")
+          ? r.code
+              .replace(/import '\.\/([A-Za-z0-9_]+)\.rozie';/g, "import './$1';")
+              .replace(
+                /import type \{ ([A-Za-z0-9_]+) \} from '\.\/([A-Za-z0-9_]+)\.rozie'/g,
+                "import type $1 from './$2'",
+              )
+              .replace(/from '\.\/([A-Za-z0-9_]+)\.rozie'/g, "from './$1'")
           : r.code;
 
       writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), code);
