@@ -66,6 +66,13 @@ export interface MonthGridInput {
   max?: string | null;
   /** Explicitly disabled ISO dates. */
   disabledDates?: string[];
+  /** Disabled weekdays by UTC index: 0 = Sunday … 6 = Saturday (e.g. `[0, 6]` disables weekends). */
+  disabledDaysOfWeek?: number[];
+  /**
+   * Consumer predicate: return `true` to disable the given ISO date. Runs in the
+   * consumer's own context (T-70-02 — accepted). Absent / `null` disables nothing.
+   */
+  isDateDisabled?: ((iso: string) => boolean) | null;
   /** First day of the week: 0 = Sunday … 6 = Saturday. */
   weekStartsOn?: number;
   /** Disable every day (the whole control is disabled). */
@@ -214,7 +221,8 @@ export function addDays(iso: string, n: number): string {
 
 /**
  * `true` when the ISO date is NOT selectable: outside `[min, max]`, in
- * `disabledDates`, or the control is globally disabled.
+ * `disabledDates`, its weekday is in `disabledDaysOfWeek`, the `isDateDisabled`
+ * predicate rejects it, or the control is globally disabled.
  */
 export function isDayDisabled(iso: string, input: MonthGridInput): boolean {
   if (input.disabled) return true;
@@ -226,6 +234,10 @@ export function isDayDisabled(iso: string, input: MonthGridInput): boolean {
   if (maxT != null && t > maxT) return true;
   const list = input.disabledDates || [];
   for (let i = 0; i < list.length; i++) if (list[i] === iso) return true;
+  const dow = new Date(t).getUTCDay();
+  const blockedDows = input.disabledDaysOfWeek || [];
+  for (let i = 0; i < blockedDows.length; i++) if (blockedDows[i] === dow) return true;
+  if (input.isDateDisabled && input.isDateDisabled(iso)) return true;
   return false;
 }
 
