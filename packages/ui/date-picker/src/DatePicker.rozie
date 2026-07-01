@@ -989,16 +989,20 @@ $expose({ focus, goToToday, clear })
   </div>
 
   <!-- Footer (Today / Clear). The #footer slot fully overrides it, receiving
-       { today, clear, todayIso }. The whole slot is gated on showFooter, so the
-       default output (footer off) is byte-identical to the pre-footer markup. -->
+       { today, clear, todayIso }. The showFooter gate lives on the DEFAULT row
+       (mirroring the #presets `hasPresets()` gate below) — NOT on the <slot>
+       element: an r-if directly on a <slot> with a fallback makes the React
+       emitter nest the slot ternary inside `&&{ … }` (a JSX parse error). With
+       the gate on the fallback, footer-off + no consumer slot renders nothing
+       (byte-identical to the pre-footer markup), while an explicit #footer slot
+       is an opt-in that renders whenever provided. -->
   <slot
     name="footer"
     :today="selectToday"
     :clear="clear"
     :todayIso="todayIso()"
-    r-if="showsFooter()"
   >
-    <div class="rozie-datepicker-footer">
+    <div class="rozie-datepicker-footer" r-if="showsFooter()">
       <button
         type="button"
         class="rozie-datepicker-footer-btn rozie-datepicker-today"

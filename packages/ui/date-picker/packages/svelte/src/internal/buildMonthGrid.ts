@@ -69,10 +69,14 @@ export interface MonthGridInput {
   /** Disabled weekdays by UTC index: 0 = Sunday … 6 = Saturday (e.g. `[0, 6]` disables weekends). */
   disabledDaysOfWeek?: number[];
   /**
-   * Consumer predicate: return `true` to disable the given ISO date. Runs in the
-   * consumer's own context (T-70-02 — accepted). Absent / `null` disables nothing.
+   * Consumer predicate: return a truthy value to disable the given ISO date. Runs
+   * in the consumer's own context (T-70-02 — accepted). Absent / `null` disables
+   * nothing. Typed with an `unknown` return (not `boolean`) so the framework-erased
+   * `Function`-prop signature each target emits — `(...args: unknown[]) => unknown`
+   * on Angular/Solid/Lit, `(...args: any[]) => any` on React/Vue/Svelte — flows in
+   * without a per-leaf cast; the value is only ever consumed in a truthy position.
    */
-  isDateDisabled?: ((iso: string) => boolean) | null;
+  isDateDisabled?: ((iso: string) => unknown) | null;
   /** First day of the week: 0 = Sunday … 6 = Saturday. */
   weekStartsOn?: number;
   /** Disable every day (the whole control is disabled). */

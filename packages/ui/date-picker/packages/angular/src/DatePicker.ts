@@ -116,18 +116,20 @@ function __rozieAttr(v: unknown): string | null {
     }
         </div>
       </div>
-    }@if (showsFooter()) {
-    @if ((footerTpl ?? templates()?.['footer'])) {
+    }@if ((footerTpl ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { today: selectToday, clear: clear, todayIso: todayIso() }, today: selectToday, clear: clear, todayIso: todayIso() }" />
     } @else {
 
-        <div class="rozie-datepicker-footer">
+        @if (showsFooter()) {
+    <div class="rozie-datepicker-footer">
           <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="selectToday()">Today</button>
           <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="clear()">Clear</button>
         </div>
-      
     }
-    }@if ((presetsTpl ?? templates()?.['presets'])) {
+    }
+
+      
+      @if ((presetsTpl ?? templates()?.['presets'])) {
     <ng-container *ngTemplateOutlet="(presetsTpl ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
     } @else {
 

@@ -37,12 +37,14 @@
     <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year">
       <button v-for="cell in yearGrid().years" :key="cell.iso" type="button" :class="['rozie-datepicker-year', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-year="cell.iso" :tabindex="(yearTabIndex(cell)) ?? undefined" :disabled="!!cell.disabled" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectYear(cell.iso)" @keydown="onYearKeydown(cell.iso, $event)">{{ cell.year }}</button>
     </div>
-  </div><template v-if="showsFooter()"><slot name="footer" :today="selectToday" :clear="clear" :todayIso="todayIso()">
-    <div class="rozie-datepicker-footer">
+  </div><slot name="footer" :today="selectToday" :clear="clear" :todayIso="todayIso()">
+    <div v-if="showsFooter()" class="rozie-datepicker-footer">
       <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="selectToday">Today</button>
       <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="clear">Clear</button>
-    </div>
-  </slot></template><slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
+    </div></slot>
+
+  
+  <slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
     <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
       <button v-for="p in resolvedPresets()" :key="p.label" type="button" :class="['rozie-datepicker-preset', { 'is-active': isPresetActive(p.range) }]" :aria-pressed="!!isPresetActive(p.range)" :disabled="!!props.disabled" @click="applyPreset(p.range)">{{ p.label }}</button>
     </div></slot>
