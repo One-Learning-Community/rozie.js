@@ -38,7 +38,7 @@
     <script type="module">
       import { compile } from 'svelte/compiler';
       import { mount, unmount } from 'svelte';
-      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost, isPassthroughTs } from './_shared.js';
 
       const host = document.getElementById('app');
       let instance = null;
@@ -51,6 +51,13 @@
         // sibling SFC becomes its own module whose default export is the
         // child component the entry imports.
         const transformOne = async (src) => {
+          // Phase 68-03 — a plain relative `.ts` helper sibling (e.g.
+          // `./internal/resizeMath`). esbuild-lower it directly; `compile()`
+          // below expects Svelte component markup and would throw on raw TS.
+          if (isPassthroughTs(src)) {
+            const lowered = await transform(src, { loader: 'ts', format: 'esm', target: 'es2022' });
+            return lowered.code;
+          }
           const compiled = compile(src, {
             filename: 'Playground.svelte',
             generate: 'client',

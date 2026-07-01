@@ -1,6 +1,26 @@
 // Shared helpers used by all 6 harness HTML files. Served as a static asset
 // from /preview/_shared.js so each harness can `import ... from './_shared.js'`.
 
+/**
+ * Sentinel prefix that marks a sibling as a PLAIN relative TS/JS helper module
+ * (e.g. `./internal/buildMonthGrid.ts`) rather than a Rozie-emitted component
+ * (Phase 68-03). `compile.ts` prepends this to the raw helper source it puts in
+ * the `siblings` map. Two harnesses that otherwise SFC-compile every sibling
+ * (vue, svelte) branch on `isPassthroughTs(src)` and esbuild-lower the helper
+ * as-is instead — running it through `@vue/compiler-sfc.parse` / `svelte.compile`
+ * would drop the helper's exports (no `<script>`/`<template>` → `export default {}`).
+ * The other four harnesses (react/solid/lit/angular) already esbuild every
+ * sibling, so the marker is just an inert leading comment there.
+ *
+ * MUST stay byte-identical to `PASSTHROUGH_TS_MARKER` in src/compile.ts.
+ */
+export const PASSTHROUGH_TS_MARKER = '/*__ROZIE_PASSTHROUGH_TS__*/';
+
+/** True if `src` is a plain relative TS/JS helper sibling (see the marker). */
+export function isPassthroughTs(src) {
+  return typeof src === 'string' && src.startsWith(PASSTHROUGH_TS_MARKER);
+}
+
 // esbuild-wasm singleton — initialized once, reused across renders.
 let esbuildReady = null;
 
@@ -80,8 +100,12 @@ export async function importFromString(code) {
  * of leading `../` segments (`'../LineChart'`, `'../../shared/Foo'`) —
  * a bundle's entry and its dependency need not live in the same directory
  * (e.g. `examples/demos/LineChartDemo.rozie` imports `../LineChart.rozie`).
- * Only the basename is matched against `blobMap`, so the leading path is
- * irrelevant to the lookup — the VFS keys siblings by basename.
+ * Only the FINAL basename is matched against `blobMap`, so both the leading
+ * `../` prefix AND any intermediate directory segments are irrelevant to the
+ * lookup — the VFS keys siblings by basename. The `(?:[\w-]+\/)*` group skips
+ * nested path segments so a NESTED relative helper like
+ * `'./internal/buildMonthGrid'` captures the final `buildMonthGrid` (the blob
+ * key) rather than the intermediate `internal` segment (Phase 68-03).
  *
  * Pass-through for anything not in the map — so unrelated imports of
  * `./foo/bar` or relative CSS paths fall through to the existing
@@ -90,7 +114,7 @@ export async function importFromString(code) {
  */
 export function rewriteRelativeImports(code, blobMap) {
   return code.replace(
-    /(\b(?:from|import)\s+)(['"])(?:\.\.?\/)+([\w-]+)(?:\.[\w]+)?\2/g,
+    /(\b(?:from|import)\s+)(['"])(?:\.\.?\/)+(?:[\w-]+\/)*([\w-]+)(?:\.[\w]+)?\2/g,
     (m, head, q, name) => (blobMap[name] ? `${head}${q}${blobMap[name]}${q}` : m),
   );
 }
@@ -125,8 +149,21 @@ export async function importBundleWith(transformFn, entryCode, siblingsCode) {
   const siblingBlobs = {};
   const allBlobUrls = [];
   try {
-    for (const [name, src] of Object.entries(siblingsCode || {})) {
-      const transformedJs = await transformFn(src);
+    // Mint passthrough-TS helper siblings (e.g. `./internal/buildMonthGrid.ts`)
+    // FIRST so their blob URLs already exist in `siblingBlobs` when we rewrite
+    // the component siblings that import them (Phase 68-03). Helpers are
+    // dependency-free leaves; components depend on them — a 2-level DAG whose
+    // topological order this stable partition satisfies without a full sort.
+    const orderedSiblings = Object.entries(siblingsCode || {}).sort(
+      (a, b) => Number(isPassthroughTs(b[1])) - Number(isPassthroughTs(a[1])),
+    );
+    for (const [name, src] of orderedSiblings) {
+      // Rewrite a sibling's OWN relative imports (e.g. a component sibling's
+      // `./internal/<helper>`) to the sibling blob URLs minted so far. Siblings
+      // with no relative-sibling imports (the common case) pass through
+      // unchanged, so pre-68-03 bundles are unaffected.
+      const rewrittenSrc = rewriteRelativeImports(src, siblingBlobs);
+      const transformedJs = await transformFn(rewrittenSrc);
       const blob = new Blob([transformedJs], { type: 'text/javascript' });
       const url = URL.createObjectURL(blob);
       siblingBlobs[name] = url;

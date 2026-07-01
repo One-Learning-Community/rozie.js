@@ -3,6 +3,16 @@ import type { Snippet } from './snippets';
 import { PARTIAL_SOURCES } from './snippets';
 
 /**
+ * Sentinel prefix marking a bundle sibling as a PLAIN relative TS/JS helper
+ * (e.g. `./internal/buildMonthGrid.ts`) — a RUNTIME import the compiled leaf
+ * emits, NOT a Rozie component (Phase 68-03). Prepended to the raw helper source
+ * so the iframe harness's `transformFn` esbuild-lowers it instead of SFC-parsing
+ * it (see `isPassthroughTs` in public/preview/_shared.js). MUST stay byte-
+ * identical to `PASSTHROUGH_TS_MARKER` there.
+ */
+const PASSTHROUGH_TS_MARKER = '/*__ROZIE_PASSTHROUGH_TS__*/';
+
+/**
  * Seed the compile VFS with every cross-package `.rzts`/`.rzjs` script partial
  * under the key @rozie/core's partial resolver produces for a bare specifier:
  * `/vfs/@rozie-ui/<pkg>/<name>.rzts`. These are COMPILE-TIME inlines (they never
@@ -164,7 +174,11 @@ export type AllTargetsBundleRuntimeOutcome = Record<CompileTarget, BundleRuntime
 
 function basenameNoExt(filename: string): string {
   const last = filename.split('/').pop() ?? filename;
-  return last.replace(/\.rozie$/, '');
+  // Strip the component (.rozie) OR plain-helper (.ts/.rzts/.rzjs) extension —
+  // the emitted `import … from './internal/buildMonthGrid'` references the
+  // basename with NO extension, so a `buildMonthGrid.ts` helper must key as
+  // `buildMonthGrid` to line up with the rewrite (Phase 68-03).
+  return last.replace(/\.(rozie|ts|rzts|rzjs)$/, '');
 }
 
 /**
@@ -220,6 +234,18 @@ export function compileBundleRuntime(
     const siblingCssParts: string[] = [];
     for (const [filename, source] of Object.entries(snippet.files)) {
       if (filename === snippet.entry) continue;
+      // Plain relative TS/JS helper (e.g. `./internal/buildMonthGrid.ts`): a
+      // RUNTIME import the leaf emits, not a Rozie component — pass the raw TS
+      // through as a blob sibling (the harness esbuild-lowers it) and NEVER run
+      // it through the Rozie compiler. Marked so the SFC-compiling harnesses
+      // (vue/svelte) esbuild it rather than SFC-parsing it (Phase 68-03).
+      // (`.rzts`/`.rzjs` compile-time partials never reach this loop — they live
+      // in the VFS map only, seeded by seedPartials — but the guard is by
+      // extension so any non-.rozie sibling is treated as passthrough.)
+      if (!filename.endsWith('.rozie')) {
+        siblings[basenameNoExt(filename)] = PASSTHROUGH_TS_MARKER + '\n' + source;
+        continue;
+      }
       const siblingResult = compile(source, {
         target,
         filename: '/vfs/' + filename,
