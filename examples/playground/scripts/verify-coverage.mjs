@@ -43,6 +43,14 @@ const FAMILIES = [
   { family: 'pagination', demo: 'PaginationBehaviorDemo' },
   { family: 'popover', demo: 'PopoverBehaviorDemo' },
   { family: 'resizable', demo: 'ResizableBehaviorDemo' },
+  // Phase 68-02 — the `.rzts`/`.rzjs` script-partial-consuming families. Each
+  // inlines a cross-package `@rozie-ui/headless-core/*.rzts` partial at compile
+  // time; this gate proves @rozie/core resolves + inlines them ×6 clean off the
+  // real on-disk workspace (headless-core is a real pnpm-workspace package).
+  { family: 'headless-core', demo: 'HeadlessCoreSmokeDemo' },
+  { family: 'combobox', demo: 'ComboboxBehaviorDemo' },
+  { family: 'listbox', demo: 'ListboxVirtualDemo' },
+  { family: 'command-palette', demo: 'CommandPaletteBehaviorDemo' },
 ];
 
 let failures = 0;

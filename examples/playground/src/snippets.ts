@@ -381,6 +381,57 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../demos/ResizableBehaviorDemo.rozie',
     dependencyGlobPaths: ['../../../packages/ui/resizable/src/Resizable.rozie'],
   },
+
+  // ---------------------------------------------------------------------------
+  // Phase 68-02 — the `.rzts`/`.rzjs` script-partial-consuming families. Each
+  // imports cross-package `@rozie-ui/headless-core/{listCore,windowing,smoke}.rzts`
+  // partials that @rozie/core INLINES at compile time; the playground now globs
+  // those partials into the compile VFS (see PARTIAL_SOURCES + compile.ts's
+  // seedPartials), so all four compile ×6 with zero error diagnostics.
+  //
+  // HeadlessCoreSmokeDemo LIVE-RENDERS immediately: its only dep is the inlined
+  // smoke.rzts partial (`probe = headlessCoreSmoke(41)` → 42), so the rendered
+  // cell proves the cross-package partial-inline path end-to-end with no engine.
+  //
+  // Combobox / Listbox / CommandPalette compile ×6 clean, but their SIBLING
+  // components emit an unconditional runtime `@tanstack/virtual-core` import (the
+  // windowing engine) — and CommandPalette additionally emits a `./internal/
+  // filterCommands` runtime helper — neither yet in the harness importmap / VFS.
+  // They stay marked unsupported-with-reason (render pending the engine-importmap
+  // wiring in 68-04 and the internal-helper VFS wiring in 68-03), never silent.
+  // ---------------------------------------------------------------------------
+  {
+    // Single-file demo: its only dep is the compile-time smoke.rzts partial,
+    // VFS-seeded globally by seedPartials — so no `.rozie` sibling to declare.
+    key: 'bundle/HeadlessCoreSmokeDemo',
+    label: 'bundle/HeadlessCoreSmokeDemo',
+    entryGlobPath: '../../demos/HeadlessCoreSmokeDemo.rozie',
+    dependencyGlobPaths: [],
+  },
+  {
+    key: 'bundle/ComboboxBehaviorDemo',
+    label: 'bundle/ComboboxBehaviorDemo',
+    entryGlobPath: '../../demos/ComboboxBehaviorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/combobox/src/Combobox.rozie'],
+  },
+  {
+    key: 'bundle/ListboxVirtualDemo',
+    label: 'bundle/ListboxVirtualDemo',
+    entryGlobPath: '../../demos/ListboxVirtualDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/listbox/src/Listbox.rozie'],
+  },
+  {
+    // CommandPalette composes @rozie-ui/combobox/Combobox.rozie via <components>;
+    // the command-palette package vendors its OWN Combobox.rozie sibling (the
+    // specifier resolves by basename in the flat VFS), so BOTH are declared.
+    key: 'bundle/CommandPaletteBehaviorDemo',
+    label: 'bundle/CommandPaletteBehaviorDemo',
+    entryGlobPath: '../../demos/CommandPaletteBehaviorDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/command-palette/src/CommandPalette.rozie',
+      '../../../packages/ui/command-palette/src/Combobox.rozie',
+    ],
+  },
 ];
 
 // Bundle entry/dep paths can resolve against either glob root: top-level
@@ -475,14 +526,19 @@ const UNSUPPORTED: Record<string, string> = {
     'compiles ×6, but emits a ./internal/middleware helper import not yet in the playground VFS — live render pending 68-03',
   'bundle/ResizableBehaviorDemo':
     'compiles ×6, but emits a ./internal/resizeMath helper import not yet in the playground VFS — live render pending 68-03',
-  // Not-yet-wired families whose demos consume @rozie-ui/headless-core `.rzts`
-  // partials — the snippet VFS can't glob `.rzts` yet (pending 68-02).
+  // Phase 68-02 CLOSED the `.rzts` gap: their @rozie-ui/headless-core
+  // {listCore,windowing}.rzts partials now inline cleanly (compiles ×6). But the
+  // Combobox/Listbox sibling emits an unconditional runtime `@tanstack/virtual-core`
+  // import (the windowing engine) not yet in the harness importmaps — render
+  // pending engine-importmap wiring (68-04). Family-token entries (win over none).
   Combobox:
-    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+    'compiles ×6 (its headless-core .rzts partials now inline), but the Combobox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
   Listbox:
-    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+    'compiles ×6 (its headless-core .rzts partials now inline), but the Listbox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
+  // CommandPalette additionally emits a `./internal/filterCommands` runtime helper
+  // not yet in the VFS (68-03) on top of the @tanstack/virtual-core engine (68-04).
   CommandPalette:
-    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+    'compiles ×6 (its headless-core .rzts partials now inline), but the CommandPalette component emits a runtime @tanstack/virtual-core (windowing engine) import + a ./internal/filterCommands helper not yet in the harness — live render pending internal-helper VFS wiring (68-03) + engine-importmap wiring (68-04)',
   // Not-yet-wired engine-backed families — their vanilla-JS engine lib is not
   // in the six harness importmaps yet (pending 68-04).
   DataTable:
