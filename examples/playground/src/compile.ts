@@ -1,5 +1,19 @@
 import { compile, renderDiagnostic, type CompileTarget } from '@rozie/core';
 import type { Snippet } from './snippets';
+import { PARTIAL_SOURCES } from './snippets';
+
+/**
+ * Seed the compile VFS with every cross-package `.rzts`/`.rzjs` script partial
+ * under the key @rozie/core's partial resolver produces for a bare specifier:
+ * `/vfs/@rozie-ui/<pkg>/<name>.rzts`. These are COMPILE-TIME inlines (they never
+ * become runtime siblings), so they live in the VFS map ONLY — never in
+ * `snippet.files` — and are therefore excluded from the sibling-compile loop.
+ */
+function seedPartials(vfs: Map<string, string>): void {
+  for (const [specifier, source] of Object.entries(PARTIAL_SOURCES)) {
+    vfs.set('/vfs/' + specifier, source);
+  }
+}
 
 export type CompileOutcome =
   | { ok: true; code: string; css: string }
@@ -40,6 +54,7 @@ export function compileBundle(snippet: Snippet, target: CompileTarget): CompileO
   for (const [filename, source] of Object.entries(snippet.files)) {
     vfs.set('/vfs/' + filename, source);
   }
+  seedPartials(vfs);
   globalThis.__rozieVfs = vfs;
 
   const entrySource = snippet.files[snippet.entry];
@@ -168,6 +183,7 @@ export function compileBundleRuntime(
   for (const [filename, source] of Object.entries(snippet.files)) {
     vfs.set('/vfs/' + filename, source);
   }
+  seedPartials(vfs);
   globalThis.__rozieVfs = vfs;
 
   const entrySource = snippet.files[snippet.entry];

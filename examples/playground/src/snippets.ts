@@ -49,6 +49,48 @@ const uiPackageFiles = import.meta.glob('../../../packages/ui/*/src/*.rozie', {
   import: 'default',
 }) as Record<string, string>;
 
+// packages/ui/<product>/src/*.{rzts,rzjs} — COMPILE-TIME script partials
+// (Phase 54). Unlike `.rozie` siblings, a `.rzts`/`.rzjs` partial is NOT a
+// standalone component: @rozie/core's `inlineScriptPartials` INLINES its
+// exported declarations into the importing host `<script>` BEFORE IR lowering,
+// so the compiled leaf carries ZERO runtime import to the partial. They must
+// therefore be present in the compile VFS keyed by the specifier the resolver
+// produces, but must NEVER enter a bundle's `files` map (which would double-
+// compile them through the sibling loop as if they were components).
+//
+// The virtualized pure-Rozie families (combobox/listbox/command-palette) and
+// HeadlessCoreSmokeDemo import cross-package partials via a BARE specifier
+// (`@rozie-ui/headless-core/windowing.rzts`). The glob captures every package's
+// partials; `PARTIAL_SOURCES` re-keys each to its `@rozie-ui/<pkg>/<name>` bare
+// specifier so compile.ts can seed them into `globalThis.__rozieVfs`.
+const partialFiles = import.meta.glob('../../../packages/ui/*/src/*.{rzts,rzjs}', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
+/**
+ * Compile-time `.rzts`/`.rzjs` script partials, keyed by their cross-package
+ * bare specifier (`@rozie-ui/<pkg>/<name>.rzts`). Derived from the on-disk
+ * glob path `../../../packages/ui/<pkg>/src/<name>.rzts`.
+ *
+ * compile.ts seeds these into the VFS under `/vfs/<specifier>` — which is
+ * exactly the path the playground's `enhanced-resolve` shim computes for a bare
+ * `@rozie-ui/headless-core/windowing.rzts` import from a `/vfs/*.rozie` host
+ * (`joinPath('/vfs', spec)` → `/vfs/@rozie-ui/headless-core/windowing.rzts`,
+ * hit as the literal candidate). @rozie/core then `readFileSync`s that same key
+ * from the VFS and inlines the partial. NOT part of any bundle's `files` map,
+ * so the sibling-compile loop never touches them.
+ */
+export const PARTIAL_SOURCES: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [path, source] of Object.entries(partialFiles)) {
+    const m = path.match(/packages\/ui\/([^/]+)\/src\/(.+\.(?:rzts|rzjs))$/);
+    if (m) out[`@rozie-ui/${m[1]}/${m[2]}`] = source;
+  }
+  return out;
+})();
+
 export interface Snippet {
   /** Display label shown in the dropdown. */
   label: string;
