@@ -903,6 +903,25 @@ export const EXAMPLES = [
   'DatePickerRangeComplete',
   'DatePickerPresetActive',
   'DatePickerRangeBehavior',
+  // @rozie-ui/date-picker NAV + ERGONOMICS cells (Phase 70, loaders →
+  // examples/demos/DatePicker{MonthsView,YearsView,TwoMonth,Footer,WeekendDisable,SingleMonth}Demo.rozie).
+  // MonthsView/YearsView/TwoMonth/Footer/WeekendDisable are deterministic INLINE
+  // SCREENSHOT cells (drilled months/years panel, 2-month layout, footer row, greyed
+  // weekends) → standard mount-clipped matrix cells (matrix.spec.ts), each auto-fixme
+  // on baselineExists() until the Linux-Docker PNGs land in Plan 70-05
+  // (feedback_vr_linux_baselines). They are ALSO the DRIVEN behavioral targets of
+  // specs/date-picker-drill-footer.spec.ts (drill day→month→year, range spanning two
+  // months, footer Today/Clear, weekend click-rejection) — asserted at the DOM level
+  // with NO pixel baseline. DatePickerSingleMonth is BEHAVIORAL-ONLY (no baseline —
+  // Plan 70-05 must NOT add a PNG): it exists solely for the numberOfMonths=1
+  // byte-identity DOM-shape assertion. All live under examples/demos/ (covered by the
+  // date-picker src root already registered for the Angular cross-tree AOT prebuild).
+  'DatePickerMonthsView',
+  'DatePickerYearsView',
+  'DatePickerTwoMonth',
+  'DatePickerFooter',
+  'DatePickerWeekendDisable',
+  'DatePickerSingleMonth',
   // @rozie-ui/date-picker + resizable + command-palette SCREENSHOT cells (loaders →
   // examples/demos/{DatePicker,Resizable,CommandPalette}ScreenshotDemo.rozie).
   // DatePickerScreenshot pins value='2025-06-15' (its default month otherwise tracks
@@ -1224,6 +1243,15 @@ export const LIT_TAGS: Record<Example, string> = {
   DatePickerRangeComplete: 'rozie-date-picker-range-complete',
   DatePickerPresetActive: 'rozie-date-picker-preset-active',
   DatePickerRangeBehavior: 'rozie-date-picker-range-behavior',
+  // @rozie-ui/date-picker NAV + ERGONOMICS cells — '-demo' appended on Lit → tags
+  // 'rozie-date-picker-months-view-demo' etc. = kebab of
+  // DatePicker{MonthsView,YearsView,TwoMonth,Footer,WeekendDisable,SingleMonth}Demo.
+  DatePickerMonthsView: 'rozie-date-picker-months-view',
+  DatePickerYearsView: 'rozie-date-picker-years-view',
+  DatePickerTwoMonth: 'rozie-date-picker-two-month',
+  DatePickerFooter: 'rozie-date-picker-footer',
+  DatePickerWeekendDisable: 'rozie-date-picker-weekend-disable',
+  DatePickerSingleMonth: 'rozie-date-picker-single-month',
   // Phase 64 P0 — the Lit entry appends '-demo' → tag
   // 'rozie-headless-core-smoke-demo' = kebab of HeadlessCoreSmokeDemo.
   HeadlessCoreSmoke: 'rozie-headless-core-smoke',
@@ -1566,6 +1594,15 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DatePickerRangeComplete: {},
   DatePickerPresetActive: {},
   DatePickerRangeBehavior: {},
+  // @rozie-ui/date-picker NAV + ERGONOMICS cells — self-contained wrappers (each
+  // seeds its own value in <data> and binds the inner DatePicker via r-model). No
+  // parent-supplied props; no MODEL_PROPS entry (the model is bound internally).
+  DatePickerMonthsView: {},
+  DatePickerYearsView: {},
+  DatePickerTwoMonth: {},
+  DatePickerFooter: {},
+  DatePickerWeekendDisable: {},
+  DatePickerSingleMonth: {},
   // Phase 64 P0 — self-contained cross-package boundary demo; no parent-supplied
   // props (the inlined probe is computed in <script>).
   HeadlessCoreSmoke: {},
