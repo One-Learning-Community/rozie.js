@@ -35,10 +35,10 @@ let esbuildReady = null;
 export async function getEsbuildTransform() {
   if (!esbuildReady) {
     esbuildReady = (async () => {
-      const ns = await import('https://esm.sh/esbuild-wasm@0.24.0');
+      const ns = await import('https://esm.sh/esbuild-wasm@0.25.5');
       const esbuild = ns.default ?? ns;
       await esbuild.initialize({
-        wasmURL: 'https://esm.sh/esbuild-wasm@0.24.0/esbuild.wasm',
+        wasmURL: 'https://esm.sh/esbuild-wasm@0.25.5/esbuild.wasm',
         worker: false,
       });
       return esbuild.transform;
