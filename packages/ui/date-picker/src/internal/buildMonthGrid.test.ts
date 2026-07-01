@@ -13,6 +13,7 @@ import {
   addMonths,
   buildMonthGrid,
   buildMonthList,
+  buildYearGrid,
   isDayDisabled,
   isInRange,
   isIsoDate,
@@ -247,6 +248,52 @@ describe('buildMonthList', () => {
     });
     expect(list.months[1].disabled).toBe(true); // Feb ends before min
     expect(list.months[2].disabled).toBe(false); // Mar straddles min → enabled
+  });
+});
+
+describe('buildYearGrid', () => {
+  it('returns a deterministic decade-aligned 12-year window + rangeLabel', () => {
+    const grid = buildYearGrid('2025-06-15', { min: null, max: null, value: '', today: '2025-06-15' });
+    expect(grid.years.length).toBe(12);
+    expect(grid.rangeLabel).toBe('2020–2031'); // en-dash
+    expect(grid.years[0].year).toBe(2020);
+    expect(grid.years[0].iso).toBe('2020-01-01');
+    expect(grid.years[11].year).toBe(2031);
+    expect(grid.years[11].iso).toBe('2031-01-01');
+  });
+
+  it('produces the same window for any viewIso inside the same decade block', () => {
+    const a = buildYearGrid('2025-06-15', { min: null, max: null, value: '', today: '' });
+    const b = buildYearGrid('2029-11-30', { min: null, max: null, value: '', today: '' });
+    expect(b.rangeLabel).toBe(a.rangeLabel);
+    expect(b.years[0].year).toBe(a.years[0].year);
+    // a fresh object each call
+    expect(b).not.toBe(a);
+  });
+
+  it('flags selected + current by year', () => {
+    const grid = buildYearGrid('2025-06-15', { min: null, max: null, value: '2023-04-01', today: '2025-06-15' });
+    expect(grid.years.filter((y) => y.selected).map((y) => y.year)).toEqual([2023]);
+    expect(grid.years.filter((y) => y.current).map((y) => y.year)).toEqual([2025]);
+  });
+
+  it('disables a year ONLY when the whole year is outside [min, max]', () => {
+    const grid = buildYearGrid('2025-06-15', {
+      min: '2025-01-01',
+      max: '2025-12-31',
+      value: '',
+      today: '',
+    });
+    const byYear = (y: number) => grid.years.find((c) => c.year === y)!;
+    expect(byYear(2024).disabled).toBe(true); // entirely below min
+    expect(byYear(2025).disabled).toBe(false); // fully bracketed
+    expect(byYear(2026).disabled).toBe(true); // entirely above max
+  });
+
+  it('keeps a partially-overlapping year enabled', () => {
+    const grid = buildYearGrid('2025-06-15', { min: '2025-06-15', max: null, value: '', today: '' });
+    expect(grid.years.find((c) => c.year === 2024)!.disabled).toBe(true);
+    expect(grid.years.find((c) => c.year === 2025)!.disabled).toBe(false); // straddles min
   });
 });
 
