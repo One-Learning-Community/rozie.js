@@ -367,6 +367,13 @@ const yearGrid = () =>
 // The decade window label (e.g. "2020–2031") shown in the years-panel header.
 const yearRangeLabel = () => yearGrid().rangeLabel
 
+// The day-grid iterable for the template: the N month grids in the 'days' view,
+// or an empty array in the months/years drill views. Gating the r-for through an
+// EMPTY array (rather than an r-if on the same element) keeps the day-grid
+// element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
+// single grid with NO extra wrapper element (the byte-identical single-month path).
+const daysGrids = () => (showsDaysView() ? grids() : [])
+
 // Roving-tabindex value for a day cell: the selected day (or today, when nothing
 // is selected) is the single tab stop (0), the rest are -1. The return type is
 // annotated `number | undefined` ON PURPOSE — the React emitter wraps every
@@ -819,7 +826,7 @@ $expose({ focus, goToToday, clear })
   role="group"
   aria-label="Date picker"
   :aria-disabled="!!$props.disabled"
-  :class="{ 'rozie-datepicker--disabled': $props.disabled }"
+  :class="{ 'rozie-datepicker--disabled': $props.disabled, 'rozie-datepicker--multi': $props.numberOfMonths > 1 }"
 >
   <!-- Month-nav header. The optional #header slot overrides the default
        prev / month-year label / next row; it receives the current heading and
@@ -840,7 +847,17 @@ $expose({ focus, goToToday, clear })
         aria-label="Previous month"
         @click="goPrevMonth"
       >‹</button>
-      <span class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span>
+      <button
+        r-if="$props.monthYearNav"
+        type="button"
+        class="rozie-datepicker-heading rozie-datepicker-heading-button"
+        :disabled="!!$props.disabled"
+        :aria-disabled="!!$props.disabled"
+        aria-label="Change month and year"
+        aria-live="polite"
+        @click="enterMonthsView"
+      >{{ monthHeading() }}</button>
+      <span r-else class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span>
       <button
         type="button"
         class="rozie-datepicker-nav rozie-datepicker-next"
@@ -855,7 +872,13 @@ $expose({ focus, goToToday, clear })
   <!-- The calendar grid. role="grid" + per-cell role="gridcell" with a button
        child carrying the roving tabindex. @mouseleave clears the range preview
        so a stuck hover band can't linger after the pointer leaves the grid. -->
-  <div class="rozie-datepicker-grid" role="grid" @mouseleave="$data.hoverIso = ''">
+  <div
+    r-for="g, gi in daysGrids()"
+    :key="gi"
+    class="rozie-datepicker-grid"
+    role="grid"
+    @mouseleave="$data.hoverIso = ''"
+  >
     <div class="rozie-datepicker-weekdays" role="row">
       <span
         r-for="wd, wi in weekdays()"
@@ -867,7 +890,7 @@ $expose({ focus, goToToday, clear })
     </div>
 
     <div
-      r-for="week, wk in grid().weeks"
+      r-for="week, wk in g.weeks"
       :key="wk"
       class="rozie-datepicker-week"
       role="row"
@@ -905,6 +928,93 @@ $expose({ focus, goToToday, clear })
       </span>
     </div>
   </div>
+
+  <!-- Months drill panel (viewMode === 'months'). A role="grid" of 12 month
+       gridcells; the header year label drills further into the years view. Only
+       rendered while in the months view, so the default days output is unchanged. -->
+  <div class="rozie-datepicker-months" r-if="showsMonthsView()">
+    <div class="rozie-datepicker-drill-header">
+      <button
+        type="button"
+        class="rozie-datepicker-drill-label"
+        :disabled="!!$props.disabled"
+        :aria-disabled="!!$props.disabled"
+        aria-label="Change year"
+        @click="enterYearsView"
+      >{{ monthList().year }}</button>
+    </div>
+    <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month">
+      <button
+        r-for="cell in monthList().months"
+        :key="cell.iso"
+        type="button"
+        class="rozie-datepicker-month"
+        role="gridcell"
+        :class="{ 'is-selected': cell.selected, 'is-current': cell.current }"
+        :data-month="cell.iso"
+        :tabindex="monthTabIndex(cell)"
+        :disabled="!!cell.disabled"
+        :aria-disabled="!!cell.disabled"
+        :aria-selected="!!cell.selected"
+        @click="selectMonth(cell.iso)"
+        @keydown="onMonthKeydown(cell.iso, $event)"
+      >{{ cell.label }}</button>
+    </div>
+  </div>
+
+  <!-- Years drill panel (viewMode === 'years'). A role="grid" of 12 year
+       gridcells spanning the decade-aligned window; the header shows the window
+       range label. Only rendered while in the years view. -->
+  <div class="rozie-datepicker-years" r-if="showsYearsView()">
+    <div class="rozie-datepicker-drill-header">
+      <span class="rozie-datepicker-drill-label" aria-live="polite">{{ yearRangeLabel() }}</span>
+    </div>
+    <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year">
+      <button
+        r-for="cell in yearGrid().years"
+        :key="cell.iso"
+        type="button"
+        class="rozie-datepicker-year"
+        role="gridcell"
+        :class="{ 'is-selected': cell.selected, 'is-current': cell.current }"
+        :data-year="cell.iso"
+        :tabindex="yearTabIndex(cell)"
+        :disabled="!!cell.disabled"
+        :aria-disabled="!!cell.disabled"
+        :aria-selected="!!cell.selected"
+        @click="selectYear(cell.iso)"
+        @keydown="onYearKeydown(cell.iso, $event)"
+      >{{ cell.year }}</button>
+    </div>
+  </div>
+
+  <!-- Footer (Today / Clear). The #footer slot fully overrides it, receiving
+       { today, clear, todayIso }. The whole slot is gated on showFooter, so the
+       default output (footer off) is byte-identical to the pre-footer markup. -->
+  <slot
+    name="footer"
+    :today="selectToday"
+    :clear="clear"
+    :todayIso="todayIso()"
+    r-if="showsFooter()"
+  >
+    <div class="rozie-datepicker-footer">
+      <button
+        type="button"
+        class="rozie-datepicker-footer-btn rozie-datepicker-today"
+        :disabled="!!$props.disabled"
+        :aria-disabled="!!$props.disabled"
+        @click="selectToday"
+      >Today</button>
+      <button
+        type="button"
+        class="rozie-datepicker-footer-btn rozie-datepicker-clear"
+        :disabled="!!$props.disabled"
+        :aria-disabled="!!$props.disabled"
+        @click="clear"
+      >Clear</button>
+    </div>
+  </slot>
 
   <!-- Preset rail (range mode). The #presets slot fully overrides it, receiving
        the resolved presets + the apply callback. The default rail renders one
@@ -1106,6 +1216,144 @@ $expose({ focus, goToToday, clear })
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
+}
+
+/* Drill panels (months / years). Only rendered while drilling, so they add no
+   markup to the default days output. Fully token-driven like the rest. */
+.rozie-datepicker-drill-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--rozie-datepicker-drill-header-gap, 0.5rem);
+}
+.rozie-datepicker-drill-label {
+  font: inherit;
+  font-weight: var(--rozie-datepicker-heading-weight, 600);
+  font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+  color: inherit;
+  background: var(--rozie-datepicker-drill-label-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-drill-label:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-drill-label:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-heading-button {
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-datepicker-drill-label-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-heading-button:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-months .rozie-datepicker-drill-grid,
+.rozie-datepicker-years .rozie-datepicker-drill-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--rozie-datepicker-drill-cols, 3), 1fr);
+  gap: var(--rozie-datepicker-drill-gap, 0.25rem);
+}
+.rozie-datepicker-month,
+.rozie-datepicker-year {
+  box-sizing: border-box;
+  height: var(--rozie-datepicker-drill-cell-height, 2.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--rozie-datepicker-drill-cell-size, 0.85rem);
+  color: inherit;
+  background: var(--rozie-datepicker-day-bg, transparent);
+  border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-day-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-month:hover:not(:disabled),
+.rozie-datepicker-year:hover:not(:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-month.is-current:not(.is-selected),
+.rozie-datepicker-year.is-current:not(.is-selected) {
+  border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+}
+.rozie-datepicker-month.is-selected,
+.rozie-datepicker-year.is-selected {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-month:focus-visible,
+.rozie-datepicker-year:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-month:disabled,
+.rozie-datepicker-year:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+
+/* Footer (Today / Clear). Only rendered when showFooter, so it adds no markup
+   to the default output. */
+.rozie-datepicker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-datepicker-footer-gap, 0.25rem);
+  margin-top: var(--rozie-datepicker-footer-gap-top, 0.5rem);
+}
+.rozie-datepicker-footer-btn {
+  font: inherit;
+  font-size: var(--rozie-datepicker-footer-size, 0.78rem);
+  color: var(--rozie-datepicker-footer-fg, inherit);
+  background: var(--rozie-datepicker-footer-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-footer-radius, 6px);
+  padding: var(--rozie-datepicker-footer-padding, 0.2rem 0.6rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-footer-btn:hover:not(:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-footer-btn:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-footer-btn:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+
+/* Multi-month row (numberOfMonths > 1). The N grids are direct children of the
+   root — no wrapper element — so at numberOfMonths === 1 the modifier class is
+   absent and the single-month layout is untouched. When present, the grids flow
+   inline side by side. */
+.rozie-datepicker--multi .rozie-datepicker-grid {
+  display: inline-grid;
+  vertical-align: top;
+}
+.rozie-datepicker--multi .rozie-datepicker-grid + .rozie-datepicker-grid {
+  margin-left: var(--rozie-datepicker-month-gap, 1rem);
 }
 </style>
 
