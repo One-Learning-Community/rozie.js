@@ -12,6 +12,7 @@ import {
   addDays,
   addMonths,
   buildMonthGrid,
+  buildMonthList,
   isDayDisabled,
   isInRange,
   isIsoDate,
@@ -174,6 +175,78 @@ describe('buildMonthGrid', () => {
     expect(find('2026-06-15').disabled).toBe(true); // explicit
     expect(find('2026-06-20').disabled).toBe(false);
     expect(find('2026-06-21').disabled).toBe(true);
+  });
+});
+
+describe('buildMonthList', () => {
+  it('returns 12 localized month cells anchored on the view year', () => {
+    const list = buildMonthList('2025-06-15', {
+      min: null,
+      max: null,
+      value: '2025-03-10',
+      today: '2025-06-15',
+      locale: 'en-US',
+    });
+    expect(list.year).toBe(2025);
+    expect(list.months.length).toBe(12);
+    expect(list.months[0].iso).toBe('2025-01-01');
+    expect(list.months[0].label).toBe('Jan');
+    expect(list.months[5].iso).toBe('2025-06-01');
+    expect(list.months[5].label).toBe('Jun');
+    // a fresh object each call
+    expect(buildMonthList('2025-06-15', { min: null, max: null, value: '', today: '', locale: 'en-US' }))
+      .not.toBe(list);
+  });
+
+  it('flags selected + current by month/year', () => {
+    const list = buildMonthList('2025-06-15', {
+      min: null,
+      max: null,
+      value: '2025-03-10',
+      today: '2025-06-15',
+      locale: 'en-US',
+    });
+    expect(list.months.filter((m) => m.selected).map((m) => m.iso)).toEqual(['2025-03-01']);
+    expect(list.months.filter((m) => m.current).map((m) => m.iso)).toEqual(['2025-06-01']);
+  });
+
+  it('does not flag selected/current for a different year', () => {
+    const list = buildMonthList('2025-06-15', {
+      min: null,
+      max: null,
+      value: '2024-03-10',
+      today: '2026-06-15',
+      locale: 'en-US',
+    });
+    expect(list.months.some((m) => m.selected)).toBe(false);
+    expect(list.months.some((m) => m.current)).toBe(false);
+  });
+
+  it('disables a month ONLY when its entire span is outside [min, max]', () => {
+    const list = buildMonthList('2025-06-15', {
+      min: '2025-03-01',
+      max: '2025-03-31',
+      value: '',
+      today: '',
+      locale: 'en-US',
+    });
+    expect(list.months[0].disabled).toBe(true); // Jan — entirely below min
+    expect(list.months[1].disabled).toBe(true); // Feb — entirely below min
+    expect(list.months[2].disabled).toBe(false); // Mar — fully bracketed
+    expect(list.months[3].disabled).toBe(true); // Apr — entirely above max
+    expect(list.months[11].disabled).toBe(true); // Dec — entirely above max
+  });
+
+  it('keeps a partially-overlapping month enabled', () => {
+    const list = buildMonthList('2025-06-15', {
+      min: '2025-03-15',
+      max: null,
+      value: '',
+      today: '',
+      locale: 'en-US',
+    });
+    expect(list.months[1].disabled).toBe(true); // Feb ends before min
+    expect(list.months[2].disabled).toBe(false); // Mar straddles min → enabled
   });
 });
 
