@@ -99,6 +99,40 @@ export interface MonthGrid {
   weeks: CalendarDay[][];
 }
 
+export interface MonthCell {
+  /** First-of-month ISO `YYYY-MM-01` for this cell. */
+  iso: string;
+  /** Localized short month name (e.g. `'Jan'`). */
+  label: string;
+  /** `true` when this month === the selected `value`'s month/year. */
+  selected: boolean;
+  /** `true` when this month === `today`'s month/year. */
+  current: boolean;
+  /** `true` when the month's entire span falls outside `[min, max]`. */
+  disabled: boolean;
+}
+
+export interface MonthList {
+  /** The anchor year the 12 cells belong to. */
+  year: number;
+  /** Twelve month cells, January (index 0) → December (index 11). */
+  months: MonthCell[];
+}
+
+/** Bounds + flags input for the month/year drill models. */
+export interface DrillInput {
+  /** Inclusive lower bound (ISO) or `null`. */
+  min?: string | null;
+  /** Inclusive upper bound (ISO) or `null`. */
+  max?: string | null;
+  /** The selected ISO date, or `''` when nothing is selected. */
+  value: string;
+  /** Today's ISO date (injected so the model stays deterministic/testable). */
+  today: string;
+  /** BCP-47 locale for localized labels; defaults to `en-US`. */
+  locale?: string;
+}
+
 /** Pad a 1-or-2-digit number to a 2-char string. */
 function pad2(n: number): string {
   return n < 10 ? '0' + n : String(n);
@@ -320,6 +354,52 @@ export function monthLabel(viewIso: string, locale: string): string {
   } catch {
     return MONTH_NAMES_FALLBACK[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
   }
+}
+
+/**
+ * Build the 12-cell month-picker model for the drill "months" view. Pure and
+ * UTC-safe — a fresh `MonthList` each call, no DOM, no framework. A month cell is
+ * `disabled` ONLY when its entire span (`toIso(y,m,1)` … `toIso(y,m+1,0)`) falls
+ * outside `[min, max]`; a partial overlap keeps it selectable.
+ */
+export function buildMonthList(viewIso: string, input: DrillInput): MonthList {
+  const anchor = isoToUtc(viewIso);
+  const year = (anchor == null ? new Date() : new Date(anchor)).getUTCFullYear();
+
+  const minT = isoToUtc(input.min);
+  const maxT = isoToUtc(input.max);
+
+  const valueT = isoToUtc(isIsoDate(input.value) ? input.value : '');
+  const todayT = isoToUtc(isIsoDate(input.today) ? input.today : '');
+  const valueDate = valueT == null ? null : new Date(valueT);
+  const todayDate = todayT == null ? null : new Date(todayT);
+
+  let fmt: Intl.DateTimeFormat | null = null;
+  try {
+    fmt = new Intl.DateTimeFormat(input.locale || 'en-US', { month: 'short', timeZone: 'UTC' });
+  } catch {
+    fmt = null;
+  }
+
+  const months: MonthCell[] = [];
+  for (let m = 0; m < 12; m++) {
+    const iso = toIso(year, m, 1);
+    const first = isoToUtc(iso) as number;
+    const last = isoToUtc(toIso(year, m + 1, 0)) as number;
+    let disabled = false;
+    if (minT != null && last < minT) disabled = true;
+    if (maxT != null && first > maxT) disabled = true;
+    months.push({
+      iso,
+      label: fmt ? fmt.format(new Date(first)) : MONTH_NAMES_FALLBACK[m].slice(0, 3),
+      selected:
+        valueDate != null && valueDate.getUTCFullYear() === year && valueDate.getUTCMonth() === m,
+      current:
+        todayDate != null && todayDate.getUTCFullYear() === year && todayDate.getUTCMonth() === m,
+      disabled,
+    });
+  }
+  return { year, months };
 }
 
 /**
