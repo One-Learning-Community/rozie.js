@@ -524,6 +524,48 @@ const focusDayIso = (iso) => {
   }
 }
 
+// ---- drill focus choreography (months / years panels) ------------------
+// Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
+// $refs.root is read only here / in handlers (post-mount → ROZ123-safe) and the
+// querySelectorAll pierces Lit's shadow root exactly as the day walk does.
+const monthCells = () => {
+  const root = $refs.root
+  if (!root) return []
+  return Array.from(root.querySelectorAll('[data-month]')) as HTMLElement[]
+}
+const focusMonthIso = (iso) => {
+  const cells = monthCells()
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].getAttribute('data-month') === iso) {
+      cells[i].focus()
+      return
+    }
+  }
+}
+const yearCells = () => {
+  const root = $refs.root
+  if (!root) return []
+  return Array.from(root.querySelectorAll('[data-year]')) as HTMLElement[]
+}
+const focusYearIso = (iso) => {
+  const cells = yearCells()
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].getAttribute('data-year') === iso) {
+      cells[i].focus()
+      return
+    }
+  }
+}
+
+// Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
+// PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
+// reachable, avoiding TS2869. The selected cell (or the current month/year when
+// nothing is selected) is the single tab stop.
+const monthTabIndex = (cell): number | undefined =>
+  cell.selected || (selected() === '' && cell.current) ? 0 : -1
+const yearTabIndex = (cell): number | undefined =>
+  cell.selected || (selected() === '' && cell.current) ? 0 : -1
+
 // Move the roving focus by `days`, crossing into an adjacent month when the
 // target leaves the displayed grid. Skips nothing — disabled days are still
 // focusable (standard grid pattern) but not selectable.
@@ -583,6 +625,64 @@ const onDayKeydown = (iso, e) => {
       }
     }
   }
+}
+
+// ---- drill keyboard (months / years 12-cell grid) ----------------------
+// A 3-column × 4-row grid: arrows move within the 12 cells (clamped at the
+// edges), Home/End jump to the row bounds, Enter/Space pick, Escape returns to
+// days. Params LEFT UNTYPED so `e.key` neutralizes to `any` and typechecks ×6.
+const DRILL_COLS = 3
+const onMonthKeydown = (iso, e) => {
+  if ($props.disabled) return
+  const key = e ? e.key : ''
+  const cells = monthList().months
+  let idx = -1
+  for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i
+  if (idx < 0) return
+  let next = idx
+  if (key === 'ArrowLeft') next = Math.max(0, idx - 1)
+  else if (key === 'ArrowRight') next = Math.min(11, idx + 1)
+  else if (key === 'ArrowUp') next = Math.max(0, idx - DRILL_COLS)
+  else if (key === 'ArrowDown') next = Math.min(11, idx + DRILL_COLS)
+  else if (key === 'Home') next = idx - (idx % DRILL_COLS)
+  else if (key === 'End') next = idx - (idx % DRILL_COLS) + (DRILL_COLS - 1)
+  else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    e.preventDefault()
+    selectMonth(iso)
+    return
+  } else if (key === 'Escape') {
+    e.preventDefault()
+    $data.viewMode = 'days'
+    return
+  } else return
+  e.preventDefault()
+  focusMonthIso(cells[next].iso)
+}
+const onYearKeydown = (iso, e) => {
+  if ($props.disabled) return
+  const key = e ? e.key : ''
+  const cells = yearGrid().years
+  let idx = -1
+  for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i
+  if (idx < 0) return
+  let next = idx
+  if (key === 'ArrowLeft') next = Math.max(0, idx - 1)
+  else if (key === 'ArrowRight') next = Math.min(11, idx + 1)
+  else if (key === 'ArrowUp') next = Math.max(0, idx - DRILL_COLS)
+  else if (key === 'ArrowDown') next = Math.min(11, idx + DRILL_COLS)
+  else if (key === 'Home') next = idx - (idx % DRILL_COLS)
+  else if (key === 'End') next = idx - (idx % DRILL_COLS) + (DRILL_COLS - 1)
+  else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    e.preventDefault()
+    selectYear(iso)
+    return
+  } else if (key === 'Escape') {
+    e.preventDefault()
+    $data.viewMode = 'days'
+    return
+  } else return
+  e.preventDefault()
+  focusYearIso(cells[next].iso)
 }
 
 // Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
@@ -673,6 +773,24 @@ const goToToday = () => {
   if ($props.disabled) return
   $data.viewIso = todayIso()
 }
+
+// ---- footer moves (Today / Clear row) ----------------------------------
+// selectToday() — the footer "Today" action. In single mode commit today
+// through the value funnel (write + emit change, gated exactly like a day
+// click); in range mode just swing the view to the current month (goToToday),
+// never mutating the value. Clear reuses the existing clear() funnel unchanged.
+const selectToday = () => {
+  if ($props.disabled) return
+  if ($props.selectionMode === 'range') {
+    goToToday()
+  } else {
+    commitValue(todayIso())
+  }
+}
+
+// Named boolean guard for the footer r-if (never a bare truthiness in the r-if
+// so the JSX targets emit a real boolean and leak no falsy value).
+const showsFooter = (): boolean => !!$props.showFooter
 
 // clear() — deselect, writing the mode-appropriate empty ('' single /
 // { start:'', end:'' } range) + emit change.
