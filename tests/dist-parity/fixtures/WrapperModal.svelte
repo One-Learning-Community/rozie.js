@@ -10,6 +10,7 @@ interface Props {
   children?: Snippet;
   actions?: Snippet;
   snippets?: Record<string, any>;
+  onopenchange?: (...args: unknown[]) => void;
   [key: string]: unknown;
 }
 
@@ -20,6 +21,7 @@ let {
   children: __childrenProp,
   actions: __actionsProp,
   snippets,
+  onopenchange,
   ...__rozieAttrs
 }: Props = $props();
 
@@ -28,4 +30,4 @@ const children = $derived(__childrenProp ?? snippets?.children);
 const actions = $derived(__actionsProp ?? snippets?.actions);
 </script>
 
-<Modal bind:open={open} title={title} data-rozie-s-1efe6192>{#snippet header()}{#if brand}{@render brand()}{:else}<h2 data-rozie-s-1efe6192>{title}</h2>{/if}{/snippet}{#snippet footer()}{@render actions?.()}{/snippet}{@render children?.()}</Modal>
+<Modal bind:open={() => open, (__rozieNext) => { open = __rozieNext; onopenchange?.(__rozieNext); }} title={title} data-rozie-s-1efe6192>{#snippet header()}{#if brand}{@render brand()}{:else}<h2 data-rozie-s-1efe6192>{title}</h2>{/if}{/snippet}{#snippet footer()}{@render actions?.()}{/snippet}{@render children?.()}</Modal>

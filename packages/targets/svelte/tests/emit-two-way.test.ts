@@ -104,10 +104,18 @@ describe('Svelte target — consumer-side two-way binding emit (Phase 07.3-04)',
     expect(template).toContain('bind:value={count}');
   });
 
-  it('emits bind:selected={$props.active} when the RHS is a model-prop on the consumer', () => {
+  it('re-exposed model prop → get/set bind firing on<key>change (Svelte model-change parity)', () => {
     // D-03 permissive LHS rule: consumer may pass $props.x through to a child
-    // when its own <props> declares model: true. The Svelte template-side
-    // rewrite drops the $props. prefix → `bind:selected={active}`.
+    // when its own <props> declares model: true — the "re-exposed model" shape
+    // (KanbanColumn `cards`, WrapperModal `open`). Svelte's plain `bind:` alone
+    // propagates the child's writeback to the `$bindable` prop but fires NO
+    // `<key>-change` EVENT, so a parent consuming the model ONE-WAY (`:selected`
+    // + `@selected-change`, the deep-chain-lvalue fallback forced by ROZ951)
+    // would silently never receive the writeback (React/Vue DO deliver it via
+    // onValueChange / defineModel). The Svelte emitter therefore emits the
+    // Svelte 5.9 get/set function-binding form so the setter ALSO fires
+    // `on<key>change` — restoring cross-target parity. The `onactivechange`
+    // prop is declared + destructured by emitScript.
     const src = `<rozie name="Consumer">
 
 <components>
@@ -131,7 +139,44 @@ describe('Svelte target — consumer-side two-way binding emit (Phase 07.3-04)',
     const ir = lowerInline(src);
     const { template, diagnostics } = emitTemplate(ir, REGISTRY);
     expect(diagnostics).toEqual([]);
-    expect(template).toContain('bind:selected={active}');
+    // Get/set function-binding form: getter returns the local model, setter
+    // writes it back AND fires the synthesized change callback.
+    expect(template).toContain(
+      'bind:selected={() => active, (__rozieNext) => { active = __rozieNext; onactivechange?.(__rozieNext); }}',
+    );
+    // Must NOT degrade to the plain one-way/two-way form that drops the event.
+    expect(template).not.toContain('bind:selected={active}>');
+  });
+
+  it('data-field two-way binding stays a plain bind: (no spurious change event)', () => {
+    // Regression guard for the fix above: a `$data.*` lvalue (NOT a model prop)
+    // must keep the plain `bind:` form — the get/set change-event wiring is
+    // scoped to re-exposed MODEL props only.
+    const src = `<rozie name="Consumer">
+
+<components>
+{
+  Tab: './Tab.rozie',
+}
+</components>
+
+<data>
+{
+  chosen: false
+}
+</data>
+
+<template>
+<Tab r-model:selected="$data.chosen" />
+</template>
+
+</rozie>
+`;
+    const ir = lowerInline(src);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('bind:selected={chosen}');
+    expect(template).not.toContain('__rozieNext');
   });
 
   it('does NOT change bare r-model="$data.x" on form input (TWO-WAY-02 regression guard)', () => {

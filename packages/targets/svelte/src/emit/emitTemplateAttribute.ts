@@ -30,6 +30,7 @@ import type {
   ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -761,6 +762,22 @@ export function emitSingleAttr(
     // prefix stripping (e.g., `$data.x` → `x`, model `$props.active` →
     // `active`).
     const expr = rewriteTemplateExpression(attr.expression, ir);
+    // Re-exposed model write: when the bound lvalue is one of THIS component's
+    // own `model: true` props (`<Child r-model:x="$props.<model>"/>`), a plain
+    // `bind:` propagates the child's writeback to our `$bindable` prop but fires
+    // NO `<key>-change` EVENT. A parent consuming us ONE-WAY (`:model` +
+    // `@model-change`, the deep-chain-lvalue fallback forced by ROZ951 —
+    // KanbanColumn/WrapperModal) would then never receive the writeback (the
+    // handler falls dead into `...__rozieAttrs`). Emit Svelte 5.9 get/set
+    // function-binding form so the setter ALSO fires `on<key>change`, matching
+    // React (`onValueChange`) / Vue (`defineModel`). Fires only on genuine child
+    // writes → no mount emit, no parent-driven echo. The `on<key>change` prop is
+    // declared + destructured by emitScript (collectChildBoundModelNames).
+    const localModel = ir.props.find((p) => p.isModel && p.name === expr);
+    if (localModel) {
+      const onName = svelteCallbackPropName(`${localModel.name}-change`);
+      return `bind:${attr.name}={() => ${expr}, (__rozieNext) => { ${expr} = __rozieNext; ${onName}?.(__rozieNext); }}`;
+    }
     return `bind:${attr.name}={${expr}}`;
   }
 

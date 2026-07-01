@@ -150,6 +150,86 @@ function templateUsesSpreadBinding(node: any): boolean {
 }
 
 /**
+ * Extract the local `model: true` prop name a `twoWayBinding` writes, iff the
+ * bound lvalue is a bare `$props.<name>` member expression. Returns the
+ * property name (`$props.cards` → `'cards'`); returns `null` for `$data.*`
+ * bindings or any other lvalue shape (those never re-expose a model prop).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function modelPropNameFromTwoWayExpr(expr: any): string | null {
+  if (
+    t.isMemberExpression(expr) &&
+    !expr.computed &&
+    t.isIdentifier(expr.object) &&
+    expr.object.name === '$props' &&
+    t.isIdentifier(expr.property)
+  ) {
+    return expr.property.name;
+  }
+  return null;
+}
+
+/**
+ * Collect the names of this component's `model: true` props that are the WRITE
+ * TARGET of a child two-way binding (`<Child r-model:x="$props.<model>"/>`) —
+ * the "re-exposed model" shape (KanbanColumn `cards`, WrapperModal `open`).
+ *
+ * These are the ONLY model props that need a synthesized `on<key>change`
+ * callback prop: Svelte's plain `bind:` propagates the child's writeback to the
+ * component's `$bindable` prop but fires NO change EVENT, so a parent consuming
+ * the model ONE-WAY (`:x` + `@x-change`, the deep-chain-lvalue fallback forced
+ * by ROZ951) would never receive the writeback. `emitSingleAttr` emits the
+ * Svelte 5.9 get/set function-binding form for these bindings so the setter
+ * ALSO fires `on<key>change`, matching React (`onValueChange`) / Vue
+ * (`defineModel`). Scoped to child-bound models so non-re-exposed model
+ * components (e.g. SortableList's `items`, written in script + consumed via
+ * `bind:`) stay byte-identical.
+ */
+function collectChildBoundModelNames(ir: IRComponent): Set<string> {
+  const modelNames = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
+  const out = new Set<string>();
+  if (modelNames.size === 0) return out;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (node: any): void => {
+    if (node === null || node === undefined) return;
+    if (node.type === 'TemplateElement') {
+      for (const a of node.attributes ?? []) {
+        if (a.kind === 'twoWayBinding' && a.expression) {
+          const name = modelPropNameFromTwoWayExpr(a.expression);
+          if (name !== null && modelNames.has(name)) out.add(name);
+        }
+      }
+      for (const c of node.children ?? []) walk(c);
+      for (const sf of node.slotFillers ?? []) {
+        for (const c of sf.children ?? sf.body ?? []) walk(c);
+      }
+      return;
+    }
+    if (node.type === 'TemplateConditional' || node.type === 'TemplateMatch') {
+      for (const branch of node.branches ?? []) {
+        for (const c of branch.body ?? []) walk(c);
+      }
+      if (node.hostElement) walk(node.hostElement);
+      return;
+    }
+    if (node.type === 'TemplateLoop') {
+      for (const c of node.body ?? []) walk(c);
+      return;
+    }
+    if (node.type === 'TemplateFragment') {
+      for (const c of node.children ?? []) walk(c);
+      return;
+    }
+    if (node.type === 'TemplateSlotInvocation') {
+      for (const c of node.fallback ?? []) walk(c);
+      return;
+    }
+  };
+  walk(ir.template);
+  return out;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Building the arrow as a Babel node (rather than string-templating
@@ -438,6 +518,16 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
     lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
   }
 
+  // Synthesized `on<key>change` callback for each re-exposed model prop (a
+  // model written by a child `bind:` — KanbanColumn `cards`, WrapperModal
+  // `open`). Svelte models carry no change EVENT on their own; this restores
+  // React/Vue parity for parents consuming the model ONE-WAY (`:x` + `@x-change`).
+  // The write is fired from the get/set binding emitted by `emitSingleAttr`.
+  for (const name of collectChildBoundModelNames(ir)) {
+    const onName = svelteCallbackPropName(`${name}-change`);
+    lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
+  }
+
   // Plan 14-05 — when `inheritAttrs !== false`, declare an index signature so
   // the synthesised `...__rozieAttrs` rest destructure types as
   // `Record<string, unknown>`. The signature is permissive (`unknown` not
@@ -550,6 +640,14 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
   // Phase 07.7 fix — shared svelteCallbackPropName helper strips hyphens.
   for (const e of ir.emits) {
     entries.push(svelteCallbackPropName(e));
+  }
+
+  // Re-exposed model props → destructure the synthesized `on<key>change`
+  // callback out of `...__rozieAttrs` so the get/set binding's setter (emitted
+  // by emitSingleAttr) can invoke it. Without this the handler would fall into
+  // the rest bucket and be attached as a dead native `addEventListener`.
+  for (const name of collectChildBoundModelNames(ir)) {
+    entries.push(svelteCallbackPropName(`${name}-change`));
   }
 
   // Plan 14-05 — cross-framework attribute fallthrough rest binding. When
