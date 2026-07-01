@@ -80,7 +80,14 @@ async function bootstrap(): Promise<void> {
     }
     const opt = document.createElement('option');
     opt.value = snippet.key;
-    opt.textContent = slash > -1 ? snippet.key.slice(slash + 1) : snippet.key;
+    const baseLabel = slash > -1 ? snippet.key.slice(slash + 1) : snippet.key;
+    // D-2: mark unsupported families in the picker with a curated suffix. The
+    // option stays SELECTABLE (never disabled) so a user can pick it to read
+    // the reason + inspect its emitted code in the Output pane.
+    opt.textContent = snippet.unsupported
+      ? `${baseLabel} — unsupported`
+      : baseLabel;
+    if (snippet.unsupported) opt.title = snippet.unsupported.reason;
     if (snippet.key === DEFAULT_SNIPPET_KEY) opt.selected = true;
     group.appendChild(opt);
   }
@@ -200,9 +207,6 @@ async function bootstrap(): Promise<void> {
     // Output pane uses entry-only compileBundle (the displayed code is what
     // the user wrote, not the auto-compiled sibling code).
     const outputOutcome = compileBundle(bundle, target);
-    // Preview uses compileBundleRuntime so siblings are available for the
-    // harness's per-sibling blob-URL pass.
-    const previewOutcome = compileBundleRuntime(bundle, target);
 
     const nextLang = OUTPUT_LANGUAGE[target];
     const rightModel = rightEditor.getModel();
@@ -211,6 +215,20 @@ async function bootstrap(): Promise<void> {
     }
 
     rightEditor.setValue(outputOutcome.ok ? outputOutcome.code : outputOutcome.errorText);
+
+    // D-2: unsupported families still show their real emitted code above, but
+    // the preview short-circuits to the curated reason instead of attempting an
+    // iframe render that would surface a raw ROZ945 / blank cell.
+    if (currentSnippet.unsupported) {
+      previewManager.clear(
+        'Not yet supported in playground: ' + currentSnippet.unsupported.reason,
+      );
+      return;
+    }
+
+    // Preview uses compileBundleRuntime so siblings are available for the
+    // harness's per-sibling blob-URL pass.
+    const previewOutcome = compileBundleRuntime(bundle, target);
 
     if (previewOutcome.ok) {
       previewManager.clearError(target);
@@ -231,15 +249,26 @@ async function bootstrap(): Promise<void> {
     // currently-selected target; preview iframes get the full runtime bundle
     // (entry + siblings) per-target.
     const outputOutcomes = compileBundleAll(bundle);
+
+    const activeTarget = targetSelect!.value as CompileTarget;
+    const activeOutput = outputOutcomes[activeTarget];
+    rightEditor.setValue(activeOutput.ok ? activeOutput.code : activeOutput.errorText);
+
+    // D-2: unsupported families keep their real per-target Output above, but the
+    // whole grid short-circuits to the curated reason rather than filling six
+    // cells with raw ROZ945 dumps.
+    if (currentSnippet.unsupported) {
+      previewManager.clear(
+        'Not yet supported in playground: ' + currentSnippet.unsupported.reason,
+      );
+      return;
+    }
+
     const previewOutcomes = compileBundleAllRuntime(bundle);
     const renderPayloads = new Map<
       CompileTarget,
       { code: string; css: string; siblings: Record<string, string> }
     >();
-
-    const activeTarget = targetSelect!.value as CompileTarget;
-    const activeOutput = outputOutcomes[activeTarget];
-    rightEditor.setValue(activeOutput.ok ? activeOutput.code : activeOutput.errorText);
 
     for (const target of ALL_TARGETS) {
       const outcome = previewOutcomes[target];

@@ -63,6 +63,16 @@ export interface Snippet {
    * a `<components>` block.
    */
   files: Record<string, string>;
+  /**
+   * D-2 "unsupported-with-reason". When set, the family compiles cleanly (the
+   * Output pane still shows its emitted code) but cannot yet LIVE-RENDER in the
+   * iframe because of a harness gap (unwired engine lib, `.rzts`/`./internal`
+   * partial not yet in the VFS, portal/CSS/Solid limit). The picker appends an
+   * "unsupported" marker and the preview short-circuits to `reason` INSTEAD of a
+   * raw ROZ945 / blank-cell failure. Driven by the `UNSUPPORTED` registry below;
+   * later plans remove entries as each gap is closed.
+   */
+  unsupported?: { reason: string };
 }
 
 function basename(path: string): string {
@@ -312,12 +322,72 @@ const matchSnippets: Snippet[] = (() => {
   return [singleFileSnippet(MATCH_SNIPPET_PATH, source, 'match')];
 })();
 
+// ---------------------------------------------------------------------------
+// D-2 — "unsupported-with-reason" registry (the phase-68 escape hatch).
+//
+// Maps either an EXACT snippet key OR a family token (matched as a substring of
+// the snippet key) to a human-readable reason a family cannot yet live-render.
+// The bar per D-2: NO silent ROZ945 / blank grid cell — a family that can't
+// render must show a curated reason in the picker + preview. Compilation still
+// runs (Output pane shows the real emitted code); only the iframe render is
+// short-circuited to the reason string (see main.ts).
+//
+// This is the reusable seam every later 68-plan consumes: as a plan lands
+// coverage for a family it DELETES that family's entry here. Exact-key entries
+// (used for the wired internal-helper bundles below, added in 68-01 Task 3)
+// take precedence over family-token substring entries.
+// ---------------------------------------------------------------------------
+const UNSUPPORTED: Record<string, string> = {
+  // Not-yet-wired families whose demos consume @rozie-ui/headless-core `.rzts`
+  // partials — the snippet VFS can't glob `.rzts` yet (pending 68-02).
+  Combobox:
+    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+  Listbox:
+    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+  CommandPalette:
+    'compiles, but its demo imports @rozie-ui/headless-core .rzts partials not yet in the playground VFS — pending .rzts VFS wiring (68-02)',
+  // Not-yet-wired engine-backed families — their vanilla-JS engine lib is not
+  // in the six harness importmaps yet (pending 68-04).
+  DataTable:
+    'engine-backed (TanStack table-core) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  Carousel:
+    'engine-backed (embla-carousel) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  CodeMirror:
+    'engine-backed (CodeMirror 6) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  Cropper:
+    'engine-backed (Cropper.js) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  PdfViewer:
+    'engine-backed (pdfjs-dist) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  Captcha:
+    'engine-backed (provider script) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+};
+
+/**
+ * Resolve the unsupported reason for a snippet key. Exact-key match wins; then
+ * a family-token substring match. Returns undefined for fully-supported
+ * families (which render normally).
+ */
+function unsupportedReason(key: string): string | undefined {
+  const exact = UNSUPPORTED[key];
+  if (exact !== undefined) return exact;
+  for (const [token, reason] of Object.entries(UNSUPPORTED)) {
+    if (key.includes(token)) return reason;
+  }
+  return undefined;
+}
+
+/** Stamp `unsupported` onto any snippet the UNSUPPORTED registry marks. */
+function markUnsupported(snippet: Snippet): Snippet {
+  const reason = unsupportedReason(snippet.key);
+  return reason ? { ...snippet, unsupported: { reason } } : snippet;
+}
+
 export const SNIPPETS: Snippet[] = [
   ...bundles,
   ...singleFileEntries(exampleFiles, ''),
   ...singleFileEntries(demoFiles, 'demos'),
   ...matchSnippets,
-];
+].map(markUnsupported);
 
 export const DEFAULT_SNIPPET_KEY = 'bundle/SortableListDemo';
 
