@@ -18,7 +18,7 @@
 
     <div v-for="(week, wk) in grid().weeks" :key="wk" class="rozie-datepicker-week" role="row">
       <span v-for="day in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
-        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="dayTabIndex(day)" :disabled="!!day.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
+        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="(dayTabIndex(day)) ?? undefined" :disabled="!!day.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
       </span>
     </div>
   </div>

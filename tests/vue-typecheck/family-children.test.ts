@@ -89,7 +89,13 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/data-table/packages/vue',
     baseline: {
       'DataTable.vue': {
-        TS2322: 6,
+        // Phase 67 (SC-2) cleared the 6 Class-A TS2322 attr-nullability errors —
+        // the Vue emitter now wraps nullable-SHAPED `:attr` bindings (`:tabindex`,
+        // `:aria-invalid`, `:colspan`, …) as `(expr) ?? undefined`. The residual 24
+        // below are inherent Class-B body-passthrough (script-body call-site param
+        // narrowing + implicit-any indexing) that are NOT emitter-fixable without
+        // injecting `as any`/annotations into the user `<script>` body — the same
+        // Phase-65 SC-3 finding. They stay baselined as a KNOWN LIMITATION.
         TS2345: 9,
         TS7006: 2,
         TS7022: 1,
@@ -103,10 +109,32 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/listbox/packages/vue',
     baseline: {
       'Listbox.vue': {
-        TS2322: 4,
-        // TS2339 ×8 (Class-3 windowing `never` narrowing) CLEARED by Phase 65 Plan 04
-        // (the headless-core/windowing.rzts pinMeasurement typed-wrapper retype dissolves
-        // into the Vue SFC too, giving the pin-hook read a real object-or-null shape).
+        // Phase 67 (SC-2) cleared the `:aria-activedescendant="activeDescendant"`
+        // TS2322 (4 → 3): a `string|null` bound to the `string|undefined` slot, now
+        // emitted as `(activeDescendant) ?? undefined` by the shape heuristic.
+        //
+        // The residual 3 are all `:aria-label="props.ariaLabel"` (`string|null` →
+        // `string|undefined` slot) at L7/L15/L24. These are NOT shape-fixable, and
+        // this is the empirical revision of 67-RESEARCH's optimistic "listbox → 0":
+        // `aria-label` is overwhelmingly bound to provably-NON-null expressions across
+        // the family set — `props.columnId` (string), string-literal concats
+        // (`'Pin ' + …`), non-null ternaries (`rowIsExpanded(row) ? 'Collapse' :
+        // 'Expand'`, INCLUDING 4 in the gated DataTable.vue), and loop-var identifiers
+        // (`gk`, `day.iso`). The Vue emitter does NO type inference and decides by
+        // SHAPE, so it cannot distinguish nullable `props.ariaLabel` from non-null
+        // `props.columnId` — both are `props.<id>` members. Adding `aria-label` to
+        // NULLABLE_DOM_ATTR_SLOTS would wrap the non-null cases as `(expr) ?? undefined`
+        // and produce a TS2869 "unreachable right operand" storm — REGRESSING the gate
+        // (DataTable.vue would gain 4 new TS2869). React avoids this by routing
+        // nullable aria-label through its `rozieAttr` RUNTIME drop (no type-level
+        // `?? undefined`); Vue has no such path. Clearing these 3 therefore needs a
+        // Vue `rozieAttr`-equivalent runtime capability — an architectural addition
+        // OUT OF SCOPE for Phase 67 (which is a shape-heuristic emitter phase, no
+        // `as any`/annotations — the Phase-65 SC-3 discipline). Baselined as an
+        // inherent residual, exactly like Phase 65's "no leaf fully clean" finding.
+        // (The earlier TS2339 ×8 Class-3 windowing `never` narrowing was already
+        // cleared by Phase 65 Plan 04.)
+        TS2322: 3,
       },
     },
   },

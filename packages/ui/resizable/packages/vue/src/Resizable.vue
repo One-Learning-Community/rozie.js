@@ -7,7 +7,7 @@
   </div>
 
   
-  <div class="rozie-resizable-handle" role="separator" tabindex="0" :aria-orientation="isVertical() ? 'horizontal' : 'vertical'" :aria-valuenow="size" :aria-valuemin="props.min" :aria-valuemax="props.max" :aria-disabled="!!props.disabled" @pointerdown="onPointerDown($event)" @pointermove="onPointerMove($event)" @pointerup="onPointerUp($event)" @keydown="onKeydown($event)">
+  <div class="rozie-resizable-handle" role="separator" tabindex="0" :aria-orientation="isVertical() ? 'horizontal' : 'vertical'" :aria-valuenow="size" :aria-valuemin="(props.min) ?? undefined" :aria-valuemax="(props.max) ?? undefined" :aria-disabled="!!props.disabled" @pointerdown="onPointerDown($event)" @pointermove="onPointerMove($event)" @pointerup="onPointerUp($event)" @keydown="onKeydown($event)">
     <slot name="handle">
       <span class="rozie-resizable-grip" aria-hidden="true"></span>
     </slot>

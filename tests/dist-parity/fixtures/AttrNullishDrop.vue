@@ -1,7 +1,7 @@
 <template>
 
 <div class="attr-nullish-drop" v-bind="$attrs">
-  <span :data-x="cond ? 'v' : undefined" :aria-expanded="cond ? 'true' : 'false'" :title="maybeNull">probe</span>
+  <span :data-x="cond ? 'v' : undefined" :aria-expanded="(cond ? 'true' : 'false') ?? undefined" :title="maybeNull">probe</span>
 </div>
 
 </template>

@@ -4,7 +4,7 @@
 
   
   <div class="rozie-listbox-control" ref="controlElRef">
-    <button ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="open$local" :aria-controls="props.id + '-list'" :aria-activedescendant="activeDescendant" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
+    <button ref="triggerElRef" type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="(open$local) ?? undefined" :aria-controls="props.id + '-list'" :aria-activedescendant="(activeDescendant) ?? undefined" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
       <slot name="selected" :selected="selectedLabel" :value="value">
         <span v-if="selectedLabel" class="rozie-listbox-selected">{{ selectedLabel }}</span><span v-else class="rozie-listbox-placeholder">{{ props.placeholder }}</span></slot>
       <span class="rozie-listbox-arrow" aria-hidden="true">▾</span>

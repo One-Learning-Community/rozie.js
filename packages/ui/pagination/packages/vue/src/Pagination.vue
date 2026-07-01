@@ -3,7 +3,7 @@
 <nav :class="['rozie-pagination', { 'rozie-pagination--disabled': props.disabled }]" ref="navRef" :aria-label="props.ariaLabel" v-bind="$attrs" @keydown="onControlKeydown($event)">
   
   <slot name="prevControl" :disabled="!canPrev() || props.disabled" :goto="goPrev" :page="currentPage() - 1">
-    <button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" :tabindex="tabIndexFor(true)" :disabled="!canPrev() || props.disabled" :aria-disabled="!!(!canPrev() || props.disabled)" aria-label="Previous page" @click="goPrev">‹</button>
+    <button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" :tabindex="(tabIndexFor(true)) ?? undefined" :disabled="!canPrev() || props.disabled" :aria-disabled="!!(!canPrev() || props.disabled)" aria-label="Previous page" @click="goPrev">‹</button>
   </slot>
 
   
@@ -12,13 +12,13 @@
       <slot name="ellipsis" :index="index">…</slot>
     </span><span v-if="item !== 'ellipsis'" class="rozie-pagination-item">
       <slot name="item" :page="item" :selected="isActive(item)" :goto="() => goToPage(item)">
-        <button type="button" :class="['rozie-pagination-page', { 'is-active': isActive(item) }]" data-page-control="" :tabindex="tabIndexFor(isActive(item))" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-current="isActive(item) ? 'page' : undefined" :aria-label="'Go to page ' + item" @click="goToPage(item)">{{ item }}</button>
+        <button type="button" :class="['rozie-pagination-page', { 'is-active': isActive(item) }]" data-page-control="" :tabindex="(tabIndexFor(isActive(item))) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-current="isActive(item) ? 'page' : undefined" :aria-label="'Go to page ' + item" @click="goToPage(item)">{{ item }}</button>
       </slot>
     </span></template>
 
   
   <slot name="nextControl" :disabled="!canNext() || props.disabled" :goto="goNext" :page="currentPage() + 1">
-    <button type="button" class="rozie-pagination-control rozie-pagination-next" data-page-control="" :tabindex="tabIndexFor(true)" :disabled="!canNext() || props.disabled" :aria-disabled="!!(!canNext() || props.disabled)" aria-label="Next page" @click="goNext">›</button>
+    <button type="button" class="rozie-pagination-control rozie-pagination-next" data-page-control="" :tabindex="(tabIndexFor(true)) ?? undefined" :disabled="!canNext() || props.disabled" :aria-disabled="!!(!canNext() || props.disabled)" aria-label="Next page" @click="goNext">›</button>
   </slot>
 </nav>
 

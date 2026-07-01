@@ -3,7 +3,7 @@
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
   <div :class="['rozie-sortable-list', props.listClass]" ref="listElRef" part="list">
     <slot name="header"></slot>
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }]" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="keyboardEnabled() ? 0 : undefined" @keydown="onRowKeyDown($event, index)">
+    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }]" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="(keyboardEnabled() ? 0 : undefined) ?? undefined" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>
     <slot name="footer"></slot>

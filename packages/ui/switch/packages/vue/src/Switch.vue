@@ -1,6 +1,6 @@
 <template>
 
-<button ref="controlRef" type="button" :class="['rozie-switch', { 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': props.disabled }]" role="switch" :tabindex="controlTabindex()" :disabled="!!props.disabled" :aria-checked="!!modelValue" :aria-disabled="!!props.disabled" :aria-readonly="!!props.readonly" :aria-label="props.ariaLabel" v-bind="$attrs" @click="onClick()" @keydown="onKeydown($event)">
+<button ref="controlRef" type="button" :class="['rozie-switch', { 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': props.disabled }]" role="switch" :tabindex="(controlTabindex()) ?? undefined" :disabled="!!props.disabled" :aria-checked="!!modelValue" :aria-disabled="!!props.disabled" :aria-readonly="!!props.readonly" :aria-label="props.ariaLabel" v-bind="$attrs" @click="onClick()" @keydown="onKeydown($event)">
   <slot :checked="isChecked()" :toggle="toggle">
     <span class="rozie-switch-track">
       <span class="rozie-switch-thumb"></span>
