@@ -47,7 +47,7 @@ import { runWitness, type Target } from './composed-ref.harness.js';
  * fixed target moves to the unconditionally-GREEN block below and drops its
  * `it.fails` gating. vue/svelte (P3) and lit (P4) remain RED here.
  */
-const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'lit'];
+const BROKEN_TARGETS: Target[] = ['svelte', 'lit'];
 
 /**
  * Targets FIXED by P2 (the Handle-INTERFACE route): a composed-component ref
@@ -56,6 +56,16 @@ const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'lit'];
  * GREEN `it` (no `.fails`).
  */
 const FIXED_HANDLE_TARGETS: Target[] = ['react', 'solid'];
+
+/**
+ * Targets FIXED by P3 (the component-INSTANCE route, D-2): a composed-component
+ * ref types as the child component INSTANCE — Vue `ref<InstanceType<typeof
+ * Child>>()`, Svelte-5 `bind:this` component instance — whose surface carries the
+ * exposed members. NO `<Name>Handle` import, NO `codegen.mjs` change.
+ * `$refs.child.ping()` typechecks, so the "ping does not exist on HTMLElement"
+ * count is 0. Plain GREEN `it` (no `.fails`).
+ */
+const FIXED_INSTANCE_TARGETS: Target[] = ['vue'];
 
 describe('composed-component ref → Handle typing witness (D-4)', () => {
   it('both fixtures compile to all 6 targets without a compiler crash', () => {
@@ -88,6 +98,26 @@ describe('composed-component ref → Handle typing witness (D-4)', () => {
           r.pingHtmlElementCount,
           `[${target}] expected 0 "ping does not exist on HTMLElement" errors ` +
             `(GREEN — the ref is typed as the child <Name>Handle). ` +
+            `Got ${r.pingHtmlElementCount}.\n${r.raw}`,
+        ).toBe(0);
+      },
+      180000,
+    );
+  }
+
+  // GREEN (P3 fix landed): vue/svelte type the composed ref as the child
+  // component INSTANCE (Vue `ref<InstanceType<typeof Child>>()`, Svelte-5
+  // `bind:this` instance) — `$refs.child.ping()` typechecks, so the "ping on
+  // HTMLElement" count is 0. NO Handle import, NO codegen.mjs change (D-2).
+  for (const target of FIXED_INSTANCE_TARGETS) {
+    it(
+      `${target}: composed ref types as child component instance, not HTMLElement (GREEN — P3 fix)`,
+      () => {
+        const r = runWitness(target);
+        expect(
+          r.pingHtmlElementCount,
+          `[${target}] expected 0 "ping does not exist on HTMLElement" errors ` +
+            `(GREEN — the ref is typed as the child component instance). ` +
             `Got ${r.pingHtmlElementCount}.\n${r.raw}`,
         ).toBe(0);
       },

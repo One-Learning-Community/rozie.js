@@ -46,6 +46,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { buildPropJsdoc, hasPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
@@ -628,8 +629,26 @@ function emitDataRefs(ir: IRComponent, imports: VueImportCollector): string[] {
  */
 function emitTemplateRefs(ir: IRComponent, imports: VueImportCollector): string[] {
   const lines: string[] = [];
+  // Phase 66 (D-2 component-INSTANCE route, SC-2): a ref that points at a
+  // `<components>`-composed CHILD is typed as the child's component INSTANCE via
+  // `ref<InstanceType<typeof Child>>()`, so `$refs.child.exposedMethod()`
+  // typechecks. Vue's shipped `.d.ts` types the component as
+  // `DefineComponent<Props, { focus; clear; … }>`, so `InstanceType` carries the
+  // `defineExpose` members. The child is ALREADY imported by the Vue shell's
+  // component-import synthesis (emitVue.ts:410 `import Child from '...'`), so
+  // `typeof Child` resolves in-scope — NO Handle import, NO `codegen.mjs` change.
+  // The shared core resolver returns NOTHING for a DOM ref, so the DOM `switch`
+  // below runs UNCHANGED for every non-composed ref (byte-identity carve-out).
+  const componentRefs = resolveComponentRefs(ir);
   for (const r of ir.refs) {
     imports.use('ref');
+    const componentLocalName = componentRefs.get(r.name);
+    if (componentLocalName !== undefined) {
+      lines.push(
+        `const ${r.name}Ref = ref<InstanceType<typeof ${componentLocalName}>>();`,
+      );
+      continue;
+    }
     let domType = 'HTMLElement';
     switch (r.elementTag.toLowerCase()) {
       case 'input':
