@@ -69,6 +69,27 @@ const partialFiles = import.meta.glob('../../../packages/ui/*/src/*.{rzts,rzjs}'
   import: 'default',
 }) as Record<string, string>;
 
+// packages/ui/<product>/src/internal/*.ts — PLAIN relative TS helper modules
+// (Phase 68-03). UNLIKE the `.rzts`/`.rzjs` partials above (which @rozie/core
+// INLINES at compile time so the leaf carries zero import), a family's
+// `<script>` imports these as an ordinary RUNTIME relative specifier
+// (`import { buildMonthGrid } from './internal/buildMonthGrid'`). The emitted
+// leaf therefore keeps that import, and the helper must reach the iframe as a
+// transformed blob SIBLING — never through the Rozie compiler. They enter a
+// bundle's `files` map keyed by their basename-WITH-`.ts`, so compile.ts's
+// sibling loop can spot them (non-`.rozie` → passthrough) and hand them over raw.
+// Colocated `*.test.ts` unit tests are excluded (codegen also vendors internal/
+// into leaves excluding tests).
+const internalHelperGlob = import.meta.glob('../../../packages/ui/*/src/internal/*.ts', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
+const internalHelperFiles: Record<string, string> = Object.fromEntries(
+  Object.entries(internalHelperGlob).filter(([path]) => !path.endsWith('.test.ts')),
+);
+
 /**
  * Compile-time `.rzts`/`.rzjs` script partials, keyed by their cross-package
  * bare specifier (`@rozie-ui/<pkg>/<name>.rzts`). Derived from the on-disk
@@ -353,33 +374,49 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/toast/src/Toaster.rozie'],
   },
   {
-    // COMPILE-clean but emits `./internal/buildMonthGrid` — marked unsupported
-    // (render pending 68-03 internal-partial VFS wiring).
+    // Phase 68-03 — its `./internal/buildMonthGrid` helper is now carried as a
+    // passthrough blob sibling, so all six targets live-render (un-marked).
     key: 'bundle/DatePickerBehaviorDemo',
     label: 'bundle/DatePickerBehaviorDemo',
     entryGlobPath: '../../demos/DatePickerBehaviorDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/date-picker/src/DatePicker.rozie'],
+    dependencyGlobPaths: [
+      '../../../packages/ui/date-picker/src/DatePicker.rozie',
+      '../../../packages/ui/date-picker/src/internal/buildMonthGrid.ts',
+    ],
   },
   {
-    // COMPILE-clean but emits `./internal/paginationItems` — marked unsupported.
+    // Phase 68-03 — `./internal/paginationItems` now a passthrough blob sibling.
     key: 'bundle/PaginationBehaviorDemo',
     label: 'bundle/PaginationBehaviorDemo',
     entryGlobPath: '../../demos/PaginationBehaviorDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/pagination/src/Pagination.rozie'],
+    dependencyGlobPaths: [
+      '../../../packages/ui/pagination/src/Pagination.rozie',
+      '../../../packages/ui/pagination/src/internal/paginationItems.ts',
+    ],
   },
   {
-    // COMPILE-clean but emits `./internal/middleware` — marked unsupported.
+    // Phase 68-03 — `./internal/middleware` is now wired as a passthrough blob
+    // sibling, BUT the Popover component ALSO emits a runtime `@floating-ui/dom`
+    // engine import that is not in the harness importmaps — so this family stays
+    // marked unsupported (engine-importmap wiring pending 68-04). The internal
+    // helper is declared here so it renders the moment the engine lands.
     key: 'bundle/PopoverBehaviorDemo',
     label: 'bundle/PopoverBehaviorDemo',
     entryGlobPath: '../../demos/PopoverBehaviorDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/popover/src/Popover.rozie'],
+    dependencyGlobPaths: [
+      '../../../packages/ui/popover/src/Popover.rozie',
+      '../../../packages/ui/popover/src/internal/middleware.ts',
+    ],
   },
   {
-    // COMPILE-clean but emits `./internal/resizeMath` — marked unsupported.
+    // Phase 68-03 — `./internal/resizeMath` now a passthrough blob sibling.
     key: 'bundle/ResizableBehaviorDemo',
     label: 'bundle/ResizableBehaviorDemo',
     entryGlobPath: '../../demos/ResizableBehaviorDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/resizable/src/Resizable.rozie'],
+    dependencyGlobPaths: [
+      '../../../packages/ui/resizable/src/Resizable.rozie',
+      '../../../packages/ui/resizable/src/internal/resizeMath.ts',
+    ],
   },
 
   // ---------------------------------------------------------------------------
@@ -430,6 +467,12 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: [
       '../../../packages/ui/command-palette/src/CommandPalette.rozie',
       '../../../packages/ui/command-palette/src/Combobox.rozie',
+      // Phase 68-03 — its `./internal/filterCommands` helper is now carried as a
+      // passthrough blob sibling. CommandPalette STAYS marked unsupported (its
+      // Combobox sibling still emits a runtime @tanstack/virtual-core engine
+      // import pending 68-04), but declaring the helper here means the ONLY
+      // remaining render blocker is the engine — it renders once 68-04 lands.
+      '../../../packages/ui/command-palette/src/internal/filterCommands.ts',
     ],
   },
 ];
@@ -441,7 +484,16 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
 // entry lives under demos/ — like FullCalendarDemo and LineChartDemo —
 // resolves regardless of where future demos land.
 function lookupRozieSource(path: string): string | undefined {
-  return exampleFiles[path] ?? demoFiles[path] ?? uiPackageFiles[path];
+  return (
+    exampleFiles[path] ??
+    demoFiles[path] ??
+    uiPackageFiles[path] ??
+    // Phase 68-03 — plain relative `.ts` helpers imported by a family's
+    // `<script>` (`./internal/<name>`). Resolved here so a bundle decl can list
+    // the helper as a `dependencyGlobPaths` entry; it lands in `files` keyed by
+    // `<name>.ts` and compile.ts routes it to the passthrough-sibling branch.
+    internalHelperFiles[path]
+  );
 }
 
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
@@ -515,17 +567,14 @@ const matchSnippets: Snippet[] = (() => {
 // take precedence over family-token substring entries.
 // ---------------------------------------------------------------------------
 const UNSUPPORTED: Record<string, string> = {
-  // Wired ×6-clean (Task 3 bundles), but the emitted component pulls a
-  // `./internal/*` helper the iframe VFS can't resolve yet — render pending the
-  // internal-partial VFS wiring in 68-03. Exact-key entries (win over tokens).
-  'bundle/DatePickerBehaviorDemo':
-    'compiles ×6, but emits a ./internal/buildMonthGrid helper import not yet in the playground VFS — live render pending 68-03',
-  'bundle/PaginationBehaviorDemo':
-    'compiles ×6, but emits a ./internal/paginationItems helper import not yet in the playground VFS — live render pending 68-03',
+  // Phase 68-03 wired plain relative `./internal/*.ts` helpers as passthrough
+  // blob siblings, so date-picker / pagination / resizable now live-render ×6
+  // (their UNSUPPORTED entries are DELETED). Popover's `./internal/middleware`
+  // helper is likewise wired, but the Popover component ALSO emits a runtime
+  // `@floating-ui/dom` (Floating UI) engine import not in the harness importmaps
+  // — so it stays marked until the engine lands (68-04). Exact-key entry.
   'bundle/PopoverBehaviorDemo':
-    'compiles ×6, but emits a ./internal/middleware helper import not yet in the playground VFS — live render pending 68-03',
-  'bundle/ResizableBehaviorDemo':
-    'compiles ×6, but emits a ./internal/resizeMath helper import not yet in the playground VFS — live render pending 68-03',
+    'compiles ×6 (its ./internal/middleware helper now resolves as a blob sibling), but the Popover component emits a runtime @floating-ui/dom (Floating UI) engine import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
   // Phase 68-02 CLOSED the `.rzts` gap: their @rozie-ui/headless-core
   // {listCore,windowing}.rzts partials now inline cleanly (compiles ×6). But the
   // Combobox/Listbox sibling emits an unconditional runtime `@tanstack/virtual-core`
@@ -535,10 +584,12 @@ const UNSUPPORTED: Record<string, string> = {
     'compiles ×6 (its headless-core .rzts partials now inline), but the Combobox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
   Listbox:
     'compiles ×6 (its headless-core .rzts partials now inline), but the Listbox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
-  // CommandPalette additionally emits a `./internal/filterCommands` runtime helper
-  // not yet in the VFS (68-03) on top of the @tanstack/virtual-core engine (68-04).
+  // Phase 68-03 wired its `./internal/filterCommands` helper as a passthrough
+  // blob sibling — so the ONLY remaining render blocker is the Combobox
+  // sibling's runtime @tanstack/virtual-core (windowing engine) import, pending
+  // the engine-importmap wiring in 68-04.
   CommandPalette:
-    'compiles ×6 (its headless-core .rzts partials now inline), but the CommandPalette component emits a runtime @tanstack/virtual-core (windowing engine) import + a ./internal/filterCommands helper not yet in the harness — live render pending internal-helper VFS wiring (68-03) + engine-importmap wiring (68-04)',
+    'compiles ×6 (its headless-core .rzts partials inline + its ./internal/filterCommands helper now resolves as a blob sibling), but the Combobox sibling emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
   // Not-yet-wired engine-backed families — their vanilla-JS engine lib is not
   // in the six harness importmaps yet (pending 68-04).
   DataTable:
