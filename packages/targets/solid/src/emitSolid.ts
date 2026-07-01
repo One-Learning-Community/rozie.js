@@ -26,6 +26,7 @@ import type { SourceMap } from 'magic-string';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
 import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
 import { deconflictSolidGeneratedNames } from '../../../core/src/rewrite/deconflict.js';
 import {
@@ -130,6 +131,12 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // 4. Compose component-imports block from ir.components.
   let componentImportsBlock: string | undefined;
   const components = ir.components ?? [];
+  // Phase 66 (D-2 Handle-INTERFACE route, SC-1): the set of composed-component
+  // LOCAL names that are the target of a `$refs.X`. For those — and ONLY those —
+  // the import brings the child's already-exported `type <Name>Handle` so the
+  // parent's `let XRef: <Name>Handle | null` (emitScript.ts) resolves. A composed
+  // component that is NOT ref'd keeps its default-only import byte-identical.
+  const refdComponentNames = new Set(resolveComponentRefs(ir).values());
   const componentImportLines: string[] = components
     .filter((decl) => {
       // Filter self-references: Solid's named function declaration handles self-ref natively.
@@ -146,6 +153,9 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
         ? (decl as { importPath: string }).importPath
         : '';
       const rewritten = rewriteRozieImport(importPath, 'solid');
+      if (refdComponentNames.has(localName)) {
+        return `import ${localName}, { type ${localName}Handle } from '${rewritten}';`;
+      }
       return `import ${localName} from '${rewritten}';`;
     });
   if (componentImportLines.length > 0) {

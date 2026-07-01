@@ -43,11 +43,11 @@ import { runWitness, type Target } from './composed-ref.harness.js';
 
 /**
  * Targets that STILL mis-type a composed-component ref as HTMLElement (RED).
- * Phase 66 P2 (this plan) FIXED react FIRST (D-2 Handle-INTERFACE route); solid
- * follows in Task 2. Each fixed target moves to the unconditionally-GREEN block
- * below and drops its `it.fails` gating. vue/svelte (P3) and lit (P4) stay RED.
+ * Phase 66 P2 (this plan) FIXED react + solid (D-2 Handle-INTERFACE route). Each
+ * fixed target moves to the unconditionally-GREEN block below and drops its
+ * `it.fails` gating. vue/svelte (P3) and lit (P4) remain RED here.
  */
-const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'solid', 'lit'];
+const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'lit'];
 
 /**
  * Targets FIXED by P2 (the Handle-INTERFACE route): a composed-component ref
@@ -55,7 +55,7 @@ const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'solid', 'lit'];
  * typechecks and the "ping does not exist on HTMLElement" count is 0. Plain
  * GREEN `it` (no `.fails`).
  */
-const FIXED_HANDLE_TARGETS: Target[] = ['react'];
+const FIXED_HANDLE_TARGETS: Target[] = ['react', 'solid'];
 
 describe('composed-component ref → Handle typing witness (D-4)', () => {
   it('both fixtures compile to all 6 targets without a compiler crash', () => {

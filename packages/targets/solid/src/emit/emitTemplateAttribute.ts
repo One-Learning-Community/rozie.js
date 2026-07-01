@@ -26,6 +26,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
@@ -679,12 +680,20 @@ function emitNonClassAttribute(
     const refNames = new Set(ctx.ir.refs.map((r) => r.name));
     if (refNames.has(attr.value)) {
       const varName = attr.value + 'Ref';
-      // LB6 SEAM 1 — keep the cast consistent with the emitScript ref-type
-      // carve-out: a ref on a native `<dialog>` declares `HTMLDialogElement |
-      // null`, so the callback cast must match (else the assignment is a type
-      // error). Every other tag keeps the byte-identical `HTMLElement` cast.
+      // Phase 66 (D-2 Handle-INTERFACE route, SC-1): a ref on a `<components>`-
+      // composed CHILD declares `<Name>Handle | null` (emitScript.ts carve-out),
+      // so the callback cast MUST match the Handle type — else the assignment
+      // `childRef = el as HTMLElement` is a type error (TS2741/TS2352: HTMLElement
+      // is not the child handle). The shared resolver returns the child's local
+      // name for a composed ref; DOM refs are ABSENT → the `dialog`/HTMLElement
+      // cast below runs unchanged (inertness/byte-identity carve-out).
+      const componentLocalName = resolveComponentRefs(ctx.ir).get(attr.value);
       const castType =
-        ctx.tagName?.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
+        componentLocalName !== undefined
+          ? `${componentLocalName}Handle`
+          : ctx.tagName?.toLowerCase() === 'dialog'
+            ? 'HTMLDialogElement'
+            : 'HTMLElement';
       return { jsx: `ref={(el) => { ${varName} = el as ${castType}; }}`, diagnostics };
     }
     // Unknown ref — pass through as static

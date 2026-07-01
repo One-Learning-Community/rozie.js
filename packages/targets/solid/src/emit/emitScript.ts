@@ -16,6 +16,7 @@ import type { GeneratorOptions } from '@babel/generator';
 import type { EncodedSourceMap } from '@ampproject/remapping';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
@@ -649,7 +650,21 @@ export function emitScript(
   // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`
   // Solid uses plain let variables (not useRef objects) for DOM refs.
   // Using HTMLElement (not Element) so DOM properties like .style, .focus() are accessible.
+  //
+  // Phase 66 (D-2 Handle-INTERFACE route, SC-1): a ref pointing at a
+  // `<components>`-composed CHILD types as the child's exported `<Name>Handle`
+  // (the Solid child already declares `ref?: (h: <Name>Handle) => void`, so the
+  // interface is the exact ref call surface). The shared core resolver returns
+  // NOTHING for a DOM ref → the `dialog`/HTMLElement branch below runs unchanged
+  // for every non-composed ref (inertness/byte-identity carve-out). The
+  // `<Name>Handle` import is wired at the child-import synthesis (emitSolid.ts).
+  const componentRefs = resolveComponentRefs(ir);
   for (const ref of ir.refs) {
+    const componentLocalName = componentRefs.get(ref.name);
+    if (componentLocalName !== undefined) {
+      hookLines.push(`let ${ref.name}Ref: ${componentLocalName}Handle | null = null;`);
+      continue;
+    }
     // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
     // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
     // Every other tag keeps the byte-identical `HTMLElement | null` default.
