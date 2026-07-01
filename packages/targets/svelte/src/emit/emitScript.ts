@@ -38,9 +38,9 @@ import type {
   PropDecl,
   PropTypeAnnotation,
   ComputedDecl,
-  RefDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
@@ -750,9 +750,30 @@ function emitStateDecls(ir: IRComponent): string[] {
  * directive populates them. They MUST be `$state(...)` to be reactive when
  * read inside `$derived` / `$effect` blocks.
  */
-function emitRefDecls(refs: RefDecl[]): string[] {
+function emitRefDecls(ir: IRComponent): string[] {
   const lines: string[] = [];
-  for (const r of refs) {
+  // Phase 66 (D-2 component-INSTANCE route, SC-2): a ref that points at a
+  // `<components>`-composed CHILD types as the Svelte-5 component instance (the
+  // exports carried by `bind:this`), so `$refs.child.exposedMethod()` typechecks.
+  // The child is ALREADY imported by the Svelte shell's component-import
+  // synthesis (emitSvelte.ts:234 `import Child from '...'`), so the component
+  // name resolves in-scope — NO `<Name>Handle` import, NO `codegen.mjs` change.
+  // The shared core resolver returns NOTHING for a DOM ref, so the DOM `switch`
+  // below runs UNCHANGED for every non-composed ref (byte-identity carve-out).
+  const componentRefs = resolveComponentRefs(ir);
+  for (const r of ir.refs) {
+    const componentLocalName = componentRefs.get(r.name);
+    if (componentLocalName !== undefined) {
+      // Svelte-5 `bind:this` on a component yields the instance whose surface
+      // carries the `export const`-emitted `$expose` members. The component's
+      // generated type is usable as the instance type via `ReturnType<typeof C>`
+      // (svelte2tsx types the default export as a `Component<...>` factory whose
+      // return is the instance exports).
+      lines.push(
+        `let ${r.name} = $state<ReturnType<typeof ${componentLocalName}> | undefined>(undefined);`,
+      );
+      continue;
+    }
     let domType = 'HTMLElement';
     switch (r.elementTag.toLowerCase()) {
       case 'input':
@@ -1343,7 +1364,7 @@ export function emitScript(
   // 4. Emit blocks in canonical order.
   const propsBlock = emitPropsBlock(ir);
   const stateLines = emitStateDecls(ir);
-  const refLines = emitRefDecls(ir.refs);
+  const refLines = emitRefDecls(ir);
 
   const clonedComputedBodies = findClonedComputedBodies(cloned);
   const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies);

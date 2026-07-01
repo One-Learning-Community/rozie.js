@@ -47,7 +47,7 @@ import { runWitness, type Target } from './composed-ref.harness.js';
  * fixed target moves to the unconditionally-GREEN block below and drops its
  * `it.fails` gating. vue/svelte (P3) and lit (P4) remain RED here.
  */
-const BROKEN_TARGETS: Target[] = ['svelte', 'lit'];
+const BROKEN_TARGETS: Target[] = ['lit'];
 
 /**
  * Targets FIXED by P2 (the Handle-INTERFACE route): a composed-component ref
@@ -65,7 +65,7 @@ const FIXED_HANDLE_TARGETS: Target[] = ['react', 'solid'];
  * `$refs.child.ping()` typechecks, so the "ping does not exist on HTMLElement"
  * count is 0. Plain GREEN `it` (no `.fails`).
  */
-const FIXED_INSTANCE_TARGETS: Target[] = ['vue'];
+const FIXED_INSTANCE_TARGETS: Target[] = ['vue', 'svelte'];
 
 describe('composed-component ref → Handle typing witness (D-4)', () => {
   it('both fixtures compile to all 6 targets without a compiler crash', () => {
