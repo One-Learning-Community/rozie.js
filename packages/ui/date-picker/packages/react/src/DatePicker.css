@@ -166,3 +166,130 @@
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
 }
+.rozie-datepicker-drill-header[data-rozie-s-6800c7a2] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--rozie-datepicker-drill-header-gap, 0.5rem);
+}
+.rozie-datepicker-drill-label[data-rozie-s-6800c7a2] {
+  font: inherit;
+  font-weight: var(--rozie-datepicker-heading-weight, 600);
+  font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+  color: inherit;
+  background: var(--rozie-datepicker-drill-label-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-drill-label[data-rozie-s-6800c7a2]:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-drill-label[data-rozie-s-6800c7a2]:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-heading-button[data-rozie-s-6800c7a2] {
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-datepicker-drill-label-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-nav-radius, 6px);
+  padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rozie-datepicker-heading-button[data-rozie-s-6800c7a2]:hover {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-months[data-rozie-s-6800c7a2] .rozie-datepicker-drill-grid[data-rozie-s-6800c7a2],
+.rozie-datepicker-years[data-rozie-s-6800c7a2] .rozie-datepicker-drill-grid[data-rozie-s-6800c7a2] {
+  display: grid;
+  grid-template-columns: repeat(var(--rozie-datepicker-drill-cols, 3), 1fr);
+  gap: var(--rozie-datepicker-drill-gap, 0.25rem);
+}
+.rozie-datepicker-month[data-rozie-s-6800c7a2],
+.rozie-datepicker-year[data-rozie-s-6800c7a2] {
+  box-sizing: border-box;
+  height: var(--rozie-datepicker-drill-cell-height, 2.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--rozie-datepicker-drill-cell-size, 0.85rem);
+  color: inherit;
+  background: var(--rozie-datepicker-day-bg, transparent);
+  border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+  border-radius: var(--rozie-datepicker-day-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled),
+.rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-month.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]),
+.rozie-datepicker-year.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]) {
+  border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+}
+.rozie-datepicker-month.is-selected[data-rozie-s-6800c7a2],
+.rozie-datepicker-year.is-selected[data-rozie-s-6800c7a2] {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+  font-weight: var(--rozie-datepicker-selected-weight, 600);
+}
+.rozie-datepicker-month[data-rozie-s-6800c7a2]:focus-visible,
+.rozie-datepicker-year[data-rozie-s-6800c7a2]:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-month[data-rozie-s-6800c7a2]:disabled,
+.rozie-datepicker-year[data-rozie-s-6800c7a2]:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+.rozie-datepicker-footer[data-rozie-s-6800c7a2] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-datepicker-footer-gap, 0.25rem);
+  margin-top: var(--rozie-datepicker-footer-gap-top, 0.5rem);
+}
+.rozie-datepicker-footer-btn[data-rozie-s-6800c7a2] {
+  font: inherit;
+  font-size: var(--rozie-datepicker-footer-size, 0.78rem);
+  color: var(--rozie-datepicker-footer-fg, inherit);
+  background: var(--rozie-datepicker-footer-bg, transparent);
+  border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+  border-radius: var(--rozie-datepicker-footer-radius, 6px);
+  padding: var(--rozie-datepicker-footer-padding, 0.2rem 0.6rem);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+  background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:focus-visible {
+  outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+  outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:disabled {
+  cursor: not-allowed;
+  opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+  pointer-events: none;
+}
+.rozie-datepicker--multi[data-rozie-s-6800c7a2] .rozie-datepicker-grid[data-rozie-s-6800c7a2] {
+  display: inline-grid;
+  vertical-align: top;
+}
+.rozie-datepicker--multi[data-rozie-s-6800c7a2] .rozie-datepicker-grid[data-rozie-s-6800c7a2] + .rozie-datepicker-grid[data-rozie-s-6800c7a2] {
+  margin-left: var(--rozie-datepicker-month-gap, 1rem);
+}

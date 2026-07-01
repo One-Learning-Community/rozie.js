@@ -43,9 +43,30 @@ export interface DatePickerProps {
    * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
    */
   presetRanges?: unknown[];
+  /**
+   * Render the month-year heading as a clickable drill **button** that navigates days → months → years (and a year label that drills months → years). **Capability-on:** this is the documented exception to the boolean-default-`false` rule — the drill navigation is the ergonomic win of this feature, so it defaults to `true`. Set `:month-year-nav="false"` to restore the static heading `<span>` (byte-identical to the pre-navigation output).
+   */
+  monthYearNav?: boolean;
+  /**
+   * How many month grids to render side by side, anchored at the view month and stepping forward (e.g. `2` for a two-up range calendar). `1` (the default) emits exactly the single-month markup with no extra wrapper element.
+   */
+  numberOfMonths?: number;
+  /**
+   * Render a Today / Clear footer row beneath the calendar grid. `Today` selects (single mode) or navigates to (range mode) the current date; `Clear` deselects. The `#footer` slot fully overrides the default row, receiving `{ today, clear, todayIso }`.
+   */
+  showFooter?: boolean;
+  /**
+   * An array of weekday indices to disable, `Number[]` where `0` = Sunday through `6` = Saturday (e.g. `[0, 6]` disables every weekend). Serializable, so it passes fine as a plain attribute. Threaded through the single gating funnel, so disabled weekdays are non-interactive, non-focusable, and marked `aria-disabled` — in agreement with day cells, drill enablement, and keyboard focus.
+   */
+  disabledDaysOfWeek?: unknown[];
+  /**
+   * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
+   */
+  isDateDisabled?: ((...args: unknown[]) => unknown) | null;
   onChange?: (...args: unknown[]) => void;
   onRangeComplete?: (...args: unknown[]) => void;
   renderHeader?: (params: { label: unknown; prev: () => void; next: () => void; disabled: unknown }) => ReactNode;
+  renderFooter?: (params: { today: () => void; clear: () => void; todayIso: unknown }) => ReactNode;
   renderPresets?: (params: { presets: unknown; apply: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

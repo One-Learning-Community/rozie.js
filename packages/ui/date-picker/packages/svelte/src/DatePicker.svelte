@@ -43,7 +43,28 @@ interface Props {
    * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
    */
   presetRanges?: any[];
+  /**
+   * Render the month-year heading as a clickable drill **button** that navigates days → months → years (and a year label that drills months → years). **Capability-on:** this is the documented exception to the boolean-default-`false` rule — the drill navigation is the ergonomic win of this feature, so it defaults to `true`. Set `:month-year-nav="false"` to restore the static heading `<span>` (byte-identical to the pre-navigation output).
+   */
+  monthYearNav?: boolean;
+  /**
+   * How many month grids to render side by side, anchored at the view month and stepping forward (e.g. `2` for a two-up range calendar). `1` (the default) emits exactly the single-month markup with no extra wrapper element.
+   */
+  numberOfMonths?: number;
+  /**
+   * Render a Today / Clear footer row beneath the calendar grid. `Today` selects (single mode) or navigates to (range mode) the current date; `Clear` deselects. The `#footer` slot fully overrides the default row, receiving `{ today, clear, todayIso }`.
+   */
+  showFooter?: boolean;
+  /**
+   * An array of weekday indices to disable, `Number[]` where `0` = Sunday through `6` = Saturday (e.g. `[0, 6]` disables every weekend). Serializable, so it passes fine as a plain attribute. Threaded through the single gating funnel, so disabled weekdays are non-interactive, non-focusable, and marked `aria-disabled` — in agreement with day cells, drill enablement, and keyboard focus.
+   */
+  disabledDaysOfWeek?: any[];
+  /**
+   * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
+   */
+  isDateDisabled?: ((...args: any[]) => any) | null;
   header?: Snippet<[{ label: any; prev: any; next: any; disabled: any }]>;
+  footer?: Snippet<[{ today: any; clear: any; todayIso: any }]>;
   presets?: Snippet<[{ presets: any; apply: any }]>;
   snippets?: Record<string, any>;
   onchange?: (...args: unknown[]) => void;
@@ -53,6 +74,7 @@ interface Props {
 
 let __defaultDisabledDates = (() => [])();
 let __defaultPresetRanges = (() => [])();
+let __defaultDisabledDaysOfWeek = (() => [])();
 
 let {
   value = $bindable(''),
@@ -64,7 +86,13 @@ let {
   disabled = false,
   locale = 'en-US',
   presetRanges = __defaultPresetRanges,
+  monthYearNav = true,
+  numberOfMonths = 1,
+  showFooter = false,
+  disabledDaysOfWeek = __defaultDisabledDaysOfWeek,
+  isDateDisabled = null,
   header: __headerProp,
+  footer: __footerProp,
   presets: __presetsProp,
   snippets,
   onchange,
@@ -73,14 +101,16 @@ let {
 }: Props = $props();
 
 const header = $derived(__headerProp ?? snippets?.header);
+const footer = $derived(__footerProp ?? snippets?.footer);
 const presets = $derived(__presetsProp ?? snippets?.presets);
 
 let viewIso = $state('');
 let hoverIso = $state('');
+let viewMode = $state('days');
 
 let root = $state<HTMLElement | undefined>(undefined);
 
-import { addDays, addMonths, buildMonthGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -167,11 +197,79 @@ const grid = () => buildMonthGrid({
   min: min,
   max: max,
   disabledDates: disabledDates,
+  disabledDaysOfWeek: disabledDaysOfWeek,
+  isDateDisabled: isDateDisabled,
   weekStartsOn: weekStartsOn,
   disabled: disabled,
   selection: selectionMode === 'range' ? readRange() : undefined,
   previewEnd: selectionMode === 'range' ? hoverIso : undefined
 });
+
+// The multi-month render model: N grids stepping forward from the view month,
+// so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
+// mirroring grid() exactly but with the view anchor advanced by `i` months.
+// numberOfMonths === 1 yields a one-element array whose single grid === grid().
+// The multi-month render model: N grids stepping forward from the view month,
+// so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
+// mirroring grid() exactly but with the view anchor advanced by `i` months.
+// numberOfMonths === 1 yields a one-element array whose single grid === grid().
+const grids = () => Array.from({
+  length: numberOfMonths
+}, (_: any, i: any) => buildMonthGrid({
+  viewIso: addMonths(viewMonthGrid(), i),
+  value: selected(),
+  today: todayIso(),
+  min: min,
+  max: max,
+  disabledDates: disabledDates,
+  disabledDaysOfWeek: disabledDaysOfWeek,
+  isDateDisabled: isDateDisabled,
+  weekStartsOn: weekStartsOn,
+  disabled: disabled,
+  selection: selectionMode === 'range' ? readRange() : undefined,
+  previewEnd: selectionMode === 'range' ? hoverIso : undefined
+}));
+
+// ---- drill models (months / years panels) ------------------------------
+// The 12-cell month picker for the 'months' drill view + the 12-cell year
+// picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
+// each a fresh object per call. The gates that matter to a whole month/year span
+// are min/max (buildMonthList/buildYearGrid own the entire-span test); the
+// per-day weekday/predicate gates apply only in the days grid.
+// ---- drill models (months / years panels) ------------------------------
+// The 12-cell month picker for the 'months' drill view + the 12-cell year
+// picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
+// each a fresh object per call. The gates that matter to a whole month/year span
+// are min/max (buildMonthList/buildYearGrid own the entire-span test); the
+// per-day weekday/predicate gates apply only in the days grid.
+const monthList = () => buildMonthList(viewMonthGrid(), {
+  min: min,
+  max: max,
+  value: selected(),
+  today: todayIso(),
+  locale: locale
+});
+const yearGrid = () => buildYearGrid(viewMonthGrid(), {
+  min: min,
+  max: max,
+  value: selected(),
+  today: todayIso()
+});
+// The decade window label (e.g. "2020–2031") shown in the years-panel header.
+// The decade window label (e.g. "2020–2031") shown in the years-panel header.
+const yearRangeLabel = () => yearGrid().rangeLabel;
+
+// The day-grid iterable for the template: the N month grids in the 'days' view,
+// or an empty array in the months/years drill views. Gating the r-for through an
+// EMPTY array (rather than an r-if on the same element) keeps the day-grid
+// element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
+// single grid with NO extra wrapper element (the byte-identical single-month path).
+// The day-grid iterable for the template: the N month grids in the 'days' view,
+// or an empty array in the months/years drill views. Gating the r-for through an
+// EMPTY array (rather than an r-if on the same element) keeps the day-grid
+// element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
+// single grid with NO extra wrapper element (the byte-identical single-month path).
+const daysGrids = () => showsDaysView() ? grids() : [];
 
 // Roving-tabindex value for a day cell: the selected day (or today, when nothing
 // is selected) is the single tab stop (0), the rest are -1. The return type is
@@ -209,6 +307,8 @@ const dayEnabled = (iso: any) => !isDayDisabled(iso, {
   min: min,
   max: max,
   disabledDates: disabledDates,
+  disabledDaysOfWeek: disabledDaysOfWeek,
+  isDateDisabled: isDateDisabled,
   weekStartsOn: weekStartsOn,
   disabled: disabled
 });
@@ -303,14 +403,68 @@ const onDaySelect = (iso: any) => {
   if (selectionMode === 'range') commitRange(iso);else commitValue(iso);
 };
 
-// ---- month navigation --------------------------------------------------
-// ---- month navigation --------------------------------------------------
+// ---- month navigation (view-mode-aware ‹ › step) -----------------------
+// The prev/next step advances the view anchor by ONE UNIT of the current drill
+// view: a month in 'days', a year (12 months) in 'months', 12 years (144
+// months) in 'years'. In the default 'days' view the delta is `delta` months —
+// byte-identical to the pre-navigation behavior, so `:month-year-nav="false"`
+// (which can never leave 'days') is unchanged.
+// ---- month navigation (view-mode-aware ‹ › step) -----------------------
+// The prev/next step advances the view anchor by ONE UNIT of the current drill
+// view: a month in 'days', a year (12 months) in 'months', 12 years (144
+// months) in 'years'. In the default 'days' view the delta is `delta` months —
+// byte-identical to the pre-navigation behavior, so `:month-year-nav="false"`
+// (which can never leave 'days') is unchanged.
 const goToMonth = (delta: any) => {
   if (disabled) return;
-  viewIso = addMonths(viewMonthGrid(), delta);
+  const unit = viewMode === 'years' ? 144 : viewMode === 'months' ? 12 : 1;
+  viewIso = addMonths(viewMonthGrid(), delta * unit);
 };
 const goPrevMonth = () => goToMonth(-1);
 const goNextMonth = () => goToMonth(1);
+
+// ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
+// ONLY — never $model.value; drilling is a pure VIEW concern) -------------
+// Named boolean guards (never a bare `.length` / bare string compare in an
+// r-if — route through a `(): boolean` so the JSX targets emit a true boolean
+// and no falsy value leaks a text node).
+// ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
+// ONLY — never $model.value; drilling is a pure VIEW concern) -------------
+// Named boolean guards (never a bare `.length` / bare string compare in an
+// r-if — route through a `(): boolean` so the JSX targets emit a true boolean
+// and no falsy value leaks a text node).
+const showsDaysView = (): boolean => viewMode === 'days';
+const showsMonthsView = (): boolean => viewMode === 'months';
+const showsYearsView = (): boolean => viewMode === 'years';
+
+// Drill DOWN into the month picker (from the days heading).
+// Drill DOWN into the month picker (from the days heading).
+const enterMonthsView = () => {
+  if (disabled) return;
+  viewMode = 'months';
+};
+// Drill DOWN into the year picker (from the months-panel year label).
+// Drill DOWN into the year picker (from the months-panel year label).
+const enterYearsView = () => {
+  if (disabled) return;
+  viewMode = 'years';
+};
+// Pick a month → move the view anchor to it and drill back UP toward days.
+// Pick a month → move the view anchor to it and drill back UP toward days.
+const selectMonth = (iso: any) => {
+  if (disabled) return;
+  if (!isIsoDate(iso)) return;
+  viewIso = iso;
+  viewMode = 'days';
+};
+// Pick a year → move the view anchor's year and drill back UP toward months.
+// Pick a year → move the view anchor's year and drill back UP toward months.
+const selectYear = (iso: any) => {
+  if (disabled) return;
+  if (!isIsoDate(iso)) return;
+  viewIso = iso;
+  viewMode = 'months';
+};
 
 // ---- focus choreography (container ref, post-mount only) ---------------
 // Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
@@ -335,6 +489,54 @@ const focusDayIso = (iso: any) => {
   }
 };
 
+// ---- drill focus choreography (months / years panels) ------------------
+// Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
+// $refs.root is read only here / in handlers (post-mount → ROZ123-safe) and the
+// querySelectorAll pierces Lit's shadow root exactly as the day walk does.
+// ---- drill focus choreography (months / years panels) ------------------
+// Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
+// $refs.root is read only here / in handlers (post-mount → ROZ123-safe) and the
+// querySelectorAll pierces Lit's shadow root exactly as the day walk does.
+const monthCells = () => {
+  const root$local = root;
+  if (!root$local) return [];
+  return Array.from(root$local.querySelectorAll('[data-month]')) as HTMLElement[];
+};
+const focusMonthIso = (iso: any) => {
+  const cells = monthCells();
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].getAttribute('data-month') === iso) {
+      cells[i].focus();
+      return;
+    }
+  }
+};
+const yearCells = () => {
+  const root$local = root;
+  if (!root$local) return [];
+  return Array.from(root$local.querySelectorAll('[data-year]')) as HTMLElement[];
+};
+const focusYearIso = (iso: any) => {
+  const cells = yearCells();
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].getAttribute('data-year') === iso) {
+      cells[i].focus();
+      return;
+    }
+  }
+};
+
+// Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
+// PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
+// reachable, avoiding TS2869. The selected cell (or the current month/year when
+// nothing is selected) is the single tab stop.
+// Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
+// PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
+// reachable, avoiding TS2869. The selected cell (or the current month/year when
+// nothing is selected) is the single tab stop.
+const monthTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
+const yearTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
+
 // Move the roving focus by `days`, crossing into an adjacent month when the
 // target leaves the displayed grid. Skips nothing — disabled days are still
 // focusable (standard grid pattern) but not selectable.
@@ -344,9 +546,10 @@ const focusDayIso = (iso: any) => {
 const moveFocus = (fromIso: any, days: any) => {
   if (disabled) return;
   const next = addDays(fromIso, days);
-  const g = grid();
-  // If `next` is not in the rendered weeks, swing the view to its month first.
-  const present = g.weeks.some((row: any) => row.some((d: any) => d.iso === next));
+  // Widened to ANY rendered month (multi-month): if `next` is present in any of
+  // the displayed grids, arrow focus can cross month columns without swinging
+  // the view. Only when it leaves every rendered month do we move the anchor.
+  const present = grids().some((g: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === next)));
   if (!present) viewIso = next;
   focusDayIso(next);
 };
@@ -407,6 +610,56 @@ const onDayKeydown = (iso: any, e: any) => {
       }
     }
   }
+};
+
+// ---- drill keyboard (months / years 12-cell grid) ----------------------
+// A 3-column × 4-row grid: arrows move within the 12 cells (clamped at the
+// edges), Home/End jump to the row bounds, Enter/Space pick, Escape returns to
+// days. Params LEFT UNTYPED so `e.key` neutralizes to `any` and typechecks ×6.
+// ---- drill keyboard (months / years 12-cell grid) ----------------------
+// A 3-column × 4-row grid: arrows move within the 12 cells (clamped at the
+// edges), Home/End jump to the row bounds, Enter/Space pick, Escape returns to
+// days. Params LEFT UNTYPED so `e.key` neutralizes to `any` and typechecks ×6.
+const DRILL_COLS = 3;
+const onMonthKeydown = (iso: any, e: any) => {
+  if (disabled) return;
+  const key = e ? e.key : '';
+  const cells = monthList().months;
+  let idx = -1;
+  for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
+  if (idx < 0) return;
+  let next = idx;
+  if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + DRILL_COLS);else if (key === 'Home') next = idx - idx % DRILL_COLS;else if (key === 'End') next = idx - idx % DRILL_COLS + (DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    e.preventDefault();
+    selectMonth(iso);
+    return;
+  } else if (key === 'Escape') {
+    e.preventDefault();
+    viewMode = 'days';
+    return;
+  } else return;
+  e.preventDefault();
+  focusMonthIso(cells[next].iso);
+};
+const onYearKeydown = (iso: any, e: any) => {
+  if (disabled) return;
+  const key = e ? e.key : '';
+  const cells = yearGrid().years;
+  let idx = -1;
+  for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
+  if (idx < 0) return;
+  let next = idx;
+  if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + DRILL_COLS);else if (key === 'Home') next = idx - idx % DRILL_COLS;else if (key === 'End') next = idx - idx % DRILL_COLS + (DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    e.preventDefault();
+    selectYear(iso);
+    return;
+  } else if (key === 'Escape') {
+    e.preventDefault();
+    viewMode = 'days';
+    return;
+  } else return;
+  e.preventDefault();
+  focusYearIso(cells[next].iso);
 };
 
 // Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
@@ -520,6 +773,31 @@ export const goToToday = () => {
   viewIso = todayIso();
 };
 
+// ---- footer moves (Today / Clear row) ----------------------------------
+// selectToday() — the footer "Today" action. In single mode commit today
+// through the value funnel (write + emit change, gated exactly like a day
+// click); in range mode just swing the view to the current month (goToToday),
+// never mutating the value. Clear reuses the existing clear() funnel unchanged.
+// ---- footer moves (Today / Clear row) ----------------------------------
+// selectToday() — the footer "Today" action. In single mode commit today
+// through the value funnel (write + emit change, gated exactly like a day
+// click); in range mode just swing the view to the current month (goToToday),
+// never mutating the value. Clear reuses the existing clear() funnel unchanged.
+const selectToday = () => {
+  if (disabled) return;
+  if (selectionMode === 'range') {
+    goToToday();
+  } else {
+    commitValue(todayIso());
+  }
+};
+
+// Named boolean guard for the footer r-if (never a bare truthiness in the r-if
+// so the JSX targets emit a real boolean and leak no falsy value).
+// Named boolean guard for the footer r-if (never a bare truthiness in the r-if
+// so the JSX targets emit a real boolean and leak no falsy value).
+const showsFooter = (): boolean => !!showFooter;
+
 // clear() — deselect, writing the mode-appropriate empty ('' single /
 // { start:'', end:'' } range) + emit change.
 // clear() — deselect, writing the mode-appropriate empty ('' single /
@@ -554,7 +832,7 @@ onMount(() => {
 });
 </script>
 
-<div bind:this={root} role="group" aria-label="Date picker" aria-disabled={!!disabled} {...__rozieAttrs} class={["rozie-datepicker", { 'rozie-datepicker--disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6800c7a2>{#if header}{@render header({ label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled })}{:else}<div class="rozie-datepicker-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Previous month" onclick={goPrevMonth} data-rozie-s-6800c7a2>‹</button><span class="rozie-datepicker-heading" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</span><button type="button" class="rozie-datepicker-nav rozie-datepicker-next" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Next month" onclick={goNextMonth} data-rozie-s-6800c7a2>›</button></div>{/if}<div class="rozie-datepicker-grid" role="grid" onmouseleave={($event) => { hoverIso = ''; }} data-rozie-s-6800c7a2><div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>{#each weekdays() as wd, wi (wi)}<span class="rozie-datepicker-weekday" role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2>{rozieDisplay(wd)}</span>{/each}</div>{#each grid().weeks as week, wk (wk)}<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>{#each week as day (day.iso)}<span class="rozie-datepicker-cell" role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2><button type="button" class={["rozie-datepicker-day", { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]} data-day={rozieAttr(day.iso)} tabindex={rozieAttr(dayTabIndex(day))} disabled={!!day.disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : null)} onclick={($event) => { onDaySelect(day.iso); }} onmouseenter={($event) => { onDayHover(day.iso); }} onfocus={($event) => { onDayHover(day.iso); }} onkeydown={($event) => { onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>{rozieDisplay(day.day)}</button></span>{/each}</div>{/each}</div>{#if presets}{@render presets({ presets: resolvedPresets(), apply: applyPreset })}{:else}{#if hasPresets()}<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>{#each resolvedPresets() as p (p.label)}<button type="button" class={["rozie-datepicker-preset", { 'is-active': isPresetActive(p.range) }]} aria-pressed={!!isPresetActive(p.range)} disabled={!!disabled} onclick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2>{rozieDisplay(p.label)}</button>{/each}</div>{/if}{/if}</div>
+<div bind:this={root} role="group" aria-label="Date picker" aria-disabled={!!disabled} {...__rozieAttrs} class={["rozie-datepicker", { 'rozie-datepicker--disabled': disabled, 'rozie-datepicker--multi': numberOfMonths > 1 }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6800c7a2>{#if header}{@render header({ label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled })}{:else}<div class="rozie-datepicker-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Previous month" onclick={goPrevMonth} data-rozie-s-6800c7a2>‹</button>{#if monthYearNav}<button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change month and year" aria-live="polite" onclick={enterMonthsView} data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</button>{:else}<span class="rozie-datepicker-heading" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</span>{/if}<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Next month" onclick={goNextMonth} data-rozie-s-6800c7a2>›</button></div>{/if}{#each daysGrids() as g, gi (gi)}<div class="rozie-datepicker-grid" role="grid" onmouseleave={($event) => { hoverIso = ''; }} data-rozie-s-6800c7a2><div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>{#each weekdays() as wd, wi (wi)}<span class="rozie-datepicker-weekday" role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2>{rozieDisplay(wd)}</span>{/each}</div>{#each g.weeks as week, wk (wk)}<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>{#each week as day (day.iso)}<span class="rozie-datepicker-cell" role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2><button type="button" class={["rozie-datepicker-day", { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]} data-day={rozieAttr(day.iso)} tabindex={rozieAttr(dayTabIndex(day))} disabled={!!day.disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : null)} onclick={($event) => { onDaySelect(day.iso); }} onmouseenter={($event) => { onDayHover(day.iso); }} onfocus={($event) => { onDayHover(day.iso); }} onkeydown={($event) => { onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>{rozieDisplay(day.day)}</button></span>{/each}</div>{/each}</div>{/each}{#if showsMonthsView()}<div class="rozie-datepicker-months" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-drill-label" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change year" onclick={enterYearsView} data-rozie-s-6800c7a2>{rozieDisplay(monthList().year)}</button></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" data-rozie-s-6800c7a2>{#each monthList().months as cell (cell.iso)}<button type="button" class={["rozie-datepicker-month", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-month={rozieAttr(cell.iso)} tabindex={rozieAttr(monthTabIndex(cell))} disabled={!!cell.disabled} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectMonth(cell.iso); }} onkeydown={($event) => { onMonthKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>{rozieDisplay(cell.label)}</button>{/each}</div></div>{/if}{#if showsYearsView()}<div class="rozie-datepicker-years" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><span class="rozie-datepicker-drill-label" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(yearRangeLabel())}</span></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" data-rozie-s-6800c7a2>{#each yearGrid().years as cell (cell.iso)}<button type="button" class={["rozie-datepicker-year", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-year={rozieAttr(cell.iso)} tabindex={rozieAttr(yearTabIndex(cell))} disabled={!!cell.disabled} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectYear(cell.iso); }} onkeydown={($event) => { onYearKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>{rozieDisplay(cell.year)}</button>{/each}</div></div>{/if}{#if showsFooter()}{#if footer}{@render footer({ today: selectToday, clear, todayIso: todayIso() })}{:else}<div class="rozie-datepicker-footer" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" disabled={!!disabled} aria-disabled={!!disabled} onclick={selectToday} data-rozie-s-6800c7a2>Today</button><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" disabled={!!disabled} aria-disabled={!!disabled} onclick={clear} data-rozie-s-6800c7a2>Clear</button></div>{/if}{/if}{#if presets}{@render presets({ presets: resolvedPresets(), apply: applyPreset })}{:else}{#if hasPresets()}<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>{#each resolvedPresets() as p (p.label)}<button type="button" class={["rozie-datepicker-preset", { 'is-active': isPresetActive(p.range) }]} aria-pressed={!!isPresetActive(p.range)} disabled={!!disabled} onclick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2>{rozieDisplay(p.label)}</button>{/each}</div>{/if}{/if}</div>
 
 <style>
 :global {
@@ -725,6 +1003,133 @@ onMount(() => {
     cursor: not-allowed;
     opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
     pointer-events: none;
+  }
+  .rozie-datepicker-drill-header[data-rozie-s-6800c7a2] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--rozie-datepicker-drill-header-gap, 0.5rem);
+  }
+  .rozie-datepicker-drill-label[data-rozie-s-6800c7a2] {
+    font: inherit;
+    font-weight: var(--rozie-datepicker-heading-weight, 600);
+    font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+    color: inherit;
+    background: var(--rozie-datepicker-drill-label-bg, transparent);
+    border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+    border-radius: var(--rozie-datepicker-nav-radius, 6px);
+    padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .rozie-datepicker-drill-label[data-rozie-s-6800c7a2]:hover {
+    background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+  }
+  .rozie-datepicker-drill-label[data-rozie-s-6800c7a2]:focus-visible {
+    outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+    outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+  }
+  .rozie-datepicker-heading-button[data-rozie-s-6800c7a2] {
+    font: inherit;
+    color: inherit;
+    background: var(--rozie-datepicker-drill-label-bg, transparent);
+    border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+    border-radius: var(--rozie-datepicker-nav-radius, 6px);
+    padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .rozie-datepicker-heading-button[data-rozie-s-6800c7a2]:hover {
+    background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+  }
+  .rozie-datepicker-months[data-rozie-s-6800c7a2] .rozie-datepicker-drill-grid[data-rozie-s-6800c7a2],
+  .rozie-datepicker-years[data-rozie-s-6800c7a2] .rozie-datepicker-drill-grid[data-rozie-s-6800c7a2] {
+    display: grid;
+    grid-template-columns: repeat(var(--rozie-datepicker-drill-cols, 3), 1fr);
+    gap: var(--rozie-datepicker-drill-gap, 0.25rem);
+  }
+  .rozie-datepicker-month[data-rozie-s-6800c7a2],
+  .rozie-datepicker-year[data-rozie-s-6800c7a2] {
+    box-sizing: border-box;
+    height: var(--rozie-datepicker-drill-cell-height, 2.5rem);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: var(--rozie-datepicker-drill-cell-size, 0.85rem);
+    color: inherit;
+    background: var(--rozie-datepicker-day-bg, transparent);
+    border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+    border-radius: var(--rozie-datepicker-day-radius, 6px);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled),
+  .rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+    background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+  }
+  .rozie-datepicker-month.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]),
+  .rozie-datepicker-year.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]) {
+    border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+  }
+  .rozie-datepicker-month.is-selected[data-rozie-s-6800c7a2],
+  .rozie-datepicker-year.is-selected[data-rozie-s-6800c7a2] {
+    color: var(--rozie-datepicker-selected-fg, #fff);
+    background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+    border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+    font-weight: var(--rozie-datepicker-selected-weight, 600);
+  }
+  .rozie-datepicker-month[data-rozie-s-6800c7a2]:focus-visible,
+  .rozie-datepicker-year[data-rozie-s-6800c7a2]:focus-visible {
+    outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+    outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+  }
+  .rozie-datepicker-month[data-rozie-s-6800c7a2]:disabled,
+  .rozie-datepicker-year[data-rozie-s-6800c7a2]:disabled {
+    cursor: not-allowed;
+    opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+    pointer-events: none;
+  }
+  .rozie-datepicker-footer[data-rozie-s-6800c7a2] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rozie-datepicker-footer-gap, 0.25rem);
+    margin-top: var(--rozie-datepicker-footer-gap-top, 0.5rem);
+  }
+  .rozie-datepicker-footer-btn[data-rozie-s-6800c7a2] {
+    font: inherit;
+    font-size: var(--rozie-datepicker-footer-size, 0.78rem);
+    color: var(--rozie-datepicker-footer-fg, inherit);
+    background: var(--rozie-datepicker-footer-bg, transparent);
+    border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+    border-radius: var(--rozie-datepicker-footer-radius, 6px);
+    padding: var(--rozie-datepicker-footer-padding, 0.2rem 0.6rem);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+    background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+  }
+  .rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:focus-visible {
+    outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+    outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+  }
+  .rozie-datepicker-footer-btn[data-rozie-s-6800c7a2]:disabled {
+    cursor: not-allowed;
+    opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+    pointer-events: none;
+  }
+  .rozie-datepicker--multi[data-rozie-s-6800c7a2] .rozie-datepicker-grid[data-rozie-s-6800c7a2] {
+    display: inline-grid;
+    vertical-align: top;
+  }
+  .rozie-datepicker--multi[data-rozie-s-6800c7a2] .rozie-datepicker-grid[data-rozie-s-6800c7a2] + .rozie-datepicker-grid[data-rozie-s-6800c7a2] {
+    margin-left: var(--rozie-datepicker-month-gap, 1rem);
   }
 }
 </style>

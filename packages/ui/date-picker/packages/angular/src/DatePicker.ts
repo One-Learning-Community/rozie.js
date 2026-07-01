@@ -2,7 +2,7 @@ import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { addDays, addMonths, buildMonthGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -14,6 +14,13 @@ interface HeaderCtx {
   prev: any;
   next: any;
   disabled: any;
+}
+
+interface FooterCtx {
+  $implicit: { today: any; clear: any; todayIso: any };
+  today: any;
+  clear: any;
+  todayIso: any;
 }
 
 interface PresetsCtx {
@@ -48,7 +55,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-datepicker" [ngClass]="{ 'rozie-datepicker--disabled': (disabled() || this.__rozieCvaDisabled()) }" #root role="group" aria-label="Date picker" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-datepicker" [ngClass]="{ 'rozie-datepicker--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-datepicker--multi': numberOfMonths() > 1 }" #root role="group" aria-label="Date picker" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" #rozieSpread_0 #rozieListenersTarget_1>
       
       @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled() }, label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled() }" />
@@ -56,21 +63,25 @@ function __rozieAttr(v: unknown): string | null {
 
         <div class="rozie-datepicker-header">
           <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Previous month" (click)="goPrevMonth()">‹</button>
-          <span class="rozie-datepicker-heading" aria-live="polite">{{ rozieDisplay(monthHeading()) }}</span>
-          <button type="button" class="rozie-datepicker-nav rozie-datepicker-next" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Next month" (click)="goNextMonth()">›</button>
+          @if (monthYearNav()) {
+    <button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Change month and year" aria-live="polite" (click)="enterMonthsView()">{{ rozieDisplay(monthHeading()) }}</button>
+    } @else {
+    <span class="rozie-datepicker-heading" aria-live="polite">{{ rozieDisplay(monthHeading()) }}</span>
+    }<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Next month" (click)="goNextMonth()">›</button>
         </div>
       
     }
 
       
-      <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
+      @for (g of daysGrids(); track gi; let gi = $index) {
+    <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
         <div class="rozie-datepicker-weekdays" role="row">
           @for (wd of weekdays(); track wi; let wi = $index) {
     <span class="rozie-datepicker-weekday" role="columnheader" [attr.aria-label]="rozieAttr(wd)">{{ rozieDisplay(wd) }}</span>
     }
         </div>
 
-        @for (week of grid().weeks; track wk; let wk = $index) {
+        @for (week of g.weeks; track wk; let wk = $index) {
     <div class="rozie-datepicker-week" role="row">
           @for (day of week; track day.iso) {
     <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!(day.selected || day.rangeStart || day.rangeEnd)">
@@ -80,9 +91,43 @@ function __rozieAttr(v: unknown): string | null {
         </div>
     }
       </div>
+    }
 
       
-      @if ((presetsTpl ?? templates()?.['presets'])) {
+      @if (showsMonthsView()) {
+    <div class="rozie-datepicker-months">
+        <div class="rozie-datepicker-drill-header">
+          <button type="button" class="rozie-datepicker-drill-label" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Change year" (click)="enterYearsView()">{{ rozieDisplay(monthList().year) }}</button>
+        </div>
+        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month">
+          @for (cell of monthList().months; track cell.iso) {
+    <button type="button" class="rozie-datepicker-month" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-month]="rozieAttr(cell.iso)" [attr.tabindex]="rozieAttr(monthTabIndex(cell))" [disabled]="!!cell.disabled" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectMonth(cell.iso)" (keydown)="onMonthKeydown(cell.iso, $event)">{{ rozieDisplay(cell.label) }}</button>
+    }
+        </div>
+      </div>
+    }@if (showsYearsView()) {
+    <div class="rozie-datepicker-years">
+        <div class="rozie-datepicker-drill-header">
+          <span class="rozie-datepicker-drill-label" aria-live="polite">{{ rozieDisplay(yearRangeLabel()) }}</span>
+        </div>
+        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year">
+          @for (cell of yearGrid().years; track cell.iso) {
+    <button type="button" class="rozie-datepicker-year" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-year]="rozieAttr(cell.iso)" [attr.tabindex]="rozieAttr(yearTabIndex(cell))" [disabled]="!!cell.disabled" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectYear(cell.iso)" (keydown)="onYearKeydown(cell.iso, $event)">{{ rozieDisplay(cell.year) }}</button>
+    }
+        </div>
+      </div>
+    }@if (showsFooter()) {
+    @if ((footerTpl ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { today: selectToday, clear: clear, todayIso: todayIso() }, today: selectToday, clear: clear, todayIso: todayIso() }" />
+    } @else {
+
+        <div class="rozie-datepicker-footer">
+          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="selectToday()">Today</button>
+          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="clear()">Clear</button>
+        </div>
+      
+    }
+    }@if ((presetsTpl ?? templates()?.['presets'])) {
     <ng-container *ngTemplateOutlet="(presetsTpl ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
     } @else {
 
@@ -266,6 +311,133 @@ function __rozieAttr(v: unknown): string | null {
       opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
       pointer-events: none;
     }
+    .rozie-datepicker-drill-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--rozie-datepicker-drill-header-gap, 0.5rem);
+    }
+    .rozie-datepicker-drill-label {
+      font: inherit;
+      font-weight: var(--rozie-datepicker-heading-weight, 600);
+      font-size: var(--rozie-datepicker-heading-size, 0.95rem);
+      color: inherit;
+      background: var(--rozie-datepicker-drill-label-bg, transparent);
+      border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+      border-radius: var(--rozie-datepicker-nav-radius, 6px);
+      padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .rozie-datepicker-drill-label:hover {
+      background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+    .rozie-datepicker-drill-label:focus-visible {
+      outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+      outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+    }
+    .rozie-datepicker-heading-button {
+      font: inherit;
+      color: inherit;
+      background: var(--rozie-datepicker-drill-label-bg, transparent);
+      border: var(--rozie-datepicker-border-width, 1px) solid transparent;
+      border-radius: var(--rozie-datepicker-nav-radius, 6px);
+      padding: var(--rozie-datepicker-drill-label-padding, 0.15rem 0.5rem);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .rozie-datepicker-heading-button:hover {
+      background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+    .rozie-datepicker-months .rozie-datepicker-drill-grid,
+    .rozie-datepicker-years .rozie-datepicker-drill-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--rozie-datepicker-drill-cols, 3), 1fr);
+      gap: var(--rozie-datepicker-drill-gap, 0.25rem);
+    }
+    .rozie-datepicker-month,
+    .rozie-datepicker-year {
+      box-sizing: border-box;
+      height: var(--rozie-datepicker-drill-cell-height, 2.5rem);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font: inherit;
+      font-size: var(--rozie-datepicker-drill-cell-size, 0.85rem);
+      color: inherit;
+      background: var(--rozie-datepicker-day-bg, transparent);
+      border: var(--rozie-datepicker-day-border-width, 1px) solid transparent;
+      border-radius: var(--rozie-datepicker-day-radius, 6px);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .rozie-datepicker-month:hover:not(:disabled),
+    .rozie-datepicker-year:hover:not(:disabled) {
+      background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+    .rozie-datepicker-month.is-current:not(.is-selected),
+    .rozie-datepicker-year.is-current:not(.is-selected) {
+      border-color: var(--rozie-datepicker-today-border, var(--rozie-datepicker-accent, #0066cc));
+    }
+    .rozie-datepicker-month.is-selected,
+    .rozie-datepicker-year.is-selected {
+      color: var(--rozie-datepicker-selected-fg, #fff);
+      background: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+      border-color: var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc));
+      font-weight: var(--rozie-datepicker-selected-weight, 600);
+    }
+    .rozie-datepicker-month:focus-visible,
+    .rozie-datepicker-year:focus-visible {
+      outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+      outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+    }
+    .rozie-datepicker-month:disabled,
+    .rozie-datepicker-year:disabled {
+      cursor: not-allowed;
+      opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+      pointer-events: none;
+    }
+    .rozie-datepicker-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--rozie-datepicker-footer-gap, 0.25rem);
+      margin-top: var(--rozie-datepicker-footer-gap-top, 0.5rem);
+    }
+    .rozie-datepicker-footer-btn {
+      font: inherit;
+      font-size: var(--rozie-datepicker-footer-size, 0.78rem);
+      color: var(--rozie-datepicker-footer-fg, inherit);
+      background: var(--rozie-datepicker-footer-bg, transparent);
+      border: var(--rozie-datepicker-border-width, 1px) solid var(--rozie-datepicker-border, rgba(0, 0, 0, 0.18));
+      border-radius: var(--rozie-datepicker-footer-radius, 6px);
+      padding: var(--rozie-datepicker-footer-padding, 0.2rem 0.6rem);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .rozie-datepicker-footer-btn:hover:not(:disabled) {
+      background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+    .rozie-datepicker-footer-btn:focus-visible {
+      outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
+      outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+    }
+    .rozie-datepicker-footer-btn:disabled {
+      cursor: not-allowed;
+      opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
+      pointer-events: none;
+    }
+    .rozie-datepicker--multi .rozie-datepicker-grid {
+      display: inline-grid;
+      vertical-align: top;
+    }
+    .rozie-datepicker--multi .rozie-datepicker-grid + .rozie-datepicker-grid {
+      margin-left: var(--rozie-datepicker-month-gap, 1rem);
+    }
   `],
   providers: [
     {
@@ -315,12 +487,34 @@ export class DatePicker {
    * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
    */
   presetRanges = input<any[]>((() => [])());
+  /**
+   * Render the month-year heading as a clickable drill **button** that navigates days → months → years (and a year label that drills months → years). **Capability-on:** this is the documented exception to the boolean-default-`false` rule — the drill navigation is the ergonomic win of this feature, so it defaults to `true`. Set `:month-year-nav="false"` to restore the static heading `<span>` (byte-identical to the pre-navigation output).
+   */
+  monthYearNav = input<boolean>(true);
+  /**
+   * How many month grids to render side by side, anchored at the view month and stepping forward (e.g. `2` for a two-up range calendar). `1` (the default) emits exactly the single-month markup with no extra wrapper element.
+   */
+  numberOfMonths = input<number>(1);
+  /**
+   * Render a Today / Clear footer row beneath the calendar grid. `Today` selects (single mode) or navigates to (range mode) the current date; `Clear` deselects. The `#footer` slot fully overrides the default row, receiving `{ today, clear, todayIso }`.
+   */
+  showFooter = input<boolean>(false);
+  /**
+   * An array of weekday indices to disable, `Number[]` where `0` = Sunday through `6` = Saturday (e.g. `[0, 6]` disables every weekend). Serializable, so it passes fine as a plain attribute. Threaded through the single gating funnel, so disabled weekdays are non-interactive, non-focusable, and marked `aria-disabled` — in agreement with day cells, drill enablement, and keyboard focus.
+   */
+  disabledDaysOfWeek = input<any[]>((() => [])());
+  /**
+   * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
+   */
+  isDateDisabled = input<((...args: unknown[]) => unknown) | null>(null);
   viewIso = signal('');
   hoverIso = signal('');
+  viewMode = signal('days');
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   change = output<unknown>();
   rangeComplete = output<unknown>();
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
+  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   @ContentChild('presets', { read: TemplateRef }) presetsTpl?: TemplateRef<PresetsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
@@ -355,11 +549,44 @@ export class DatePicker {
     min: this.min(),
     max: this.max(),
     disabledDates: this.disabledDates(),
+    disabledDaysOfWeek: this.disabledDaysOfWeek(),
+    isDateDisabled: this.isDateDisabled(),
     weekStartsOn: this.weekStartsOn(),
     disabled: (this.disabled() || this.__rozieCvaDisabled()),
     selection: this.selectionMode() === 'range' ? this.readRange() : undefined,
     previewEnd: this.selectionMode() === 'range' ? this.hoverIso() : undefined
   });
+  grids = () => Array.from({
+    length: this.numberOfMonths()
+  }, (_: any, i: any) => buildMonthGrid({
+    viewIso: addMonths(this.viewMonthGrid(), i),
+    value: this.selected(),
+    today: this.todayIso(),
+    min: this.min(),
+    max: this.max(),
+    disabledDates: this.disabledDates(),
+    disabledDaysOfWeek: this.disabledDaysOfWeek(),
+    isDateDisabled: this.isDateDisabled(),
+    weekStartsOn: this.weekStartsOn(),
+    disabled: (this.disabled() || this.__rozieCvaDisabled()),
+    selection: this.selectionMode() === 'range' ? this.readRange() : undefined,
+    previewEnd: this.selectionMode() === 'range' ? this.hoverIso() : undefined
+  }));
+  monthList = () => buildMonthList(this.viewMonthGrid(), {
+    min: this.min(),
+    max: this.max(),
+    value: this.selected(),
+    today: this.todayIso(),
+    locale: this.locale()
+  });
+  yearGrid = () => buildYearGrid(this.viewMonthGrid(), {
+    min: this.min(),
+    max: this.max(),
+    value: this.selected(),
+    today: this.todayIso()
+  });
+  yearRangeLabel = () => this.yearGrid().rangeLabel;
+  daysGrids = () => this.showsDaysView() ? this.grids() : [];
   dayTabIndex = (day: any): number | undefined => day.selected || this.selected() === '' && day.today ? 0 : -1;
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale());
   weekdays = () => weekdayLabels(this.weekStartsOn(), this.locale());
@@ -370,6 +597,8 @@ export class DatePicker {
     min: this.min(),
     max: this.max(),
     disabledDates: this.disabledDates(),
+    disabledDaysOfWeek: this.disabledDaysOfWeek(),
+    isDateDisabled: this.isDateDisabled(),
     weekStartsOn: this.weekStartsOn(),
     disabled: (this.disabled() || this.__rozieCvaDisabled())
   });
@@ -431,11 +660,36 @@ export class DatePicker {
     if (this.selectionMode() === 'range') this.commitRange(iso);else this.commitValue(iso);
   };
   goToMonth = (delta: any) => {
+    const __viewMode = this.viewMode();
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    this.viewIso.set(addMonths(this.viewMonthGrid(), delta));
+    const unit = __viewMode === 'years' ? 144 : __viewMode === 'months' ? 12 : 1;
+    this.viewIso.set(addMonths(this.viewMonthGrid(), delta * unit));
   };
   goPrevMonth = () => this.goToMonth(-1);
   goNextMonth = () => this.goToMonth(1);
+  showsDaysView = (): boolean => this.viewMode() === 'days';
+  showsMonthsView = (): boolean => this.viewMode() === 'months';
+  showsYearsView = (): boolean => this.viewMode() === 'years';
+  enterMonthsView = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    this.viewMode.set('months');
+  };
+  enterYearsView = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    this.viewMode.set('years');
+  };
+  selectMonth = (iso: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (!isIsoDate(iso)) return;
+    this.viewIso.set(iso);
+    this.viewMode.set('days');
+  };
+  selectYear = (iso: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (!isIsoDate(iso)) return;
+    this.viewIso.set(iso);
+    this.viewMode.set('months');
+  };
   dayCells = () => {
     const root = this.root()?.nativeElement;
     if (!root) return [];
@@ -450,12 +704,43 @@ export class DatePicker {
       }
     }
   };
+  monthCells = () => {
+    const root = this.root()?.nativeElement;
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('[data-month]')) as HTMLElement[];
+  };
+  focusMonthIso = (iso: any) => {
+    const cells = this.monthCells();
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].getAttribute('data-month') === iso) {
+        cells[i].focus();
+        return;
+      }
+    }
+  };
+  yearCells = () => {
+    const root = this.root()?.nativeElement;
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('[data-year]')) as HTMLElement[];
+  };
+  focusYearIso = (iso: any) => {
+    const cells = this.yearCells();
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].getAttribute('data-year') === iso) {
+        cells[i].focus();
+        return;
+      }
+    }
+  };
+  monthTabIndex = (cell: any): number | undefined => cell.selected || this.selected() === '' && cell.current ? 0 : -1;
+  yearTabIndex = (cell: any): number | undefined => cell.selected || this.selected() === '' && cell.current ? 0 : -1;
   moveFocus = (fromIso: any, days: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const next = addDays(fromIso, days);
-    const g = this.grid();
-    // If `next` is not in the rendered weeks, swing the view to its month first.
-    const present = g.weeks.some((row: any) => row.some((d: any) => d.iso === next));
+    // Widened to ANY rendered month (multi-month): if `next` is present in any of
+    // the displayed grids, arrow focus can cross month columns without swinging
+    // the view. Only when it leaves every rendered month do we move the anchor.
+    const present = this.grids().some((g: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === next)));
     if (!present) this.viewIso.set(next);
     this.focusDayIso(next);
   };
@@ -512,6 +797,47 @@ export class DatePicker {
         }
       }
     }
+  };
+  DRILL_COLS = 3;
+  onMonthKeydown = (iso: any, e: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    const key = e ? e.key : '';
+    const cells = this.monthList().months;
+    let idx = -1;
+    for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
+    if (idx < 0) return;
+    let next = idx;
+    if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - this.DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + this.DRILL_COLS);else if (key === 'Home') next = idx - idx % this.DRILL_COLS;else if (key === 'End') next = idx - idx % this.DRILL_COLS + (this.DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+      e.preventDefault();
+      this.selectMonth(iso);
+      return;
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      this.viewMode.set('days');
+      return;
+    } else return;
+    e.preventDefault();
+    this.focusMonthIso(cells[next].iso);
+  };
+  onYearKeydown = (iso: any, e: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    const key = e ? e.key : '';
+    const cells = this.yearGrid().years;
+    let idx = -1;
+    for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
+    if (idx < 0) return;
+    let next = idx;
+    if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - this.DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + this.DRILL_COLS);else if (key === 'Home') next = idx - idx % this.DRILL_COLS;else if (key === 'End') next = idx - idx % this.DRILL_COLS + (this.DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+      e.preventDefault();
+      this.selectYear(iso);
+      return;
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      this.viewMode.set('days');
+      return;
+    } else return;
+    e.preventDefault();
+    this.focusYearIso(cells[next].iso);
   };
   weekdayOffset = (iso: any) => {
     const g = this.grid();
@@ -572,6 +898,15 @@ export class DatePicker {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     this.viewIso.set(this.todayIso());
   };
+  selectToday = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (this.selectionMode() === 'range') {
+      this.goToToday();
+    } else {
+      this.commitValue(this.todayIso());
+    }
+  };
+  showsFooter = (): boolean => !!this.showFooter();
   clear = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     if (this.selectionMode() === 'range') {
@@ -623,7 +958,7 @@ export class DatePicker {
   static ngTemplateContextGuard(
     _dir: DatePicker,
     _ctx: unknown,
-  ): _ctx is HeaderCtx | PresetsCtx {
+  ): _ctx is HeaderCtx | FooterCtx | PresetsCtx {
     return true;
   }
 

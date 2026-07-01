@@ -66,6 +66,13 @@ export interface MonthGridInput {
   max?: string | null;
   /** Explicitly disabled ISO dates. */
   disabledDates?: string[];
+  /** Disabled weekdays by UTC index: 0 = Sunday … 6 = Saturday (e.g. `[0, 6]` disables weekends). */
+  disabledDaysOfWeek?: number[];
+  /**
+   * Consumer predicate: return `true` to disable the given ISO date. Runs in the
+   * consumer's own context (T-70-02 — accepted). Absent / `null` disables nothing.
+   */
+  isDateDisabled?: ((iso: string) => boolean) | null;
   /** First day of the week: 0 = Sunday … 6 = Saturday. */
   weekStartsOn?: number;
   /** Disable every day (the whole control is disabled). */
@@ -90,6 +97,60 @@ export interface MonthGrid {
   month: number;
   /** Weeks, each a 7-element row of CalendarDay (always 6 rows for a stable layout). */
   weeks: CalendarDay[][];
+}
+
+export interface MonthCell {
+  /** First-of-month ISO `YYYY-MM-01` for this cell. */
+  iso: string;
+  /** Localized short month name (e.g. `'Jan'`). */
+  label: string;
+  /** `true` when this month === the selected `value`'s month/year. */
+  selected: boolean;
+  /** `true` when this month === `today`'s month/year. */
+  current: boolean;
+  /** `true` when the month's entire span falls outside `[min, max]`. */
+  disabled: boolean;
+}
+
+export interface MonthList {
+  /** The anchor year the 12 cells belong to. */
+  year: number;
+  /** Twelve month cells, January (index 0) → December (index 11). */
+  months: MonthCell[];
+}
+
+export interface YearCell {
+  /** Jan-1 ISO `YYYY-01-01` for this cell. */
+  iso: string;
+  /** The numeric year. */
+  year: number;
+  /** `true` when this year === the selected `value`'s year. */
+  selected: boolean;
+  /** `true` when this year === `today`'s year. */
+  current: boolean;
+  /** `true` when the whole year falls outside `[min, max]`. */
+  disabled: boolean;
+}
+
+export interface YearGrid {
+  /** Window label like `"2020–2031"` (en-dash). */
+  rangeLabel: string;
+  /** Twelve year cells spanning the decade-aligned window. */
+  years: YearCell[];
+}
+
+/** Bounds + flags input for the month/year drill models. */
+export interface DrillInput {
+  /** Inclusive lower bound (ISO) or `null`. */
+  min?: string | null;
+  /** Inclusive upper bound (ISO) or `null`. */
+  max?: string | null;
+  /** The selected ISO date, or `''` when nothing is selected. */
+  value: string;
+  /** Today's ISO date (injected so the model stays deterministic/testable). */
+  today: string;
+  /** BCP-47 locale for localized labels; defaults to `en-US`. */
+  locale?: string;
 }
 
 /** Pad a 1-or-2-digit number to a 2-char string. */
@@ -214,7 +275,8 @@ export function addDays(iso: string, n: number): string {
 
 /**
  * `true` when the ISO date is NOT selectable: outside `[min, max]`, in
- * `disabledDates`, or the control is globally disabled.
+ * `disabledDates`, its weekday is in `disabledDaysOfWeek`, the `isDateDisabled`
+ * predicate rejects it, or the control is globally disabled.
  */
 export function isDayDisabled(iso: string, input: MonthGridInput): boolean {
   if (input.disabled) return true;
@@ -226,6 +288,10 @@ export function isDayDisabled(iso: string, input: MonthGridInput): boolean {
   if (maxT != null && t > maxT) return true;
   const list = input.disabledDates || [];
   for (let i = 0; i < list.length; i++) if (list[i] === iso) return true;
+  const dow = new Date(t).getUTCDay();
+  const blockedDows = input.disabledDaysOfWeek || [];
+  for (let i = 0; i < blockedDows.length; i++) if (blockedDows[i] === dow) return true;
+  if (input.isDateDisabled && input.isDateDisabled(iso)) return true;
   return false;
 }
 
@@ -308,6 +374,93 @@ export function monthLabel(viewIso: string, locale: string): string {
   } catch {
     return MONTH_NAMES_FALLBACK[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
   }
+}
+
+/**
+ * Build the 12-cell month-picker model for the drill "months" view. Pure and
+ * UTC-safe — a fresh `MonthList` each call, no DOM, no framework. A month cell is
+ * `disabled` ONLY when its entire span (`toIso(y,m,1)` … `toIso(y,m+1,0)`) falls
+ * outside `[min, max]`; a partial overlap keeps it selectable.
+ */
+export function buildMonthList(viewIso: string, input: DrillInput): MonthList {
+  const anchor = isoToUtc(viewIso);
+  const year = (anchor == null ? new Date() : new Date(anchor)).getUTCFullYear();
+
+  const minT = isoToUtc(input.min);
+  const maxT = isoToUtc(input.max);
+
+  const valueT = isoToUtc(isIsoDate(input.value) ? input.value : '');
+  const todayT = isoToUtc(isIsoDate(input.today) ? input.today : '');
+  const valueDate = valueT == null ? null : new Date(valueT);
+  const todayDate = todayT == null ? null : new Date(todayT);
+
+  let fmt: Intl.DateTimeFormat | null = null;
+  try {
+    fmt = new Intl.DateTimeFormat(input.locale || 'en-US', { month: 'short', timeZone: 'UTC' });
+  } catch {
+    fmt = null;
+  }
+
+  const months: MonthCell[] = [];
+  for (let m = 0; m < 12; m++) {
+    const iso = toIso(year, m, 1);
+    const first = isoToUtc(iso) as number;
+    const last = isoToUtc(toIso(year, m + 1, 0)) as number;
+    let disabled = false;
+    if (minT != null && last < minT) disabled = true;
+    if (maxT != null && first > maxT) disabled = true;
+    months.push({
+      iso,
+      label: fmt ? fmt.format(new Date(first)) : MONTH_NAMES_FALLBACK[m].slice(0, 3),
+      selected:
+        valueDate != null && valueDate.getUTCFullYear() === year && valueDate.getUTCMonth() === m,
+      current:
+        todayDate != null && todayDate.getUTCFullYear() === year && todayDate.getUTCMonth() === m,
+      disabled,
+    });
+  }
+  return { year, months };
+}
+
+/**
+ * Build the 12-cell year-picker model for the drill "years" view. The window is
+ * decade-aligned (`floor(year/10)*10` … `+11`) so the same `viewIso` always
+ * yields the same block and `rangeLabel`. A year cell is `disabled` ONLY when its
+ * whole span (`toIso(y,0,1)` … `toIso(y,11,31)`) falls outside `[min, max]`. Pure,
+ * UTC-safe, fresh object each call.
+ */
+export function buildYearGrid(viewIso: string, input: DrillInput): YearGrid {
+  const anchor = isoToUtc(viewIso);
+  const year = (anchor == null ? new Date() : new Date(anchor)).getUTCFullYear();
+  const start = Math.floor(year / 10) * 10;
+
+  const minT = isoToUtc(input.min);
+  const maxT = isoToUtc(input.max);
+
+  const valueT = isoToUtc(isIsoDate(input.value) ? input.value : '');
+  const todayT = isoToUtc(isIsoDate(input.today) ? input.today : '');
+  const valueYear = valueT == null ? null : new Date(valueT).getUTCFullYear();
+  const todayYear = todayT == null ? null : new Date(todayT).getUTCFullYear();
+
+  const years: YearCell[] = [];
+  for (let i = 0; i < 12; i++) {
+    const y = start + i;
+    const iso = toIso(y, 0, 1);
+    const first = isoToUtc(iso) as number;
+    const last = isoToUtc(toIso(y, 11, 31)) as number;
+    let disabled = false;
+    if (minT != null && last < minT) disabled = true;
+    if (maxT != null && first > maxT) disabled = true;
+    years.push({
+      iso,
+      year: y,
+      selected: valueYear != null && valueYear === y,
+      current: todayYear != null && todayYear === y,
+      disabled,
+    });
+  }
+  // U+2013 EN DASH between the window bounds.
+  return { rangeLabel: start + '–' + (start + 11), years };
 }
 
 /**
