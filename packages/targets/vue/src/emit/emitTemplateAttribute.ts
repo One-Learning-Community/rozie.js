@@ -132,6 +132,122 @@ function normalizeNullAttrBinding(expr: t.Expression): t.Expression {
 }
 
 /**
+ * Phase 67 (SC-1 / SC-3) — DOM-attribute names whose vue-tsc slot type is
+ * `X | undefined` (never `X | null`), so a nullable-SHAPED binding (`string|null`,
+ * `number|null`, `'true'|null`) bound RAW is a TS2322. Ported from react's
+ * Phase-65 `NUMERIC_HTML_ATTRS` + `BOOLEAN_NULLISH_ARIA_ATTRS` and extended with
+ * the STRING-typed ARIA names in the vue family-child TS2322 inventory
+ * (`aria-activedescendant`, `aria-invalid`). For a binding on one of these attrs
+ * whose expression shape is NOT provably-non-nullish, the emitter wraps the
+ * (rewritten) expression as `(expr) ?? undefined` — Vue treats `null`≡`undefined`
+ * for attribute presence, so this is the faithful drop AND it satisfies the
+ * `X | undefined` slot without a `null` in the union.
+ *
+ * Compared to react this is the SAME attr set (react's numeric + boolean-enum),
+ * plus the string-ARIA names react routes through `rozieAttr` (a fallback Vue
+ * lacks). The wrap is gated ADDITIONALLY on the shape exclusion below so a
+ * provably-non-null operand is never wrapped (TS2869 guard).
+ */
+const NULLABLE_DOM_ATTR_SLOTS: ReadonlySet<string> = new Set([
+  // Numeric DOM-attr slots (react NUMERIC_HTML_ATTRS).
+  'tabindex',
+  'maxlength',
+  'minlength',
+  'rowspan',
+  'colspan',
+  'size',
+  'cols',
+  'rows',
+  'span',
+  'start',
+  'aria-rowindex',
+  'aria-colindex',
+  'aria-rowcount',
+  'aria-colcount',
+  'aria-level',
+  'aria-valuenow',
+  'aria-valuemin',
+  'aria-valuemax',
+  // Boolean-enumerated ARIA slot (react BOOLEAN_NULLISH_ARIA_ATTRS).
+  'aria-expanded',
+  // String-typed ARIA slots in the vue family-child TS2322 inventory. React
+  // routes these through `rozieAttr`; Vue has no such fallback, so it wraps.
+  'aria-activedescendant',
+  'aria-invalid',
+]);
+
+/**
+ * Member-property names that TypeScript proves `number` (never nullish) — a
+ * `.length`/`.size` read. Bound to a numeric attr slot these are RAW; appending
+ * `?? undefined` to a statically-`number` operand is TS2869 "unreachable right
+ * operand" (the NEGATIVE-witness guard).
+ */
+const PROVABLY_NUMBER_MEMBER_PROPS: ReadonlySet<string> = new Set(['length', 'size']);
+
+/**
+ * A LogicalExpression whose RHS fallback yields a non-nullish result.
+ */
+const NON_NULLISH_LOGICAL_OPS: ReadonlySet<string> = new Set(['||', '&&', '??']);
+
+/**
+ * Phase 67 CRITICAL DIVERGENCE from react's `isProvablyNonNullishNumeric`.
+ *
+ * React treats a bald CallExpression / MemberExpression as non-nullish (emits
+ * RAW) precisely BECAUSE it has a `rozieAttr` fallback that handles the runtime
+ * drop downstream. Vue has NO `rozieAttr` path and does NO type inference, and
+ * the real TS2322 sources ARE calls (`cellTabindex()` → `number|null`) and
+ * identifiers (`activeDescendant` → `string|null`). So Vue's exclusion predicate
+ * is NARROWER: a bare call / general member / identifier is treated as
+ * POSSIBLY-nullish (→ WRAP). Only shapes TypeScript proves non-null — and would
+ * flag TS2869 on if wrapped — are recognized here (→ RAW):
+ *   - a numeric / string / boolean / bigint literal, a TemplateLiteral;
+ *   - ANY BinaryExpression (`a + 1`, `i * 2`, `a === b`, `a < b`) — every binary
+ *     operator yields a non-null primitive (number | string | boolean | bigint);
+ *   - a boolean/number/string UnaryExpression (`!x`, `!!x`, `+x`, `-x`, `typeof x`);
+ *   - a provably-number member read (`arr.length`, `set.size`);
+ *   - a LogicalExpression `a || n` / `a ?? n` / `a && n` whose RHS is itself
+ *     provably-non-nullish (`span || 1`).
+ * A ConditionalExpression (`x ? n : null`, normalized to `: undefined`) is
+ * deliberately NOT recognized, so it falls through to the `?? undefined` drop
+ * with a REACHABLE right operand (its `undefined` branch → no TS2869).
+ */
+function isProvablyNonNullishAttr(expr: t.Expression): boolean {
+  if (
+    t.isNumericLiteral(expr) ||
+    t.isStringLiteral(expr) ||
+    t.isBooleanLiteral(expr) ||
+    t.isBigIntLiteral(expr) ||
+    t.isTemplateLiteral(expr)
+  ) {
+    return true;
+  }
+  // Every BinaryExpression yields a non-null primitive (arithmetic → number,
+  // `+` with a string → string, comparison/equality → boolean).
+  if (t.isBinaryExpression(expr)) return true;
+  if (t.isUnaryExpression(expr)) {
+    return (
+      expr.operator === '!' ||
+      expr.operator === '+' ||
+      expr.operator === '-' ||
+      expr.operator === '~' ||
+      expr.operator === 'typeof'
+    );
+  }
+  // A `.length` / `.size` member is provably `number`; a GENERAL member
+  // (`row.value`, `$data.activeDescendant`) may be nullable → NOT excluded.
+  if (t.isMemberExpression(expr) || t.isOptionalMemberExpression(expr)) {
+    if (!expr.computed && t.isIdentifier(expr.property)) {
+      return PROVABLY_NUMBER_MEMBER_PROPS.has(expr.property.name);
+    }
+    return false;
+  }
+  if (t.isLogicalExpression(expr) && NON_NULLISH_LOGICAL_OPS.has(expr.operator)) {
+    return isProvablyNonNullishAttr(expr.right);
+  }
+  return false;
+}
+
+/**
  * Phase 12 — the three BUILT-IN model modifiers. Vue has a native `v-model`
  * suffix for each (`v-model.lazy.number.trim`), so a chain composed only of
  * these maps ~1:1. Any modifier NOT in this set is a CUSTOM model modifier
@@ -528,10 +644,22 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
     // `undefined` so vue-tsc's `string | undefined` attr types accept it
     // (quick task 260520-w18).
-    const expr = rewriteTemplateExpression(
-      normalizeNullAttrBinding(attr.expression),
-      ir,
-    );
+    const normalized = normalizeNullAttrBinding(attr.expression);
+    const expr = rewriteTemplateExpression(normalized, ir);
+    // Phase 67 (SC-1 / SC-3) — a nullable-SHAPED binding on a `X | undefined`
+    // DOM-attr slot (`:aria-activedescendant="activeDescendant"`,
+    // `:tabindex="cellTabindex()"`) is a TS2322 (its inferred type includes
+    // `null`). Vue has no `rozieAttr` fallback and does no type inference, so it
+    // decides by SHAPE (ported from react's Phase-65 heuristic, DIVERGING to
+    // wrap calls/general-members/identifiers). Wrap as `(expr) ?? undefined`
+    // unless the shape is provably-non-nullish (TS2869 guard). Parenthesize so a
+    // top-level `||`/`&&` adjacent to `??` stays well-formed.
+    if (
+      NULLABLE_DOM_ATTR_SLOTS.has(name.toLowerCase()) &&
+      !isProvablyNonNullishAttr(normalized)
+    ) {
+      return `:${name}="(${expr}) ?? undefined"`;
+    }
     return `:${name}="${expr}"`;
   }
 
