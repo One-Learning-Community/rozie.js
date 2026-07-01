@@ -43,6 +43,7 @@ import type { SourceMap } from 'magic-string';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { resolveComponentRefs } from '../../../core/src/codegen/resolveComponentRefs.js';
 import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
@@ -225,10 +226,20 @@ export function emitReact(
   // enclosing function declaration in the same file).
   // Defensive `?? []` guards pre-P1 hand-rolled IRs in legacy tests.
   const components = ir.components ?? [];
+  // Phase 66 (D-2 Handle-INTERFACE route, SC-1): the set of composed-component
+  // LOCAL names that are the target of a `$refs.X` in this component. For those
+  // — and ONLY those — the import is augmented to also bring the child's
+  // already-exported `type <Name>Handle` (react barrel `index.ts:5`) so the
+  // parent's `useRef<<Name>Handle | null>` (emitScript.ts) resolves. A composed
+  // component that is NOT ref'd keeps its default-only import byte-identical.
+  const refdComponentNames = new Set(resolveComponentRefs(ir).values());
   const componentImportsLines: string[] = components
     .filter((decl) => decl.localName !== ir.name) // skip redundant self-entry
     .map((decl) => {
       const rewritten = rewriteRozieImport(decl.importPath, 'react');
+      if (refdComponentNames.has(decl.localName)) {
+        return `import ${decl.localName}, { type ${decl.localName}Handle } from '${rewritten}';`;
+      }
       return `import ${decl.localName} from '${rewritten}';`;
     });
   const componentImportsBlock =

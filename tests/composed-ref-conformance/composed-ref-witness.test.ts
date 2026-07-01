@@ -41,8 +41,21 @@
 import { describe, it, expect } from 'vitest';
 import { runWitness, type Target } from './composed-ref.harness.js';
 
-/** The 5 targets that currently mis-type a composed-component ref as HTMLElement. */
-const BROKEN_TARGETS: Target[] = ['react', 'vue', 'svelte', 'solid', 'lit'];
+/**
+ * Targets that STILL mis-type a composed-component ref as HTMLElement (RED).
+ * Phase 66 P2 (this plan) FIXED react FIRST (D-2 Handle-INTERFACE route); solid
+ * follows in Task 2. Each fixed target moves to the unconditionally-GREEN block
+ * below and drops its `it.fails` gating. vue/svelte (P3) and lit (P4) stay RED.
+ */
+const BROKEN_TARGETS: Target[] = ['vue', 'svelte', 'solid', 'lit'];
+
+/**
+ * Targets FIXED by P2 (the Handle-INTERFACE route): a composed-component ref
+ * types as the child's exported `<Name>Handle`, so `$refs.child.ping()`
+ * typechecks and the "ping does not exist on HTMLElement" count is 0. Plain
+ * GREEN `it` (no `.fails`).
+ */
+const FIXED_HANDLE_TARGETS: Target[] = ['react'];
 
 describe('composed-component ref → Handle typing witness (D-4)', () => {
   it('both fixtures compile to all 6 targets without a compiler crash', () => {
@@ -61,6 +74,26 @@ describe('composed-component ref → Handle typing witness (D-4)', () => {
         `ref is typed viewChild<ExposeChild>). Got ${r.pingHtmlElementCount}.\n${r.raw}`,
     ).toBe(0);
   }, 180000);
+
+  // GREEN (P2 fix landed): react/solid type the composed ref as the child's
+  // exported `<Name>Handle` — `$refs.child.ping()` typechecks, so the "ping on
+  // HTMLElement" count is 0. Plain `it` (the `.fails` gate is dropped the moment
+  // the fix makes the assertion pass for real — per the it.fails design above).
+  for (const target of FIXED_HANDLE_TARGETS) {
+    it(
+      `${target}: composed ref types as child handle, not HTMLElement (GREEN — P2 fix)`,
+      () => {
+        const r = runWitness(target);
+        expect(
+          r.pingHtmlElementCount,
+          `[${target}] expected 0 "ping does not exist on HTMLElement" errors ` +
+            `(GREEN — the ref is typed as the child <Name>Handle). ` +
+            `Got ${r.pingHtmlElementCount}.\n${r.raw}`,
+        ).toBe(0);
+      },
+      180000,
+    );
+  }
 
   // RED-FIRST: each broken target asserts the DESIRED end state (count === 0),
   // which currently FAILS (count >= 1). `it.fails` inverts → committable green.

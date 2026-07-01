@@ -42,6 +42,7 @@ import type {
 import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import {
@@ -2360,8 +2361,25 @@ export function emitScript(
   }
 
   // 5d. useRef for each RefDecl. Element type guessed from elementTag.
+  //
+  // Phase 66 (D-2 Handle-INTERFACE route, SC-1): a ref that points at a
+  // `<components>`-composed CHILD is typed as the child's already-exported
+  // `<Name>Handle` interface (React's `$expose` handle is a plain object) so
+  // `$refs.child.exposedMethod()` typechecks. The shared core resolver decides
+  // "is this ref a composed component" — it returns NOTHING for a DOM ref, so
+  // the DOM `switch` below runs UNCHANGED for every non-composed ref (the
+  // inertness/byte-identity carve-out). The `<Name>Handle` import is wired at
+  // the child-import synthesis site (emitReact.ts).
+  const componentRefs = resolveComponentRefs(ir);
   for (const r of ir.refs) {
     collectors.react.add('useRef');
+    const componentLocalName = componentRefs.get(r.name);
+    if (componentLocalName !== undefined) {
+      hookLines.push(
+        `const ${r.name} = useRef<${componentLocalName}Handle | null>(null);`,
+      );
+      continue;
+    }
     let domType = 'HTMLElement';
     switch (r.elementTag.toLowerCase()) {
       case 'input':
