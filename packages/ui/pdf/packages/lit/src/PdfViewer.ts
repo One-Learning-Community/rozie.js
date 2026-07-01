@@ -51,6 +51,10 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
 .rozie-pdf .textLayer ::selection {
     background: rgba(0, 100, 255, 0.3);
   }
+.rozie-pdf .textLayer span.rozie-pdf-find {
+    background: rgba(255, 196, 0, 0.45);
+    border-radius: 2px;
+  }
 `;
 
   /**
@@ -219,6 +223,12 @@ private __rozieFirstUpdateDone = false;
 
   suppressScroll = false;
 
+  findQuery = '';
+
+  findMatches = [];
+
+  findIndex = -1;
+
   cancelled = false;
 
   buildSource = () => {
@@ -287,6 +297,16 @@ private __rozieFirstUpdateDone = false;
       viewport
     });
     await layer.render();
+    // coarse find-highlight: add .rozie-pdf-find to text-layer spans whose text
+    // CONTAINS the active query. Span-level / COARSE — a query straddling two
+    // adjacent spans won't highlight (documented). Runs only while a find is active.
+    if (this.findQuery) {
+      const spans = tl.querySelectorAll('span');
+      for (const sp of spans as any) {
+        const t = sp.textContent;
+        if (t && t.toLowerCase().indexOf(this.findQuery) !== -1) sp.classList.add('rozie-pdf-find');
+      }
+    }
   }
   container.appendChild(pageDiv);
   return pageDiv;
@@ -391,6 +411,16 @@ private __rozieFirstUpdateDone = false;
         composed: true
       }));
     };
+    // download progress in bytes; `total` may be 0/undefined when the server sends
+    // no Content-Length header — pass the raw pdfjs onProgress payload through as-is.
+    this.loadingTask.onProgress = (p: any) => this.dispatchEvent(new CustomEvent("progress", {
+      detail: {
+        loaded: p && p.loaded,
+        total: p && p.total
+      },
+      bubbles: true,
+      composed: true
+    }));
     const pdf = await this.loadingTask.promise;
     // stale (a newer load bumped the token + destroyed this task) — drop it.
     if (token !== this.renderToken) return;
@@ -500,6 +530,108 @@ private __rozieFirstUpdateDone = false;
     return this.instance ? this.instance.getOutline() : null;
   }
 
+  async find(query: any) {
+    const q = (query == null ? '' : String(query)).trim().toLowerCase();
+    this.findQuery = q;
+    this.findMatches = [];
+    this.findIndex = -1;
+    if (!this.instance || !q) {
+      this.renderView();
+      this.dispatchEvent(new CustomEvent("findresult", {
+        detail: {
+          query: q,
+          matches: 0,
+          current: 0
+        },
+        bubbles: true,
+        composed: true
+      }));
+      return 0;
+    }
+    const total = this.instance.numPages;
+    for (let p = 1; p <= total; p++) {
+      const page = await this.instance.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items.map((it: any) => it && it.str != null ? it.str : '').join('').toLowerCase();
+      let from = 0;
+      while (true) {
+        const at = text.indexOf(q, from);
+        if (at === -1) break;
+        this.findMatches.push({
+          page: p
+        });
+        from = at + q.length;
+      }
+    }
+    if (this.findMatches.length) {
+      this.findIndex = 0;
+      const target = this.findMatches[0].page;
+      // navigate if needed; if already on the target page, force a re-render so the
+      // highlight pass runs (a no-op goToPage wouldn't trip the $data.current $watch).
+      if (target !== this._current.value) this.goToPage(target);else this.renderView();
+    } else {
+      this.renderView();
+    }
+    this.dispatchEvent(new CustomEvent("findresult", {
+      detail: {
+        query: q,
+        matches: this.findMatches.length,
+        current: this.findMatches.length ? 1 : 0
+      },
+      bubbles: true,
+      composed: true
+    }));
+    return this.findMatches.length;
+  }
+
+  findNext() {
+    if (!this.findMatches.length) return;
+    this.findIndex = (this.findIndex + 1) % this.findMatches.length;
+    const target = this.findMatches[this.findIndex].page;
+    if (target !== this._current.value) this.goToPage(target);
+    this.dispatchEvent(new CustomEvent("findresult", {
+      detail: {
+        query: this.findQuery,
+        matches: this.findMatches.length,
+        current: this.findIndex + 1
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  findPrev() {
+    if (!this.findMatches.length) return;
+    this.findIndex = (this.findIndex - 1 + this.findMatches.length) % this.findMatches.length;
+    const target = this.findMatches[this.findIndex].page;
+    if (target !== this._current.value) this.goToPage(target);
+    this.dispatchEvent(new CustomEvent("findresult", {
+      detail: {
+        query: this.findQuery,
+        matches: this.findMatches.length,
+        current: this.findIndex + 1
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  clearFind() {
+    this.findQuery = '';
+    this.findMatches = [];
+    this.findIndex = -1;
+    this.renderView();
+    this.dispatchEvent(new CustomEvent("findresult", {
+      detail: {
+        query: '',
+        matches: 0,
+        current: 0
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   get page(): number { return this._pageControllable.read(); }
   set page(v: number) { this._pageControllable.notifyPropertyWrite(v); }
 
@@ -577,5 +709,9 @@ injectGlobalStyles('rozie-pdf-viewer-global', `
   }
 .rozie-pdf .textLayer ::selection {
     background: rgba(0, 100, 255, 0.3);
+  }
+.rozie-pdf .textLayer span.rozie-pdf-find {
+    background: rgba(255, 196, 0, 0.45);
+    border-radius: 2px;
   }
 `);

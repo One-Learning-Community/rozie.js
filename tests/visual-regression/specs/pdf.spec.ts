@@ -38,6 +38,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *      uniform across all 6 — an Angular child-component ref resolves to the host
  *      element, not the instance, so a handle-driven Next would no-op there.
  *
+ *   5. **Text find/search (all 6 targets).** Clicking "Find" (query defaults to
+ *      "fox") calls the `find` `$expose` handle via a child-component ref — which
+ *      now resolves to the component INSTANCE on all six (incl. Angular's
+ *      `viewChild`). It scans every page's text, navigates to + coarse-highlights
+ *      the first match, and emits `findresult` → the readout shows the total
+ *      occurrence count (3, one "fox" per page). A `.rozie-pdf-find` span proves
+ *      the span-level highlight pass ran over the text layer.
+ *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
  * `toHaveScreenshot`. There is NO PDF screenshot cell: pdfjs renders to a
  * `<canvas>` (the chartjs/maplibre canvas-VR class, where cross-emit byte-
@@ -100,5 +108,19 @@ for (const target of TARGETS) {
     await expect(readout).toHaveText('1');
     await mount.getByTestId('next').click();
     await expect(readout).toHaveText('2', { timeout: 10_000 });
+
+    // ---- 5. text find/search (coarse span-level highlight) ----
+    // Click "Find" (the query input defaults to "fox"). The handle scans all 3
+    // pages ("fox" occurs once per page), navigates to + highlights the first
+    // match, and emits `findresult` → the readout shows the total occurrence count
+    // (3). A `.rozie-pdf-find` span proves the coarse highlight pass ran. The find
+    // runs async over 3 pages, so use web-first `expect` with a generous timeout.
+    await mount.getByTestId('find').click();
+    await expect(mount.getByTestId('find-readout')).toHaveText('3', {
+      timeout: 15_000,
+    });
+    await expect(
+      page.locator('.textLayer span.rozie-pdf-find').first(),
+    ).toBeVisible({ timeout: 5_000 });
   });
 }

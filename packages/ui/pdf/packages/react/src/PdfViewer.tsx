@@ -51,8 +51,10 @@ interface PdfViewerProps {
   onError?: (...args: any[]) => void;
   onPagesrendered?: (...args: any[]) => void;
   onPasswordrequest?: (...args: any[]) => void;
+  onProgress?: (...args: any[]) => void;
   onLoad?: (...args: any[]) => void;
   onPagechange?: (...args: any[]) => void;
+  onFindresult?: (...args: any[]) => void;
 }
 
 export interface PdfViewerHandle {
@@ -71,6 +73,10 @@ export interface PdfViewerHandle {
   download: (...args: any[]) => any;
   getMetadata: (...args: any[]) => any;
   getOutline: (...args: any[]) => any;
+  find: (...args: any[]) => any;
+  findNext: (...args: any[]) => any;
+  findPrev: (...args: any[]) => any;
+  clearFind: (...args: any[]) => any;
 }
 
 const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer(_props: PdfViewerProps, ref): JSX.Element {
@@ -100,6 +106,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const loadingTask = useRef<any>(null);
   const instance = useRef<any>(null);
   const suppressScroll = useRef(false);
+  const findQuery = useRef('');
+  const findMatches = useRef([]);
+  const findIndex = useRef(-1);
   const [page, setPage] = useControllableState({
     value: props.page,
     defaultValue: props.defaultPage ?? 1,
@@ -196,6 +205,16 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
         viewport
       });
       await layer.render();
+      // coarse find-highlight: add .rozie-pdf-find to text-layer spans whose text
+      // CONTAINS the active query. Span-level / COARSE — a query straddling two
+      // adjacent spans won't highlight (documented). Runs only while a find is active.
+      if (findQuery.current) {
+        const spans = tl.querySelectorAll('span');
+        for (const sp of spans as any) {
+          const t = sp.textContent;
+          if (t && t.toLowerCase().indexOf(findQuery.current) !== -1) sp.classList.add('rozie-pdf-find');
+        }
+      }
     }
     container.appendChild(pageDiv);
     return pageDiv;
@@ -284,6 +303,12 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
           reason
         });
       };
+      // download progress in bytes; `total` may be 0/undefined when the server sends
+      // no Content-Length header — pass the raw pdfjs onProgress payload through as-is.
+      loadingTask.current.onProgress = (p: any) => props.onProgress && props.onProgress({
+        loaded: p && p.loaded,
+        total: p && p.total
+      });
       const pdf = await loadingTask.current.promise;
       // stale (a newer load bumped the token + destroyed this task) — drop it.
       if (token !== renderToken.current) return;
@@ -311,20 +336,21 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (mode === 'width') setZoom(cw / vp.width);else setZoom(Math.min(cw / vp.width, ch / vp.height));
   }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-  // 15 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+  // 19 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
   // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-  // pagesrendered/passwordrequest); none is a Lit reserved lifecycle. The
-  // navigation/zoom/rotate verbs drive $data (not the props), so they work whether
-  // or not the consumer binds `page`. The document-level verbs below are cheap
-  // passthroughs over the held PDFDocumentProxy (`instance`) that a consumer can't
-  // reach otherwise without `getDocument()` + pdf.js knowledge:
+  // pagesrendered/passwordrequest/progress/findresult); none is a Lit reserved
+  // lifecycle. The navigation/zoom/rotate verbs drive $data (not the props), so they
+  // work whether or not the consumer binds `page`. The document-level verbs below
+  // are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
+  // consumer can't reach otherwise without `getDocument()` + pdf.js knowledge:
   //   - download(filename?): save the original PDF bytes (instance.getData() ->
   //     Blob -> anchor click) — the single most-expected viewer affordance.
   //   - getMetadata(): document title/author/page-labels (tab title / info panel).
   //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
   //     dests map onto goToPage).
-  // (Text search/find is intentionally DEFERRED — it's a real find-controller
-  // build over the text layer, not a passthrough; tracked as a follow-up.)
+  // The four find verbs (find/findNext/findPrev/clearFind) drive the coarse
+  // span-level highlight pass + emit `findresult`. `find/findNext/findPrev/clearFind`
+  // are collision-vetted (no Lit reserved lifecycle, no `page`-model auto-setter clash).
   function getDocument() {
     return instance.current;
   }
@@ -390,6 +416,101 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   function getOutline() {
     return instance.current ? instance.current.getOutline() : null;
+  }
+
+  // ─── text find/search (coarse span-level highlight) ──────────────────────────
+  // find(query) scans EVERY page's extracted text for occurrences, navigates to +
+  // highlights the first match, returns the match count, and emits `findresult`. The
+  // highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
+  // text-layer spans that CONTAIN the query (a query straddling two spans won't
+  // highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
+  // clearFind resets the query + highlights. All async-safe over the `any`
+  // PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
+  // ─── text find/search (coarse span-level highlight) ──────────────────────────
+  // find(query) scans EVERY page's extracted text for occurrences, navigates to +
+  // highlights the first match, returns the match count, and emits `findresult`. The
+  // highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
+  // text-layer spans that CONTAIN the query (a query straddling two spans won't
+  // highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
+  // clearFind resets the query + highlights. All async-safe over the `any`
+  // PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
+  async function find(query: any) {
+    const q = (query == null ? '' : String(query)).trim().toLowerCase();
+    findQuery.current = q;
+    findMatches.current = [];
+    findIndex.current = -1;
+    if (!instance.current || !q) {
+      renderView();
+      props.onFindresult && props.onFindresult({
+        query: q,
+        matches: 0,
+        current: 0
+      });
+      return 0;
+    }
+    const total = instance.current.numPages;
+    for (let p = 1; p <= total; p++) {
+      const page = await instance.current.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items.map((it: any) => it && it.str != null ? it.str : '').join('').toLowerCase();
+      let from = 0;
+      while (true) {
+        const at = text.indexOf(q, from);
+        if (at === -1) break;
+        findMatches.current.push({
+          page: p
+        });
+        from = at + q.length;
+      }
+    }
+    if (findMatches.current.length) {
+      findIndex.current = 0;
+      const target = findMatches.current[0].page;
+      // navigate if needed; if already on the target page, force a re-render so the
+      // highlight pass runs (a no-op goToPage wouldn't trip the $data.current $watch).
+      if (target !== current) goToPage(target);else renderView();
+    } else {
+      renderView();
+    }
+    props.onFindresult && props.onFindresult({
+      query: q,
+      matches: findMatches.current.length,
+      current: findMatches.current.length ? 1 : 0
+    });
+    return findMatches.current.length;
+  }
+  function findNext() {
+    if (!findMatches.current.length) return;
+    findIndex.current = (findIndex.current + 1) % findMatches.current.length;
+    const target = findMatches.current[findIndex.current].page;
+    if (target !== current) goToPage(target);
+    props.onFindresult && props.onFindresult({
+      query: findQuery.current,
+      matches: findMatches.current.length,
+      current: findIndex.current + 1
+    });
+  }
+  function findPrev() {
+    if (!findMatches.current.length) return;
+    findIndex.current = (findIndex.current - 1 + findMatches.current.length) % findMatches.current.length;
+    const target = findMatches.current[findIndex.current].page;
+    if (target !== current) goToPage(target);
+    props.onFindresult && props.onFindresult({
+      query: findQuery.current,
+      matches: findMatches.current.length,
+      current: findIndex.current + 1
+    });
+  }
+  function clearFind() {
+    findQuery.current = '';
+    findMatches.current = [];
+    findIndex.current = -1;
+    renderView();
+    props.onFindresult && props.onFindresult({
+      query: '',
+      matches: 0,
+      current: 0
+    });
   }
 
   useEffect(() => {
@@ -482,9 +603,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     renderView();
   }, [props.textLayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline });
-  _rozieExposeRef.current = { getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline };
-  useImperativeHandle(ref, () => ({ getDocument: (...args: Parameters<typeof getDocument>): ReturnType<typeof getDocument> => _rozieExposeRef.current.getDocument(...args), getPageCount: (...args: Parameters<typeof getPageCount>): ReturnType<typeof getPageCount> => _rozieExposeRef.current.getPageCount(...args), goToPage: (...args: Parameters<typeof goToPage>): ReturnType<typeof goToPage> => _rozieExposeRef.current.goToPage(...args), nextPage: (...args: Parameters<typeof nextPage>): ReturnType<typeof nextPage> => _rozieExposeRef.current.nextPage(...args), prevPage: (...args: Parameters<typeof prevPage>): ReturnType<typeof prevPage> => _rozieExposeRef.current.prevPage(...args), setScale: (...args: Parameters<typeof setScale>): ReturnType<typeof setScale> => _rozieExposeRef.current.setScale(...args), zoomIn: (...args: Parameters<typeof zoomIn>): ReturnType<typeof zoomIn> => _rozieExposeRef.current.zoomIn(...args), zoomOut: (...args: Parameters<typeof zoomOut>): ReturnType<typeof zoomOut> => _rozieExposeRef.current.zoomOut(...args), fitWidth: (...args: Parameters<typeof fitWidth>): ReturnType<typeof fitWidth> => _rozieExposeRef.current.fitWidth(...args), fitPage: (...args: Parameters<typeof fitPage>): ReturnType<typeof fitPage> => _rozieExposeRef.current.fitPage(...args), rotateCW: (...args: Parameters<typeof rotateCW>): ReturnType<typeof rotateCW> => _rozieExposeRef.current.rotateCW(...args), rotateCCW: (...args: Parameters<typeof rotateCCW>): ReturnType<typeof rotateCCW> => _rozieExposeRef.current.rotateCCW(...args), download: (...args: Parameters<typeof download>): ReturnType<typeof download> => _rozieExposeRef.current.download(...args), getMetadata: (...args: Parameters<typeof getMetadata>): ReturnType<typeof getMetadata> => _rozieExposeRef.current.getMetadata(...args), getOutline: (...args: Parameters<typeof getOutline>): ReturnType<typeof getOutline> => _rozieExposeRef.current.getOutline(...args) }), []);
+  const _rozieExposeRef = useRef({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind });
+  _rozieExposeRef.current = { getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind };
+  useImperativeHandle(ref, () => ({ getDocument: (...args: Parameters<typeof getDocument>): ReturnType<typeof getDocument> => _rozieExposeRef.current.getDocument(...args), getPageCount: (...args: Parameters<typeof getPageCount>): ReturnType<typeof getPageCount> => _rozieExposeRef.current.getPageCount(...args), goToPage: (...args: Parameters<typeof goToPage>): ReturnType<typeof goToPage> => _rozieExposeRef.current.goToPage(...args), nextPage: (...args: Parameters<typeof nextPage>): ReturnType<typeof nextPage> => _rozieExposeRef.current.nextPage(...args), prevPage: (...args: Parameters<typeof prevPage>): ReturnType<typeof prevPage> => _rozieExposeRef.current.prevPage(...args), setScale: (...args: Parameters<typeof setScale>): ReturnType<typeof setScale> => _rozieExposeRef.current.setScale(...args), zoomIn: (...args: Parameters<typeof zoomIn>): ReturnType<typeof zoomIn> => _rozieExposeRef.current.zoomIn(...args), zoomOut: (...args: Parameters<typeof zoomOut>): ReturnType<typeof zoomOut> => _rozieExposeRef.current.zoomOut(...args), fitWidth: (...args: Parameters<typeof fitWidth>): ReturnType<typeof fitWidth> => _rozieExposeRef.current.fitWidth(...args), fitPage: (...args: Parameters<typeof fitPage>): ReturnType<typeof fitPage> => _rozieExposeRef.current.fitPage(...args), rotateCW: (...args: Parameters<typeof rotateCW>): ReturnType<typeof rotateCW> => _rozieExposeRef.current.rotateCW(...args), rotateCCW: (...args: Parameters<typeof rotateCCW>): ReturnType<typeof rotateCCW> => _rozieExposeRef.current.rotateCCW(...args), download: (...args: Parameters<typeof download>): ReturnType<typeof download> => _rozieExposeRef.current.download(...args), getMetadata: (...args: Parameters<typeof getMetadata>): ReturnType<typeof getMetadata> => _rozieExposeRef.current.getMetadata(...args), getOutline: (...args: Parameters<typeof getOutline>): ReturnType<typeof getOutline> => _rozieExposeRef.current.getOutline(...args), find: (...args: Parameters<typeof find>): ReturnType<typeof find> => _rozieExposeRef.current.find(...args), findNext: (...args: Parameters<typeof findNext>): ReturnType<typeof findNext> => _rozieExposeRef.current.findNext(...args), findPrev: (...args: Parameters<typeof findPrev>): ReturnType<typeof findPrev> => _rozieExposeRef.current.findPrev(...args), clearFind: (...args: Parameters<typeof clearFind>): ReturnType<typeof clearFind> => _rozieExposeRef.current.clearFind(...args) }), []);
 
   return (
     <>

@@ -35,3 +35,7 @@
 .rozie-pdf .textLayer ::selection {
     background: rgba(0, 100, 255, 0.3);
   }
+.rozie-pdf .textLayer span.rozie-pdf-find {
+    background: rgba(255, 196, 0, 0.45);
+    border-radius: 2px;
+  }

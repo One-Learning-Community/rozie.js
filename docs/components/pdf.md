@@ -185,19 +185,21 @@ el.addEventListener('load', (e) => console.log(e.detail.numPages));
 
 ### Events
 
-PDF.js's load / page / render lifecycle is forwarded as **five** structured events:
+PDF.js's load / page / render / find lifecycle is forwarded as **seven** structured events:
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
 | `load` | `{ numPages }` | The document finished loading (after `getDocument(...).promise` resolves). Carries the total page count. |
+| `progress` | `{ loaded, total }` | The document download advanced — `loaded` / `total` are bytes (PDF.js's `onProgress`). `total` may be `0` (or `undefined`) when the server omits a `Content-Length` header — passed through as-is. |
 | `error` | the engine `Error` | A load or page-render failed (bad source, network error, corrupt PDF). Stale-load aborts are suppressed (a `src` change mid-load doesn't fire a spurious error). |
 | `pagechange` | `{ page }` | The current page changed — driven by `goToPage` / `nextPage` / `prevPage`, a `page`-prop write, or (in `render-all-pages`) the scroll spy. Also drives the two-way `page` model. |
 | `pagesrendered` | — | The visible page(s) finished rendering (canvas + optional text layer) into the container. |
 | `passwordrequest` | `{ reason }` | The document is encrypted and the supplied `password` is missing or wrong. `reason` is PDF.js's `PasswordResponses` code (need vs. incorrect). |
+| `findresult` | `{ query, matches, current }` | A find ran (`find` / `findNext` / `findPrev` / `clearFind`). `query` is the active lowercased query (`''` when cleared), `matches` is the total occurrence count across all pages, and `current` is the 1-based index of the active match (`0` when none). |
 
 ### Imperative handle
 
-Beyond props, the component exposes **12** imperative methods declared once in the Rozie source via `$expose`. Grab a handle with your framework's native ref mechanism (React `useRef` / Vue template ref / Svelte `bind:this` / Angular `viewChild` / Solid callback ref / the Lit custom element itself) and call them directly:
+Beyond props, the component exposes **19** imperative methods declared once in the Rozie source via `$expose`. Grab a handle with your framework's native ref mechanism (React `useRef` / Vue template ref / Svelte `bind:this` / Angular `viewChild` / Solid callback ref / the Lit custom element itself) and call them directly:
 
 | Method | Description |
 | --- | --- |
@@ -213,9 +215,16 @@ Beyond props, the component exposes **12** imperative methods declared once in t
 | `fitPage` | Fit the current page entirely within the container (width and height). |
 | `rotateCW` | Rotate the view 90° clockwise. |
 | `rotateCCW` | Rotate the view 90° counter-clockwise. |
+| `download` | Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads. |
+| `getMetadata` | Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. `null` before load. |
+| `getOutline` | Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. `null` when absent or before load. |
+| `find` | Search the whole document for a query — `find(query)`. Scans every page's text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query that straddles two spans won't highlight. |
+| `findNext` | Advance to the next match (wraps around), navigating its page + re-emitting `findresult` with the new `current`. No-op before a `find`. |
+| `findPrev` | Go back to the previous match (wraps around), navigating its page + re-emitting `findresult`. No-op before a `find`. |
+| `clearFind` | Clear the active query + highlights, re-render, and emit `findresult` with `{ query: '', matches: 0, current: 0 }`. |
 
 ::: tip Why navigation is `goToPage`, not `setPage`
-The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it (ROZ524). None of the 12 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `passwordrequest` — ROZ121), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
+The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it (ROZ524). None of the 19 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `passwordrequest` / `progress` / `findresult` — ROZ121), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
 :::
 
 **React example:**

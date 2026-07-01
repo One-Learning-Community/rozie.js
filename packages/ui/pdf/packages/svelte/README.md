@@ -52,8 +52,10 @@ No separate engine-CSS import is needed — `PdfViewer` ships the selectable tex
 | `error` | |
 | `pagesrendered` | |
 | `passwordrequest` | |
+| `progress` | |
 | `load` | |
 | `pagechange` | |
+| `findresult` | |
 
 ## Imperative handle
 
@@ -85,3 +87,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `download` | Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads. |
 | `getMetadata` | Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load. |
 | `getOutline` | Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load. |
+| `find` | Search the whole document for a query — `find(query)`. Scans every page's text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query straddling two spans won't highlight. |
+| `findNext` | Advance to the next match (wraps around), navigating its page + re-emitting `findresult` with the new `current`. No-op before a `find`. |
+| `findPrev` | Go back to the previous match (wraps around), navigating its page + re-emitting `findresult`. No-op before a `find`. |
+| `clearFind` | Clear the active query + highlights, re-render, and emit `findresult` with `{ query: '', matches: 0, current: 0 }`. |

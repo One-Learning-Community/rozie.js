@@ -46,6 +46,8 @@
 {
   page: 1,
   total: 0,
+  query: 'fox',
+  findCount: 0,
 }
 </data>
 
@@ -76,6 +78,14 @@ const onLoad = (e) => {
   const n = e && e.detail && typeof e.detail.numPages === 'number' ? e.detail.numPages : e.numPages
   $data.total = n
 }
+
+// @findresult handler — same Lit-robust payload read as onLoad (Lit delivers the
+// payload under `e.detail`). `matches` is the total occurrence count; mirror it
+// into the readout so the spec can assert the count.
+const onFind = (e) => {
+  const m = e && e.detail && typeof e.detail.matches === 'number' ? e.detail.matches : e.matches
+  $data.findCount = m
+}
 </script>
 
 <template>
@@ -87,12 +97,22 @@ const onLoad = (e) => {
     <span class="readout">page <b data-testid="page-readout">{{ $data.page }}</b> / <b data-testid="total-readout">{{ $data.total }}</b></span>
   </div>
 
+  <div class="controls">
+    <input type="text" data-testid="find-input" r-model="$data.query" />
+    <button type="button" data-testid="find" @click="$refs.viewer && $refs.viewer.find($data.query)">Find</button>
+    <button type="button" data-testid="find-next" @click="$refs.viewer && $refs.viewer.findNext()">Next match</button>
+    <button type="button" data-testid="find-clear" @click="$refs.viewer && $refs.viewer.clearFind()">Clear</button>
+    <span class="readout">matches <b data-testid="find-readout">{{ $data.findCount }}</b></span>
+  </div>
+
   <div class="pdf-wrap" style="height: 360px">
     <PdfViewer
+      ref="viewer"
       :src="SAMPLE"
       :worker-src="workerSrc"
       r-model:page="$data.page"
       @load="onLoad"
+      @findresult="onFind"
     />
   </div>
 </div>

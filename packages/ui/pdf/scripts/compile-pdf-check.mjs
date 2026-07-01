@@ -22,11 +22,13 @@ const EXPECT = {
   name: 'PdfViewer',
   props: ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options'],
   models: ['page'],
-  emits: ['load', 'error', 'pagechange', 'pagesrendered', 'passwordrequest'],
+  emits: ['load', 'progress', 'error', 'pagechange', 'pagesrendered', 'passwordrequest', 'findresult'],
   slots: [],
   expose: [
     'getDocument', 'getPageCount', 'goToPage', 'nextPage', 'prevPage', 'setScale',
     'zoomIn', 'zoomOut', 'fitWidth', 'fitPage', 'rotateCW', 'rotateCCW',
+    'download', 'getMetadata', 'getOutline',
+    'find', 'findNext', 'findPrev', 'clearFind',
   ],
 };
 

@@ -50,8 +50,10 @@ export interface PdfViewerProps {
   onError?: (...args: unknown[]) => void;
   onPagesrendered?: (...args: unknown[]) => void;
   onPasswordrequest?: (...args: unknown[]) => void;
+  onProgress?: (...args: unknown[]) => void;
   onLoad?: (...args: unknown[]) => void;
   onPagechange?: (...args: unknown[]) => void;
+  onFindresult?: (...args: unknown[]) => void;
 }
 
 export interface PdfViewerHandle {
@@ -70,6 +72,10 @@ export interface PdfViewerHandle {
   download: (...args: any[]) => any;
   getMetadata: (...args: any[]) => any;
   getOutline: (...args: any[]) => any;
+  find: (...args: any[]) => any;
+  findNext: (...args: any[]) => any;
+  findPrev: (...args: any[]) => any;
+  clearFind: (...args: any[]) => any;
 }
 
 declare const PdfViewer: React.ForwardRefExoticComponent<PdfViewerProps & React.RefAttributes<PdfViewerHandle>>;

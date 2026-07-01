@@ -46,6 +46,10 @@ __rozieInjectStyle('PdfViewer-3c863364', `.rozie-pdf[data-rozie-s-3c863364] {
   }
 .rozie-pdf .textLayer ::selection {
     background: rgba(0, 100, 255, 0.3);
+  }
+.rozie-pdf .textLayer span.rozie-pdf-find {
+    background: rgba(255, 196, 0, 0.45);
+    border-radius: 2px;
   }`);
 
 interface PdfViewerProps {
@@ -96,8 +100,10 @@ interface PdfViewerProps {
   onError?: (...args: unknown[]) => void;
   onPagesrendered?: (...args: unknown[]) => void;
   onPasswordrequest?: (...args: unknown[]) => void;
+  onProgress?: (...args: unknown[]) => void;
   onLoad?: (...args: unknown[]) => void;
   onPagechange?: (...args: unknown[]) => void;
+  onFindresult?: (...args: unknown[]) => void;
   ref?: (h: PdfViewerHandle) => void;
 }
 
@@ -117,12 +123,16 @@ export interface PdfViewerHandle {
   download: (...args: any[]) => any;
   getMetadata: (...args: any[]) => any;
   getOutline: (...args: any[]) => any;
+  find: (...args: any[]) => any;
+  findNext: (...args: any[]) => any;
+  findPrev: (...args: any[]) => any;
+  clearFind: (...args: any[]) => any;
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options', 'ref']);
-  onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline }); });
+  onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind }); });
 
   const [page, setPage] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'page', 1);
   const [current, setCurrent] = createSignal(1);
@@ -215,6 +225,14 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   let renderToken = 0;
   // guards the scroll-spy → $data.current → scroll-to feedback loop.
   let suppressScroll = false;
+  // find/search state. findQuery is the active lowercased query (''=inactive);
+  // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
+  // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
+  // $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
+  // them across renders.
+  let findQuery = '';
+  let findMatches = [];
+  let findIndex = -1;
   // set in the $onMount teardown so a late-resolving dynamic import() bails. A
   // TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
   // teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
@@ -289,6 +307,16 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
         viewport
       });
       await layer.render();
+      // coarse find-highlight: add .rozie-pdf-find to text-layer spans whose text
+      // CONTAINS the active query. Span-level / COARSE — a query straddling two
+      // adjacent spans won't highlight (documented). Runs only while a find is active.
+      if (findQuery) {
+        const spans = tl.querySelectorAll('span');
+        for (const sp of spans as any) {
+          const t = sp.textContent;
+          if (t && t.toLowerCase().indexOf(findQuery) !== -1) sp.classList.add('rozie-pdf-find');
+        }
+      }
     }
     container.appendChild(pageDiv);
     return pageDiv;
@@ -383,6 +411,12 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
           reason
         });
       };
+      // download progress in bytes; `total` may be 0/undefined when the server sends
+      // no Content-Length header — pass the raw pdfjs onProgress payload through as-is.
+      loadingTask.onProgress = (p: any) => _props.onProgress?.({
+        loaded: p && p.loaded,
+        total: p && p.total
+      });
       const pdf = await loadingTask.promise;
       // stale (a newer load bumped the token + destroyed this task) — drop it.
       if (token !== renderToken) return;
@@ -410,20 +444,21 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     if (mode === 'width') setZoom(cw / vp.width);else setZoom(Math.min(cw / vp.width, ch / vp.height));
   }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-  // 15 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+  // 19 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
   // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-  // pagesrendered/passwordrequest); none is a Lit reserved lifecycle. The
-  // navigation/zoom/rotate verbs drive $data (not the props), so they work whether
-  // or not the consumer binds `page`. The document-level verbs below are cheap
-  // passthroughs over the held PDFDocumentProxy (`instance`) that a consumer can't
-  // reach otherwise without `getDocument()` + pdf.js knowledge:
+  // pagesrendered/passwordrequest/progress/findresult); none is a Lit reserved
+  // lifecycle. The navigation/zoom/rotate verbs drive $data (not the props), so they
+  // work whether or not the consumer binds `page`. The document-level verbs below
+  // are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
+  // consumer can't reach otherwise without `getDocument()` + pdf.js knowledge:
   //   - download(filename?): save the original PDF bytes (instance.getData() ->
   //     Blob -> anchor click) — the single most-expected viewer affordance.
   //   - getMetadata(): document title/author/page-labels (tab title / info panel).
   //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
   //     dests map onto goToPage).
-  // (Text search/find is intentionally DEFERRED — it's a real find-controller
-  // build over the text layer, not a passthrough; tracked as a follow-up.)
+  // The four find verbs (find/findNext/findPrev/clearFind) drive the coarse
+  // span-level highlight pass + emit `findresult`. `find/findNext/findPrev/clearFind`
+  // are collision-vetted (no Lit reserved lifecycle, no `page`-model auto-setter clash).
   function getDocument() {
     return instance;
   }
@@ -485,6 +520,93 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   function getOutline() {
     return instance ? instance.getOutline() : null;
+  }
+
+  // ─── text find/search (coarse span-level highlight) ──────────────────────────
+  // find(query) scans EVERY page's extracted text for occurrences, navigates to +
+  // highlights the first match, returns the match count, and emits `findresult`. The
+  // highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
+  // text-layer spans that CONTAIN the query (a query straddling two spans won't
+  // highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
+  // clearFind resets the query + highlights. All async-safe over the `any`
+  // PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
+  async function find(query: any) {
+    const q = (query == null ? '' : String(query)).trim().toLowerCase();
+    findQuery = q;
+    findMatches = [];
+    findIndex = -1;
+    if (!instance || !q) {
+      renderView();
+      _props.onFindresult?.({
+        query: q,
+        matches: 0,
+        current: 0
+      });
+      return 0;
+    }
+    const total = instance.numPages;
+    for (let p = 1; p <= total; p++) {
+      const page = await instance.getPage(p);
+      const tc = await page.getTextContent();
+      const text = tc.items.map((it: any) => it && it.str != null ? it.str : '').join('').toLowerCase();
+      let from = 0;
+      while (true) {
+        const at = text.indexOf(q, from);
+        if (at === -1) break;
+        findMatches.push({
+          page: p
+        });
+        from = at + q.length;
+      }
+    }
+    if (findMatches.length) {
+      findIndex = 0;
+      const target = findMatches[0].page;
+      // navigate if needed; if already on the target page, force a re-render so the
+      // highlight pass runs (a no-op goToPage wouldn't trip the $data.current $watch).
+      if (target !== current()) goToPage(target);else renderView();
+    } else {
+      renderView();
+    }
+    _props.onFindresult?.({
+      query: q,
+      matches: findMatches.length,
+      current: findMatches.length ? 1 : 0
+    });
+    return findMatches.length;
+  }
+  function findNext() {
+    if (!findMatches.length) return;
+    findIndex = (findIndex + 1) % findMatches.length;
+    const target = findMatches[findIndex].page;
+    if (target !== current()) goToPage(target);
+    _props.onFindresult?.({
+      query: findQuery,
+      matches: findMatches.length,
+      current: findIndex + 1
+    });
+  }
+  function findPrev() {
+    if (!findMatches.length) return;
+    findIndex = (findIndex - 1 + findMatches.length) % findMatches.length;
+    const target = findMatches[findIndex].page;
+    if (target !== current()) goToPage(target);
+    _props.onFindresult?.({
+      query: findQuery,
+      matches: findMatches.length,
+      current: findIndex + 1
+    });
+  }
+  function clearFind() {
+    findQuery = '';
+    findMatches = [];
+    findIndex = -1;
+    renderView();
+    _props.onFindresult?.({
+      query: '',
+      matches: 0,
+      current: 0
+    });
   }
 
   return (

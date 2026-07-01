@@ -9,12 +9,13 @@
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every exposed
  * method name has an entry here and throws if one is missing.
  *
- * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 15 verbs
+ * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 19 verbs
  * collides with an emitted event name (NO bare `load`/`error`/`pagechange`/
- * `pagesrendered`/`passwordrequest`), the React `page`-model auto-setter (NO
- * `setPage` — navigate via `goToPage(n)`; the two-way `page` binding reads it),
- * or a Lit reserved lifecycle name. Every verb drives `$data` (not the props), so
- * it works whether or not the consumer two-way-binds `page`.
+ * `pagesrendered`/`passwordrequest`/`progress`/`findresult`), the React
+ * `page`-model auto-setter (NO `setPage` — navigate via `goToPage(n)`; the
+ * two-way `page` binding reads it), or a Lit reserved lifecycle name. Every verb
+ * drives `$data` (or reads the loaded document), so it works whether or not the
+ * consumer two-way-binds `page`.
  */
 export const handleManifest = {
   getDocument:
@@ -36,6 +37,14 @@ export const handleManifest = {
     'Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load.',
   getOutline:
     'Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load.',
+  find:
+    'Search the whole document for a query — `find(query)`. Scans every page\'s text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query straddling two spans won\'t highlight.',
+  findNext:
+    'Advance to the next match (wraps around), navigating its page + re-emitting `findresult` with the new `current`. No-op before a `find`.',
+  findPrev:
+    'Go back to the previous match (wraps around), navigating its page + re-emitting `findresult`. No-op before a `find`.',
+  clearFind:
+    'Clear the active query + highlights, re-render, and emit `findresult` with `{ query: \'\', matches: 0, current: 0 }`.',
 };
 
 export default handleManifest;
