@@ -244,6 +244,8 @@ import {
   addDays,
   addMonths,
   buildMonthGrid,
+  buildMonthList,
+  buildYearGrid,
   isDayDisabled,
   isInRange,
   isIsoDate,
@@ -311,11 +313,59 @@ const grid = () =>
     min: $props.min,
     max: $props.max,
     disabledDates: $props.disabledDates,
+    disabledDaysOfWeek: $props.disabledDaysOfWeek,
+    isDateDisabled: $props.isDateDisabled,
     weekStartsOn: $props.weekStartsOn,
     disabled: $props.disabled,
     selection: $props.selectionMode === 'range' ? readRange() : undefined,
     previewEnd: $props.selectionMode === 'range' ? $data.hoverIso : undefined,
   })
+
+// The multi-month render model: N grids stepping forward from the view month,
+// so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
+// mirroring grid() exactly but with the view anchor advanced by `i` months.
+// numberOfMonths === 1 yields a one-element array whose single grid === grid().
+const grids = () =>
+  Array.from({ length: $props.numberOfMonths }, (_, i) =>
+    buildMonthGrid({
+      viewIso: addMonths(viewMonthGrid(), i),
+      value: selected(),
+      today: todayIso(),
+      min: $props.min,
+      max: $props.max,
+      disabledDates: $props.disabledDates,
+      disabledDaysOfWeek: $props.disabledDaysOfWeek,
+      isDateDisabled: $props.isDateDisabled,
+      weekStartsOn: $props.weekStartsOn,
+      disabled: $props.disabled,
+      selection: $props.selectionMode === 'range' ? readRange() : undefined,
+      previewEnd: $props.selectionMode === 'range' ? $data.hoverIso : undefined,
+    }),
+  )
+
+// ---- drill models (months / years panels) ------------------------------
+// The 12-cell month picker for the 'months' drill view + the 12-cell year
+// picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
+// each a fresh object per call. The gates that matter to a whole month/year span
+// are min/max (buildMonthList/buildYearGrid own the entire-span test); the
+// per-day weekday/predicate gates apply only in the days grid.
+const monthList = () =>
+  buildMonthList(viewMonthGrid(), {
+    min: $props.min,
+    max: $props.max,
+    value: selected(),
+    today: todayIso(),
+    locale: $props.locale,
+  })
+const yearGrid = () =>
+  buildYearGrid(viewMonthGrid(), {
+    min: $props.min,
+    max: $props.max,
+    value: selected(),
+    today: todayIso(),
+  })
+// The decade window label (e.g. "2020–2031") shown in the years-panel header.
+const yearRangeLabel = () => yearGrid().rangeLabel
 
 // Roving-tabindex value for a day cell: the selected day (or today, when nothing
 // is selected) is the single tab stop (0), the rest are -1. The return type is
@@ -343,6 +393,8 @@ const dayEnabled = (iso) =>
     min: $props.min,
     max: $props.max,
     disabledDates: $props.disabledDates,
+    disabledDaysOfWeek: $props.disabledDaysOfWeek,
+    isDateDisabled: $props.isDateDisabled,
     weekStartsOn: $props.weekStartsOn,
     disabled: $props.disabled,
   })
@@ -405,13 +457,53 @@ const onDaySelect = (iso) => {
   else commitValue(iso)
 }
 
-// ---- month navigation --------------------------------------------------
+// ---- month navigation (view-mode-aware ‹ › step) -----------------------
+// The prev/next step advances the view anchor by ONE UNIT of the current drill
+// view: a month in 'days', a year (12 months) in 'months', 12 years (144
+// months) in 'years'. In the default 'days' view the delta is `delta` months —
+// byte-identical to the pre-navigation behavior, so `:month-year-nav="false"`
+// (which can never leave 'days') is unchanged.
 const goToMonth = (delta) => {
   if ($props.disabled) return
-  $data.viewIso = addMonths(viewMonthGrid(), delta)
+  const unit = $data.viewMode === 'years' ? 144 : $data.viewMode === 'months' ? 12 : 1
+  $data.viewIso = addMonths(viewMonthGrid(), delta * unit)
 }
 const goPrevMonth = () => goToMonth(-1)
 const goNextMonth = () => goToMonth(1)
+
+// ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
+// ONLY — never $model.value; drilling is a pure VIEW concern) -------------
+// Named boolean guards (never a bare `.length` / bare string compare in an
+// r-if — route through a `(): boolean` so the JSX targets emit a true boolean
+// and no falsy value leaks a text node).
+const showsDaysView = (): boolean => $data.viewMode === 'days'
+const showsMonthsView = (): boolean => $data.viewMode === 'months'
+const showsYearsView = (): boolean => $data.viewMode === 'years'
+
+// Drill DOWN into the month picker (from the days heading).
+const enterMonthsView = () => {
+  if ($props.disabled) return
+  $data.viewMode = 'months'
+}
+// Drill DOWN into the year picker (from the months-panel year label).
+const enterYearsView = () => {
+  if ($props.disabled) return
+  $data.viewMode = 'years'
+}
+// Pick a month → move the view anchor to it and drill back UP toward days.
+const selectMonth = (iso) => {
+  if ($props.disabled) return
+  if (!isIsoDate(iso)) return
+  $data.viewIso = iso
+  $data.viewMode = 'days'
+}
+// Pick a year → move the view anchor's year and drill back UP toward months.
+const selectYear = (iso) => {
+  if ($props.disabled) return
+  if (!isIsoDate(iso)) return
+  $data.viewIso = iso
+  $data.viewMode = 'months'
+}
 
 // ---- focus choreography (container ref, post-mount only) ---------------
 // Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
@@ -438,9 +530,10 @@ const focusDayIso = (iso) => {
 const moveFocus = (fromIso, days) => {
   if ($props.disabled) return
   const next = addDays(fromIso, days)
-  const g = grid()
-  // If `next` is not in the rendered weeks, swing the view to its month first.
-  const present = g.weeks.some((row) => row.some((d) => d.iso === next))
+  // Widened to ANY rendered month (multi-month): if `next` is present in any of
+  // the displayed grids, arrow focus can cross month columns without swinging
+  // the view. Only when it leaves every rendered month do we move the anchor.
+  const present = grids().some((g) => g.weeks.some((row) => row.some((d) => d.iso === next)))
   if (!present) $data.viewIso = next
   focusDayIso(next)
 }
