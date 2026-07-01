@@ -1,0 +1,33 @@
+<!--
+  ComposedRefParent.rozie — Phase 66 red-first witness parent.
+
+  Composes ExposeChild via <components>, refs it (`ref="child"`), and calls the
+  exposed `ping()` from $onMount (ROZ123-safe: $refs only in $onMount). Pre-fix,
+  the composed-component ref types as HTMLElement on react/vue/svelte/solid/lit,
+  so `$refs.child.ping()` is a TS2339 ("property 'ping' does not exist on type
+  'HTMLElement'"). Angular alone types it as the child instance → clean.
+-->
+<rozie name="ComposedRefParent">
+
+<components>{ ExposeChild: './ExposeChild.rozie' }</components>
+
+<data>
+{ result: '' }
+</data>
+
+<script lang="ts">
+$onMount(() => {
+  // The witness call: a composed-component handle method. Must typecheck once
+  // the ref is typed as the child handle; TS2339 on HTMLElement pre-fix.
+  $data.result = $refs.child.ping()
+})
+</script>
+
+<template>
+  <div>
+    <ExposeChild ref="child" />
+    <output>{{ $data.result }}</output>
+  </div>
+</template>
+
+</rozie>

@@ -1,0 +1,31 @@
+<!--
+  ExposeChild.rozie — Phase 66 witness child.
+
+  Minimal `<components>`-composable child that $expose()s an AUTHOR-TYPED method
+  `ping(): string`. The author return type makes synthesizeHandleType emit a real
+  `ping(): string` member on the child's `<Name>Handle` — so the parent's
+  `$refs.child.ping()` SHOULD typecheck once the composed-component ref is typed
+  as the child handle (Angular) and MUST NOT when it falls back to HTMLElement
+  (the 5 broken targets). Deliberately trivial: one exposed method, no props.
+-->
+<rozie name="ExposeChild">
+
+<data>
+{ hits: 0 }
+</data>
+
+<script lang="ts">
+// Author-typed return so the synthesized ExposeChildHandle carries `ping(): string`.
+const ping = (): string => {
+  $data.hits += 1
+  return 'ok'
+}
+
+$expose({ ping })
+</script>
+
+<template>
+  <span>{{ $data.hits }}</span>
+</template>
+
+</rozie>

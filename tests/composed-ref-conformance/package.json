@@ -1,0 +1,14 @@
+{
+  "name": "@rozie/composed-ref-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "typescript": "~5.6.0",
+    "vitest": "^4"
+  }
+}

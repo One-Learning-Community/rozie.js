@@ -21,6 +21,7 @@ packages:
   - "tests/vue-typecheck"
   - "tests/react-typecheck"
   - "tests/strict-conformance"
+  - "tests/composed-ref-conformance"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"
