@@ -467,12 +467,102 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: [
       '../../../packages/ui/command-palette/src/CommandPalette.rozie',
       '../../../packages/ui/command-palette/src/Combobox.rozie',
-      // Phase 68-03 — its `./internal/filterCommands` helper is now carried as a
-      // passthrough blob sibling. CommandPalette STAYS marked unsupported (its
-      // Combobox sibling still emits a runtime @tanstack/virtual-core engine
-      // import pending 68-04), but declaring the helper here means the ONLY
-      // remaining render blocker is the engine — it renders once 68-04 lands.
+      // Phase 68-03 — its `./internal/filterCommands` helper is carried as a
+      // passthrough blob sibling; Phase 68-04 added @tanstack/virtual-core to the
+      // harness importmaps, so the vendored Combobox's windowing engine now
+      // resolves and CommandPalette live-renders (un-marked).
       '../../../packages/ui/command-palette/src/internal/filterCommands.ts',
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 68-04 — WS1 SC-1: the single-engine-library families. Each demo's
+  // `<components>` block imports exactly one sibling from `packages/ui/<fam>/src`
+  // (already covered by `uiPackageFiles`); the engine libs those siblings import
+  // at runtime (embla-carousel[+autoplay], the @codemirror/* set + codemirror,
+  // cropperjs, pdfjs-dist) were added to all six harness importmaps in this plan.
+  // Every demo VARIANT (incl. the *ScreenshotDemo fixtures) is bundled here so
+  // un-marking the family token never leaves a screenshot demo silently blank.
+  //
+  // embla / codemirror / cropper LIVE-RENDER (every emitted runtime import now
+  // resolves; cropper additionally needs the external `cropper.css` `<link>`
+  // added to each harness `<head>`). pdf compiles ×6 and its `pdfjs-dist` dynamic
+  // import resolves, but its PDF.js web worker (a cross-origin jsDelivr worker
+  // URL) is not loadable from the sandboxed null-origin preview iframe — it stays
+  // marked unsupported-with-reason (D-2). captcha has NO examples/demos entry, so
+  // its package `Captcha.rozie` IS the bundle entry; it loads an EXTERNAL provider
+  // script and its `sitekey` is required with no valid sample, so it cannot render
+  // in a sandboxed iframe and is marked unsupported-with-reason immediately (D-2).
+  // ---------------------------------------------------------------------------
+  {
+    key: 'bundle/CarouselDemo',
+    label: 'bundle/CarouselDemo',
+    entryGlobPath: '../../demos/CarouselDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/embla/src/Carousel.rozie'],
+  },
+  {
+    key: 'bundle/CarouselScreenshotDemo',
+    label: 'bundle/CarouselScreenshotDemo',
+    entryGlobPath: '../../demos/CarouselScreenshotDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/embla/src/Carousel.rozie'],
+  },
+  {
+    key: 'bundle/CarouselNavScreenshotDemo',
+    label: 'bundle/CarouselNavScreenshotDemo',
+    entryGlobPath: '../../demos/CarouselNavScreenshotDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/embla/src/Carousel.rozie'],
+  },
+  {
+    key: 'bundle/CodeMirrorDemo',
+    label: 'bundle/CodeMirrorDemo',
+    entryGlobPath: '../../demos/CodeMirrorDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/codemirror/src/CodeMirror.rozie'],
+  },
+  {
+    key: 'bundle/CodeMirrorScreenshotDemo',
+    label: 'bundle/CodeMirrorScreenshotDemo',
+    entryGlobPath: '../../demos/CodeMirrorScreenshotDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/codemirror/src/CodeMirror.rozie'],
+  },
+  {
+    key: 'bundle/CropperDemo',
+    label: 'bundle/CropperDemo',
+    entryGlobPath: '../../demos/CropperDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/cropper/src/Cropper.rozie'],
+  },
+  {
+    key: 'bundle/CropperScreenshotDemo',
+    label: 'bundle/CropperScreenshotDemo',
+    entryGlobPath: '../../demos/CropperScreenshotDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/cropper/src/Cropper.rozie'],
+  },
+  {
+    // pdf compiles ×6 + its pdfjs-dist dynamic import resolves, but the PDF.js
+    // web worker can't load in the sandboxed iframe → marked unsupported (below).
+    key: 'bundle/PdfViewerDemo',
+    label: 'bundle/PdfViewerDemo',
+    entryGlobPath: '../../demos/PdfViewerDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/pdf/src/PdfViewer.rozie'],
+  },
+  {
+    key: 'bundle/PdfViewerScreenshotDemo',
+    label: 'bundle/PdfViewerScreenshotDemo',
+    entryGlobPath: '../../demos/PdfViewerScreenshotDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/pdf/src/PdfViewer.rozie'],
+  },
+  {
+    // captcha has NO examples/demos wrapper — the package `Captcha.rozie` is the
+    // bundle entry directly (resolvable via `uiPackageFiles`). Its `RecaptchaV3`
+    // sibling + the `./internal/*` runtime helpers are declared so the bundle is
+    // complete; it is marked unsupported-with-reason (external provider script +
+    // required site key + non-sandboxed origin) — it does NOT render.
+    key: 'bundle/Captcha',
+    label: 'bundle/Captcha',
+    entryGlobPath: '../../../packages/ui/captcha/src/Captcha.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/captcha/src/RecaptchaV3.rozie',
+      '../../../packages/ui/captcha/src/internal/loadCaptchaApi.ts',
+      '../../../packages/ui/captcha/src/internal/loadRecaptchaV3.ts',
     ],
   },
 ];
@@ -567,43 +657,29 @@ const matchSnippets: Snippet[] = (() => {
 // take precedence over family-token substring entries.
 // ---------------------------------------------------------------------------
 const UNSUPPORTED: Record<string, string> = {
-  // Phase 68-03 wired plain relative `./internal/*.ts` helpers as passthrough
-  // blob siblings, so date-picker / pagination / resizable now live-render ×6
-  // (their UNSUPPORTED entries are DELETED). Popover's `./internal/middleware`
-  // helper is likewise wired, but the Popover component ALSO emits a runtime
-  // `@floating-ui/dom` (Floating UI) engine import not in the harness importmaps
-  // — so it stays marked until the engine lands (68-04). Exact-key entry.
-  'bundle/PopoverBehaviorDemo':
-    'compiles ×6 (its ./internal/middleware helper now resolves as a blob sibling), but the Popover component emits a runtime @floating-ui/dom (Floating UI) engine import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
-  // Phase 68-02 CLOSED the `.rzts` gap: their @rozie-ui/headless-core
-  // {listCore,windowing}.rzts partials now inline cleanly (compiles ×6). But the
-  // Combobox/Listbox sibling emits an unconditional runtime `@tanstack/virtual-core`
-  // import (the windowing engine) not yet in the harness importmaps — render
-  // pending engine-importmap wiring (68-04). Family-token entries (win over none).
-  Combobox:
-    'compiles ×6 (its headless-core .rzts partials now inline), but the Combobox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
-  Listbox:
-    'compiles ×6 (its headless-core .rzts partials now inline), but the Listbox component emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
-  // Phase 68-03 wired its `./internal/filterCommands` helper as a passthrough
-  // blob sibling — so the ONLY remaining render blocker is the Combobox
-  // sibling's runtime @tanstack/virtual-core (windowing engine) import, pending
-  // the engine-importmap wiring in 68-04.
-  CommandPalette:
-    'compiles ×6 (its headless-core .rzts partials inline + its ./internal/filterCommands helper now resolves as a blob sibling), but the Combobox sibling emits a runtime @tanstack/virtual-core (windowing engine) import not yet in the harness importmaps — live render pending engine-importmap wiring (68-04)',
-  // Not-yet-wired engine-backed families — their vanilla-JS engine lib is not
-  // in the six harness importmaps yet (pending 68-04).
-  DataTable:
-    'engine-backed (TanStack table-core) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
-  Carousel:
-    'engine-backed (embla-carousel) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
-  CodeMirror:
-    'engine-backed (CodeMirror 6) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
-  Cropper:
-    'engine-backed (Cropper.js) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+  // Phase 68-04 added the engine libs to all six harness importmaps, un-blocking
+  // the families that were held for an unwired engine:
+  //   • embla (embla-carousel[+autoplay]), codemirror (@codemirror/* + codemirror),
+  //     cropper (cropperjs + the external cropper.css <link>) — every emitted
+  //     runtime import now resolves → LIVE-RENDER (entries DELETED).
+  //   • combobox / listbox — their @tanstack/virtual-core windowing engine is now
+  //     in the importmap (their .rzts partials inlined in 68-02) → un-marked.
+  //   • popover — its @floating-ui/dom engine is now in the importmap (its
+  //     ./internal/middleware blob sibling wired in 68-03) → un-marked.
+  //   • command-palette — @tanstack/virtual-core (via its vendored Combobox) is now
+  //     in the importmap + its ./internal/filterCommands helper wired in 68-03 →
+  //     un-marked.
+  //
+  // Two engine families still cannot LIVE-RENDER for a genuine harness limit (not
+  // an unwired lib) and stay marked-with-reason per D-2 — never a silent blank:
   PdfViewer:
-    'engine-backed (pdfjs-dist) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+    'compiles ×6 and its `pdfjs-dist` dynamic import now resolves from the importmap, but PDF.js sets GlobalWorkerOptions.workerSrc to a cross-origin jsDelivr worker URL and that web worker is not loadable from the sandboxed null-origin preview iframe — live render blocked by the harness sandbox, not by an unwired engine (bundled-worker support is WS3/Phase 69)',
   Captcha:
-    'engine-backed (provider script) — the lib is not in the harness importmaps yet — pending engine importmap wiring (68-04)',
+    'compiles ×6, but loads an EXTERNAL provider script (recaptcha/hcaptcha/turnstile) at runtime and its `sitekey` prop is required with no valid sample — it needs a real provider site key + network + a non-sandboxed origin, so it cannot live-render in the sandboxed preview iframe',
+  // Still pending its own plan — DataTable is the multi-partial engine family wired
+  // separately in 68-05 (TanStack table-core), not part of this single-engine slice.
+  DataTable:
+    'engine-backed (TanStack table-core) — the multi-partial data-table family is wired separately in 68-05',
 };
 
 /**

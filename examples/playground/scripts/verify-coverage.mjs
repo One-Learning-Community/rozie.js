@@ -51,17 +51,38 @@ const FAMILIES = [
   { family: 'combobox', demo: 'ComboboxBehaviorDemo' },
   { family: 'listbox', demo: 'ListboxVirtualDemo' },
   { family: 'command-palette', demo: 'CommandPaletteBehaviorDemo' },
+  // Phase 68-04 — the single-engine-library families. Their engine libs
+  // (embla-carousel, @codemirror/*, cropperjs, pdfjs-dist) were added to the six
+  // harness importmaps in this plan; this gate asserts the demo entry + its
+  // package sibling still compile ×6 clean off the real workspace. Rendering is
+  // the browser's job — pdf (worker) + captcha (external provider) are marked
+  // unsupported-with-reason in snippets.ts; compiling ×6 is the floor they meet.
+  { family: 'embla', demo: 'CarouselDemo' },
+  { family: 'codemirror', demo: 'CodeMirrorDemo' },
+  { family: 'cropper', demo: 'CropperDemo' },
+  { family: 'pdf', demo: 'PdfViewerDemo' },
+  // captcha has NO examples/demos wrapper — compile its package `Captcha.rozie`
+  // directly (the same entry the playground bundles), via an `entryPath` override.
+  { family: 'captcha', entryPath: 'packages/ui/captcha/src/Captcha.rozie' },
 ];
 
 let failures = 0;
 
-for (const { family, demo } of FAMILIES) {
-  const entry = resolve(DEMOS_DIR, `${demo}.rozie`);
+for (const { family, demo, entryPath } of FAMILIES) {
+  // Most families resolve their entry under examples/demos/<demo>.rozie; a family
+  // with no demos/ wrapper (e.g. captcha) provides `entryPath` relative to the
+  // repo root instead.
+  const entry = entryPath
+    ? resolve(REPO_ROOT, entryPath)
+    : resolve(DEMOS_DIR, `${demo}.rozie`);
+  // Human-readable entry label for the gate output (demo basename, or the
+  // package-src filename for entryPath families like captcha).
+  const entryLabel = demo ?? (entryPath ? entryPath.split('/').pop() : '?');
   let source;
   try {
     source = readFileSync(entry, 'utf8');
   } catch {
-    console.error(`FAIL  ${family.padEnd(14)} — missing demo entry ${demo}.rozie`);
+    console.error(`FAIL  ${family.padEnd(14)} — missing entry ${entryPath ?? `${demo}.rozie`}`);
     failures++;
     continue;
   }
@@ -82,10 +103,10 @@ for (const { family, demo } of FAMILIES) {
   }
 
   if (bad.length > 0) {
-    console.error(`FAIL  ${family.padEnd(14)} ${demo} — ${bad.join(' ')}`);
+    console.error(`FAIL  ${family.padEnd(14)} ${entryLabel} — ${bad.join(' ')}`);
     failures++;
   } else {
-    console.log(`ok    ${family.padEnd(14)} ${demo} — clean x${TARGETS.length}`);
+    console.log(`ok    ${family.padEnd(14)} ${entryLabel} — clean x${TARGETS.length}`);
   }
 }
 
