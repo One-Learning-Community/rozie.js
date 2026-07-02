@@ -31,6 +31,14 @@ export default class Waveform extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) src: string | null = null;
   /**
+   * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
+   */
+  @property({ type: Object }) peaks: unknown = undefined;
+  /**
+   * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
+   */
+  @property({ type: Number, reflect: true }) duration: number | null = null;
+  /**
    * The waveform height in pixels. Reconciled at runtime via `setOptions`.
    */
   @property({ type: Number, reflect: true }) height: number = 128;
@@ -120,7 +128,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) regionColor: string | null = null;
   /**
-   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
+   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
    */
   @property({ type: Object }) options: any = {};
   /**
@@ -355,6 +363,10 @@ private __rozieFirstUpdateDone = false;
     dragToSeek: !this.disableDragToSeek,
     plugins: plugins
   };
+  // peaks/duration override the `options` bag ONLY when actually provided —
+  // assigning `undefined` unconditionally would clobber a caller's options.peaks.
+  if (this.peaks != null) cfg.peaks = this.peaks;
+  if (this.duration != null) cfg.duration = this.duration;
   this.ws = WaveSurfer.create(cfg);
 
   // ── engine events → emits + the two-way currentTime writeback ──────────────
@@ -569,7 +581,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'regions', 'drag-to-create-regions', 'dragtocreateregions', 'region-color', 'regioncolor', 'options', 'current-time', 'currenttime']);
+    const __skip = new Set<string>(['src', 'peaks', 'duration', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'regions', 'drag-to-create-regions', 'dragtocreateregions', 'region-color', 'regioncolor', 'options', 'current-time', 'currenttime']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

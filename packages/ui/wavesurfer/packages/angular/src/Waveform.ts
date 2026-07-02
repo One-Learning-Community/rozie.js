@@ -36,6 +36,14 @@ export class Waveform {
    */
   src = input<(string) | null>(null);
   /**
+   * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
+   */
+  peaks = input<unknown>(undefined);
+  /**
+   * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
+   */
+  duration = input<(number) | null>(null);
+  /**
    * The waveform height in pixels. Reconciled at runtime via `setOptions`.
    */
   height = input<number>(128);
@@ -124,7 +132,7 @@ export class Waveform {
    */
   regionColor = input<(string) | null>(null);
   /**
-   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
+   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
    */
   options = input<Record<string, any>>((() => ({}))());
   /**
@@ -315,6 +323,8 @@ export class Waveform {
     if (addedWithoutId) this.writeBackRegions();
   };
   buildWaveSurfer = () => {
+    const __peaks = this.peaks();
+    const __duration = this.duration();
     let plugins = [];
     plugins = [];
     if (this.timeline()) plugins.push(TimelinePlugin.create());
@@ -348,6 +358,10 @@ export class Waveform {
       dragToSeek: !this.disableDragToSeek(),
       plugins: plugins
     };
+    // peaks/duration override the `options` bag ONLY when actually provided —
+    // assigning `undefined` unconditionally would clobber a caller's options.peaks.
+    if (__peaks != null) cfg.peaks = __peaks;
+    if (__duration != null) cfg.duration = __duration;
     this.ws = WaveSurfer.create(cfg);
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────

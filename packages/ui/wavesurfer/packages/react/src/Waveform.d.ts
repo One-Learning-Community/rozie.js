@@ -10,6 +10,14 @@ export interface WaveformProps {
    */
   src?: (string) | null;
   /**
+   * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
+   */
+  peaks?: unknown;
+  /**
+   * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
+   */
+  duration?: (number) | null;
+  /**
    * The waveform height in pixels. Reconciled at runtime via `setOptions`.
    */
   height?: number;
@@ -100,7 +108,7 @@ export interface WaveformProps {
    */
   regionColor?: (string) | null;
   /**
-   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
+   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
    */
   options?: Record<string, unknown>;
   /**

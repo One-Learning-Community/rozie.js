@@ -21,7 +21,7 @@ const source = readFileSync(SRC, 'utf8');
 const EXPECT = {
   name: 'Waveform',
   props: [
-    'src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
+    'src', 'peaks', 'duration', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
     'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate',
     'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
     'timeline', 'hover', 'hoverColor', 'regions', 'dragToCreateRegions', 'regionColor',

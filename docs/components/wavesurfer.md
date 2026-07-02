@@ -219,6 +219,8 @@ There are two **two-way** model props — `currentTime` and `regions` (bind eith
 | Name | Type | Default | Two-way (model) | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | :---: | --- |
 | `src` | `String` | `null` | | ✓ | The audio URL the waveform loads. Changing it calls `load(url)`. |
+| `peaks` | `unknown` | `undefined` | | | Pre-computed waveform peaks (array of channel sample arrays, or a single `number[]`) — render without downloading/decoding audio; pair with `duration`. **Construction-only.** |
+| `duration` | `Number` | `null` | | | Audio duration in seconds — required alongside `peaks` when there's no decodable `src`. **Construction-only.** |
 | `height` | `Number` | `128` | | ✓ | The waveform height in pixels. Reconciled via `setOptions`. |
 | `waveColor` | `String` | `"#8a2be2"` | | ✓ | Color of the unplayed portion of the waveform. Reconciled via `setOptions`. |
 | `progressColor` | `String` | `"#5a189a"` | | ✓ | Color of the played (progress) portion. Reconciled via `setOptions`. |
@@ -308,8 +310,8 @@ When you drive `regions` as a controlled list, include a stable `id` on each des
 
 ### Offline / deterministic rendering
 
-To render a waveform without decoding audio (CI, tests, SSR-adjacent), pass a pre-computed peaks array and a duration through `options`:
+To render a waveform without decoding audio (CI, tests, SSR-adjacent), pass a pre-computed peaks array and a duration — no `src` needed:
 
 ```ts
-<Waveform :options="{ peaks: [/* -1..1 samples */], duration: 8 }" src="/audio.mp3" />
+<Waveform :peaks="[/* -1..1 samples */]" :duration="8" />
 ```

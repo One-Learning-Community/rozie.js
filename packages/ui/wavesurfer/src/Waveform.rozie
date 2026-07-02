@@ -73,6 +73,26 @@
       example: '<Waveform :src="audioUrl" r-model:currentTime="time" />',
     },
   },
+  // pre-computed waveform peaks — render WITHOUT decoding audio (SSR / offline /
+  // deterministic tests). Untyped (`unknown`) + `default: undefined` so it merges
+  // cleanly under strict typecheck (the Cropper `data` idiom). Construction-time.
+  peaks: {
+    default: undefined,
+    docs: {
+      description:
+        'Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.',
+    },
+  },
+  // known audio duration in seconds — required alongside `peaks` when there is no
+  // `src` to decode. Construction-time.
+  duration: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.',
+    },
+  },
   // waveform px height. Runtime-reconciled via setOptions().
   height: {
     type: Number,
@@ -211,7 +231,7 @@
     default: () => ({}),
     docs: {
       description:
-        'Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).',
+        'Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).',
     },
   },
   // two-way playback position in seconds. Untyped (no `type:`) so it emits as
@@ -370,6 +390,10 @@ const buildWaveSurfer = () => {
     dragToSeek: !$props.disableDragToSeek,
     plugins: plugins,
   }
+  // peaks/duration override the `options` bag ONLY when actually provided —
+  // assigning `undefined` unconditionally would clobber a caller's options.peaks.
+  if ($props.peaks != null) cfg.peaks = $snapshot($props.peaks)
+  if ($props.duration != null) cfg.duration = $props.duration
   ws = WaveSurfer.create(cfg)
 
   // ── engine events → emits + the two-way currentTime writeback ──────────────

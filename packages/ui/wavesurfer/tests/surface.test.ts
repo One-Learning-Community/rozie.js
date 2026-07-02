@@ -26,7 +26,7 @@ const source = readFileSync(SRC, 'utf8');
 const EXPECT = {
   name: 'Waveform',
   props: [
-    'src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
+    'src', 'peaks', 'duration', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
     'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate',
     'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
     'timeline', 'hover', 'hoverColor', 'regions', 'dragToCreateRegions', 'regionColor',
@@ -62,7 +62,7 @@ describe('Waveform.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (25 props)', () => {
+  it('props surface matches (27 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

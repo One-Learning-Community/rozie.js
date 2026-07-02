@@ -23,6 +23,14 @@ interface WaveformProps {
    */
   src?: (string) | null;
   /**
+   * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
+   */
+  peaks?: unknown;
+  /**
+   * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
+   */
+  duration?: (number) | null;
+  /**
    * The waveform height in pixels. Reconciled at runtime via `setOptions`.
    */
   height?: number;
@@ -113,7 +121,7 @@ interface WaveformProps {
    */
   regionColor?: (string) | null;
   /**
-   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
+   * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
    */
   options?: Record<string, any>;
   /**
@@ -161,9 +169,11 @@ export interface WaveformHandle {
 
 const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_props: WaveformProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<WaveformProps, 'src' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'dragToCreateRegions' | 'regionColor' | 'options'> & { src: (string) | null; height: number; waveColor: string; progressColor: string; cursorColor: string; cursorWidth: number; barWidth: (unknown) | null; barGap: (unknown) | null; barRadius: (unknown) | null; minPxPerSec: number; volume: number; playbackRate: number; autoplay: boolean; normalizeAmplitude: boolean; hideScrollbar: boolean; disableInteraction: boolean; disableDragToSeek: boolean; timeline: boolean; hover: boolean; hoverColor: (string) | null; dragToCreateRegions: boolean; regionColor: (string) | null; options: Record<string, any> } = {
+  const props: Omit<WaveformProps, 'src' | 'peaks' | 'duration' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'dragToCreateRegions' | 'regionColor' | 'options'> & { src: (string) | null; peaks: unknown; duration: (number) | null; height: number; waveColor: string; progressColor: string; cursorColor: string; cursorWidth: number; barWidth: (unknown) | null; barGap: (unknown) | null; barRadius: (unknown) | null; minPxPerSec: number; volume: number; playbackRate: number; autoplay: boolean; normalizeAmplitude: boolean; hideScrollbar: boolean; disableInteraction: boolean; disableDragToSeek: boolean; timeline: boolean; hover: boolean; hoverColor: (string) | null; dragToCreateRegions: boolean; regionColor: (string) | null; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? null,
+    peaks: _props.peaks ?? undefined,
+    duration: _props.duration ?? null,
     height: _props.height ?? 128,
     waveColor: _props.waveColor ?? '#8a2be2',
     progressColor: _props.progressColor ?? '#5a189a',
@@ -188,8 +198,8 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, height, waveColor, progressColor, cursorColor, cursorWidth, barWidth, barGap, barRadius, minPxPerSec, volume, playbackRate, autoplay, normalizeAmplitude, hideScrollbar, disableInteraction, disableDragToSeek, timeline, hover, hoverColor, regions, dragToCreateRegions, regionColor, options, currentTime, defaultValue, onRegionsChange, defaultRegions, onCurrentTimeChange, defaultCurrentTime, ...rest } = _props as WaveformProps & Record<string, unknown>;
-    void src; void height; void waveColor; void progressColor; void cursorColor; void cursorWidth; void barWidth; void barGap; void barRadius; void minPxPerSec; void volume; void playbackRate; void autoplay; void normalizeAmplitude; void hideScrollbar; void disableInteraction; void disableDragToSeek; void timeline; void hover; void hoverColor; void regions; void dragToCreateRegions; void regionColor; void options; void currentTime; void defaultValue; void onRegionsChange; void defaultRegions; void onCurrentTimeChange; void defaultCurrentTime;
+    const { src, peaks, duration, height, waveColor, progressColor, cursorColor, cursorWidth, barWidth, barGap, barRadius, minPxPerSec, volume, playbackRate, autoplay, normalizeAmplitude, hideScrollbar, disableInteraction, disableDragToSeek, timeline, hover, hoverColor, regions, dragToCreateRegions, regionColor, options, currentTime, defaultValue, onRegionsChange, defaultRegions, onCurrentTimeChange, defaultCurrentTime, ...rest } = _props as WaveformProps & Record<string, unknown>;
+    void src; void peaks; void duration; void height; void waveColor; void progressColor; void cursorColor; void cursorWidth; void barWidth; void barGap; void barRadius; void minPxPerSec; void volume; void playbackRate; void autoplay; void normalizeAmplitude; void hideScrollbar; void disableInteraction; void disableDragToSeek; void timeline; void hover; void hoverColor; void regions; void dragToCreateRegions; void regionColor; void options; void currentTime; void defaultValue; void onRegionsChange; void defaultRegions; void onCurrentTimeChange; void defaultCurrentTime;
     return rest;
   })();
   const regionsPlugin = useRef<any>(null);
@@ -324,6 +334,10 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
       dragToSeek: !props.disableDragToSeek,
       plugins: plugins
     };
+    // peaks/duration override the `options` bag ONLY when actually provided —
+    // assigning `undefined` unconditionally would clobber a caller's options.peaks.
+    if (props.peaks != null) cfg.peaks = props.peaks;
+    if (props.duration != null) cfg.duration = props.duration;
     ws.current = WaveSurfer.create(cfg);
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────
@@ -390,7 +404,7 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
         _rozieProp_onRegionOut && _rozieProp_onRegionOut(serializeRegion(region));
       });
     }
-  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionIn, _rozieProp_onRegionOut, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
+  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionIn, _rozieProp_onRegionOut, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.duration, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.peaks, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/
   // playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);

@@ -41,6 +41,8 @@ export class DemoComponent {
 | Name | Type | Default | Two-way (model) | Required |
 | --- | --- | --- | :---: | :---: |
 | `src` | `String` | `null` |  |  |
+| `peaks` | `unknown` | `undefined` |  |  |
+| `duration` | `Number` | `null` |  |  |
 | `height` | `Number` | `128` |  |  |
 | `waveColor` | `String` | `"#8a2be2"` |  |  |
 | `progressColor` | `String` | `"#5a189a"` |  |  |

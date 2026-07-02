@@ -16,6 +16,14 @@ const props = withDefaults(
      */
     src?: string | null;
     /**
+     * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
+     */
+    peaks?: unknown;
+    /**
+     * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
+     */
+    duration?: number | null;
+    /**
      * The waveform height in pixels. Reconciled at runtime via `setOptions`.
      */
     height?: number;
@@ -100,11 +108,11 @@ const props = withDefaults(
      */
     regionColor?: string | null;
     /**
-     * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
+     * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).
      */
     options?: Record<string, any>;
   }>(),
-  { src: null, height: 128, waveColor: '#8a2be2', progressColor: '#5a189a', cursorColor: '#333333', cursorWidth: 1, barWidth: null, barGap: null, barRadius: null, minPxPerSec: 1, volume: 1, playbackRate: 1, autoplay: false, normalizeAmplitude: false, hideScrollbar: false, disableInteraction: false, disableDragToSeek: false, timeline: false, hover: false, hoverColor: null, dragToCreateRegions: false, regionColor: null, options: () => ({}) }
+  { src: null, peaks: undefined, duration: null, height: 128, waveColor: '#8a2be2', progressColor: '#5a189a', cursorColor: '#333333', cursorWidth: 1, barWidth: null, barGap: null, barRadius: null, minPxPerSec: 1, volume: 1, playbackRate: 1, autoplay: false, normalizeAmplitude: false, hideScrollbar: false, disableInteraction: false, disableDragToSeek: false, timeline: false, hover: false, hoverColor: null, dragToCreateRegions: false, regionColor: null, options: () => ({}) }
 );
 
 /**
@@ -303,6 +311,10 @@ const buildWaveSurfer = () => {
     dragToSeek: !props.disableDragToSeek,
     plugins: plugins
   };
+  // peaks/duration override the `options` bag ONLY when actually provided —
+  // assigning `undefined` unconditionally would clobber a caller's options.peaks.
+  if (props.peaks != null) cfg.peaks = props.peaks;
+  if (props.duration != null) cfg.duration = props.duration;
   ws = WaveSurfer.create(cfg);
 
   // ── engine events → emits + the two-way currentTime writeback ──────────────
