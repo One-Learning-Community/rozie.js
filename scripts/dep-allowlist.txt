@@ -1555,6 +1555,7 @@ vue-tsc
 w3c-keyname
 w3c-xmlserializer
 watchpack
+wavesurfer.js
 wbuf
 wcwidth
 weak-lru-cache
