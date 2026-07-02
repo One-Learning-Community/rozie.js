@@ -57,6 +57,7 @@ import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
 import {
   OBJECT_PROTOTYPE_MEMBERS,
+  LIT_DOM_METHOD_MEMBERS,
   LIT_LIFECYCLE_MEMBERS,
   ANGULAR_LIFECYCLE_MEMBERS,
   VUE_RESERVED_PROPS,
@@ -115,8 +116,17 @@ const LIT_DOM_PROP_FOOTGUNS: ReadonlySet<string> = new Set<string>([
   'autocorrect', 'enterKeyHint', 'nodeType', 'nodeName', 'className', 'innerHTML',
   'outerHTML', 'localName', 'namespaceURI', 'scrollTop', 'scrollLeft',
 ]);
+// The inherited DOM *method* names (`LIT_DOM_METHOD_MEMBERS`) are folded in
+// WHOLESALE, not curated like `LIT_DOM_PROP_FOOTGUNS`. A `@property` field named
+// after an inherited method is an UNCONDITIONAL TS2416 on the Lit leaf (a data
+// type is never assignable to the inherited `(...) => T` signature), whereas a
+// reflected data-prop collides only conditionally — so the method class needs no
+// hand-curation, and it is corpus-absent (503 .rozie files ship zero method-named
+// props). This closes the wavesurfer `normalize` gap (`Node.prototype.normalize`)
+// that slipped compile()×6 and only surfaced at the per-leaf Lit typecheck.
 const PROP_WARNING_TIER: ReadonlySet<string> = new Set<string>([
   ...LIT_DOM_PROP_FOOTGUNS,
+  ...LIT_DOM_METHOD_MEMBERS,
   ...LIT_LIFECYCLE_MEMBERS,
   ...OBJECT_PROTOTYPE_MEMBERS,
   ...ANGULAR_LIFECYCLE_MEMBERS,

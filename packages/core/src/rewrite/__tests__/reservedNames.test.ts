@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   LIT_DOM_MEMBERS,
+  LIT_DOM_METHOD_MEMBERS,
   LIT_LIFECYCLE_MEMBERS,
   LIT_EMITTER_MEMBERS,
   ANGULAR_CVA_MEMBERS,
@@ -37,6 +38,31 @@ describe('reservedNames — Lit tables (collision-lit §2)', () => {
       'assignedSlot', 'id', 'title', 'focus', 'scrollTo', 'nodeType',
     ]) {
       expect(LIT_DOM_MEMBERS.has(n)).toBe(true);
+    }
+  });
+
+  it('Group A method subset ⊆ Group A (INVARIANT — the two must never drift)', () => {
+    // Every DOM-method name promoted wholesale into the ROZ142 warning tier MUST
+    // also be a real member of the full DOM chain, or the validator would flag a
+    // name that is not actually inherited (a false positive with no TS2416).
+    for (const n of LIT_DOM_METHOD_MEMBERS) {
+      expect(LIT_DOM_MEMBERS.has(n), `${n} in LIT_DOM_MEMBERS`).toBe(true);
+    }
+  });
+
+  it('Group A method subset holds the guaranteed-TS2416 methods, excludes reflected data props', () => {
+    // The wavesurfer `normalize` regression + representative methods across the
+    // EventTarget→Node→Element→HTMLElement chain.
+    for (const n of [
+      'normalize', 'focus', 'blur', 'click', 'remove', 'append', 'scroll',
+      'contains', 'matches', 'setAttribute', 'addEventListener',
+    ]) {
+      expect(LIT_DOM_METHOD_MEMBERS.has(n), `method ${n}`).toBe(true);
+    }
+    // Reflected DATA properties are NOT methods → they stay in the curated
+    // conditional-collision footgun list, never the always-warn method class.
+    for (const n of ['id', 'title', 'tabIndex', 'hidden', 'ariaLabel', 'className']) {
+      expect(LIT_DOM_METHOD_MEMBERS.has(n), `data-prop ${n} excluded`).toBe(false);
     }
   });
 

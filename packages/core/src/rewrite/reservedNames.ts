@@ -108,6 +108,48 @@ export const LIT_DOM_MEMBERS: ReadonlySet<string> = new Set([
   'togglePopover',
 ]);
 
+// collision-lit §2 Group A (method subset) — the inherited DOM *methods* on the
+// prototype chain (EventTarget → Node → Element → HTMLElement). Split out of
+// `LIT_DOM_MEMBERS` because methods are a categorically stronger collision than
+// reflected DATA properties: a `@property` field named after an inherited method
+// (e.g. `normalize` → `Node.prototype.normalize(): void`) has a data type that is
+// NEVER assignable to the inherited `(...) => T` signature, so it is an
+// UNCONDITIONAL TS2416 on the Lit leaf regardless of the prop's type — unlike a
+// reflected data-prop (`tabIndex: number`) which collides only when the types
+// mismatch. The ROZ142 validator folds THIS set into its warning tier wholesale
+// (the whole method class is corpus-absent — 503 .rozie files ship zero
+// method-named props), closing the wavesurfer `normalize` gap that slipped
+// compile()×6 and only broke at the per-leaf Lit typecheck. INVARIANT: every name
+// here is also in `LIT_DOM_MEMBERS` (asserted in reservedNames.test.ts) so the
+// two never drift.
+export const LIT_DOM_METHOD_MEMBERS: ReadonlySet<string> = new Set([
+  // EventTarget
+  'addEventListener', 'removeEventListener', 'dispatchEvent',
+  // Node (instance methods)
+  'appendChild', 'cloneNode', 'compareDocumentPosition', 'contains',
+  'getRootNode', 'hasChildNodes', 'insertBefore', 'isDefaultNamespace',
+  'isEqualNode', 'isSameNode', 'lookupNamespaceURI', 'lookupPrefix',
+  'normalize', 'removeChild', 'replaceChild',
+  // Element (instance methods)
+  'after', 'animate', 'append', 'attachShadow', 'before', 'checkVisibility',
+  'closest', 'computedStyleMap', 'getAnimations', 'getAttribute',
+  'getAttributeNames', 'getAttributeNode', 'getAttributeNodeNS',
+  'getAttributeNS', 'getBoundingClientRect', 'getClientRects',
+  'getElementsByClassName', 'getElementsByTagName', 'getElementsByTagNameNS',
+  'getHTML', 'hasAttribute', 'hasAttributeNS', 'hasAttributes',
+  'hasPointerCapture', 'insertAdjacentElement', 'insertAdjacentHTML',
+  'insertAdjacentText', 'matches', 'prepend', 'querySelector',
+  'querySelectorAll', 'releasePointerCapture', 'remove', 'removeAttribute',
+  'removeAttributeNode', 'removeAttributeNS', 'replaceChildren', 'replaceWith',
+  'requestFullscreen', 'requestPointerLock', 'scroll', 'scrollBy',
+  'scrollIntoView', 'scrollTo', 'setAttribute', 'setAttributeNode',
+  'setAttributeNodeNS', 'setAttributeNS', 'setPointerCapture',
+  'toggleAttribute', 'setHTMLUnsafe',
+  // HTMLElement (instance methods)
+  'attachInternals', 'blur', 'click', 'focus', 'hidePopover', 'showPopover',
+  'togglePopover',
+]);
+
 // collision-lit §2 Group C — Lit ReactiveElement / LitElement reserved members.
 // Lifecycle methods (overriding silently breaks reactivity) + instance accessors
 // + static members. NOT in Group A/B; currently missing from every guard

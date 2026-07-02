@@ -108,6 +108,33 @@ describe('reservedNameCollisionValidator — ROZ142 public-contract collisions (
     expect(hits.length, JSON.stringify(hits)).toBe(0);
   });
 
+  // ── Lit DOM-METHOD prop (UNCONDITIONAL hard TS2416) — the wavesurfer `normalize`
+  // history. A <props> key equal to an inherited DOM *method* name (Node/Element/
+  // HTMLElement) becomes a class field whose data type is NEVER assignable to the
+  // inherited `(...) => T` method signature → a GUARANTEED TS2416 on the Lit leaf
+  // regardless of the prop's type — unlike the reflected DATA-property footguns
+  // above (`tabIndex`) which collide only conditionally. This slipped compile()×6
+  // in the wavesurfer port (`normalize` shadowing `Node.prototype.normalize()`)
+  // because the method names were absent from the curated footgun subset. The
+  // whole method class is corpus-absent (503 .rozie files ship zero method-named
+  // props), so it is promoted wholesale — catching future `focus`/`remove`/`click`
+  // props without a new port finding each time.
+
+  it('fires (warning) on a <props> key `normalize` (Lit Node.prototype.normalize — the wavesurfer regression)', () => {
+    const hits = roz142(analyzeSource(propsComponent('normalize: { type: Boolean }')));
+    expect(hits.length, JSON.stringify(hits)).toBe(1);
+    expect(hits[0]!.severity).toBe('warning');
+    expect(hits[0]!.message).toContain('normalize');
+    expect(hits[0]!.hint).toContain('normalizeBase');
+  });
+
+  it('fires (warning) on a <props> key `focus` (Lit HTMLElement.focus) — the class generalizes beyond one name', () => {
+    const hits = roz142(analyzeSource(propsComponent('focus: { type: Boolean }')));
+    expect(hits.length, JSON.stringify(hits)).toBe(1);
+    expect(hits[0]!.severity).toBe('warning');
+    expect(hits[0]!.message).toContain('focus');
+  });
+
   // ── Svelte emit-normalization collapse (runtime-only, ROZ981) ──
 
   it('fires on two emits `fooBar` + `foo-bar` that normalize to one callback prop (Svelte)', () => {
