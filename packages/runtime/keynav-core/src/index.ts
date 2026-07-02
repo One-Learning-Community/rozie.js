@@ -8,10 +8,6 @@
 //
 // Tree-shakable named exports — no default export.
 //
-// NOTE: Task 1 populates the config/host types + windower contract only.
-// `stateMachine.ts` (Task 2) and `normalizeClassTokens.ts` (Task 3) add
-// their exports here as they land.
-
 export type {
   KeynavFocusModel,
   KeynavOrientation,
@@ -23,3 +19,6 @@ export type {
 
 export type { KeynavWindower, SourceArrayFallback } from './windower.js';
 export { sourceArrayFallback } from './windower.js';
+
+export type { KeynavStateMachine } from './stateMachine.js';
+export { createKeynavStateMachine } from './stateMachine.js';

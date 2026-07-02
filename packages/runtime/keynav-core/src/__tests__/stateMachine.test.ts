@@ -133,12 +133,19 @@ describe('createKeynavStateMachine', () => {
   });
 
   it('typeahead=true: printable char jumps to next item whose label prefix-matches (case-insensitive)', () => {
-    const host = makeHost([{ label: 'Apple' }, { label: 'Banana' }, { label: 'Cherry' }], 0);
-    const sm = createKeynavStateMachine(host, { ...baseConfig, typeahead: true });
-    sm.onKeydown(key('b'));
-    expect(host.active).toBe(1);
-    sm.onKeydown(key('C'));
-    expect(host.active).toBe(2);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const host = makeHost([{ label: 'Apple' }, { label: 'Banana' }, { label: 'Cherry' }], 0);
+      const sm = createKeynavStateMachine(host, { ...baseConfig, typeahead: true });
+      sm.onKeydown(key('b'));
+      expect(host.active).toBe(1);
+      vi.setSystemTime(600); // beyond the ~500ms buffer window -> fresh search
+      sm.onKeydown(key('C'));
+      expect(host.active).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('typeahead buffer accumulates within ~500ms then resets', () => {
