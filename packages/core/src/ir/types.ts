@@ -847,6 +847,74 @@ export interface TemplateElementIR {
    *     a hint for editor tooling and a forward-compatible hook.
    */
   isExternal?: boolean;
+  /**
+   * Phase 71 — `r-keynav:<focus-model>[.<modifier>…]="…"` (+ a co-located
+   * `r-keynav-active-class="…"`, SPEC §9) lowered onto the nav-root element.
+   * Additive-optional: absent on every element without the directive, so
+   * existing corpus IR is byte-identical (SPEC §11 — no rebless for the
+   * front-end). `sourceExpression`/`sourceDeps` start undefined here — the
+   * whole-component pass `resolveKeynavGroups` (71-02 Task 2) fills them in
+   * from an explicit `:source="…"` binding on this element or synthesizes
+   * them from a co-located `r-for` (SPEC §5).
+   */
+  keynavRoot?: KeynavRootIR;
+  /**
+   * Phase 71 — `r-keynav-item="{ label?, disabled? }"` lowered onto an item
+   * element. Additive-optional, same corpus-safety rationale as `keynavRoot`.
+   */
+  keynavItem?: KeynavItemIR;
+}
+
+/**
+ * Phase 71 — `r-keynav` compiler front-end (SPEC.md). See `keynavRoot` on
+ * `TemplateElementIR` for the additive-field rationale.
+ *
+ * `focusModel` is carried UNVALIDATED at lowering time — an empty string
+ * (bare `r-keynav` with no colon-argument) or an unrecognized argument
+ * (`r-keynav:foo`) both lower into this field as-is; validating it and
+ * emitting `KEYNAV_BAD_FOCUS_MODEL` (ROZ985) is `resolveKeynavGroups`'s job
+ * (71-02 Task 2), which has the full-component view needed to report
+ * cleanly alongside the association diagnostics.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface KeynavRootIR {
+  focusModel: 'tabindex' | 'activedescendant';
+  orientation: 'vertical' | 'horizontal' | 'both';
+  loop: boolean;
+  typeahead: boolean;
+  skipDisabled: boolean;
+  /** The `r-keynav:<focus-model>` value — the active-index binding (e.g. `$data.active`). */
+  activeExpression: Expression;
+  activeDeps: SignalRef[];
+  /** From an optional co-located `r-keynav-active-class="…"` on this same element (SPEC §9). */
+  activeClassExpression?: Expression;
+  activeClassDeps?: SignalRef[];
+  /**
+   * The item-source array expression — either an explicit `:source="…"`
+   * binding on this element or synthesized from a co-located `r-for`
+   * (SPEC §5). Filled in by `resolveKeynavGroups` (71-02 Task 2); undefined
+   * immediately after `lowerTemplate`.
+   */
+  sourceExpression?: Expression;
+  sourceDeps?: SignalRef[];
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 71 — `r-keynav-item="{ label?, disabled? }"` (SPEC §5). Both fields
+ * are optional: `label` only matters for `.typeahead`, `disabled` only for
+ * `.skipdisabled`. The item's index comes from its `r-for` context, not from
+ * this IR node.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface KeynavItemIR {
+  labelExpression?: Expression;
+  labelDeps?: SignalRef[];
+  disabledExpression?: Expression;
+  disabledDeps?: SignalRef[];
+  sourceLoc: SourceLoc;
 }
 
 /**

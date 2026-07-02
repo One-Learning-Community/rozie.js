@@ -39,7 +39,12 @@ export interface ModifierChain {
 }
 
 export type ModifierArg =
-  | { kind: 'literal'; value: string | number; loc: SourceLoc }
+  // Phase 71 (r-keynav) — `boolean` added to `value` for `.skipdisabled(false)`
+  // (SPEC.md §3). Additive to the union; every existing caller destructures
+  // `string | number` values by `typeof`, so a new possible runtime type is
+  // inert until a caller opts in to checking for it (resolveKeynavModifiers
+  // is the first).
+  | { kind: 'literal'; value: string | number | boolean; loc: SourceLoc }
   | { kind: 'refExpr'; ref: string; loc: SourceLoc };
 
 /** peggy's location() return shape. */
@@ -59,7 +64,7 @@ type PeggyError = {
 interface RawArg {
   kind: 'literal' | 'refExpr';
   loc: RawLoc;
-  value?: string | number;
+  value?: string | number | boolean;
   ref?: string;
 }
 
@@ -80,7 +85,7 @@ function shiftArg(arg: RawArg, baseOffset: number): ModifierArg {
   if (arg.kind === 'literal') {
     return {
       kind: 'literal',
-      value: arg.value as string | number,
+      value: arg.value as string | number | boolean,
       loc: shift(arg.loc, baseOffset),
     };
   }

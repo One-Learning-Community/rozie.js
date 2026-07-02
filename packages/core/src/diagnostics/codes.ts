@@ -789,6 +789,18 @@ export const RozieErrorCode = {
   // 970-cluster (r-for/slot family) alongside the retired ROZ980. ROZ981 is the
   // next free code after the BURNED ROZ980.
   RUNTIME_ONLY_NAME_COLLISION: 'ROZ981', // error — a runtime-only public-contract collision with no typecheck net (Svelte slot-param shadows an r-for loop var, or two emits normalize to one callback prop). Rename one.
+
+  // ---- Phase 71 r-keynav — ROZ982..ROZ987 ----
+  // The compiler-owned keyboard-navigation primitive (SPEC.md). Plan 71-02
+  // Task 1 (parser/lowerer front-end) claims ROZ982; Task 2
+  // (resolveKeynavGroups, the whole-component association pass) claims
+  // ROZ983..ROZ987. ROZ982 is the next free code after ROZ981.
+  KEYNAV_UNKNOWN_MODIFIER: 'ROZ982', // error — unknown r-keynav modifier (did-you-mean among .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled)
+  KEYNAV_NO_ITEMS: 'ROZ983', // error — r-keynav root has no associated r-keynav-item in the component
+  KEYNAV_ORPHAN_ITEM: 'ROZ984', // error — r-keynav-item with no r-keynav root in the component
+  KEYNAV_BAD_FOCUS_MODEL: 'ROZ985', // error — missing/unrecognized r-keynav focus-model argument (valid: tabindex, activedescendant)
+  KEYNAV_MULTIPLE_ROOTS: 'ROZ986', // error — more than one r-keynav root in one component (v1 = one group per component; named groups deferred)
+  KEYNAV_SOURCE_UNRESOLVED: 'ROZ987', // error — r-keynav :source neither provided nor synthesizable from a co-located r-for
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

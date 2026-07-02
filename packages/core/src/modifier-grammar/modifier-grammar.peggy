@@ -40,6 +40,7 @@ ArgList
 
 Arg
   = RefExpr
+  / BooleanLiteral
   / NumberLiteral
   / StringLiteral
 
@@ -47,6 +48,17 @@ RefExpr
   = "$refs." name:Identifier {
       return { kind: 'refExpr', ref: name, loc: location() };
     }
+
+// Phase 71 (r-keynav) — `.skipdisabled(false)` is the first modifier-grammar
+// consumer to need a bare boolean argument (SPEC.md §3). Additive alternative
+// tried BEFORE NumberLiteral/StringLiteral: matched only on the exact bare
+// keyword (no quotes, no digits), so it cannot shadow either. Any existing
+// modifier call site's args are unaffected — no built-in modifier before
+// today accepted a bare `true`/`false` token, so nothing outside this
+// grammar's own coverage changes.
+BooleanLiteral
+  = "true" { return { kind: 'literal', value: true, loc: location() }; }
+  / "false" { return { kind: 'literal', value: false, loc: location() }; }
 
 NumberLiteral
   = digits:[0-9]+ {

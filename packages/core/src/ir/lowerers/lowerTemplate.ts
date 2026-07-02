@@ -56,9 +56,12 @@ import type {
   ListenerSpreadIR,
   SlotFillerDecl,
   ResolvedModelModifier,
+  KeynavRootIR,
+  KeynavItemIR,
 } from '../types.js';
 import { parseModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
+import type { SignalRef } from '../../reactivity/signalRef.js';
 
 /**
  * Per-element annotation of tagKind + diagnostic emission for Phase 06.2 P1
@@ -755,6 +758,97 @@ function resolveModelModifiers(
 }
 
 /**
+ * Phase 71 (r-keynav) — the fixed enum of valid `r-keynav` modifiers, used
+ * both for pattern-matching and as the `didYouMean` candidate list.
+ */
+const KEYNAV_MODIFIER_NAMES = [
+  'vertical',
+  'horizontal',
+  'both',
+  'loop',
+  'typeahead',
+  'skipdisabled',
+] as const;
+
+interface ResolvedKeynavModifiers {
+  orientation: 'vertical' | 'horizontal' | 'both';
+  loop: boolean;
+  typeahead: boolean;
+  skipDisabled: boolean;
+}
+
+/**
+ * Phase 71 (Landmine 2, 71-01-SUMMARY.md decision) — bespoke `r-keynav`
+ * modifier resolver, deliberately STANDALONE from the shared
+ * `ModifierRegistry`/`ModifierImpl` machinery `resolveModelModifiers` (above)
+ * and `resolveModifierPipeline` (event modifiers) both go through. `r-keynav`
+ * modifiers are a fixed, closed enum
+ * (`.vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled`) —
+ * pattern-matched directly against the `parseModifierChain` peggy tokenizer
+ * output, never touching `registry.get()`/`register()`. This keeps the
+ * `@public` `ModifierImpl` discriminated union at exactly
+ * `EventModifierImpl | ModelModifierImpl` — no third `kind` added for a
+ * directive-internal concern.
+ *
+ * Orientation defaults to `'vertical'`; `.loop`/`.typeahead` default `false`;
+ * `.skipdisabled` defaults `true` (SPEC §3 — "skip disabled items" is the
+ * safer out-of-the-box behavior). `.skipdisabled(false)` — the one modifier
+ * with a meaningful argument — flips it off; any other/missing arg shape
+ * falls back to the default-on behavior rather than throwing (collected-not-
+ * thrown, D-08).
+ *
+ * Unknown modifier names are a hard error (did-you-mean against the fixed
+ * enum), never a throw — mirrors `resolveModelModifiers`'s ROZ960 handling.
+ */
+function resolveKeynavModifiers(
+  chain: readonly ModifierChain[],
+  diagnostics: Diagnostic[],
+): ResolvedKeynavModifiers {
+  let orientation: ResolvedKeynavModifiers['orientation'] = 'vertical';
+  let loop = false;
+  let typeahead = false;
+  let skipDisabled = true;
+
+  for (const m of chain) {
+    switch (m.name) {
+      case 'vertical':
+      case 'horizontal':
+      case 'both':
+        orientation = m.name;
+        break;
+      case 'loop':
+        loop = true;
+        break;
+      case 'typeahead':
+        typeahead = true;
+        break;
+      case 'skipdisabled': {
+        const arg = m.args[0];
+        skipDisabled =
+          arg !== undefined && arg.kind === 'literal' && typeof arg.value === 'boolean'
+            ? arg.value
+            : true;
+        break;
+      }
+      default: {
+        const suggestion = didYouMean(m.name, [...KEYNAV_MODIFIER_NAMES]);
+        diagnostics.push({
+          code: RozieErrorCode.KEYNAV_UNKNOWN_MODIFIER,
+          severity: 'error',
+          message: suggestion
+            ? `Unknown r-keynav modifier '.${m.name}' — did you mean '.${suggestion}'?`
+            : `Unknown r-keynav modifier '.${m.name}' — valid modifiers are .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled.`,
+          loc: m.loc,
+          hint: 'r-keynav modifiers: orientation (.vertical/.horizontal/.both, default .vertical), .loop, .typeahead, .skipdisabled (default on — .skipdisabled(false) to include disabled items).',
+        });
+      }
+    }
+  }
+
+  return { orientation, loop, typeahead, skipDisabled };
+}
+
+/**
  * Lower an element node WITHOUT r-for/r-if wrapping. Handles <slot>,
  * static + binding attrs, template @event bindings, recursive children.
  */
@@ -861,6 +955,16 @@ function lowerBareElement(
   // to apply target-specific rebuild strategies that preserve the marked
   // element's identity across `$reconcileAfterDomMutation()` calls.
   let isExternal = false;
+  // Phase 71 — `r-keynav`/`r-keynav-item`/`r-keynav-active-class` staging
+  // locals. `r-keynav-active-class` may appear before OR after
+  // `r-keynav:<focus-model>` in source order (they're independent attrs on
+  // the same element), so its expression is staged here and merged onto
+  // `keynavRoot` once after the full attribute loop (below) rather than
+  // requiring `r-keynav:` to have been seen first.
+  let keynavRoot: KeynavRootIR | undefined;
+  let keynavItem: KeynavItemIR | undefined;
+  let keynavActiveClassExpression: t.Expression | undefined;
+  let keynavActiveClassDeps: SignalRef[] | undefined;
 
   for (const attr of el.attributes) {
     if (attr.kind === 'event') {
@@ -1113,6 +1217,98 @@ function lowerBareElement(
         continue;
       }
 
+      // Phase 71 — `r-keynav:<focus-model>[.<modifier>…]="<active-index>"`
+      // (the nav root). Handles BOTH the well-formed colon-arg form
+      // (`attr.name === 'keynav:tabindex'`, produced by the parser-level
+      // Landmine-1 allowlist widening above) AND the malformed bare
+      // `r-keynav`/`r-keynav.<mods>` form (`attr.name === 'keynav'` — no
+      // colon-arg was ever split off it, since `directiveBase` only equals
+      // `'keynav'` exactly when a colon IS present). Both still build a
+      // `keynavRoot` marker (with `focusModel: ''` for the malformed case) so
+      // `resolveKeynavGroups` (71-02 Task 2) — which validates focusModel
+      // against the fixed enum and emits KEYNAV_BAD_FOCUS_MODEL/ROZ985 — has
+      // a node to see at all; if this branch instead silently dropped the
+      // malformed form, no diagnostic could ever fire for it (Task 2 only
+      // walks elements that already carry `keynavRoot`).
+      if (attr.name === 'keynav' || attr.name.startsWith('keynav:')) {
+        const focusModelArg = attr.name.startsWith('keynav:')
+          ? attr.name.slice('keynav:'.length)
+          : '';
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        const modifiers = resolveKeynavModifiers(attr.chain, diagnostics);
+        keynavRoot = {
+          // Cast: `focusModel` is carried UNVALIDATED here by design (see
+          // `KeynavRootIR` doc comment) — `resolveKeynavGroups` validates it.
+          focusModel: focusModelArg as KeynavRootIR['focusModel'],
+          orientation: modifiers.orientation,
+          loop: modifiers.loop,
+          typeahead: modifiers.typeahead,
+          skipDisabled: modifiers.skipDisabled,
+          activeExpression: expr ?? t.identifier('undefined'),
+          activeDeps: expr ? computeExpressionDeps(expr, bindings) : [],
+          sourceLoc: attr.loc,
+        };
+        continue;
+      }
+
+      // Phase 71 — `r-keynav-item="{ label?, disabled? }"` (each item, SPEC
+      // §5). Both object keys are optional; a non-`ObjectExpression` or
+      // unparsable value still lowers to a `keynavItem` marker with both
+      // fields undefined — the element remains a tagged item (its index
+      // comes from its `r-for` context, not from this attribute), it simply
+      // carries no typeahead label / skip-disabled hint. Mirrors the r-on
+      // ObjectExpression own-property walk above.
+      if (attr.name === 'keynav-item') {
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        let labelExpression: t.Expression | undefined;
+        let labelDeps: SignalRef[] | undefined;
+        let disabledExpression: t.Expression | undefined;
+        let disabledDeps: SignalRef[] | undefined;
+        if (expr !== null && t.isObjectExpression(expr)) {
+          for (const prop of expr.properties) {
+            if (!t.isObjectProperty(prop)) continue;
+            const key = prop.key;
+            let keyName: string | null = null;
+            if (t.isIdentifier(key) && !prop.computed) {
+              keyName = key.name;
+            } else if (t.isStringLiteral(key)) {
+              keyName = key.value;
+            }
+            if (keyName === null || !t.isExpression(prop.value)) continue;
+            if (keyName === 'label') {
+              labelExpression = prop.value;
+              labelDeps = computeExpressionDeps(prop.value, bindings);
+            } else if (keyName === 'disabled') {
+              disabledExpression = prop.value;
+              disabledDeps = computeExpressionDeps(prop.value, bindings);
+            }
+          }
+        }
+        keynavItem = {
+          ...(labelExpression !== undefined
+            ? { labelExpression, labelDeps: labelDeps ?? [] }
+            : {}),
+          ...(disabledExpression !== undefined
+            ? { disabledExpression, disabledDeps: disabledDeps ?? [] }
+            : {}),
+          sourceLoc: attr.loc,
+        };
+        continue;
+      }
+
+      // Phase 71 — `r-keynav-active-class="<class spec>"` (optional, on the
+      // root, SPEC §9). Staged into a local and merged onto `keynavRoot`
+      // after the attribute loop (see below) — it may appear before OR after
+      // `r-keynav:<focus-model>` in source order on the same element.
+      if (attr.name === 'keynav-active-class') {
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        if (expr !== null) {
+          keynavActiveClassExpression = expr;
+          keynavActiveClassDeps = computeExpressionDeps(expr, bindings);
+        }
+        continue;
+      }
+
       // Phase 12 — generic guard (ROZ962). The parser splits a `.modifier`
       // chain off `r-model` ONLY; for every other directive the dot stays
       // inside `attr.name` (`r-show.foo` → name `show.foo`). A `.` in a
@@ -1183,6 +1379,18 @@ function lowerBareElement(
     // static or binding
     const ab = lowerAttribute(attr, bindings, elementIsComponent);
     if (ab) attributes.push(ab);
+  }
+
+  // Phase 71 — merge a co-located `r-keynav-active-class` onto `keynavRoot`
+  // now that the full attribute loop has run (source order between it and
+  // `r-keynav:<focus-model>` doesn't matter — see the staging-local comment
+  // above). No-op when either half is absent.
+  if (keynavRoot !== undefined && keynavActiveClassExpression !== undefined) {
+    keynavRoot = {
+      ...keynavRoot,
+      activeClassExpression: keynavActiveClassExpression,
+      activeClassDeps: keynavActiveClassDeps ?? [],
+    };
   }
 
   // Phase 06.2 P1 Task 3/4 — annotate tagKind + emit ROZ920..928 sub-codes
@@ -1260,6 +1468,11 @@ function lowerBareElement(
     // elements stay byte-identical to the pre-change IR (and dist-parity
     // strict-bytes assertions don't drift).
     ...(isExternal ? { isExternal: true } : {}),
+    // Phase 71 — `r-keynav`/`r-keynav-item` markers. Spread only when set so
+    // non-marked elements (i.e. all existing corpus `.rozie` — SPEC §11)
+    // stay byte-identical to the pre-phase IR.
+    ...(keynavRoot !== undefined ? { keynavRoot } : {}),
+    ...(keynavItem !== undefined ? { keynavItem } : {}),
   };
   return result;
 }

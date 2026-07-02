@@ -138,6 +138,18 @@ export function parseTemplate(
       // Phase 15 D-15 — r-on lands here for free as kind:'directive',
       // name:'on'; literal-key modifier resolution runs at lower time, NOT
       // here (Pitfall 2 — do NOT extend the r-model dotIdx split for r-on).
+      //
+      // Phase 71 (Landmine 1 fix, plan 71-02) — `keynav` joins `model` in the
+      // colon-arg + dotted-modifier-chain split allowlist:
+      // `r-keynav:<focus-model>[.<modifier>…]="…"` needs the exact same
+      // "colon-arg always precedes the first `.`" split `r-model:propName.
+      // modifier` already gets. `model` behavior is byte-identical — this is
+      // strictly membership-widening, not a semantic change to the `model`
+      // branch. `r-keynav-item` / `r-keynav-active-class` (no colon) are
+      // untouched by this split (their `directiveBase` computes to the whole
+      // `keynav-item` / `keynav-active-class` string, never `'keynav'`
+      // exactly) and keep flowing through the `else` branch below, byte-
+      // identical to every other non-modifier-bearing directive.
       const dotIdx = rest.indexOf('.');
       const colonIdx = rest.indexOf(':');
       const directiveBase =
@@ -146,7 +158,10 @@ export function parseTemplate(
           : dotIdx >= 0
             ? rest.slice(0, dotIdx)
             : rest;
-      if (directiveBase === 'model' && dotIdx >= 0) {
+      if (
+        (directiveBase === 'model' || directiveBase === 'keynav') &&
+        dotIdx >= 0
+      ) {
         name = rest.slice(0, dotIdx);
         modifierChainText = rest.slice(dotIdx);
         // The leading '.' lives at `a.nameStart + 2 (the 'r-' prefix) + dotIdx`.
