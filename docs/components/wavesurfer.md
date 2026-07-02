@@ -2,7 +2,7 @@
 
 [wavesurfer.js](https://wavesurfer.xyz) is the de-facto vanilla-JS audio-waveform engine (2D canvas + Web Audio). But its framework wrappers are **lopsided**: React has the official [`@wavesurfer/react`](https://www.npmjs.com/package/@wavesurfer/react); Angular, Svelte, Solid and Lit have thin, stale, or absent wrappers. That gap (React served, the rest stranded) is exactly what Rozie's write-once-ship-six thesis exists to close.
 
-One `Waveform.rozie` source compiles to six idiomatic packages — so Angular, Svelte, Solid and Lit consumers get a category-leading waveform player for free, with the same props, events, two-way playback position, and imperative handle as the React one.
+One `Waveform.rozie` source compiles to six idiomatic packages — so Angular, Svelte, Solid and Lit consumers get a category-leading waveform player for free, with the same props, events, two-way playback position, two-way interactive regions, and imperative handle as the React one.
 
 ## The `@rozie-ui/wavesurfer` packages
 
@@ -176,11 +176,45 @@ const regions = ref([
 
 Or manage regions imperatively through the handle — `addRegion(...)`, `clearRegions()`, `getRegions()` — and listen for the `regionCreated` / `regionUpdated` / `regionClicked` / `regionRemoved` events.
 
+### Following playback through regions
+
+`regionIn` / `regionOut` fire as playback crosses a region's boundaries — the events behind active-segment highlighting, transcript/karaoke sync, and loop-a-region. Together with `getWaveSurfer()` (the engine escape hatch) they make a region loop trivial:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import Waveform from '@rozie-ui/wavesurfer-vue';
+
+const wave = ref();
+const regions = ref([{ id: 'loop', start: 2, end: 4, color: 'rgba(45,212,191,0.25)' }]);
+const activeId = ref<string | null>(null);
+const loop = ref(true);
+
+// Track the active segment on enter; seek back to its start on exit → seamless loop.
+const onIn = (r: { id: string }) => (activeId.value = r.id);
+const onOut = (r: { id: string; start: number }) => {
+  activeId.value = null;
+  if (loop.value && r.id === 'loop') wave.value?.setTime(r.start);
+};
+</script>
+
+<template>
+  <Waveform
+    ref="wave"
+    src="/audio.mp3"
+    v-model:regions="regions"
+    @region-in="onIn"
+    @region-out="onOut"
+  />
+  <p>Now playing: {{ activeId ?? '—' }}</p>
+</template>
+```
+
 ## Reference
 
 ### Props
 
-`currentTime` is the lone **two-way** model prop (bind with `r-model` / `v-model` / `bind:` / `[(…)]` / `onCurrentTimeChange`). The appearance and playback props reconcile into the live engine on change (`src` via `load`, colors/bars via `setOptions`, `volume` / `playbackRate` / `minPxPerSec` via their setters). A handful are **set at construction** — `autoplay`, `hideScrollbar`, `disableInteraction`, `disableDragToSeek`, and the two plugin toggles (`timeline` / `hover` / `hoverColor`); anything not surfaced here can be passed through the `options` bag (`peaks`, `duration`, `sampleRate`, `mediaControls`, …).
+There are two **two-way** model props — `currentTime` and `regions` (bind either with `r-model` / `v-model` / `bind:` / `[(…)]` / `onCurrentTimeChange` / `onRegionsChange`). The appearance and playback props reconcile into the live engine on change (`src` via `load`, colors/bars via `setOptions`, `volume` / `playbackRate` / `minPxPerSec` via their setters). A handful are **set at construction** — `autoplay`, `hideScrollbar`, `disableInteraction`, `disableDragToSeek`, the plugin toggles (`timeline` / `hover` / `hoverColor`), and the regions-plugin registration (`regions` must be an array at first render — see [Plugins are construction-time](#plugins-are-construction-time-v1)); anything not surfaced here can be passed through the `options` bag (`peaks`, `duration`, `sampleRate`, `mediaControls`, …).
 
 | Name | Type | Default | Two-way (model) | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | :---: | --- |
