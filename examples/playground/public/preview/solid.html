@@ -55,7 +55,24 @@
       const host = document.getElementById('app');
       let dispose = null;
 
+      // Module-local render-token gate — independent of `bootHarness`'s own
+      // internal `renderToken` (which only gates the OUTGOING `rendered` ack,
+      // not this callback's body). Two `render` messages can arrive close
+      // together (rapid snippet-picker switching — "explicit user dropdown
+      // change compiles immediately, no debounce" per main.ts — or several
+      // scripted `postMessage` sends with no `rendered` wait between them);
+      // each has an `await importBundleWith(...)` between message-arrival and
+      // the dispose()/render() pair below, so a later message's compile can
+      // resolve before an earlier message's, inverting the intended order.
+      // Re-checking `renderId !== currentRenderId` immediately before
+      // dispose()/render() skips a now-superseded render instead of letting
+      // its stale dispose()/render() pair run after a newer one already
+      // mounted (Phase 69-04 / 69-RESEARCH.md § "(c) Solid").
+      let currentRenderId = 0;
+
       bootHarness(async ({ code, siblings }) => {
+        currentRenderId += 1;
+        const renderId = currentRenderId;
         const transform = await getEsbuildTransform();
 
         // Per-source transform — same shape as React (stub CSS imports, esbuild
@@ -79,6 +96,11 @@
         if (typeof Component !== 'function') {
           throw new Error('compiled output has no default Solid component export');
         }
+
+        // A newer render message arrived while this one was still compiling —
+        // skip the dispose()/render() pair entirely rather than let this
+        // now-stale render overwrite what the newer one already mounted.
+        if (renderId !== currentRenderId) return;
 
         if (dispose) dispose();
         dispose = render(() => createComponent(Component, {}), host);
