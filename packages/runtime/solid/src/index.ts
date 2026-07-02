@@ -10,6 +10,7 @@ export { createControllableSignal } from './createControllableSignal.js';
 export { createOutsideClick } from './createOutsideClick.js';
 export { createDebouncedHandler } from './createDebouncedHandler.js';
 export { createThrottledHandler } from './createThrottledHandler.js';
+export { createKeynav, type CreateKeynavOpts } from './createKeynav.js';
 export {
   isEnter,
   isEscape,
