@@ -61,6 +61,7 @@ function Menu({
     <div role="menu" ref={rootRef} tabIndex={-1} data-testid="root">
       {items.map((it, i) => (
         <button
+          type="button"
           key={it.id}
           role="menuitem"
           id={`menu-item-${i}`}

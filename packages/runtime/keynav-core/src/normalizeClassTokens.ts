@@ -23,7 +23,7 @@
  *
  * @public — runtime API consumed by all six per-target keynav controllers.
  */
-type ClassValue = string | number | boolean | null | undefined | Record<string, unknown> | ClassValue[];
+export type ClassValue = string | number | boolean | null | undefined | Record<string, unknown> | ClassValue[];
 
 export function normalizeClassTokens(...args: ClassValue[]): string[] {
   const tokens: string[] = [];

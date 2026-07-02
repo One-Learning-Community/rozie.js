@@ -9,6 +9,7 @@ export {
   type UseControllableStateOpts,
 } from './useControllableState.js';
 export { useOutsideClick } from './useOutsideClick.js';
+export { useKeynav, type UseKeynavOpts } from './useKeynav.js';
 export { useDebouncedCallback } from './useDebouncedCallback.js';
 export { useThrottledCallback } from './useThrottledCallback.js';
 export {

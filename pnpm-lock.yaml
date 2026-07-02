@@ -1077,6 +1077,9 @@ importers:
 
   packages/runtime/react:
     dependencies:
+      '@rozie/runtime-keynav-core':
+        specifier: workspace:*
+        version: link:../keynav-core
       clsx:
         specifier: ^2
         version: 2.1.1

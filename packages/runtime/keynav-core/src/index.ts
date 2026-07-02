@@ -23,4 +23,5 @@ export { sourceArrayFallback } from './windower.js';
 export type { KeynavStateMachine } from './stateMachine.js';
 export { createKeynavStateMachine } from './stateMachine.js';
 
+export type { ClassValue } from './normalizeClassTokens.js';
 export { normalizeClassTokens } from './normalizeClassTokens.js';

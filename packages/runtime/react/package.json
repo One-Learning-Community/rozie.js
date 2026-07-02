@@ -26,6 +26,7 @@
     "!src/**/*.spec.ts"
   ],
   "dependencies": {
+    "@rozie/runtime-keynav-core": "workspace:*",
     "clsx": "^2",
     "style-to-js": "^2.0.0"
   },
