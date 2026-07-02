@@ -21,7 +21,16 @@ const require = createRequire(import.meta.url);
 // Angular is deliberately absent — emitAngular.ts inlines everything and asserts
 // its output never imports `@rozie/runtime-angular`, so a served angular runtime
 // would be dead weight.
-const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit', 'svelte', 'engine-helpers'] as const;
+const RUNTIME_FRAMEWORKS = [
+  'react',
+  'solid',
+  'vue',
+  'lit',
+  'svelte',
+  'engine-helpers',
+  'svelte-portal-host',
+  'svelte-portal-host-reactive',
+] as const;
 function runtimeFile(name: string): string {
   // KEEP-THE-URL (Phase 20-03, OQ1): the `engine-helpers` runtime package was
   // retired — its sole export (`useSortableJS`) is now colocated in the
@@ -67,11 +76,70 @@ function svelteRuntimeBytes(): Buffer {
   return svelteRuntimeCache;
 }
 
-// Load the served bytes for a runtime URL. Svelte is source-bundled; every
-// other runtime is read from its prebuilt dist. Returns null when the dist is
+// `@rozie/runtime-svelte/PortalHost.svelte` and `.../PortalHostReactive.svelte`
+// are raw `.svelte` SFC subpath exports (packages/runtime/svelte/package.json)
+// — svelte-emitted portal wrappers import them directly (emitPortals.ts), but
+// `svelteRuntimeBytes()` above only bundles `src/index.ts`, never these two
+// sibling files. Compile them Node-side with the same `svelte/compiler` the
+// workspace already pins (resolved off `@rozie/runtime-svelte`'s own
+// node_modules, same paths-anchor trick as `svelteRuntimeBytes()`'s esbuild
+// resolution) to client-mode JS, leaving `svelte*` bare specifiers external —
+// the svelte iframe's importmap resolves those. Memoized like every other
+// runtime cache here.
+let svelteCompilerCache: typeof import('svelte/compiler') | null = null;
+function loadSvelteCompiler(): typeof import('svelte/compiler') {
+  if (svelteCompilerCache) return svelteCompilerCache;
+  const compilerPath = require.resolve('svelte/compiler', {
+    paths: [require.resolve('../../packages/runtime/svelte/package.json')],
+  });
+  svelteCompilerCache = require(compilerPath) as typeof import('svelte/compiler');
+  return svelteCompilerCache;
+}
+
+let sveltePortalHostCache: Buffer | null = null;
+function sveltePortalHostBytes(): Buffer {
+  if (sveltePortalHostCache) return sveltePortalHostCache;
+  const { compile } = loadSvelteCompiler();
+  const source = readFileSync(
+    resolve(__dirname, '../../packages/runtime/svelte/src/PortalHost.svelte'),
+    'utf8',
+  );
+  const result = compile(source, {
+    filename: 'PortalHost.svelte',
+    generate: 'client',
+    dev: false,
+    css: 'injected',
+  });
+  sveltePortalHostCache = Buffer.from(result.js.code);
+  return sveltePortalHostCache;
+}
+
+let sveltePortalHostReactiveCache: Buffer | null = null;
+function sveltePortalHostReactiveBytes(): Buffer {
+  if (sveltePortalHostReactiveCache) return sveltePortalHostReactiveCache;
+  const { compile } = loadSvelteCompiler();
+  const source = readFileSync(
+    resolve(__dirname, '../../packages/runtime/svelte/src/PortalHostReactive.svelte'),
+    'utf8',
+  );
+  const result = compile(source, {
+    filename: 'PortalHostReactive.svelte',
+    generate: 'client',
+    dev: false,
+    css: 'injected',
+  });
+  sveltePortalHostReactiveCache = Buffer.from(result.js.code);
+  return sveltePortalHostReactiveCache;
+}
+
+// Load the served bytes for a runtime URL. Svelte is source-bundled; the two
+// PortalHost subpaths are Node-side `svelte/compiler` compiles; every other
+// runtime is read from its prebuilt dist. Returns null when the dist is
 // missing (unbuilt) so the caller can 404-with-hint.
 function loadRuntimeBytes(name: string): Buffer | null {
   if (name === 'svelte') return svelteRuntimeBytes();
+  if (name === 'svelte-portal-host') return sveltePortalHostBytes();
+  if (name === 'svelte-portal-host-reactive') return sveltePortalHostReactiveBytes();
   const file = runtimeFile(name);
   if (!existsSync(file)) return null;
   return readFileSync(file);
