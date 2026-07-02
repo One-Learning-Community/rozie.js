@@ -114,6 +114,17 @@ const CROPPER_SRC = resolve(
   'cropper',
   'src',
 );
+// Same packaging move for @rozie-ui/wavesurfer: Waveform.rozie lives in the
+// package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops
+// the same cross-tree `.rozie.ts` + `Waveform.ts` shim artefacts that must be
+// swept after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const WAVESURFER_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'wavesurfer',
+  'src',
+);
 // Same packaging move for @rozie-ui/pdf: PdfViewer.rozie lives in the package
 // src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
 // cross-tree `.rozie.ts` + `PdfViewer.ts` shim artefacts that must be swept after
@@ -481,6 +492,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // cropper src always exists post-port — defensive only
   }
   rmSync(resolve(CROPPER_SRC, 'Cropper.ts'), { force: true });
+  // Same sweep for @rozie-ui/wavesurfer's package src (WaveformScreenshotDemo
+  // composes Waveform via <components>, so the Angular sub-build emits
+  // Waveform.rozie.ts + the Waveform.ts shim here). Leftovers (the emitted
+  // .rozie.ts imports @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(WAVESURFER_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(WAVESURFER_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // wavesurfer src always exists post-port — defensive only
+  }
+  rmSync(resolve(WAVESURFER_SRC, 'Waveform.ts'), { force: true });
   // Same sweep for @rozie-ui/pdf's package src (PdfViewerDemo composes PdfViewer
   // via <components>, so the Angular sub-build emits PdfViewer.rozie.ts + the
   // PdfViewer.ts shim here). Leftovers (the emitted .rozie.ts imports

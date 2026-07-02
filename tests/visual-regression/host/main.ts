@@ -292,6 +292,13 @@ export const EXAMPLES = [
   // registered in matrix.spec.ts (auto-fixme until the Linux PNG lands).
   'Cropper',
   'CropperScreenshot',
+  // Waveform (wavesurfer.js v7) — the content-STABLE audio-waveform pixel cell
+  // (loader → examples/demos/WaveformScreenshotDemo.rozie, which imports
+  // ../../packages/ui/wavesurfer/src/Waveform.rozie). Renders from FIXED offline
+  // peaks + duration (no network/decode) with two pinned regions + the timeline
+  // ruler, container pinned to 480px for D-10. Registered as a screenshot cell in
+  // matrix.spec.ts EXAMPLES.
+  'WaveformScreenshot',
   // PdfViewer (PDF.js / pdfjs-dist v6) — the dynamic-import + canvas-render +
   // two-way-page cell. BEHAVIORAL (loader → examples/demos/PdfViewerDemo.rozie,
   // which imports ../../packages/ui/pdf/src/PdfViewer.rozie): a bundled worker + a
@@ -1053,6 +1060,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-cropper-screenshot-demo' = kebab of CropperDemo / CropperScreenshotDemo.
   Cropper: 'rozie-cropper',
   CropperScreenshot: 'rozie-cropper-screenshot',
+  // Waveform — the lit entry appends '-demo' → tag
+  // 'rozie-waveform-screenshot-demo' = kebab of WaveformScreenshotDemo.
+  WaveformScreenshot: 'rozie-waveform-screenshot',
   // PdfViewer — the lit entry appends '-demo' → tag 'rozie-pdf-viewer-demo' =
   // kebab of PdfViewerDemo (the wrapper component is name="PdfViewer" →
   // 'rozie-pdf-viewer'). Behavioral only — no screenshot cell.

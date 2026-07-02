@@ -308,6 +308,16 @@ const EXAMPLES = [
   // Behavioral CORRECTNESS (mount, crop box, two-way `data`) is green 6/6 in
   // cropper.spec.ts. The screenshot cell is now blessed for the 5 non-Lit targets.
   'CropperScreenshot',
+  // Phase (wavesurfer) — WaveformScreenshot is the content-STABLE audio-waveform
+  // pixel cell. `WaveformScreenshotDemo.rozie` renders wavesurfer.js v7 from FIXED
+  // offline peaks + duration (no network/decode/wall-clock) with two pinned
+  // regions + the timeline ruler, container pinned to 480px. The waveform bitmap
+  // is engine-rendered into a 2D canvas identically across targets, so per D-10
+  // all 6 diff against the same shared `WaveformScreenshot.png`. Baseline owned by
+  // the orchestrator (Linux-Docker `vr.sh -u -b WaveformScreenshot -g
+  // WaveformScreenshot`); until it lands the cell baseline-gates to `test.fixme`
+  // via `baselineExists()` (never red). Behavioral coverage is not baseline-gated.
+  'WaveformScreenshot',
   // PdfViewer (pdfjs-dist v6) — PdfViewerScreenshot is the content-STABLE pixel
   // cell (loader → examples/demos/PdfViewerScreenshotDemo.rozie): a network-free
   // base64 PDF + bundled worker, pinned to page 1 at scale 0.45 with text-layer
@@ -771,6 +781,51 @@ async function settleExample(
       .toBe(true);
     // The crop UI is positioned; a short settle absorbs any final reflow.
     await page.waitForTimeout(500);
+  }
+  // WaveformScreenshot (wavesurfer.js v7): the wrapper builds the engine on
+  // `$onMount` and renders the waveform from FIXED offline peaks into a 2D
+  // `<canvas>` (wavesurfer nests its canvases inside its own shadow wrapper within
+  // the host container). Regions are added in the engine's `ready` callback. Poll
+  // until a canvas has painted a healthy count of SATURATED (purple wave) pixels —
+  // recursing through every shadow root (the Lit target mounts inside a shadow DOM,
+  // and wavesurfer itself uses an inner shadow) — then a short settle. No autoplay,
+  // no interaction, so once the wave has painted the frame is final.
+  if (example === 'WaveformScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const collect = (root: Document | ShadowRoot, acc: HTMLCanvasElement[]) => {
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                if (el.tagName === 'CANVAS') acc.push(el as HTMLCanvasElement);
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) collect(sr, acc);
+              }
+              return acc;
+            };
+            const canvases = collect(document, []);
+            let best = 0;
+            for (const c of canvases) {
+              const ctx = c.getContext('2d');
+              if (!ctx || !c.width || !c.height) continue;
+              const { data } = ctx.getImageData(0, 0, c.width, c.height);
+              let colored = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] === 0) continue;
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                if (Math.max(r, g, b) - Math.min(r, g, b) > 30) colored++;
+              }
+              if (colored > best) best = colored;
+            }
+            return best;
+          }),
+        { timeout: 15_000, intervals: [200, 400, 800, 1600] },
+      )
+      .toBeGreaterThan(200);
+    // Waveform + regions + timeline painted; a short settle absorbs any reflow.
+    await page.waitForTimeout(400);
   }
   // PdfViewerScreenshot: the PdfViewer wrapper dynamic-imports pdfjs, calls
   // getDocument(), then renders page 1 into a JS-created `<canvas>` inside a

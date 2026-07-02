@@ -74,6 +74,7 @@
     "svelte": "^5.0.0",
     "tslib": "^2.6",
     "vue": "^3.4.0",
+    "wavesurfer.js": "^7.12.8",
     "zone.js": "^0.14"
   },
   "devDependencies": {

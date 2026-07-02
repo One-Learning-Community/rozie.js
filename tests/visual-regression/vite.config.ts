@@ -307,6 +307,21 @@ export default defineConfig(async () => {
     'cropper',
     'src',
   );
+  // Same move for @rozie-ui/wavesurfer: Waveform.rozie lives in the package src,
+  // so the Angular sub-build must walk it too — without it analogjs AOT reports
+  // "Waveform.rozie.ts contains Angular decorators but is not in the TypeScript
+  // program", WaveformScreenshotDemo's `imports: [Waveform]` collapses to `any[]`,
+  // and the cell mounts empty (the canvas never paints → the pixel poll times
+  // out). The cross-tree prebuild trap (project_vr_angular_crosstree_prebuild_move_trap).
+  const wavesurferSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'wavesurfer',
+    'src',
+  );
   // Same move for @rozie-ui/pdf: PdfViewer.rozie lives in the package src, so the
   // Angular sub-build must walk it too (PdfViewerDemo's `imports: [PdfViewer]`
   // would otherwise collapse to `any[]` → empty mount + "JIT compiler
@@ -601,10 +616,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
     ...(TARGET === 'lit' ? [lowerLitDecoratorsWithEsbuild()] : []),
