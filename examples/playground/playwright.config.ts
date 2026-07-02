@@ -16,6 +16,12 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
+  // Engine-CSS specs drive real engine libraries (Leaflet, Cropper,
+  // Flatpickr) fetched from the esm.sh CDN at runtime — a single retry
+  // absorbs transient CDN/network hiccups (e.g. Leaflet's default marker
+  // icon assets occasionally 404 under concurrent-worker load) without
+  // masking a genuine, reproducible regression.
+  retries: 1,
   use: {
     baseURL: 'http://127.0.0.1:4175',
     trace: 'on-first-retry',
