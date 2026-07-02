@@ -83,7 +83,11 @@ import listPlugin from '@fullcalendar/list'
 // All seed events land on a SINGLE pinned day (2026-06-15) so that — with the
 // passthrough dayMaxEvents: 2 — the day overflows past 2 and the engine renders
 // a `.fc-more-link` (which routes through the moreLink portal-slot). Fixed ISO
-// strings keep the behavioral run stable (no live clock).
+// strings AND a pinned passthrough `initialDate: '2026-06-15'` (see the :options
+// binding below) keep the run wall-clock-independent: pinning the DATE alone was
+// not enough — without initialDate FullCalendar defaults to the current month,
+// so once real "today" left June 2026 the seed events fell off-view, no event
+// cells rendered, and the `event` portal-slot (eventContent) never fired.
 const sampleEvents = () => {
   return [
     { id: 'as-1', title: 'Standup',       start: '2026-06-15' },
@@ -156,7 +160,7 @@ const remount  = () => { $data.calendarMounted = true }
       :height="480"
       :selectable="true"
       :editable="true"
-      :options="{ weekNumbers: true, dayMaxEvents: 2, businessHours: { startTime: '09:00', endTime: '17:00' }, plugins: [listPlugin] }"
+      :options="{ initialDate: '2026-06-15', weekNumbers: true, dayMaxEvents: 2, businessHours: { startTime: '09:00', endTime: '17:00' }, plugins: [listPlugin] }"
       @eventMouseEnter="onEventMouseEnter"
       @eventMouseLeave="onEventMouseLeave"
       @unselect="onUnselect"
