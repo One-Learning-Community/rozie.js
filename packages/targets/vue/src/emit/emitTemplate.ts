@@ -23,11 +23,25 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { ScriptInjection } from './emitTemplateEvent.js';
+import { buildKeynavScriptInjections, resolveKeynavPlan } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
   scriptInjections: ScriptInjection[];
   diagnostics: Diagnostic[];
+  /**
+   * Phase 71 (r-keynav) — extra `'vue'` import names required by this
+   * template's script injections (currently only `'ref'`, when keynav
+   * mints a fresh root ref). MUST be routed through `mergeVueImportsAndListeners`'s
+   * existing collapse-into-one-line merge (emitVue.ts), NOT re-emitted as a
+   * second literal `import { ref } from 'vue';` statement — a component
+   * that ALSO has `<data>`/template refs already imports `ref` via
+   * emitScript.ts's own collector, and TWO `import { ref } from 'vue'`
+   * statements naming the same binding is a TS2300 duplicate-identifier
+   * error. Empty array for every non-keynav component (byte-identical,
+   * SPEC §11).
+   */
+  extraVueImportNames: string[];
 }
 
 export function emitTemplate(
@@ -42,8 +56,16 @@ export function emitTemplate(
       template: '<!-- empty template -->',
       scriptInjections,
       diagnostics,
+      extraVueImportNames: [],
     };
   }
+
+  // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
+  // emitKeynav.ts's module doc comment). `null` for the overwhelming
+  // majority of components (no r-keynav root) — every downstream keynav
+  // call site short-circuits on `null`, so this stays a cheap no-op for
+  // every existing fixture (SPEC §11: "no corpus rebless").
+  const keynav = resolveKeynavPlan(ir);
 
   const ctx: EmitNodeCtx = {
     ir,
@@ -52,9 +74,18 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     indent: '',
+    keynav,
   };
 
   const template = emitNode(ir.template, ctx);
 
-  return { template, scriptInjections, diagnostics };
+  const extraVueImportNames: string[] = [];
+  if (keynav !== null) {
+    scriptInjections.push(...buildKeynavScriptInjections(keynav, ir));
+    if (keynav.mintedRootRef) {
+      extraVueImportNames.push('ref');
+    }
+  }
+
+  return { template, scriptInjections, diagnostics, extraVueImportNames };
 }

@@ -36,6 +36,15 @@ import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitMergedAttributes, emitListenerSpread, findRHtml } from './emitTemplateAttribute.js';
 import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js';
+// Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
+// (see emitKeynav.ts's module doc comment).
+import {
+  keynavItemAttrs,
+  keynavRootAttrs,
+  loopBodyHasKeynavItem,
+  stripKeynavCommitEvent,
+  type KeynavEmitPlan,
+} from './emitKeynav.js';
 
 /**
  * HTML void elements (no closing tag, self-close `/>`).
@@ -67,6 +76,20 @@ export interface EmitNodeCtx {
   injectionCounter: { next: number };
   /** Current indent prefix (two-space units). */
   indent: string;
+  /**
+   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
+   * ONCE by `emitTemplate.ts` via `resolveKeynavPlan`), or `null` when the
+   * component has no `r-keynav` root. `undefined` (the default, back-compat
+   * for callers that don't thread it) is treated identically to `null`.
+   */
+  keynav?: KeynavEmitPlan | null;
+  /**
+   * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier,
+   * threaded down by `emitLoop` for the duration of that loop's body subtree
+   * ONLY (a nested loop overwrites it with its own). `null` when not inside
+   * a loop, or the enclosing loop has no keynav item and needed no index.
+   */
+  keynavItemIndexAlias?: string | null;
 }
 
 /**
@@ -147,13 +170,30 @@ function emitConditional(
  */
 function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   const iter = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
-  const itemDecl = node.indexAlias
-    ? `(${node.itemAlias}, ${node.indexAlias})`
+
+  // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
+  // context". An author who wrote a bare `r-for="it in items"` (no `(it,
+  // idx)` index alias) still needs a working `:data-rozie-keynav-item="i"`
+  // marker — the compiler synthesizes the index binding itself rather than
+  // requiring the author to declare an index alias just for keynav's sake.
+  // `loopBodyHasKeynavItem` deliberately does not recurse into a NESTED
+  // r-for, so this synthesis never fires for an unrelated outer loop.
+  const needsKeynavIndex =
+    (ctx.keynav ?? null) !== null &&
+    node.indexAlias === null &&
+    loopBodyHasKeynavItem(node.body);
+  const indexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
+  const itemDecl = indexAlias
+    ? `(${node.itemAlias}, ${indexAlias})`
     : node.itemAlias;
   const vfor = `v-for="${itemDecl} in ${iter}"`;
   const keyDir = node.keyExpression
     ? ` :key="${rewriteTemplateExpression(node.keyExpression, ctx.ir)}"`
     : '';
+
+  // `keynavItemIndexAlias` is scoped to THIS loop's body subtree only — a
+  // nested loop's own `emitLoop` call overwrites it for its own children.
+  const childCtx: EmitNodeCtx = { ...ctx, keynavItemIndexAlias: indexAlias };
 
   // body[0] is expected to be a TemplateElement (the loop target). If it's not
   // (rare/unusual IR), wrap children in a <template> with the directive.
@@ -171,11 +211,11 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     return emitElementWithExtraDirective(
       stripped,
       `${vfor}${keyDir}`,
-      ctx,
+      childCtx,
     );
   }
 
-  const inner = node.body.map((c) => emitNode(c, ctx)).join('');
+  const inner = node.body.map((c) => emitNode(c, childCtx)).join('');
   return `<template ${vfor}${keyDir}>${inner}</template>`;
 }
 
@@ -248,10 +288,17 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * (`{ name: '' }`) emits as bare children inside the component tag.
  */
 function emitElementWithExtraDirective(
-  node: TemplateElementIR,
+  origNode: TemplateElementIR,
   extraDirective: string | null,
   ctx: EmitNodeCtx,
 ): string {
+  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
+  // BEFORE any listener emission runs; it's routed into `useKeynav`'s
+  // `onCommit` option by emitKeynav.ts, never as a `@keynav-commit=`
+  // template attribute (see `stripKeynavCommitEvent`'s doc comment). No-op
+  // (returns the SAME node) for every element that isn't a keynav root.
+  const node = stripKeynavCommitEvent(origNode);
+
   // Phase 24 (req 1) — r-html intercept. Vue's `v-html` is an ATTRIBUTE
   // directive (NOT element-content like Svelte/Lit). We must compute the
   // r-html expression AND strip the `r-html` binding from the attribute set
@@ -333,6 +380,18 @@ function emitElementWithExtraDirective(
   // TS "unused import" hygiene under exactOptionalPropertyTypes.
   void hasDynamicListenerSpread;
 
+  // Phase 71 (r-keynav) — root `ref="…"`/`:aria-activedescendant` and item
+  // `:id`/`:data-rozie-keynav-item`/`:data-rozie-keynav-active`/`:tabindex`
+  // fragments. Both resolve to `[]` for the overwhelming majority of
+  // elements (no keynav plan, or this element carries neither marker) — a
+  // cheap two-property check, not a tree walk, so non-keynav components pay
+  // no emission cost (SPEC §11: "no corpus rebless").
+  const keynav = ctx.keynav ?? null;
+  const keynavAttrs = [
+    ...keynavRootAttrs(keynav, node, ctx.ir),
+    ...keynavItemAttrs(keynav, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
+  ];
+
   const partsHead: string[] = [];
   if (extraDirective) partsHead.push(extraDirective);
   // Phase 24 (req 1) — r-html → `v-html="<expr>"` attribute directive. Emit
@@ -370,6 +429,7 @@ function emitElementWithExtraDirective(
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const sp of spreadTexts) partsHead.push(sp);
+  for (const ka of keynavAttrs) partsHead.push(ka);
 
   const head = partsHead.length > 0 ? ' ' + partsHead.join(' ') : '';
 

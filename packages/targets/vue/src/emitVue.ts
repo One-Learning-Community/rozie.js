@@ -316,6 +316,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     template,
     scriptInjections,
     diagnostics: tmplDiags,
+    extraVueImportNames: keynavExtraVueImportNames,
   } = emitTemplate(ir, registry);
   const {
     code: listenerCode,
@@ -354,9 +355,15 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   const allInjections = [...scriptInjections, ...listenerImportInjections, ...deepCloneInjections];
 
   let enrichedScript = mergeScriptInjections(script, allInjections);
-  const extraVueNames = listenerVueImports.has('watchEffect')
-    ? Array.from(['watchEffect'])
-    : [];
+  // Phase 71 (r-keynav) — a freshly-minted root ref (`emitKeynav.ts`'s
+  // `ROOT_REF_VAR`) needs `import { ref } from 'vue'`, routed through the
+  // SAME collapse-into-one-line merge as `watchEffect` below — see
+  // `EmitTemplateResult.extraVueImportNames`'s doc comment for why this
+  // cannot be a second literal `ScriptInjection` import line (TS2300 risk).
+  const extraVueNames = [
+    ...(listenerVueImports.has('watchEffect') ? ['watchEffect'] : []),
+    ...keynavExtraVueImportNames,
+  ];
   enrichedScript = mergeVueImportsAndListeners(
     enrichedScript,
     listenerCode,

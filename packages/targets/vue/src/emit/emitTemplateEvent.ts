@@ -61,9 +61,12 @@ export interface ScriptInjection {
    * `@rozie/runtime-vue`). The `from` union therefore carries both module
    * sources; `mergeScriptInjections` already emits one import line per
    * distinct `from`, so a `'vue'`-sourced `computed` flows through unchanged.
+   *
+   * Phase 71 (r-keynav, Plan 71-05): `useKeynav` is an additive
+   * `@rozie/runtime-vue` member alongside the existing helpers.
    */
   import:
-    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' | 'normalizeListeners' | 'rozieDeepClone' }
+    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' | 'normalizeListeners' | 'rozieDeepClone' | 'useKeynav' }
     | { from: 'vue'; name: 'computed' };
   /** Full `const wrapName = helper(handler, ...args);` declaration. */
   decl: string;
