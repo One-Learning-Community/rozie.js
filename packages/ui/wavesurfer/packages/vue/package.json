@@ -1,0 +1,72 @@
+{
+  "name": "@rozie-ui/wavesurfer-vue",
+  "version": "0.1.1",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue audio waveform player wrapping wavesurfer.js — one Rozie source compiled to Vue.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "wavesurfer.js",
+    "wavesurfer",
+    "audio",
+    "waveform",
+    "player",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/wavesurfer/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/Waveform.vue",
+      "default": "./src/Waveform.vue"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "peerDependencies": {
+    "vue": "^3.4",
+    "wavesurfer.js": "^7"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "wavesurfer.js": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3",
+    "wavesurfer.js": "^7"
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

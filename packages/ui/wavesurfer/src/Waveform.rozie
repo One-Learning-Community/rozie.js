@@ -133,10 +133,14 @@
     default: false,
     docs: { description: 'Begin playback as soon as the audio is ready. Construction-only.' },
   },
-  normalize: {
+  // maps to wavesurfer's `normalize` option. Named `normalizeAmplitude` (not
+  // `normalize`) because a `normalize` reactive property collides with the
+  // inherited `Node.prototype.normalize()` DOM method on the Lit custom element
+  // (hard TS2416 — the otp `inputMode` / pagination `totalPages` collision class).
+  normalizeAmplitude: {
     type: Boolean,
     default: false,
-    docs: { description: 'Normalize the waveform by its largest peak. Reconciled at runtime via `setOptions`.' },
+    docs: { description: 'Normalize the waveform by its largest peak (wavesurfer\'s `normalize` option). Reconciled at runtime via `setOptions`.' },
   },
   hideScrollbar: {
     type: Boolean,
@@ -236,7 +240,7 @@ const buildWaveSurfer = () => {
     barRadius: $props.barRadius ?? undefined,
     minPxPerSec: $props.minPxPerSec,
     autoplay: $props.autoplay,
-    normalize: $props.normalize,
+    normalize: $props.normalizeAmplitude,
     hideScrollbar: $props.hideScrollbar,
     interact: !$props.disableInteraction,
     dragToSeek: !$props.disableDragToSeek,
@@ -297,7 +301,7 @@ $watch(() => $props.barGap, (v) => {
 $watch(() => $props.barRadius, (v) => {
   if (ws) ws.setOptions({ barRadius: v ?? undefined })
 })
-$watch(() => $props.normalize, (v) => {
+$watch(() => $props.normalizeAmplitude, (v) => {
   if (ws) ws.setOptions({ normalize: v })
 })
 $watch(() => $props.volume, (v) => {

@@ -23,7 +23,7 @@ const EXPECT = {
   props: [
     'src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
     'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate',
-    'autoplay', 'normalize', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
+    'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
     'timeline', 'hover', 'hoverColor', 'options', 'currentTime',
   ],
   models: ['currentTime'],
