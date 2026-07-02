@@ -19,6 +19,13 @@
  *     This is the FIRST real `index.ts` export beyond PortalHost — the
  *     package's earlier `export {};` documentation stub transitioned to
  *     a real export in Phase 15 Plan 15-04.
+ *
+ *   - `keynav` (Phase 71 — `r-keynav` Svelte target-pair) — the Svelte 5
+ *     action driving `@rozie/runtime-keynav-core`'s framework-neutral state
+ *     machine. Emitted as `use:keynav={{ config, active, getSource,
+ *     getActive, setActive, onCommit, activeClass?, windower? }}` on the
+ *     `r-keynav` root element. See `keynav.ts`'s module doc comment for why
+ *     this is an action `update()`, not a separate `$effect` block.
  */
 
 export { applyListeners } from './applyListeners.js';
@@ -26,3 +33,4 @@ export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
 export { rozieClass } from './rozieClass.js';
 export { rozieStyle } from './rozieStyle.js';
+export { keynav, type KeynavActionOpts } from './keynav.js';

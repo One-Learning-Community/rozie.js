@@ -30,6 +30,9 @@
     "!src/**/*.test.tsx",
     "!src/**/*.spec.ts"
   ],
+  "dependencies": {
+    "@rozie/runtime-keynav-core": "workspace:*"
+  },
   "peerDependencies": {
     "svelte": "^5"
   },
@@ -39,6 +42,7 @@
     }
   },
   "devDependencies": {
+    "happy-dom": "^15.0.0",
     "svelte": "^5",
     "vitest": "^4.1.0"
   },
