@@ -52,6 +52,14 @@ import {
   emitDynamicSlotFiller,
   type EmitSlotFillerCtx,
 } from './emitSlotFiller.js';
+// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius) — inline
+// controller emitter wiring (see emitKeynav.ts's module doc comment).
+import {
+  keynavItemAttrs,
+  keynavRootAttrs,
+  stripKeynavCommitEvent,
+  type KeynavEmitPlan,
+} from './emitKeynav.js';
 
 /**
  * Phase 06.2 P2: resolve a TemplateElement's emitted tag name. For
@@ -171,6 +179,26 @@ export interface EmitNodeCtx {
    * declared.
    */
   cvaMergeDisabled?: boolean | undefined;
+  /**
+   * Phase 71 (r-keynav, Angular) — the per-component keynav emission plan
+   * (resolved ONCE by `emitAngular.ts` via `resolveKeynavPlan`, threaded
+   * through both `emitTemplate.ts` and `emitScript.ts`), or `null` when the
+   * component has no `r-keynav` root. `undefined` (the default, back-compat
+   * for callers that don't thread it) is treated identically to `null`.
+   */
+  keynav?: KeynavEmitPlan | null;
+  /**
+   * Phase 71 (r-keynav, Angular) — the CURRENT `@for` loop's index
+   * identifier, threaded down by `emitLoop` for the duration of that loop's
+   * body subtree ONLY (a nested loop overwrites it with its own). Angular's
+   * `@for` block exposes an implicit `$index` context variable that is
+   * ALWAYS directly usable inside the block with no `let` alias needed — so,
+   * unlike the React/Vue/Solid references, this is threaded UNCONDITIONALLY
+   * on every loop (no `loopBodyHasKeynavItem`-gated synthesis is needed; see
+   * `emitKeynav.ts`'s `keynavItemAttrs` doc comment). `null` when not inside
+   * a loop.
+   */
+  keynavItemIndexAlias?: string | null;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -251,7 +279,15 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   childBindings.add(node.itemAlias);
   if (node.indexAlias) childBindings.add(node.indexAlias);
 
-  const childCtx: EmitNodeCtx = { ...ctx, loopBindings: childBindings };
+  // Phase 71 (r-keynav) — Angular's `@for` block exposes `$index` as an
+  // implicit context variable directly usable inside the block body with NO
+  // `let` alias required (Angular's own `@for` docs). This means, unlike
+  // every other target, NO loop-declaration synthesis is needed for keynav's
+  // sake — the value is threaded through unconditionally (cheap: only
+  // consumed by `keynavItemAttrs`, itself gated on `node.keynavItem`).
+  const keynavItemIndexAlias = node.indexAlias ?? '$index';
+
+  const childCtx: EmitNodeCtx = { ...ctx, loopBindings: childBindings, keynavItemIndexAlias };
 
   const iter = rewriteTemplateExpression(node.iterableExpression, ctx.ir, {
     collisionRenames: ctx.collisionRenames,
@@ -442,7 +478,15 @@ function isMeaningfulChild(node: TemplateNode): boolean {
 /**
  * Emit a TemplateElement. Walks attributes, events; renders children.
  */
-function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
+  // BEFORE any listener emission runs; it's routed into the inline
+  // controller's `KeynavHost.commit` by `emitScript.ts`, never as an Angular
+  // `(keynavCommit)=` template binding (see `emitKeynav.ts`'s
+  // `stripKeynavCommitEvent` doc comment). No-op (returns the SAME node) for
+  // every element that isn't a keynav root.
+  const node = stripKeynavCommitEvent(origNode);
+
   // Detect ngModel binding (either [(ngModel)] shorthand or [ngModel]/(ngModelChange)
   // long form) for FormsModule wiring. r-model on form-input always lowers to one of
   // these in emitTemplateAttribute → r-model presence on form-input tag triggers it.
@@ -544,6 +588,19 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const text of dynamicListenerTexts) partsHead.push(text);
+
+  // Phase 71 (r-keynav) — root `#…`/`[attr.aria-activedescendant]` and item
+  // `[id]`/`[attr.data-rozie-keynav-item]`/`[attr.data-rozie-keynav-active]`/
+  // `[tabIndex]` fragments. Both resolve to `[]` for the overwhelming
+  // majority of elements (no keynav plan, or this element carries neither
+  // marker) — a cheap two-property check, not a tree walk, so non-keynav
+  // components pay no emission cost (SPEC §11: "no corpus rebless").
+  const keynav = ctx.keynav ?? null;
+  const keynavAttrs = [
+    ...keynavRootAttrs(keynav, node, ctx.ir),
+    ...keynavItemAttrs(keynav, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
+  ];
+  for (const a of keynavAttrs) partsHead.push(a);
 
   if (rShow !== null) {
     const expr = rewriteTemplateExpression(rShow.expression, ctx.ir, {

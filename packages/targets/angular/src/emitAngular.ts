@@ -555,6 +555,7 @@ export function emitAngular(
     classMembers,
     cvaModelProp: cvaModelProp !== null ? cvaModelProp.name : null,
     cvaMergeDisabled,
+    keynavPlan,
   });
 
   // 3. Listeners-block emission.

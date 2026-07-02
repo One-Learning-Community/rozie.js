@@ -22,6 +22,7 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
+import type { KeynavEmitPlan } from './emitKeynav.js';
 
 export interface EmitTemplateOpts {
   /** Collision-renames from rewriteScript (e.g., `close` → `_close`). */
@@ -50,6 +51,14 @@ export interface EmitTemplateOpts {
   cvaModelProp?: string | null | undefined;
   /** Phase 23 — true when CVA-receiving AND a `disabled` prop is declared. */
   cvaMergeDisabled?: boolean | undefined;
+  /**
+   * Phase 71 (r-keynav) — the per-component keynav emission plan, resolved
+   * ONCE by `emitAngular.ts` via `resolveKeynavPlan` and threaded here so the
+   * template walk stamps the declarative root/item attribute fragments.
+   * `null`/`undefined` for the overwhelming majority of components (no
+   * `r-keynav` root) — every downstream call site short-circuits (SPEC §11).
+   */
+  keynavPlan?: KeynavEmitPlan | null | undefined;
 }
 
 export interface EmitTemplateResult {
@@ -255,6 +264,7 @@ export function emitTemplate(
     classMembers: opts.classMembers,
     cvaModelProp: opts.cvaModelProp ?? null,
     cvaMergeDisabled: opts.cvaMergeDisabled ?? false,
+    keynav: opts.keynavPlan ?? null,
   };
 
   const template = emitNode(ir.template, ctx);
