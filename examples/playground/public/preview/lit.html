@@ -57,7 +57,6 @@
       // Counter so each render produces a unique custom-element tag (custom
       // elements can only be defined once per tag name; re-defining throws).
       let counter = 0;
-      let placeholderCounter = 0;
 
       // Idempotent customElements.define. Multi-file bundle siblings (e.g.
       // SortableListDemo importing SortableList) compile to LitElement custom
@@ -79,10 +78,16 @@
       bootHarness(async ({ code, siblings }) => {
         const transform = await getEsbuildTransform();
 
-        // Per-source: esbuild ts → esm + customElements-name rewrite. Each
-        // call gets its own placeholder name so the same source compiled
-        // twice doesn't accidentally collide (the importBundleWith pass calls
-        // this once per sibling AND once for the entry).
+        // Per-source: esbuild ts → esm. (No customElements-name rewrite here —
+        // esbuild's experimentalDecorators lowering of `@customElement('tag')`
+        // compiles to `__decorateClass([customElement("tag")], Cls)`, which
+        // contains neither a literal `customElements.define(` substring nor a
+        // leading-underscore `customElement(` call form; the actual
+        // `customElements.define` call happens inside `lit/decorators.js`'s
+        // `customElement()` implementation at module-evaluation time. A
+        // placeholder-rename pass here would never match real Lit output —
+        // the live safety net is the global `customElements.define` override
+        // above.)
         const transformOne = async (src) => {
           const { code: stubbed, cssSpecifiers } = stubUnresolvableImports(src);
           injectEngineCss(cssSpecifiers);
@@ -97,10 +102,7 @@
               },
             },
           });
-          const phName = `__placeholder_${++placeholderCounter}__`;
-          return result.code
-            .replace(/customElements\s*\.\s*define\s*\([^)]*\)\s*;?/g, '')
-            .replace(/_customElement\(['"][^'"]*['"]\)/g, `_customElement("${phName}")`);
+          return result.code;
         };
 
         const mod = await importBundleWith(transformOne, code, siblings ?? {});
