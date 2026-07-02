@@ -29,14 +29,19 @@ const EXPECT = {
     'src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
     'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate',
     'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
-    'timeline', 'hover', 'hoverColor', 'options', 'currentTime',
+    'timeline', 'hover', 'hoverColor', 'regions', 'dragToCreateRegions', 'regionColor',
+    'options', 'currentTime',
   ],
-  models: ['currentTime'],
-  emits: ['ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error'],
+  models: ['currentTime', 'regions'],
+  emits: [
+    'ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error',
+    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved',
+  ],
   slots: [] as string[],
   expose: [
     'play', 'pause', 'playPause', 'stop', 'seekTo', 'setTime', 'setVolume',
     'setPlaybackRate', 'setZoom', 'load', 'isPlaying', 'getDuration', 'getCurrentTime', 'getWaveSurfer',
+    'addRegion', 'clearRegions', 'getRegions',
   ],
 } as const;
 
@@ -57,19 +62,19 @@ describe('Waveform.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (22 props)', () => {
+  it('props surface matches (25 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
 
-  it('model:true props match (currentTime)', () => {
+  it('model:true props match (currentTime, regions)', () => {
     const modelNames = ir.props
       .filter((p: { isModel?: boolean }) => p.isModel)
       .map((p: { name: string }) => p.name);
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (9 emits)', () => {
+  it('emits surface matches (13 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
@@ -78,7 +83,7 @@ describe('Waveform.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (14 verbs)', () => {
+  it('expose surface matches (17 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

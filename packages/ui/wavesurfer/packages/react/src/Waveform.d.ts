@@ -86,6 +86,20 @@ export interface WaveformProps {
    */
   hoverColor?: (string) | null;
   /**
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   */
+  regions?: unknown;
+  defaultRegions?: unknown;
+  onRegionsChange?: (next: unknown) => void;
+  /**
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   */
+  dragToCreateRegions?: boolean;
+  /**
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   */
+  regionColor?: (string) | null;
+  /**
    * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
    */
   options?: Record<string, unknown>;
@@ -104,6 +118,10 @@ export interface WaveformProps {
   onInteraction?: (...args: unknown[]) => void;
   onLoading?: (...args: unknown[]) => void;
   onError?: (...args: unknown[]) => void;
+  onRegionCreated?: (...args: unknown[]) => void;
+  onRegionUpdated?: (...args: unknown[]) => void;
+  onRegionRemoved?: (...args: unknown[]) => void;
+  onRegionClicked?: (...args: unknown[]) => void;
 }
 
 export interface WaveformHandle {
@@ -121,6 +139,9 @@ export interface WaveformHandle {
   getDuration: (...args: any[]) => any;
   getCurrentTime: (...args: any[]) => any;
   getWaveSurfer: (...args: any[]) => any;
+  addRegion: (...args: any[]) => any;
+  clearRegions: (...args: any[]) => any;
+  getRegions: (...args: any[]) => any;
 }
 
 declare const Waveform: React.ForwardRefExoticComponent<WaveformProps & React.RefAttributes<WaveformHandle>>;

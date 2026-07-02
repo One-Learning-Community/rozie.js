@@ -17,8 +17,8 @@ One `Waveform.rozie` source compiles to six idiomatic packages — so Angular, S
 
 All six wrap **wavesurfer.js v7** (`wavesurfer.js@^7`), declared as a peer dependency. wavesurfer renders a canvas — **no external CSS import is required** (unlike engines whose UI is styled DOM).
 
-::: tip v1 scope — Core + Timeline + Hover
-This family ships the core waveform + full playback plus the two **stateless** plugins (the [Timeline](https://wavesurfer.xyz/docs/classes/plugins_timeline.TimelinePlugin) ruler and [Hover](https://wavesurfer.xyz/docs/classes/plugins_hover.HoverPlugin) cursor), opt-in via the `timeline` / `hover` props. Interactive **Regions** — draggable, resizable selections — are the natural next phase.
+::: tip Scope — Core + Timeline + Hover + Regions
+This family ships the core waveform + full playback, the two **stateless** plugins (the [Timeline](https://wavesurfer.xyz/docs/classes/plugins_timeline.TimelinePlugin) ruler and [Hover](https://wavesurfer.xyz/docs/classes/plugins_hover.HoverPlugin) cursor), and the interactive [**Regions**](https://wavesurfer.xyz/docs/classes/plugins_regions.RegionsPlugin) plugin — draggable, resizable selections with a two-way `regions` binding. Register a plugin by opting in (`timeline` / `hover`) or by passing a `regions` array.
 :::
 
 ## Quick start
@@ -146,6 +146,36 @@ el.addEventListener('currentTime-change', (e) => { el.currentTime = e.detail; })
 el.addEventListener('ready', (e) => console.log('duration', e.detail));
 ```
 
+## Regions
+
+Regions are draggable, resizable selections over the waveform. Pass a `regions` array (even empty) to register the plugin; bind it two-way to keep your state in sync as the user creates, drags, resizes, and removes them. Turn on `dragToCreateRegions` to let users draw new regions on empty space.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import Waveform from '@rozie-ui/wavesurfer-vue';
+
+const regions = ref([
+  { id: 'intro', start: 0, end: 2, color: 'rgba(138,43,226,0.2)' },
+  { id: 'chorus', start: 4, end: 6, color: 'rgba(90,24,154,0.25)' },
+]);
+</script>
+
+<template>
+  <Waveform
+    src="/audio.mp3"
+    v-model:regions="regions"
+    :drag-to-create-regions="true"
+    region-color="rgba(138,43,226,0.2)"
+    @region-created="(r) => console.log('created', r.id)"
+    @region-updated="(r) => console.log('moved', r.id, r.start, r.end)"
+    @region-removed="(r) => console.log('removed', r.id)"
+  />
+</template>
+```
+
+Or manage regions imperatively through the handle — `addRegion(...)`, `clearRegions()`, `getRegions()` — and listen for the `regionCreated` / `regionUpdated` / `regionClicked` / `regionRemoved` events.
+
 ## Reference
 
 ### Props
@@ -174,6 +204,9 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 | `timeline` | `Boolean` | `false` | | | Render a time-ruler beneath the waveform (Timeline plugin). **Construction-only** in v1. |
 | `hover` | `Boolean` | `false` | | | Show a hover cursor + time label (Hover plugin). **Construction-only** in v1. |
 | `hoverColor` | `String` | `null` | | | Line color of the Hover cursor (only when `hover` is on). **Construction-only** in v1. |
+| `regions` | `unknown` | `undefined` | ✓ | ✓ | Interactive regions — an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even `[]`) registers the Regions plugin at construction. Two-way: user create/drag/resize/remove writes the array back (round-trip-guarded); a consumer write reconciles the live regions by `id`. |
+| `dragToCreateRegions` | `Boolean` | `false` | | | Allow drawing new regions by dragging empty waveform space. Requires `regions` to be an array. **Construction-only** in v1. |
+| `regionColor` | `String` | `null` | | | Default fill color for drag-created regions (only when `dragToCreateRegions` is on). **Construction-only** in v1. |
 | `options` | `Object` | `{}` | | | Raw [wavesurfer `WaveSurferOptions`](https://wavesurfer.xyz/docs/types/wavesurfer.WaveSurferOptions) passthrough — spread into `WaveSurfer.create()` **before** the curated keys (explicit props win). Use for `peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, … |
 | `currentTime` | `unknown` | `undefined` | ✓ | ✓ | The current playback position in seconds. Two-way: playback writes it back on every `timeupdate` (round-trip-guarded); a consumer write seeks via `setTime`. |
 
@@ -190,6 +223,12 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 | `interaction` | `newTime` | The user clicks/interacts with the waveform. |
 | `loading` | `percent` | Audio download progresses (`0`–`100`). |
 | `error` | `error` | The audio fails to load or decode. |
+| `regionCreated` | `region` | A region is created (by drag or `addRegion`). |
+| `regionUpdated` | `region` | A region finishes being dragged or resized. |
+| `regionClicked` | `region` | A region is clicked. |
+| `regionRemoved` | `region` | A region is removed. |
+
+> Region-event payloads are the serialized descriptor `{ id, start, end, color, content, drag, resize }`. Programmatic region changes made through a controlled `regions` update do **not** re-emit these — only genuine user gestures do.
 
 > The engine's own `play` / `pause` / `finish` events are surfaced as `playing` / `paused` / `finished` so they don't collide with the `play()` / `pause()` imperative verbs (Rozie forbids an `$expose` verb sharing a name with an emit).
 
@@ -213,6 +252,9 @@ Grab a handle via your framework's native ref mechanism (`useRef` / template ref
 | `getDuration()` | Total duration in seconds. |
 | `getCurrentTime()` | Current playback position in seconds. |
 | `getWaveSurfer()` | The underlying wavesurfer instance (the engine escape hatch). |
+| `addRegion(opts)` | Add a region — `{ start, end?, id?, content?, color?, drag?, resize? }`. Returns the created region. |
+| `clearRegions()` | Remove all regions. |
+| `getRegions()` | The live engine region objects. |
 
 ## Gotchas
 
@@ -222,7 +264,11 @@ wavesurfer's option is `normalize`, but a reactive property named `normalize` wo
 
 ### Plugins are construction-time (v1)
 
-`timeline` / `hover` are read once when the engine is created. Toggling them after mount is a no-op in v1 — pass the desired value at first render. (Live toggling would re-create the engine; it's a planned follow-up.)
+`timeline` / `hover` are read once when the engine is created, and the Regions plugin is registered only if `regions` is an array at first render. Toggling a plugin on/off after mount is a no-op in v1 — pass the desired value at first render (for regions, start with `[]` if you want them enabled but empty). Once registered, the `regions` **contents** are fully reactive; only the plugin's presence is fixed. (Live plugin toggling would re-create the engine; it's a planned follow-up.)
+
+### Give controlled regions stable ids
+
+When you drive `regions` as a controlled list, include a stable `id` on each descriptor so reconciliation can match update-vs-add. Regions you add without an id get one assigned by the engine, and — because the binding is two-way — that id is written back into your bound array. If you hold an id-less array and never consume the writeback, a changing array reference can re-add the same region.
 
 ### Offline / deterministic rendering
 

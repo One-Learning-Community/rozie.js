@@ -40,6 +40,17 @@ const time = ref(0);
 const duration = ref(0);
 const rate = ref(1);
 const zoom = ref(1);
+const regions = ref<any[]>([
+  { id: 'intro', start: 0.5, end: 1.8, color: 'rgba(138,43,226,0.22)' },
+  { id: 'hook', start: 3, end: 4.2, color: 'rgba(90,24,154,0.28)' },
+]);
+let regionSeq = 0;
+const addRegion = () => {
+  const start = 1 + (regionSeq % 4);
+  regionSeq++;
+  wave.value?.addRegion({ start, end: start + 0.8, color: 'rgba(45,212,191,0.28)' });
+};
+const clearRegions = () => wave.value?.clearRegions();
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const pct = computed(() => (duration.value ? Math.round((time.value / duration.value) * 100) : 0));
@@ -63,6 +74,9 @@ This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (Vi
     <button :class="{ 'wave-live__on': rate === 2 }" @click="setRate(2)">2×</button>
     <span class="wave-live__sep" />
     <label class="wave-live__zoom">Zoom <input type="range" min="1" max="120" :value="zoom" @input="onZoom" /></label>
+    <span class="wave-live__sep" />
+    <button @click="addRegion">+ Region</button>
+    <button @click="clearRegions">Clear regions</button>
   </div>
 
   <div class="wave-live__stage">
@@ -70,8 +84,11 @@ This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (Vi
       ref="wave"
       :src="SAMPLE"
       v-model:currentTime="time"
+      v-model:regions="regions"
       :timeline="true"
       :hover="true"
+      :drag-to-create-regions="true"
+      region-color="rgba(138,43,226,0.2)"
       wave-color="#8a2be2"
       progress-color="#5a189a"
       :bar-width="2"
@@ -82,8 +99,9 @@ This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (Vi
   </div>
 
   <div class="wave-live__readout">
-    <code>{{ fmt(time) }} / {{ fmt(duration) }} · {{ pct }}%</code>
+    <code>{{ fmt(time) }} / {{ fmt(duration) }} · {{ pct }}% · {{ regions.length }} region(s)</code>
   </div>
+  <div class="wave-live__hint">Drag on empty waveform space to draw a region · drag/resize to adjust · they stay in sync with the two-way <code>v-model:regions</code>.</div>
 </div>
 </ClientOnly>
 
@@ -178,5 +196,10 @@ Each is a real, idiomatic component for its framework — React `forwardRef` + h
   margin-top: 0.6rem;
   font-size: 0.82rem;
   color: var(--vp-c-text-2);
+}
+.wave-live__hint {
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--vp-c-text-3);
 }
 </style>

@@ -7,6 +7,7 @@ import './Waveform.css';
 import WaveSurfer from 'wavesurfer.js';
 import TimelinePlugin from 'wavesurfer.js/plugins/timeline';
 import HoverPlugin from 'wavesurfer.js/plugins/hover';
+import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 
 // null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's
 // strict WaveSurferOptions/return types don't match the loosely-typed .rozie props,
@@ -98,6 +99,20 @@ interface WaveformProps {
    */
   hoverColor?: (string) | null;
   /**
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   */
+  regions?: unknown;
+  defaultRegions?: unknown;
+  onRegionsChange?: (regions: unknown) => void;
+  /**
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   */
+  dragToCreateRegions?: boolean;
+  /**
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   */
+  regionColor?: (string) | null;
+  /**
    * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
    */
   options?: Record<string, any>;
@@ -116,6 +131,10 @@ interface WaveformProps {
   onInteraction?: (...args: any[]) => void;
   onLoading?: (...args: any[]) => void;
   onError?: (...args: any[]) => void;
+  onRegionCreated?: (...args: any[]) => void;
+  onRegionUpdated?: (...args: any[]) => void;
+  onRegionRemoved?: (...args: any[]) => void;
+  onRegionClicked?: (...args: any[]) => void;
 }
 
 export interface WaveformHandle {
@@ -133,11 +152,14 @@ export interface WaveformHandle {
   getDuration: (...args: any[]) => any;
   getCurrentTime: (...args: any[]) => any;
   getWaveSurfer: (...args: any[]) => any;
+  addRegion: (...args: any[]) => any;
+  clearRegions: (...args: any[]) => any;
+  getRegions: (...args: any[]) => any;
 }
 
 const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_props: WaveformProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<WaveformProps, 'src' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'options'> & { src: (string) | null; height: number; waveColor: string; progressColor: string; cursorColor: string; cursorWidth: number; barWidth: (unknown) | null; barGap: (unknown) | null; barRadius: (unknown) | null; minPxPerSec: number; volume: number; playbackRate: number; autoplay: boolean; normalizeAmplitude: boolean; hideScrollbar: boolean; disableInteraction: boolean; disableDragToSeek: boolean; timeline: boolean; hover: boolean; hoverColor: (string) | null; options: Record<string, any> } = {
+  const props: Omit<WaveformProps, 'src' | 'height' | 'waveColor' | 'progressColor' | 'cursorColor' | 'cursorWidth' | 'barWidth' | 'barGap' | 'barRadius' | 'minPxPerSec' | 'volume' | 'playbackRate' | 'autoplay' | 'normalizeAmplitude' | 'hideScrollbar' | 'disableInteraction' | 'disableDragToSeek' | 'timeline' | 'hover' | 'hoverColor' | 'dragToCreateRegions' | 'regionColor' | 'options'> & { src: (string) | null; height: number; waveColor: string; progressColor: string; cursorColor: string; cursorWidth: number; barWidth: (unknown) | null; barGap: (unknown) | null; barRadius: (unknown) | null; minPxPerSec: number; volume: number; playbackRate: number; autoplay: boolean; normalizeAmplitude: boolean; hideScrollbar: boolean; disableInteraction: boolean; disableDragToSeek: boolean; timeline: boolean; hover: boolean; hoverColor: (string) | null; dragToCreateRegions: boolean; regionColor: (string) | null; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? null,
     height: _props.height ?? 128,
@@ -159,14 +181,24 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     timeline: _props.timeline ?? false,
     hover: _props.hover ?? false,
     hoverColor: _props.hoverColor ?? null,
+    dragToCreateRegions: _props.dragToCreateRegions ?? false,
+    regionColor: _props.regionColor ?? null,
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, height, waveColor, progressColor, cursorColor, cursorWidth, barWidth, barGap, barRadius, minPxPerSec, volume, playbackRate, autoplay, normalizeAmplitude, hideScrollbar, disableInteraction, disableDragToSeek, timeline, hover, hoverColor, options, currentTime, defaultValue, onCurrentTimeChange, defaultCurrentTime, ...rest } = _props as WaveformProps & Record<string, unknown>;
-    void src; void height; void waveColor; void progressColor; void cursorColor; void cursorWidth; void barWidth; void barGap; void barRadius; void minPxPerSec; void volume; void playbackRate; void autoplay; void normalizeAmplitude; void hideScrollbar; void disableInteraction; void disableDragToSeek; void timeline; void hover; void hoverColor; void options; void currentTime; void defaultValue; void onCurrentTimeChange; void defaultCurrentTime;
+    const { src, height, waveColor, progressColor, cursorColor, cursorWidth, barWidth, barGap, barRadius, minPxPerSec, volume, playbackRate, autoplay, normalizeAmplitude, hideScrollbar, disableInteraction, disableDragToSeek, timeline, hover, hoverColor, regions, dragToCreateRegions, regionColor, options, currentTime, defaultValue, onRegionsChange, defaultRegions, onCurrentTimeChange, defaultCurrentTime, ...rest } = _props as WaveformProps & Record<string, unknown>;
+    void src; void height; void waveColor; void progressColor; void cursorColor; void cursorWidth; void barWidth; void barGap; void barRadius; void minPxPerSec; void volume; void playbackRate; void autoplay; void normalizeAmplitude; void hideScrollbar; void disableInteraction; void disableDragToSeek; void timeline; void hover; void hoverColor; void regions; void dragToCreateRegions; void regionColor; void options; void currentTime; void defaultValue; void onRegionsChange; void defaultRegions; void onCurrentTimeChange; void defaultCurrentTime;
     return rest;
   })();
+  const regionsPlugin = useRef<any>(null);
   const ws = useRef<any>(null);
+  const regionsReady = useRef(false);
+  const reconciling = useRef(false);
+  const [regions, setRegions] = useControllableState({
+    value: props.regions,
+    defaultValue: props.defaultRegions ?? undefined,
+    onValueChange: props.onRegionsChange,
+  });
   const [currentTime, setCurrentTime] = useControllableState({
     value: props.currentTime,
     defaultValue: props.defaultCurrentTime ?? undefined,
@@ -187,8 +219,75 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
   const _watch11First = useRef(true);
   const _watch12First = useRef(true);
   const _watch13First = useRef(true);
+  const _watch14First = useRef(true);
 
-  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
+  function serializeRegion(r: any) {
+    return {
+      id: r.id,
+      start: r.start,
+      end: r.end,
+      color: r.color,
+      content: r.content && r.content.textContent ? r.content.textContent : undefined,
+      drag: r.drag,
+      resize: r.resize
+    };
+  }
+  function sameRegions(list: any, engineRegions: any) {
+    if (!Array.isArray(list) || list.length !== engineRegions.length) return false;
+    const key = (r: any) => `${r.id}:${Math.round((r.start ?? 0) * 1000)}:${Math.round((r.end ?? 0) * 1000)}`;
+    const a = list.map(key).sort();
+    const b = engineRegions.map(key).sort();
+    return a.every((k: any, i: any) => k === b[i]);
+  }
+  function writeBackRegions() {
+    if (!regionsPlugin.current || reconciling.current) return;
+    setRegions(regionsPlugin.current.getRegions().map(serializeRegion));
+  }
+  function reconcileRegions(list: any) {
+    if (!regionsPlugin.current || !Array.isArray(list)) return;
+    const current = regionsPlugin.current.getRegions();
+    if (sameRegions(list, current)) return;
+    reconciling.current = true;
+    let addedWithoutId = false;
+    // Build the id→region map with a no-arg `new Map()` (infers Map<any, any>) — a
+    // `new Map(current.map(...))` over the `any`-typed engine list infers
+    // Map<unknown, unknown>, so `.setOptions` would fail the strict leaf typecheck.
+    const byId = new Map();
+    for (const r of current as any) byId.set(r.id, r);
+    const keep = new Set();
+    for (const desc of list as any) {
+      if (!desc || typeof desc.start !== 'number') continue;
+      if (desc.id != null && byId.has(desc.id)) {
+        byId.get(desc.id).setOptions({
+          start: desc.start,
+          end: desc.end,
+          color: desc.color,
+          drag: desc.drag,
+          resize: desc.resize,
+          content: desc.content
+        });
+        keep.add(desc.id);
+      } else {
+        const created = regionsPlugin.current.addRegion({
+          id: desc.id,
+          start: desc.start,
+          end: desc.end,
+          color: desc.color,
+          content: desc.content,
+          drag: desc.drag,
+          resize: desc.resize
+        });
+        keep.add(created.id);
+        if (desc.id == null) addedWithoutId = true;
+      }
+    }
+    for (const r of current as any) {
+      if (!keep.has(r.id)) r.remove();
+    }
+    reconciling.current = false;
+    if (addedWithoutId) writeBackRegions();
+  }
+  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onRegionClicked: _rozieProp_onRegionClicked, onRegionCreated: _rozieProp_onRegionCreated, onRegionRemoved: _rozieProp_onRegionRemoved, onRegionUpdated: _rozieProp_onRegionUpdated, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
     const buildWaveSurfer = useCallback(() => {
     let plugins = [];
     plugins = [];
@@ -196,6 +295,12 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     if (props.hover) plugins.push(HoverPlugin.create({
       lineColor: props.hoverColor ?? undefined
     }));
+    // Regions plugin is registered when `regions` is an array (even empty).
+    regionsPlugin.current = null;
+    if (Array.isArray(regions)) {
+      regionsPlugin.current = RegionsPlugin.create();
+      plugins.push(regionsPlugin.current);
+    }
     let cfg: any = null;
     cfg = {
       ...props.options,
@@ -220,7 +325,22 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     ws.current = WaveSurfer.create(cfg);
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────
-    ws.current.on('ready', (duration: any) => _rozieProp_onReady && _rozieProp_onReady(duration));
+    ws.current.on('ready', (duration: any) => {
+      // Regions can only be placed once the duration is known — do the initial
+      // reconcile + drag-selection wiring here, then open the gate for prop-driven
+      // reconciles. ($watch is lazy, so it never fires at mount; this is the only
+      // place initial regions get added.)
+      if (regionsPlugin.current) {
+        regionsReady.current = true;
+        if (props.dragToCreateRegions) {
+          regionsPlugin.current.enableDragSelection({
+            color: props.regionColor ?? undefined
+          });
+        }
+        reconcileRegions(regions);
+      }
+      _rozieProp_onReady && _rozieProp_onReady(duration);
+    });
     ws.current.on('play', () => _rozieProp_onPlaying && _rozieProp_onPlaying());
     ws.current.on('pause', () => _rozieProp_onPaused && _rozieProp_onPaused());
     ws.current.on('finish', () => _rozieProp_onFinished && _rozieProp_onFinished());
@@ -234,7 +354,32 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     ws.current.on('interaction', (t: any) => _rozieProp_onInteraction && _rozieProp_onInteraction(t));
     ws.current.on('loading', (percent: any) => _rozieProp_onLoading && _rozieProp_onLoading(percent));
     ws.current.on('error', (err: any) => _rozieProp_onError && _rozieProp_onError(err));
-  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.progressColor, props.src, props.timeline, props.waveColor, setCurrentTime]);
+
+    // ── regions plugin events → emits + two-way `regions` writeback ────────────
+    // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
+    // programmatic add/update/remove does not echo back or double-emit; only genuine
+    // user gestures (drag-create, drag/resize, delete) drive the model + emits.
+    if (regionsPlugin.current) {
+      regionsPlugin.current.on('region-created', (region: any) => {
+        if (reconciling.current) return;
+        _rozieProp_onRegionCreated && _rozieProp_onRegionCreated(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.current.on('region-updated', (region: any) => {
+        if (reconciling.current) return;
+        _rozieProp_onRegionUpdated && _rozieProp_onRegionUpdated(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.current.on('region-removed', (region: any) => {
+        if (reconciling.current) return;
+        _rozieProp_onRegionRemoved && _rozieProp_onRegionRemoved(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.current.on('region-clicked', (region: any) => {
+        _rozieProp_onRegionClicked && _rozieProp_onRegionClicked(serializeRegion(region));
+      });
+    }
+  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/
   // playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);
@@ -281,6 +426,23 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
   }
   function getWaveSurfer() {
     return ws.current;
+  }
+  // Regions imperative surface (active only when the `regions` array registered the
+  // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
+  // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way
+  // binding instead).
+  // Regions imperative surface (active only when the `regions` array registered the
+  // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
+  // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way
+  // binding instead).
+  function addRegion(opts: any) {
+    return regionsPlugin.current ? regionsPlugin.current.addRegion(opts) : null;
+  }
+  function clearRegions() {
+    if (regionsPlugin.current) regionsPlugin.current.clearRegions();
+  }
+  function getRegions() {
+    return regionsPlugin.current ? regionsPlugin.current.getRegions() : [];
   }
 
   useEffect(() => {
@@ -382,10 +544,19 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     if (Math.abs(v - ws.current.getCurrentTime()) < 0.05) return;
     ws.current.setTime(v);
   }, [currentTime]);
+  useEffect(() => {
+    if (_watch14First.current) { _watch14First.current = false; return; }
+    const list = regions;
+    // Controlled reconcile of the live regions to match the incoming list.
+    // Gated on `regionsReady` (duration known) and value-equality-guarded inside
+    // reconcileRegions so a writeback echo doesn't loop.
+    if (!regionsReady.current) return;
+    reconcileRegions(list);
+  }, [regions]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer });
-  _rozieExposeRef.current = { play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer };
-  useImperativeHandle(ref, () => ({ play: (...args: Parameters<typeof play>): ReturnType<typeof play> => _rozieExposeRef.current.play(...args), pause: (...args: Parameters<typeof pause>): ReturnType<typeof pause> => _rozieExposeRef.current.pause(...args), playPause: (...args: Parameters<typeof playPause>): ReturnType<typeof playPause> => _rozieExposeRef.current.playPause(...args), stop: (...args: Parameters<typeof stop>): ReturnType<typeof stop> => _rozieExposeRef.current.stop(...args), seekTo: (...args: Parameters<typeof seekTo>): ReturnType<typeof seekTo> => _rozieExposeRef.current.seekTo(...args), setTime: (...args: Parameters<typeof setTime>): ReturnType<typeof setTime> => _rozieExposeRef.current.setTime(...args), setVolume: (...args: Parameters<typeof setVolume>): ReturnType<typeof setVolume> => _rozieExposeRef.current.setVolume(...args), setPlaybackRate: (...args: Parameters<typeof setPlaybackRate>): ReturnType<typeof setPlaybackRate> => _rozieExposeRef.current.setPlaybackRate(...args), setZoom: (...args: Parameters<typeof setZoom>): ReturnType<typeof setZoom> => _rozieExposeRef.current.setZoom(...args), load: (...args: Parameters<typeof load>): ReturnType<typeof load> => _rozieExposeRef.current.load(...args), isPlaying: (...args: Parameters<typeof isPlaying>): ReturnType<typeof isPlaying> => _rozieExposeRef.current.isPlaying(...args), getDuration: (...args: Parameters<typeof getDuration>): ReturnType<typeof getDuration> => _rozieExposeRef.current.getDuration(...args), getCurrentTime: (...args: Parameters<typeof getCurrentTime>): ReturnType<typeof getCurrentTime> => _rozieExposeRef.current.getCurrentTime(...args), getWaveSurfer: (...args: Parameters<typeof getWaveSurfer>): ReturnType<typeof getWaveSurfer> => _rozieExposeRef.current.getWaveSurfer(...args) }), []);
+  const _rozieExposeRef = useRef({ play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer, addRegion, clearRegions, getRegions });
+  _rozieExposeRef.current = { play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer, addRegion, clearRegions, getRegions };
+  useImperativeHandle(ref, () => ({ play: (...args: Parameters<typeof play>): ReturnType<typeof play> => _rozieExposeRef.current.play(...args), pause: (...args: Parameters<typeof pause>): ReturnType<typeof pause> => _rozieExposeRef.current.pause(...args), playPause: (...args: Parameters<typeof playPause>): ReturnType<typeof playPause> => _rozieExposeRef.current.playPause(...args), stop: (...args: Parameters<typeof stop>): ReturnType<typeof stop> => _rozieExposeRef.current.stop(...args), seekTo: (...args: Parameters<typeof seekTo>): ReturnType<typeof seekTo> => _rozieExposeRef.current.seekTo(...args), setTime: (...args: Parameters<typeof setTime>): ReturnType<typeof setTime> => _rozieExposeRef.current.setTime(...args), setVolume: (...args: Parameters<typeof setVolume>): ReturnType<typeof setVolume> => _rozieExposeRef.current.setVolume(...args), setPlaybackRate: (...args: Parameters<typeof setPlaybackRate>): ReturnType<typeof setPlaybackRate> => _rozieExposeRef.current.setPlaybackRate(...args), setZoom: (...args: Parameters<typeof setZoom>): ReturnType<typeof setZoom> => _rozieExposeRef.current.setZoom(...args), load: (...args: Parameters<typeof load>): ReturnType<typeof load> => _rozieExposeRef.current.load(...args), isPlaying: (...args: Parameters<typeof isPlaying>): ReturnType<typeof isPlaying> => _rozieExposeRef.current.isPlaying(...args), getDuration: (...args: Parameters<typeof getDuration>): ReturnType<typeof getDuration> => _rozieExposeRef.current.getDuration(...args), getCurrentTime: (...args: Parameters<typeof getCurrentTime>): ReturnType<typeof getCurrentTime> => _rozieExposeRef.current.getCurrentTime(...args), getWaveSurfer: (...args: Parameters<typeof getWaveSurfer>): ReturnType<typeof getWaveSurfer> => _rozieExposeRef.current.getWaveSurfer(...args), addRegion: (...args: Parameters<typeof addRegion>): ReturnType<typeof addRegion> => _rozieExposeRef.current.addRegion(...args), clearRegions: (...args: Parameters<typeof clearRegions>): ReturnType<typeof clearRegions> => _rozieExposeRef.current.clearRegions(...args), getRegions: (...args: Parameters<typeof getRegions>): ReturnType<typeof getRegions> => _rozieExposeRef.current.getRegions(...args) }), []);
 
   return (
     <>

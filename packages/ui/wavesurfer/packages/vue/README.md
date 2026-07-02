@@ -55,6 +55,9 @@ const time = ref(0);
 | `timeline` | `Boolean` | `false` |  |  |
 | `hover` | `Boolean` | `false` |  |  |
 | `hoverColor` | `String` | `null` |  |  |
+| `regions` | `unknown` | `undefined` | ✓ |  |
+| `dragToCreateRegions` | `Boolean` | `false` |  |  |
+| `regionColor` | `String` | `null` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `currentTime` | `unknown` | `undefined` | ✓ |  |
 
@@ -71,6 +74,10 @@ const time = ref(0);
 | `interaction` | |
 | `loading` | |
 | `error` | |
+| `regionCreated` | |
+| `regionUpdated` | |
+| `regionRemoved` | |
+| `regionClicked` | |
 
 ## Imperative handle
 
@@ -104,3 +111,6 @@ const wave = ref();      // template ref
 | `getDuration` | Return the total duration in seconds (`0` before the audio is ready). |
 | `getCurrentTime` | Return the current playback position in seconds. |
 | `getWaveSurfer` | Return the underlying wavesurfer instance for direct API access (the engine escape hatch). Null before mount. |
+| `addRegion` | Add a region imperatively — `addRegion({ start, end?, id?, content?, color?, drag?, resize? })`. Returns the created engine Region. Requires the `regions` array to have registered the plugin. Null when regions are disabled. |
+| `clearRegions` | Remove all regions. |
+| `getRegions` | Return the live engine Region objects (empty array when regions are disabled). |

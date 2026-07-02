@@ -24,14 +24,19 @@ const EXPECT = {
     'src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth',
     'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate',
     'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek',
-    'timeline', 'hover', 'hoverColor', 'options', 'currentTime',
+    'timeline', 'hover', 'hoverColor', 'regions', 'dragToCreateRegions', 'regionColor',
+    'options', 'currentTime',
   ],
-  models: ['currentTime'],
-  emits: ['ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error'],
+  models: ['currentTime', 'regions'],
+  emits: [
+    'ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error',
+    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved',
+  ],
   slots: [],
   expose: [
     'play', 'pause', 'playPause', 'stop', 'seekTo', 'setTime', 'setVolume',
     'setPlaybackRate', 'setZoom', 'load', 'isPlaying', 'getDuration', 'getCurrentTime', 'getWaveSurfer',
+    'addRegion', 'clearRegions', 'getRegions',
   ],
 };
 

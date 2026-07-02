@@ -8,6 +8,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 import WaveSurfer from 'wavesurfer.js';
 import TimelinePlugin from 'wavesurfer.js/plugins/timeline';
 import HoverPlugin from 'wavesurfer.js/plugins/hover';
+import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 
 // null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's
 // strict WaveSurferOptions/return types don't match the loosely-typed .rozie props,
@@ -106,6 +107,19 @@ export default class Waveform extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) hoverColor: string | null = null;
   /**
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   */
+  @property({ type: Object, attribute: 'regions' }) _regions_attr: unknown = undefined;
+  private _regionsControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'regions-change', defaultValue: undefined, initialControlledValue: undefined });
+  /**
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   */
+  @property({ type: Boolean, reflect: true }) dragToCreateRegions: boolean = false;
+  /**
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   */
+  @property({ type: String, reflect: true }) regionColor: string | null = null;
+  /**
    * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
    */
   @property({ type: Object }) options: any = {};
@@ -116,6 +130,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   private _currentTimeControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'current-time-change', defaultValue: undefined, initialControlledValue: undefined });
   @query('[data-rozie-ref="container"]') private _refContainer!: HTMLElement;
 private __rozieWatchInitial_13 = true;
+private __rozieWatchInitial_14 = true;
 private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -134,6 +149,13 @@ private __rozieFirstUpdateDone = false;
       if (!this.ws || typeof v !== 'number') return;
       if (Math.abs(v - this.ws.getCurrentTime()) < 0.05) return;
       this.ws.setTime(v);
+    })(__watchVal); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.regions)(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } ((list: any) => {
+      // Controlled reconcile of the live regions to match the incoming list.
+      // Gated on `regionsReady` (duration known) and value-equality-guarded inside
+      // reconcileRegions so a writeback echo doesn't loop.
+      if (!this.regionsReady) return;
+      this.reconcileRegions(list);
     })(__watchVal); }); }));
 
     // $refs read ONLY here (ROZ123). The container is the engine's attach target.
@@ -213,6 +235,7 @@ private __rozieFirstUpdateDone = false;
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
+    if (name === 'regions') this._regionsControllable.notifyAttributeChange(value as unknown as unknown);
     if (name === 'current-time') this._currentTimeControllable.notifyAttributeChange(value as unknown as unknown);
   }
 
@@ -224,6 +247,80 @@ private __rozieFirstUpdateDone = false;
 
   ws: any = null;
 
+  regionsPlugin: any = null;
+
+  regionsReady = false;
+
+  reconciling = false;
+
+  serializeRegion = (r: any) => ({
+  id: r.id,
+  start: r.start,
+  end: r.end,
+  color: r.color,
+  content: r.content && r.content.textContent ? r.content.textContent : undefined,
+  drag: r.drag,
+  resize: r.resize
+});
+
+  sameRegions = (list: any, engineRegions: any) => {
+  if (!Array.isArray(list) || list.length !== engineRegions.length) return false;
+  const key = (r: any) => `${r.id}:${Math.round((r.start ?? 0) * 1000)}:${Math.round((r.end ?? 0) * 1000)}`;
+  const a = list.map(key).sort();
+  const b = engineRegions.map(key).sort();
+  return a.every((k: any, i: any) => k === b[i]);
+};
+
+  writeBackRegions = () => {
+  if (!this.regionsPlugin || this.reconciling) return;
+  this._regionsControllable.write(this.regionsPlugin.getRegions().map(this.serializeRegion));
+};
+
+  reconcileRegions = (list: any) => {
+  if (!this.regionsPlugin || !Array.isArray(list)) return;
+  const current = this.regionsPlugin.getRegions();
+  if (this.sameRegions(list, current)) return;
+  this.reconciling = true;
+  let addedWithoutId = false;
+  // Build the id→region map with a no-arg `new Map()` (infers Map<any, any>) — a
+  // `new Map(current.map(...))` over the `any`-typed engine list infers
+  // Map<unknown, unknown>, so `.setOptions` would fail the strict leaf typecheck.
+  const byId = new Map();
+  for (const r of current as any) byId.set(r.id, r);
+  const keep = new Set();
+  for (const desc of list as any) {
+    if (!desc || typeof desc.start !== 'number') continue;
+    if (desc.id != null && byId.has(desc.id)) {
+      byId.get(desc.id).setOptions({
+        start: desc.start,
+        end: desc.end,
+        color: desc.color,
+        drag: desc.drag,
+        resize: desc.resize,
+        content: desc.content
+      });
+      keep.add(desc.id);
+    } else {
+      const created = this.regionsPlugin.addRegion({
+        id: desc.id,
+        start: desc.start,
+        end: desc.end,
+        color: desc.color,
+        content: desc.content,
+        drag: desc.drag,
+        resize: desc.resize
+      });
+      keep.add(created.id);
+      if (desc.id == null) addedWithoutId = true;
+    }
+  }
+  for (const r of current as any) {
+    if (!keep.has(r.id)) r.remove();
+  }
+  this.reconciling = false;
+  if (addedWithoutId) this.writeBackRegions();
+};
+
   buildWaveSurfer = () => {
   let plugins = [];
   plugins = [];
@@ -231,6 +328,12 @@ private __rozieFirstUpdateDone = false;
   if (this.hover) plugins.push(HoverPlugin.create({
     lineColor: this.hoverColor ?? undefined
   }));
+  // Regions plugin is registered when `regions` is an array (even empty).
+  this.regionsPlugin = null;
+  if (Array.isArray(this.regions)) {
+    this.regionsPlugin = RegionsPlugin.create();
+    plugins.push(this.regionsPlugin);
+  }
   let cfg: any = null;
   cfg = {
     ...this.options,
@@ -255,11 +358,26 @@ private __rozieFirstUpdateDone = false;
   this.ws = WaveSurfer.create(cfg);
 
   // ── engine events → emits + the two-way currentTime writeback ──────────────
-  this.ws.on('ready', (duration: any) => this.dispatchEvent(new CustomEvent("ready", {
-    detail: duration,
-    bubbles: true,
-    composed: true
-  })));
+  this.ws.on('ready', (duration: any) => {
+    // Regions can only be placed once the duration is known — do the initial
+    // reconcile + drag-selection wiring here, then open the gate for prop-driven
+    // reconciles. ($watch is lazy, so it never fires at mount; this is the only
+    // place initial regions get added.)
+    if (this.regionsPlugin) {
+      this.regionsReady = true;
+      if (this.dragToCreateRegions) {
+        this.regionsPlugin.enableDragSelection({
+          color: this.regionColor ?? undefined
+        });
+      }
+      this.reconcileRegions(this.regions);
+    }
+    this.dispatchEvent(new CustomEvent("ready", {
+      detail: duration,
+      bubbles: true,
+      composed: true
+    }));
+  });
   this.ws.on('play', () => this.dispatchEvent(new CustomEvent("playing", {
     detail: undefined,
     bubbles: true,
@@ -305,6 +423,47 @@ private __rozieFirstUpdateDone = false;
     bubbles: true,
     composed: true
   })));
+
+  // ── regions plugin events → emits + two-way `regions` writeback ────────────
+  // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
+  // programmatic add/update/remove does not echo back or double-emit; only genuine
+  // user gestures (drag-create, drag/resize, delete) drive the model + emits.
+  if (this.regionsPlugin) {
+    this.regionsPlugin.on('region-created', (region: any) => {
+      if (this.reconciling) return;
+      this.dispatchEvent(new CustomEvent("regionCreated", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+      this.writeBackRegions();
+    });
+    this.regionsPlugin.on('region-updated', (region: any) => {
+      if (this.reconciling) return;
+      this.dispatchEvent(new CustomEvent("regionUpdated", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+      this.writeBackRegions();
+    });
+    this.regionsPlugin.on('region-removed', (region: any) => {
+      if (this.reconciling) return;
+      this.dispatchEvent(new CustomEvent("regionRemoved", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+      this.writeBackRegions();
+    });
+    this.regionsPlugin.on('region-clicked', (region: any) => {
+      this.dispatchEvent(new CustomEvent("regionClicked", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+    });
+  }
 };
 
   play() {
@@ -363,6 +522,20 @@ private __rozieFirstUpdateDone = false;
     return this.ws;
   }
 
+  addRegion(opts: any) {
+    return this.regionsPlugin ? this.regionsPlugin.addRegion(opts) : null;
+  }
+
+  clearRegions() {
+    if (this.regionsPlugin) this.regionsPlugin.clearRegions();
+  }
+
+  getRegions() {
+    return this.regionsPlugin ? this.regionsPlugin.getRegions() : [];
+  }
+
+  get regions(): unknown { return this._regionsControllable.read(); }
+  set regions(v: unknown) { this._regionsControllable.notifyPropertyWrite(v); }
   get currentTime(): unknown { return this._currentTimeControllable.read(); }
   set currentTime(v: unknown) { this._currentTimeControllable.notifyPropertyWrite(v); }
 
@@ -379,7 +552,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'options', 'current-time', 'currenttime']);
+    const __skip = new Set<string>(['src', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'regions', 'drag-to-create-regions', 'dragtocreateregions', 'region-color', 'regioncolor', 'options', 'current-time', 'currenttime']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

@@ -7,6 +7,7 @@ import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-sol
 import WaveSurfer from 'wavesurfer.js';
 import TimelinePlugin from 'wavesurfer.js/plugins/timeline';
 import HoverPlugin from 'wavesurfer.js/plugins/hover';
+import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 
 // null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's
 // strict WaveSurferOptions/return types don't match the loosely-typed .rozie props,
@@ -102,6 +103,20 @@ interface WaveformProps {
    */
   hoverColor?: (string) | null;
   /**
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   */
+  regions?: unknown;
+  defaultRegions?: unknown;
+  onRegionsChange?: (regions: unknown) => void;
+  /**
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   */
+  dragToCreateRegions?: boolean;
+  /**
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   */
+  regionColor?: (string) | null;
+  /**
    * Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).
    */
   options?: Record<string, any>;
@@ -120,6 +135,10 @@ interface WaveformProps {
   onInteraction?: (...args: unknown[]) => void;
   onLoading?: (...args: unknown[]) => void;
   onError?: (...args: unknown[]) => void;
+  onRegionCreated?: (...args: unknown[]) => void;
+  onRegionUpdated?: (...args: unknown[]) => void;
+  onRegionRemoved?: (...args: unknown[]) => void;
+  onRegionClicked?: (...args: unknown[]) => void;
   ref?: (h: WaveformHandle) => void;
 }
 
@@ -138,13 +157,17 @@ export interface WaveformHandle {
   getDuration: (...args: any[]) => any;
   getCurrentTime: (...args: any[]) => any;
   getWaveSurfer: (...args: any[]) => any;
+  addRegion: (...args: any[]) => any;
+  clearRegions: (...args: any[]) => any;
+  getRegions: (...args: any[]) => any;
 }
 
 export default function Waveform(_props: WaveformProps): JSX.Element {
-  const _merged = mergeProps({ src: null, height: 128, waveColor: '#8a2be2', progressColor: '#5a189a', cursorColor: '#333333', cursorWidth: 1, barWidth: null, barGap: null, barRadius: null, minPxPerSec: 1, volume: 1, playbackRate: 1, autoplay: false, normalizeAmplitude: false, hideScrollbar: false, disableInteraction: false, disableDragToSeek: false, timeline: false, hover: false, hoverColor: null, options: (() => ({}))() }, _props);
-  const [local, attrs] = splitProps(_merged, ['src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth', 'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate', 'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek', 'timeline', 'hover', 'hoverColor', 'options', 'currentTime', 'ref']);
-  onMount(() => { local.ref?.({ play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer }); });
+  const _merged = mergeProps({ src: null, height: 128, waveColor: '#8a2be2', progressColor: '#5a189a', cursorColor: '#333333', cursorWidth: 1, barWidth: null, barGap: null, barRadius: null, minPxPerSec: 1, volume: 1, playbackRate: 1, autoplay: false, normalizeAmplitude: false, hideScrollbar: false, disableInteraction: false, disableDragToSeek: false, timeline: false, hover: false, hoverColor: null, dragToCreateRegions: false, regionColor: null, options: (() => ({}))() }, _props);
+  const [local, attrs] = splitProps(_merged, ['src', 'height', 'waveColor', 'progressColor', 'cursorColor', 'cursorWidth', 'barWidth', 'barGap', 'barRadius', 'minPxPerSec', 'volume', 'playbackRate', 'autoplay', 'normalizeAmplitude', 'hideScrollbar', 'disableInteraction', 'disableDragToSeek', 'timeline', 'hover', 'hoverColor', 'regions', 'dragToCreateRegions', 'regionColor', 'options', 'currentTime', 'ref']);
+  onMount(() => { local.ref?.({ play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer, addRegion, clearRegions, getRegions }); });
 
+  const [regions, setRegions] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'regions', undefined);
   const [currentTime, setCurrentTime] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'currentTime', undefined);
   onMount(() => {
     const _cleanup = (() => {
@@ -220,6 +243,13 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     if (Math.abs(v - ws.getCurrentTime()) < 0.05) return;
     ws.setTime(v);
   })(v)), { defer: true }));
+  createEffect(on(() => (() => regions())(), (v) => untrack(() => ((list: any) => {
+    // Controlled reconcile of the live regions to match the incoming list.
+    // Gated on `regionsReady` (duration known) and value-equality-guarded inside
+    // reconcileRegions so a writeback echo doesn't loop.
+    if (!regionsReady) return;
+    reconcileRegions(list);
+  })(v)), { defer: true }));
   let containerRef: HTMLElement | null = null;
 
   // null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's
@@ -228,6 +258,97 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
   // splits $onMount into onMount(...) + onCleanup(...), so a mount-local `let` would
   // be out of scope in teardown (TS2304).
   let ws: any = null;
+  // Regions plugin instance + its two guards (all top-level for the Solid teardown
+  // scope, same reason as `ws`). `regionsReady` gates the reconcile until the audio
+  // is decoded (addRegion needs a known duration). `reconciling` is the re-entrancy
+  // guard: while a controlled reconcile mutates the engine, the region-event
+  // handlers must NOT emit or write back (that would fight the incoming update) —
+  // only genuine USER edits (outside reconcile) drive the model + emits.
+  let regionsPlugin: any = null;
+  let regionsReady = false;
+  let reconciling = false;
+
+  // Serialize an engine Region to the plain descriptor shape the two-way `regions`
+  // model carries. Pure (no sigils) — safe at top level.
+  function serializeRegion(r: any) {
+    return {
+      id: r.id,
+      start: r.start,
+      end: r.end,
+      color: r.color,
+      content: r.content && r.content.textContent ? r.content.textContent : undefined,
+      drag: r.drag,
+      resize: r.resize
+    };
+  }
+
+  // Value-equality guard (by id + rounded start/end) that stops the
+  // user-edit → writeback → $model.regions → $watch → reconcile loop from
+  // oscillating (the Cropper `sameData` idiom, generalized to a list).
+  function sameRegions(list: any, engineRegions: any) {
+    if (!Array.isArray(list) || list.length !== engineRegions.length) return false;
+    const key = (r: any) => `${r.id}:${Math.round((r.start ?? 0) * 1000)}:${Math.round((r.end ?? 0) * 1000)}`;
+    const a = list.map(key).sort();
+    const b = engineRegions.map(key).sort();
+    return a.every((k: any, i: any) => k === b[i]);
+  }
+
+  // Push the live engine regions back into the two-way `regions` model (serialized).
+  // No-op while `reconciling` — a controlled update must not echo back onto itself.
+  function writeBackRegions() {
+    if (!regionsPlugin || reconciling) return;
+    setRegions(regionsPlugin.getRegions().map(serializeRegion));
+  }
+
+  // Reconcile the live engine regions to match a consumer-provided descriptor list:
+  // update-by-id, add the new, remove the missing. Guarded by `reconciling` so the
+  // add/remove/setOptions calls don't trigger writeBackRegions mid-flight. If any
+  // region was added WITHOUT a consumer id, echo the engine state (now carrying the
+  // assigned ids) back once so the two-way binding gains them.
+  function reconcileRegions(list: any) {
+    if (!regionsPlugin || !Array.isArray(list)) return;
+    const current = regionsPlugin.getRegions();
+    if (sameRegions(list, current)) return;
+    reconciling = true;
+    let addedWithoutId = false;
+    // Build the id→region map with a no-arg `new Map()` (infers Map<any, any>) — a
+    // `new Map(current.map(...))` over the `any`-typed engine list infers
+    // Map<unknown, unknown>, so `.setOptions` would fail the strict leaf typecheck.
+    const byId = new Map();
+    for (const r of current as any) byId.set(r.id, r);
+    const keep = new Set();
+    for (const desc of list as any) {
+      if (!desc || typeof desc.start !== 'number') continue;
+      if (desc.id != null && byId.has(desc.id)) {
+        byId.get(desc.id).setOptions({
+          start: desc.start,
+          end: desc.end,
+          color: desc.color,
+          drag: desc.drag,
+          resize: desc.resize,
+          content: desc.content
+        });
+        keep.add(desc.id);
+      } else {
+        const created = regionsPlugin.addRegion({
+          id: desc.id,
+          start: desc.start,
+          end: desc.end,
+          color: desc.color,
+          content: desc.content,
+          drag: desc.drag,
+          resize: desc.resize
+        });
+        keep.add(created.id);
+        if (desc.id == null) addedWithoutId = true;
+      }
+    }
+    for (const r of current as any) {
+      if (!keep.has(r.id)) r.remove();
+    }
+    reconciling = false;
+    if (addedWithoutId) writeBackRegions();
+  }
 
   // Build the engine. The whole config object is untyped (ws is `any`) so the
   // constructor's options + event-callback params are unchecked against wavesurfer's
@@ -239,6 +360,12 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     if (local.hover) plugins.push(HoverPlugin.create({
       lineColor: local.hoverColor ?? undefined
     }));
+    // Regions plugin is registered when `regions` is an array (even empty).
+    regionsPlugin = null;
+    if (Array.isArray(regions())) {
+      regionsPlugin = RegionsPlugin.create();
+      plugins.push(regionsPlugin);
+    }
     let cfg: any = null;
     cfg = {
       ...local.options,
@@ -263,7 +390,22 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     ws = WaveSurfer.create(cfg);
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────
-    ws.on('ready', (duration: any) => _props.onReady?.(duration));
+    ws.on('ready', (duration: any) => {
+      // Regions can only be placed once the duration is known — do the initial
+      // reconcile + drag-selection wiring here, then open the gate for prop-driven
+      // reconciles. ($watch is lazy, so it never fires at mount; this is the only
+      // place initial regions get added.)
+      if (regionsPlugin) {
+        regionsReady = true;
+        if (local.dragToCreateRegions) {
+          regionsPlugin.enableDragSelection({
+            color: local.regionColor ?? undefined
+          });
+        }
+        reconcileRegions(regions());
+      }
+      _props.onReady?.(duration);
+    });
     ws.on('play', () => _props.onPlaying?.());
     ws.on('pause', () => _props.onPaused?.());
     ws.on('finish', () => _props.onFinished?.());
@@ -277,6 +419,31 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     ws.on('interaction', (t: any) => _props.onInteraction?.(t));
     ws.on('loading', (percent: any) => _props.onLoading?.(percent));
     ws.on('error', (err: any) => _props.onError?.(err));
+
+    // ── regions plugin events → emits + two-way `regions` writeback ────────────
+    // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
+    // programmatic add/update/remove does not echo back or double-emit; only genuine
+    // user gestures (drag-create, drag/resize, delete) drive the model + emits.
+    if (regionsPlugin) {
+      regionsPlugin.on('region-created', (region: any) => {
+        if (reconciling) return;
+        _props.onRegionCreated?.(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.on('region-updated', (region: any) => {
+        if (reconciling) return;
+        _props.onRegionUpdated?.(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.on('region-removed', (region: any) => {
+        if (reconciling) return;
+        _props.onRegionRemoved?.(serializeRegion(region));
+        writeBackRegions();
+      });
+      regionsPlugin.on('region-clicked', (region: any) => {
+        _props.onRegionClicked?.(serializeRegion(region));
+      });
+    }
   }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/
@@ -324,6 +491,19 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
   }
   function getWaveSurfer() {
     return ws;
+  }
+  // Regions imperative surface (active only when the `regions` array registered the
+  // plugin). `addRegion` returns the created engine Region; NO `setRegions` verb
+  // (the React `regions`-model auto-setter, ROZ524 — drive the list via the two-way
+  // binding instead).
+  function addRegion(opts: any) {
+    return regionsPlugin ? regionsPlugin.addRegion(opts) : null;
+  }
+  function clearRegions() {
+    if (regionsPlugin) regionsPlugin.clearRegions();
+  }
+  function getRegions() {
+    return regionsPlugin ? regionsPlugin.getRegions() : [];
   }
 
   return (
