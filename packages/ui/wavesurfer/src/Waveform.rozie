@@ -1,0 +1,357 @@
+<!--
+  Waveform.rozie — data-bound port of wavesurfer.js v7 (wavesurfer.js@^7).
+
+  wavesurfer.js is the de-facto vanilla-JS audio-waveform engine (2D canvas +
+  Web Audio). Per-framework wrappers are LOPSIDED: React has `@wavesurfer/react`;
+  Angular, Svelte, Solid and Lit have thin, stale, or absent wrappers. ONE Rozie
+  source ships six idiomatic packages — so every ecosystem gets a category-leading
+  waveform player for free. That market gap is exactly Rozie's write-once-ship-six
+  thesis.
+
+  WHY v7 (not v6): v7 is the ESM rewrite. `WaveSurfer.create({ container, url })`
+  is the imperative vanilla engine; each plugin is a separate entry
+  (`wavesurfer.js/plugins/*`) exposing a `.create(opts)` factory passed into the
+  `plugins: []` array at construction. Pin `wavesurfer.js@^7`.
+
+  v1 SCOPE = Core + Timeline + Hover:
+    - Core: waveform render + full playback (play/pause/seek/volume/rate/zoom),
+      the two-way `currentTime` model, the event set, and the imperative handle.
+    - Two STATELESS plugins (timeline ruler, hover cursor) — pure config, no
+      interactive writeback — prove the plugin-wiring path ×6 without region CRUD.
+  DEFERRED (fast-follow): interactive Regions, live plugin toggling, a #controls
+  scoped slot, spectrogram/minimap/envelope/record.
+
+  Usage:
+
+    <Waveform
+      :src="$data.audioUrl"
+      r-model:currentTime="$data.time"   (two-way playback position, seconds)
+      :wave-color="'#8a2be2'"
+      :timeline="true"
+      :hover="true"
+      @ready="onReady"
+      @playing="onPlay"
+    />
+
+  KEY facts that drive this port:
+    - The engine attaches to a container element: `WaveSurfer.create({ container })`.
+      We render a <div ref="container">; `$refs.container` is read ONLY inside
+      $onMount (ROZ123). v7 renders its canvas + an internal shadow wrapper INTO
+      that container — it needs NO external CSS, so the scoped .rozie <style> only
+      sizes the host (no consumer CSS import, unlike Cropper).
+    - COLLISION DISCIPLINE — the engine's playback methods (`play`/`pause`) share
+      names with its events (`play`/`pause` on the engine event bus). A bare
+      `play`/`pause` $expose verb would collide with same-named emits (ROZ121, the
+      Cropper crop/zoom class). Because `.play()`/`.pause()` are the canonical
+      media-handle API (mirroring HTMLMediaElement), we keep the VERBS and rename
+      the EMITS to `playing`/`paused`/`finished`. `currentTime` is the lone
+      model:true prop, so React auto-generates a `setCurrentTime` setter — NO
+      `setCurrentTime` verb is exposed (ROZ524, the Cropper setData class); the
+      distinct `setTime` verb (→ engine `setTime(seconds)`) is safe.
+    - Two-way `currentTime`: the engine `timeupdate` event carries the live
+      position; we echo it into $model.currentTime and emit it. The reverse $watch
+      is round-trip-guarded (|v − getCurrentTime()| < tolerance) so a consumer
+      write → setTime → timeupdate → $model → $watch loop settles instead of
+      oscillating (the Cropper sameData idiom, value-equality not flag-timing).
+    - Plugins are decided at CONSTRUCTION. `timeline`/`hover` are read once in
+      buildWaveSurfer(); toggling them post-mount is a documented v1 no-op (live
+      toggling = engine re-create, deferred). The `options` passthrough covers any
+      v7 WaveSurferOptions not surfaced as a first-class prop.
+-->
+
+<rozie name="Waveform">
+
+<props>
+{
+  // audio source URL — bound at construction AND reconciled at runtime via load().
+  src: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.',
+      example: '<Waveform :src="audioUrl" r-model:currentTime="time" />',
+    },
+  },
+  // waveform px height. Runtime-reconciled via setOptions().
+  height: {
+    type: Number,
+    default: 128,
+    docs: { description: 'The waveform height in pixels. Reconciled at runtime via `setOptions`.' },
+  },
+  waveColor: {
+    type: String,
+    default: '#8a2be2',
+    docs: { description: 'The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.' },
+  },
+  progressColor: {
+    type: String,
+    default: '#5a189a',
+    docs: { description: 'The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.' },
+  },
+  cursorColor: {
+    type: String,
+    default: '#333333',
+    docs: { description: 'The color of the playback cursor. Reconciled at runtime via `setOptions`.' },
+  },
+  cursorWidth: {
+    type: Number,
+    default: 1,
+    docs: { description: 'The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.' },
+  },
+  // null → continuous (non-bar) waveform. Runtime-reconciled.
+  barWidth: {
+    default: null,
+    docs: { description: 'Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.' },
+  },
+  barGap: {
+    default: null,
+    docs: { description: 'The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.' },
+  },
+  barRadius: {
+    default: null,
+    docs: { description: 'The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.' },
+  },
+  // zoom baseline — minimum pixels per second. Runtime-reconciled via zoom().
+  minPxPerSec: {
+    type: Number,
+    default: 1,
+    docs: { description: 'The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.' },
+  },
+  volume: {
+    type: Number,
+    default: 1,
+    docs: { description: 'Playback volume (`0`–`1`). Reconciled at runtime via `setVolume`.' },
+  },
+  playbackRate: {
+    type: Number,
+    default: 1,
+    docs: { description: 'Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.' },
+  },
+  autoplay: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Begin playback as soon as the audio is ready. Construction-only.' },
+  },
+  normalize: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Normalize the waveform by its largest peak. Reconciled at runtime via `setOptions`.' },
+  },
+  hideScrollbar: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.' },
+  },
+  // engine `interact` defaults true; expose the negative opt-out. Construction-only.
+  disableInteraction: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.' },
+  },
+  // engine `dragToSeek` defaults true; expose the negative opt-out. Construction-only.
+  disableDragToSeek: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.' },
+  },
+  // opt-in Timeline plugin (stateless). Construction-only in v1.
+  timeline: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Construction-only in v1 — toggling after mount is a no-op.' },
+  },
+  // opt-in Hover plugin (stateless). Construction-only in v1.
+  hover: {
+    type: Boolean,
+    default: false,
+    docs: { description: 'Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Construction-only in v1 — toggling after mount is a no-op.' },
+  },
+  hoverColor: {
+    type: String,
+    default: null,
+    docs: { description: 'The line color of the Hover plugin cursor (only applies when `hover` is enabled). Construction-only in v1.' },
+  },
+  // passthrough — spread into WaveSurfer.create() BEFORE the curated keys (explicit
+  // props win), for any v7 WaveSurferOptions not surfaced as a first-class prop.
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, …).',
+    },
+  },
+  // two-way playback position in seconds. Untyped (no `type:`) so it emits as
+  // `unknown` and `default: undefined` merges cleanly under the strict framework
+  // typecheck harness (the Cropper `data` idiom). React auto-generates
+  // `setCurrentTime` — do NOT expose a same-named verb (ROZ524).
+  currentTime: {
+    default: undefined,
+    model: true,
+    docs: {
+      description:
+        'The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.',
+    },
+  },
+}
+</props>
+
+<script>
+// Default import is `WaveSurfer` (≠ the component name `Waveform`, so no import⇄
+// component collision — Cropper had to alias; we don't). Plugin factories are
+// separate v7 entry points.
+import WaveSurfer from 'wavesurfer.js'
+import TimelinePlugin from 'wavesurfer.js/plugins/timeline'
+import HoverPlugin from 'wavesurfer.js/plugins/hover'
+
+// null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's
+// strict WaveSurferOptions/return types don't match the loosely-typed .rozie props,
+// and (per the engine-wrapper recipe) `ws` must be TOP-LEVEL — the Solid emitter
+// splits $onMount into onMount(...) + onCleanup(...), so a mount-local `let` would
+// be out of scope in teardown (TS2304).
+let ws = null
+
+// Build the engine. The whole config object is untyped (ws is `any`) so the
+// constructor's options + event-callback params are unchecked against wavesurfer's
+// strict types (the Cropper buildCropper idiom).
+const buildWaveSurfer = () => {
+  let plugins = []
+  plugins = []
+  if ($props.timeline) plugins.push(TimelinePlugin.create())
+  if ($props.hover) plugins.push(HoverPlugin.create({ lineColor: $props.hoverColor ?? undefined }))
+
+  let cfg = null
+  cfg = {
+    ...$snapshot($props.options),
+    container: $refs.container,
+    url: $props.src ?? undefined,
+    height: $props.height,
+    waveColor: $props.waveColor,
+    progressColor: $props.progressColor,
+    cursorColor: $props.cursorColor,
+    cursorWidth: $props.cursorWidth,
+    barWidth: $props.barWidth ?? undefined,
+    barGap: $props.barGap ?? undefined,
+    barRadius: $props.barRadius ?? undefined,
+    minPxPerSec: $props.minPxPerSec,
+    autoplay: $props.autoplay,
+    normalize: $props.normalize,
+    hideScrollbar: $props.hideScrollbar,
+    interact: !$props.disableInteraction,
+    dragToSeek: !$props.disableDragToSeek,
+    plugins: plugins,
+  }
+  ws = WaveSurfer.create(cfg)
+
+  // ── engine events → emits + the two-way currentTime writeback ──────────────
+  ws.on('ready', (duration) => $emit('ready', duration))
+  ws.on('play', () => $emit('playing'))
+  ws.on('pause', () => $emit('paused'))
+  ws.on('finish', () => $emit('finished'))
+  ws.on('timeupdate', (t) => {
+    // Echo the live position into the two-way model, then emit. The reverse
+    // $watch below is value-equality-guarded, so this write does not loop.
+    $model.currentTime = t
+    $emit('timeupdate', t)
+  })
+  ws.on('seeking', (t) => $emit('seeking', t))
+  ws.on('interaction', (t) => $emit('interaction', t))
+  ws.on('loading', (percent) => $emit('loading', percent))
+  ws.on('error', (err) => $emit('error', err))
+}
+
+$onMount(() => {
+  // $refs read ONLY here (ROZ123). The container is the engine's attach target.
+  buildWaveSurfer()
+  return () => {
+    if (ws) ws.destroy()
+  }
+})
+
+// ─── reconcile the runtime-reconcilable props (no rebuild) ───────────────────
+$watch(() => $props.src, (v) => {
+  if (ws && typeof v === 'string' && v) ws.load(v)
+})
+$watch(() => $props.height, (v) => {
+  if (ws) ws.setOptions({ height: v })
+})
+$watch(() => $props.waveColor, (v) => {
+  if (ws) ws.setOptions({ waveColor: v })
+})
+$watch(() => $props.progressColor, (v) => {
+  if (ws) ws.setOptions({ progressColor: v })
+})
+$watch(() => $props.cursorColor, (v) => {
+  if (ws) ws.setOptions({ cursorColor: v })
+})
+$watch(() => $props.cursorWidth, (v) => {
+  if (ws) ws.setOptions({ cursorWidth: v })
+})
+$watch(() => $props.barWidth, (v) => {
+  if (ws) ws.setOptions({ barWidth: v ?? undefined })
+})
+$watch(() => $props.barGap, (v) => {
+  if (ws) ws.setOptions({ barGap: v ?? undefined })
+})
+$watch(() => $props.barRadius, (v) => {
+  if (ws) ws.setOptions({ barRadius: v ?? undefined })
+})
+$watch(() => $props.normalize, (v) => {
+  if (ws) ws.setOptions({ normalize: v })
+})
+$watch(() => $props.volume, (v) => {
+  if (ws && typeof v === 'number') ws.setVolume(v)
+})
+$watch(() => $props.playbackRate, (v) => {
+  if (ws && typeof v === 'number') ws.setPlaybackRate(v)
+})
+$watch(() => $props.minPxPerSec, (v) => {
+  if (ws && typeof v === 'number' && v > 0) ws.zoom(v)
+})
+$watch(() => $props.currentTime, (v) => {
+  // Round-trip guard: skip if the incoming value already matches the engine
+  // position (the timeupdate → $model → $watch echo), else seek.
+  if (!ws || typeof v !== 'number') return
+  if (Math.abs(v - ws.getCurrentTime()) < 0.05) return
+  ws.setTime(v)
+})
+
+// ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
+// Collision-clear across all six targets: canonical media verbs play/pause/
+// playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);
+// no setCurrentTime (React model auto-setter, ROZ524 — use setTime); no Lit
+// reserved lifecycle name (update/render/firstUpdated/updated/willUpdate/requestUpdate).
+function play() { if (ws) ws.play() }
+function pause() { if (ws) ws.pause() }
+function playPause() { if (ws) ws.playPause() }
+function stop() { if (ws) ws.stop() }
+function seekTo(progress) { if (ws) ws.seekTo(progress) }
+function setTime(seconds) { if (ws) ws.setTime(seconds) }
+function setVolume(v) { if (ws) ws.setVolume(v) }
+function setPlaybackRate(rate) { if (ws) ws.setPlaybackRate(rate) }
+function setZoom(pxPerSec) { if (ws) ws.zoom(pxPerSec) }
+function load(url) { if (ws) ws.load(url) }
+function isPlaying() { return ws ? ws.isPlaying() : false }
+function getDuration() { return ws ? ws.getDuration() : 0 }
+function getCurrentTime() { return ws ? ws.getCurrentTime() : 0 }
+function getWaveSurfer() { return ws }
+
+$expose({
+  play, pause, playPause, stop,
+  seekTo, setTime, setVolume, setPlaybackRate, setZoom, load,
+  isPlaying, getDuration, getCurrentTime, getWaveSurfer,
+})
+</script>
+
+<template>
+<div class="rozie-waveform" ref="container"></div>
+</template>
+
+<style>
+.rozie-waveform {
+  width: 100%;
+}
+</style>
+
+</rozie>
