@@ -25,6 +25,9 @@
     "!src/**/*.test.tsx",
     "!src/**/*.spec.ts"
   ],
+  "dependencies": {
+    "@rozie/runtime-keynav-core": "workspace:*"
+  },
   "peerDependencies": {
     "@lit-labs/preact-signals": "^1.0.0",
     "@lit/context": "^1.1.6",

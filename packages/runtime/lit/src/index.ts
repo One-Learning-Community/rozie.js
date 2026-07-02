@@ -14,6 +14,11 @@ export { observeRozieSlotCtx } from './observeRozieSlotCtx.js';
 export { rozieSpread } from './rozieSpread.js';
 export { rozieListeners } from './rozieListeners.js';
 export { attachOutsideClickListener } from './attachOutsideClickListener.js';
+export {
+  KeynavController,
+  type KeynavControllerHost,
+  type KeynavControllerOpts,
+} from './KeynavController.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
 export { adoptConsumerStyles } from './adoptConsumerStyles.js';
 export { adoptDocumentStyles } from './adoptDocumentStyles.js';
