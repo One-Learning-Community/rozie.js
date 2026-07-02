@@ -62,6 +62,16 @@ import { emitSlotFiller, findTagClose, type EmitSlotFillerCtx } from './emitSlot
 // to guarantee byte-equal CustomEvent name parity with the producer).
 import { resolveLitSetterText } from './resolveLitSetterText.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
+// Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
+// (see emitKeynav.ts's module doc comment).
+import {
+  buildKeynavFieldDecls,
+  keynavItemAttrs,
+  keynavRootAttrs,
+  resolveKeynavPlan,
+  stripKeynavCommitEvent,
+  type KeynavEmitPlan,
+} from './emitKeynav.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
@@ -89,6 +99,29 @@ export interface EmitTemplateOpts {
    * stamp and the rewritten selectors.
    */
   scopeHash?: string;
+  /**
+   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
+   * ONCE by `emitTemplate.ts`'s exported `emitTemplate()` via
+   * `resolveKeynavPlan`), or `null` when the component has no `r-keynav`
+   * root. `undefined` (the default, back-compat for every existing call
+   * site/test-fixture) is treated identically to `null` at every read site
+   * (`opts.keynav ?? null`).
+   */
+  keynav?: KeynavEmitPlan | null;
+  /**
+   * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier
+   * text, threaded by `emitLoop` so a deeply-nested `keynavItem` element can
+   * build its `data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`
+   * bindings. `undefined` outside any loop. Lit's `repeat()` template
+   * callback ALWAYS receives an index parameter (`node.indexAlias ?? '_idx'`
+   * — see `emitLoop`), so — UNLIKE the React/Solid references — this never
+   * needs a "does the loop body need a synthesized index" pre-check; it is
+   * simply set to that same always-present callback parameter on every loop.
+   * Scoped to THIS loop's body subtree only — reset to `undefined` outside it
+   * so a keynav item's index alias from an outer loop never leaks into an
+   * inner, unrelated loop's elements.
+   */
+  keynavItemIndexAlias?: string | undefined;
   /**
    * Internal mutable state threaded through the emit call chain so recursive
    * emitters (emitLoop) can communicate back to emitTemplate without a module-level
@@ -294,6 +327,14 @@ export interface EmitTemplateResult {
    * `_disconnectCleanups` drain so re-mounts re-attempt cleanly.
    */
   slotFillerDisconnectReset: string[];
+  /**
+   * Phase 71 (r-keynav) — the group-id field + `new KeynavController(this,
+   * {...})` field-initializer declarations (empty array when the component
+   * has no `r-keynav` root). emitLit splices these into the class body
+   * alongside the other field declarations (mirrors `hoistedLiteralFieldDecls`
+   * plumbing).
+   */
+  keynavFieldDecls: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -1411,6 +1452,18 @@ function emitElementOpenTag(
 
   if (refAttr) parts.push(refAttr);
 
+  // Phase 71 (r-keynav) — root `aria-activedescendant` and item
+  // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`
+  // markers (see emitKeynav.ts's module doc comment). `[]` for every
+  // element outside a keynav plan (no keynav plan, or this element carries
+  // neither marker) — a cheap two-property check, not a tree walk, so
+  // non-keynav components pay zero emission cost.
+  const keynav = opts.keynav ?? null;
+  parts.push(
+    ...keynavRootAttrs(keynav, node, opts.runtime),
+    ...keynavItemAttrs(keynav, node, opts.keynavItemIndexAlias ?? null),
+  );
+
   // Phase 07.6 — producer-side CSS scope stamp on `tagKind === 'html'`
   // elements: composed custom elements (`component`) own their own internal
   // shadow scope, and the implicit host ('self') is the producer custom
@@ -1478,11 +1531,18 @@ function emitNode(
 }
 
 function emitElement(
-  node: TemplateElementIR,
+  origNode: TemplateElementIR,
   ir: IRComponent,
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
+  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
+  // BEFORE any listener emission runs; it's routed into `KeynavController`'s
+  // `onCommit` option by `emitKeynav.ts`'s `buildKeynavFieldDecls`, never as
+  // a `@keynavCommit=${...}` template binding (see `stripKeynavCommitEvent`'s
+  // doc comment). No-op (returns the SAME node) for every element that isn't
+  // a keynav root.
+  const node = stripKeynavCommitEvent(origNode);
   const tagName = resolveTagName(node, ir.name);
   const { open, selfClose } = emitElementOpenTag(node, ir, ir.name, opts);
   if (selfClose) return open;
@@ -1777,8 +1837,17 @@ function emitLoop(
   const items = rewriteTemplateExpression(node.iterableExpression, ir);
   const item = node.itemAlias;
   const idx = node.indexAlias ?? '_idx';
+  // Phase 71 (r-keynav) — `repeat()`'s template callback ALWAYS receives an
+  // index parameter (`idx`, whether or not the author declared one), so a
+  // nested `keynavItem` element's index-alias context is simply `idx` on
+  // EVERY loop — no "does this loop need a synthesized index" pre-check the
+  // React/Solid references require (their loop callback omits the index
+  // entirely unless requested). Scoped to THIS loop's body subtree only via a
+  // shallow opts copy — a keynav item's index alias from an outer loop must
+  // never leak into an inner, unrelated loop's elements.
+  const loopOpts: EmitTemplateOpts = { ...opts, keynavItemIndexAlias: idx };
   const body = node.body
-    .map((c) => emitNode(c, ir, hostListenerWiring, opts))
+    .map((c) => emitNode(c, ir, hostListenerWiring, loopOpts))
     .join('');
   // For the key function, pass shadowAliases so the loop alias (and idx) are
   // not rewritten to `this.alias.value` — they are loop-scoped, not class fields.
@@ -1968,7 +2037,17 @@ export function emitTemplate(
     slotFillerDisconnectReset: [] as string[],
     diagnostics,
   };
-  const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
+  // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
+  // emitKeynav.ts's module doc comment). `null` for the overwhelming
+  // majority of components (no r-keynav root) — every downstream keynav
+  // read site short-circuits on `null`/`undefined`, so a non-keynav
+  // component's emit is completely untouched (SPEC §11: "no corpus rebless").
+  const keynav = resolveKeynavPlan(ir);
+  const optsWithState: EmitTemplateOpts = { ...opts, keynav, _state: state };
+  const keynavFieldDecls =
+    keynav !== null
+      ? buildKeynavFieldDecls(keynav, ir, { runtime: opts.runtime })
+      : [];
 
   if (!ir.template) {
     // CR-01 fix (Phase 07.4 review): the early-return path now uses the same
@@ -1994,6 +2073,7 @@ export function emitTemplate(
       slotFillerClassFields: state.slotFillerClassFields,
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
       slotFillerDisconnectReset: state.slotFillerDisconnectReset,
+      keynavFieldDecls,
       diagnostics,
     };
   }
@@ -2019,6 +2099,7 @@ export function emitTemplate(
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,
     slotFillerDisconnectReset: state.slotFillerDisconnectReset,
+    keynavFieldDecls,
     diagnostics,
   };
 }

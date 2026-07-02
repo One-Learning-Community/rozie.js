@@ -362,6 +362,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     fieldDecls: scriptResult.fieldDecls,
     debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
     hoistedLiteralFieldDecls: templateResult.hoistedLiteralFieldDecls.join('\n'),
+    // Phase 71 (r-keynav) — the group-id field + `new KeynavController(this,
+    // {...})` field initializer (empty for every non-keynav component).
+    keynavFieldDecls: templateResult.keynavFieldDecls.join('\n'),
     slotFillerClassFields: templateResult.slotFillerClassFields
       .map((f) => '  ' + f)
       .join('\n'),
@@ -522,6 +525,12 @@ interface ComposeClassBodyParts {
    */
   hoistedLiteralFieldDecls: string;
   /**
+   * Phase 71 (r-keynav) — the group-id field + `new KeynavController(this,
+   * {...})` field initializer. Empty string for every component without an
+   * `r-keynav` root (byte-identical to pre-Phase-71 output).
+   */
+  keynavFieldDecls: string;
+  /**
    * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
    * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`). Spliced
    * in alongside the other field decls so firstUpdated()'s
@@ -588,6 +597,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.hoistedLiteralFieldDecls.trim().length > 0) {
     sections.push(parts.hoistedLiteralFieldDecls);
+  }
+  if (parts.keynavFieldDecls.trim().length > 0) {
+    sections.push(parts.keynavFieldDecls);
   }
   if (parts.slotFillerClassFields.trim().length > 0) {
     sections.push(parts.slotFillerClassFields);

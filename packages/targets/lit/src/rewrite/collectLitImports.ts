@@ -193,7 +193,15 @@ export type RuntimeLitImport =
    * byte-identical. Routes a dynamic OBJECT `:style` through `styleMap` (real
    * CSS, not `[object Object]`) and a string value through verbatim.
    */
-  | 'rozieStyle';
+  | 'rozieStyle'
+  /**
+   * Phase 71 (r-keynav, Plan 71-08) — the `KeynavController` ReactiveController,
+   * shipped from `@rozie/runtime-lit`. Added by `emitKeynav.ts`'s
+   * `buildKeynavFieldDecls` ONLY when the component has an `r-keynav` root, so
+   * a non-keynav component's `@rozie/runtime-lit` import line stays
+   * byte-identical (SPEC §11 — no corpus rebless).
+   */
+  | 'KeynavController';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();
