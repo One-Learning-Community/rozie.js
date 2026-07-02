@@ -26,6 +26,7 @@ import {
 } from '../rewrite/collectReactImports.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import { emitSlotDecl } from './emitSlotDecl.js';
+import { buildKeynavScriptInjections, resolveKeynavPlan } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   jsx: string;
@@ -64,6 +65,13 @@ export function emitTemplate(
     };
   }
 
+  // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
+  // emitKeynav.ts's module doc comment). `null` for the overwhelming
+  // majority of components (no r-keynav root) — every downstream keynav
+  // call site short-circuits on `null`, so this stays a cheap no-op for
+  // every existing fixture (SPEC §11: "no corpus rebless").
+  const keynav = resolveKeynavPlan(ir);
+
   const ctx: EmitNodeCtx = {
     ir,
     collectors,
@@ -72,9 +80,18 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
+    keynav,
   };
 
   const jsx = emitNode(ir.template, ctx);
+
+  // Phase 71 (r-keynav) — the `useKeynav(...)` call + its `useRef`/`useId`
+  // scaffolding. Appended AFTER the template walk (order doesn't matter for
+  // THESE lines — they're independent declarations — but keeps this block
+  // visually adjacent to the `keynav` resolution above).
+  if (keynav !== null) {
+    scriptInjections.push(...buildKeynavScriptInjections(keynav, ir, collectors));
+  }
 
   return {
     jsx,

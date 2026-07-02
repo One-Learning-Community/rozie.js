@@ -21,6 +21,11 @@ export type ReactImport =
   | 'useEffect'
   | 'useRef'
   | 'useCallback'
+  // Phase 71 (r-keynav) — emitted ONLY when the component has an r-keynav
+  // root, minting the SSR-safe group id shared by the root's
+  // aria-activedescendant and every item's id (see emitKeynav.ts). Byte-
+  // identical otherwise (D-03-style additive-only import).
+  | 'useId'
   // Phase 21 ($expose) — emitted only when ir.expose is non-empty so a
   // non-$expose component's `react` import line stays byte-identical (D-03).
   | 'forwardRef'
@@ -81,6 +86,9 @@ export class ReactImportCollector {
 export type RuntimeReactImport =
   | 'useControllableState'
   | 'useOutsideClick'
+  // Phase 71 (r-keynav) — emitted ONLY when the component has an r-keynav
+  // root (see emitKeynav.ts). Byte-identical otherwise.
+  | 'useKeynav'
   | 'useDebouncedCallback'
   | 'useThrottledCallback'
   | 'clsx'
