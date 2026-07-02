@@ -6,6 +6,14 @@
 // (`keynavRoot?`/`keynavItem?` on `TemplateElementIR`) with zero diagnostics
 // on valid input.
 //
+// Every fixture below is a FULL valid component (a root paired with at
+// least one item) — Task 2's `resolveKeynavGroups` (also wired into
+// `lowerToIR` by this same plan) whole-component-validates keynav wiring,
+// so an isolated root-only or item-only fragment now correctly raises
+// ROZ983/ROZ984 (see diagnostics.test.ts for that cluster's own coverage).
+// These tests stay focused on the per-directive IR *shape* by keeping the
+// pairing minimal.
+//
 // Harness mirrors landmine1-probe.test.ts / tests/ir/lowerTemplate-rmodel-modifiers.test.ts.
 import { describe, it, expect } from 'vitest';
 import { parse } from '../../src/parse.js';
@@ -71,10 +79,13 @@ function errors(diags: Diagnostic[]): Diagnostic[] {
   return diags.filter((d) => d.severity === 'error');
 }
 
+/** A minimal r-for + r-keynav-item pairing, reused across fixtures. */
+const MENU_ITEMS = `<button r-for="it in items" :key="it.id" r-keynav-item="{ label: it.label }">{{ it.label }}</button>`;
+
 describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
   it('r-keynav:tabindex.vertical.loop="$data.active" → KeynavRootIR{ tabindex, vertical, loop:true }, zero diagnostics', () => {
     const { ir, diagnostics } = lower(
-      rozie('<div r-keynav:tabindex.vertical.loop="$data.active"></div>'),
+      rozie(`<div r-keynav:tabindex.vertical.loop="$data.active">${MENU_ITEMS}</div>`),
     );
     expect(errors(diagnostics)).toEqual([]);
     const div = collectElements(ir!.template!).find((el) => el.tagName === 'div');
@@ -90,7 +101,12 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
 
   it('r-keynav:activedescendant.vertical="$data.active" → KeynavRootIR{ activedescendant, vertical, loop:false }, zero diagnostics', () => {
     const { ir, diagnostics } = lower(
-      rozie('<input r-keynav:activedescendant.vertical="$data.active"/>'),
+      rozie(
+        `<div>
+          <input r-keynav:activedescendant.vertical="$data.active"/>
+          <ul>${MENU_ITEMS}</ul>
+        </div>`,
+      ),
     );
     expect(errors(diagnostics)).toEqual([]);
     const input = collectElements(ir!.template!).find((el) => el.tagName === 'input');
@@ -104,7 +120,9 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
   it('r-keynav-item="{ label: it.label, disabled: it.disabled }" → KeynavItemIR{ labelExpr, disabledExpr }', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        '<ul><li r-for="it in items :key it.id" r-keynav-item="{ label: it.label, disabled: it.disabled }">{{ it.label }}</li></ul>',
+        `<div role="menu" r-keynav:tabindex.vertical="$data.active">
+          <ul><li r-for="it in items" :key="it.id" r-keynav-item="{ label: it.label, disabled: it.disabled }">{{ it.label }}</li></ul>
+        </div>`,
       ),
     );
     expect(errors(diagnostics)).toEqual([]);
@@ -118,7 +136,7 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
   it('r-keynav:tabindex.both.loop.typeahead.skipdisabled(false) → orientation both, loop/typeahead true, skipDisabled false', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        '<div role="menu" r-keynav:tabindex.both.loop.typeahead.skipdisabled(false)="$data.active"></div>',
+        `<div role="menu" r-keynav:tabindex.both.loop.typeahead.skipdisabled(false)="$data.active">${MENU_ITEMS}</div>`,
       ),
     );
     expect(errors(diagnostics)).toEqual([]);
@@ -134,7 +152,7 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
 
   it('.skipdisabled defaults ON when the modifier is absent from the chain', () => {
     const { ir, diagnostics } = lower(
-      rozie('<div r-keynav:tabindex.vertical="$data.active"></div>'),
+      rozie(`<div r-keynav:tabindex.vertical="$data.active">${MENU_ITEMS}</div>`),
     );
     expect(errors(diagnostics)).toEqual([]);
     const div = collectElements(ir!.template!).find((el) => el.tagName === 'div');
@@ -144,7 +162,7 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
   it("r-keynav-active-class=\"'is-active'\" → captured as a raw expr on the co-located KeynavRootIR", () => {
     const { ir, diagnostics } = lower(
       rozie(
-        `<div role="menu" r-keynav:tabindex.vertical.loop="$data.active" r-keynav-active-class="'is-active'"></div>`,
+        `<div role="menu" r-keynav:tabindex.vertical.loop="$data.active" r-keynav-active-class="'is-active'">${MENU_ITEMS}</div>`,
       ),
     );
     expect(errors(diagnostics)).toEqual([]);
@@ -156,7 +174,7 @@ describe('r-keynav parse + lower (71-02 Task 1 <behavior> cases)', () => {
   it('r-keynav-active-class before r-keynav:<focus-model> in source order still merges onto the same KeynavRootIR', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        `<div role="menu" r-keynav-active-class="'is-active'" r-keynav:tabindex.vertical.loop="$data.active"></div>`,
+        `<div role="menu" r-keynav-active-class="'is-active'" r-keynav:tabindex.vertical.loop="$data.active">${MENU_ITEMS}</div>`,
       ),
     );
     expect(errors(diagnostics)).toEqual([]);

@@ -118,7 +118,7 @@ describe('LANDMINE 1 red-witness — r-keynav directive grammar (Phase 71 Plan 0
   it('r-keynav-item="{ label }" → lowers to a keynavItem marker with labelExpression', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        '<ul><li r-for="it in items :key it.id" r-keynav-item="{ label: it.label }">{{ it.label }}</li></ul>',
+        '<div role="menu" r-keynav:tabindex.vertical="$data.active"><ul><li r-for="it in items" :key="it.id" r-keynav-item="{ label: it.label }">{{ it.label }}</li></ul></div>',
       ),
     );
     expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

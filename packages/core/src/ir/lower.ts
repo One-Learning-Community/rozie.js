@@ -50,6 +50,7 @@ import { validateDefaultPortalCollision } from './validateDefaultPortalCollision
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateClone } from './validateClone.js';
+import { resolveKeynavGroups } from './resolveKeynavGroups.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import { deconflictStateExposeCollision } from '../rewrite/deconflict.js';
@@ -357,6 +358,17 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // change, no dist-parity rebless). Collected-not-thrown (D-08); never mutates
   // `ir`.
   validateClone(ir, diagnostics);
+
+  // Phase 71 — resolveKeynavGroups: the r-keynav whole-component association
+  // + `:source` synthesis + ROZ983-987 diagnostic cluster pass (SPEC.md
+  // §5-§7). Wired at this SAME lowerToIR chokepoint (compile() AND
+  // @rozie/unplugin both share it) immediately after the existing
+  // validate*() block. Mutates `ir.template` in place — stamps
+  // `sourceExpression`/`sourceDeps` onto the one validated `keynavRoot`
+  // (mirrors `annotateDisplayWrap`'s established mutating-pass idiom); every
+  // other keynav directive shape is validated via collected diagnostics
+  // only (D-08 — never throws).
+  resolveKeynavGroups(ir, diagnostics);
 
   // Phase 14 — validate cross-framework attribute fallthrough (R8/R9). Wired
   // directly after validateClassSelector — the same lowerToIR chokepoint both
