@@ -37,9 +37,6 @@
         }
       }
     </script>
-    <!-- Cropper.js overlay CSS is EXTERNAL (not shippable via the scoped .rozie <style>);
-         the playground drops CSS side-effect imports, so link it here (68-04). -->
-    <link rel="stylesheet" href="https://esm.sh/cropperjs@1.6.2/dist/cropper.css" />
     <style>
       html, body { margin: 0; height: 100%; font-family: system-ui; }
       #app { min-height: 100%; padding: 12px; }
@@ -50,7 +47,7 @@
     <script type="module">
       import { createApp } from 'vue';
       import { parse, compileScript, compileTemplate, compileStyle } from '@vue/compiler-sfc';
-      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost, isPassthroughTs } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost, isPassthroughTs, stubUnresolvableImports, injectEngineCss } from './_shared.js';
 
       const host = document.getElementById('app');
       let app = null;
@@ -75,8 +72,13 @@
             const lowered = await transform(src, { loader: 'ts', format: 'esm', target: 'es2020' });
             return lowered.code;
           }
+          // `@vue/compiler-sfc`'s `parse` does not tolerate an unresolvable
+          // bare `.css` import inside `<script>` — strip/capture it first
+          // (Phase 69-01), same as every other harness.
+          const { code: stubbedSrc, cssSpecifiers } = stubUnresolvableImports(src);
+          injectEngineCss(cssSpecifiers);
           const id = `rozie-vue-${renderCount}-${++sfcCounter}`;
-          const { descriptor } = parse(src, { filename: 'Playground.vue' });
+          const { descriptor } = parse(stubbedSrc, { filename: 'Playground.vue' });
           const hasScoped = descriptor.styles.some((s) => s.scoped);
 
           // Script (composition API w/ <script setup>). When the SFC has

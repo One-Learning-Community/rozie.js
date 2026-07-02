@@ -44,9 +44,6 @@
         }
       }
     </script>
-    <!-- Cropper.js overlay CSS is EXTERNAL (not shippable via the scoped .rozie <style>);
-         the playground drops CSS side-effect imports, so link it here (68-04). -->
-    <link rel="stylesheet" href="https://esm.sh/cropperjs@1.6.2/dist/cropper.css" />
     <style>
       html, body { margin: 0; height: 100%; font-family: system-ui; }
       #app { min-height: 100%; padding: 12px; }
@@ -66,8 +63,11 @@
       await import('https://esm.sh/zone.js@0.15.0');
       await import('@angular/compiler');
 
-      const [coreNs, { bootstrapApplication }, { getEsbuildTransform, importBundleWith, bootHarness, clearHost }] =
-        await Promise.all([
+      const [
+        coreNs,
+        { bootstrapApplication },
+        { getEsbuildTransform, importBundleWith, bootHarness, clearHost, stubUnresolvableImports, injectEngineCss },
+      ] = await Promise.all([
           import('@angular/core'),
           import('@angular/platform-browser'),
           import('./_shared.js'),
@@ -98,7 +98,14 @@
         // last.
         const transformOne = async (src) => {
           callIndex += 1;
-          const result = await transform(src, {
+          // Angular never wired a css-import helper at all before Phase 69-01 —
+          // an unresolvable bare `.css` side-effect import passed straight
+          // through esbuild's syntax-only transform and hard-crashed the
+          // dynamic `import()` of the resulting blob module. Strip/capture it
+          // first, same as every other harness.
+          const { code: stubbed, cssSpecifiers } = stubUnresolvableImports(src);
+          injectEngineCss(cssSpecifiers);
+          const result = await transform(stubbed, {
             loader: 'ts',
             format: 'esm',
             target: 'es2022',
