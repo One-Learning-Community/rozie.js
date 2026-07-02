@@ -29,3 +29,6 @@ export { normalizeListeners } from './normalizeListeners.js';
 // sigil. Replaces the old `structuredClone(toRaw(x))` lowering, which threw on
 // nested INDEPENDENT reactive proxies / refs. See rozieDeepClone.ts.
 export { rozieDeepClone } from './rozieDeepClone.js';
+// Phase 71 (r-keynav) — Vue composable driving @rozie/runtime-keynav-core's
+// framework-neutral keyboard-navigation state machine. See useKeynav.ts.
+export { useKeynav, type UseKeynavOpts } from './useKeynav.js';

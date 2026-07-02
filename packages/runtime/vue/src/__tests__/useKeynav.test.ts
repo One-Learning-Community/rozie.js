@@ -11,7 +11,7 @@
 // never touches those two attributes). Mirrors the React reference's
 // `useKeynav.test.tsx` (Plan 71-04) test-by-test.
 import { describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import type { KeynavConfig } from '@rozie/runtime-keynav-core';
 import { useKeynav } from '../useKeynav.js';
@@ -175,11 +175,12 @@ describe('useKeynav (Vue, Plan 71-05 Task 1)', () => {
     wrapper.unmount();
   });
 
-  it('pointer activation: pointerdown on an item sets active + fires commit (bounds-checked marker parse)', () => {
+  it('pointer activation: pointerdown on an item sets active + fires commit (bounds-checked marker parse)', async () => {
     const commit = vi.fn();
     const wrapper = mountMenu({ config: BASE_CONFIG, onCommit: commit });
 
     byText(wrapper, 'Charlie').dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await nextTick();
 
     expect(commit).toHaveBeenCalledWith(2);
     expect(isActive(byText(wrapper, 'Charlie'))).toBe(true);
