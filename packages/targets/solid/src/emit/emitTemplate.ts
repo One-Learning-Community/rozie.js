@@ -14,6 +14,7 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
+import { buildKeynavScriptInjections, resolveKeynavPlan } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   jsx: string;
@@ -49,6 +50,13 @@ export function emitTemplate(
   const scriptInjections: string[] = [];
   const injectionCounter = { next: 0 };
 
+  // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
+  // emitKeynav.ts's module doc comment). `null` for the overwhelming
+  // majority of components (no r-keynav root) — every downstream keynav
+  // call site short-circuits on `null`, so this stays a cheap no-op for
+  // every existing fixture (SPEC §11: "no corpus rebless").
+  const keynav = resolveKeynavPlan(ir);
+
   const ctx: EmitNodeCtx = {
     ir,
     collectors,
@@ -56,10 +64,18 @@ export function emitTemplate(
     diagnostics,
     scriptInjections,
     injectionCounter,
+    keynav,
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
   };
 
   const jsx = emitNode(ir.template, ctx);
+
+  // Phase 71 (r-keynav) — the `createKeynav(...)` call + its `let`/group-id
+  // scaffolding are appended AFTER the JSX walk (mirrors the React/Vue
+  // references — visually adjacent to the `keynav` resolution above).
+  if (keynav !== null) {
+    scriptInjections.push(...buildKeynavScriptInjections(keynav, ir, collectors));
+  }
 
   return { jsx, scriptInjections, diagnostics };
 }

@@ -58,6 +58,11 @@ export type RuntimeSolidImport =
   | 'createOutsideClick'
   | 'createDebouncedHandler'
   | 'createThrottledHandler'
+  // Phase 71 (r-keynav) — the Solid `r-keynav` primitive. Added by
+  // `emitKeynav.ts`'s `buildKeynavScriptInjections` ONLY when the component
+  // has an `r-keynav` root, so a non-keynav component's
+  // `@rozie/runtime-solid` import line stays byte-identical (SPEC §11).
+  | 'createKeynav'
   // Phase 26 (D-01/D-06) — portable display helper. Added by the template
   // emitters ONLY when a `wrapForDisplay` interpolation actually wraps, so a
   // primitive-only component's `@rozie/runtime-solid` import line stays

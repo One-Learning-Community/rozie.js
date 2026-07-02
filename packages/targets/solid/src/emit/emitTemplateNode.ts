@@ -55,6 +55,15 @@ import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emission for component-tag elements.
 import { emitSlotFiller, emitDynamicSlotsProp } from './emitSlotFiller.js';
+// Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
+// (see emitKeynav.ts's module doc comment).
+import {
+  keynavItemAttrs,
+  keynavRootAttrs,
+  loopBodyHasKeynavItem,
+  stripKeynavCommitEvent,
+  type KeynavEmitPlan,
+} from './emitKeynav.js';
 
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
@@ -98,6 +107,25 @@ export interface EmitNodeCtx {
   scopeAccessorParams?:
     | { accessorIdent: string; params: ReadonlyMap<string, string> }
     | undefined;
+  /**
+   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
+   * ONCE by `emitTemplate.ts` via `resolveKeynavPlan`), or `null` when the
+   * component has no `r-keynav` root. `undefined` (the default, back-compat
+   * for any caller that doesn't thread this field) behaves identically to
+   * `null` at every read site (`ctx.keynav ?? null`).
+   */
+  keynav?: KeynavEmitPlan | null;
+  /**
+   * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier
+   * (author-declared OR compiler-synthesized), threaded from `emitLoop` so a
+   * `keynavItem` element deep in the loop body can build its
+   * `data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabIndex` bindings.
+   * `null` when the current element isn't (transitively) inside a loop, or
+   * the enclosing loop has no keynav item and needed no index. This is a
+   * Solid `<For>` Accessor identifier (`() => number`) — `keynavItemAttrs`
+   * appends `()` at each use site.
+   */
+  keynavItemIndexAlias?: string | null;
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -145,24 +173,41 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // shadow parent bindings inside the inner callback only).
   const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
 
+  // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
+  // context". An author who wrote a bare `r-for="it in items"` (no `(it,
+  // idx)` index alias) still needs a working `data-rozie-keynav-item={i()}`
+  // marker — the compiler synthesizes the index binding itself (SPEC §1's
+  // "the primitive reads as markup ... the compiler owns the rest") rather
+  // than requiring the author to declare an index alias just for keynav's
+  // sake. `loopBodyHasKeynavItem` deliberately does not recurse into a
+  // NESTED r-for, so this synthesis never fires for an unrelated outer loop.
+  const needsKeynavIndex =
+    (ctx.keynav ?? null) !== null &&
+    node.indexAlias === null &&
+    loopBodyHasKeynavItem(node.body);
+  const indexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
+
   // Build the callback arrow signature: (item) or (item, index)
-  const aliasStr = node.indexAlias
-    ? `(${node.itemAlias}, ${node.indexAlias})`
+  const aliasStr = indexAlias
+    ? `(${node.itemAlias}, ${indexAlias})`
     : `(${node.itemAlias})`;
 
   // Inside the loop body, indexAlias is bound to a Solid Accessor<number>
   // (NOT a number). Threading it via `invokeAccessors` on a child ctx makes
   // descendant rewriteTemplateExpression calls auto-wrap bare references in
   // CallExpressions — see EmitNodeCtx.invokeAccessors for rationale.
-  const childCtx: EmitNodeCtx = node.indexAlias
+  // `keynavItemIndexAlias` is scoped to THIS loop's body subtree only — a
+  // nested loop's own `emitLoop` call overwrites it for its own children.
+  const childCtx: EmitNodeCtx = indexAlias
     ? {
         ...ctx,
         invokeAccessors: new Set([
           ...(ctx.invokeAccessors ?? []),
-          node.indexAlias,
+          indexAlias,
         ]),
+        keynavItemIndexAlias: indexAlias,
       }
-    : ctx;
+    : { ...ctx, keynavItemIndexAlias: null };
 
   let bodyJsx: string;
   if (node.body.length === 1) {
@@ -586,10 +631,28 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
  *   - 'component': PascalCase tag, emit verbatim; cross-rozie imports handled by emitSolid
  *   - 'self': self-reference, emit verbatim PascalCase (JS scope resolves it)
  */
-function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
+  // BEFORE any listener emission runs; it's routed into `createKeynav`'s
+  // `onCommit` option by `emitTemplate.ts`, never as a JSX `onKeynavCommit=`
+  // prop (see emitKeynav.ts's `stripKeynavCommitEvent` doc comment). No-op
+  // (returns the SAME node) for every element that isn't a keynav root.
+  const node = stripKeynavCommitEvent(origNode);
+
   let workingAttrs: AttributeBinding[] = [...node.attributes];
 
   const scopeAttrJsx = scopeAttrForElement(node, ctx);
+  // Phase 71 (r-keynav) — root `ref={...}`/`aria-activedescendant` and item
+  // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabIndex`
+  // fragments. Both resolve to `[]` for the overwhelming majority of
+  // elements (no keynav plan, or this element carries neither marker) — a
+  // cheap two-property check, not a tree walk, so non-keynav components pay
+  // no emission cost (SPEC §11: "no corpus rebless").
+  const keynav = ctx.keynav ?? null;
+  const keynavAttrs = [
+    ...keynavRootAttrs(keynav, node),
+    ...keynavItemAttrs(keynav, node, ctx.keynavItemIndexAlias ?? null),
+  ];
 
   // r-html special-case
   const rHtmlAttr = findAttribute(workingAttrs, 'r-html');
@@ -615,6 +678,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       listenerResult.eventsJsx,
       ...listenerResult.extraSpreads,
       `innerHTML={${exprCode}}`,
+      ...keynavAttrs,
     ].filter(Boolean);
     if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
@@ -674,6 +738,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const headParts = [
     mergeEventAttributes(attrsResult.jsx, listenerResult.eventsJsx),
     ...listenerResult.extraSpreads,
+    ...keynavAttrs,
   ];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
