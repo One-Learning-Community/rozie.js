@@ -27,6 +27,15 @@
       uniform across all 6 — an Angular child-component ref resolves to the host
       element, not the instance, so a handle-driven Next would no-op there. The
       $expose handle (nextPage/zoomIn/…) is covered structurally + in the docs.
+    - Find is driven through the CONTROLLED `:query` prop (NOT the $expose handle):
+      the "Find" button copies the input's text into $data.active, which flows into
+      the wrapper's `:query` prop → its lazy $watch runs find() → emits `findresult`
+      → onFind mirrors the count into the readout. This mirrors the two-way `page`
+      model: an Angular child-component `ref` can't reach the $expose handle from a
+      template event handler (a handle-driven `$refs.viewer.find()` throws
+      "viewer_r2 is not a function" there), so the demo stays uniform across all 6
+      by driving reactive props, never the handle. The find/findNext/… handle verbs
+      are covered structurally + in the docs.
     - standardFontDataUrl is left at its default; offline (Docker) it can't load,
       so glyphs may fall back — fine, the spec asserts a .textLayer span exists
       (selectable text present), not its exact glyphs.
@@ -47,6 +56,10 @@
   page: 1,
   total: 0,
   query: 'fox',
+  // the CONTROLLED search query handed to the wrapper's `:query` prop. Starts
+  // empty so the wrapper's lazy $watch does not run a find on mount; the "Find"
+  // button copies $data.query into it to trigger the search.
+  active: '',
   findCount: 0,
 }
 </data>
@@ -86,6 +99,12 @@ const onFind = (e) => {
   const m = e && e.detail && typeof e.detail.matches === 'number' ? e.detail.matches : e.matches
   $data.findCount = m
 }
+
+// run the search by copying the query into the CONTROLLED `:query` prop (the
+// wrapper's lazy $watch runs find()) — NOT the imperative handle, so it works
+// uniformly across all six targets. Clearing it resets the highlight.
+const runFind = () => { $data.active = $data.query }
+const clearSearch = () => { $data.active = '' }
 </script>
 
 <template>
@@ -99,17 +118,16 @@ const onFind = (e) => {
 
   <div class="controls">
     <input type="text" data-testid="find-input" r-model="$data.query" />
-    <button type="button" data-testid="find" @click="$refs.viewer && $refs.viewer.find($data.query)">Find</button>
-    <button type="button" data-testid="find-next" @click="$refs.viewer && $refs.viewer.findNext()">Next match</button>
-    <button type="button" data-testid="find-clear" @click="$refs.viewer && $refs.viewer.clearFind()">Clear</button>
+    <button type="button" data-testid="find" @click="runFind">Find</button>
+    <button type="button" data-testid="find-clear" @click="clearSearch">Clear</button>
     <span class="readout">matches <b data-testid="find-readout">{{ $data.findCount }}</b></span>
   </div>
 
   <div class="pdf-wrap" style="height: 360px">
     <PdfViewer
-      ref="viewer"
       :src="SAMPLE"
       :worker-src="workerSrc"
+      :query="$data.active"
       r-model:page="$data.page"
       @load="onLoad"
       @findresult="onFind"

@@ -45,6 +45,10 @@ interface PdfViewerProps {
    */
   password?: unknown;
   /**
+   * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+   */
+  query?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: Record<string, any>;
@@ -81,7 +85,7 @@ export interface PdfViewerHandle {
 
 const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer(_props: PdfViewerProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; standardFontDataUrl: string; renderAllPages: boolean; textLayer: boolean; password: unknown; options: Record<string, any> } = {
+  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; standardFontDataUrl: string; renderAllPages: boolean; textLayer: boolean; password: unknown; query: unknown; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? undefined,
     scale: _props.scale ?? 1,
@@ -91,11 +95,12 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     renderAllPages: _props.renderAllPages ?? false,
     textLayer: _props.textLayer ?? true,
     password: _props.password ?? undefined,
+    query: _props.query ?? undefined,
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
-    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void options; void defaultValue; void onPageChange; void defaultPage;
+    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, query, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
+    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void options; void defaultValue; void onPageChange; void defaultPage;
     return rest;
   })();
   const cancelled = useRef(false);
@@ -139,6 +144,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const _watch9First = useRef(true);
   const _watch10First = useRef(true);
   const _watch11First = useRef(true);
+  const _watch12First = useRef(true);
 
   function buildSource() {
     let cfg: any = null;
@@ -602,6 +608,13 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (_watch11First.current) { _watch11First.current = false; return; }
     renderView();
   }, [props.textLayer]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch12First.current) { _watch12First.current = false; return; }
+    const v = props.query;
+    if (v == null) return;
+    const q = String(v);
+    if (q) find(q);else clearFind();
+  }, [props.query]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind });
   _rozieExposeRef.current = { getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind };

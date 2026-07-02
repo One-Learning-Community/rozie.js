@@ -44,11 +44,15 @@ const props = withDefaults(
      */
     password?: unknown;
     /**
+     * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+     */
+    query?: unknown;
+    /**
      * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
      */
     options?: Record<string, any>;
   }>(),
-  { src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: () => ({}) }
+  { src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, query: undefined, options: () => ({}) }
 );
 
 /**
@@ -576,6 +580,11 @@ watch(() => zoom.value, () => renderView());
 watch(() => rot.value, () => renderView());
 watch(() => props.renderAllPages, () => renderView());
 watch(() => props.textLayer, () => renderView());
+watch(() => props.query, (v: any) => {
+  if (v == null) return;
+  const q = String(v);
+  if (q) find(q);else clearFind();
+});
 
 defineExpose({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind });
 </script>

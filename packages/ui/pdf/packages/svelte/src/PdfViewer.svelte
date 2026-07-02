@@ -43,6 +43,10 @@ interface Props {
    */
   password?: unknown;
   /**
+   * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+   */
+  query?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: any;
@@ -68,6 +72,7 @@ let {
   renderAllPages = false,
   textLayer = true,
   password = undefined,
+  query = undefined,
   options = __defaultOptions,
   onerror,
   onpagesrendered,
@@ -599,6 +604,12 @@ let __rozieWatchInitial_10 = true;
 $effect(() => { (() => renderAllPages)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => renderView())(); }); });
 let __rozieWatchInitial_11 = true;
 $effect(() => { (() => textLayer)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => renderView())(); }); });
+let __rozieWatchInitial_12 = true;
+$effect(() => { const __watchVal = (() => query)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } ((v: any) => {
+  if (v == null) return;
+  const q = String(v);
+  if (q) find(q);else clearFind();
+})(__watchVal); }); });
 </script>
 
 <div bind:this={viewerEl} {...__rozieAttrs} class={["rozie-pdf", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3c863364></div>

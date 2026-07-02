@@ -51,6 +51,7 @@ export class DemoComponent {
 | `renderAllPages` | `Boolean` | `false` |  |  |
 | `textLayer` | `Boolean` | `true` |  |  |
 | `password` | `unknown` | `undefined` |  |  |
+| `query` | `unknown` | `undefined` |  |  |
 | `options` | `Object` | `{}` |  |  |
 
 ## Events

@@ -97,6 +97,10 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
    */
   @property({ type: Object }) password: unknown = undefined;
   /**
+   * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+   */
+  @property({ type: Object }) query: unknown = undefined;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   @property({ type: Object }) options: any = {};
@@ -185,6 +189,11 @@ private __rozieFirstUpdateDone = false;
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('renderAllPages'))) { const __watchVal = (() => this.renderAllPages)(); (() => this.renderView())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('textLayer'))) { const __watchVal = (() => this.textLayer)(); (() => this.renderView())(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('query'))) { const __watchVal = (() => this.query)(); ((v: any) => {
+      if (v == null) return;
+      const q = String(v);
+      if (q) this.find(q);else this.clearFind();
+    })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -648,7 +657,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'standard-font-data-url', 'standardfontdataurl', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'options']);
+    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'standard-font-data-url', 'standardfontdataurl', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'query', 'options']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

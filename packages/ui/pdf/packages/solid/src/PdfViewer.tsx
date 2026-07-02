@@ -94,6 +94,10 @@ interface PdfViewerProps {
    */
   password?: unknown;
   /**
+   * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+   */
+  query?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: Record<string, any>;
@@ -130,8 +134,8 @@ export interface PdfViewerHandle {
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
-  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, options: (() => ({}))() }, _props);
-  const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'options', 'ref']);
+  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, query: undefined, options: (() => ({}))() }, _props);
+  const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'query', 'options', 'ref']);
   onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind }); });
 
   const [page, setPage] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'page', 1);
@@ -200,6 +204,11 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   createEffect(on(() => (() => rot())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
   createEffect(on(() => (() => local.renderAllPages)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
   createEffect(on(() => (() => local.textLayer)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
+  createEffect(on(() => (() => local.query)(), (v) => untrack(() => ((v: any) => {
+    if (v == null) return;
+    const q = String(v);
+    if (q) find(q);else clearFind();
+  })(v)), { defer: true }));
   let viewerElRef: HTMLElement | null = null;
 
   // pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main

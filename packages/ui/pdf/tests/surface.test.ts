@@ -27,7 +27,7 @@ const EXPECT = {
   name: 'PdfViewer',
   props: [
     'src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl',
-    'renderAllPages', 'textLayer', 'password', 'options',
+    'renderAllPages', 'textLayer', 'password', 'query', 'options',
   ],
   models: ['page'],
   emits: ['load', 'progress', 'error', 'pagechange', 'pagesrendered', 'passwordrequest', 'findresult'],
@@ -57,7 +57,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (10 props)', () => {
+  it('props surface matches (11 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

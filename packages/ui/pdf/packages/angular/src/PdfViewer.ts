@@ -110,6 +110,10 @@ export class PdfViewer {
    */
   password = input<unknown>(undefined);
   /**
+   * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
+   */
+  query = input<unknown>(undefined);
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options = input<Record<string, any>>((() => ({}))());
@@ -138,6 +142,7 @@ export class PdfViewer {
   private __rozieWatchInitial_9 = true;
   private __rozieWatchInitial_10 = true;
   private __rozieWatchInitial_11 = true;
+  private __rozieWatchInitial_12 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.engineReady())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this._load())(); }); });
@@ -168,6 +173,11 @@ export class PdfViewer {
     effect(() => { const __watchVal = (() => this.rot())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); });
     effect(() => { const __watchVal = (() => this.renderAllPages())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.renderView())(); }); });
     effect(() => { const __watchVal = (() => this.textLayer())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => this.renderView())(); }); });
+    effect(() => { const __watchVal = (() => this.query())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } ((v: any) => {
+      if (v == null) return;
+      const q = String(v);
+      if (q) this.find(q);else this.clearFind();
+    })(__watchVal); }); });
   }
 
   ngAfterViewInit() {

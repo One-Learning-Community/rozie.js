@@ -43,6 +43,7 @@ No separate engine-CSS import is needed — `PdfViewer` ships the selectable tex
 | `renderAllPages` | `Boolean` | `false` |  |  |
 | `textLayer` | `Boolean` | `true` |  |  |
 | `password` | `unknown` | `undefined` |  |  |
+| `query` | `unknown` | `undefined` |  |  |
 | `options` | `Object` | `{}` |  |  |
 
 ## Events

@@ -39,6 +39,7 @@ el.addEventListener('load', (e) => console.log(e.detail.numPages));
 | `renderAllPages` | `Boolean` | `false` |  |  |
 | `textLayer` | `Boolean` | `true` |  |  |
 | `password` | `unknown` | `undefined` |  |  |
+| `query` | `unknown` | `undefined` |  |  |
 | `options` | `Object` | `{}` |  |  |
 
 ## Events

@@ -129,6 +129,20 @@
         'Password for an encrypted PDF. If the document is encrypted and no (or a wrong) password is set, the `passwordrequest` event fires with `{ reason }`. Changing it reloads the document.',
     },
   },
+  // active search query — the CONTROLLED / reactive alternative to the imperative
+  // find() handle. No `type:` → emits `unknown` so `default: undefined` merges
+  // under the strict typecheck (the `src` idiom). A consumer WRITE runs a find
+  // (empty/null clears it); reactive so it works uniformly across all six targets
+  // — an Angular child-component `ref` can't reach the $expose handle from a
+  // template event handler (the page-model precedent), so a handle-driven find
+  // would throw/no-op there.
+  query:          {
+    default: undefined,
+    docs: {
+      description:
+        'A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).',
+    },
+  },
   // raw getDocument() DocumentInitParameters passthrough — spread BEFORE the
   // curated keys (explicit src/password win). For cMapUrl, httpHeaders,
   // withCredentials, etc.
@@ -425,6 +439,18 @@ $watch(() => $data.zoom, () => renderView())
 $watch(() => $data.rot, () => renderView())
 $watch(() => $props.renderAllPages, () => renderView())
 $watch(() => $props.textLayer, () => renderView())
+
+// reactive search query (the CONTROLLED alternative to the imperative find()
+// handle) → run/clear the search. Lazy $watch: only fires on a consumer WRITE,
+// never on mount, so an initial empty query does not trigger a spurious find.
+// `find`/`clearFind` are hoisted function declarations (defined below), so they
+// are in scope when this callback runs post-setup.
+$watch(() => $props.query, (v) => {
+  if (v == null) return
+  const q = String(v)
+  if (q) find(q)
+  else clearFind()
+})
 
 // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
 // 19 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
