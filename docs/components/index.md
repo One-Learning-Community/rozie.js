@@ -44,6 +44,7 @@ Grouped by what they do. Most wrap a vanilla-JS engine; the **headless** group a
 | Family | Wraps | Showcase |
 | --- | --- | --- |
 | **Cropper** | [Cropper.js](https://fengyuanchen.github.io/cropperjs/) image cropping | [/components/cropper](/components/cropper) |
+| **Waveform** | [wavesurfer.js](https://wavesurfer.xyz) audio waveform + playback | [/components/wavesurfer](/components/wavesurfer) |
 | **PdfViewer** | [pdf.js](https://mozilla.github.io/pdf.js/) PDF rendering | [/components/pdf](/components/pdf) |
 | **Carousel** | [Embla Carousel](https://www.embla-carousel.com) carousel engine | [/components/embla](/components/embla) |
 

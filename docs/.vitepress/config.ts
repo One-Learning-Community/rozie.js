@@ -211,6 +211,16 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/wavesurfer',
+          collapsed: true,
+          items: [
+            { text: 'Waveform — showcase & API', link: '/components/wavesurfer' },
+            { text: 'Usage examples', link: '/components/wavesurfer-usage' },
+            { text: 'wavesurfer libraries comparison', link: '/components/wavesurfer-comparison' },
+            { text: 'Waveform — live demo', link: '/components/wavesurfer-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/captcha',
           collapsed: true,
           items: [

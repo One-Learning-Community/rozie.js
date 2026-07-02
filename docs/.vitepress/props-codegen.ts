@@ -71,6 +71,7 @@ export function propsCodegen(
       'tiptap',
       'maplibre',
       'cropper',
+      'wavesurfer',
       'pdf',
     ]) {
       const pkgSrc = resolve(
