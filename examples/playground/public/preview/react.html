@@ -41,9 +41,6 @@
         }
       }
     </script>
-    <!-- Cropper.js overlay CSS is EXTERNAL (not shippable via the scoped .rozie <style>);
-         the playground drops CSS side-effect imports, so link it here (68-04). -->
-    <link rel="stylesheet" href="https://esm.sh/cropperjs@1.6.2/dist/cropper.css" />
     <style>
       html, body { margin: 0; height: 100%; font-family: system-ui; }
       #app { min-height: 100%; padding: 12px; }
@@ -54,7 +51,7 @@
     <script type="module">
       import * as React from 'react';
       import { createRoot } from 'react-dom/client';
-      import { getEsbuildTransform, importBundleWith, bootHarness, stubUnresolvableImports, setSidecarCss } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, stubUnresolvableImports, setSidecarCss, injectEngineCss } from './_shared.js';
 
       const host = document.getElementById('app');
       let root = null;
@@ -72,7 +69,9 @@
         // call it once per sibling AND once for the entry after relative
         // imports are rewritten to blob URLs.
         const transformOne = async (src) => {
-          const result = await transform(stubUnresolvableImports(src), {
+          const { code: stubbed, cssSpecifiers } = stubUnresolvableImports(src);
+          injectEngineCss(cssSpecifiers);
+          const result = await transform(stubbed, {
             loader: 'tsx',
             format: 'esm',
             target: 'es2020',
