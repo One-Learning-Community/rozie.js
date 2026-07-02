@@ -57,17 +57,99 @@ export async function getEsbuildTransform() {
  *     a valid string so the markup renders.
  *   - `import './X.module.css'` (bare side-effect import) → dropped.
  *   - `import './X.css'` (plain side-effect CSS import) → dropped.
+ *
+ * Every stripped `.css` specifier is CAPTURED (not silently discarded) and
+ * returned alongside the rewritten code so callers can route it through
+ * `injectEngineCss` (Phase 69-01) — the previous behavior of dropping a bare
+ * engine `.css` side-effect import (e.g. `cropperjs/dist/cropper.css`,
+ * `flatpickr/dist/flatpickr.css`, `leaflet/dist/leaflet.css`) meant those
+ * demos rendered unstyled at best, and on harnesses that never wired this
+ * helper at all (vue/svelte/angular) an unresolved bare `.css` specifier
+ * hard-crashed the render instead.
+ *
+ * @param {string} code
+ * @returns {{ code: string, cssSpecifiers: string[] }}
  */
 export function stubUnresolvableImports(code) {
+  const cssSpecifiers = [];
   let out = code;
-  // `import <name> from './*.css'` → const name = proxy
+  // `import <name> from './*.css'` → const name = proxy; capture the specifier.
   out = out.replace(
-    /import\s+(\w+)\s+from\s+['"][^'"]+\.css['"]\s*;?/g,
-    'const $1 = new Proxy({}, { get: (_, k) => String(k) });',
+    /import\s+(\w+)\s+from\s+(['"])([^'"]+\.css)\2\s*;?/g,
+    (_m, varName, _q, spec) => {
+      cssSpecifiers.push(spec);
+      return `const ${varName} = new Proxy({}, { get: (_, k) => String(k) });`;
+    },
   );
-  // `import './*.css'` bare side-effect import → drop
-  out = out.replace(/import\s+['"][^'"]+\.css['"]\s*;?/g, '');
-  return out;
+  // `import './*.css'` bare side-effect import → drop; capture the specifier.
+  out = out.replace(/import\s+(['"])([^'"]+\.css)\1\s*;?/g, (_m, _q, spec) => {
+    cssSpecifiers.push(spec);
+    return '';
+  });
+  return { code: out, cssSpecifiers };
+}
+
+// Memoized parse of the harness's own `<script type="importmap">` — same
+// singleton-init idiom as `esbuildReady` above. Every harness page defines
+// exactly one importmap script tag before this module ever runs.
+let importMapCache = null;
+
+function getImportMapEntries() {
+  if (!importMapCache) {
+    const el = document.querySelector('script[type="importmap"]');
+    let imports = {};
+    if (el) {
+      try {
+        imports = JSON.parse(el.textContent).imports || {};
+      } catch (_) {
+        imports = {};
+      }
+    }
+    importMapCache = imports;
+  }
+  return importMapCache;
+}
+
+// Module-scope, append-only, href-deduped record of `<link>` tags this pass
+// has already injected — mirrors `setSidecarCss`'s idempotency, adapted to
+// an append-only multi-href shape (re-rendering the same demo must not pile
+// up duplicate `<link>`s for the same engine stylesheet).
+const injectedCssHrefs = new Set();
+
+/**
+ * Resolve each `.css` specifier captured by `stubUnresolvableImports` against
+ * the harness's own importmap and append a deduped `<link rel="stylesheet">`
+ * to `document.head` for each one that resolves.
+ *
+ * Resolution is a LONGEST-PREFIX match against `Object.keys(importmap.imports)`
+ * — NOT a naive split on the first `/` — so scoped-package-shaped importmap
+ * keys (e.g. `@codemirror/lang-javascript`) and multi-segment specifiers
+ * (e.g. `cropperjs/dist/cropper.css`) both resolve correctly: the matched key
+ * is replaced by its importmap URL and the remainder of the specifier is
+ * appended verbatim.
+ *
+ * Specifiers that don't resolve against any importmap key are silently
+ * skipped (same "fail open, don't crash the render" posture the old drop
+ * behavior had) — e.g. a still-out-of-scope engine like MapLibre whose
+ * package isn't in the importmap at all.
+ *
+ * @param {string[]} specifiers
+ */
+export function injectEngineCss(specifiers) {
+  if (!specifiers || specifiers.length === 0) return;
+  const imports = getImportMapEntries();
+  const keys = Object.keys(imports).sort((a, b) => b.length - a.length);
+  for (const spec of specifiers) {
+    const matchedKey = keys.find((k) => spec === k || spec.startsWith(`${k}/`));
+    if (!matchedKey) continue;
+    const href = imports[matchedKey] + spec.slice(matchedKey.length);
+    if (injectedCssHrefs.has(href)) continue;
+    injectedCssHrefs.add(href);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
 }
 
 /**
