@@ -119,6 +119,8 @@ interface Props {
   onregionupdated?: (...args: unknown[]) => void;
   onregionremoved?: (...args: unknown[]) => void;
   onregionclicked?: (...args: unknown[]) => void;
+  onregionin?: (...args: unknown[]) => void;
+  onregionout?: (...args: unknown[]) => void;
   [key: string]: unknown;
 }
 
@@ -163,6 +165,8 @@ let {
   onregionupdated,
   onregionremoved,
   onregionclicked,
+  onregionin,
+  onregionout,
   ...__rozieAttrs
 }: Props = $props();
 
@@ -390,6 +394,15 @@ const buildWaveSurfer = () => {
     });
     regionsPlugin.on('region-clicked', (region: any) => {
       onregionclicked?.(serializeRegion(region));
+    });
+    // Playback entered/left a region — pure notifications (no writeback), so they
+    // fire regardless of the reconcile guard. The events for active-segment
+    // highlighting, transcript/karaoke sync, and loop-a-region.
+    regionsPlugin.on('region-in', (region: any) => {
+      onregionin?.(serializeRegion(region));
+    });
+    regionsPlugin.on('region-out', (region: any) => {
+      onregionout?.(serializeRegion(region));
     });
   }
 };

@@ -145,6 +145,8 @@ export class Waveform {
   regionUpdated = output<unknown>();
   regionRemoved = output<unknown>();
   regionClicked = output<unknown>();
+  regionIn = output<unknown>();
+  regionOut = output<unknown>();
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -401,6 +403,15 @@ export class Waveform {
       });
       this.regionsPlugin.on('region-clicked', (region: any) => {
         this.regionClicked.emit(this.serializeRegion(region));
+      });
+      // Playback entered/left a region — pure notifications (no writeback), so they
+      // fire regardless of the reconcile guard. The events for active-segment
+      // highlighting, transcript/karaoke sync, and loop-a-region.
+      this.regionsPlugin.on('region-in', (region: any) => {
+        this.regionIn.emit(this.serializeRegion(region));
+      });
+      this.regionsPlugin.on('region-out', (region: any) => {
+        this.regionOut.emit(this.serializeRegion(region));
       });
     }
   };

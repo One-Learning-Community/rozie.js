@@ -83,6 +83,8 @@ export class DemoComponent {
 | `regionUpdated` | |
 | `regionRemoved` | |
 | `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 
 ## Imperative handle
 

@@ -75,6 +75,8 @@ Peer dependencies: the `wavesurfer.js` engine (`^7`) + `svelte`. Install them al
 | `regionUpdated` | |
 | `regionRemoved` | |
 | `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 
 ## Imperative handle
 

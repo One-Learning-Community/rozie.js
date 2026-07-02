@@ -139,6 +139,8 @@ interface WaveformProps {
   onRegionUpdated?: (...args: unknown[]) => void;
   onRegionRemoved?: (...args: unknown[]) => void;
   onRegionClicked?: (...args: unknown[]) => void;
+  onRegionIn?: (...args: unknown[]) => void;
+  onRegionOut?: (...args: unknown[]) => void;
   ref?: (h: WaveformHandle) => void;
 }
 
@@ -442,6 +444,15 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
       });
       regionsPlugin.on('region-clicked', (region: any) => {
         _props.onRegionClicked?.(serializeRegion(region));
+      });
+      // Playback entered/left a region — pure notifications (no writeback), so they
+      // fire regardless of the reconcile guard. The events for active-segment
+      // highlighting, transcript/karaoke sync, and loop-a-region.
+      regionsPlugin.on('region-in', (region: any) => {
+        _props.onRegionIn?.(serializeRegion(region));
+      });
+      regionsPlugin.on('region-out', (region: any) => {
+        _props.onRegionOut?.(serializeRegion(region));
       });
     }
   }

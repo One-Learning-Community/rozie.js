@@ -78,6 +78,8 @@ export function Demo() {
 | `regionUpdated` | |
 | `regionRemoved` | |
 | `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 
 ## Imperative handle
 

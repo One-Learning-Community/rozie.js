@@ -130,6 +130,8 @@ const emit = defineEmits<{
   regionUpdated: [...args: any[]];
   regionRemoved: [...args: any[]];
   regionClicked: [...args: any[]];
+  regionIn: [...args: any[]];
+  regionOut: [...args: any[]];
 }>();
 
 const containerRef = ref<HTMLElement>();
@@ -356,6 +358,15 @@ const buildWaveSurfer = () => {
     });
     regionsPlugin.on('region-clicked', (region: any) => {
       emit('regionClicked', serializeRegion(region));
+    });
+    // Playback entered/left a region — pure notifications (no writeback), so they
+    // fire regardless of the reconcile guard. The events for active-segment
+    // highlighting, transcript/karaoke sync, and loop-a-region.
+    regionsPlugin.on('region-in', (region: any) => {
+      emit('regionIn', serializeRegion(region));
+    });
+    regionsPlugin.on('region-out', (region: any) => {
+      emit('regionOut', serializeRegion(region));
     });
   }
 };

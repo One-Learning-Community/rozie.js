@@ -122,6 +122,8 @@ export interface WaveformProps {
   onRegionUpdated?: (...args: unknown[]) => void;
   onRegionRemoved?: (...args: unknown[]) => void;
   onRegionClicked?: (...args: unknown[]) => void;
+  onRegionIn?: (...args: unknown[]) => void;
+  onRegionOut?: (...args: unknown[]) => void;
 }
 
 export interface WaveformHandle {

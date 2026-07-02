@@ -71,6 +71,8 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 | `regionUpdated` | |
 | `regionRemoved` | |
 | `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 
 ## Imperative handle
 

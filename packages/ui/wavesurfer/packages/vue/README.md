@@ -78,6 +78,8 @@ const time = ref(0);
 | `regionUpdated` | |
 | `regionRemoved` | |
 | `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 
 ## Imperative handle
 

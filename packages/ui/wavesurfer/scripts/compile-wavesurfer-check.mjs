@@ -30,7 +30,7 @@ const EXPECT = {
   models: ['currentTime', 'regions'],
   emits: [
     'ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error',
-    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved',
+    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved', 'regionIn', 'regionOut',
   ],
   slots: [],
   expose: [

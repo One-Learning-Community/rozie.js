@@ -463,6 +463,23 @@ private __rozieFirstUpdateDone = false;
         composed: true
       }));
     });
+    // Playback entered/left a region — pure notifications (no writeback), so they
+    // fire regardless of the reconcile guard. The events for active-segment
+    // highlighting, transcript/karaoke sync, and loop-a-region.
+    this.regionsPlugin.on('region-in', (region: any) => {
+      this.dispatchEvent(new CustomEvent("regionIn", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+    });
+    this.regionsPlugin.on('region-out', (region: any) => {
+      this.dispatchEvent(new CustomEvent("regionOut", {
+        detail: this.serializeRegion(region),
+        bubbles: true,
+        composed: true
+      }));
+    });
   }
 };
 

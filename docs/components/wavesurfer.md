@@ -227,6 +227,8 @@ Or manage regions imperatively through the handle — `addRegion(...)`, `clearRe
 | `regionUpdated` | `region` | A region finishes being dragged or resized. |
 | `regionClicked` | `region` | A region is clicked. |
 | `regionRemoved` | `region` | A region is removed. |
+| `regionIn` | `region` | Playback enters a region (for active-segment highlighting / transcript sync). |
+| `regionOut` | `region` | Playback leaves a region. |
 
 > Region-event payloads are the serialized descriptor `{ id, start, end, color, content, drag, resize }`. Programmatic region changes made through a controlled `regions` update do **not** re-emit these — only genuine user gestures do.
 

@@ -35,7 +35,7 @@ const EXPECT = {
   models: ['currentTime', 'regions'],
   emits: [
     'ready', 'playing', 'paused', 'finished', 'timeupdate', 'seeking', 'interaction', 'loading', 'error',
-    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved',
+    'regionCreated', 'regionUpdated', 'regionClicked', 'regionRemoved', 'regionIn', 'regionOut',
   ],
   slots: [] as string[],
   expose: [
@@ -74,7 +74,7 @@ describe('Waveform.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (13 emits)', () => {
+  it('emits surface matches (15 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 

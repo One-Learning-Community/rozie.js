@@ -135,6 +135,8 @@ interface WaveformProps {
   onRegionUpdated?: (...args: any[]) => void;
   onRegionRemoved?: (...args: any[]) => void;
   onRegionClicked?: (...args: any[]) => void;
+  onRegionIn?: (...args: any[]) => void;
+  onRegionOut?: (...args: any[]) => void;
 }
 
 export interface WaveformHandle {
@@ -287,7 +289,7 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     reconciling.current = false;
     if (addedWithoutId) writeBackRegions();
   }
-  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onRegionClicked: _rozieProp_onRegionClicked, onRegionCreated: _rozieProp_onRegionCreated, onRegionRemoved: _rozieProp_onRegionRemoved, onRegionUpdated: _rozieProp_onRegionUpdated, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
+  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onRegionClicked: _rozieProp_onRegionClicked, onRegionCreated: _rozieProp_onRegionCreated, onRegionIn: _rozieProp_onRegionIn, onRegionOut: _rozieProp_onRegionOut, onRegionRemoved: _rozieProp_onRegionRemoved, onRegionUpdated: _rozieProp_onRegionUpdated, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
     const buildWaveSurfer = useCallback(() => {
     let plugins = [];
     plugins = [];
@@ -378,8 +380,17 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
       regionsPlugin.current.on('region-clicked', (region: any) => {
         _rozieProp_onRegionClicked && _rozieProp_onRegionClicked(serializeRegion(region));
       });
+      // Playback entered/left a region — pure notifications (no writeback), so they
+      // fire regardless of the reconcile guard. The events for active-segment
+      // highlighting, transcript/karaoke sync, and loop-a-region.
+      regionsPlugin.current.on('region-in', (region: any) => {
+        _rozieProp_onRegionIn && _rozieProp_onRegionIn(serializeRegion(region));
+      });
+      regionsPlugin.current.on('region-out', (region: any) => {
+        _rozieProp_onRegionOut && _rozieProp_onRegionOut(serializeRegion(region));
+      });
     }
-  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
+  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionIn, _rozieProp_onRegionOut, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/
   // playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);
