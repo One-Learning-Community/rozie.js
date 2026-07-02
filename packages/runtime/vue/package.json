@@ -32,6 +32,9 @@
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@rozie/runtime-keynav-core": "workspace:*"
+  },
   "peerDependencies": {
     "vue": "^3.4"
   },
