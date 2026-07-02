@@ -69,6 +69,20 @@
       // registered — acceptable for a preview surface, and far better than a
       // hard crash. The entry itself still gets a fresh `rozie-preview-N` tag
       // per render (below), so editing the entry always re-renders live.
+      //
+      // 69-05 spike (2026-07-02): instrumented this override live (console.log
+      // on every define call, both sequential re-renders and rapid-fire
+      // overlapping renders with zero delay between postMessages) against the
+      // exact SortableList precedent shape, including a `@customElement`-
+      // decorated ENTRY class (matching real emitLit.ts output, which
+      // self-registers the entry too, not just the sibling). The guard fired
+      // on every call and never let a single hot-redefine reach the real
+      // `customElements.define` — no DOMException reproduced under any tested
+      // condition. This exact crash (`NotSupportedError: ... already been
+      // defined`) was already root-caused and fixed by this very guard in
+      // commit 7b390d4b (Phase 999.2, well before this phase) — that commit's
+      // message documents the identical error text and confirms this
+      // mechanism as the fix. No further change was needed here.
       const __origDefine = customElements.define.bind(customElements);
       customElements.define = (name, ctor, options) => {
         if (customElements.get(name)) return;
