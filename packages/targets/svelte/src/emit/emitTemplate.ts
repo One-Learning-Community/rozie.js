@@ -23,6 +23,9 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { SvelteScriptInjection } from './emitScript.js';
+// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), modeled on the
+// React/Vue references (see emitKeynav.ts's module doc comment).
+import { resolveKeynavPlan, buildKeynavScriptInjections } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -57,6 +60,18 @@ export function emitTemplate(
     };
   }
 
+  // Phase 71 (r-keynav) — resolve the per-component keynav emission plan
+  // ONCE (mirrors the React/Vue references' identical "resolve once, thread
+  // through ctx" discipline). `null` for the overwhelming majority of
+  // components (no `r-keynav` root) — every downstream call site
+  // short-circuits on `null`, so a non-keynav component's emit is
+  // completely untouched (SPEC §11: "no corpus rebless").
+  const keynavPlan = resolveKeynavPlan(ir);
+  if (keynavPlan !== null) {
+    runtimeImports.add('keynav');
+    scriptInjections.push(...buildKeynavScriptInjections(keynavPlan));
+  }
+
   const ctx: EmitNodeCtx = {
     ir,
     registry,
@@ -65,6 +80,7 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     runtimeImports,
     scopeAttr,
+    keynav: keynavPlan,
   };
 
   const template = emitNode(ir.template, ctx);

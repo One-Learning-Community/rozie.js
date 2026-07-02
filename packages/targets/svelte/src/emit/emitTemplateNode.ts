@@ -54,6 +54,15 @@ import {
   emitDynamicSnippetsProp,
 } from './emitSlotFiller.js';
 import type { SvelteScriptInjection } from './emitScript.js';
+// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), modeled on the
+// React/Vue references (see emitKeynav.ts's module doc comment).
+import {
+  keynavItemAttrs,
+  keynavRootAttrs,
+  loopBodyHasKeynavItem,
+  stripKeynavCommitEvent,
+  type KeynavEmitPlan,
+} from './emitKeynav.js';
 
 /**
  * HTML void elements (no closing tag, self-close `/>`).
@@ -118,6 +127,20 @@ export interface EmitNodeCtx {
    * `emitElement` to decide whether a slot-filler param collides.
    */
   enclosingLoopVars?: ReadonlySet<string>;
+  /**
+   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
+   * ONCE by `emitTemplate.ts` via `resolveKeynavPlan`), or `null` when the
+   * component has no `r-keynav` root. `undefined` (the default, back-compat
+   * for callers that don't thread it) is treated identically to `null`.
+   */
+  keynav?: KeynavEmitPlan | null;
+  /**
+   * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier,
+   * threaded down by `emitLoop` for the duration of that loop's body subtree
+   * ONLY (a nested loop overwrites it with its own). `null` when not inside
+   * a loop, or the enclosing loop has no keynav item and needed no index.
+   */
+  keynavItemIndexAlias?: string | null;
 }
 
 /**
@@ -268,19 +291,35 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     }
   }
 
+  // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
+  // context". An author who wrote a bare `r-for="it in items"` (no `(it,
+  // idx)` index alias) still needs a working `data-rozie-keynav-item="i"`
+  // marker — the compiler synthesizes the index binding itself rather than
+  // requiring the author to declare an index alias just for keynav's sake.
+  // `loopBodyHasKeynavItem` deliberately does not recurse into a NESTED
+  // r-for, so this synthesis never fires for an unrelated outer loop.
+  const needsKeynavIndex =
+    (ctx.keynav ?? null) !== null &&
+    node.indexAlias === null &&
+    loopBodyHasKeynavItem(node.body);
+  const sourceIndexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
+
   // Loop-var declaration + key are INSIDE the loop scope → rename the var.
   const emittedItem = renameLoopVar(node.itemAlias);
-  const emittedIndex = node.indexAlias ? renameLoopVar(node.indexAlias) : null;
+  const emittedIndex = sourceIndexAlias ? renameLoopVar(sourceIndexAlias) : null;
   const itemDecl = emittedIndex ? `${emittedItem}, ${emittedIndex}` : emittedItem;
   // Accumulate THIS loop's variable names for enclosing-loop slot-param detection.
   const nextEnclosing = new Set<string>(ctx.enclosingLoopVars ?? []);
   nextEnclosing.add(node.itemAlias);
-  if (node.indexAlias) nextEnclosing.add(node.indexAlias);
+  if (sourceIndexAlias) nextEnclosing.add(sourceIndexAlias);
 
+  // `keynavItemIndexAlias` is scoped to THIS loop's body subtree only — a
+  // nested loop's own `emitLoop` call overwrites it for its own children.
   const bodyCtx: EmitNodeCtx = {
     ...ctx,
     scopeRenames: bodyRenames,
     enclosingLoopVars: nextEnclosing,
+    keynavItemIndexAlias: emittedIndex,
   };
   const keySuffix = node.keyExpression
     ? ` (${rewriteTemplateExpression(node.keyExpression, ctx.ir, bodyRenames)})`
@@ -436,7 +475,14 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
  * 2026-05-07; `<svelte:self>` NOT used). Both emit the verbatim PascalCase
  * tag below; no template AST rewrite needed.
  */
-function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
+  // BEFORE any listener emission runs; it's routed into the `keynav`
+  // action's `onCommit` option by emitKeynav.ts, never as an
+  // `onkeynav-commit=` template attribute (see `stripKeynavCommitEvent`'s
+  // doc comment). No-op (returns the SAME node) for every element that
+  // isn't a keynav root.
+  const node = stripKeynavCommitEvent(origNode);
   // 260519 linechart-watch-recreate step 5 — resolve the host's static `type`
   // attribute when it is an `<input>`, so emitAttributes can route an
   // `r-model` on a `<input type="checkbox">` to `bind:checked` instead of
@@ -527,10 +573,24 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 
   const rHtml = findRHtml(node.attributes);
 
+  // Phase 71 (r-keynav) — root `bind:this=`/`use:keynav=`/`aria-
+  // activedescendant` and item `id`/`data-rozie-keynav-item`/`data-rozie-
+  // keynav-active`/`tabindex` fragments. Both resolve to `[]` for the
+  // overwhelming majority of elements (no keynav plan, or this element
+  // carries neither marker) — a cheap two-property check, not a tree walk,
+  // so non-keynav components pay no emission cost (SPEC §11: "no corpus
+  // rebless").
+  const keynav = ctx.keynav ?? null;
+  const keynavAttrs = [
+    ...keynavRootAttrs(keynav, node, ctx.ir),
+    ...keynavItemAttrs(keynav, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
+  ];
+
   const partsHead: string[] = [];
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const sp of spreadTexts) partsHead.push(sp);
+  for (const ka of keynavAttrs) partsHead.push(ka);
   // Pre-Phase-16 Item 2: stamp the per-component scope attribute on every
   // emitted element AND on every component-tag invocation. The element-side
   // stamp matches the `[data-rozie-s-<hash>]` selector that `scopeCss`
