@@ -43,6 +43,43 @@ interface RozieToolbarSlotCtx {
 @customElement('rozie-flow-canvas')
 export default class FlowCanvas extends SignalWatcher(LitElement) {
   static styles = css`
+@media (prefers-color-scheme: dark) {
+  .rozie-flow-canvas[data-rozie-s-cd396d6a] {
+    --rozie-flow-accent: #60a5fa;
+    --rozie-flow-bg: #0f172a;
+    --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
+    --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
+    --rozie-flow-node-bg: #1e293b;
+    --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
+    --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    --rozie-flow-node-title-fg: #e2e8f0;
+    --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
+    --rozie-flow-port-fg: #94a3b8;
+    --rozie-flow-socket-bg: #64748b;
+    --rozie-flow-socket-border-color: #1e293b;
+    --rozie-flow-connection-stroke: #64748b;
+    --rozie-flow-connection-label-fg: #e2e8f0;
+    --rozie-flow-connection-label-halo: #0f172a;
+    --rozie-flow-control-bg: #1e293b;
+    --rozie-flow-control-fg: #cbd5e1;
+    --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-control-hover-bg: #334155;
+    --rozie-flow-control-active-bg: #475569;
+    --rozie-flow-control-selected-bg: #1e3a8a;
+    --rozie-flow-control-selected-fg: #bfdbfe;
+    --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
+    --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-minimap-node-fill: #64748b;
+    --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+    --rozie-flow-toolbar-bg: #1e293b;
+    --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-toolbar-btn-bg: #334155;
+    --rozie-flow-toolbar-btn-fg: #cbd5e1;
+    --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+    --rozie-flow-toolbar-btn-hover-bg: #475569;
+    --rozie-flow-toolbar-delete-fg: #f87171;
+  }
+}
 .rozie-flow-canvas[data-rozie-s-cd396d6a] {
   width: 100%;
   height: 100%;
@@ -140,43 +177,6 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
 .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-toolbar-btn-hover-bg, #eef2f7); }
 .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
 .rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
-@media (prefers-color-scheme: dark) {
-    .rozie-flow-canvas {
-      --rozie-flow-accent: #60a5fa;
-      --rozie-flow-bg: #0f172a;
-      --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-      --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-      --rozie-flow-node-bg: #1e293b;
-      --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      --rozie-flow-node-title-fg: #e2e8f0;
-      --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-      --rozie-flow-port-fg: #94a3b8;
-      --rozie-flow-socket-bg: #64748b;
-      --rozie-flow-socket-border-color: #1e293b;
-      --rozie-flow-connection-stroke: #64748b;
-      --rozie-flow-connection-label-fg: #e2e8f0;
-      --rozie-flow-connection-label-halo: #0f172a;
-      --rozie-flow-control-bg: #1e293b;
-      --rozie-flow-control-fg: #cbd5e1;
-      --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-control-hover-bg: #334155;
-      --rozie-flow-control-active-bg: #475569;
-      --rozie-flow-control-selected-bg: #1e3a8a;
-      --rozie-flow-control-selected-fg: #bfdbfe;
-      --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-      --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-minimap-node-fill: #64748b;
-      --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-      --rozie-flow-toolbar-bg: #1e293b;
-      --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-toolbar-btn-bg: #334155;
-      --rozie-flow-toolbar-btn-fg: #cbd5e1;
-      --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-toolbar-btn-hover-bg: #475569;
-      --rozie-flow-toolbar-delete-fg: #f87171;
-    }
-  }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -3607,43 +3607,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 }
 
 injectGlobalStyles('rozie-flow-canvas-global', `
-@media (prefers-color-scheme: dark) {
-    .rozie-flow-canvas {
-      --rozie-flow-accent: #60a5fa;
-      --rozie-flow-bg: #0f172a;
-      --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
-      --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
-      --rozie-flow-node-bg: #1e293b;
-      --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      --rozie-flow-node-title-fg: #e2e8f0;
-      --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
-      --rozie-flow-port-fg: #94a3b8;
-      --rozie-flow-socket-bg: #64748b;
-      --rozie-flow-socket-border-color: #1e293b;
-      --rozie-flow-connection-stroke: #64748b;
-      --rozie-flow-connection-label-fg: #e2e8f0;
-      --rozie-flow-connection-label-halo: #0f172a;
-      --rozie-flow-control-bg: #1e293b;
-      --rozie-flow-control-fg: #cbd5e1;
-      --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-control-hover-bg: #334155;
-      --rozie-flow-control-active-bg: #475569;
-      --rozie-flow-control-selected-bg: #1e3a8a;
-      --rozie-flow-control-selected-fg: #bfdbfe;
-      --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
-      --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-minimap-node-fill: #64748b;
-      --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
-      --rozie-flow-toolbar-bg: #1e293b;
-      --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
-      --rozie-flow-toolbar-btn-bg: #334155;
-      --rozie-flow-toolbar-btn-fg: #cbd5e1;
-      --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
-      --rozie-flow-toolbar-btn-hover-bg: #475569;
-      --rozie-flow-toolbar-delete-fg: #f87171;
-    }
-  }
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;
