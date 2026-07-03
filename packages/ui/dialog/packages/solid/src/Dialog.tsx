@@ -2,7 +2,36 @@ import type { JSX } from 'solid-js';
 import { children, createEffect, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, mergeListeners, rozieAttr } from '@rozie/runtime-solid';
 
-__rozieInjectStyle('Dialog-2a679072', `.rozie-dialog[data-rozie-s-2a679072] {
+__rozieInjectStyle('Dialog-2a679072', `@media (prefers-reduced-motion: no-preference) {
+  .rozie-dialog[data-rozie-s-2a679072] {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072]) {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  @starting-style {
+    .rozie-dialog[open][data-rozie-s-2a679072] {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+  }
+  .rozie-dialog[data-rozie-s-2a679072]::backdrop {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+  }
+  .rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .rozie-dialog[open][data-rozie-s-2a679072]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+.rozie-dialog[data-rozie-s-2a679072] {
   margin: auto; /* centers in the top layer */
   padding: 0;
   width: var(--rozie-dialog-width, auto);
@@ -22,30 +51,7 @@ __rozieInjectStyle('Dialog-2a679072', `.rozie-dialog[data-rozie-s-2a679072] {
 .rozie-dialog-panel[data-rozie-s-2a679072] {
   padding: var(--rozie-dialog-padding, 1.5rem);
   font: var(--rozie-dialog-font, inherit);
-}
-.rozie-dialog[data-rozie-s-2a679072] {
-    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-.rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072]) {
-    opacity: 0;
-    transform: translateY(0.5rem) scale(0.98);
-  }
-.rozie-dialog[open][data-rozie-s-2a679072] {
-      opacity: 0;
-      transform: translateY(0.5rem) scale(0.98);
-    }
-.rozie-dialog[data-rozie-s-2a679072]::backdrop {
-    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
-    opacity: 1;
-  }
-.rozie-dialog[data-rozie-s-2a679072]:not([open][data-rozie-s-2a679072])::backdrop {
-    opacity: 0;
-  }
-.rozie-dialog[open][data-rozie-s-2a679072]::backdrop {
-      opacity: 0;
-    }`);
+}`);
 
 interface DialogProps {
   /**

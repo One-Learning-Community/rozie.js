@@ -155,6 +155,35 @@ defineExpose({ show, hide });
 </script>
 
 <style scoped>
+@media (prefers-reduced-motion: no-preference) {
+  .rozie-dialog {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .rozie-dialog:not([open]) {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  @starting-style {
+    .rozie-dialog[open] {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+  }
+  .rozie-dialog::backdrop {
+    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
+    opacity: 1;
+  }
+  .rozie-dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .rozie-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
 .rozie-dialog {
   margin: auto; /* centers in the top layer */
   padding: 0;
@@ -176,27 +205,4 @@ defineExpose({ show, hide });
   padding: var(--rozie-dialog-padding, 1.5rem);
   font: var(--rozie-dialog-font, inherit);
 }
-.rozie-dialog {
-    transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-.rozie-dialog:not([open]) {
-    opacity: 0;
-    transform: translateY(0.5rem) scale(0.98);
-  }
-.rozie-dialog[open] {
-      opacity: 0;
-      transform: translateY(0.5rem) scale(0.98);
-    }
-.rozie-dialog::backdrop {
-    transition: opacity var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;
-    opacity: 1;
-  }
-.rozie-dialog:not([open])::backdrop {
-    opacity: 0;
-  }
-.rozie-dialog[open]::backdrop {
-      opacity: 0;
-    }
 </style>
