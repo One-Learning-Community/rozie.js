@@ -1518,7 +1518,7 @@ const onKeydown = ($event) => {
   }
 }
 
-$watch($data.active, () => {
+$watch(() => $data.active, () => {
   $refs.list.children[$data.active]?.scrollIntoView({ block: 'nearest' })
 })
 </script>
@@ -1526,10 +1526,10 @@ $watch($data.active, () => {
 <template>
 <input type="text" role="combobox" :aria-activedescendant="'opt-' + $data.active"
        @keydown="onKeydown($event)" />
-<ul role="listbox" r-refs="list">
-  <li r-for="r in RESULTS :key r.id" role="option"
-      :id="'opt-' + $index" :aria-disabled="!!r.disabled"
-      @pointermove="$data.active = $index">
+<ul role="listbox" ref="list">
+  <li r-for="(r, i) in RESULTS" :key="r.id" role="option"
+      :id="'opt-' + i" :aria-disabled="!!r.disabled"
+      @pointermove="$data.active = i">
     {{ r.label }}
   </li>
 </ul>
@@ -1543,7 +1543,7 @@ $watch($data.active, () => {
 <input type="text" role="combobox" r-keynav:activedescendant.vertical="$data.active"
        :source="RESULTS" @keynav-commit="choose(RESULTS[$data.active])" />
 <ul role="listbox">
-  <li r-for="r in RESULTS :key r.id" role="option"
+  <li r-for="r in RESULTS" :key="r.id" role="option"
       r-keynav-item="{ label: r.label, disabled: r.disabled }">{{ r.label }}</li>
 </ul>
 </template>
@@ -1590,7 +1590,7 @@ r-keynav-active-class="<class spec>"                             (optional, on t
 <template>
 <div role="menu" r-keynav:tabindex.vertical.loop="$data.active"
      :source="items" @keynav-commit="run(items[$data.active])">
-  <button role="menuitem" r-for="it in items :key it.id"
+  <button role="menuitem" r-for="it in items" :key="it.id"
           r-keynav-item="{ label: it.label, disabled: it.disabled }">
     {{ it.label }}
   </button>
@@ -1631,7 +1631,7 @@ const onSearch = ($event) => {
        :source="RESULTS" @keynav-commit="choose(RESULTS[$data.active])"
        @input="onSearch($event)" />
 <ul role="listbox">
-  <li role="option" r-for="r in RESULTS :key r.id"
+  <li role="option" r-for="r in RESULTS" :key="r.id"
       r-keynav-item="{ label: r.label, disabled: r.disabled }"
       :aria-disabled="!!r.disabled">{{ r.label }}</li>
 </ul>
