@@ -1460,6 +1460,113 @@ The compiled CSS flows through the **same scoping pass** as a plain `<style>`: i
 
 v1 supports `lang="scss"` only. `lang="less"` is a deliberate deferral — the optional-peer model and the generic block-`lang=` substrate make it a clean later addition; today an unrecognized `lang` value is itself a compile error.
 
+## `r-keynav` — compiler-owned keyboard navigation
+
+Keyboard list-navigation — Arrow/Home/End/typeahead, an active index, the `aria`/`id` wiring that goes with it, and roving focus or `aria-activedescendant` — is boilerplate every menu, listbox, combobox, toolbar, and tab strip in a component library rewrites by hand, once per framework. `r-keynav` replaces the active-state field, the entire `@keydown` switch, per-item `:id`/`@pointermove`, `:aria-activedescendant`, and the scroll-into-view `$watch` with **one directive on the nav root plus one marker on each item**. The compiler owns the plumbing; you own only what happens on commit.
+
+### Surface
+
+```
+r-keynav:<focus-model>[.<modifier>…]="<active-index binding>"   (on the nav root)
+r-keynav-item="{ label?, disabled? }"                            (on each item)
+r-keynav-active-class="<class spec>"                             (optional, on the root)
+@keynav-commit="…"                                               (Enter / click-on-active)
+:source="<items array>"                                          (optional; else synthesized from co-located r-for)
+```
+
+**Two focus models** (the directive's argument):
+
+- **`r-keynav:activedescendant`** — DOM focus **stays on the root control**; the active item is tracked virtually via `aria-activedescendant` pointing at its id. Use this for a listbox or a combobox with an `<input>`.
+- **`r-keynav:tabindex`** — DOM focus **moves to the active item** (the WAI-ARIA "roving tabindex" pattern: `tabindex` toggles `0`/`-1`, `.focus()` runs on change). Use this for a menu, toolbar, radio-group, or tab strip.
+
+**Modifiers** (the existing dotted-modifier grammar):
+
+- orientation: `.vertical` (default) / `.horizontal` / `.both`
+- `.loop` — wrap past the ends (default: clamp)
+- `.typeahead` — printable characters jump to a matching item by `label`
+- `.skipdisabled` — skip `disabled` items (default: **on**; write `.skipdisabled(false)` to include them)
+
+**The rest of the surface:**
+
+- **`r-keynav-item="{ label?, disabled? }"`** — tags each rendered row. `label` feeds typeahead matching; `disabled` feeds `.skipdisabled`. The item's index comes from its enclosing `r-for`.
+- **`:source="<items array>"`** — the data array the primitive navigates (not the rendered DOM — required because the list may be virtualized). **Sugar:** omit `:source` and the compiler synthesizes it from the co-located `r-for` producing the `r-keynav-item` elements — a static menu never has to mention a source at all.
+- **`@keynav-commit="…"`** — fires on Enter or a click on an item, with the active index. `r-keynav` manages the active index and focus; **you** own selection semantics (single vs. multiple, toggle vs. replace) via this event — navigation and selection are deliberately separate concerns.
+- **`r-keynav-active-class`** — optional; see [Active-item styling](#active-item-styling) below.
+
+### Two examples
+
+**Menu — tabindex model, items contained in one subtree:**
+
+```rozie
+<template>
+<div role="menu" r-keynav:tabindex.vertical.loop="$data.active"
+     :source="items" @keynav-commit="run(items[$data.active])">
+  <button role="menuitem" r-for="it in items :key it.id"
+          r-keynav-item="{ label: it.label, disabled: it.disabled }">
+    {{ it.label }}
+  </button>
+</div>
+</template>
+```
+
+**Combobox — activedescendant model, input and list in SEPARATE subtrees:**
+
+```rozie
+<template>
+<input role="combobox" r-keynav:activedescendant.vertical="$data.active"
+       :source="results" @keynav-commit="choose(results[$data.active])"
+       @input="onSearch($event)" />
+<ul role="listbox">
+  <li role="option" r-for="r in results :key r.id"
+      r-keynav-item="{ label: r.label }">{{ r.label }}</li>
+</ul>
+</template>
+```
+
+The combobox example is the proof that association is **shared reactive state** (`$data.active` + `:source`), not DOM nesting — the `<input>` root and the `<ul>` items live in separate subtrees and still track each other, because the compiler wires `aria-activedescendant` on the input to the active `<li>`'s id and stamps the same active marker onto each `<li>` through their shared state, not through parent/child structure.
+
+### Keyboard map
+
+| Key | Action |
+| --- | --- |
+| Arrow (per orientation) | move active ±1 (wrap if `.loop`, skip disabled if `.skipdisabled`) |
+| Home / End | move to first / last enabled |
+| Enter | fires `@keynav-commit` with the active index |
+| printable characters | typeahead to a matching `label` (if `.typeahead`) — case-insensitive prefix match, ~500ms buffer reset |
+| click on an item | sets active to it and fires `@keynav-commit` |
+
+`Escape`, `Tab`, and open/close semantics stay with you — they belong to the surrounding widget (a popover, a dialog), not to navigation.
+
+### Active-item styling
+
+The compiler **always** stamps <span v-pre>`data-rozie-keynav-active`</span> on the active item — cheap, and it gives you one canonical hook for both default styling and VR/tests, with nothing to opt into:
+
+```css
+[data-rozie-keynav-active] { background: var(--rozie-accent); }
+```
+
+`r-keynav-active-class="…"` is **optional and additive** — it never replaces the `data-*` hook, it only *also* toggles author classes on the active item. It accepts the same shapes `:class` does (`'is-active'`, `['is-active', 'ring']`, `{ 'is-active': cond }`).
+
+Two semantics are worth knowing by name before you reach for it:
+
+1. **Evaluated once (static config), not a live per-render binding.** The controller normalizes the class spec at setup and toggles the token set on active-change — it does not re-evaluate on every render the way a template `:class` binding would. If the active item's styling needs to change *while* it stays active (a value that changes without the active index changing), bind off the always-present `[data-rozie-keynav-active]` attribute instead — that one *is* live, because it's a plain declarative binding the compiler emits per item, not an imperative toggle.
+2. **The object form composes with activeness.** `r-keynav-active-class="{ 'is-active': cond }"` applies the `is-active` class only when the item **is active AND** `cond` holds — both conditions, not either. An item that is active but whose `cond` is falsy gets no class from this rule (though it still carries `[data-rozie-keynav-active]`, since that hook is unconditional).
+
+### Diagnostics
+
+Six compile-time diagnostics catch malformed `r-keynav` forms (each collected, not thrown):
+
+| Code | When |
+| --- | --- |
+| `ROZ982` `KEYNAV_UNKNOWN_MODIFIER` | an unrecognized modifier (did-you-mean among `.vertical`/`.horizontal`/`.both`/`.loop`/`.typeahead`/`.skipdisabled`) |
+| `ROZ983` `KEYNAV_NO_ITEMS` | an `r-keynav` root with no associated `r-keynav-item` in the component |
+| `ROZ984` `KEYNAV_ORPHAN_ITEM` | an `r-keynav-item` with no `r-keynav` root in the component |
+| `ROZ985` `KEYNAV_BAD_FOCUS_MODEL` | a missing or unrecognized focus-model argument (valid: `tabindex`, `activedescendant`) |
+| `ROZ986` `KEYNAV_MULTIPLE_ROOTS` | more than one `r-keynav` root in one component (v1 is one group per component — named groups are a future extension) |
+| `ROZ987` `KEYNAV_SOURCE_UNRESOLVED` | `:source` is neither provided nor synthesizable from a co-located `r-for` |
+
+See the [Diagnostics reference](/reference/diagnostics) for the full code table.
+
 ## Smaller wins
 
 A grab-bag of little decisions that add up:
