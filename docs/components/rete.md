@@ -361,6 +361,16 @@ import '@rozie-ui/rete-react/themes/bootstrap.css'; // Bootstrap 5 — reads --b
 
 Swap `-react` for your target framework's package. The bridges are **colors-only** — they remap the color/accent tokens and leave the *sizing* tokens (radii, socket size, stroke widths, grid) at their component defaults.
 
-**Dark mode** ships in `themes/base.css` (import it to enable). It covers both the OS-driven `@media (prefers-color-scheme: dark)` and an app-toggled `.dark` / `[data-theme="dark"]` root class, and because it sets the tokens at the document root — where CSS custom properties inherit and pierce the shadow boundary — it re-skins the Lit custom element too. It lives in the imported stylesheet rather than the component's own scoped styles because Rozie's CSS scoping pass strips `@media` at-rules; the raw preset preserves them. The light default is unchanged whether or not you import it.
+**Dark mode is a zero-import, OS-driven default.** The component ships an
+`@media (prefers-color-scheme: dark)` block that re-skins the color tokens when the OS
+requests dark — no import, no config, on all six targets (it rides the `:root` engine-DOM
+escape hatch, so it reaches the Lit shadow tree too). The light render is untouched (the
+query only matches in a dark context), so nothing changes for light-mode consumers.
+
+For apps that toggle theme by a **root class** rather than the OS setting, import
+`themes/base.css` — it adds the `.dark` / `[data-theme="dark"]` strategy (and is the
+explicit full token reference). On the five light-DOM targets a class ancestor drives the
+switch; Lit's shadow boundary blocks a descendant class, so Lit relies on the built-in OS
+default (or a token override on the element).
 
 The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/themes/base.css).

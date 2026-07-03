@@ -150,27 +150,38 @@ Linux-rendered per `feedback_vr_linux_baselines`.
 6. Manual: override `--rozie-flow-accent` at `:root` in a demo → every selection cue recolors;
    toggle `.dark` → dark palette applies.
 
-## Execution note (as-built deviation, 2026-07-03)
+## Execution note (as-built, 2026-07-03)
 
-**Dark mode is opt-in via `themes/base.css`, not a zero-import scoped default.** During
-execution the scoped `@media (prefers-color-scheme: dark)` block emitted as
-*unconditional* dark — Rozie's CSS scoping pass **strips `@media` at-rules** from
-`<style>` (confirmed: `Dialog.rozie`'s `@media` is dropped the same way), which would
-have hoisted the dark overrides to always-on and destroyed the light default. Fix: dark
-lives in the raw-vendored `themes/base.css` (copied verbatim, so the media query
-survives), covering **both** OS `@media (prefers-color-scheme: dark)` (guarded against an
-explicit `.light`/`[data-theme=light]` opt-out) **and** app-toggled
-`.dark`/`[data-theme=dark]`. Consequences vs the approved design:
+**Dark mode ships as a zero-import, OS-driven default — via the `:root {}` escape hatch,
+not a top-level scoped `@media` block.** During execution a *scoped* `@media
+(prefers-color-scheme: dark)` block emitted as *unconditional* dark: Rozie's CSS scoping
+pass **silently drops a top-level `@media` wrapper** and hoists its inner rule out (a real
+compiler bug — it also silently defeats `Dialog.rozie`'s `prefers-reduced-motion` guard).
+A direct compile probe then showed the fix: the **`:root {}` escape hatch preserves
+at-rule children verbatim** (parseStyle CR-01) on **all six** targets (react/vue/svelte
+global CSS, angular `::ng-deep`, lit injected document styles, solid inline global). So the
+dark block lives inside the escape hatch — where the engine-DOM chrome already lives — and
+sets the tokens on the bare `.rozie-flow-canvas`; they inherit onto the engine DOM and are
+read by `flowToken()`. Result:
 
-- **Light default is byte-identical** (git-diff confirmed: every change is
-  `literal → var(--token, same-literal)`), so **no VR rebless** — the opposite of the
-  approved "requires rebless." Net safer.
-- **Dark requires importing `base.css`** (one line) instead of working with zero config.
-  A true zero-import OS-dark default would need the compiler's scoping pass to preserve
-  `@media` — filed as a follow-up, not attempted here.
-- **The net-new dark VR cell is deferred** — it needs a demo that imports `base.css` and a
-  Docker-Linux-rendered baseline (macOS baselines fail CI). The light baseline is
-  byte-identical, so the existing cell still guards the default.
+- **Zero-import OS-dark default on all six** — exactly the approved design, achieved
+  without a compiler change (the escape hatch is the correct home for tokens that must
+  reach unscoped engine DOM anyway).
+- **Light default is byte-identical** (git-diff: the scoped CSS is unchanged; the dark
+  `@media` is added only to the global/`:root` bucket and is query-gated) → **no VR
+  rebless**.
+- **`themes/base.css`** adds the app-toggled `.dark`/`[data-theme]` class strategy on top
+  (for the five light-DOM targets) and is the explicit token reference.
+
+**Follow-up (separate task): fix the compiler's scoped-`@media` silent-drop.** The
+top-level scoped path should preserve/re-wrap at-rules (as the escape-hatch path already
+does) rather than hoist them to unconditional; at minimum it should emit a diagnostic.
+This also fixes `Dialog.rozie`'s broken `prefers-reduced-motion`. Wide blast radius (the
+shared CSS pass) → owns its own red-first fixture + full target-suite/dist-parity rebless.
+
+- **The net-new dark VR cell is deferred** — it needs a dark-rendered demo cell + a
+  Docker-Linux baseline (macOS baselines fail CI). The light baseline is byte-identical,
+  so the existing cell still guards the default.
 
 ## Out of scope / deferred
 
