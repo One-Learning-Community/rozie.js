@@ -220,7 +220,7 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
       <Column field="id"         header="#"         :sortable="true" :groupable="false" />
       <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
       <Column field="category"   header="Category"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
-      <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" :editable="true" editor="custom" />
+      <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" :filterable="true" :editable="true" editor="custom" />
       <Column field="units"      header="Units"     :sortable="true" :groupable="false" />
       <Column field="status"     header="Status"    :sortable="true" :filterable="true" :editable="true" editor="custom" />
       <Column field="active"     header="Active"    :sortable="true" :groupable="false" :editable="true" editor="custom" />

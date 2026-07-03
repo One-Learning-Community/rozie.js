@@ -60,15 +60,53 @@ test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
   await expect(page.getByTestId('readout').locator('[data-slice="lastCommit"]')).toContainText('customer');
 });
 
-test('faceted select filter narrows rows', async ({ page }) => {
+test('faceted select filter narrows every visible row to the selected category', async ({ page }) => {
   await page.goto('/?example=DataTableSuper&target=vue');
-  const before = await page.locator('tbody tr').count();
-  // Scope to `thead` — the control panel (`ctl-gridMode`/`ctl-selectionMode`) also
-  // renders <select> comboboxes ahead of the FilterSelect drop-ins in DOM order, so
-  // an unscoped `getByRole('combobox').first()` silently hits the mode toggle instead
-  // (selecting it is a no-op on row count — a false-pass, not a real assertion).
-  await page.locator('thead').getByRole('combobox').first().selectOption({ index: 1 });
-  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThanOrEqual(before);
+  // With pageSize:20 and ~375 rows/category out of 1,500, a `count <= before`
+  // assertion is near-tautological (both sides are 20 regardless of whether the
+  // filter works) — it would NOT catch a broken/no-op FilterSelect. Instead, drive
+  // the REAL FilterSelect drop-in (DataTable also renders its own built-in text
+  // filter input per column — `aria-label="Filter Category"` — alongside the
+  // slotted facet control, so scope to the drop-in's own `aria-label="category"`,
+  // NOT the built-in one) and assert every visible row's Category cell equals the
+  // selected value. A broken/no-op filter would leave mixed categories in the
+  // body and fail this — pagination-independent, so it holds regardless of page
+  // size vs. per-category row counts.
+  const categorySelect = page.locator('thead').locator('select[aria-label="category"]');
+  await categorySelect.selectOption('Hardware');
+  const categoryCells = page.locator('tbody td[data-col="category"] .rdt-cell-value');
+  await expect.poll(async () => {
+    const texts = await categoryCells.allTextContents();
+    return texts.length > 0 && texts.every((t) => t === 'Hardware');
+  }).toBe(true);
+});
+
+test('numeric range filter on Amount narrows every visible row into the range', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  // Exercises the FilterNumberRange drop-in wired to the `amount` column (only
+  // reachable once `amount` carries `:filterable="true"` — the Task 5 review's
+  // Important fix; the #filter slot's `columnId === 'amount'` branch was
+  // previously dead code because DataTable gates the `#filter` slot on
+  // `columnIsFilterable(columnId)`). FilterNumberRange.rozie applies the range on
+  // `@change` (not `@input` — see its `applyRange()` handler), so a bare `.fill()`
+  // on both inputs does NOT commit the filter; blurring (Tab) after filling does,
+  // matching real user interaction (type into min, tab to max, type, tab out).
+  const minInput = page.locator('thead').locator('input[aria-label="amount min"]');
+  const maxInput = page.locator('thead').locator('input[aria-label="amount max"]');
+  await minInput.fill('200');
+  await maxInput.fill('400');
+  await maxInput.press('Tab');
+  const amountCells = page.locator('tbody td[data-col="amount"] .rdt-cell-value');
+  await expect.poll(async () => {
+    const texts = await amountCells.allTextContents();
+    return (
+      texts.length > 0 &&
+      texts.every((t) => {
+        const n = Number(t);
+        return n >= 200 && n <= 400;
+      })
+    );
+  }).toBe(true);
 });
 
 test('expanding a row reveals its detail panel', async ({ page }) => {
