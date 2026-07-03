@@ -545,6 +545,11 @@ export const EXAMPLES = [
   // registration (vite.config.ts + tsconfig.app.json + build-cells.mjs).
   'DataTableColumns',
   'DataTableSort',
+  // Task 1 (super-demo scaffold) — loader → examples/demos/DataTableSuperDemo.rozie,
+  // which imports ../../packages/ui/data-table/src/{DataTable,Column}.rozie. One
+  // .rozie wiring every data-table feature together for hand-dogfooding per
+  // framework. Behavioral-only; NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+  'DataTableSuper',
   'DataTableFilterPaginate',
   'DataTableSelection',
   'DataTableColumnMgmt',
@@ -1166,6 +1171,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // screenshot cell.
   DataTableColumns: 'rozie-data-table-columns',
   DataTableSort: 'rozie-data-table-sort',
+  // Task 1 super-demo scaffold — behavioral-only, no screenshot cell.
+  DataTableSuper: 'rozie-data-table-super',
   DataTableFilterPaginate: 'rozie-data-table-filter-paginate',
   DataTableSelection: 'rozie-data-table-selection',
   DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
@@ -1545,6 +1552,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // No parent props needed.
   DataTableColumns: {},
   DataTableSort: {},
+  // Task 1 super-demo scaffold — self-contained ($data only). No parent props.
+  DataTableSuper: {},
   DataTableFilterPaginate: {},
   DataTableSelection: {},
   DataTableColumnMgmt: {},

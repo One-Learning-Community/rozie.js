@@ -1,0 +1,44 @@
+<!--
+  DataTableSuperDemo.rozie — Task 1 scaffold for the "super demo": one .rozie
+  wiring every @rozie-ui/data-table feature together, compiled to all six
+  targets through the VR host for hand-dogfooding per framework.
+
+  This is the MINIMAL Task-1 scaffold: a sticky-header table with four
+  sortable columns and three static rows. Later tasks extend this same file
+  with filtering/pagination/selection/column-mgmt/grid/edit features.
+
+  Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
+-->
+
+<rozie name="DataTableSuperDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, customer: 'Ada Lovelace', category: 'Software', amount: 120.5, units: 3, status: 'active', active: true, orderedAt: '2026-03-01' },
+    { id: 2, customer: 'Alan Turing',  category: 'Hardware', amount: 88.0,  units: 7, status: 'pending', active: false, orderedAt: '2026-03-04' },
+    { id: 3, customer: 'Grace Hopper', category: 'Services', amount: 240.0, units: 1, status: 'active', active: true, orderedAt: '2026-03-06' },
+  ],
+}
+</data>
+
+<template>
+  <main data-testid="dt-super">
+    <h1>DataTable — super demo</h1>
+    <DataTable :data="$data.rows" :stickyHeader="true">
+      <Column field="id" header="#" :sortable="true" />
+      <Column field="customer" header="Customer" :sortable="true" />
+      <Column field="category" header="Category" :sortable="true" />
+      <Column field="amount" header="Amount" :sortable="true" />
+    </DataTable>
+  </main>
+</template>
+
+</rozie>
