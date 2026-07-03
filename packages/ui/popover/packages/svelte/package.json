@@ -36,7 +36,8 @@
     "./source": {
       "svelte": "./src/Popover.svelte",
       "default": "./src/Popover.svelte"
-    }
+    },
+    "./themes/*": "./src/themes/*"
   },
   "files": [
     "dist",
