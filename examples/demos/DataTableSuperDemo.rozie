@@ -57,16 +57,28 @@
     - `#detail` → DetailPanel (mirrors DataTableDetailPanelDemo.rozie),
       receiving `{ row }`; `:expandable="true"` added at the table level
       (`:groupable="true"` already present since Task 2/3 — not duplicated).
-  KNOWN LANDMINE (flagged, not fixed here — Vue-only scope this task):
-  DataTableGroupBarDemo.rozie names its controlled-grouping <data> field
-  `groupingModel` (NOT `grouping`) specifically because the #groupBar slot's
-  `grouping` let-var shadows an Angular `grouping` signal ("grouping_r7 is
-  not a function", whole table hidden). This super-demo's grouping slice has
-  been named `$data.grouping` since Task 2 (preserved per Task 5's brief), so
-  the identical Angular collision is latent here too — undetected in this
-  revision because build/test scope is Vue-only and grouping-via-GroupBar is
-  validated later (Task 6, via the imperative handle). Surface this before
-  Angular is added to the super demo's VR matrix.
+  Task 6 (this revision): folds in the Angular-landmine fix flagged at the end
+  of Task 5 above — the `<data>` field is renamed `grouping` → `groupingModel`
+  (mirroring DataTableGroupBarDemo.rozie's proven fix) because the #groupBar
+  slot's `grouping` let-var would otherwise shadow an Angular `grouping`
+  signal ("grouping_r7 is not a function", whole table hidden). The
+  `r-model:grouping="…"` binding target and the readout's `JSON.stringify(…)`
+  source both move to `$data.groupingModel`; the readout's
+  `data-slice="grouping"` KEY is preserved unchanged (a smoke locator depends
+  on it — only the underlying field changed, not the locator). The
+  `#groupBar` slot's own `grouping` let-var is untouched (DataTable's slot
+  scope, not this component's `<data>`).
+
+  Also adds an ISOLATED imperative-handle panel — `ref="tbl"` on `<DataTable>`
+  plus a `showHandle`-gated (default `false`) fieldset of one button per
+  `$expose` verb (expandAll/collapseAll/toggleAllRows/clearSelection/
+  clearSorting/applyGrouping/clearGrouping/setPage/resetColumnSizing/
+  pinColumn), each calling `$refs.tbl.<verb>(…)` from `@click` (the only
+  ROZ123-safe place to read `$refs` outside `$onMount`). Defaulted OFF so an
+  unproven per-target `$refs`-into-composed-child-handle wiring can't take
+  down the rest of the demo if it misbehaves on a non-Vue target — cross-
+  target status is validated later (Task 7/8); this revision's build/test
+  scope is Vue-only.
 
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
@@ -114,7 +126,10 @@
   columnFilters: [],
   rowSelection: {},
   pagination: { pageIndex: 0, pageSize: 20 },
-  grouping: [],
+  // Renamed from `grouping` (Task 6): the #groupBar slot's `grouping` let-var
+  // shadows an Angular `grouping` signal (DataTableGroupBarDemo.rozie's
+  // proven fix). `data-slice="grouping"` readout KEY is unchanged.
+  groupingModel: [],
   expanded: {},
   columnVisibility: {},
   columnSizing: {},
@@ -146,6 +161,12 @@
   // Last cell-edit-commit payload ({ rowId, columnId, oldValue, newValue }),
   // surfaced verbatim (JSON.stringify) as the 12th readout slice.
   lastCommit: null,
+
+  // ── Task 6: isolated imperative-handle panel ──────────────────────────
+  // Default OFF — the panel drives $refs.tbl.<verb>() (a composed-child
+  // $expose handle whose cross-target wiring is unproven), so it's gated
+  // behind an explicit opt-in toggle rather than rendered unconditionally.
+  showHandle: false,
 }
 </data>
 
@@ -178,6 +199,7 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
         </select>
       </label>
       <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
+      <label><input data-testid="ctl-handle" type="checkbox" r-model="$data.showHandle" /> imperative panel</label>
     </fieldset>
 
     <!-- `virtual` is a construction-time-only prop on DataTable — the vertical
@@ -193,6 +215,7 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
          just the two zero-height spacer <tr>s (the exact silent-failure the
          folded-in Task 3 review fix's two-sided bound now catches). -->
     <DataTable
+      ref="tbl"
       :key="String($data.virtual)"
       :data="$data.rows"
       :stickyHeader="true"
@@ -209,7 +232,7 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
       r-model:columnFilters="$data.columnFilters"
       r-model:rowSelection="$data.rowSelection"
       r-model:pagination="$data.pagination"
-      r-model:grouping="$data.grouping"
+      r-model:grouping="$data.groupingModel"
       r-model:expanded="$data.expanded"
       r-model:columnVisibility="$data.columnVisibility"
       r-model:columnSizing="$data.columnSizing"
@@ -261,8 +284,8 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
 
       <!-- Task 5: the #groupBar scoped slot filled with the real GroupBar drop-in
            (mirrors DataTableGroupBarDemo.rozie's proven idiom). This is what makes
-           `:grouping="$data.grouping"` (bound since Task 2 but UI-unreachable until
-           now) actually drivable from the rendered page. -->
+           `r-model:grouping="$data.groupingModel"` (bound since Task 2 but
+           UI-unreachable until now) actually drivable from the rendered page. -->
       <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
         <GroupBar
           :grouping="grouping"
@@ -298,9 +321,29 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
       </template>
     </DataTable>
 
+    <!-- Task 6: isolated imperative-handle panel — gated OFF by default
+         (ctl-handle toggle) so an unproven per-target $refs-into-composed-
+         child-handle wiring can't break the rest of the demo. Every button
+         calls $refs.tbl.<verb>(…) from @click — the only ROZ123-safe place
+         to read $refs outside $onMount. Side effects surface in the readout
+         below (expandAll→expanded non-empty; applyGrouping→grouping slice
+         contains 'category'). -->
+    <fieldset r-if="$data.showHandle" data-testid="handle">
+      <button data-testid="verb-expandAll" @click="$refs.tbl.expandAll()">expandAll</button>
+      <button data-testid="verb-collapseAll" @click="$refs.tbl.collapseAll()">collapseAll</button>
+      <button data-testid="verb-toggleAllRows" @click="$refs.tbl.toggleAllRows(true)">toggleAllRows</button>
+      <button data-testid="verb-clearSelection" @click="$refs.tbl.clearSelection()">clearSelection</button>
+      <button data-testid="verb-clearSorting" @click="$refs.tbl.clearSorting()">clearSorting</button>
+      <button data-testid="verb-applyGrouping" @click="$refs.tbl.applyGrouping(['category'])">applyGrouping(category)</button>
+      <button data-testid="verb-clearGrouping" @click="$refs.tbl.clearGrouping()">clearGrouping</button>
+      <button data-testid="verb-setPage" @click="$refs.tbl.setPage(2)">setPage(2)</button>
+      <button data-testid="verb-resetColumnSizing" @click="$refs.tbl.resetColumnSizing()">resetColumnSizing</button>
+      <button data-testid="verb-pinColumn" @click="$refs.tbl.pinColumn('customer','left')">pinColumn</button>
+    </fieldset>
+
     <aside data-testid="readout">
       <code data-slice="sorting">sorting: {{ JSON.stringify($data.sorting) }}</code>
-      <code data-slice="grouping">grouping: {{ JSON.stringify($data.grouping) }}</code>
+      <code data-slice="grouping">grouping: {{ JSON.stringify($data.groupingModel) }}</code>
       <code data-slice="rowSelection">rowSelection: {{ JSON.stringify($data.rowSelection) }}</code>
       <code data-slice="expanded">expanded: {{ JSON.stringify($data.expanded) }}</code>
       <code data-slice="pagination">pagination: {{ JSON.stringify($data.pagination) }}</code>

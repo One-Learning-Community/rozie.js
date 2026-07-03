@@ -114,3 +114,18 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
   await page.locator('tbody tr').first().getByRole('button').first().click();
   await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });
+
+test('imperative expandAll populates expanded; applyGrouping writes grouping', async ({ page }) => {
+  // Task 6: the isolated imperative-handle panel is gated OFF by default
+  // (ctl-handle) — check it to reveal the $refs.tbl.<verb>() button panel,
+  // then drive two side-effecting verbs and assert the effect shows up in
+  // the readout ($data.groupingModel underlies the `grouping` slice —
+  // Task 6's Angular-landmine rename; the `data-slice="grouping"` locator
+  // is unchanged).
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByTestId('ctl-handle').check();
+  await page.getByTestId('verb-expandAll').click();
+  await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
+  await page.getByTestId('verb-applyGrouping').click();
+  await expect(page.getByTestId('readout').locator('[data-slice="grouping"]')).toContainText('category');
+});
