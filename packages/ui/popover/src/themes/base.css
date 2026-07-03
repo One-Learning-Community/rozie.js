@@ -1,0 +1,24 @@
+/*
+ * @rozie-ui/popover — base token reference.
+ *
+ * Every visual value the component renders is a `--rozie-popover-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-popover` element — custom properties inherit through `display:contents`).
+ * See themes/shadcn.css, themes/material.css and themes/bootstrap.css for
+ * design-system bridges.
+ */
+.rozie-popover {
+  --rozie-popover-z: 1000;
+  --rozie-popover-max-width: calc(100vw - 16px);
+  --rozie-popover-bg: #fff;
+  --rozie-popover-color: inherit;
+  --rozie-popover-border: 1px solid rgba(0, 0, 0, 0.12);
+  --rozie-popover-radius: 8px;
+  --rozie-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --rozie-popover-padding: 8px 12px;
+  --rozie-popover-arrow-size: 8px;
+}
