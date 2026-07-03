@@ -30,6 +30,14 @@ const RUNTIME_FRAMEWORKS = [
   'engine-helpers',
   'svelte-portal-host',
   'svelte-portal-host-reactive',
+  // Phase 71 — the framework-neutral `@rozie/runtime-keynav-core` package. Every
+  // per-target runtime (react/vue/solid/lit) externalizes its
+  // `import … from '@rozie/runtime-keynav-core'`, and Angular's INLINED keynav
+  // controller imports the state machine directly, so all six harness importmaps
+  // map `@rozie/runtime-keynav-core` → `/preview/runtimes/keynav-core.mjs`. Its
+  // dist is fully self-contained (zero external imports). `runtimeFile` resolves
+  // it via the default branch (packages/runtime/keynav-core/dist/index.mjs).
+  'keynav-core',
 ] as const;
 function runtimeFile(name: string): string {
   // KEEP-THE-URL (Phase 20-03, OQ1): the `engine-helpers` runtime package was
