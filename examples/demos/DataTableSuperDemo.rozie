@@ -88,30 +88,44 @@
   proven-portable precedent = PdfViewerDemo.rozie's `?url` worker import
   (also resolved through the VR host's Vite config on every target, since
   every target column here is a Vite sub-build). `$onMount` injects one
-  style element (id="rdt-theme-<name>") per sheet into `document.head`, all
-  `disabled=true` except `base`. The `ctl-theme` picker select
-  (`r-model="$data.theme"`, default `'base'`) calls `applyTheme(name)` on
-  `@change`, which flips `.disabled` on the four style elements so
-  exactly one is ever enabled — an event handler, so `$refs`/DOM access is
-  ROZ123-safe here.
+  style element (id="rdt-theme-<name>") per sheet into `document.head`, then
+  delegates to `applyTheme()` for the initial enable/disable state.
 
-  ARCHITECTURE FINDING (reported, not fixed — mirrors the Lit-shadow caveat
-  below): shadcn.css/material.css/bootstrap.css are NOT standalone skins —
-  each file's own docstring says "Import this AFTER base.css" because
-  base.css does the ONLY wiring from the public `--rozie-data-table-*`
-  tokens to the internal `--rdt-*` tokens the component's own scoped style
-  rules actually read; the three skins only remap the public tokens. A
-  strictly mutually-exclusive swap (this task's literal spec, matching the
-  given smoke test's single-active-stylesheet assertion) therefore disables
-  that wiring the moment a skin is selected, so shadcn/material/bootstrap's
-  remapped `--rozie-data-table-*` values land on properties nothing reads —
-  the table falls back to its own hardcoded zero-config look instead of
-  visibly re-skinning. Real per-package theming finding for Task 8; NOT
-  attempted here per the brief's explicit scope.
+  LAYERED swap model (corrected — the original Task 7 landing used a
+  mutually-exclusive swap and is documented as a bug below):
+  shadcn.css/material.css/bootstrap.css are NOT standalone skins — each
+  file's own docstring says "Import this AFTER base.css" because base.css
+  does the ONLY wiring from the public `--rozie-data-table-*` tokens to the
+  internal `--rdt-*` tokens the component's own scoped style rules actually
+  read; the three skins only remap the public tokens and rely on base.css's
+  structural wiring underneath. So `applyTheme(name)` keeps the `base`
+  style element enabled UNCONDITIONALLY, and only toggles which (if any) of
+  the three skin sheets layers on top: `theme === 'base'` disables all
+  three skins (base alone renders the zero-config look); otherwise the
+  matching skin is enabled and the other two stay disabled. Because the
+  skin sheet is appended to `document.head` AFTER base (DOM order = base,
+  shadcn, material, bootstrap) and both share the same
+  `.rozie-data-table-wrap, .rozie-data-table` selector at equal specificity,
+  the skin's remapped `--rozie-data-table-*` custom properties win the
+  cascade and flow through base's `--rdt-*` wiring — a real, visible
+  restyle. The `ctl-theme` picker select (`r-model="$data.theme"`, default
+  `'base'`) calls `applyTheme(name)` on `@change` — an event handler, so
+  `$refs`/DOM access is ROZ123-safe here.
+
+  BUG FIXED (was: "ARCHITECTURE FINDING, reported not fixed"): the original
+  Task 7 landing used a strictly mutually-exclusive swap (disable every
+  sheet, enable only the selected one), matching the smoke test's literal
+  single-active-stylesheet assertion. That disabled base's token wiring the
+  moment ANY skin was selected, so shadcn/material/bootstrap's remapped
+  tokens landed on custom properties nothing reads — the table silently fell
+  back to its own hardcoded zero-config look for 3 of 4 themes instead of
+  visibly re-skinning. Fixed by the LAYERED model above (base always on);
+  the smoke test now asserts a real computed-style change, not just an id
+  swap, so a regression back to mutually-exclusive would fail it again.
 
   Known caveat (Task 7, not fixed here): on the LIT target, DataTable renders
   in a shadow root, so this `document.head`-injected style-element swap will
-  NOT reach it (shadow encapsulation) — a second real per-target theming finding
+  NOT reach it (shadow encapsulation) — a real per-target theming finding
   for Task 8. Vue (light DOM) is the validated target for this revision.
 
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
@@ -219,15 +233,17 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
   $data.lastCommit = p
 }
 
-// Task 7 — theme switcher. All four shipped theme sheets are pulled in as
-// INLINE strings via Vite's `?inline` query (PdfViewerDemo.rozie's
+// Task 7 — theme switcher (LAYERED model — base always on; a selected skin
+// layers on top). All four shipped theme sheets are pulled in as INLINE
+// strings via Vite's `?inline` query (PdfViewerDemo.rozie's
 // `pdf.worker.min.mjs?url` import is the proven-portable precedent — every
 // target column in this VR host is a Vite sub-build, so the `?inline` query
 // resolves the same way on all six). $onMount injects one style element
-// (id="rdt-theme-<name>") per sheet into document.head, all disabled except
-// base; applyTheme() (an @change handler — DOM access is ROZ123-safe here,
-// unlike $onMount-only $refs reads) flips .disabled so exactly one is ever
-// active.
+// (id="rdt-theme-<name>") per sheet into document.head (in base/shadcn/
+// material/bootstrap DOM order — load-bearing: a later skin sheet must win
+// the cascade over base on the shared `.rozie-data-table-wrap,
+// .rozie-data-table` selector), then delegates to applyTheme() for the
+// initial enable/disable state.
 import baseCss from '../../packages/ui/data-table/src/themes/base.css?inline'
 import shadcnCss from '../../packages/ui/data-table/src/themes/shadcn.css?inline'
 import materialCss from '../../packages/ui/data-table/src/themes/material.css?inline'
@@ -240,6 +256,24 @@ const THEME_SHEETS: Record<string, string> = {
   bootstrap: bootstrapCss,
 }
 
+// LAYERED swap (not mutually-exclusive): base.css wires the public
+// `--rozie-data-table-*` tokens onto the internal `--rdt-*` tokens the
+// component's own scoped style actually reads; shadcn.css/material.css/
+// bootstrap.css only REMAP the public tokens and require base.css's
+// structural wiring underneath (each file's own header says "Import this
+// AFTER base.css"). So `base` stays enabled unconditionally, and only the
+// selected skin (if any) is enabled alongside it — `theme === 'base'`
+// disables all three skins, leaving base's own zero-config look. An
+// @change handler (or the $onMount call below) — DOM access is ROZ123-safe
+// here, unlike $onMount-only $refs reads.
+const applyTheme = (name: string): void => {
+  for (const key of Object.keys(THEME_SHEETS)) {
+    const el = document.getElementById(`rdt-theme-${key}`) as HTMLStyleElement | null
+    if (!el) continue
+    el.disabled = key === 'base' ? false : key !== name
+  }
+}
+
 $onMount(() => {
   for (const name of Object.keys(THEME_SHEETS)) {
     const el = document.createElement('style')
@@ -247,22 +281,13 @@ $onMount(() => {
     el.textContent = THEME_SHEETS[name]
     // `.disabled` reflects onto the element's CSSStyleSheet, which only
     // exists once the <style> is actually inserted into the document — set
-    // it BEFORE appendChild and the assignment is a silent no-op (all four
-    // sheets stay enabled, and since they share the same
-    // `.rozie-data-table-wrap, .rozie-data-table` selector at equal
-    // specificity, the LAST one appended — bootstrap — wins the cascade
-    // regardless of the picker). Must set `.disabled` AFTER appendChild.
+    // it BEFORE appendChild and the assignment is a silent no-op. Must set
+    // `.disabled` AFTER appendChild — done via applyTheme() below, once all
+    // four sheets are in the document in the correct (base-first) order.
     document.head.appendChild(el)
-    el.disabled = name !== 'base'
   }
+  applyTheme($data.theme)
 })
-
-const applyTheme = (name: string): void => {
-  for (const key of Object.keys(THEME_SHEETS)) {
-    const el = document.getElementById(`rdt-theme-${key}`) as HTMLStyleElement | null
-    if (el) el.disabled = key !== name
-  }
-}
 </script>
 
 <template>

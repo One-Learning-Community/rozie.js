@@ -115,13 +115,43 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
   await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });
 
-test('switching theme changes the active data-table stylesheet', async ({ page }) => {
+test('switching theme changes the active data-table stylesheet AND visibly restyles it', async ({ page }) => {
   await page.goto('/?example=DataTableSuper&target=vue');
-  const activeHref = () => page.evaluate(() =>
-    Array.from(document.querySelectorAll('[id^="rdt-theme-"]')).find((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)?.id);
-  const before = await activeHref();
+  // An id-only assertion (which `<style id="rdt-theme-*">` is `.disabled`)
+  // is NOT sufficient — it passed even under the original Task 7 landing's
+  // mutually-exclusive swap bug, which disabled base.css's token-wiring the
+  // moment a skin was selected, so shadcn/material/bootstrap's remapped
+  // tokens landed on custom properties nothing reads and the table silently
+  // kept its zero-config look. Assert the REAL computed effect instead: the
+  // header cell's `background-color` (driven by `--rdt-header-bg`, which
+  // base.css wires from the public `--rozie-data-table-header-bg` token —
+  // base.css's value is `rgba(0, 0, 0, 0.03)`, shadcn.css's remapped value
+  // is `hsl(var(--muted, 210 40% 96.1%))` — genuinely different colors)
+  // must actually CHANGE when switching themes. A broken/no-op swap fails
+  // this even if the active stylesheet id still flips.
+  const headerCell = page.locator('thead .rdt-th').first();
+  const headerBg = () => headerCell.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+  // Under the LAYERED swap, `base` is ALWAYS enabled (a "first non-disabled
+  // id" locator would always resolve to `rdt-theme-base` and never change) —
+  // so capture the full SET of enabled sheet ids instead: base-only before,
+  // base+material after.
+  const enabledIds = () => page.evaluate(() =>
+    Array.from(document.querySelectorAll('[id^="rdt-theme-"]'))
+      .filter((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)
+      .map((s) => s.id)
+      .sort()
+      .join(','));
+
+  // $onMount's style-element injection runs after first paint, so poll
+  // rather than asserting synchronously on the very first read.
+  await expect.poll(enabledIds).toBe('rdt-theme-base');
+  const beforeBg = await headerBg();
+
   await page.getByTestId('ctl-theme').selectOption('material');
-  await expect.poll(activeHref).not.toBe(before);
+
+  await expect.poll(enabledIds).toBe('rdt-theme-base,rdt-theme-material');
+  await expect.poll(headerBg).not.toBe(beforeBg);
   await expect(page.locator('tbody tr').first()).toBeVisible();
 });
 
