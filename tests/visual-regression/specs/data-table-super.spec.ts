@@ -1,4 +1,38 @@
 import { test, expect } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// tests/visual-regression/package.json sets "type": "module".
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Task 8 — cross-target render smoke.
+ *
+ * Every other test in this file is Vue-only (Tasks 1-7 validated the demo
+ * on Vue only). This loop is the FIRST assertion that the super demo — which
+ * composes DataTable + Column + 10 drop-ins from SOURCE via `<components>` —
+ * even COMPILES and RENDERS on the other five targets. A target that fails
+ * to compile shows up as `test.fixme` (dist/<target>/host/entry.<target>.html
+ * missing after `pnpm --filter @rozie/visual-regression build`); a target
+ * that compiles but fails to render fails this test outright. See
+ * docs/superpowers/plans/data-table-super-crosstarget-findings.md for the
+ * full per-target/per-feature results this run produced.
+ */
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`super demo renders a table [${target}]`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    await expect(page.getByTestId('dt-super')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table, [role="grid"], [role="table"]')).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+  });
+}
 
 test('super demo renders a table in Vue', async ({ page }) => {
   await page.goto('/?example=DataTableSuper&target=vue');
