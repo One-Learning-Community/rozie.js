@@ -150,6 +150,28 @@ Linux-rendered per `feedback_vr_linux_baselines`.
 6. Manual: override `--rozie-flow-accent` at `:root` in a demo → every selection cue recolors;
    toggle `.dark` → dark palette applies.
 
+## Execution note (as-built deviation, 2026-07-03)
+
+**Dark mode is opt-in via `themes/base.css`, not a zero-import scoped default.** During
+execution the scoped `@media (prefers-color-scheme: dark)` block emitted as
+*unconditional* dark — Rozie's CSS scoping pass **strips `@media` at-rules** from
+`<style>` (confirmed: `Dialog.rozie`'s `@media` is dropped the same way), which would
+have hoisted the dark overrides to always-on and destroyed the light default. Fix: dark
+lives in the raw-vendored `themes/base.css` (copied verbatim, so the media query
+survives), covering **both** OS `@media (prefers-color-scheme: dark)` (guarded against an
+explicit `.light`/`[data-theme=light]` opt-out) **and** app-toggled
+`.dark`/`[data-theme=dark]`. Consequences vs the approved design:
+
+- **Light default is byte-identical** (git-diff confirmed: every change is
+  `literal → var(--token, same-literal)`), so **no VR rebless** — the opposite of the
+  approved "requires rebless." Net safer.
+- **Dark requires importing `base.css`** (one line) instead of working with zero config.
+  A true zero-import OS-dark default would need the compiler's scoping pass to preserve
+  `@media` — filed as a follow-up, not attempted here.
+- **The net-new dark VR cell is deferred** — it needs a demo that imports `base.css` and a
+  Docker-Linux-rendered baseline (macOS baselines fail CI). The light baseline is
+  byte-identical, so the existing cell still guards the default.
+
 ## Out of scope / deferred
 
 - Refreshing the *light* default look (kept byte-identical).
