@@ -1,8 +1,26 @@
 # data-table dogfood app — design
 
 **Date:** 2026-07-03
-**Status:** Approved (design), pending implementation plan
+**Status:** Approved; architecture revised 2026-07-03 (see addendum)
 **Author:** Dan Krieger + Claude
+
+## Addendum (2026-07-03) — build it in `.rozie`, test cross-target
+
+Revised at Dan's direction: instead of a hand-written Vue SFC consumer app,
+author the super-demo **once as `examples/demos/DataTableSuperDemo.rozie`**
+that composes `<DataTable>`/`<Column>`/drop-ins from source via `<components>`
+(the proven pattern in the 34 existing `DataTable*Demo.rozie`), registered in
+the VR host so it compiles to all six targets. Dan validates Vue first, then
+flips `?example=DataTableSuper&target=<t>` to hand-test the compiled output of
+each framework. This dogfoods the **compiler** (one source → six) as well as
+the component. Trade-off accepted: this consumes DataTable **source**, not the
+installed package — the installed-package/consumer-typecheck reality moves to
+the separate pre-launch tarball smoke. Two constructs whose cross-target
+support is unproven (the imperative-handle panel; runtime theme swap) are
+built **isolated/portable** so they can't break a whole target's render, and
+their per-target status becomes a dogfood finding. The blind spots the effort
+targets (feature combinations, theming, "works like we want") are unchanged;
+only the delivery vehicle changed. The plan below reflects this.
 
 ## Problem
 

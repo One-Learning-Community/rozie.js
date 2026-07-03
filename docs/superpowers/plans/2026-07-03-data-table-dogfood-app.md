@@ -1,894 +1,443 @@
-# DataTable Dogfood App Implementation Plan
+# DataTable Super-Demo (`.rozie`, cross-target) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build one Vue app that consumes the installed `@rozie-ui/data-table-vue` package and wires every data-table feature together (grid + virtualization + editing + grouping + drop-ins), with a live theme switcher, state readouts, and an imperative-handle panel — so the flagship can be hand-dogfooded before launch.
+**Goal:** Author one `examples/demos/DataTableSuperDemo.rozie` that wires every data-table feature together (grid + virtualization + editing + grouping + drop-ins + theming) with control toggles, state readouts, and an isolated imperative-handle panel — compiled to all six targets through the VR host so it can be hand-dogfooded per target (Vue first).
 
-**Architecture:** A standalone Vite + Vue 3 app at `examples/dogfood/data-table-vue/`, registered in the pnpm workspace, depending on `@rozie-ui/data-table-vue` and importing **only** through its package entry (built `dist` + published `.d.ts`), never from `src`. One kitchen-sink `<DataTable>` on a ~1,500-row synthetic dataset, driven by a control panel that flips features on in combination. Verification is per-task: `vue-tsc --noEmit` (consumer-typecheck reality) + a Playwright smoke that drives the feature the task adds.
+**Architecture:** A single `.rozie` demo that composes `<DataTable>`/`<Column>`/drop-ins from source via `<components>` (the proven pattern in the 34 existing `DataTable*Demo.rozie` files). Registered in the VR host (`tests/visual-regression/host/main.ts`), it renders per target at `?example=DataTableSuper&target=<t>` from the per-target sub-builds. Feature flags live in `<data>` and drive `<DataTable>` props/models; drop-ins fill headless slots dispatched by `columnId`. Verification per task: build the VR host + a Playwright smoke against `target=vue`; the final task validates all six.
 
-**Tech Stack:** Vite 8, Vue 3.5, `@rozie-ui/data-table-vue` (built leaf), `@tanstack/table-core` ^8.21, `@tanstack/virtual-core` ^3, `vue-tsc`, `@playwright/test` 1.60.
+**Tech Stack:** Rozie authoring (`.rozie`: `<components>`, `<data>`, `<template>`, `r-model`, `r-if`, `@click`, `$data`, `$refs`, `$onMount`), the VR host (Vite, 6 per-target sub-builds), `@rozie-ui/data-table` source, `@playwright/test` 1.60.
 
 ## Global Constraints
 
-- Consumer imports resolve through the package entry only: `@rozie-ui/data-table-vue` and `@rozie-ui/data-table-vue/themes/*.css`. **Never** import from `.../src/...` or `.../source`.
-- The leaf must be built before the app resolves types/runtime: `pnpm --filter @rozie-ui/data-table-vue build`.
-- Peer deps the consumer must install: `vue@^3.5`, `@tanstack/table-core@^8.21`, `@tanstack/virtual-core@^3`.
-- TypeScript floor 5.6+; the app must pass `vue-tsc --noEmit` clean (this is a real success criterion, not incidental).
-- Node 20+. Package is `private: true` (never published).
-- Vue template attribute forms (verified against `docs/components/data-table-{demo,usage}.md`): v-models are kebab — `v-model:sorting`, `v-model:global-filter`, `v-model:column-filters`, `v-model:row-selection`, `v-model:pagination`, `v-model:grouping`, `v-model:expanded`, `v-model:column-visibility`, `v-model:column-sizing`, `v-model:column-order`, `v-model:column-pinning`, `v-model:data`. Props: `groupable`, `expandable`, `sticky-header`, `selection-mode`, `:virtual`, `max-height`, `:estimate-row-height`, `interaction-mode`. Events kebab: `@cell-edit-commit`, `@row-edit-commit`. Column props: `field`, `header`, `:sortable`, `:filterable`, `:editable`, `editor` (`"text"|"number"|"select"|"checkbox"|"custom"`), `:editorOptions`, `:validate`, `groupable`, `expandable`, `pinned`, `:width`.
+- Compose from **source** via `<components>` exactly like existing demos: `DataTable: '../../packages/ui/data-table/src/DataTable.rozie'`, `Column: '../../packages/ui/data-table/src/Column.rozie'`, and each drop-in `'../../packages/ui/data-table/src/<Name>.rozie'` (EditorText/EditorNumber/EditorSelect/EditorCheckbox/EditorDate/FilterText/FilterNumberRange/FilterSelect/GroupBar/DetailPanel). Never import compiled leaves here.
+- **ROZ123:** `$refs` may be read ONLY in `$onMount`, event handlers, `$watch` callbacks, `<listeners>`, `r-model`, and plain function bodies — NEVER in `$computed`, `$watch` getters, or template-binding/`r-if`/`r-show`/`r-text`/`r-for`-iterable positions (crashes Solid, null on Lit). The imperative panel's verb calls happen in `@click` handlers only.
+- **Isolation rule:** the imperative-handle panel and anything else whose cross-target support is unproven must be gated behind an `r-if` toggle (default off) so a target that can't compile/run it still renders the rest of the demo.
+- Author idioms by mirroring existing demos — read `examples/demos/DataTableGridEmitDemo.rozie` (components/data/models), `examples/demos/DataTableEditDemo.rozie` and `DataTableDetailPanelDemo.rozie` (`#editor`/`#filter`/`#groupBar`/`#detail` slot idioms) before writing new slot markup.
+- The demo is behavioral-only: register it in the host loader + `LIT_TAGS` + the third per-example map, but do NOT add it to `matrix.spec.ts` `EXAMPLES` (no pixel baseline, no CI pixel gate).
+- Demo props in `.rozie` authoring are camelCase bindings (`:interactionMode`, `:selectionMode`, `:estimateRowHeight`, `:maxHeight`, `:stickyHeader`) and `r-model:<slice>` for two-way (`r-model:sorting`, `r-model:grouping`, `r-model:data`, etc.), mirroring the existing demos — NOT the Vue kebab consumer syntax.
+- Test surface: `pnpm vr-preview` (or `pnpm vr-preview:build` to rebuild) → open `http://localhost:<port>/?example=DataTableSuper&target=<t>`.
 
 ---
 
-### Task 1: Scaffold the installed-package consumer app
+### Task 1: Scaffold `DataTableSuperDemo.rozie` + register in the VR host
 
 **Files:**
-- Modify: `pnpm-workspace.yaml` (add `examples/dogfood/*` glob)
-- Create: `examples/dogfood/data-table-vue/package.json`
-- Create: `examples/dogfood/data-table-vue/tsconfig.json`
-- Create: `examples/dogfood/data-table-vue/vite.config.ts`
-- Create: `examples/dogfood/data-table-vue/index.html`
-- Create: `examples/dogfood/data-table-vue/src/main.ts`
-- Create: `examples/dogfood/data-table-vue/src/App.vue`
-- Create: `examples/dogfood/data-table-vue/src/env.d.ts`
-- Create: `examples/dogfood/data-table-vue/playwright.config.ts`
-- Test: `examples/dogfood/data-table-vue/tests/smoke.spec.ts`
-- Create: `examples/dogfood/data-table-vue/README.md`
+- Create: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/host/main.ts` (loader list ~L547 area; `LIT_TAGS` ~L1168; the third per-example map ~L1547)
+- Test: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Produces: a runnable Vue app whose `#app` mounts `App.vue`; a Playwright config whose `webServer` runs `vite preview`; the `data-testid="dogfood-root"` mount marker consumed by every later task's smoke test.
+- Produces: an example keyed `DataTableSuper` → `examples/demos/DataTableSuperDemo.rozie`, Lit tag `rozie-data-table-super`, reachable at `?example=DataTableSuper&target=<t>`. Later tasks extend the same `.rozie`.
 
-- [ ] **Step 1: Register the workspace glob**
+- [ ] **Step 1: Read the pattern anchors**
 
-Add to `pnpm-workspace.yaml` under `packages:` (after the `examples/playground` line):
+Read `examples/demos/DataTableGridEmitDemo.rozie` (top ~90 lines) for the `<components>` + `<data>` + `<template>` shape, and note the exact host-registration spots by reading `tests/visual-regression/host/main.ts` around lines 540–560, 1165–1175, and 1545–1550 for an existing `DataTableSort`/`DataTableGridEmit` entry.
 
-```yaml
-  - "examples/dogfood/*"
-```
-
-- [ ] **Step 2: Create `package.json`**
-
-```json
-{
-  "name": "@rozie-ui-dogfood/data-table-vue",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 4319 --strictPort",
-    "typecheck": "vue-tsc --noEmit",
-    "test:smoke": "playwright test"
-  },
-  "dependencies": {
-    "@rozie-ui/data-table-vue": "workspace:*",
-    "@tanstack/table-core": "^8.21",
-    "@tanstack/virtual-core": "^3",
-    "vue": "^3.5"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.60.0",
-    "@vitejs/plugin-vue": "^5.2.4",
-    "typescript": "^5.6.0",
-    "vite": "^8.0.0",
-    "vue-tsc": "^2.1.0"
-  }
-}
-```
-
-> If `@vitejs/plugin-vue@^5` rejects Vite 8's peer range at install, bump it to the version other workspace Vue builds resolve (check `docs/package.json`); do not downgrade Vite.
-
-- [ ] **Step 3: Create `tsconfig.json`**
-
-```json
-{
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "jsx": "preserve",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "types": ["vite/client"]
-  },
-  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts"]
-}
-```
-
-- [ ] **Step 4: Create `vite.config.ts`, `index.html`, `src/env.d.ts`, `src/main.ts`**
-
-`vite.config.ts`:
-
-```ts
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
-
-export default defineConfig({
-  plugins: [vue()],
-  server: { port: 4319, strictPort: true },
-});
-```
-
-`index.html`:
+- [ ] **Step 2: Create a minimal `DataTableSuperDemo.rozie`**
 
 ```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>data-table dogfood</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-</html>
-```
-
-`src/env.d.ts`:
-
-```ts
-/// <reference types="vite/client" />
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue';
-  const component: DefineComponent<{}, {}, any>;
-  export default component;
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
 }
-```
+</components>
 
-`src/main.ts`:
-
-```ts
-import { createApp } from 'vue';
-import App from './App.vue';
-
-createApp(App).mount('#app');
-```
-
-- [ ] **Step 5: Create a minimal `App.vue` (mount marker only, for now)**
-
-```vue
-<script setup lang="ts">
-import { DataTable } from '@rozie-ui/data-table-vue';
-import '@rozie-ui/data-table-vue/themes/base.css';
-</script>
+<data>
+{
+  rows: [
+    { id: 1, customer: 'Ada Lovelace', category: 'Software', amount: 120.5, units: 3, status: 'active', active: true, orderedAt: '2026-03-01' },
+    { id: 2, customer: 'Alan Turing',  category: 'Hardware', amount: 88.0,  units: 7, status: 'pending', active: false, orderedAt: '2026-03-04' },
+    { id: 3, customer: 'Grace Hopper', category: 'Services', amount: 240.0, units: 1, status: 'active', active: true, orderedAt: '2026-03-06' },
+  ],
+}
+</data>
 
 <template>
-  <main data-testid="dogfood-root">
-    <h1>data-table dogfood</h1>
-    <DataTable :data="[]" />
+  <main data-testid="dt-super">
+    <h1>DataTable — super demo</h1>
+    <DataTable :data="$data.rows" :stickyHeader="true">
+      <Column field="id" header="#" :sortable="true" />
+      <Column field="customer" header="Customer" :sortable="true" />
+      <Column field="category" header="Category" :sortable="true" />
+      <Column field="amount" header="Amount" :sortable="true" />
+    </DataTable>
   </main>
 </template>
 ```
 
-- [ ] **Step 6: Build the leaf, install, and typecheck (verify consumer reality)**
+- [ ] **Step 3: Register in the VR host (3 spots)**
 
-Run:
-```bash
-pnpm --filter @rozie-ui/data-table-vue build
-pnpm install
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-```
-Expected: leaf builds; install links the workspace dep; `vue-tsc --noEmit` exits 0 (the empty `DataTable` resolves types from the built `.d.ts`).
+Add `'DataTableSuper'` to the host loader example list (near `'DataTableSort'`), `DataTableSuper: 'rozie-data-table-super'` to `LIT_TAGS`, and `DataTableSuper: {}` to the third per-example map (mirror the `DataTableSort: {}` entry). Do NOT touch `matrix.spec.ts`.
 
-- [ ] **Step 7: Write the smoke test scaffold**
+- [ ] **Step 4: Build the host + verify it renders in Vue**
 
-`playwright.config.ts`:
+Run: `pnpm vr-preview:build` then, in another shell, confirm the built cell exists:
+`ls tests/visual-regression/dist/vue/host/entry.vue.html`
+Expected: the file exists (the Vue sub-build compiled the demo). If the build errors on the new demo, read the compiler diagnostic and fix the `.rozie` before proceeding.
 
-```ts
-import { defineConfig } from '@playwright/test';
+- [ ] **Step 5: Write the smoke**
 
-export default defineConfig({
-  testDir: './tests',
-  webServer: {
-    command: 'pnpm build && pnpm preview',
-    url: 'http://localhost:4319',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
-  use: { baseURL: 'http://localhost:4319' },
-});
-```
-
-`tests/smoke.spec.ts`:
+`tests/visual-regression/specs/data-table-super.spec.ts`:
 
 ```ts
 import { test, expect } from '@playwright/test';
 
-test('app mounts and renders a DataTable', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('dogfood-root')).toBeVisible();
+test('super demo renders a table in Vue', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await expect(page.getByTestId('dt-super')).toBeVisible();
   await expect(page.locator('table, [role="grid"], [role="table"]')).toBeVisible();
+  await expect(page.locator('tbody tr').first()).toBeVisible();
 });
 ```
 
-- [ ] **Step 8: Run the smoke test**
+- [ ] **Step 6: Run the smoke**
 
-Run: `pnpm --filter @rozie-ui-dogfood/data-table-vue test:smoke`
-Expected: PASS — the built app serves and the empty table renders.
-
-- [ ] **Step 9: Write `README.md`**
-
-Document: purpose (pre-launch hand-dogfood of the flagship), the build-leaf-first requirement, `pnpm dev` to drive it, `pnpm typecheck` / `pnpm test:smoke`, and that it consumes the **built** package (never source).
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add pnpm-workspace.yaml examples/dogfood/data-table-vue pnpm-lock.yaml
-git commit -m "feat(dogfood): scaffold data-table-vue installed-package consumer app"
-```
-
----
-
-### Task 2: Synthetic dataset + column model
-
-**Files:**
-- Create: `examples/dogfood/data-table-vue/src/data.ts`
-- Test: `examples/dogfood/data-table-vue/tests/data.spec.ts`
-
-**Interfaces:**
-- Produces: `type Order` (fields below); `makeOrders(n: number): Order[]`; `ORDERS: Order[]` (1,500 rows); `roleOptions`, `statusOptions`, `categoryOptions: { value: string; label: string }[]`. Consumed by App.vue in every later task.
-
-- [ ] **Step 1: Write the failing test**
-
-`tests/data.spec.ts`:
-
-```ts
-import { test, expect } from '@playwright/test';
-import { makeOrders, ORDERS } from '../src/data';
-
-test('dataset shape and size', () => {
-  expect(ORDERS.length).toBe(1500);
-  const r = makeOrders(3)[0];
-  expect(Object.keys(r).sort()).toEqual(
-    ['active', 'amount', 'category', 'customer', 'id', 'orderedAt', 'status', 'units'].sort(),
-  );
-  expect(typeof r.amount).toBe('number');
-  expect(typeof r.active).toBe('boolean');
-});
-```
-
-> Note: this is a plain unit test run by Playwright's runner (no browser). Keep it in `tests/` so one runner covers both; it does not hit the `webServer`.
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test data.spec --reporter=line`
-Expected: FAIL — `Cannot find module '../src/data'`.
-
-- [ ] **Step 3: Implement `src/data.ts`**
-
-```ts
-export type Order = {
-  id: number;
-  customer: string;      // TEXT   → FilterText / EditorText
-  category: string;      // ENUM   → FilterSelect / EditorSelect
-  amount: number;        // CURRENCY (number) → FilterNumberRange / EditorNumber
-  units: number;         // NUMBER → grouping/aggregation
-  status: string;        // ENUM   → EditorSelect
-  active: boolean;       // BOOL   → EditorCheckbox
-  orderedAt: string;     // DATE (ISO yyyy-mm-dd) → EditorDate
-};
-
-const CUSTOMERS = ['Ada Lovelace', 'Alan Turing', 'Grace Hopper', 'Katherine Johnson',
-  'Margaret Hamilton', 'Edsger Dijkstra', 'Barbara Liskov', 'Donald Knuth', 'Radia Perlman'];
-const CATEGORIES = ['Hardware', 'Software', 'Services', 'Support'];
-const STATUSES = ['active', 'pending', 'archived'];
-
-export const categoryOptions = CATEGORIES.map((v) => ({ value: v, label: v }));
-export const statusOptions = STATUSES.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }));
-export const roleOptions = categoryOptions; // alias for the editor demo
-
-// Deterministic PRNG so the dataset is stable across reloads (no Math.random).
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function makeOrders(n: number): Order[] {
-  const rnd = mulberry32(42);
-  const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
-  return Array.from({ length: n }, (_, i) => {
-    const day = 1 + Math.floor(rnd() * 27);
-    return {
-      id: i + 1,
-      customer: pick(CUSTOMERS),
-      category: pick(CATEGORIES),
-      amount: Math.round(rnd() * 500_00) / 100,
-      units: 1 + Math.floor(rnd() * 40),
-      status: pick(STATUSES),
-      active: rnd() > 0.4,
-      orderedAt: `2026-03-${String(day).padStart(2, '0')}`,
-    };
-  });
-}
-
-export const ORDERS: Order[] = makeOrders(1500);
-```
-
-- [ ] **Step 4: Run the test to verify it passes**
-
-Run: `pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test data.spec --reporter=line`
+Run: `pnpm --filter @rozie/visual-regression exec playwright test data-table-super --reporter=line`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add examples/dogfood/data-table-vue/src/data.ts examples/dogfood/data-table-vue/tests/data.spec.ts
-git commit -m "feat(dogfood): synthetic 1500-row Order dataset + column value sets"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/host/main.ts tests/visual-regression/specs/data-table-super.spec.ts
+git commit -m "feat(dogfood): scaffold DataTableSuperDemo.rozie + register in VR host"
 ```
 
 ---
 
-### Task 3: Base kitchen-sink table + live state readouts
+### Task 2: Full column set + all two-way slices + state readout
 
 **Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Create: `examples/dogfood/data-table-vue/src/StateReadout.vue`
-- Test: `examples/dogfood/data-table-vue/tests/base-table.spec.ts`
+- Modify: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Consumes: `ORDERS`, `Order` from `src/data.ts`.
-- Produces: refs for all two-way slices on `App.vue` (`sorting`, `globalFilter`, `columnFilters`, `rowSelection`, `pagination`, `grouping`, `expanded`, `columnVisibility`, `columnSizing`, `columnOrder`, `columnPinning`, `rows`); a `data-testid="state-readout"` panel; the table under `data-testid="dt"`.
+- Produces: `$data` slices `sorting, globalFilter, columnFilters, rowSelection, pagination, grouping, expanded, columnVisibility, columnSizing, columnOrder, columnPinning` bound via `r-model:<slice>`; a `data-testid="readout"` panel with one `[data-slice="<k>"]` per slice; the eight-column set on the ~1,500-row dataset.
 
-- [ ] **Step 1: Create `StateReadout.vue`**
+- [ ] **Step 1: Grow the dataset to ~1,500 rows via a factory**
 
-```vue
-<script setup lang="ts">
-defineProps<{ state: Record<string, unknown> }>();
-</script>
+In `<data>`, replace the 3 static rows with a generated set. Rozie `<data>` accepts function-valued defaults; use an IIFE-free factory field the template reads:
 
-<template>
-  <aside data-testid="state-readout" class="readout">
-    <h2>state</h2>
-    <code v-for="(v, k) in state" :key="k" :data-slice="k">{{ k }}: {{ JSON.stringify(v) }}</code>
-  </aside>
-</template>
-
-<style scoped>
-.readout { display: flex; flex-direction: column; gap: 4px; font: 12px/1.4 ui-monospace, monospace; }
-.readout code { white-space: pre-wrap; word-break: break-all; }
-</style>
+```js
+  rows: (() => {
+    const C = ['Ada Lovelace','Alan Turing','Grace Hopper','Katherine Johnson','Margaret Hamilton','Edsger Dijkstra','Barbara Liskov','Donald Knuth','Radia Perlman'];
+    const K = ['Hardware','Software','Services','Support'];
+    const S = ['active','pending','archived'];
+    let seed = 42; const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const pick = (a) => a[Math.floor(rnd()*a.length)];
+    return Array.from({ length: 1500 }, (_, i) => ({
+      id: i+1, customer: pick(C), category: pick(K),
+      amount: Math.round(rnd()*50000)/100, units: 1+Math.floor(rnd()*40),
+      status: pick(S), active: rnd() > 0.4,
+      orderedAt: `2026-03-${String(1+Math.floor(rnd()*27)).padStart(2,'0')}`,
+    }));
+  })(),
 ```
 
-- [ ] **Step 2: Rewrite `App.vue` to bind every slice + a global-filter search box**
+> If the `<data>` object-literal parser rejects the IIFE, move the generator into a `<script>` block that assigns `$data.rows` in `$onMount`, seeding an empty `rows: []` in `<data>` and gating the table with `r-if="$data.rows.length"`. Prefer the `<data>` factory; fall back only on a parser error.
 
-```vue
-<script setup lang="ts">
-import { ref } from 'vue';
-import { DataTable, Column } from '@rozie-ui/data-table-vue';
-import '@rozie-ui/data-table-vue/themes/base.css';
-import { ORDERS, type Order } from './data';
-import StateReadout from './StateReadout.vue';
+- [ ] **Step 2: Bind all slices + full columns**
 
-const rows = ref<Order[]>([...ORDERS]);
-const sorting = ref<any[]>([]);
-const globalFilter = ref('');
-const columnFilters = ref<any[]>([]);
-const rowSelection = ref<Record<string, boolean>>({});
-const pagination = ref({ pageIndex: 0, pageSize: 20 });
-const grouping = ref<string[]>([]);
-const expanded = ref<Record<string, boolean>>({});
-const columnVisibility = ref<Record<string, boolean>>({});
-const columnSizing = ref<Record<string, number>>({});
-const columnOrder = ref<string[]>([]);
-const columnPinning = ref<{ left?: string[]; right?: string[] }>({});
-</script>
+Add all `r-model:<slice>` bindings to `<DataTable>` (`sorting`, `globalFilter`, `columnFilters`, `rowSelection`, `pagination`, `grouping`, `expanded`, `columnVisibility`, `columnSizing`, `columnOrder`, `columnPinning`) with matching `<data>` seed values (`sorting: []`, `pagination: { pageIndex: 0, pageSize: 20 }`, object slices `{}`, array slices `[]`). Add the full eight columns (`id, customer, category, amount, units, status, active, orderedAt`) with `:sortable`, `:filterable` on the filterable ones, and `groupable` on `customer`/`category`/`status`. Add `:selectionMode="'multiple'"`.
 
-<template>
-  <main data-testid="dogfood-root" class="shell">
-    <section class="tablewrap">
-      <input
-        data-testid="global-filter"
-        v-model="globalFilter"
-        placeholder="search all columns…"
-      />
-      <div data-testid="dt">
-        <DataTable
-          :data="rows"
-          selection-mode="multiple"
-          sticky-header
-          v-model:sorting="sorting"
-          v-model:global-filter="globalFilter"
-          v-model:column-filters="columnFilters"
-          v-model:row-selection="rowSelection"
-          v-model:pagination="pagination"
-          v-model:grouping="grouping"
-          v-model:expanded="expanded"
-          v-model:column-visibility="columnVisibility"
-          v-model:column-sizing="columnSizing"
-          v-model:column-order="columnOrder"
-          v-model:column-pinning="columnPinning"
-        >
-          <Column field="id" header="#" :sortable="true" :width="60" />
-          <Column field="customer" header="Customer" :sortable="true" :filterable="true" groupable />
-          <Column field="category" header="Category" :sortable="true" :filterable="true" groupable />
-          <Column field="amount" header="Amount" :sortable="true" :filterable="true" />
-          <Column field="units" header="Units" :sortable="true" />
-          <Column field="status" header="Status" :sortable="true" :filterable="true" groupable />
-          <Column field="active" header="Active" :sortable="true" />
-          <Column field="orderedAt" header="Ordered" :sortable="true" />
-        </DataTable>
-      </div>
-    </section>
+- [ ] **Step 3: Add the state readout panel**
 
-    <StateReadout
-      :state="{ sorting, globalFilter, columnFilters, rowSelection, pagination, grouping, expanded, columnVisibility, columnSizing, columnOrder, columnPinning }"
-    />
-  </main>
-</template>
-
-<style scoped>
-.shell { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px; align-items: start; }
-.tablewrap { min-width: 0; }
-[data-testid='global-filter'] { margin-bottom: 8px; padding: 4px 8px; width: 240px; }
-</style>
-```
-
-- [ ] **Step 3: Write the behavioral smoke**
-
-`tests/base-table.spec.ts`:
-
-```ts
-import { test, expect } from '@playwright/test';
-
-test('renders rows, sorts on header click, readout reflects sorting', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('dt').locator('tbody tr').first()).toBeVisible();
-  await page.getByRole('columnheader', { name: 'Customer' }).click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="sorting"]'))
-    .toContainText('customer');
-});
-
-test('global filter narrows the row set', async ({ page }) => {
-  await page.goto('/');
-  const rowsBefore = await page.getByTestId('dt').locator('tbody tr').count();
-  await page.getByTestId('global-filter').fill('Turing');
-  await expect
-    .poll(async () => page.getByTestId('dt').locator('tbody tr').count())
-    .toBeLessThan(rowsBefore);
-});
-```
-
-- [ ] **Step 4: Typecheck + run smokes**
-
-Run:
-```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test base-table.spec --reporter=line
-```
-Expected: typecheck exits 0; both smokes PASS.
-
-> If sorting-header role/name differs, open `pnpm dev` and read the actual DOM (the compiled table markup is authoritative) before adjusting the locator — do not weaken the assertion to make it pass.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/src/StateReadout.vue examples/dogfood/data-table-vue/tests/base-table.spec.ts
-git commit -m "feat(dogfood): kitchen-sink table with all 11 two-way slices + live state readout"
-```
-
----
-
-### Task 4: Control panel — interaction mode, virtualization, selection, pagination
-
-**Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Create: `examples/dogfood/data-table-vue/src/ControlPanel.vue`
-- Test: `examples/dogfood/data-table-vue/tests/controls-core.spec.ts`
-
-**Interfaces:**
-- Produces: a `ControlPanel.vue` emitting `v-model` on a shared `controls` reactive object with keys `interactionMode: 'table'|'grid'`, `virtual: boolean`, `selectionMode: 'none'|'single'|'multiple'`, `manualPagination: boolean`. App.vue binds these onto `<DataTable>`. Each control carries `data-testid="ctl-<key>"`.
-
-- [ ] **Step 1: Create `ControlPanel.vue`**
-
-```vue
-<script setup lang="ts">
-const model = defineModel<{
-  interactionMode: 'table' | 'grid';
-  virtual: boolean;
-  selectionMode: 'none' | 'single' | 'multiple';
-  manualPagination: boolean;
-}>({ required: true });
-</script>
-
-<template>
-  <fieldset class="controls">
-    <legend>controls</legend>
-    <label>mode
-      <select data-testid="ctl-interactionMode" v-model="model.interactionMode">
-        <option value="table">table</option>
-        <option value="grid">grid</option>
-      </select>
-    </label>
-    <label><input data-testid="ctl-virtual" type="checkbox" v-model="model.virtual" /> virtualize</label>
-    <label>selection
-      <select data-testid="ctl-selectionMode" v-model="model.selectionMode">
-        <option value="none">none</option>
-        <option value="single">single</option>
-        <option value="multiple">multiple</option>
-      </select>
-    </label>
-    <label><input data-testid="ctl-manualPagination" type="checkbox" v-model="model.manualPagination" /> manual pagination</label>
-  </fieldset>
-</template>
-```
-
-- [ ] **Step 2: Wire controls into App.vue**
-
-In `App.vue` `<script setup>` add:
-
-```ts
-import ControlPanel from './ControlPanel.vue';
-const controls = ref({
-  interactionMode: 'table' as 'table' | 'grid',
-  virtual: false,
-  selectionMode: 'multiple' as 'none' | 'single' | 'multiple',
-  manualPagination: false,
-});
-```
-
-Replace the static `selection-mode="multiple"` on `<DataTable>` and add the bound props:
+Below the table, render a readout mirroring the existing demos' readout pattern (see `DataTableGridEmitDemo.rozie`'s activecell readout):
 
 ```html
-          :interaction-mode="controls.interactionMode"
-          :virtual="controls.virtual"
-          max-height="440px"
-          :estimate-row-height="40"
-          :selection-mode="controls.selectionMode"
-          :manual="controls.manualPagination"
+    <aside data-testid="readout">
+      <code data-slice="sorting">sorting: {{ JSON.stringify($data.sorting) }}</code>
+      <code data-slice="grouping">grouping: {{ JSON.stringify($data.grouping) }}</code>
+      <code data-slice="rowSelection">rowSelection: {{ JSON.stringify($data.rowSelection) }}</code>
+      <code data-slice="expanded">expanded: {{ JSON.stringify($data.expanded) }}</code>
+      <code data-slice="pagination">pagination: {{ JSON.stringify($data.pagination) }}</code>
+      <code data-slice="columnFilters">columnFilters: {{ JSON.stringify($data.columnFilters) }}</code>
+    </aside>
 ```
 
-Add `<ControlPanel v-model="controls" />` above the table inside `.tablewrap`.
+- [ ] **Step 4: Extend the smoke**
 
-- [ ] **Step 3: Write the smoke**
-
-`tests/controls-core.spec.ts`:
+Add to `data-table-super.spec.ts`:
 
 ```ts
-import { test, expect } from '@playwright/test';
+test('header click updates the sorting readout', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByRole('columnheader', { name: 'Customer' }).click();
+  await expect(page.getByTestId('readout').locator('[data-slice="sorting"]')).toContainText('customer');
+});
+```
 
-test('grid mode exposes role=grid and roving tabstop', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('ctl-interactionMode').selectOption('grid');
+- [ ] **Step 5: Rebuild + run smokes**
+
+Run: `pnpm vr-preview:build` then `pnpm --filter @rozie/visual-regression exec playwright test data-table-super --reporter=line`
+Expected: both PASS. If the sort-header role/name differs, read the real DOM via `pnpm vr-preview` before adjusting the locator.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts
+git commit -m "feat(dogfood): full column set, all two-way slices, live state readout"
+```
+
+---
+
+### Task 3: Control panel — grid/virtual/selection/pagination toggles
+
+**Files:**
+- Modify: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
+
+**Interfaces:**
+- Produces: `$data` flags `gridMode`, `virtual`, `selectionMode`, `manualPagination` bound to control inputs (`data-testid="ctl-<flag>"`) and onto `<DataTable>` props: `:interactionMode="$data.gridMode ? 'grid' : 'table'"`, `:virtual`, `:maxHeight`, `:estimateRowHeight`, `:selectionMode`, `:manual`.
+
+- [ ] **Step 1: Add flags to `<data>`**
+
+`gridMode: false, virtual: false, selectionMode: 'multiple', manualPagination: false`.
+
+- [ ] **Step 2: Add the control panel above the table**
+
+```html
+    <fieldset data-testid="controls">
+      <label>mode
+        <select data-testid="ctl-gridMode" r-model="$data.gridMode">
+          <option :value="false">table</option>
+          <option :value="true">grid</option>
+        </select>
+      </label>
+      <label><input data-testid="ctl-virtual" type="checkbox" r-model="$data.virtual" /> virtualize</label>
+      <label>selection
+        <select data-testid="ctl-selectionMode" r-model="$data.selectionMode">
+          <option value="none">none</option>
+          <option value="single">single</option>
+          <option value="multiple">multiple</option>
+        </select>
+      </label>
+      <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
+    </fieldset>
+```
+
+> If binding `<option :value="true/false">` mis-coerces to strings on some target, switch `gridMode` to a string `'table'|'grid'` model and bind `:interactionMode="$data.gridMode"` directly. Note it as DONE_WITH_CONCERNS if you hit it.
+
+- [ ] **Step 3: Wire flags onto `<DataTable>`**
+
+Add: `:interactionMode="$data.gridMode ? 'grid' : 'table'"`, `:virtual="$data.virtual"`, `:maxHeight="'440px'"`, `:estimateRowHeight="40"`, `:selectionMode="$data.selectionMode"`, `:manual="$data.manualPagination"`.
+
+- [ ] **Step 4: Extend the smoke**
+
+```ts
+test('grid mode exposes role=grid', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByTestId('ctl-gridMode').selectOption('grid');
   await expect(page.locator('[role="grid"]')).toBeVisible();
 });
-
-test('virtualization windows the row set', async ({ page }) => {
-  await page.goto('/');
+test('virtualization windows the rows', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
   await page.getByTestId('ctl-virtual').check();
-  // With 1500 rows windowed into a 440px viewport, far fewer than 1500 <tr> render.
-  await expect
-    .poll(async () => page.getByTestId('dt').locator('tbody tr').count())
-    .toBeLessThan(100);
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(100);
 });
 ```
 
-- [ ] **Step 4: Typecheck + run smokes**
+- [ ] **Step 5: Rebuild + run + commit**
 
-Run:
+Run: `pnpm vr-preview:build` then `pnpm --filter @rozie/visual-regression exec playwright test data-table-super --reporter=line` (expected PASS), then:
 ```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test controls-core.spec --reporter=line
-```
-Expected: typecheck 0; both PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/ControlPanel.vue examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/tests/controls-core.spec.ts
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts
 git commit -m "feat(dogfood): control panel — grid/table, virtualization, selection, manual pagination"
 ```
 
 ---
 
-### Task 5: Editing + the five editor drop-ins
+### Task 4: Editing + the five editor drop-ins (`#editor`)
 
 **Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Test: `examples/dogfood/data-table-vue/tests/editing.spec.ts`
+- Modify: `examples/demos/DataTableSuperDemo.rozie` (add drop-ins to `<components>`; editable columns; `#editor` slot)
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Consumes: `statusOptions`, `categoryOptions` from `src/data.ts`.
-- Produces: `:editable` columns + a `#editor` slot dispatched by `columnId` to `EditorText/Number/Select/Checkbox/Date`; `@cell-edit-commit` writing back to `rows`.
+- Produces: `:editable="true" editor="custom"` on `customer/category/amount/active/orderedAt/status`; a `#editor` slot dispatched by `columnId` to `EditorText/Number/Select/Checkbox/Date`; a `@cellEditCommit` handler setting `$data.lastCommit`.
 
-- [ ] **Step 1: Add editor imports + editable columns**
+- [ ] **Step 1: Add editor drop-ins to `<components>`**
 
-In `App.vue` extend the import:
+Add `EditorText`, `EditorNumber`, `EditorSelect`, `EditorCheckbox`, `EditorDate` (paths `'../../packages/ui/data-table/src/<Name>.rozie'`). Add `categoryOptions`/`statusOptions` arrays to `<data>` (`[{ value, label }]`).
 
-```ts
-import { DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckbox, EditorDate } from '@rozie-ui/data-table-vue';
-import { ORDERS, statusOptions, categoryOptions, type Order } from './data';
-```
+- [ ] **Step 2: Mark columns editable + add the `#editor` slot**
 
-Mark columns editable with `editor="custom"` so the `#editor` slot drives them: add `:editable="true" editor="custom"` to `customer`, `category`, `amount`, `active`, `orderedAt`, and `status`.
-
-- [ ] **Step 2: Add the `#editor` slot (dispatched by columnId)**
-
-Inside `<DataTable>`:
+Mirror `examples/demos/DataTableEditDemo.rozie`'s `#editor` slot. Add `:editable="true" editor="custom"` to the six columns, then:
 
 ```html
-          <template #editor="{ columnId, column, row, value, commit, cancel }">
-            <EditorSelect v-if="columnId === 'category'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" :options="categoryOptions" />
-            <EditorSelect v-else-if="columnId === 'status'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" :options="statusOptions" />
-            <EditorNumber v-else-if="columnId === 'amount'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
-            <EditorCheckbox v-else-if="columnId === 'active'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
-            <EditorDate v-else-if="columnId === 'orderedAt'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
-            <EditorText v-else :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
-          </template>
+      <template #editor="{ columnId, column, row, value, commit, cancel }">
+        <EditorSelect r-if="columnId === 'category'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" :options="$data.categoryOptions" />
+        <EditorSelect r-else-if="columnId === 'status'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" :options="$data.statusOptions" />
+        <EditorNumber r-else-if="columnId === 'amount'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
+        <EditorCheckbox r-else-if="columnId === 'active'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
+        <EditorDate r-else-if="columnId === 'orderedAt'" :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
+        <EditorText r-else :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel" />
+      </template>
 ```
 
-Add the commit handler on `<DataTable>`: `@cell-edit-commit="onCellCommit"` and in script:
+Add `@cellEditCommit="onCommit"` and a `<listeners>`/`<script>` `onCommit(p) { $data.lastCommit = p }` with `lastCommit: null` in `<data>` and a `[data-slice="lastCommit"]` readout line.
+
+- [ ] **Step 2b: Verify the `r-else-if` chain compiles on all authored targets**
+
+If the compiler rejects `r-else-if` in slot position, fall back to separate `r-if` blocks each testing `columnId`. Note which you used.
+
+- [ ] **Step 3: Smoke**
 
 ```ts
-function onCellCommit(p: { rowId: string | number; columnId: string; value: unknown }) {
-  // The component owns edit state and re-feeds via data; this readout proves commits fire.
-  lastCommit.value = p;
-}
-const lastCommit = ref<unknown>(null);
-```
-
-Add `lastCommit` into the `StateReadout` `:state` object.
-
-- [ ] **Step 3: Write the smoke**
-
-`tests/editing.spec.ts`:
-
-```ts
-import { test, expect } from '@playwright/test';
-
-test('editing a Customer cell commits and fires cell-edit-commit', async ({ page }) => {
-  await page.goto('/');
-  const cell = page.getByTestId('dt').locator('tbody tr').first().locator('td').nth(1);
+test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  const cell = page.locator('tbody tr').first().locator('td').nth(1);
   await cell.click();
-  await page.keyboard.press('Enter'); // enter edit mode
-  const input = cell.locator('input');
-  await input.fill('Zzz Edited');
-  await page.keyboard.press('Enter'); // commit
-  await expect(page.getByTestId('state-readout').locator('[data-slice="lastCommit"]'))
-    .toContainText('customer');
+  await page.keyboard.press('Enter');
+  await cell.locator('input').fill('Zzz Edited');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('readout').locator('[data-slice="lastCommit"]')).toContainText('customer');
 });
 ```
 
-- [ ] **Step 4: Typecheck + run**
+- [ ] **Step 4: Rebuild + run + commit**
 
-Run:
+`pnpm vr-preview:build` → run the spec (PASS; if Enter-to-edit differs, drive it in `pnpm vr-preview` and match the real keymap — F2 is the documented alternate — do not weaken the commit assertion), then:
 ```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test editing.spec --reporter=line
-```
-Expected: typecheck 0; smoke PASS. If Enter-to-edit differs, drive it in `pnpm dev` and match the real keymap (F2 is the documented alternate) before adjusting — do not weaken the commit assertion.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/tests/editing.spec.ts
-git commit -m "feat(dogfood): inline editing wired to all five editor drop-ins + commit readout"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts
+git commit -m "feat(dogfood): inline editing wired to all five editor drop-ins"
 ```
 
 ---
 
-### Task 6: Grouping + GroupBar, per-column filters + faceted, expandable + DetailPanel
+### Task 5: Grouping + GroupBar, filters (text/faceted/range), expandable + DetailPanel
 
 **Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Test: `examples/dogfood/data-table-vue/tests/group-filter-expand.spec.ts`
+- Modify: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Produces: `#groupBar`, `#filter` (dispatched by columnId to `FilterText/FilterSelect/FilterNumberRange`), `#detail` slots; `groupable` + `expandable` on `<DataTable>`.
+- Produces: `groupable expandable` on `<DataTable>`; `#groupBar`, `#filter` (dispatched by `columnId`), `#detail` slots filled by `GroupBar`/`FilterText`/`FilterSelect`/`FilterNumberRange`/`DetailPanel`.
 
-- [ ] **Step 1: Extend imports + enable groupable/expandable**
+- [ ] **Step 1: Add the five drop-ins to `<components>`**
 
-```ts
-import { /* …existing… */ GroupBar, FilterText, FilterSelect, FilterNumberRange, DetailPanel } from '@rozie-ui/data-table-vue';
-```
+`GroupBar`, `FilterText`, `FilterNumberRange`, `FilterSelect`, `DetailPanel`.
 
-Add `groupable expandable` attributes to `<DataTable>`.
+- [ ] **Step 2: Enable + add slots (mirror `DataTableDetailPanelDemo.rozie` + the docs demo)**
 
-- [ ] **Step 2: Add the three slots**
+Add `:groupable="true" :expandable="true"` to `<DataTable>`, then the three slots:
 
 ```html
-          <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
-            <GroupBar :grouping="grouping" :groupableColumns="groupableColumns" :applyGrouping="applyGrouping" :clearGrouping="clearGrouping" />
-          </template>
-
-          <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
-            <FilterSelect v-if="columnId === 'category' || columnId === 'status'" :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues" />
-            <FilterNumberRange v-else-if="columnId === 'amount'" :columnId="columnId" :setFilter="setFilter" :minMax="minMax" />
-            <FilterText v-else :columnId="columnId" :setFilter="setFilter" />
-          </template>
-
-          <template #detail="{ row }">
-            <DetailPanel :row="row" />
-          </template>
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <GroupBar :grouping="grouping" :groupableColumns="groupableColumns" :applyGrouping="applyGrouping" :clearGrouping="clearGrouping" />
+      </template>
+      <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
+        <FilterSelect r-if="columnId === 'category' || columnId === 'status'" :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues" />
+        <FilterNumberRange r-else-if="columnId === 'amount'" :columnId="columnId" :setFilter="setFilter" :minMax="minMax" />
+        <FilterText r-else :columnId="columnId" :setFilter="setFilter" />
+      </template>
+      <template #detail="{ row }">
+        <DetailPanel :row="row" />
+      </template>
 ```
 
-- [ ] **Step 3: Write the smoke**
-
-`tests/group-filter-expand.spec.ts`:
+- [ ] **Step 3: Smoke (faceted filter + expand; grouping is covered via the handle in Task 6)**
 
 ```ts
-import { test, expect } from '@playwright/test';
-
-test('faceted select filter narrows rows to one category', async ({ page }) => {
-  await page.goto('/');
-  const before = await page.getByTestId('dt').locator('tbody tr').count();
-  const facet = page.getByTestId('dt').getByRole('combobox').first();
-  await facet.selectOption({ index: 1 });
-  await expect
-    .poll(async () => page.getByTestId('dt').locator('tbody tr').count())
-    .toBeLessThanOrEqual(before);
+test('faceted select filter narrows rows', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  const before = await page.locator('tbody tr').count();
+  await page.getByTestId('dt-super').getByRole('combobox').first().selectOption({ index: 1 });
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThanOrEqual(before);
 });
-
-test('expanding a row reveals its DetailPanel', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('dt').locator('tbody tr').first().getByRole('button').first().click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
+test('expanding a row reveals its detail panel', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.locator('tbody tr').first().getByRole('button').first().click();
+  await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });
 ```
 
-> Grouping is not smoke-tested here — it is exercised by hand via the GroupBar and asserted through the imperative `applyGrouping` path in Task 7. Keep the faceted + expand assertions in this task strict.
+- [ ] **Step 4: Rebuild + run + commit**
 
-- [ ] **Step 4: Typecheck + run**
-
-Run:
+`pnpm vr-preview:build` → run spec (PASS; verify selectors in `pnpm vr-preview` if a locator misses), then:
 ```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test group-filter-expand.spec --reporter=line
-```
-Expected: typecheck 0; PASS. Verify selectors against real DOM in `pnpm dev` if a locator misses.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/tests/group-filter-expand.spec.ts
-git commit -m "feat(dogfood): GroupBar + faceted/text/range filters + expandable DetailPanel drop-ins"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts
+git commit -m "feat(dogfood): GroupBar + text/faceted/range filters + expandable DetailPanel"
 ```
 
 ---
 
-### Task 7: Column-ops controls + imperative-handle panel
+### Task 6: Isolated imperative-handle panel (`$refs` in `@click` only)
 
 **Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Create: `examples/dogfood/data-table-vue/src/HandlePanel.vue`
-- Test: `examples/dogfood/data-table-vue/tests/handle.spec.ts`
+- Modify: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Consumes: the table instance via `ref="tbl"` on `<DataTable>`.
-- Produces: a `HandlePanel.vue` taking `:handle` (the table ref) and rendering a button per `$expose` verb; each button `data-testid="verb-<name>"`.
+- Produces: `r-ref="tbl"` on `<DataTable>`; a panel gated by `r-if="$data.showHandle"` (default `false`) with a button per `$expose` verb, each calling `$refs.tbl.<verb>(…)` in `@click`.
 
-- [ ] **Step 1: Add `ref="tbl"` to `<DataTable>` and expose it**
+- [ ] **Step 1: Add the ref + the isolation toggle**
 
-In `App.vue`: `const tbl = ref<any>(null);` and add `ref="tbl"` to `<DataTable>`. Pass `:handle="tbl"` to a new `<HandlePanel>`.
+Add `r-ref="tbl"` to `<DataTable>` (mirror how existing demos attach a component ref). Add `showHandle: false` to `<data>` and a toggle: `<label><input data-testid="ctl-handle" type="checkbox" r-model="$data.showHandle" /> imperative panel</label>`.
 
-- [ ] **Step 2: Create `HandlePanel.vue`**
+- [ ] **Step 2: Add the gated panel**
 
-```vue
-<script setup lang="ts">
-const props = defineProps<{ handle: any }>();
-const VERBS: { name: string; run: (h: any) => void }[] = [
-  { name: 'expandAll', run: (h) => h?.expandAll?.() },
-  { name: 'collapseAll', run: (h) => h?.collapseAll?.() },
-  { name: 'toggleAllRows', run: (h) => h?.toggleAllRows?.(true) },
-  { name: 'clearSelection', run: (h) => h?.clearSelection?.() },
-  { name: 'clearSorting', run: (h) => h?.clearSorting?.() },
-  { name: 'applyGrouping', run: (h) => h?.applyGrouping?.(['category']) },
-  { name: 'clearGrouping', run: (h) => h?.clearGrouping?.() },
-  { name: 'setPage', run: (h) => h?.setPage?.(2) },
-  { name: 'setRowsPerPage', run: (h) => h?.setRowsPerPage?.(50) },
-  { name: 'resetColumnSizing', run: (h) => h?.resetColumnSizing?.() },
-  { name: 'pinColumn', run: (h) => h?.pinColumn?.('customer', 'left') },
-  { name: 'focusCell', run: (h) => h?.focusCell?.(0, 1) },
-  { name: 'commitEditing', run: (h) => h?.commitEditing?.() },
-];
-function fire(v: (h: any) => void) { v(props.handle); }
-</script>
-
-<template>
-  <fieldset class="handle">
-    <legend>imperative handle ($expose)</legend>
-    <button v-for="v in VERBS" :key="v.name" :data-testid="'verb-' + v.name" type="button" @click="fire(v.run)">
-      {{ v.name }}
-    </button>
-  </fieldset>
-</template>
+```html
+    <fieldset r-if="$data.showHandle" data-testid="handle">
+      <button data-testid="verb-expandAll" @click="$refs.tbl.expandAll()">expandAll</button>
+      <button data-testid="verb-collapseAll" @click="$refs.tbl.collapseAll()">collapseAll</button>
+      <button data-testid="verb-toggleAllRows" @click="$refs.tbl.toggleAllRows(true)">toggleAllRows</button>
+      <button data-testid="verb-clearSelection" @click="$refs.tbl.clearSelection()">clearSelection</button>
+      <button data-testid="verb-clearSorting" @click="$refs.tbl.clearSorting()">clearSorting</button>
+      <button data-testid="verb-applyGrouping" @click="$refs.tbl.applyGrouping(['category'])">applyGrouping(category)</button>
+      <button data-testid="verb-clearGrouping" @click="$refs.tbl.clearGrouping()">clearGrouping</button>
+      <button data-testid="verb-setPage" @click="$refs.tbl.setPage(2)">setPage(2)</button>
+      <button data-testid="verb-resetColumnSizing" @click="$refs.tbl.resetColumnSizing()">resetColumnSizing</button>
+      <button data-testid="verb-pinColumn" @click="$refs.tbl.pinColumn('customer','left')">pinColumn</button>
+    </fieldset>
 ```
 
-> This intentionally covers the safe, side-effecting verbs. Getter verbs (`getSelectedRows`, `getActiveCell`, `getFacetedUniqueValues`, …) are exercised by hand in `pnpm dev` via the console; do not fabricate assertions for them here.
+> These are side-effecting verbs whose result shows in the readout. Getter verbs are exercised by hand. If `$refs.tbl.<verb>` is undefined at click time on `target=vue`, the composed-child handle is not wired — report DONE_WITH_CONCERNS with the exact verb/target; do NOT delete the panel (its cross-target status is a dogfood deliverable).
 
-- [ ] **Step 3: Write the smoke**
-
-`tests/handle.spec.ts`:
+- [ ] **Step 3: Smoke (vue only — the cross-target status is validated in Task 7)**
 
 ```ts
-import { test, expect } from '@playwright/test';
-
-test('expandAll populates the expanded slice; clearSelection empties selection', async ({ page }) => {
-  await page.goto('/');
+test('imperative expandAll populates expanded; applyGrouping writes grouping', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByTestId('ctl-handle').check();
   await page.getByTestId('verb-expandAll').click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
-  await page.getByTestId('verb-toggleAllRows').click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="rowSelection"]')).not.toContainText('{}');
-  await page.getByTestId('verb-clearSelection').click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="rowSelection"]')).toContainText('{}');
-});
-
-test('applyGrouping(category) writes the grouping slice', async ({ page }) => {
-  await page.goto('/');
+  await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
   await page.getByTestId('verb-applyGrouping').click();
-  await expect(page.getByTestId('state-readout').locator('[data-slice="grouping"]')).toContainText('category');
+  await expect(page.getByTestId('readout').locator('[data-slice="grouping"]')).toContainText('category');
 });
 ```
 
-- [ ] **Step 4: Typecheck + run**
+- [ ] **Step 4: Rebuild + run + commit**
 
-Run:
+`pnpm vr-preview:build` → run spec (PASS on vue), then:
 ```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test handle.spec --reporter=line
-```
-Expected: typecheck 0; PASS. Any verb that throws or no-ops unexpectedly is a real dogfood finding — record it, do not delete the button.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/HandlePanel.vue examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/tests/handle.spec.ts
-git commit -m "feat(dogfood): imperative-handle panel driving the \$expose verbs by hand"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts
+git commit -m "feat(dogfood): isolated imperative-handle panel (\$refs verbs in @click)"
 ```
 
 ---
 
-### Task 8: Live theme switcher (the theming blind spot)
+### Task 7: Theme switcher (portable `<link>`/`sheet.disabled` swap)
 
 **Files:**
-- Modify: `examples/dogfood/data-table-vue/src/App.vue`
-- Create: `examples/dogfood/data-table-vue/src/themes.ts`
-- Test: `examples/dogfood/data-table-vue/tests/theming.spec.ts`
+- Modify: `examples/demos/DataTableSuperDemo.rozie`
+- Modify: `tests/visual-regression/specs/data-table-super.spec.ts`
 
 **Interfaces:**
-- Produces: a `theme` ref (`'base'|'shadcn'|'material'|'bootstrap'`) driving a stylesheet swap; a `data-testid="ctl-theme"` selector.
+- Produces: a `theme` model (`'base'|'shadcn'|'material'|'bootstrap'`, default `'base'`) that swaps the active data-table stylesheet at runtime via DOM, portably across targets.
 
-- [ ] **Step 1: Import all four theme sheets via the package subpath**
+- [ ] **Step 1: Provide the four theme sheets to the host as swappable stylesheets**
 
-`src/themes.ts`:
+The theme CSS lives at `packages/ui/data-table/src/themes/{base,shadcn,material,bootstrap}.css`. In the demo `<script>`/`$onMount`, inject four `<link rel="stylesheet">` (or `<style>`) elements into `document.head`, one per theme, each with `id="rdt-theme-<name>"` and all but `base` set `disabled = true`. Resolve the four URLs by importing them as assets so Vite serves them; if a portable import is not available from inside `.rozie`, inject `<style>` elements whose text is imported from the theme files via the host build. Keep base active on mount.
 
-```ts
-// All four ship from the package's ./themes/* export (source-served CSS).
-// Importing as `?inline` gives us the raw text so we can swap at runtime without
-// four <link>s fighting over the cascade.
-import base from '@rozie-ui/data-table-vue/themes/base.css?inline';
-import shadcn from '@rozie-ui/data-table-vue/themes/shadcn.css?inline';
-import material from '@rozie-ui/data-table-vue/themes/material.css?inline';
-import bootstrap from '@rozie-ui/data-table-vue/themes/bootstrap.css?inline';
+> This is the portability-sensitive task. If asset-URL resolution from `.rozie` is not portable, the acceptable fallback is: the host wrapper (`tests/visual-regression/host/*`) exposes the four sheets on `window.__rdtThemes` and the demo reads that in `$onMount`. Prefer the self-contained `.rozie` approach; use the host-provided fallback only if the compiler blocks asset imports. Record which path you used.
 
-export type ThemeName = 'base' | 'shadcn' | 'material' | 'bootstrap';
-export const THEMES: Record<ThemeName, string> = { base, shadcn, material, bootstrap };
-```
-
-- [ ] **Step 2: Swap the active sheet in App.vue**
-
-Remove the static `import '@rozie-ui/data-table-vue/themes/base.css';`. Add:
-
-```ts
-import { computed, ref } from 'vue';
-import { THEMES, type ThemeName } from './themes';
-const theme = ref<ThemeName>('base');
-const themeCss = computed(() => THEMES[theme.value]);
-```
-
-Render the active sheet and a picker:
+- [ ] **Step 2: Add the picker + swap handler**
 
 ```html
-    <component :is="'style'" data-testid="active-theme">{{ themeCss }}</component>
     <label>theme
-      <select data-testid="ctl-theme" v-model="theme">
+      <select data-testid="ctl-theme" r-model="$data.theme" @change="applyTheme($data.theme)">
         <option value="base">base</option>
         <option value="shadcn">shadcn</option>
         <option value="material">material</option>
@@ -897,65 +446,74 @@ Render the active sheet and a picker:
     </label>
 ```
 
-- [ ] **Step 3: Write the smoke**
+`applyTheme(name)` (event handler — `$refs`/DOM access allowed): set `sheet.disabled` on each `rdt-theme-*` element so only `name` is enabled.
 
-`tests/theming.spec.ts`:
+- [ ] **Step 3: Smoke**
 
 ```ts
-import { test, expect } from '@playwright/test';
-
-test('switching theme swaps the active stylesheet content', async ({ page }) => {
-  await page.goto('/');
-  const styleEl = page.getByTestId('active-theme');
-  const base = await styleEl.textContent();
+test('switching theme changes the active data-table stylesheet', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  const activeHref = () => page.evaluate(() =>
+    Array.from(document.querySelectorAll('[id^="rdt-theme-"]')).find((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)?.id);
+  const before = await activeHref();
   await page.getByTestId('ctl-theme').selectOption('material');
-  await expect.poll(async () => styleEl.textContent()).not.toBe(base);
-  // The table still renders under the new skin.
-  await expect(page.getByTestId('dt').locator('tbody tr').first()).toBeVisible();
+  await expect.poll(activeHref).not.toBe(before);
+  await expect(page.locator('tbody tr').first()).toBeVisible();
 });
 ```
 
-- [ ] **Step 4: Typecheck + run**
+- [ ] **Step 4: Rebuild + run + commit**
 
-Run:
+`pnpm vr-preview:build` → run spec (PASS), then:
 ```bash
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue exec playwright test theming.spec --reporter=line
-```
-Expected: typecheck 0 (this also proves `./themes/*` + `?inline` resolve as a real consumer); PASS.
-
-> If any of the four sheets fails to resolve or throws at import, that is a **shipped-package theming bug** (the whole reason theming is in scope) — record it and fix at the leaf's `exports`/theme-copy, do not drop the theme from the switcher.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add examples/dogfood/data-table-vue/src/themes.ts examples/dogfood/data-table-vue/src/App.vue examples/dogfood/data-table-vue/tests/theming.spec.ts
-git commit -m "feat(dogfood): live theme switcher — first exercise of all four shipped skins"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression/specs/data-table-super.spec.ts tests/visual-regression/host
+git commit -m "feat(dogfood): live theme switcher via portable stylesheet-disable swap"
 ```
 
 ---
 
-### Task 9: Kill the stale `interactionMode` deprecation annotation + full-app verification
+### Task 8: Cross-target validation pass + drop stale `interactionMode` annotation
 
 **Files:**
-- Modify: `packages/ui/data-table/src/DataTable.rozie` (the `interactionMode` prop annotation, ~line 394)
-- Modify: (regenerated) the 6 leaves under `packages/ui/data-table/packages/*` via rebless
-- Test: `examples/dogfood/data-table-vue/tests/full-suite` (run all specs green)
+- Modify: `packages/ui/data-table/src/DataTable.rozie` (the `interactionMode` prop annotation, ~L394)
+- Modify: (regenerated) the 6 data-table leaves via rebless
+- Create: `docs/superpowers/plans/data-table-super-crosstarget-findings.md` (the dogfood findings log)
 
 **Interfaces:**
-- Consumes: nothing new.
-- Produces: an `interactionMode` prop whose docs/annotation no longer says "not implemented yet".
+- Consumes: the completed `DataTableSuperDemo.rozie`.
+- Produces: a per-target findings table (what works / what breaks per target) + the annotation fix.
 
-- [ ] **Step 1: Locate and read the annotation**
+- [ ] **Step 1: Build all six sub-targets**
 
-Run: `grep -n "not implemented yet\|deprecated" packages/ui/data-table/src/DataTable.rozie`
-Read the surrounding `<props>` block for `interactionMode` to see the exact annotation shape before editing.
+Run: `pnpm vr-preview:build`
+Expected: all six per-target sub-builds succeed. A build error on one target is finding #1 — record the diagnostic, and if it's the imperative panel or theme swap, confirm the isolation toggle keeps the rest renderable.
 
-- [ ] **Step 2: Remove the stale `deprecated` note**
+- [ ] **Step 2: Smoke the render on every target**
 
-Edit the `interactionMode` prop so it documents the two supported values (`'table'` default, `'grid'` WAI-ARIA grid navigation, GA since Phase 63) and carries **no** `deprecated`/"not implemented" text. Keep the prop, its type, and default unchanged.
+Add a parametrized render check:
 
-- [ ] **Step 3: Rebuild + rebless the leaves (emitter-change flow)**
+```ts
+for (const t of ['vue','react','svelte','angular','solid','lit'] as const) {
+  test(`super demo renders on ${t}`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${t}`);
+    await expect(page.getByTestId('dt-super')).toBeVisible();
+    await expect(page.locator('tbody tr, [role="row"]').first()).toBeVisible();
+  });
+}
+```
+
+Run: `pnpm --filter @rozie/visual-regression exec playwright test data-table-super --reporter=line`
+Record every failure in the findings log with target + symptom (do not mask a failure by loosening the assertion).
+
+- [ ] **Step 3: Write the findings log**
+
+`docs/superpowers/plans/data-table-super-crosstarget-findings.md`: a table of feature × target with ✅/⚠️/❌ and a note per non-✅ cell, plus a "root-cause candidates" list (compiler gap vs demo-authoring vs genuinely-unsupported). This is the artifact Dan reviews.
+
+- [ ] **Step 4: Drop the stale `interactionMode` deprecation annotation**
+
+Run `grep -n "not implemented yet\|deprecated" packages/ui/data-table/src/DataTable.rozie`; edit the `interactionMode` prop so it documents `'table'` (default) and `'grid'` (WAI-ARIA grid nav, GA since Phase 63) with NO "not implemented"/`deprecated` text. Keep type + default unchanged.
+
+- [ ] **Step 5: Rebless the leaves + re-verify**
 
 Run:
 ```bash
@@ -963,48 +521,31 @@ pnpm --filter @rozie/core... build --force
 pnpm --filter @rozie-ui/data-table build --force
 pnpm --filter dist-parity bootstrap
 ```
-Expected: the 6 data-table leaves regenerate; dist-parity rebless updates byte baselines for the annotation-only change. Review `git diff` — it must touch only comment/annotation text in the emitted leaves, no logic.
-
-- [ ] **Step 4: Rebuild the leaf the dogfood app consumes + re-run the whole app suite**
-
-Run:
+Review `git diff` on the leaves — annotation/comment text only, no logic. Then rebuild the host and re-run the render smokes:
 ```bash
-pnpm --filter @rozie-ui/data-table-vue build
-pnpm --filter @rozie-ui-dogfood/data-table-vue typecheck
-pnpm --filter @rozie-ui-dogfood/data-table-vue test:smoke
+pnpm vr-preview:build
+pnpm --filter @rozie/visual-regression exec playwright test data-table-super --reporter=line
+grep -rn "not implemented yet" packages/ui/data-table/ || echo clean
 ```
-Expected: typecheck 0; **all** dogfood specs (data, base-table, controls-core, editing, group-filter-expand, handle, theming) PASS against the freshly built leaf.
-
-- [ ] **Step 5: Confirm the annotation is gone**
-
-Run: `grep -rn "not implemented yet" packages/ui/data-table/ || echo "clean"`
-Expected: `clean`.
+Expected: `clean`; vue render smoke still PASS (other-target results recorded, not necessarily all green — that's the dogfood output).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/ui/data-table
-git commit -m "fix(data-table): drop stale interactionMode 'not implemented' annotation; rebless leaves"
+git add examples/demos/DataTableSuperDemo.rozie tests/visual-regression packages/ui/data-table docs/superpowers/plans/data-table-super-crosstarget-findings.md
+git commit -m "feat(dogfood): cross-target validation pass + drop stale interactionMode annotation; rebless leaves"
 ```
 
 ---
 
 ## Self-Review
 
-**Spec coverage:**
-- Combined kitchen-sink (grid + virtual + editing + grouping + drop-ins in one table) → Tasks 3–7. ✓
-- Theme switcher (blind spot) → Task 8. ✓
-- Real installed-package consumption + `vue-tsc` gate → Task 1 (entry-only imports, typecheck) + every task re-runs typecheck. ✓
-- State readouts → Task 3. ✓
-- Imperative-handle panel (~30 verbs) → Task 7. ✓
-- Synthetic mixed-type dataset → Task 2. ✓
-- Stale `interactionMode` annotation removal + rebless → Task 9. ✓
-- All-six / tarball smoke / theming demo+spec → explicitly out of scope (spec "Fast-follow"); not planned. ✓
+**Spec coverage:** combined kitchen-sink in one `.rozie` (Tasks 1–6); theming (Task 7); cross-target validation, Vue-first (per-task smoke on `target=vue`, all-six in Task 8); state readout (Task 2); imperative handle isolated (Task 6); stale annotation + rebless (Task 8). The original spec's "real installed package" is intentionally superseded by source-composition per the user's cross-target directive — noted in the spec addendum. ✓
 
-**Placeholder scan:** No "TBD"/"handle edge cases"/"similar to Task N". The two deliberately-light assertions (grouping-by-drag in Task 6, getter verbs in Task 7) are called out with the reason and covered by the imperative path/hand-driving instead — not silent gaps.
+**Placeholder scan:** No "handle edge cases"/"similar to Task N". Each fallback (data-factory IIFE, `r-else-if` in slots, `<option :value>` coercion, theme asset-URL portability, composed-child handle wiring) names the exact trigger and the exact fallback — these are real cross-target unknowns this dogfood exists to surface, flagged as DONE_WITH_CONCERNS points, not vague gaps.
 
-**Type consistency:** `controls` keys (`interactionMode`, `virtual`, `selectionMode`, `manualPagination`) match between ControlPanel.vue (Task 4) and App.vue bindings. Slice ref names match the `v-model:` kebab attributes (Task 3) and the `[data-slice="…"]` readout keys used by every later smoke. `theme` ref values match the `<option>`s and `THEMES` keys (Task 8). Editor/filter/drop-in import names match the leaf's `src/index.ts` named exports.
+**Type/name consistency:** `$data` flag names (`gridMode`, `virtual`, `selectionMode`, `manualPagination`, `showHandle`, `theme`) match their `ctl-*` inputs and the `<DataTable>` prop bindings. Slice names match `r-model:<slice>`, the `[data-slice]` readout keys, and the smoke locators. Drop-in component names match the `.rozie` source filenames imported in `<components>`.
 
 ## Execution Handoff
 
-See the two options below.
+Subagent-driven, per the active skill.
