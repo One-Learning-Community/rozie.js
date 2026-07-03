@@ -37,7 +37,8 @@
     "./source": {
       "vue": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./themes/*": "./src/themes/*"
   },
   "files": [
     "dist",

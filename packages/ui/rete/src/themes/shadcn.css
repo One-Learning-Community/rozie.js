@@ -1,0 +1,52 @@
+/*
+ * @rozie-ui/rete — shadcn/ui (Radix) bridge.
+ *
+ * Maps the flow tokens onto the shadcn/ui CSS variables defined on `:root` / `.dark`
+ * (the classic HSL-channel convention: `--background: 0 0% 100%` consumed as
+ * `hsl(var(--background))`). Because it reads those vars live, the canvas
+ * automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/rete-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 / oklch
+ * tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * Only color tokens are remapped here — sizing tokens (radii, socket-size, widths,
+ * grid-size) are left unset so the `.rozie-flow-canvas` defaults hold. Selected/active
+ * tokens are left unset too — they fall back to `--rozie-flow-accent` (set below).
+ */
+.rozie-flow-canvas {
+  --rozie-flow-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-flow-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rozie-flow-grid-dot-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-flow-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+
+  --rozie-flow-node-bg: hsl(var(--card, 0 0% 100%));
+  --rozie-flow-node-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-flow-node-title-fg: hsl(var(--card-foreground, 222.2 47.4% 11.2%));
+  --rozie-flow-node-shadow: 0 2px 6px hsl(var(--foreground, 222.2 47.4% 11.2%) / 0.12);
+
+  --rozie-flow-port-fg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-flow-socket-bg: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-flow-socket-border-color: hsl(var(--card, 0 0% 100%));
+
+  --rozie-flow-connection-stroke: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+  --rozie-flow-connection-label-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
+  --rozie-flow-connection-label-halo: hsl(var(--background, 0 0% 100%));
+
+  --rozie-flow-control-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-flow-control-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
+  --rozie-flow-control-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-flow-control-hover-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rozie-flow-control-active-bg: hsl(var(--accent, 210 40% 96.1%));
+
+  --rozie-flow-minimap-bg: hsl(var(--background, 0 0% 100%) / 0.82);
+  --rozie-flow-minimap-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-flow-minimap-node-fill: hsl(var(--muted-foreground, 215.4 16.3% 46.9%));
+
+  --rozie-flow-toolbar-bg: hsl(var(--popover, 0 0% 100%));
+  --rozie-flow-toolbar-border: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-flow-toolbar-btn-bg: hsl(var(--muted, 210 40% 96.1%));
+  --rozie-flow-toolbar-btn-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
+  --rozie-flow-toolbar-delete-fg: hsl(var(--destructive, 0 84.2% 60.2%));
+}

@@ -11,7 +11,8 @@
  *
  * Like @rozie-ui/maplibre, FlowCanvas.rozie imports the engine packages (`rete`,
  * `rete-area-plugin`, `rete-connection-plugin`, `rete-render-utils`) directly, so
- * the leaves carry no colocated bridge and there is NO internal-helper copy step.
+ * the leaves carry no colocated engine-bridge. The ONLY copy step is the design-token
+ * presets (src/themes/ → each leaf src/themes/), mirroring @rozie-ui/embla.
  *
  * BUILD-ORDER CONTRACT: this writes each leaf's src/FlowCanvas.*, so it MUST run
  * before the bundled-leaf tsdown builds (`turbo run build --force`).
@@ -72,6 +73,20 @@ function leafPkgName(dir) {
   return pkg.name;
 }
 
+/**
+ * Copy src/themes/ → leaf src/themes/ (the design-token presets). The FlowCanvas
+ * ships every visual value as a `--rozie-flow-*` token with an inline fallback, so
+ * these files are OPTIONAL for a consumer — but each leaf vendors them so
+ * `import '@rozie-ui/rete-<fw>/themes/{base,shadcn,material,bootstrap}.css'`
+ * resolves (wired via each leaf package.json `exports["./themes/*"]`). Mirrors the
+ * @rozie-ui/embla copyThemes step.
+ */
+function copyThemes(leafSrc) {
+  const src = resolve(ROOT, 'src/themes');
+  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+}
+
 function main() {
   // Read every component source once. Keyed by component name.
   const sources = Object.fromEntries(
@@ -98,6 +113,9 @@ function main() {
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
+
+    // Vendor the design-token presets (base + shadcn/material/bootstrap bridges).
+    copyThemes(leafSrc);
 
     // STALE-LEAF CLEANUP (Phase 41 D6 clean break): delete any pre-existing leaf
     // output for a REMOVED component (FlowNode/Handle/Connection). The codegen never
@@ -203,7 +221,7 @@ function main() {
 
     const sidecars = target === 'react' ? ' (+ .css + .global.css + .d.ts)' : '';
     const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓`);
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`);
   }
 
   // ENFORCE docs props-table validation against docs/components/rete.md (the
@@ -240,7 +258,7 @@ function main() {
   }
 
   console.log(
-    `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), 6 READMEs rendered, 6 LICENSEs vendored.`,
+    `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), 6 theme-sets vendored, 6 READMEs rendered, 6 LICENSEs vendored.`,
   );
 }
 
