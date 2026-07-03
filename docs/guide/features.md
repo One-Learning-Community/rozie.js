@@ -1464,6 +1464,93 @@ v1 supports `lang="scss"` only. `lang="less"` is a deliberate deferral — the o
 
 Keyboard list-navigation — Arrow/Home/End/typeahead, an active index, the `aria`/`id` wiring that goes with it, and roving focus or `aria-activedescendant` — is boilerplate every menu, listbox, combobox, toolbar, and tab strip in a component library rewrites by hand, once per framework. `r-keynav` replaces the active-state field, the entire `@keydown` switch, per-item `:id`/`@pointermove`, `:aria-activedescendant`, and the scroll-into-view `$watch` with **one directive on the nav root plus one marker on each item**. The compiler owns the plumbing; you own only what happens on commit.
 
+This is the diff `r-keynav` deletes:
+
+**Before — hand-rolled, ~40 lines:**
+
+```rozie
+<data>
+{
+  active: 0,
+  chosen: '',
+}
+</data>
+
+<script>
+const RESULTS = [
+  { id: 'r1', label: 'Apple' },
+  { id: 'r2', label: 'Banana' },
+  { id: 'r3', label: 'Cherry', disabled: true },
+  { id: 'r4', label: 'Date' },
+  { id: 'r5', label: 'Elderberry' },
+]
+
+let typeaheadBuffer = ''
+let typeaheadTimer = null
+
+const move = (delta) => {
+  let next = $data.active
+  do {
+    next = (next + delta + RESULTS.length) % RESULTS.length
+  } while (RESULTS[next].disabled)
+  $data.active = next
+}
+
+const choose = (item) => {
+  $data.chosen = item ? item.label : ''
+}
+
+const onKeydown = ($event) => {
+  switch ($event.key) {
+    case 'ArrowDown': $event.preventDefault(); move(1); break
+    case 'ArrowUp': $event.preventDefault(); move(-1); break
+    case 'Home': $data.active = 0; break
+    case 'End': $data.active = RESULTS.length - 1; break
+    case 'Enter': choose(RESULTS[$data.active]); break
+    default:
+      if ($event.key.length === 1) {
+        clearTimeout(typeaheadTimer)
+        typeaheadBuffer += $event.key.toLowerCase()
+        const match = RESULTS.findIndex((r) => r.label.toLowerCase().startsWith(typeaheadBuffer))
+        if (match !== -1) $data.active = match
+        typeaheadTimer = setTimeout(() => { typeaheadBuffer = '' }, 500)
+      }
+  }
+}
+
+$watch($data.active, () => {
+  $refs.list.children[$data.active]?.scrollIntoView({ block: 'nearest' })
+})
+</script>
+
+<template>
+<input type="text" role="combobox" :aria-activedescendant="'opt-' + $data.active"
+       @keydown="onKeydown($event)" />
+<ul role="listbox" r-refs="list">
+  <li r-for="r in RESULTS :key r.id" role="option"
+      :id="'opt-' + $index" :aria-disabled="!!r.disabled"
+      @pointermove="$data.active = $index">
+    {{ r.label }}
+  </li>
+</ul>
+</template>
+```
+
+**After — r-keynav, ~5 lines:**
+
+```rozie
+<template>
+<input type="text" role="combobox" r-keynav:activedescendant.vertical="$data.active"
+       :source="RESULTS" @keynav-commit="choose(RESULTS[$data.active])" />
+<ul role="listbox">
+  <li r-for="r in RESULTS :key r.id" role="option"
+      r-keynav-item="{ label: r.label, disabled: r.disabled }">{{ r.label }}</li>
+</ul>
+</template>
+```
+
+The `active` field in `<data>` stays — you still own it — but the entire `@keydown` switch, the typeahead buffer, per-item `:id`/`@pointermove`, `:aria-activedescendant`, and the scroll `$watch` are gone.
+
 ### Surface
 
 ```
@@ -1481,10 +1568,12 @@ r-keynav-active-class="<class spec>"                             (optional, on t
 
 **Modifiers** (the existing dotted-modifier grammar):
 
-- orientation: `.vertical` (default) / `.horizontal` / `.both`
-- `.loop` — wrap past the ends (default: clamp)
-- `.typeahead` — printable characters jump to a matching item by `label`
-- `.skipdisabled` — skip `disabled` items (default: **on**; write `.skipdisabled(false)` to include them)
+| Modifier | Values | Default | Effect |
+| --- | --- | --- | --- |
+| orientation | `.vertical` / `.horizontal` / `.both` | `.vertical` | which arrow axis navigates (`.both` = both arrow axes navigate) |
+| `.loop` | flag | off (clamp) | wrap past the ends instead of clamping |
+| `.typeahead` | flag | off | printable characters jump to a matching item by `label`; ~500ms buffer, resets after the pause |
+| `.skipdisabled` | flag or `.skipdisabled(false)` | **on** | skip `disabled` items during navigation; pass the bare-boolean argument `.skipdisabled(false)` to include disabled items in navigation |
 
 **The rest of the surface:**
 
@@ -1512,18 +1601,44 @@ r-keynav-active-class="<class spec>"                             (optional, on t
 **Combobox — activedescendant model, input and list in SEPARATE subtrees:**
 
 ```rozie
+<data>
+{
+  active: 0,
+  chosen: '',
+}
+</data>
+
+<script>
+const RESULTS = [
+  { id: 'r1', label: 'Apple' },
+  { id: 'r2', label: 'Banana' },
+  { id: 'r3', label: 'Cherry', disabled: true },
+  { id: 'r4', label: 'Date' },
+  { id: 'r5', label: 'Elderberry' },
+]
+
+const choose = (item) => {
+  $data.chosen = item ? item.label : ''
+}
+
+const onSearch = ($event) => {
+  // re-filter RESULTS from $event.target.value, reset $data.active as needed
+}
+</script>
+
 <template>
-<input role="combobox" r-keynav:activedescendant.vertical="$data.active"
-       :source="results" @keynav-commit="choose(results[$data.active])"
+<input type="text" role="combobox" r-keynav:activedescendant.vertical="$data.active"
+       :source="RESULTS" @keynav-commit="choose(RESULTS[$data.active])"
        @input="onSearch($event)" />
 <ul role="listbox">
-  <li role="option" r-for="r in results :key r.id"
-      r-keynav-item="{ label: r.label }">{{ r.label }}</li>
+  <li role="option" r-for="r in RESULTS :key r.id"
+      r-keynav-item="{ label: r.label, disabled: r.disabled }"
+      :aria-disabled="!!r.disabled">{{ r.label }}</li>
 </ul>
 </template>
 ```
 
-The combobox example is the proof that association is **shared reactive state** (`$data.active` + `:source`), not DOM nesting — the `<input>` root and the `<ul>` items live in separate subtrees and still track each other, because the compiler wires `aria-activedescendant` on the input to the active `<li>`'s id and stamps the same active marker onto each `<li>` through their shared state, not through parent/child structure.
+The combobox example is the proof that association is **shared reactive state** (`$data.active` + `:source`), not DOM nesting — the `<input>` root and the `<ul>` items live in separate subtrees and still track each other, because the compiler wires `aria-activedescendant` on the input to the active `<li>`'s id and stamps the same active marker onto each `<li>` through their shared state, not through parent/child structure. (The menu example above stays template-only — a static menu never needs a `<data>`/`<script>` block at all.)
 
 ### Keyboard map
 
@@ -1536,6 +1651,24 @@ The combobox example is the proof that association is **shared reactive state** 
 | click on an item | sets active to it and fires `@keynav-commit` |
 
 `Escape`, `Tab`, and open/close semantics stay with you — they belong to the surrounding widget (a popover, a dialog), not to navigation.
+
+### Accessibility
+
+`r-keynav` draws an explicit line between what the compiler wires for you and what stays yours to set.
+
+**What the compiler sets for you:**
+
+- tabindex model (`r-keynav:tabindex`): the roving `tabindex` `0`/`-1` toggle across items, plus `.focus()` on the active item whenever it changes.
+- activedescendant model (`r-keynav:activedescendant`): `aria-activedescendant` on the nav root, plus a stable, unique `id` per item (so the root has something to point at).
+- both models: `data-rozie-keynav-item="<index>"` on each item and `data-rozie-keynav-active` on the active item (the canonical styling/test hook — see [Active-item styling](#active-item-styling) below), a stable group id on the root, and the delegated keydown/pointermove wiring.
+
+**What you still own:**
+
+- semantic roles: `role="menu"`/`role="menuitem"`, `role="listbox"`/`role="option"`, `role="combobox"` — the primitive never guesses your widget's role.
+- labelling: `aria-label` / `aria-labelledby` on the nav root.
+- combobox trigger wiring: `aria-expanded` + `aria-controls` linking an input/button to its popup.
+- `aria-disabled` on disabled items — `r-keynav-item="{ disabled }"` only feeds `.skipdisabled` navigation, it does **not** emit the `aria-disabled` attribute. Set it yourself, as both demos do: `:aria-disabled="!!r.disabled"`.
+- open/close, `Escape`, and `Tab` semantics — as the Keyboard map notes above, these belong to the surrounding widget, not to navigation.
 
 ### Active-item styling
 
