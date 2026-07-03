@@ -47,13 +47,32 @@ test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
   // real keymap requirement, not a weakened assertion.
   await page.getByTestId('ctl-gridMode').selectOption('grid');
   // The demo's default selectionMode is 'multiple' (see ctl-selectionMode), which
-  // auto-injects a LEADING checkbox column (D-04/IN-02) ahead of the 8 authored
-  // <Column>s — so the visible order is [select, id, customer, …]. `nth(2)` is
-  // the Customer cell, not `nth(1)`.
-  const cell = page.locator('tbody tr').first().locator('td').nth(2);
+  // auto-injects a LEADING checkbox column (D-04/IN-02), and Task 5's
+  // `:expandable="true"` auto-injects a chevron expander column right after it
+  // (DataTable.rozie: "a leading chevron expander column auto-injects (after the
+  // select column)") — so the visible order is [select, expand, id, customer, …].
+  // `nth(3)` is the Customer cell, not `nth(2)`.
+  const cell = page.locator('tbody tr').first().locator('td').nth(3);
   await cell.click();
   await page.keyboard.press('Enter');
   await cell.locator('input').fill('Zzz Edited');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('readout').locator('[data-slice="lastCommit"]')).toContainText('customer');
+});
+
+test('faceted select filter narrows rows', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  const before = await page.locator('tbody tr').count();
+  // Scope to `thead` — the control panel (`ctl-gridMode`/`ctl-selectionMode`) also
+  // renders <select> comboboxes ahead of the FilterSelect drop-ins in DOM order, so
+  // an unscoped `getByRole('combobox').first()` silently hits the mode toggle instead
+  // (selecting it is a no-op on row count — a false-pass, not a real assertion).
+  await page.locator('thead').getByRole('combobox').first().selectOption({ index: 1 });
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThanOrEqual(before);
+});
+
+test('expanding a row reveals its detail panel', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.locator('tbody tr').first().getByRole('button').first().click();
+  await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });

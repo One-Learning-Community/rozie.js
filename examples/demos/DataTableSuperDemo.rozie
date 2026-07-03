@@ -42,6 +42,32 @@
   two-sided row-count bound in the VR spec that would have caught it not
   working.
 
+  Task 5 (this revision): wires the remaining three DataTable scoped slots to
+  their real drop-ins, cross-tree from packages/ui/data-table/src — mirroring
+  each drop-in's own proven behavioral demo:
+    - `#groupBar` → GroupBar (mirrors DataTableGroupBarDemo.rozie), receiving
+      `{ grouping, groupableColumns, applyGrouping, clearGrouping }`. This is
+      what makes grouping (bound since Task 2 via r-model:grouping, scoped to
+      customer/category/status by the Task 3 cleanup above) UI-reachable for
+      the first time — earlier tasks deliberately left it undrivable.
+    - `#filter` → dispatched by columnId (mirrors
+      DataTableFilterDropinsDemo.rozie): FilterSelect (faceted) for
+      category/status, FilterNumberRange for amount, FilterText (`r-else`)
+      for customer/status-adjacent text columns.
+    - `#detail` → DetailPanel (mirrors DataTableDetailPanelDemo.rozie),
+      receiving `{ row }`; `:expandable="true"` added at the table level
+      (`:groupable="true"` already present since Task 2/3 — not duplicated).
+  KNOWN LANDMINE (flagged, not fixed here — Vue-only scope this task):
+  DataTableGroupBarDemo.rozie names its controlled-grouping <data> field
+  `groupingModel` (NOT `grouping`) specifically because the #groupBar slot's
+  `grouping` let-var shadows an Angular `grouping` signal ("grouping_r7 is
+  not a function", whole table hidden). This super-demo's grouping slice has
+  been named `$data.grouping` since Task 2 (preserved per Task 5's brief), so
+  the identical Angular collision is latent here too — undetected in this
+  revision because build/test scope is Vue-only and grouping-via-GroupBar is
+  validated later (Task 6, via the imperative handle). Surface this before
+  Angular is added to the super demo's VR matrix.
+
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
 
@@ -56,6 +82,11 @@
   EditorSelect: '../../packages/ui/data-table/src/EditorSelect.rozie',
   EditorCheckbox: '../../packages/ui/data-table/src/EditorCheckbox.rozie',
   EditorDate: '../../packages/ui/data-table/src/EditorDate.rozie',
+  GroupBar: '../../packages/ui/data-table/src/GroupBar.rozie',
+  FilterText: '../../packages/ui/data-table/src/FilterText.rozie',
+  FilterNumberRange: '../../packages/ui/data-table/src/FilterNumberRange.rozie',
+  FilterSelect: '../../packages/ui/data-table/src/FilterSelect.rozie',
+  DetailPanel: '../../packages/ui/data-table/src/DetailPanel.rozie',
 }
 </components>
 
@@ -172,6 +203,7 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
       :selectionMode="$data.selectionMode"
       :manual="$data.manualPagination"
       :groupable="true"
+      :expandable="true"
       r-model:sorting="$data.sorting"
       r-model:globalFilter="$data.globalFilter"
       r-model:columnFilters="$data.columnFilters"
@@ -225,6 +257,44 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
           r-else
           :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
         />
+      </template>
+
+      <!-- Task 5: the #groupBar scoped slot filled with the real GroupBar drop-in
+           (mirrors DataTableGroupBarDemo.rozie's proven idiom). This is what makes
+           `:grouping="$data.grouping"` (bound since Task 2 but UI-unreachable until
+           now) actually drivable from the rendered page. -->
+      <template #groupBar="{ grouping, groupableColumns, applyGrouping, clearGrouping }">
+        <GroupBar
+          :grouping="grouping"
+          :groupableColumns="groupableColumns"
+          :applyGrouping="applyGrouping"
+          :clearGrouping="clearGrouping"
+        />
+      </template>
+
+      <!-- Task 5: the #filter scoped slot, dispatched by columnId to the real
+           FilterSelect (category/status — faceted) / FilterNumberRange (amount) /
+           FilterText (everything else) drop-ins (mirrors
+           DataTableFilterDropinsDemo.rozie's proven idiom). -->
+      <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
+        <FilterSelect
+          r-if="columnId === 'category' || columnId === 'status'"
+          :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues"
+        />
+        <FilterNumberRange
+          r-else-if="columnId === 'amount'"
+          :columnId="columnId" :setFilter="setFilter" :minMax="minMax"
+        />
+        <FilterText
+          r-else
+          :columnId="columnId" :setFilter="setFilter"
+        />
+      </template>
+
+      <!-- Task 5: the #detail scoped slot filled with the real DetailPanel drop-in
+           (mirrors DataTableDetailPanelDemo.rozie's proven idiom). -->
+      <template #detail="{ row }">
+        <DetailPanel :row="row" />
       </template>
     </DataTable>
 
