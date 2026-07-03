@@ -393,8 +393,14 @@ export function validatePortalScopedStyle(
   // the pass never reads them.
   const scopedRules = (ir.styles?.scopedRules ?? []) as StyleRule[];
 
-  for (const rule of scopedRules) {
-    const subject = extractSubject(rule?.selector);
+  /**
+   * Check one selector (a plain scoped rule's own selector, OR — quick task
+   * 260703-12j — an `at-rule-block`'s `children[].selector`) against the
+   * portal-exclusive subject sets and push the ROZ088 warning at its own
+   * `loc` when it matches.
+   */
+  const checkSelector = (selector: unknown, loc: StyleRule['loc']): void => {
+    const subject = extractSubject(selector);
 
     // A subject matches when ANY of its class tokens is a portal-exclusive
     // class, OR ANY of its tags is a portal-exclusive tag (class-vs-class,
@@ -410,9 +416,9 @@ export function validatePortalScopedStyle(
       if (portalExclusiveTags.has(tg)) matchedTags.add(tg);
     }
 
-    if (matchedClasses.size === 0 && matchedTags.size === 0) continue;
+    if (matchedClasses.size === 0 && matchedTags.size === 0) return;
 
-    // Per-rule dedup is free (one push per scoped rule).
+    // Per-rule dedup is free (one push per scoped rule / child selector).
     const naming = findNamingFiller(ir.template, matchedClasses, matchedTags);
     // Label the offending subject: prefer a matched tag, else the matched
     // class compound. `[...set][0]` is deterministic (insertion order = the
@@ -428,9 +434,22 @@ export function validatePortalScopedStyle(
     diagnostics.push({
       code: RozieErrorCode.STYLE_SCOPED_RULE_TARGETS_PORTAL_CONTENT,
       severity: 'warning',
-      message: `Scoped style \`${rule.selector}\` (subject ${subjectLabel}) targets content rendered into ${where}. Portal content teleports into the engine's shadow root on Lit, where this scoped rule can't reach it (the 5 light-DOM targets are unaffected).`,
-      loc: rule.loc,
+      message: `Scoped style \`${typeof selector === 'string' ? selector : ''}\` (subject ${subjectLabel}) targets content rendered into ${where}. Portal content teleports into the engine's shadow root on Lit, where this scoped rule can't reach it (the 5 light-DOM targets are unaffected).`,
+      loc,
       hint: `Move this rule into a \`:root { … }\` block (the Phase 34 engine-DOM escape hatch) so it applies on all six targets — \`:global()\` is forbidden (ROZ128).`,
     });
+  };
+
+  for (const rule of scopedRules) {
+    checkSelector(rule?.selector, rule.loc);
+    // Quick task 260703-12j — an `at-rule-block`'s own `selector` is `''`
+    // (the prelude lives in the byte slice); the real subjects live on
+    // `children[].selector`, each checked at its own `loc` so the Lit
+    // portal-content warning still points at the exact inner rule.
+    if (Array.isArray(rule?.children)) {
+      for (const child of rule.children) {
+        checkSelector(child?.selector, child?.loc ?? rule.loc);
+      }
+    }
   }
 }

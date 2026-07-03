@@ -21,6 +21,12 @@
  * `root-block` arm is checked BEFORE `isRootEscape` so a co-present flat
  * `:root { --custom-prop }` rule still lands in `rootRules` unchanged (D-03).
  *
+ * Quick task 260703-12j — `at-rule-block` (a captured top-level conditional-
+ * group at-rule: `@media`/`@supports`/`@container`) routes to `scopedRules`
+ * alongside plain rules: every target's `emitStyle` byte-slices `loc` and
+ * never switches on `kind`, so the at-rule's full span (including its
+ * wrapper) re-stringifies and scopes correctly with zero emitter changes.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { StyleAST } from '../../ast/blocks/StyleAST.js';
@@ -36,6 +42,11 @@ export function lowerStyles(style: StyleAST): StyleSection {
       portalRules.push(rule);
     } else if (rule.kind === 'root-block') {
       engineRules.push(rule);
+    } else if (rule.kind === 'at-rule-block') {
+      // Quick task 260703-12j — routed alongside plain rules; see file-header
+      // comment. Explicit branch (rather than relying on the `else` fall-
+      // through) documents the routing decision at the call site.
+      scopedRules.push(rule);
     } else if (rule.isRootEscape) {
       rootRules.push(rule);
     } else {

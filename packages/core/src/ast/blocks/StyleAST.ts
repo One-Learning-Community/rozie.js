@@ -20,8 +20,22 @@ export interface StyleRule {
    * `:root` rule that carries any flat custom-property declarations is emitted
    * SEPARATELY through the unchanged `isRootEscape` path; the `root-block`
    * carries only the nested selector rules. Routed to `engineRules` at lowering.
+   * `'at-rule-block'` (quick task 260703-12j) for a top-level conditional-group
+   * at-rule (`@media` / `@supports` / `@container`) captured WHOLE — the full
+   * `@media (...) { ... }` byte span is a SINGLE scoped `StyleRule` so its
+   * wrapper survives compilation instead of being silently dropped by
+   * postcss's `walkRules` descending into it. `selector` is `''` (the at-rule
+   * prelude lives in the `loc` byte slice, not `selector`); `children` carry
+   * the inner selector rules (real selector + own loc) as metadata for the
+   * `$classSelector` / portal-scoped-style validators — they are NOT emitted
+   * separately. Routed to `scopedRules` at lowering: every target's
+   * `emitStyle` byte-slices `loc` and never switches on `kind`, so the
+   * wrapper is re-stringified as-is and each target's scoper (postcss
+   * `scopeCss` for React/Solid/Svelte/Lit; native `<style scoped>` /
+   * emulated view-encapsulation / shadow DOM for Vue/Angular/Lit) descends
+   * into it and scopes the inner selectors with zero emitter changes.
    */
-  kind?: 'rule' | 'portal-block' | 'root-block';
+  kind?: 'rule' | 'portal-block' | 'root-block' | 'at-rule-block';
   /**
    * Raw selector text. For a plain rule this is the postcss selector verbatim
    * (including commas/whitespace). For a `portal-block` this is the at-rule
@@ -35,12 +49,16 @@ export interface StyleRule {
   /** Set only when `kind === 'portal-block'` — the `@portal <NAME>` argument. */
   portalName?: string;
   /**
-   * Set when `kind === 'portal-block'` (Spike 004) OR `kind === 'root-block'`
-   * (Phase 34) — the inner selectors of the block, flattened to bottom-level
-   * rules. For `portal-block` these are the `@portal NAME { ... }` inner
-   * selectors; for `root-block` these are the `:root { ... }` NESTED selector
-   * rules flattened bare (NO `:root` wrapper). Each child's `loc` is the
-   * absolute span of its own `selector { body }`.
+   * Set when `kind === 'portal-block'` (Spike 004), `kind === 'root-block'`
+   * (Phase 34), OR `kind === 'at-rule-block'` (quick task 260703-12j) — the
+   * inner selectors of the block, flattened to bottom-level rules. For
+   * `portal-block` these are the `@portal NAME { ... }` inner selectors; for
+   * `root-block` these are the `:root { ... }` NESTED selector rules
+   * flattened bare (NO `:root` wrapper); for `at-rule-block` these are the
+   * conditional-group at-rule's inner selector rules — metadata ONLY (the
+   * validators walk them; emitters never read `children` for `at-rule-block`,
+   * they byte-slice the parent's `loc` which already includes them verbatim).
+   * Each child's `loc` is the absolute span of its own `selector { body }`.
    */
   children?: StyleRule[];
 }

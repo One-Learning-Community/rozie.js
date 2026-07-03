@@ -51,6 +51,19 @@ export interface ParseStyleResult {
 }
 
 /**
+ * Quick task 260703-12j — top-level conditional-group at-rules whose WHOLE
+ * `@media (...) { ... }` span is captured as a single `at-rule-block`
+ * scoped rule so the wrapper survives compilation (see `StyleAST.StyleRule`
+ * doc for the full rationale). `@keyframes` is deliberately excluded — its
+ * children are keyframe-selector percentages/`from`/`to`, not style rules,
+ * and a target's `scopeCss` selector-rewriter would mangle them if routed
+ * through the same path (T-12j-03, accepted). `@portal` is excluded — it has
+ * its own dedicated collection pass (`walkAtRules('portal', ...)` below) and
+ * its own nesting-validation diagnostic (ROZ082).
+ */
+const SCOPED_GROUP_AT_RULES = new Set(['media', 'supports', 'container']);
+
+/**
  * Parse a `<style>` block into a `StyleAST`.
  *
  * @param lang - the resolved `lang=` attribute from the source `<style>` tag
@@ -239,12 +252,18 @@ export function parseStyle(
     });
   };
 
-  /** Build a plain (non-portal) StyleRule, emitting ROZ081 on mixed :root. */
-  const buildPlainRule = (rule: Rule): StyleRule => {
-    const ruleLoc = nodeLoc(rule);
-    checkGlobalPseudo(rule.selector, ruleLoc);
+  /**
+   * Run the per-rule diagnostics (ROZ128 `:global()` + ROZ081 mixed-`:root`)
+   * for a rule's selector, given its already-computed loc. Factored out of
+   * `buildPlainRule` (quick task 260703-12j) so the new top-level conditional-
+   * group at-rule pass can reuse the SAME diagnostics for its inner rules
+   * without also pushing them as separate scoped rules. Returns whether the
+   * selector is a pure `:root` escape (mirrors `buildPlainRule`'s `isPureRoot`).
+   */
+  const runRuleDiagnostics = (selector: string, ruleLoc: SourceLoc): boolean => {
+    checkGlobalPseudo(selector, ruleLoc);
     // Selector classification (Pitfall 6 — mixed-:root rejection).
-    const parts = rule.selector.split(',').map(s => s.trim());
+    const parts = selector.split(',').map(s => s.trim());
     const hasRoot = parts.includes(':root');
     const isPureRoot = parts.length === 1 && parts[0] === ':root';
     if (hasRoot && !isPureRoot) {
@@ -256,12 +275,19 @@ export function parseStyle(
       diagnostics.push({
         code: RozieErrorCode.STYLE_MIXED_ROOT_SELECTOR,
         severity: 'error',
-        message: `Mixed :root selector "${rule.selector}" is not allowed. Split :root rules into their own block.`,
+        message: `Mixed :root selector "${selector}" is not allowed. Split :root rules into their own block.`,
         loc: isScss ? contentLoc : ruleLoc,
         ...(filename !== undefined ? { filename } : {}),
         hint: 'Move :root rules into a separate selector block; combining :root with other selectors mixes scoped and unscoped emission.',
       });
     }
+    return isPureRoot;
+  };
+
+  /** Build a plain (non-portal) StyleRule, emitting ROZ081 on mixed :root. */
+  const buildPlainRule = (rule: Rule): StyleRule => {
+    const ruleLoc = nodeLoc(rule);
+    const isPureRoot = runRuleDiagnostics(rule.selector, ruleLoc);
     return { kind: 'rule', selector: rule.selector, loc: ruleLoc, isRootEscape: isPureRoot };
   };
 
@@ -408,13 +434,67 @@ export function parseStyle(
     });
   });
 
+  // Quick task 260703-12j — top-level conditional-group at-rule survival.
+  // `root.walkRules` (used both above for `:root` and below for plain rules)
+  // DESCENDS into `@media`/`@supports`/`@container` bodies too — without this
+  // collect-once pass, the top-level plain-rule pass would collect each INNER
+  // selector as a bare, unconditional scoped rule, silently dropping the
+  // at-rule wrapper and hoisting a conditional guard (e.g. Dialog's
+  // `@media (prefers-reduced-motion: no-preference)` guard) to unconditional.
+  //
+  // Only DIRECT root children are considered (`root.each`, not `walkAtRules`)
+  // so a nested at-rule (`@supports (...) { @media (...) { ... } }`) is NOT
+  // separately collected — it stays inside its parent's byte slice, preserving
+  // the nesting verbatim. `@keyframes` is deliberately excluded: its children
+  // are keyframe selectors (`0%`, `to`, ...), not style rules, and running them
+  // through a target's `scopeCss` selector-rewriter would mangle them (T-12j-03,
+  // accepted — no shipped component nests @keyframes inside a conditional
+  // at-rule). `@portal` is excluded too — it has its own dedicated collection
+  // pass (walkAtRules above) and its own nesting-validation diagnostic (ROZ082).
+  root.each((node: ChildNode) => {
+    if (node.type !== 'atrule') return;
+    const atRule = node as AtRule;
+    if (!SCOPED_GROUP_AT_RULES.has(atRule.name)) return;
+
+    // ROZ082 (`@portal` nested inside `@media`) is already raised by the
+    // dedicated `walkAtRules('portal', ...)` pass above (it runs over the
+    // whole `root` independently of this pass and never pushes a `rules`
+    // entry for the invalid-nesting case). Skip collecting THIS at-rule as a
+    // scoped rule when it contains a descendant `@portal` — otherwise the
+    // `@portal ... { ul {} }` text would leak verbatim into the scoped-rule
+    // byte slice and its inner `ul` selector would be double-collected here.
+    let containsPortal = false;
+    atRule.walkAtRules('portal', () => {
+      containsPortal = true;
+    });
+    if (containsPortal) return;
+
+    const children: StyleRule[] = [];
+    atRule.walkRules((inner: Rule) => {
+      const innerLoc = nodeLoc(inner);
+      runRuleDiagnostics(inner.selector, innerLoc);
+      children.push({ kind: 'rule', selector: inner.selector, loc: innerLoc, isRootEscape: false });
+    });
+
+    rules.push({
+      kind: 'at-rule-block',
+      selector: '',
+      loc: nodeLoc(atRule),
+      isRootEscape: false,
+      children,
+    });
+  });
+
   // Top-level plain rules. Skip any rule that descends from a `@portal`
   // at-rule — those are collected (as `children`) by the walkAtRules pass
   // above. Without this gate they would be double-counted as scopedRules.
   // Also skip rules nested inside a `:root { }` block (Phase 34) — those are
-  // collected as a `root-block`'s `children` by the pass above.
+  // collected as a `root-block`'s `children` by the pass above. Also skip
+  // rules nested inside a captured conditional-group at-rule (quick task
+  // 260703-12j) — those are collected as an `at-rule-block`'s `children` by
+  // the pass immediately above.
   root.walkRules((rule: Rule) => {
-    if (hasPortalAncestor(rule) || hasRootAncestor(rule)) return;
+    if (hasPortalAncestor(rule) || hasRootAncestor(rule) || hasScopedGroupAtRuleAncestor(rule)) return;
     // A pure-`:root` rule that carries NO flat declarations produced a
     // `root-block` above and must NOT also emit a dead empty `isRootEscape`
     // rule. One that DOES carry flat decls still flows through (mixed split).
@@ -468,6 +548,24 @@ function hasRootAncestor(rule: Rule): boolean {
   let parent: Node | undefined = rule.parent;
   while (parent && parent.type !== 'root') {
     if (parent.type === 'rule' && isPureRootSelector((parent as Rule).selector)) {
+      return true;
+    }
+    parent = parent.parent;
+  }
+  return false;
+}
+
+/**
+ * True when `rule` is nested (at any depth) inside a top-level
+ * `@media`/`@supports`/`@container` at-rule captured by the `at-rule-block`
+ * pass (quick task 260703-12j). Mirrors `hasPortalAncestor`. Gates the
+ * top-level `walkRules` plain-rule pass so a captured at-rule's inner rules
+ * are NOT double-collected as bare unconditional scoped rules.
+ */
+function hasScopedGroupAtRuleAncestor(rule: Rule): boolean {
+  let parent: Node | undefined = rule.parent;
+  while (parent && parent.type !== 'root') {
+    if (parent.type === 'atrule' && SCOPED_GROUP_AT_RULES.has((parent as AtRule).name)) {
       return true;
     }
     parent = parent.parent;

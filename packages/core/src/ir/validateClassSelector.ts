@@ -116,8 +116,17 @@ function collectClassTokens(selector: unknown, out: Set<string>): void {
  */
 function declaredScopedClasses(styles: StyleSection): Set<string> {
   const out = new Set<string>();
-  for (const rule of styles.scopedRules as Array<{ selector?: unknown }>) {
+  for (const rule of styles.scopedRules as Array<{
+    selector?: unknown;
+    children?: Array<{ selector?: unknown }>;
+  }>) {
     collectClassTokens(rule?.selector, out);
+    // Quick task 260703-12j — an `at-rule-block` scoped rule's own `selector`
+    // is `''` (the prelude lives in the byte slice); the real class tokens
+    // live on `children[].selector` (mirrors the `portalRules` pattern below).
+    if (Array.isArray(rule?.children)) {
+      for (const child of rule.children) collectClassTokens(child?.selector, out);
+    }
   }
   for (const rule of styles.rootRules as Array<{ selector?: unknown }>) {
     collectClassTokens(rule?.selector, out);
