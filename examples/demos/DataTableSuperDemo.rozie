@@ -6,10 +6,20 @@
   Task 1 (DONE): minimal scaffold — sticky-header table, four sortable
   columns, three static rows.
 
-  Task 2 (this revision): grows to the full eight-column set, binds all
-  eleven two-way state slices via r-model:<slice>, adds a live state readout
-  panel, and expands the dataset to ~1,500 deterministically-generated rows
-  (no Math.random — a seeded LCG, so VR/manual runs are reproducible).
+  Task 2: grows to the full eight-column set, binds all eleven two-way state
+  slices via r-model:<slice>, adds a live state readout panel, and expands
+  the dataset to ~1,500 deterministically-generated rows (no Math.random —
+  a seeded LCG, so VR/manual runs are reproducible).
+
+  Task 3 (this revision): adds a control panel toggling grid/table
+  interaction mode, virtualization, selection mode, and manual pagination in
+  combination — plus two folded-in clean-ups from the Task 2 review: (1) the
+  readout now surfaces all eleven bound slices (was 6/11), and (2)
+  `:groupable` is scoped to customer/category/status only (id/amount/units/
+  active/orderedAt now set `:groupable="false"` — DataTable's Column default
+  is groupable=true, opt-out, so all 8 columns were groupable pre-cleanup,
+  which would offer nonsensical grouping keys once #groupBar lands in a
+  later task).
 
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
@@ -53,16 +63,47 @@
   columnSizing: {},
   columnOrder: [],
   columnPinning: { left: [], right: [] },
+
+  // ── Task 3: control-panel flags (NOT r-model slices — plain $data, driving
+  // one-way DataTable props) ────────────────────────────────────────────────
+  gridMode: false,
+  virtual: false,
+  selectionMode: 'multiple',
+  manualPagination: false,
 }
 </data>
 
 <template>
   <main data-testid="dt-super">
     <h1>DataTable — super demo</h1>
+
+    <fieldset data-testid="controls">
+      <label>mode
+        <select data-testid="ctl-gridMode" r-model="$data.gridMode">
+          <option :value="false">table</option>
+          <option :value="true">grid</option>
+        </select>
+      </label>
+      <label><input data-testid="ctl-virtual" type="checkbox" r-model="$data.virtual" /> virtualize</label>
+      <label>selection
+        <select data-testid="ctl-selectionMode" r-model="$data.selectionMode">
+          <option value="none">none</option>
+          <option value="single">single</option>
+          <option value="multiple">multiple</option>
+        </select>
+      </label>
+      <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
+    </fieldset>
+
     <DataTable
       :data="$data.rows"
       :stickyHeader="true"
-      :selectionMode="'multiple'"
+      :interactionMode="$data.gridMode ? 'grid' : 'table'"
+      :virtual="$data.virtual"
+      :maxHeight="'440px'"
+      :estimateRowHeight="40"
+      :selectionMode="$data.selectionMode"
+      :manual="$data.manualPagination"
       :groupable="true"
       r-model:sorting="$data.sorting"
       r-model:globalFilter="$data.globalFilter"
@@ -76,14 +117,14 @@
       r-model:columnOrder="$data.columnOrder"
       r-model:columnPinning="$data.columnPinning"
     >
-      <Column field="id"         header="#"         :sortable="true" />
-      <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" :groupable="true" />
-      <Column field="category"   header="Category"  :sortable="true" :filterable="true" :groupable="true" />
-      <Column field="amount"     header="Amount"    :sortable="true" />
-      <Column field="units"      header="Units"     :sortable="true" />
-      <Column field="status"     header="Status"    :sortable="true" :filterable="true" :groupable="true" />
-      <Column field="active"     header="Active"    :sortable="true" />
-      <Column field="orderedAt"  header="Ordered"   :sortable="true" />
+      <Column field="id"         header="#"         :sortable="true" :groupable="false" />
+      <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" />
+      <Column field="category"   header="Category"  :sortable="true" :filterable="true" />
+      <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" />
+      <Column field="units"      header="Units"     :sortable="true" :groupable="false" />
+      <Column field="status"     header="Status"    :sortable="true" :filterable="true" />
+      <Column field="active"     header="Active"    :sortable="true" :groupable="false" />
+      <Column field="orderedAt"  header="Ordered"   :sortable="true" :groupable="false" />
     </DataTable>
 
     <aside data-testid="readout">
@@ -93,6 +134,11 @@
       <code data-slice="expanded">expanded: {{ JSON.stringify($data.expanded) }}</code>
       <code data-slice="pagination">pagination: {{ JSON.stringify($data.pagination) }}</code>
       <code data-slice="columnFilters">columnFilters: {{ JSON.stringify($data.columnFilters) }}</code>
+      <code data-slice="globalFilter">globalFilter: {{ JSON.stringify($data.globalFilter) }}</code>
+      <code data-slice="columnVisibility">columnVisibility: {{ JSON.stringify($data.columnVisibility) }}</code>
+      <code data-slice="columnSizing">columnSizing: {{ JSON.stringify($data.columnSizing) }}</code>
+      <code data-slice="columnOrder">columnOrder: {{ JSON.stringify($data.columnOrder) }}</code>
+      <code data-slice="columnPinning">columnPinning: {{ JSON.stringify($data.columnPinning) }}</code>
     </aside>
   </main>
 </template>

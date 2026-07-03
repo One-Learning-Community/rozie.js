@@ -17,3 +17,15 @@ test('header click updates the sorting readout', async ({ page }) => {
   await page.getByRole('button', { name: 'Customer', exact: true }).click();
   await expect(page.getByTestId('readout').locator('[data-slice="sorting"]')).toContainText('customer');
 });
+
+test('grid mode exposes role=grid', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByTestId('ctl-gridMode').selectOption('grid');
+  await expect(page.locator('[role="grid"]')).toBeVisible();
+});
+
+test('virtualization windows the rows', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  await page.getByTestId('ctl-virtual').check();
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(100);
+});
