@@ -1,11 +1,15 @@
 <!--
-  DataTableSuperDemo.rozie — Task 1 scaffold for the "super demo": one .rozie
-  wiring every @rozie-ui/data-table feature together, compiled to all six
-  targets through the VR host for hand-dogfooding per framework.
+  DataTableSuperDemo.rozie — "super demo" for @rozie-ui/data-table: one .rozie
+  wiring every core feature together, compiled to all six targets through the
+  VR host for hand-dogfooding per framework.
 
-  This is the MINIMAL Task-1 scaffold: a sticky-header table with four
-  sortable columns and three static rows. Later tasks extend this same file
-  with filtering/pagination/selection/column-mgmt/grid/edit features.
+  Task 1 (DONE): minimal scaffold — sticky-header table, four sortable
+  columns, three static rows.
+
+  Task 2 (this revision): grows to the full eight-column set, binds all
+  eleven two-way state slices via r-model:<slice>, adds a live state readout
+  panel, and expands the dataset to ~1,500 deterministically-generated rows
+  (no Math.random — a seeded LCG, so VR/manual runs are reproducible).
 
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
@@ -21,24 +25,97 @@
 
 <data>
 {
-  rows: [
-    { id: 1, customer: 'Ada Lovelace', category: 'Software', amount: 120.5, units: 3, status: 'active', active: true, orderedAt: '2026-03-01' },
-    { id: 2, customer: 'Alan Turing',  category: 'Hardware', amount: 88.0,  units: 7, status: 'pending', active: false, orderedAt: '2026-03-04' },
-    { id: 3, customer: 'Grace Hopper', category: 'Services', amount: 240.0, units: 1, status: 'active', active: true, orderedAt: '2026-03-06' },
-  ],
+  // ~1,500 deterministically-generated rows (seeded LCG — NOT Math.random —
+  // so the dataset is byte-identical across runs/targets for dogfooding).
+  rows: (() => {
+    const C = ['Ada Lovelace','Alan Turing','Grace Hopper','Katherine Johnson','Margaret Hamilton','Edsger Dijkstra','Barbara Liskov','Donald Knuth','Radia Perlman'];
+    const K = ['Hardware','Software','Services','Support'];
+    const S = ['active','pending','archived'];
+    let seed = 42; const rnd = () => (seed = (seed*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const pick = (a) => a[Math.floor(rnd()*a.length)];
+    return Array.from({ length: 1500 }, (_, i) => ({
+      id: i+1, customer: pick(C), category: pick(K),
+      amount: Math.round(rnd()*50000)/100, units: 1+Math.floor(rnd()*40),
+      status: pick(S), active: rnd() > 0.4,
+      orderedAt: `2026-03-${String(1+Math.floor(rnd()*27)).padStart(2,'0')}`,
+    }));
+  })(),
+
+  // ── Two-way state slices (all eleven r-model bindings) ───────────────────
+  sorting: [],
+  globalFilter: '',
+  columnFilters: [],
+  rowSelection: {},
+  pagination: { pageIndex: 0, pageSize: 20 },
+  grouping: [],
+  expanded: {},
+  columnVisibility: {},
+  columnSizing: {},
+  columnOrder: [],
+  columnPinning: { left: [], right: [] },
 }
 </data>
 
 <template>
   <main data-testid="dt-super">
     <h1>DataTable — super demo</h1>
-    <DataTable :data="$data.rows" :stickyHeader="true">
-      <Column field="id" header="#" :sortable="true" />
-      <Column field="customer" header="Customer" :sortable="true" />
-      <Column field="category" header="Category" :sortable="true" />
-      <Column field="amount" header="Amount" :sortable="true" />
+    <DataTable
+      :data="$data.rows"
+      :stickyHeader="true"
+      :selectionMode="'multiple'"
+      :groupable="true"
+      r-model:sorting="$data.sorting"
+      r-model:globalFilter="$data.globalFilter"
+      r-model:columnFilters="$data.columnFilters"
+      r-model:rowSelection="$data.rowSelection"
+      r-model:pagination="$data.pagination"
+      r-model:grouping="$data.grouping"
+      r-model:expanded="$data.expanded"
+      r-model:columnVisibility="$data.columnVisibility"
+      r-model:columnSizing="$data.columnSizing"
+      r-model:columnOrder="$data.columnOrder"
+      r-model:columnPinning="$data.columnPinning"
+    >
+      <Column field="id"         header="#"         :sortable="true" />
+      <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" :groupable="true" />
+      <Column field="category"   header="Category"  :sortable="true" :filterable="true" :groupable="true" />
+      <Column field="amount"     header="Amount"    :sortable="true" />
+      <Column field="units"      header="Units"     :sortable="true" />
+      <Column field="status"     header="Status"    :sortable="true" :filterable="true" :groupable="true" />
+      <Column field="active"     header="Active"    :sortable="true" />
+      <Column field="orderedAt"  header="Ordered"   :sortable="true" />
     </DataTable>
+
+    <aside data-testid="readout">
+      <code data-slice="sorting">sorting: {{ JSON.stringify($data.sorting) }}</code>
+      <code data-slice="grouping">grouping: {{ JSON.stringify($data.grouping) }}</code>
+      <code data-slice="rowSelection">rowSelection: {{ JSON.stringify($data.rowSelection) }}</code>
+      <code data-slice="expanded">expanded: {{ JSON.stringify($data.expanded) }}</code>
+      <code data-slice="pagination">pagination: {{ JSON.stringify($data.pagination) }}</code>
+      <code data-slice="columnFilters">columnFilters: {{ JSON.stringify($data.columnFilters) }}</code>
+    </aside>
   </main>
 </template>
+
+<style>
+main[data-testid="dt-super"] {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+}
+main[data-testid="dt-super"] h1 { margin: 0 0 0.75rem; font-size: 1.125rem; }
+aside[data-testid="readout"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+}
+aside[data-testid="readout"] code {
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
 
 </rozie>
