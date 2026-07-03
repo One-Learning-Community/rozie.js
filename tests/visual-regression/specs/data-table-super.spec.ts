@@ -27,5 +27,33 @@ test('grid mode exposes role=grid', async ({ page }) => {
 test('virtualization windows the rows', async ({ page }) => {
   await page.goto('/?example=DataTableSuper&target=vue');
   await page.getByTestId('ctl-virtual').check();
-  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(100);
+  // Two-sided bound (folded-in Task 3 review fix): a one-sided `< 100` also
+  // passes on a SILENT construction failure (windowedRows() returning `[]` —
+  // 0 rows). Assert `count > 0` (rules out the empty-render regression) AND
+  // `count < 100` (rules out the ~1,500 no-window regression). Window ≈
+  // 25-30 rows at estimateRowHeight=40 / maxHeight=440px, so `5 < count <
+  // 50` is a tight-but-safe real-poll bound.
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeGreaterThan(5);
+  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(50);
+});
+
+test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  // Inline editing's Enter/F2-to-edit keymap lives in onGridKeyDown, which no-ops
+  // entirely when `!isGrid()` (gridKeydownHandlers.rzts:6 — `if (!isGrid() || !e)
+  // return`). DataTableEditDemo.rozie / DataTableEditorDropinsDemo.rozie both use
+  // `interactionMode="grid"` for exactly this reason. The super demo defaults to
+  // 'table' mode (ctl-gridMode), so the smoke test must switch modes first — the
+  // real keymap requirement, not a weakened assertion.
+  await page.getByTestId('ctl-gridMode').selectOption('grid');
+  // The demo's default selectionMode is 'multiple' (see ctl-selectionMode), which
+  // auto-injects a LEADING checkbox column (D-04/IN-02) ahead of the 8 authored
+  // <Column>s — so the visible order is [select, id, customer, …]. `nth(2)` is
+  // the Customer cell, not `nth(1)`.
+  const cell = page.locator('tbody tr').first().locator('td').nth(2);
+  await cell.click();
+  await page.keyboard.press('Enter');
+  await cell.locator('input').fill('Zzz Edited');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('readout').locator('[data-slice="lastCommit"]')).toContainText('customer');
 });

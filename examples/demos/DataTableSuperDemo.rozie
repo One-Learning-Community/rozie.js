@@ -11,15 +11,36 @@
   the dataset to ~1,500 deterministically-generated rows (no Math.random —
   a seeded LCG, so VR/manual runs are reproducible).
 
-  Task 3 (this revision): adds a control panel toggling grid/table
-  interaction mode, virtualization, selection mode, and manual pagination in
-  combination — plus two folded-in clean-ups from the Task 2 review: (1) the
-  readout now surfaces all eleven bound slices (was 6/11), and (2)
-  `:groupable` is scoped to customer/category/status only (id/amount/units/
-  active/orderedAt now set `:groupable="false"` — DataTable's Column default
-  is groupable=true, opt-out, so all 8 columns were groupable pre-cleanup,
+  Task 3: adds a control panel toggling grid/table interaction mode,
+  virtualization, selection mode, and manual pagination in combination —
+  plus two folded-in clean-ups from the Task 2 review: (1) the readout now
+  surfaces all eleven bound slices (was 6/11), and (2) `:groupable` is
+  scoped to customer/category/status only (id/amount/units/active/orderedAt
+  now set `:groupable="false"` — DataTable's Column default is
+  groupable=true, opt-out, so all 8 columns were groupable pre-cleanup,
   which would offer nonsensical grouping keys once #groupBar lands in a
   later task).
+
+  Task 4 (this revision): wires inline editing to all FIVE `#editor`
+  drop-ins (EditorText/Number/Select/Checkbox/Date — Column.rozie's
+  editor='custom' route, mirroring DataTableEditDemo.rozie /
+  DataTableEditorDropinsDemo.rozie's proven `#editor` slot idiom). Six
+  columns become editable (`:editable="true" editor="custom"`):
+  customer→EditorText (the `r-else` fallthrough), category/status→
+  EditorSelect (with :options), amount→EditorNumber, active→EditorCheckbox,
+  orderedAt→EditorDate. The `#editor` slot dispatches by `columnId` via an
+  `r-if`/`r-else-if`/…/`r-else` chain (proven to compile ×6 in
+  DataTableEditorDropinsDemo.rozie — no fallback needed). A
+  `@cell-edit-commit` listener (the literal event name DataTable's
+  `$emit('cell-edit-commit', …)` fires — matching every existing demo's
+  idiom; NOT the camelCase `cellEditCommit` spelling, since the attribute
+  name is NOT normalized/camelized before matching against the child's
+  literal emit-name string) sets `$data.lastCommit` to the raw commit
+  payload, surfaced as a 12th readout slice (JSON.stringify, matching the
+  other ten). Also folds in the Task 3 review fix (below): `:key`-forces-
+  remount on `<DataTable>` so live `virtual` toggling actually works, and a
+  two-sided row-count bound in the VR spec that would have caught it not
+  working.
 
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
@@ -30,6 +51,11 @@
 {
   DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
   Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+  EditorNumber: '../../packages/ui/data-table/src/EditorNumber.rozie',
+  EditorSelect: '../../packages/ui/data-table/src/EditorSelect.rozie',
+  EditorCheckbox: '../../packages/ui/data-table/src/EditorCheckbox.rozie',
+  EditorDate: '../../packages/ui/data-table/src/EditorDate.rozie',
 }
 </components>
 
@@ -70,8 +96,36 @@
   virtual: false,
   selectionMode: 'multiple',
   manualPagination: false,
+
+  // ── Task 4: editing ────────────────────────────────────────────────────
+  // Select-editor options for the category/status columns (mirrors the row
+  // generator's K/S value sets above — those are IIFE-scoped, so restated
+  // here as { value, label } pairs for the EditorSelect drop-in).
+  categoryOptions: [
+    { value: 'Hardware', label: 'Hardware' },
+    { value: 'Software', label: 'Software' },
+    { value: 'Services', label: 'Services' },
+    { value: 'Support',  label: 'Support' },
+  ],
+  statusOptions: [
+    { value: 'active',   label: 'Active' },
+    { value: 'pending',  label: 'Pending' },
+    { value: 'archived', label: 'Archived' },
+  ],
+  // Last cell-edit-commit payload ({ rowId, columnId, oldValue, newValue }),
+  // surfaced verbatim (JSON.stringify) as the 12th readout slice.
+  lastCommit: null,
 }
 </data>
+
+<script lang="ts">
+// cell-edit-commit payload ({ rowId, columnId, oldValue, newValue }) → surfaced
+// verbatim in the readout. Payload arrives as arg0 directly (the @emit consumer
+// contract — NOT a wrapped CustomEvent; mirrors DataTableEditDemo.rozie).
+const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
+  $data.lastCommit = p
+}
+</script>
 
 <template>
   <main data-testid="dt-super">
@@ -95,7 +149,20 @@
       <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
     </fieldset>
 
+    <!-- `virtual` is a construction-time-only prop on DataTable — the vertical
+         Virtualizer is built once in $onMount, gated on the INITIAL value of
+         `$props.virtual` (no `$watch` re-fires it on a live prop flip, unlike
+         SortableList's ghostClass/etc.). Toggling `$data.virtual` on the control
+         panel therefore needs the SAME `:key`-forces-remount idiom
+         SortableListShowcaseDemo.rozie documents for its construction-time-only
+         knobs (forceFallback/swapThreshold/cloneable) — re-keying unmounts the
+         stale DataTable instance and mounts a fresh one that reads the current
+         `virtual` value at $onMount. Without this, flipping the checkbox renders
+         the windowed markup with NO virtualizer behind it — 0 real body rows,
+         just the two zero-height spacer <tr>s (the exact silent-failure the
+         folded-in Task 3 review fix's two-sided bound now catches). -->
     <DataTable
+      :key="String($data.virtual)"
       :data="$data.rows"
       :stickyHeader="true"
       :interactionMode="$data.gridMode ? 'grid' : 'table'"
@@ -116,15 +183,49 @@
       r-model:columnSizing="$data.columnSizing"
       r-model:columnOrder="$data.columnOrder"
       r-model:columnPinning="$data.columnPinning"
+      @cell-edit-commit="onCommit"
     >
       <Column field="id"         header="#"         :sortable="true" :groupable="false" />
-      <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" />
-      <Column field="category"   header="Category"  :sortable="true" :filterable="true" />
-      <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" />
+      <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
+      <Column field="category"   header="Category"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
+      <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" :editable="true" editor="custom" />
       <Column field="units"      header="Units"     :sortable="true" :groupable="false" />
-      <Column field="status"     header="Status"    :sortable="true" :filterable="true" />
-      <Column field="active"     header="Active"    :sortable="true" :groupable="false" />
-      <Column field="orderedAt"  header="Ordered"   :sortable="true" :groupable="false" />
+      <Column field="status"     header="Status"    :sortable="true" :filterable="true" :editable="true" editor="custom" />
+      <Column field="active"     header="Active"    :sortable="true" :groupable="false" :editable="true" editor="custom" />
+      <Column field="orderedAt"  header="Ordered"   :sortable="true" :groupable="false" :editable="true" editor="custom" />
+
+      <!-- The #editor scoped slot (Task 4), dispatched by columnId to the five
+           EditorText/Number/Select/Checkbox/Date drop-ins (mirrors
+           DataTableEditDemo.rozie / DataTableEditorDropinsDemo.rozie's proven
+           #editor slot idiom — r-if/r-else-if/…/r-else compiles ×6). -->
+      <template #editor="{ columnId, column, row, value, commit, cancel }">
+        <EditorSelect
+          r-if="columnId === 'category'"
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+          :options="$data.categoryOptions"
+        />
+        <EditorSelect
+          r-else-if="columnId === 'status'"
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+          :options="$data.statusOptions"
+        />
+        <EditorNumber
+          r-else-if="columnId === 'amount'"
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+        />
+        <EditorCheckbox
+          r-else-if="columnId === 'active'"
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+        />
+        <EditorDate
+          r-else-if="columnId === 'orderedAt'"
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+        />
+        <EditorText
+          r-else
+          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
+        />
+      </template>
     </DataTable>
 
     <aside data-testid="readout">
@@ -139,6 +240,7 @@
       <code data-slice="columnSizing">columnSizing: {{ JSON.stringify($data.columnSizing) }}</code>
       <code data-slice="columnOrder">columnOrder: {{ JSON.stringify($data.columnOrder) }}</code>
       <code data-slice="columnPinning">columnPinning: {{ JSON.stringify($data.columnPinning) }}</code>
+      <code data-slice="lastCommit">lastCommit: {{ JSON.stringify($data.lastCommit) }}</code>
     </aside>
   </main>
 </template>
