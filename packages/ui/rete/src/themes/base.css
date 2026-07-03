@@ -3,14 +3,16 @@
  *
  * Every visual value the FlowCanvas renders is a `--rozie-flow-*` custom property.
  * The component ships with inline `var(token, fallback)` defaults (a zero-config,
- * byte-identical LIGHT look), so importing this file is OPTIONAL — it makes the full
+ * byte-identical LIGHT look) AND a built-in OS-driven dark default
+ * (`@media (prefers-color-scheme: dark)`, emitted through the component's `:root`
+ * escape hatch) — so dark mode works with NO import at all.
+ *
+ * Importing this file is therefore OPTIONAL. It does two things: (1) makes the full
  * token surface explicit in one place so you can copy/override exactly what you need,
- * AND it is the DARK-MODE entry point: it carries both the OS-driven
- * `@media (prefers-color-scheme: dark)` and the app-toggled `.dark` / `[data-theme]`
- * overrides. (Dark lives here, not inside the component's own `<style>`, because
- * Rozie's scoping pass strips `@media` at-rules — a scoped dark block would silently
- * become unconditional. This raw file is vendored verbatim, so the media query
- * survives.) Import it to make the canvas dark-aware:
+ * and (2) adds the APP-TOGGLED dark strategy (`.dark` / `[data-theme="dark"]`) for
+ * apps that switch theme by a root class instead of the OS setting — plus a redundant
+ * (identical-value) OS `@media` block so an app that imports ONLY this file, ahead of
+ * any custom overrides, still gets OS dark.
  *
  *   import '@rozie-ui/rete-react/themes/base.css';
  *

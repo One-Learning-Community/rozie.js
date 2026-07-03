@@ -3063,11 +3063,13 @@ $expose({
    every selected/active affordance (node-selected border+ring, socket hover,
    selected-edge stroke, active control, marquee border, minimap selected node +
    viewport window). Fallbacks equal the historical literals, so the LIGHT render is
-   byte-identical (the FlowCanvasScreenshot VR baseline is untouched). Dark mode is
-   opt-in via themes/base.css (see the note above the `:root {}` block below) — it
-   sets the tokens at the document root, which inherit onto the engine-DOM
-   descendants (node/socket/connection) and are read by the imperative minimap/
-   arrowhead SVG via flowToken()/getComputedStyle. */
+   byte-identical (the FlowCanvasScreenshot VR baseline is untouched). Dark mode is a
+   ZERO-IMPORT, OS-driven default: a `@media (prefers-color-scheme: dark)` block inside
+   the `:root {}` escape hatch below (the one place the compiler preserves `@media`)
+   redefines the color tokens, which inherit onto the engine-DOM descendants
+   (node/socket/connection) and are read by the imperative minimap/arrowhead SVG via
+   flowToken()/getComputedStyle. themes/base.css adds the app-toggled `.dark` class
+   strategy on top. */
 .rozie-flow-canvas {
   width: 100%;
   height: 100%;
@@ -3190,18 +3192,62 @@ $expose({
 .rozie-flow-toolbar__btn:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
 .rozie-flow-toolbar__btn--delete { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
 
-/* DARK MODE is shipped by the OPT-IN themes/base.css (a raw-vendored CSS file, not
-   processed by Rozie's scoping pass), which carries BOTH the OS-driven
-   `@media (prefers-color-scheme: dark)` and the app-toggled `.dark`/`[data-theme]`
-   overrides. It lives there rather than in this scoped block on purpose: the
-   scoping pass strips `@media` at-rules from `<style>`, which would silently hoist
-   the dark overrides to UNCONDITIONAL (dark always-on, destroying the light
-   default). Importing base.css sets the `--rozie-flow-*` tokens at the document
-   root; custom properties inherit (and pierce Lit's shadow boundary) so one import
-   re-skins the component chrome, the engine DOM, AND the flowToken()-read imperative
-   SVG on all six targets. Light stays zero-config + byte-identical. */
-
 :root {
+  /* ── DARK-MODE-AWARE DEFAULT (zero-import, OS-driven) ─────────────────────────
+     Lives INSIDE the `:root {}` escape hatch, NOT as a top-level scoped `@media`
+     block: Rozie's scoping pass silently DROPS a top-level `@media` wrapper and
+     hoists its inner rule to unconditional (which would force dark always-on and
+     destroy the light default — the same bug that silently defeats Dialog.rozie's
+     `prefers-reduced-motion` guard). The escape hatch instead slices at-rule
+     children VERBATIM (parseStyle CR-01), so the media query is PRESERVED and
+     emitted globally on all six targets (react/vue/svelte global CSS, angular
+     `::ng-deep`, lit injected document styles) — verified by direct compile probe.
+     The tokens are set on the BARE `.rozie-flow-canvas` (engine/global scope, no
+     scope attr), so they inherit onto the engine-DOM node/socket/connection
+     descendants AND are read by flowToken()/getComputedStyle for the imperative
+     minimap/arrowhead SVG. Sizing tokens are unchanged. Light is untouched (the
+     query never matches in a light context) → the FlowCanvasScreenshot VR baseline
+     needs no rebless. App-TOGGLED dark (`.dark`/`[data-theme]`) for the five
+     light-DOM targets ships in themes/base.css (opt-in; a class ancestor can't
+     cross Lit's shadow boundary, but OS dark covers Lit zero-import). */
+  @media (prefers-color-scheme: dark) {
+    .rozie-flow-canvas {
+      --rozie-flow-accent: #60a5fa;
+      --rozie-flow-bg: #0f172a;
+      --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
+      --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
+      --rozie-flow-node-bg: #1e293b;
+      --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
+      --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      --rozie-flow-node-title-fg: #e2e8f0;
+      --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
+      --rozie-flow-port-fg: #94a3b8;
+      --rozie-flow-socket-bg: #64748b;
+      --rozie-flow-socket-border-color: #1e293b;
+      --rozie-flow-connection-stroke: #64748b;
+      --rozie-flow-connection-label-fg: #e2e8f0;
+      --rozie-flow-connection-label-halo: #0f172a;
+      --rozie-flow-control-bg: #1e293b;
+      --rozie-flow-control-fg: #cbd5e1;
+      --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-control-hover-bg: #334155;
+      --rozie-flow-control-active-bg: #475569;
+      --rozie-flow-control-selected-bg: #1e3a8a;
+      --rozie-flow-control-selected-fg: #bfdbfe;
+      --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
+      --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-minimap-node-fill: #64748b;
+      --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+      --rozie-flow-toolbar-bg: #1e293b;
+      --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+      --rozie-flow-toolbar-btn-bg: #334155;
+      --rozie-flow-toolbar-btn-fg: #cbd5e1;
+      --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+      --rozie-flow-toolbar-btn-hover-bg: #475569;
+      --rozie-flow-toolbar-delete-fg: #f87171;
+    }
+  }
+
   /* Engine-rendered node / socket / connection DOM never carries the
      [data-rozie-s-*] scope attribute — reach it via the Phase-34 :root engine-DOM
      escape hatch (NOT :global(), a ROZ128 hard error). Rete ships NO stylesheet,
