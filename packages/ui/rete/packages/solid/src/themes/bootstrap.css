@@ -1,0 +1,48 @@
+/*
+ * @rozie-ui/rete — Bootstrap 5 bridge.
+ *
+ * Maps the flow tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap 5.2+).
+ * Reading them live means the canvas follows `data-bs-theme="dark"` and any custom
+ * `$primary` build automatically. Falls back to Bootstrap's default light palette
+ * when the vars are absent.
+ *
+ *   import '@rozie-ui/rete-react/themes/bootstrap.css';
+ *
+ * Colors-only scope — sizing tokens are left unset so the `.rozie-flow-canvas`
+ * defaults hold; selected/active tokens fall back to `--rozie-flow-accent`.
+ */
+.rozie-flow-canvas {
+  --rozie-flow-accent: var(--bs-primary, #0d6efd);
+  --rozie-flow-bg: var(--bs-tertiary-bg, #f8f9fa);
+  --rozie-flow-grid-dot-color: var(--bs-border-color, #dee2e6);
+  --rozie-flow-border-color: var(--bs-border-color, #dee2e6);
+
+  --rozie-flow-node-bg: var(--bs-body-bg, #fff);
+  --rozie-flow-node-border: var(--bs-border-color, #dee2e6);
+  --rozie-flow-node-title-fg: var(--bs-body-color, #212529);
+  --rozie-flow-node-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+
+  --rozie-flow-port-fg: var(--bs-secondary-color, #6c757d);
+  --rozie-flow-socket-bg: var(--bs-secondary, #6c757d);
+  --rozie-flow-socket-border-color: var(--bs-body-bg, #fff);
+
+  --rozie-flow-connection-stroke: var(--bs-secondary, #6c757d);
+  --rozie-flow-connection-label-fg: var(--bs-body-color, #212529);
+  --rozie-flow-connection-label-halo: var(--bs-body-bg, #fff);
+
+  --rozie-flow-control-bg: var(--bs-body-bg, #fff);
+  --rozie-flow-control-fg: var(--bs-body-color, #212529);
+  --rozie-flow-control-border: var(--bs-border-color, #dee2e6);
+  --rozie-flow-control-hover-bg: var(--bs-tertiary-bg, #f8f9fa);
+  --rozie-flow-control-active-bg: var(--bs-secondary-bg, #e9ecef);
+
+  --rozie-flow-minimap-bg: var(--bs-body-bg, #fff);
+  --rozie-flow-minimap-border: var(--bs-border-color, #dee2e6);
+  --rozie-flow-minimap-node-fill: var(--bs-secondary, #6c757d);
+
+  --rozie-flow-toolbar-bg: var(--bs-body-bg, #fff);
+  --rozie-flow-toolbar-border: var(--bs-border-color, #dee2e6);
+  --rozie-flow-toolbar-btn-bg: var(--bs-tertiary-bg, #f8f9fa);
+  --rozie-flow-toolbar-btn-fg: var(--bs-body-color, #212529);
+  --rozie-flow-toolbar-delete-fg: var(--bs-danger, #dc3545);
+}

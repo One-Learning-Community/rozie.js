@@ -1158,6 +1158,23 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     },
   };
     const container = canvasEl.current;
+
+    // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
+    // SVG attributes that can't take a raw `var()` (the arrowhead fill + the minimap
+    // node/mask/viewport colors). Reads post-mount (container is live here → ROZ123-safe)
+    // via getComputedStyle; the custom property inherits onto `.rozie-flow-canvas` from
+    // any theme import (themes/base.css dark overrides, the shadcn/material/bootstrap
+    // bridges) or `:root` override, and falls back to the historical literal when unset —
+    // so the zero-import light default stays byte-identical while an imported dark theme
+    // + design-system bridges track automatically.
+    const flowToken = (name: any, fallback: any) => {
+      try {
+        const v = container ? getComputedStyle(container).getPropertyValue(name) : '';
+        return v && v.trim() || fallback;
+      } catch (e: any) {
+        return fallback;
+      }
+    };
     lastPropNodeIds.current = [];
     lastPropConnIds.current = [];
     editor.current = new NodeEditor();
@@ -1741,9 +1758,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       // (url(#id) resolves to the first match otherwise). The def lives in the SAME
       // per-edge <svg> inside the SAME shadow root as the path, so url(#id) resolves
       // within that root — no cross-root reference (Lit-safe). markerUnits="userSpaceOnUse"
-      // keeps a constant pixel size under the area zoom transform. Inline fill (#64748b,
-      // matching the connection stroke) is the cross-target-safe choice — no scoped-CSS /
-      // :root rule needed for the marker DOM. The marker does NOT change the path `d`
+      // keeps a constant pixel size under the area zoom transform. Inline fill (the
+      // `--rozie-flow-connection-stroke` token via flowToken(), default #64748b — matching
+      // the connection stroke) is the cross-target-safe choice — no scoped-CSS / :root rule
+      // needed for the marker DOM. The marker does NOT change the path `d`
       // or the socket geometry (the rete-flow-align cell stays green) — redraw() only
       // sets the head's `orient` and a `stroke-dasharray` that visually trims the last
       // ARROW_LEN of the stroke so the line meets the head without poking through it.
@@ -1766,7 +1784,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arrow.setAttribute('class', 'rozie-flow-connection__arrow');
       arrow.setAttribute('d', 'M0,0 L12,5 L0,10 Z');
-      arrow.setAttribute('fill', '#64748b');
+      arrow.setAttribute('fill', flowToken('--rozie-flow-connection-stroke', '#64748b'));
       marker.appendChild(arrow);
       defs.appendChild(marker);
       svg.appendChild(defs);
@@ -2459,7 +2477,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       const toMMy = (gy: any) => (gy - minY) * scale + offY;
       minimapSvg.current.innerHTML = '';
       for (const r of rects as any) {
-        const fill = r.selected ? '#3b82f6' : '#94a3b8';
+        const fill = r.selected ? flowToken('--rozie-flow-accent', '#3b82f6') : flowToken('--rozie-flow-minimap-node-fill', '#94a3b8');
         minimapSvg.current.appendChild(mkMinimapRect(toMMx(r.gx), toMMy(r.gy), r.gw * scale, r.gh * scale, 'rozie-flow-minimap__node', fill, null, 0));
       }
       // dim mask OUTSIDE the viewport: full minimap rect with the viewport rect punched
@@ -2471,10 +2489,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       const mask = document.createElementNS(SVGNS, 'path');
       mask.setAttribute('class', 'rozie-flow-minimap__mask');
       mask.setAttribute('fill-rule', 'evenodd');
-      mask.setAttribute('fill', 'rgba(15, 23, 42, 0.18)');
+      mask.setAttribute('fill', flowToken('--rozie-flow-minimap-mask', 'rgba(15, 23, 42, 0.18)'));
       mask.setAttribute('d', 'M0 0 H' + MINIMAP_W + ' V' + MINIMAP_H + ' H0 Z ' + 'M' + mvx + ' ' + mvy + ' h' + mvw + ' v' + mvh + ' h' + -mvw + ' Z');
       minimapSvg.current.appendChild(mask);
-      minimapSvg.current.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', '#3b82f6', 1.5));
+      minimapSvg.current.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', flowToken('--rozie-flow-accent', '#3b82f6'), 1.5));
     };
 
     // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op

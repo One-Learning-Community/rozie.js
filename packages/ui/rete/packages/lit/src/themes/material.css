@@ -1,0 +1,49 @@
+/*
+ * @rozie-ui/rete — Material Design 3 bridge.
+ *
+ * Maps the flow tokens onto the MD3 system color roles (`--md-sys-color-*`) emitted
+ * by material-web / @material/material-color-utilities theme builders. Falls back to
+ * the baseline M3 light palette when those vars are absent, so it renders correctly
+ * even without a generated theme, and follows the app's light/dark M3 scheme when it
+ * is present.
+ *
+ *   import '@rozie-ui/rete-react/themes/material.css';
+ *
+ * Colors-only scope — sizing tokens are left unset so the `.rozie-flow-canvas`
+ * defaults hold; selected/active tokens fall back to `--rozie-flow-accent`.
+ */
+.rozie-flow-canvas {
+  --rozie-flow-accent: var(--md-sys-color-primary, #6750a4);
+  --rozie-flow-bg: var(--md-sys-color-surface-container-low, #f7f2fa);
+  --rozie-flow-grid-dot-color: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-flow-border-color: var(--md-sys-color-outline-variant, #cac4d0);
+
+  --rozie-flow-node-bg: var(--md-sys-color-surface, #fef7ff);
+  --rozie-flow-node-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-flow-node-title-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-flow-node-shadow: 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3);
+
+  --rozie-flow-port-fg: var(--md-sys-color-on-surface-variant, #49454f);
+  --rozie-flow-socket-bg: var(--md-sys-color-outline, #79747e);
+  --rozie-flow-socket-border-color: var(--md-sys-color-surface, #fef7ff);
+
+  --rozie-flow-connection-stroke: var(--md-sys-color-outline, #79747e);
+  --rozie-flow-connection-label-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-flow-connection-label-halo: var(--md-sys-color-surface, #fef7ff);
+
+  --rozie-flow-control-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-flow-control-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-flow-control-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-flow-control-hover-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+  --rozie-flow-control-active-bg: var(--md-sys-color-surface-container-highest, #e6e0e9);
+
+  --rozie-flow-minimap-bg: var(--md-sys-color-surface-container-low, #f7f2fa);
+  --rozie-flow-minimap-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-flow-minimap-node-fill: var(--md-sys-color-outline, #79747e);
+
+  --rozie-flow-toolbar-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-flow-toolbar-border: var(--md-sys-color-outline-variant, #cac4d0);
+  --rozie-flow-toolbar-btn-bg: var(--md-sys-color-surface-container-high, #ece6f0);
+  --rozie-flow-toolbar-btn-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-flow-toolbar-delete-fg: var(--md-sys-color-error, #b3261e);
+}

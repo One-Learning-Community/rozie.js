@@ -1,0 +1,185 @@
+/*
+ * @rozie-ui/rete — base token reference.
+ *
+ * Every visual value the FlowCanvas renders is a `--rozie-flow-*` custom property.
+ * The component ships with inline `var(token, fallback)` defaults (a zero-config,
+ * byte-identical LIGHT look), so importing this file is OPTIONAL — it makes the full
+ * token surface explicit in one place so you can copy/override exactly what you need,
+ * AND it is the DARK-MODE entry point: it carries both the OS-driven
+ * `@media (prefers-color-scheme: dark)` and the app-toggled `.dark` / `[data-theme]`
+ * overrides. (Dark lives here, not inside the component's own `<style>`, because
+ * Rozie's scoping pass strips `@media` at-rules — a scoped dark block would silently
+ * become unconditional. This raw file is vendored verbatim, so the media query
+ * survives.) Import it to make the canvas dark-aware:
+ *
+ *   import '@rozie-ui/rete-react/themes/base.css';
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-flow-canvas` element). One `--rozie-flow-accent` drives every
+ * selected/active affordance (node-selected border+ring, socket hover,
+ * selected-edge stroke, active control, marquee border, minimap selected node +
+ * viewport window) — override it alone to recolor every selection cue.
+ *
+ * See themes/shadcn.css, themes/material.css and themes/bootstrap.css for
+ * design-system bridges.
+ */
+.rozie-flow-canvas {
+  /* accent — the shared selected/active color. */
+  --rozie-flow-accent: #3b82f6;
+
+  /* canvas surface */
+  --rozie-flow-bg: #f7f8fa;
+  --rozie-flow-grid-dot-color: rgba(0, 0, 0, 0.08);
+  --rozie-flow-grid-size: 20px;
+  --rozie-flow-border-color: rgba(0, 0, 0, 0.1);
+  --rozie-flow-radius: 8px;
+
+  /* node chrome */
+  --rozie-flow-node-bg: #ffffff;
+  --rozie-flow-node-border: rgba(0, 0, 0, 0.16);
+  --rozie-flow-node-radius: 8px;
+  --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  --rozie-flow-node-title-fg: #1f2937;
+  --rozie-flow-node-selected-border: var(--rozie-flow-accent);
+  --rozie-flow-node-selected-ring: rgba(59, 130, 246, 0.5);
+
+  /* ports + sockets */
+  --rozie-flow-port-fg: #6b7280;
+  --rozie-flow-socket-size: 12px;
+  --rozie-flow-socket-bg: #94a3b8;
+  --rozie-flow-socket-border-color: #ffffff;
+  --rozie-flow-socket-ring: rgba(0, 0, 0, 0.2);
+  --rozie-flow-socket-hover-bg: var(--rozie-flow-accent);
+
+  /* connections */
+  --rozie-flow-connection-stroke: #64748b;
+  --rozie-flow-connection-width: 3px;
+  --rozie-flow-connection-selected-stroke: var(--rozie-flow-accent);
+  --rozie-flow-connection-selected-width: 4px;
+  --rozie-flow-connection-label-fg: #334155;
+  --rozie-flow-connection-label-halo: #ffffff;
+
+  /* built-in Controls overlay */
+  --rozie-flow-control-bg: #ffffff;
+  --rozie-flow-control-fg: #334155;
+  --rozie-flow-control-border: rgba(0, 0, 0, 0.16);
+  --rozie-flow-control-radius: 6px;
+  --rozie-flow-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  --rozie-flow-control-hover-bg: #f1f5f9;
+  --rozie-flow-control-active-bg: #e2e8f0;
+  --rozie-flow-control-selected-bg: #dbeafe;
+  --rozie-flow-control-selected-fg: #1d4ed8;
+  --rozie-flow-control-selected-border: var(--rozie-flow-accent);
+
+  /* marquee (mode:'select') */
+  --rozie-flow-marquee-bg: rgba(59, 130, 246, 0.12);
+  --rozie-flow-marquee-border: var(--rozie-flow-accent);
+
+  /* MiniMap overlay */
+  --rozie-flow-minimap-bg: rgba(255, 255, 255, 0.82);
+  --rozie-flow-minimap-border: rgba(0, 0, 0, 0.16);
+  --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  --rozie-flow-minimap-node-fill: #94a3b8;
+  --rozie-flow-minimap-mask: rgba(15, 23, 42, 0.18);
+
+  /* NodeToolbar overlay */
+  --rozie-flow-toolbar-bg: #ffffff;
+  --rozie-flow-toolbar-border: rgba(0, 0, 0, 0.16);
+  --rozie-flow-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  --rozie-flow-toolbar-btn-bg: #f8fafc;
+  --rozie-flow-toolbar-btn-fg: #334155;
+  --rozie-flow-toolbar-btn-border: rgba(0, 0, 0, 0.14);
+  --rozie-flow-toolbar-btn-hover-bg: #eef2f7;
+  --rozie-flow-toolbar-delete-fg: #b91c1c;
+}
+
+/*
+ * App-toggled dark theme. The component ships a zero-import
+ * `@media (prefers-color-scheme: dark)` default, but an app that toggles dark via a
+ * class needs these. Only COLOR tokens are remapped (sizes/radii hold). Applies when
+ * a `.dark` or `[data-theme="dark"]` ancestor is present. Custom properties inherit
+ * (and pierce shadow DOM), so this reaches the Lit custom element too — the one
+ * place a bare class-toggle otherwise can't reach inside the shadow root.
+ */
+.dark .rozie-flow-canvas,
+[data-theme="dark"] .rozie-flow-canvas,
+.dark.rozie-flow-canvas,
+[data-theme="dark"].rozie-flow-canvas {
+  --rozie-flow-accent: #60a5fa;
+  --rozie-flow-bg: #0f172a;
+  --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
+  --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
+  --rozie-flow-node-bg: #1e293b;
+  --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
+  --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --rozie-flow-node-title-fg: #e2e8f0;
+  --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
+  --rozie-flow-port-fg: #94a3b8;
+  --rozie-flow-socket-bg: #64748b;
+  --rozie-flow-socket-border-color: #1e293b;
+  --rozie-flow-connection-stroke: #64748b;
+  --rozie-flow-connection-label-fg: #e2e8f0;
+  --rozie-flow-connection-label-halo: #0f172a;
+  --rozie-flow-control-bg: #1e293b;
+  --rozie-flow-control-fg: #cbd5e1;
+  --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+  --rozie-flow-control-hover-bg: #334155;
+  --rozie-flow-control-active-bg: #475569;
+  --rozie-flow-control-selected-bg: #1e3a8a;
+  --rozie-flow-control-selected-fg: #bfdbfe;
+  --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
+  --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+  --rozie-flow-minimap-node-fill: #64748b;
+  --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+  --rozie-flow-toolbar-bg: #1e293b;
+  --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+  --rozie-flow-toolbar-btn-bg: #334155;
+  --rozie-flow-toolbar-btn-fg: #cbd5e1;
+  --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+  --rozie-flow-toolbar-btn-hover-bg: #475569;
+  --rozie-flow-toolbar-delete-fg: #f87171;
+}
+
+/*
+ * OS-driven dark. Applies the same dark palette when the operating system requests
+ * a dark scheme — UNLESS the app explicitly opted into light via a `.light` /
+ * `[data-theme="light"]` root class (so a class-strategy app keeps full control).
+ * An explicit `.dark` / `[data-theme="dark"]` (above) always wins regardless of OS.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not([data-theme="light"]) .rozie-flow-canvas {
+    --rozie-flow-accent: #60a5fa;
+    --rozie-flow-bg: #0f172a;
+    --rozie-flow-grid-dot-color: rgba(255, 255, 255, 0.06);
+    --rozie-flow-border-color: rgba(255, 255, 255, 0.1);
+    --rozie-flow-node-bg: #1e293b;
+    --rozie-flow-node-border: rgba(255, 255, 255, 0.12);
+    --rozie-flow-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    --rozie-flow-node-title-fg: #e2e8f0;
+    --rozie-flow-node-selected-ring: rgba(96, 165, 250, 0.5);
+    --rozie-flow-port-fg: #94a3b8;
+    --rozie-flow-socket-bg: #64748b;
+    --rozie-flow-socket-border-color: #1e293b;
+    --rozie-flow-connection-stroke: #64748b;
+    --rozie-flow-connection-label-fg: #e2e8f0;
+    --rozie-flow-connection-label-halo: #0f172a;
+    --rozie-flow-control-bg: #1e293b;
+    --rozie-flow-control-fg: #cbd5e1;
+    --rozie-flow-control-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-control-hover-bg: #334155;
+    --rozie-flow-control-active-bg: #475569;
+    --rozie-flow-control-selected-bg: #1e3a8a;
+    --rozie-flow-control-selected-fg: #bfdbfe;
+    --rozie-flow-minimap-bg: rgba(15, 23, 42, 0.82);
+    --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-minimap-node-fill: #64748b;
+    --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+    --rozie-flow-toolbar-bg: #1e293b;
+    --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
+    --rozie-flow-toolbar-btn-bg: #334155;
+    --rozie-flow-toolbar-btn-fg: #cbd5e1;
+    --rozie-flow-toolbar-btn-border: rgba(255, 255, 255, 0.12);
+    --rozie-flow-toolbar-btn-hover-bg: #475569;
+    --rozie-flow-toolbar-delete-fg: #f87171;
+  }
+}

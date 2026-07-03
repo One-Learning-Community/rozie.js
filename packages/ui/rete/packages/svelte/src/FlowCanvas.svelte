@@ -1812,6 +1812,23 @@ $effect(() => () => {
 
 onMount(() => {
   const container = canvasEl;
+
+  // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
+  // SVG attributes that can't take a raw `var()` (the arrowhead fill + the minimap
+  // node/mask/viewport colors). Reads post-mount (container is live here → ROZ123-safe)
+  // via getComputedStyle; the custom property inherits onto `.rozie-flow-canvas` from
+  // any theme import (themes/base.css dark overrides, the shadcn/material/bootstrap
+  // bridges) or `:root` override, and falls back to the historical literal when unset —
+  // so the zero-import light default stays byte-identical while an imported dark theme
+  // + design-system bridges track automatically.
+  const flowToken = (name: any, fallback: any) => {
+    try {
+      const v = container ? getComputedStyle(container).getPropertyValue(name) : '';
+      return v && v.trim() || fallback;
+    } catch (e: any) {
+      return fallback;
+    }
+  };
   lastPropNodeIds = [];
   lastPropConnIds = [];
   editor = new NodeEditor();
@@ -2395,9 +2412,10 @@ onMount(() => {
     // (url(#id) resolves to the first match otherwise). The def lives in the SAME
     // per-edge <svg> inside the SAME shadow root as the path, so url(#id) resolves
     // within that root — no cross-root reference (Lit-safe). markerUnits="userSpaceOnUse"
-    // keeps a constant pixel size under the area zoom transform. Inline fill (#64748b,
-    // matching the connection stroke) is the cross-target-safe choice — no scoped-CSS /
-    // :root rule needed for the marker DOM. The marker does NOT change the path `d`
+    // keeps a constant pixel size under the area zoom transform. Inline fill (the
+    // `--rozie-flow-connection-stroke` token via flowToken(), default #64748b — matching
+    // the connection stroke) is the cross-target-safe choice — no scoped-CSS / :root rule
+    // needed for the marker DOM. The marker does NOT change the path `d`
     // or the socket geometry (the rete-flow-align cell stays green) — redraw() only
     // sets the head's `orient` and a `stroke-dasharray` that visually trims the last
     // ARROW_LEN of the stroke so the line meets the head without poking through it.
@@ -2420,7 +2438,7 @@ onMount(() => {
     const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     arrow.setAttribute('class', 'rozie-flow-connection__arrow');
     arrow.setAttribute('d', 'M0,0 L12,5 L0,10 Z');
-    arrow.setAttribute('fill', '#64748b');
+    arrow.setAttribute('fill', flowToken('--rozie-flow-connection-stroke', '#64748b'));
     marker.appendChild(arrow);
     defs.appendChild(marker);
     svg.appendChild(defs);
@@ -3113,7 +3131,7 @@ onMount(() => {
     const toMMy = (gy: any) => (gy - minY) * scale + offY;
     minimapSvg.innerHTML = '';
     for (const r of rects as any) {
-      const fill = r.selected ? '#3b82f6' : '#94a3b8';
+      const fill = r.selected ? flowToken('--rozie-flow-accent', '#3b82f6') : flowToken('--rozie-flow-minimap-node-fill', '#94a3b8');
       minimapSvg.appendChild(mkMinimapRect(toMMx(r.gx), toMMy(r.gy), r.gw * scale, r.gh * scale, 'rozie-flow-minimap__node', fill, null, 0));
     }
     // dim mask OUTSIDE the viewport: full minimap rect with the viewport rect punched
@@ -3125,10 +3143,10 @@ onMount(() => {
     const mask = document.createElementNS(SVGNS, 'path');
     mask.setAttribute('class', 'rozie-flow-minimap__mask');
     mask.setAttribute('fill-rule', 'evenodd');
-    mask.setAttribute('fill', 'rgba(15, 23, 42, 0.18)');
+    mask.setAttribute('fill', flowToken('--rozie-flow-minimap-mask', 'rgba(15, 23, 42, 0.18)'));
     mask.setAttribute('d', 'M0 0 H' + MINIMAP_W + ' V' + MINIMAP_H + ' H0 Z ' + 'M' + mvx + ' ' + mvy + ' h' + mvw + ' v' + mvh + ' h' + -mvw + ' Z');
     minimapSvg.appendChild(mask);
-    minimapSvg.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', '#3b82f6', 1.5));
+    minimapSvg.appendChild(mkMinimapRect(mvx, mvy, mvw, mvh, 'rozie-flow-minimap__viewport', 'none', flowToken('--rozie-flow-accent', '#3b82f6'), 1.5));
   };
 
   // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
@@ -3685,11 +3703,11 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
     min-height: 360px;
     position: relative;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: var(--rozie-flow-radius, 8px);
     background:
-      radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px) 0 0 / 20px 20px,
-      #f7f8fa;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+      radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+      var(--rozie-flow-bg, #f7f8fa);
+    border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
   }
   .rozie-flow-controls[data-rozie-s-cd396d6a] {
     position: absolute;
@@ -3710,24 +3728,28 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
     justify-content: center;
     padding: 0;
     font: 600 16px/1 system-ui, sans-serif;
-    color: #334155;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.16);
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+    color: var(--rozie-flow-control-fg, #334155);
+    background: var(--rozie-flow-control-bg, #ffffff);
+    border: 1px solid var(--rozie-flow-control-border, rgba(0, 0, 0, 0.16));
+    border-radius: var(--rozie-flow-control-radius, 6px);
+    box-shadow: var(--rozie-flow-control-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
     cursor: pointer;
     user-select: none;
   }
-  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: #f1f5f9; }
-  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
-  .rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] { background: #dbeafe; color: #1d4ed8; border-color: #3b82f6; }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-control-hover-bg, #f1f5f9); }
+  .rozie-flow-controls__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+  .rozie-flow-controls__btn.is-active[data-rozie-s-cd396d6a] {
+    background: var(--rozie-flow-control-selected-bg, #dbeafe);
+    color: var(--rozie-flow-control-selected-fg, #1d4ed8);
+    border-color: var(--rozie-flow-control-selected-border, var(--rozie-flow-accent, #3b82f6));
+  }
   .rozie-flow-marquee[data-rozie-s-cd396d6a] {
     position: absolute;
     display: none;
     z-index: 9;
     pointer-events: none;
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid #3b82f6;
+    background: var(--rozie-flow-marquee-bg, rgba(59, 130, 246, 0.12));
+    border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, #3b82f6));
     border-radius: 2px;
   }
   .rozie-flow-minimap[data-rozie-s-cd396d6a] {
@@ -3737,10 +3759,10 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
     z-index: 10;
     width: 200px;
     height: 150px;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(0, 0, 0, 0.16);
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+    background: var(--rozie-flow-minimap-bg, rgba(255, 255, 255, 0.82));
+    border: 1px solid var(--rozie-flow-minimap-border, rgba(0, 0, 0, 0.16));
+    border-radius: var(--rozie-flow-control-radius, 6px);
+    box-shadow: var(--rozie-flow-minimap-shadow, 0 1px 3px rgba(0, 0, 0, 0.14));
     overflow: hidden;
     cursor: pointer;
     touch-action: none;
@@ -3752,26 +3774,26 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
     z-index: 11;
     gap: 4px;
     padding: 3px;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.16);
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    background: var(--rozie-flow-toolbar-bg, #ffffff);
+    border: 1px solid var(--rozie-flow-toolbar-border, rgba(0, 0, 0, 0.16));
+    border-radius: var(--rozie-flow-control-radius, 6px);
+    box-shadow: var(--rozie-flow-toolbar-shadow, 0 2px 8px rgba(0, 0, 0, 0.18));
     pointer-events: auto;
     white-space: nowrap;
   }
   .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a] {
     font: 600 12px/1 system-ui, sans-serif;
-    color: #334155;
-    background: #f8fafc;
-    border: 1px solid rgba(0, 0, 0, 0.14);
+    color: var(--rozie-flow-toolbar-btn-fg, #334155);
+    background: var(--rozie-flow-toolbar-btn-bg, #f8fafc);
+    border: 1px solid var(--rozie-flow-toolbar-btn-border, rgba(0, 0, 0, 0.14));
     border-radius: 4px;
     padding: 4px 8px;
     cursor: pointer;
     user-select: none;
   }
-  .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: #eef2f7; }
-  .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: #e2e8f0; }
-  .rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: #b91c1c; }
+  .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:hover { background: var(--rozie-flow-toolbar-btn-hover-bg, #eef2f7); }
+  .rozie-flow-toolbar__btn[data-rozie-s-cd396d6a]:active { background: var(--rozie-flow-control-active-bg, #e2e8f0); }
+  .rozie-flow-toolbar__btn--delete[data-rozie-s-cd396d6a] { color: var(--rozie-flow-toolbar-delete-fg, #b91c1c); }
 }
 
 :global {
@@ -3780,22 +3802,22 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
       grid-template-columns: auto 1fr auto;
       align-items: stretch;
       min-width: 140px;
-      background: #ffffff;
-      border: 1px solid rgba(0, 0, 0, 0.16);
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      background: var(--rozie-flow-node-bg, #ffffff);
+      border: 1px solid var(--rozie-flow-node-border, rgba(0, 0, 0, 0.16));
+      border-radius: var(--rozie-flow-node-radius, 8px);
+      box-shadow: var(--rozie-flow-node-shadow, 0 2px 6px rgba(0, 0, 0, 0.12));
       user-select: none;
       cursor: grab;
       font: 13px/1.4 system-ui, sans-serif;
     }
   .rozie-flow-canvas .rozie-flow-node.is-selected {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 2px 8px rgba(0, 0, 0, 0.15);
+      border-color: var(--rozie-flow-node-selected-border, var(--rozie-flow-accent, #3b82f6));
+      box-shadow: 0 0 0 2px var(--rozie-flow-node-selected-ring, rgba(59, 130, 246, 0.5)), 0 2px 8px rgba(0, 0, 0, 0.15);
     }
   .rozie-flow-canvas .rozie-flow-node__title {
       padding: 0.5rem 0.75rem;
       font-weight: 600;
-      color: #1f2937;
+      color: var(--rozie-flow-node-title-fg, #1f2937);
       white-space: nowrap;
     }
   .rozie-flow-canvas .rozie-flow-node__body { min-width: 0; }
@@ -3811,22 +3833,22 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
       align-items: center;
       gap: 0.375rem;
       font-size: 0.75rem;
-      color: #6b7280;
+      color: var(--rozie-flow-port-fg, #6b7280);
     }
   .rozie-flow-canvas .rozie-flow-port--output { justify-content: flex-end; }
   .rozie-flow-canvas .rozie-flow-socket {
-      width: 12px;
-      height: 12px;
+      width: var(--rozie-flow-socket-size, 12px);
+      height: var(--rozie-flow-socket-size, 12px);
       border-radius: 50%;
-      background: #94a3b8;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+      background: var(--rozie-flow-socket-bg, #94a3b8);
+      border: 2px solid var(--rozie-flow-socket-border-color, #ffffff);
+      box-shadow: 0 0 0 1px var(--rozie-flow-socket-ring, rgba(0, 0, 0, 0.2));
       cursor: crosshair;
       flex: none;
     }
   .rozie-flow-canvas .rozie-flow-socket--input { margin-left: -6px; }
   .rozie-flow-canvas .rozie-flow-socket--output { margin-right: -6px; }
-  .rozie-flow-canvas .rozie-flow-socket:hover { background: #3b82f6; }
+  .rozie-flow-canvas .rozie-flow-socket:hover { background: var(--rozie-flow-socket-hover-bg, var(--rozie-flow-accent, #3b82f6)); }
   .rozie-flow-canvas .rozie-flow-node--rows {
       display: flex;
       flex-direction: column;
@@ -3875,19 +3897,19 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
     }
   .rozie-flow-canvas .rozie-flow-connection__path {
       fill: none;
-      stroke: #64748b;
-      stroke-width: 3px;
+      stroke: var(--rozie-flow-connection-stroke, #64748b);
+      stroke-width: var(--rozie-flow-connection-width, 3px);
       pointer-events: auto;
     }
   .rozie-flow-canvas .rozie-flow-connection__path.is-selected {
-      stroke: #3b82f6;
-      stroke-width: 4px;
+      stroke: var(--rozie-flow-connection-selected-stroke, var(--rozie-flow-accent, #3b82f6));
+      stroke-width: var(--rozie-flow-connection-selected-width, 4px);
     }
   .rozie-flow-canvas .rozie-flow-connection__label {
       font: 600 11px system-ui, sans-serif;
-      fill: #334155;
+      fill: var(--rozie-flow-connection-label-fg, #334155);
       paint-order: stroke;
-      stroke: #ffffff;
+      stroke: var(--rozie-flow-connection-label-halo, #ffffff);
       stroke-width: 3px;
       stroke-linejoin: round;
       pointer-events: none;
