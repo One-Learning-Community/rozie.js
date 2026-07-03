@@ -115,6 +115,16 @@ test('expanding a row reveals its detail panel', async ({ page }) => {
   await expect(page.getByTestId('readout').locator('[data-slice="expanded"]')).not.toContainText('{}');
 });
 
+test('switching theme changes the active data-table stylesheet', async ({ page }) => {
+  await page.goto('/?example=DataTableSuper&target=vue');
+  const activeHref = () => page.evaluate(() =>
+    Array.from(document.querySelectorAll('[id^="rdt-theme-"]')).find((s) => !(s as HTMLStyleElement & { disabled?: boolean }).disabled)?.id);
+  const before = await activeHref();
+  await page.getByTestId('ctl-theme').selectOption('material');
+  await expect.poll(activeHref).not.toBe(before);
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+});
+
 test('imperative expandAll populates expanded; applyGrouping writes grouping', async ({ page }) => {
   // Task 6: the isolated imperative-handle panel is gated OFF by default
   // (ctl-handle) — check it to reveal the $refs.tbl.<verb>() button panel,

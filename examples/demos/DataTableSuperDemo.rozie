@@ -80,6 +80,40 @@
   target status is validated later (Task 7/8); this revision's build/test
   scope is Vue-only.
 
+  Task 7 (this revision): a live theme switcher across the four shipped skins
+  (packages/ui/data-table/src/themes/{base,shadcn,material,bootstrap}.css) —
+  theming has NO other demo/test anywhere, so this is its first exercise.
+  Portability approach: the script block imports all four sheets as INLINE
+  strings via Vite's `?inline` query (`import baseCss from '…/base.css?inline'`),
+  proven-portable precedent = PdfViewerDemo.rozie's `?url` worker import
+  (also resolved through the VR host's Vite config on every target, since
+  every target column here is a Vite sub-build). `$onMount` injects one
+  style element (id="rdt-theme-<name>") per sheet into `document.head`, all
+  `disabled=true` except `base`. The `ctl-theme` picker select
+  (`r-model="$data.theme"`, default `'base'`) calls `applyTheme(name)` on
+  `@change`, which flips `.disabled` on the four style elements so
+  exactly one is ever enabled — an event handler, so `$refs`/DOM access is
+  ROZ123-safe here.
+
+  ARCHITECTURE FINDING (reported, not fixed — mirrors the Lit-shadow caveat
+  below): shadcn.css/material.css/bootstrap.css are NOT standalone skins —
+  each file's own docstring says "Import this AFTER base.css" because
+  base.css does the ONLY wiring from the public `--rozie-data-table-*`
+  tokens to the internal `--rdt-*` tokens the component's own scoped style
+  rules actually read; the three skins only remap the public tokens. A
+  strictly mutually-exclusive swap (this task's literal spec, matching the
+  given smoke test's single-active-stylesheet assertion) therefore disables
+  that wiring the moment a skin is selected, so shadcn/material/bootstrap's
+  remapped `--rozie-data-table-*` values land on properties nothing reads —
+  the table falls back to its own hardcoded zero-config look instead of
+  visibly re-skinning. Real per-package theming finding for Task 8; NOT
+  attempted here per the brief's explicit scope.
+
+  Known caveat (Task 7, not fixed here): on the LIT target, DataTable renders
+  in a shadow root, so this `document.head`-injected style-element swap will
+  NOT reach it (shadow encapsulation) — a second real per-target theming finding
+  for Task 8. Vue (light DOM) is the validated target for this revision.
+
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
 
@@ -167,6 +201,13 @@
   // $expose handle whose cross-target wiring is unproven), so it's gated
   // behind an explicit opt-in toggle rather than rendered unconditionally.
   showHandle: false,
+
+  // ── Task 7: live theme switcher ────────────────────────────────────────
+  // Drives the ctl-theme picker select; applyTheme() (in the script block)
+  // reads this on @change to flip which rdt-theme-* style element is
+  // enabled. 'base' is the default so the table is styled out of the box on
+  // mount.
+  theme: 'base',
 }
 </data>
 
@@ -176,6 +217,51 @@
 // contract — NOT a wrapped CustomEvent; mirrors DataTableEditDemo.rozie).
 const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newValue: unknown }): void => {
   $data.lastCommit = p
+}
+
+// Task 7 — theme switcher. All four shipped theme sheets are pulled in as
+// INLINE strings via Vite's `?inline` query (PdfViewerDemo.rozie's
+// `pdf.worker.min.mjs?url` import is the proven-portable precedent — every
+// target column in this VR host is a Vite sub-build, so the `?inline` query
+// resolves the same way on all six). $onMount injects one style element
+// (id="rdt-theme-<name>") per sheet into document.head, all disabled except
+// base; applyTheme() (an @change handler — DOM access is ROZ123-safe here,
+// unlike $onMount-only $refs reads) flips .disabled so exactly one is ever
+// active.
+import baseCss from '../../packages/ui/data-table/src/themes/base.css?inline'
+import shadcnCss from '../../packages/ui/data-table/src/themes/shadcn.css?inline'
+import materialCss from '../../packages/ui/data-table/src/themes/material.css?inline'
+import bootstrapCss from '../../packages/ui/data-table/src/themes/bootstrap.css?inline'
+
+const THEME_SHEETS: Record<string, string> = {
+  base: baseCss,
+  shadcn: shadcnCss,
+  material: materialCss,
+  bootstrap: bootstrapCss,
+}
+
+$onMount(() => {
+  for (const name of Object.keys(THEME_SHEETS)) {
+    const el = document.createElement('style')
+    el.id = `rdt-theme-${name}`
+    el.textContent = THEME_SHEETS[name]
+    // `.disabled` reflects onto the element's CSSStyleSheet, which only
+    // exists once the <style> is actually inserted into the document — set
+    // it BEFORE appendChild and the assignment is a silent no-op (all four
+    // sheets stay enabled, and since they share the same
+    // `.rozie-data-table-wrap, .rozie-data-table` selector at equal
+    // specificity, the LAST one appended — bootstrap — wins the cascade
+    // regardless of the picker). Must set `.disabled` AFTER appendChild.
+    document.head.appendChild(el)
+    el.disabled = name !== 'base'
+  }
+})
+
+const applyTheme = (name: string): void => {
+  for (const key of Object.keys(THEME_SHEETS)) {
+    const el = document.getElementById(`rdt-theme-${key}`) as HTMLStyleElement | null
+    if (el) el.disabled = key !== name
+  }
 }
 </script>
 
@@ -200,6 +286,14 @@ const onCommit = (p: { rowId: unknown; columnId: string; oldValue: unknown; newV
       </label>
       <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
       <label><input data-testid="ctl-handle" type="checkbox" r-model="$data.showHandle" /> imperative panel</label>
+      <label>theme
+        <select data-testid="ctl-theme" r-model="$data.theme" @change="applyTheme($data.theme)">
+          <option value="base">base</option>
+          <option value="shadcn">shadcn</option>
+          <option value="material">material</option>
+          <option value="bootstrap">bootstrap</option>
+        </select>
+      </label>
     </fieldset>
 
     <!-- `virtual` is a construction-time-only prop on DataTable — the vertical
