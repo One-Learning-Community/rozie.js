@@ -16,6 +16,7 @@ on:
       - 'packages/targets/**'
       - 'packages/unplugin/**'
       - 'packages/runtime/vue/**'
+      - 'packages/runtime/keynav-core/**'
       # @rozie-ui product sources — docs resolveExample() now pulls
       # SortableList from packages/ui/sortable-list/src (Phase 20), so a
       # change to the product source must redeploy the docs.
@@ -64,8 +65,12 @@ jobs:
       - name: Build @rozie/unplugin
         run: pnpm --filter @rozie/unplugin run build
 
+      # `turbo run build` (not plain `pnpm --filter`) so ^build deps of
+      # runtime-vue — e.g. @rozie/runtime-keynav-core (Phase 71 r-keynav) —
+      # build first. A plain pnpm --filter here previously skipped that
+      # dependency, breaking any Vue leaf whose bundle reaches useKeynav.
       - name: Build @rozie/runtime-vue
-        run: pnpm --filter @rozie/runtime-vue run build
+        run: pnpm turbo run build --filter=@rozie/runtime-vue
 
       # The `@rozie-ui/*-vue` leaves now export compiled dist/ (Vite-lib drop-ins)
       # as their main entry, and the demo pages import them. `pnpm --filter
