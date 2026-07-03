@@ -1,0 +1,23 @@
+/*
+ * @rozie-ui/popover — shadcn/ui (Radix) bridge.
+ *
+ * Maps the popover tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--popover: 0 0% 100%`
+ * consumed as `hsl(var(--popover))`). Because it reads those vars live, the
+ * popover panel automatically follows light/dark theme switches.
+ *
+ *   import '@rozie-ui/popover-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * Only the color/shadow tokens are remapped here — sizing tokens (z,
+ * max-width, radius, padding, arrow-size) are left unset so the
+ * `.rozie-popover` defaults hold.
+ */
+.rozie-popover {
+  --rozie-popover-bg: hsl(var(--popover, 0 0% 100%));
+  --rozie-popover-color: hsl(var(--popover-foreground, 222.2 47.4% 11.2%));
+  --rozie-popover-border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%));
+  --rozie-popover-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}

@@ -62,7 +62,8 @@
     "./source": {
       "vue": "./src/Popover.vue",
       "default": "./src/Popover.vue"
-    }
+    },
+    "./themes/*": "./src/themes/*"
   },
   "sideEffects": false,
   "devDependencies": {

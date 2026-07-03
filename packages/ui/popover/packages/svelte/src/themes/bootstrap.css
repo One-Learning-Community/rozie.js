@@ -1,0 +1,19 @@
+/*
+ * @rozie-ui/popover — Bootstrap 5 bridge.
+ *
+ * Maps the popover tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the popover follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/popover-react/themes/bootstrap.css';
+ *
+ * Colors-only scope — sizing tokens are left unset so the `.rozie-popover`
+ * defaults hold.
+ */
+.rozie-popover {
+  --rozie-popover-bg: var(--bs-body-bg, #fff);
+  --rozie-popover-color: var(--bs-body-color, #212529);
+  --rozie-popover-border: 1px solid var(--bs-border-color, #dee2e6);
+  --rozie-popover-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
