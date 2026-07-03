@@ -716,14 +716,6 @@ Add `groupable expandable` attributes to `<DataTable>`.
 ```ts
 import { test, expect } from '@playwright/test';
 
-test('applying grouping updates the grouping slice and renders group rows', async ({ page }) => {
-  await page.goto('/');
-  // Drive grouping through the imperative bar or the applyGrouping handle exposed in the slot.
-  // The GroupBar renders draggable column chips; assert the slice updates once grouped.
-  await page.getByTestId('state-readout').locator('[data-slice="grouping"]').waitFor();
-  // Group by category via the exposed applyGrouping path (chip drag is best-effort; use handle in Task 7 if needed).
-});
-
 test('faceted select filter narrows rows to one category', async ({ page }) => {
   await page.goto('/');
   const before = await page.getByTestId('dt').locator('tbody tr').count();
@@ -741,7 +733,7 @@ test('expanding a row reveals its DetailPanel', async ({ page }) => {
 });
 ```
 
-> The grouping smoke is intentionally light — real grouping is driven by hand and by the imperative panel (Task 7). Keep the faceted + expand assertions strict.
+> Grouping is not smoke-tested here — it is exercised by hand via the GroupBar and asserted through the imperative `applyGrouping` path in Task 7. Keep the faceted + expand assertions in this task strict.
 
 - [ ] **Step 4: Typecheck + run**
 
