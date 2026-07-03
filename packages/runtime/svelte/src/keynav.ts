@@ -123,9 +123,17 @@ function applyActiveEffects(
   if (opts.activeClass !== undefined) {
     const tokens = normalizeClassTokens(opts.activeClass);
     if (tokens.length > 0) {
-      for (const el of node.querySelectorAll<HTMLElement>('[data-rozie-keynav-item]')) {
+      // `.forEach(...)`, not `for...of` — `NodeListOf<T>` only gets a
+      // `[Symbol.iterator]()` when a consumer's tsconfig includes the
+      // `DOM.Iterable` lib. This package ships raw `.ts` source (Svelte
+      // components compile against the author's own source, unlike
+      // React/Vue's pre-built `dist/*.d.ts`), so a consumer's tsc
+      // typechecks this function body directly — `forEach` is defined on
+      // `NodeListOf` unconditionally (base `DOM` lib), so this stays
+      // portable regardless of the consumer's `lib` array.
+      node.querySelectorAll<HTMLElement>('[data-rozie-keynav-item]').forEach((el) => {
         el.classList.remove(...tokens);
-      }
+      });
       if (activeEl) activeEl.classList.add(...tokens);
     }
   }

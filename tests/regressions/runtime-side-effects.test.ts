@@ -114,9 +114,14 @@ function scanFile(file: string, rel: string): string[] {
 const packages = listRuntimePackages();
 
 describe('@rozie/runtime-* packages are genuinely side-effect-free', () => {
-  it('discovers all five runtime packages', () => {
+  it('discovers all six runtime packages', () => {
     // Sanity: the scan is worthless if path resolution silently finds nothing.
+    // `@rozie/runtime-keynav-core` (Phase 71) is the framework-neutral r-keynav
+    // state-machine core — it lives under packages/runtime/* alongside the five
+    // per-target packages and is genuinely side-effect-free (pure TS, zero deps),
+    // so it is expected here rather than filtered out.
     expect(packages.map((p) => p.name).sort()).toEqual([
+      '@rozie/runtime-keynav-core',
       '@rozie/runtime-lit',
       '@rozie/runtime-react',
       '@rozie/runtime-solid',
