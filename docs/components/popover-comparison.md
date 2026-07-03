@@ -4,7 +4,7 @@ surface_hash: 951a5ea440e4
 
 # Popover — how it compares
 
-`@rozie-ui/popover` wraps [`@floating-ui/dom`](https://floating-ui.com) — the same vanilla-JS positioning engine that powers most of the libraries below. The difference is **one source, six idiomatic packages**: instead of maintaining a separate React hook library, a Vue plugin, and hand-rolled Svelte/Solid/Lit ports, you ship a single `Popover.rozie` and consumers install only their framework's leaf.
+`@rozie-ui/popover` wraps [`@floating-ui/dom`](https://floating-ui.com) — the same vanilla-JS positioning engine that powers most of the libraries below. The difference is **one source, six idiomatic packages**: instead of maintaining a separate React hook library, a Vue plugin, and hand-rolled Svelte/Solid/Lit ports, you ship a single `Popover.rozie` and consumers install only their framework's leaf. Styling follows the same one-source model: every rendered value is a `--rozie-popover-*` CSS custom property with a built-in fallback (zero-config, fully re-skinnable), plus ready-made [theme bridges](/components/popover#theming) for shadcn/ui, Material 3, and Bootstrap 5 — where most of the libraries below ship unstyled or leave re-skinning to per-framework CSS.
 
 ## vs the Floating UI framework packages (`@floating-ui/react`, Floating Vue, etc.)
 

@@ -82,6 +82,33 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `toggle` | Flip the open state (no-op when `disabled`). Emits `change`. |
 | `reposition` | Recompute the floating position immediately (`computePosition`). **Named `reposition`, not `update`**, because `update` is a reserved Lit `ReactiveElement` lifecycle method. |
 
+## Theming
+
+Every value the component renders is a `--rozie-popover-*` CSS custom property with a built-in fallback, so it works with **zero configuration** yet is completely re-skinnable. Override tokens at any ancestor scope (`:root`, `.dark`, a wrapper, or the `.rozie-popover` element — custom properties inherit through `display:contents`):
+
+```css
+.rozie-popover {
+  --rozie-popover-bg: #0b1220;
+  --rozie-popover-color: #e5e7eb;
+  --rozie-popover-border: 1px solid rgba(255, 255, 255, 0.12);
+  --rozie-popover-radius: 10px;
+  --rozie-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+```
+
+### Design-system bridges
+
+Each package ships token presets that map the popover tokens onto a known design system's published CSS variables — so the popover automatically follows that system's light/dark theme and accent:
+
+```ts
+import '@rozie-ui/popover-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --popover/--popover-foreground/--border…
+import '@rozie-ui/popover-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
+import '@rozie-ui/popover-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
+import '@rozie-ui/popover-react/themes/base.css';      // the documented default token set
+```
+
+The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/popover/src/themes/base.css).
+
 ## Accessibility
 
 The floating element carries `role="tooltip"` when `trigger` is `hover`/`focus`, or `role="dialog"` (with `aria-modal`) when `trigger` is `click`. The anchor carries `aria-haspopup="dialog"` and `aria-expanded` (stringified, never dropped on `false`); in tooltip mode it also gains `aria-describedby` pointing at the open content. Project an interactive, focusable element (e.g. a `<button>`) into the `anchor` slot so the keyboard story works; Escape dismisses while open.
