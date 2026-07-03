@@ -35,7 +35,8 @@
     "./source": {
       "svelte": "./src/Carousel.svelte",
       "default": "./src/Carousel.svelte"
-    }
+    },
+    "./themes/*": "./src/themes/*"
   },
   "files": [
     "dist",

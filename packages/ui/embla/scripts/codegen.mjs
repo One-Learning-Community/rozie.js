@@ -11,7 +11,10 @@
  *
  * Like @rozie-ui/cropper, Carousel.rozie imports `embla-carousel` +
  * `embla-carousel-autoplay` directly, so the leaves carry no colocated bridge and
- * there is NO internal-helper copy step.
+ * there is NO internal-helper copy step. It DOES vendor the `src/themes/`
+ * design-token presets (base / shadcn / material / bootstrap) into each leaf,
+ * same as @rozie-ui/listbox, so consumers can
+ * `import '@rozie-ui/embla-<fw>/themes/X.css'`.
  *
  * Carousel.rozie's 4 emits + 9 expose verbs compile strict-tsc-clean as-authored,
  * so there is NO per-leaf type-aid `code.replace(...)` patch. (The Cropper
@@ -61,6 +64,13 @@ function leafPkgName(dir) {
   const pkgPath = resolve(ROOT, 'packages', dir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   return pkg.name;
+}
+
+/** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
+function copyThemes(leafSrc) {
+  const src = resolve(ROOT, 'src/themes');
+  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
 function main() {
@@ -137,6 +147,9 @@ function main() {
       if (r.types) writeFileSync(resolve(leafSrc, 'Carousel.d.ts'), r.types);
     }
 
+    // Vendor the design-token presets.
+    copyThemes(leafSrc);
+
     // (4) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, pkgName, handleManifest);
@@ -148,7 +161,7 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`);
   }
 
   // (5) ENFORCE docs props-table validation against docs/components/embla.md.
@@ -184,7 +197,7 @@ function main() {
     );
   }
 
-  console.log('codegen: done — 6 targets emitted, 6 READMEs rendered, 6 LICENSEs vendored.');
+  console.log('codegen: done — 6 targets emitted, 6 theme-sets vendored, 6 READMEs rendered, 6 LICENSEs vendored.');
 }
 
 main();

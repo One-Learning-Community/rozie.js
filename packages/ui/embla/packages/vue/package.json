@@ -35,7 +35,8 @@
     "./source": {
       "vue": "./src/Carousel.vue",
       "default": "./src/Carousel.vue"
-    }
+    },
+    "./themes/*": "./src/themes/*"
   },
   "files": [
     "dist",
