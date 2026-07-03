@@ -1,0 +1,115 @@
+<!--
+  KeynavMenuDemo — fresh proof of `r-keynav:tabindex` (SPEC §3.1 example 1,
+  Phase 71). A role="menu" with five `r-keynav-item` buttons (one disabled),
+  active index bound via the co-located-`r-for` `:source` sugar (no explicit
+  `:source` — synthesized from the ITEMS array the `r-for` iterates), roving
+  DOM focus (WAI-ARIA "roving tabindex"), wrap-around (`.loop`), and
+  typeahead-by-label (`.typeahead`). Enter / click commits the active item —
+  `run(...)` writes a visible `data-testid="readout-committed"` readout so
+  `keynav-behavior.spec.ts` can assert the commit fired.
+
+  Self-contained (no `<components>` import, no existing @rozie-ui family
+  touched — the scope fence). Deliberately unwindowed / small-N (Landmine 5 —
+  the KeynavWindower contract is designed but never constructed here).
+
+  Doubles as BOTH the behavioral cell (keynav-behavior.spec.ts, no
+  screenshot) and a VR pixel-baseline cell (matrix.spec.ts) — the default
+  first-paint (active index 0, no interaction) is fully deterministic, so one
+  demo file safely serves both roles for this primitive (Plan 71-11 scope).
+-->
+<rozie name="KeynavMenuDemo">
+
+<data>
+{
+  active: 0,
+  committed: '',
+}
+</data>
+
+<script>
+const ITEMS = [
+  { id: 'new', label: 'New' },
+  { id: 'open', label: 'Open' },
+  { id: 'save', label: 'Save', disabled: true },
+  { id: 'print', label: 'Print' },
+  { id: 'export', label: 'Export' },
+]
+
+const run = (item) => {
+  $data.committed = item ? item.label : ''
+}
+</script>
+
+<template>
+<div class="keynav-menu-demo" data-keynav-menu-demo>
+  <h3>Menu — r-keynav:tabindex</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-committed">{{ $data.committed }}</span>
+  </div>
+
+  <div role="menu" class="menu"
+       r-keynav:tabindex.vertical.loop.typeahead="$data.active"
+       r-keynav-active-class="'is-active'"
+       @keynav-commit="run(ITEMS[$data.active])">
+    <button type="button" role="menuitem" r-for="it in ITEMS" :key="it.id"
+            r-keynav-item="{ label: it.label, disabled: it.disabled }"
+            class="menu-item"
+            :aria-disabled="!!it.disabled"
+            :class="{ 'menu-item--disabled': it.disabled }">
+      {{ it.label }}
+    </button>
+  </div>
+</div>
+</template>
+
+<style>
+.keynav-menu-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 240px;
+}
+.keynav-menu-demo h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.keynav-menu-demo .controls {
+  margin-bottom: 0.75rem;
+}
+.keynav-menu-demo .readout {
+  min-width: 4ch;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 4px;
+}
+.menu-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+.menu-item[data-rozie-keynav-active] {
+  background: #2563eb;
+  color: #fff;
+}
+.menu-item--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+</style>
+
+</rozie>

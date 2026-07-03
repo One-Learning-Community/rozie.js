@@ -951,6 +951,27 @@ export const EXAMPLES = [
   // headless-core registers its src root for the Angular cross-tree AOT prebuild
   // (vite.config.ts + tsconfig.app.json + build-cells.mjs) per D-08.
   'HeadlessCoreSmoke',
+  // Phase 71 (r-keynav compiler-owned keyboard-navigation primitive) — the
+  // two fresh proof cells (loaders → examples/demos/Keynav{Menu,Combobox}Demo.rozie).
+  // KeynavMenu is the roving-tabindex model (role="menu", five r-keynav-item
+  // buttons incl. one disabled, `.loop.typeahead`, active index bound via the
+  // co-located-r-for `:source` sugar, DOM focus moves to the active item).
+  // KeynavCombobox is the activedescendant model (role="combobox" input +
+  // a SEPARATE role="listbox" subtree, DOM focus stays on the input,
+  // explicit `:source`, aria-activedescendant tracks the active option) —
+  // proving the association is shared-state, not DOM containment (SPEC §7).
+  // Both are self-contained (no existing @rozie-ui family touched — the
+  // scope fence) and deliberately unwindowed/small-N (Landmine 5). Each
+  // doubles as the DOM-driven behavioral cell (keynav-behavior.spec.ts, no
+  // screenshot — this is also the Angular real-DOM proof deferred from
+  // 71-09) AND a VR pixel-baseline cell (matrix.spec.ts): the default
+  // first-paint (active index 0, no interaction) is fully deterministic.
+  // No new Angular 3-file registration needed — both live under
+  // examples/demos/ (already covered by prebuildExtraRoots[examplesRoot] +
+  // the examples tsconfig include + the glob-driven build-cells demos
+  // sweep) and import no cross-tree package.
+  'KeynavMenu',
+  'KeynavCombobox',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1266,6 +1287,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 64 P0 — the Lit entry appends '-demo' → tag
   // 'rozie-headless-core-smoke-demo' = kebab of HeadlessCoreSmokeDemo.
   HeadlessCoreSmoke: 'rozie-headless-core-smoke',
+  // Phase 71 — the Lit entry appends '-demo' → tags
+  // 'rozie-keynav-menu-demo' / 'rozie-keynav-combobox-demo' = kebab of
+  // KeynavMenuDemo / KeynavComboboxDemo.
+  KeynavMenu: 'rozie-keynav-menu',
+  KeynavCombobox: 'rozie-keynav-combobox',
 };
 
 export interface HostQuery {
@@ -1617,6 +1643,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 64 P0 — self-contained cross-package boundary demo; no parent-supplied
   // props (the inlined probe is computed in <script>).
   HeadlessCoreSmoke: {},
+  // Phase 71 (r-keynav) — both demos are self-contained (ITEMS/RESULTS live
+  // in <script>, active index in <data>); no parent-supplied props.
+  KeynavMenu: {},
+  KeynavCombobox: {},
 };
 
 /**

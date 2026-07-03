@@ -1,0 +1,118 @@
+<!--
+  KeynavComboboxDemo — fresh proof of `r-keynav:activedescendant` (SPEC §3.1
+  example 2, Phase 71). The nav ROOT is the `<input role="combobox">`; the
+  items live in a SEPARATE `<ul role="listbox">` subtree — proving the
+  association is shared-state (`:source` + `$data.active`), not DOM
+  containment (SPEC §7). DOM focus stays on the input; the active option is
+  tracked virtually via `aria-activedescendant`. Explicit `:source="RESULTS"`
+  (no co-located-`r-for` sugar here, matching the canonical combobox example).
+  Enter commits the active result — `choose(...)` writes a visible
+  `data-testid="readout-chosen"` readout so `keynav-behavior.spec.ts` can
+  assert the commit fired.
+
+  Self-contained (no `<components>` import, no existing @rozie-ui family
+  touched — the scope fence, and deliberately distinct from the type-to-
+  filter @rozie-ui/combobox). Deliberately unwindowed / small-N (Landmine 5).
+
+  Doubles as BOTH the behavioral cell (keynav-behavior.spec.ts, no
+  screenshot) and a VR pixel-baseline cell (matrix.spec.ts) — the listbox
+  renders inline (always visible, no popover open/close), so the default
+  first-paint is fully deterministic (Plan 71-11 scope).
+-->
+<rozie name="KeynavComboboxDemo">
+
+<data>
+{
+  active: 0,
+  chosen: '',
+}
+</data>
+
+<script>
+const RESULTS = [
+  { id: 'r1', label: 'Apple' },
+  { id: 'r2', label: 'Banana' },
+  { id: 'r3', label: 'Cherry', disabled: true },
+  { id: 'r4', label: 'Date' },
+  { id: 'r5', label: 'Elderberry' },
+]
+
+const choose = (item) => {
+  $data.chosen = item ? item.label : ''
+}
+</script>
+
+<template>
+<div class="keynav-combobox-demo" data-keynav-combobox-demo>
+  <h3>Combobox — r-keynav:activedescendant</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-chosen">{{ $data.chosen }}</span>
+  </div>
+
+  <input type="text" role="combobox" aria-expanded="true" class="combobox-input"
+         r-keynav:activedescendant.vertical="$data.active"
+         :source="RESULTS"
+         @keynav-commit="choose(RESULTS[$data.active])" />
+  <ul role="listbox" class="listbox">
+    <li r-for="r in RESULTS" :key="r.id" role="option"
+        r-keynav-item="{ label: r.label, disabled: r.disabled }"
+        class="option"
+        :aria-disabled="!!r.disabled"
+        :class="{ 'option--disabled': r.disabled }">
+      {{ r.label }}
+    </li>
+  </ul>
+</div>
+</template>
+
+<style>
+.keynav-combobox-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 240px;
+}
+.keynav-combobox-demo h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.keynav-combobox-demo .controls {
+  margin-bottom: 0.75rem;
+}
+.keynav-combobox-demo .readout {
+  min-width: 4ch;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.combobox-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font: inherit;
+  margin-bottom: 4px;
+}
+.listbox {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+}
+.option {
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+}
+.option[data-rozie-keynav-active] {
+  background: #2563eb;
+  color: #fff;
+}
+.option--disabled {
+  opacity: 0.4;
+}
+</style>
+
+</rozie>
