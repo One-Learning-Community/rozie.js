@@ -6,7 +6,7 @@
   "scripts": {
     "gen:usage": "node scripts/gen-usage-pages.mjs",
     "dev": "node scripts/gen-usage-pages.mjs && vitepress dev .",
-    "build": "node scripts/gen-usage-pages.mjs && NODE_OPTIONS=--max-old-space-size=6144 vitepress build . && node scripts/check-anchors.mjs",
+    "build": "node scripts/gen-usage-pages.mjs && NODE_OPTIONS=--max-old-space-size=8192 vitepress build . && node scripts/check-anchors.mjs",
     "preview": "vitepress preview .",
     "test": "vitest run"
   },
