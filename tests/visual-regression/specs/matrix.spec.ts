@@ -436,6 +436,17 @@ const EXAMPLES = [
   'DatePickerTwoMonth',
   'DatePickerFooter',
   'DatePickerWeekendDisable',
+  // Phase 71 (r-keynav compiler-owned keyboard-navigation primitive) —
+  // KeynavMenu / KeynavCombobox double as BOTH the DOM-driven behavioral
+  // cells (keynav-behavior.spec.ts) AND these two pixel-baseline cells: the
+  // default first-paint (active index 0, no interaction — a static role=menu
+  // list / role=combobox input+listbox, no popover open/close) is fully
+  // deterministic, so no separate *Screenshot sibling demo is needed for
+  // this primitive (Plan 71-11 scope decision). Per D-10 all 6 targets diff
+  // against the same shared `${name}.png`; baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNG lands.
+  'KeynavMenu',
+  'KeynavCombobox',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -1026,6 +1037,23 @@ async function settleExample(
   // `role="separator"` pierces Lit's shadow.
   if (example === 'ResizableScreenshot') {
     await expect(page.getByRole('separator')).toBeVisible({ timeout: 10_000 });
+  }
+  // KeynavMenu (Phase 71, r-keynav tabindex model): the compiler's own
+  // active-change effect calls `.focus()` on item 0 as part of MOUNT itself
+  // (active initializes to 0, and the tabindex-model effect fires on that
+  // first value too — SPEC §3/§9), so the browser's native focus-ring
+  // outline is part of the deterministic frame. On Angular specifically that
+  // effect is a constructor-body `effect()` gated on a `viewChild()` signal
+  // that only resolves AFTER `ngAfterViewInit` — one extra change-detection
+  // tick beyond the other 5 targets' synchronous-setup equivalent — so an
+  // unguarded screenshot can race ahead of the focus-ring paint on Angular
+  // only. Wait for real DOM focus to land on item 0 before clipping (a
+  // no-op wait on the 5 targets where it's already true by the time the
+  // mount locator settles).
+  if (example === 'KeynavMenu') {
+    await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
+      timeout: 10_000,
+    });
   }
 }
 

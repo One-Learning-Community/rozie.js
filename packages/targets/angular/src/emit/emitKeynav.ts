@@ -87,6 +87,7 @@ const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
 const RENDERER_FIELD = '__rozieKeynavRenderer';
 const CONTROLLER_VAR = '__rozieKeynavController';
+const SYNC_ACTIVE_METHOD = '__rozieKeynavSyncActive';
 
 export interface KeynavEmitPlan {
   rootElement: TemplateElementIR;
@@ -350,6 +351,38 @@ export function buildKeynavClassEmission(
    */
   listenerOpts: RewriteListenerOpts,
 ): KeynavClassEmission {
+  const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
+  const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
+  const getSourceCode = buildGetSourceCode(plan, ir, listenerOpts);
+  const commitCode = buildCommitCode(plan.rootElement, ir, listenerOpts);
+  const configCode = buildConfigCode(plan.keynavRoot);
+
+  // `type KeynavStateMachine` — the emitted field declaration
+  // (`private __rozieKeynavController: KeynavStateMachine | null = null;`)
+  // needs the TYPE imported too; inline `type` specifier form (TS 5.6+, per
+  // the project's floor) lets it share the SAME import statement as the
+  // value import `createKeynavStateMachine`.
+  const runtimeImports = ['createKeynavStateMachine', 'type KeynavStateMachine'];
+  const activeClassLines: string[] = [];
+  if (plan.keynavRoot.activeClassExpression) {
+    runtimeImports.push('normalizeClassTokens');
+    const activeClassCode = rewriteListenerExpression(
+      plan.keynavRoot.activeClassExpression,
+      ir,
+      listenerOpts,
+    );
+    activeClassLines.push(
+      `  const __rozieKeynavTokens = normalizeClassTokens(${activeClassCode});`,
+      `  if (__rozieKeynavTokens.length > 0) {`,
+      `    __rozieKeynavRootEl.querySelectorAll('[data-rozie-keynav-item]').forEach((__rozieKeynavItemEl) => __rozieKeynavItemEl.classList.remove(...__rozieKeynavTokens));`,
+      `    __rozieKeynavActiveEl?.classList.add(...__rozieKeynavTokens);`,
+      `  }`,
+    );
+  }
+
+  const focusLines: string[] =
+    plan.keynavRoot.focusModel === 'tabindex' ? ['  __rozieKeynavActiveEl?.focus();'] : [];
+
   const fieldDecls: string[] = [
     `private ${GROUP_ID_VAR} = 'rozie-keynav-' + Math.random().toString(36).slice(2);`,
   ];
@@ -360,12 +393,42 @@ export function buildKeynavClassEmission(
   }
   fieldDecls.push(`private ${RENDERER_FIELD} = inject(Renderer2);`);
   fieldDecls.push(`private ${CONTROLLER_VAR}: KeynavStateMachine | null = null;`);
-
-  const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
-  const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
-  const getSourceCode = buildGetSourceCode(plan, ir, listenerOpts);
-  const commitCode = buildCommitCode(plan.rootElement, ir, listenerOpts);
-  const configCode = buildConfigCode(plan.keynavRoot);
+  // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
+  // SPEC §9). Extracted into its own arrow-field method — rather than inlined
+  // ONLY in the constructor `effect()` below — because Angular's viewChild()
+  // query signal (`this.${plan.rootRefVar}()`) does not reliably notify an
+  // effect created in the CONSTRUCTOR of its FIRST post-view-init resolution
+  // in every Angular version/CD configuration: the effect can be created
+  // (and read the still-`undefined` query signal) before the view-query
+  // refresh that populates it, and its subsequent notification is not
+  // guaranteed to re-flush that constructor effect within the SAME initial
+  // render — leaving item 0's mount-time focus ring (tabindex model) and
+  // `r-keynav-active-class` toggle silently un-applied until an UNRELATED
+  // active-change happens to fire the effect again (empirically confirmed:
+  // a real-DOM VR pixel cell caught item 0 never receiving DOM focus on
+  // mount, while `ngAfterViewInit`'s OWN synchronous read of the identical
+  // `${rootRefExpr}` expression — used one line below for the keydown/
+  // pointer delegation attach — reliably resolves a real element every
+  // time). `ngAfterViewInit` is the one lifecycle point BOTH the root and
+  // every `r-keynav-item` are GUARANTEED rendered, so this method is called
+  // there explicitly once (below) in addition to the constructor `effect()`
+  // that continues to own every SUBSEQUENT active-change — idempotent by
+  // construction (re-focusing/re-toggling the same element twice is a no-op),
+  // so calling it from both places is safe regardless of whichever path the
+  // constructor effect's own dependency tracking happens to take.
+  fieldDecls.push(
+    [
+      `private ${SYNC_ACTIVE_METHOD} = () => {`,
+      `  const __rozieKeynavActive = ${active.get};`,
+      `  const __rozieKeynavRootEl = ${rootRefExpr};`,
+      `  if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;`,
+      `  const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(\`[data-rozie-keynav-item="\${__rozieKeynavActive}"]\`);`,
+      ...activeClassLines,
+      ...focusLines,
+      `  __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
+      `};`,
+    ].join('\n'),
+  );
 
   const afterViewInitLines: string[] = [
     [
@@ -406,53 +469,21 @@ export function buildKeynavClassEmission(
       `  }`,
       `}`,
     ].join('\n'),
+    // Explicit mount-time sync — see the field decl's doc comment above for
+    // why this cannot be left to the constructor effect() alone.
+    `this.${SYNC_ACTIVE_METHOD}();`,
   ];
-
-  // `type KeynavStateMachine` — the emitted field declaration
-  // (`private __rozieKeynavController: KeynavStateMachine | null = null;`)
-  // needs the TYPE imported too; inline `type` specifier form (TS 5.6+, per
-  // the project's floor) lets it share the SAME import statement as the
-  // value import `createKeynavStateMachine`.
-  const runtimeImports = ['createKeynavStateMachine', 'type KeynavStateMachine'];
-  const activeClassLines: string[] = [];
-  if (plan.keynavRoot.activeClassExpression) {
-    runtimeImports.push('normalizeClassTokens');
-    const activeClassCode = rewriteListenerExpression(
-      plan.keynavRoot.activeClassExpression,
-      ir,
-      listenerOpts,
-    );
-    activeClassLines.push(
-      `  const __rozieKeynavTokens = normalizeClassTokens(${activeClassCode});`,
-      `  if (__rozieKeynavTokens.length > 0) {`,
-      `    __rozieKeynavRootEl.querySelectorAll('[data-rozie-keynav-item]').forEach((__rozieKeynavItemEl) => __rozieKeynavItemEl.classList.remove(...__rozieKeynavTokens));`,
-      `    __rozieKeynavActiveEl?.classList.add(...__rozieKeynavTokens);`,
-      `  }`,
-    );
-  }
-
-  const focusLines: string[] =
-    plan.keynavRoot.focusModel === 'tabindex' ? ['  __rozieKeynavActiveEl?.focus();'] : [];
 
   // Active-CHANGE effect (SPEC §9: "evaluated once ... toggles on
   // active-change, not a live per-render binding") — the `this.<prop>()`
-  // signal read happens DIRECTLY inside the effect() callback body so
-  // Angular's auto-tracking subscribes to it; every other captured value is a
-  // plain closure read (no latest-ref indirection needed — a class instance's
-  // fields are already live, matching the Vue/Solid/Lit references' identical
-  // rationale for skipping React's optsRef pattern).
+  // signal read happens DIRECTLY inside `${SYNC_ACTIVE_METHOD}`'s body,
+  // called from this effect's callback, so Angular's auto-tracking still
+  // subscribes to it (a signal read during an effect callback's synchronous
+  // execution is tracked through any depth of nested function calls). Every
+  // SUBSEQUENT active-change is owned by this effect exactly as before; the
+  // mount-time invocation is now the explicit `ngAfterViewInit` call above.
   const constructorLines: string[] = [
-    [
-      `effect(() => {`,
-      `  const __rozieKeynavActive = ${active.get};`,
-      `  const __rozieKeynavRootEl = ${rootRefExpr};`,
-      `  if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;`,
-      `  const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(\`[data-rozie-keynav-item="\${__rozieKeynavActive}"]\`);`,
-      ...activeClassLines,
-      ...focusLines,
-      `  __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
-      `});`,
-    ].join('\n'),
+    [`effect(() => {`, `  this.${SYNC_ACTIVE_METHOD}();`, `});`].join('\n'),
   ];
 
   const angularImports = ['inject', 'Renderer2', 'DestroyRef', 'effect'];

@@ -276,6 +276,14 @@ const COMMAND_PALETTE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'command-palett
 // so this sweep is a DEFENSIVE no-op registered per the D-08 trio. Phase 64 P0
 // Task 3 A/B-tests whether the sweep is load-bearing for a partial-only package.
 const HEADLESS_CORE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'headless-core', 'src');
+// Phase 71 (r-keynav) — KeynavMenuDemo / KeynavComboboxDemo (examples/demos/)
+// need NO new SRC const / prebuildExtraRoots entry here: both are
+// self-contained single-file demos (no `<components>` import of a
+// packages/ui/* family — the scope fence), so their `.rozie.ts` Angular
+// disk-cache artefacts land directly under `examples/demos/` and are already
+// swept by the existing glob-driven `DEMOS_DIR` cleanup below (no hand-listed
+// basename needed, matching the DataTableGridProbeDemo self-contained
+// precedent).
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
