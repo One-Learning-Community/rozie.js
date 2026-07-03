@@ -1,0 +1,28 @@
+/*
+ * @rozie-ui/embla — shadcn/ui (Radix) bridge.
+ *
+ * Maps the embla tokens onto the shadcn/ui CSS variables defined on `:root`
+ * / `.dark` (the classic HSL-channel convention: `--background: 0 0% 100%`
+ * consumed as `hsl(var(--background))`). Because it reads those vars live, the
+ * carousel automatically follows light/dark theme switches and accent changes.
+ *
+ *   import '@rozie-ui/embla-react/themes/shadcn.css';
+ *
+ * If your shadcn setup predates the `hsl()`-wrapping convention (Tailwind v4 /
+ * oklch tokens emit pre-formed colors), drop the `hsl(...)` wrappers below.
+ *
+ * Only the color/shadow tokens are remapped here — sizing tokens (arrow-size,
+ * dot-size, radii, gaps, opacities, the dot-selected-scale factor) are left
+ * unset so the `.rozie-embla` defaults hold.
+ */
+.rozie-embla {
+  --rozie-embla-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
+  --rozie-embla-arrow-bg: hsl(var(--background, 0 0% 100%));
+  --rozie-embla-arrow-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
+  --rozie-embla-arrow-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --rozie-embla-dot-bg: hsl(var(--muted, 210 40% 96.1%));
+
+  /* dot-selected-bg / thumb-selected-border-color intentionally unset — both
+     fall back to --rozie-embla-accent (set above), the same nested-fallback
+     pattern base.css uses. */
+}

@@ -37,60 +37,60 @@ export default class Carousel extends SignalWatcher(LitElement) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--rozie-embla-arrow-size, 2.25rem);
+  height: var(--rozie-embla-arrow-size, 2.25rem);
   padding: 0;
   border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: #1a1a1a;
-  font-size: 1.5rem;
+  border-radius: var(--rozie-embla-arrow-radius, 50%);
+  background: var(--rozie-embla-arrow-bg, rgb(255 255 255 / 0.9));
+  color: var(--rozie-embla-arrow-fg, var(--rozie-embla-accent, #1a1a1a));
+  font-size: var(--rozie-embla-arrow-font-size, 1.5rem);
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--rozie-embla-arrow-shadow, 0 1px 4px rgb(0 0 0 / 0.25));
   transition: opacity 0.15s ease, background 0.15s ease;
 }
-.rozie-embla__arrow[data-rozie-s-4143c216]:hover { background: #fff; }
-.rozie-embla__arrow[data-rozie-s-4143c216]:disabled { opacity: 0.35; cursor: default; }
-.rozie-embla__arrow--prev[data-rozie-s-4143c216] { left: 0.5rem; }
-.rozie-embla__arrow--next[data-rozie-s-4143c216] { right: 0.5rem; }
+.rozie-embla__arrow[data-rozie-s-4143c216]:hover { background: var(--rozie-embla-arrow-hover-bg, #fff); }
+.rozie-embla__arrow[data-rozie-s-4143c216]:disabled { opacity: var(--rozie-embla-arrow-disabled-opacity, 0.35); cursor: default; }
+.rozie-embla__arrow--prev[data-rozie-s-4143c216] { left: var(--rozie-embla-arrow-inset, 0.5rem); }
+.rozie-embla__arrow--next[data-rozie-s-4143c216] { right: var(--rozie-embla-arrow-inset, 0.5rem); }
 .rozie-embla__dots[data-rozie-s-4143c216] {
   display: flex;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 0.625rem 0;
+  gap: var(--rozie-embla-dots-gap, 0.4rem);
+  padding: var(--rozie-embla-dots-padding, 0.625rem 0);
 }
 .rozie-embla__dot[data-rozie-s-4143c216] {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: var(--rozie-embla-dot-size, 0.5rem);
+  height: var(--rozie-embla-dot-size, 0.5rem);
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--rozie-embla-dot-bg, rgb(0 0 0 / 0.25));
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.rozie-embla__dot[data-rozie-s-4143c216]:hover { background: rgba(0, 0, 0, 0.45); }
+.rozie-embla__dot[data-rozie-s-4143c216]:hover { background: var(--rozie-embla-dot-hover-bg, rgba(0, 0, 0, 0.45)); }
 .rozie-embla__dot.is-selected[data-rozie-s-4143c216] {
-  background: #1a1a1a;
-  transform: scale(1.25);
+  background: var(--rozie-embla-dot-selected-bg, var(--rozie-embla-accent, #1a1a1a));
+  transform: scale(var(--rozie-embla-dot-selected-scale, 1.25));
 }
-.rozie-embla__thumbs[data-rozie-s-4143c216] { margin-top: 0.5rem; }
+.rozie-embla__thumbs[data-rozie-s-4143c216] { margin-top: var(--rozie-embla-thumbs-gap, 0.5rem); }
 .rozie-embla__thumbs-viewport[data-rozie-s-4143c216] { overflow: hidden; }
-.rozie-embla__thumbs-container[data-rozie-s-4143c216] { display: flex; gap: 0.5rem; }
+.rozie-embla__thumbs-container[data-rozie-s-4143c216] { display: flex; gap: var(--rozie-embla-thumb-gap, 0.5rem); }
 .rozie-embla__thumb[data-rozie-s-4143c216] {
   flex: 0 0 auto;
   cursor: pointer;
-  opacity: 0.5;
-  border: 2px solid transparent;
-  border-radius: 4px;
+  opacity: var(--rozie-embla-thumb-opacity, 0.5);
+  border: var(--rozie-embla-thumb-border-width, 2px) solid var(--rozie-embla-thumb-border-color, transparent);
+  border-radius: var(--rozie-embla-thumb-radius, 4px);
   overflow: hidden;
   transition: opacity 0.15s ease, border-color 0.15s ease;
 }
-.rozie-embla__thumb[data-rozie-s-4143c216]:hover { opacity: 0.8; }
+.rozie-embla__thumb[data-rozie-s-4143c216]:hover { opacity: var(--rozie-embla-thumb-hover-opacity, 0.8); }
 .rozie-embla__thumb.is-selected[data-rozie-s-4143c216] {
-  opacity: 1;
-  border-color: #1a1a1a;
+  opacity: var(--rozie-embla-thumb-selected-opacity, 1);
+  border-color: var(--rozie-embla-thumb-selected-border-color, var(--rozie-embla-accent, #1a1a1a));
 }
 `;
 

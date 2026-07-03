@@ -1,0 +1,20 @@
+/*
+ * @rozie-ui/embla — Material Design 3 bridge.
+ *
+ * Maps the embla tokens onto the MD3 system color roles (`--md-sys-color-*`)
+ * emitted by material-web / @material/material-color-utilities theme builders.
+ * Falls back to the baseline M3 light palette when those vars are absent, so
+ * it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/embla-react/themes/material.css';
+ *
+ * Colors-only scope — sizing tokens are left unset so the `.rozie-embla`
+ * defaults hold.
+ */
+.rozie-embla {
+  --rozie-embla-accent: var(--md-sys-color-primary, #6750a4);
+  --rozie-embla-arrow-bg: var(--md-sys-color-surface-container, #f3edf7);
+  --rozie-embla-arrow-fg: var(--md-sys-color-on-surface, #1d1b20);
+  --rozie-embla-arrow-shadow: 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3);
+  --rozie-embla-dot-bg: var(--md-sys-color-outline-variant, #cac4d0);
+}

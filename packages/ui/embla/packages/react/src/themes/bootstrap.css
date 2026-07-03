@@ -1,0 +1,20 @@
+/*
+ * @rozie-ui/embla — Bootstrap 5 bridge.
+ *
+ * Maps the embla tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the carousel follows `data-bs-theme="dark"`
+ * and any custom `$primary` build automatically. Falls back to Bootstrap's
+ * default light palette when the vars are absent.
+ *
+ *   import '@rozie-ui/embla-react/themes/bootstrap.css';
+ *
+ * Colors-only scope — sizing tokens are left unset so the `.rozie-embla`
+ * defaults hold.
+ */
+.rozie-embla {
+  --rozie-embla-accent: var(--bs-primary, #0d6efd);
+  --rozie-embla-arrow-bg: var(--bs-body-bg, #fff);
+  --rozie-embla-arrow-fg: var(--bs-body-color, #212529);
+  --rozie-embla-arrow-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --rozie-embla-dot-bg: var(--bs-border-color, #dee2e6);
+}
