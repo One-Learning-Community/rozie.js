@@ -6,7 +6,7 @@
   "scripts": {
     "gen:usage": "node scripts/gen-usage-pages.mjs",
     "dev": "node scripts/gen-usage-pages.mjs && vitepress dev .",
-    "build": "node scripts/gen-usage-pages.mjs && NODE_OPTIONS=--max-old-space-size=8192 vitepress build . && node scripts/check-anchors.mjs",
+    "build": "node scripts/gen-usage-pages.mjs && vitepress build . && node scripts/check-anchors.mjs",
     "preview": "vitepress preview .",
     "test": "vitest run"
   },
@@ -81,8 +81,9 @@
     "rete-area-plugin": "^2.1.2",
     "rete-connection-plugin": "^2.0.4",
     "rete-render-utils": "^2.0.3",
+    "oxc-minify": "^0.138.0",
     "sortablejs": "^1.15.7",
-    "vitepress": "^1.5.0",
+    "vitepress": "2.0.0-alpha.17",
     "vitest": "^4.1.5",
     "vue": "^3.5.0"
   }
