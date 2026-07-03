@@ -55,6 +55,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Custom edge RENDERING (step/smooth/bezier types) | ✅ `edgeTypes` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ bezier only (deferred) |
 | Background variants / NodeToolbar / NodeResizer | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ deferred (see below) |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
+| Zero-config styling, re-skinnable | ⚠️ import CSS + vars | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `--rozie-flow-*` tokens + shadcn/Material/Bootstrap bridges + opt-in dark |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ## Where Rozie wins today
@@ -68,6 +69,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **Workflow-builder essentials on all six** — **palette drag-drop** (`screenToFlowPosition` projects a drop point to graph coords so a sidebar item lands under the pointer), **top/bottom handle positioning** (`<Port position>` for vertical flows — decision trees, top-down pipelines), and **labeled / styled edges** (`connection.label` / `stroke` / `dashed` for conditional edges). The interactions that actually define a no-code / workflow builder, idiomatic on Solid and Lit too.
 - **A uniform 26-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `deleteNode` / `addConnection` / `removeConnection` / `clear` / `clearSelection` / `selectAll` / `selectNode` / `getSelectedNodes` / `centerOnNode` / `autoArrange` / `undo` / `redo` / `canUndo` / `canRedo` / `zoomToFit` / `zoomTo` / `setCenter` / `setViewport` / `screenToFlowPosition` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
 - **`getEditor()` / `getArea()` are always one hop from the raw engine**, so the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) is reachable on any target when the curated surface doesn't cover something.
+- **Zero-config styling that re-skins to any design system.** Rete ships *no* stylesheet, so the incumbents leave node / socket / connection chrome to consumer CSS. `@rozie-ui/rete` styles every value as a `--rozie-flow-*` CSS custom property with a built-in fallback — it looks right on drop-in, yet one `--rozie-flow-accent` override recolors every selection cue, and ready-made `themes/{base,shadcn,material,bootstrap}.css` bridges map it onto a design system. `themes/base.css` also adds dark mode (OS `prefers-color-scheme` **and** app-toggled `.dark`), reaching Lit's shadow DOM too. Same tokens on all six targets.
 
 ## The controlled-graph + `<NodeType>` / `<Port>` model {#controlled-graph}
 
@@ -114,7 +116,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 ## Try it
 
-The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, so there is no engine CSS to import — all node / socket / connection chrome is styled by the component.
+The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, and there is **no engine CSS to import** — all node / socket / connection chrome ships scoped and fully-tokenised inside the component. Every rendered value is a `--rozie-flow-*` custom property with an inline fallback, so it works zero-config yet re-skins by overriding a token; opt into dark mode or a design-system look with a one-line `themes/{base,shadcn,material,bootstrap}.css` import.
 
 ## Cross-references
 

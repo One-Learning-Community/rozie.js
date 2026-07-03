@@ -330,3 +330,37 @@ const onDrop = (e) => {
 `screenToFlowPosition(clientX, clientY)` inverts the viewport transform (pan + zoom), so a node placed at the result renders exactly under the drop point regardless of how the canvas is panned or zoomed.
 
 > **Angular consumers:** reach the handle with a native `@ViewChild(FlowCanvas)` query (`this.flow.screenToFlowPosition(...)`). Rozie's `$refs` to a child *component* resolves to the host element on Angular (a documented parity edge), so the in-template `$refs.flow` path above is for the other five targets.
+
+## Theming
+
+Rete ships no stylesheet, and `FlowCanvas` needs **no engine CSS import** — every node / socket / connection / control value it renders is a `--rozie-flow-*` CSS custom property with a built-in inline `var(token, fallback)` default. It looks right zero-config yet is completely re-skinnable: override tokens at any ancestor scope. As a shortcut, overriding just `--rozie-flow-accent` recolors every "selected/active" affordance at once — the selected-node border + ring, socket hover, selected-edge stroke, the active control button, the marquee box, and the minimap's selected node + viewport window all fall back to it.
+
+```css
+/* on :root, a wrapper, or the .rozie-flow-canvas element */
+.rozie-flow-canvas {
+  --rozie-flow-accent: #16a34a;      /* every selection cue */
+  --rozie-flow-bg: #fbfaf7;          /* canvas surface */
+  --rozie-flow-node-bg: #ffffff;
+  --rozie-flow-node-radius: 12px;
+  --rozie-flow-connection-stroke: #a3a3a3;
+}
+```
+
+The imperative overlays that draw with SVG attributes (the minimap fills, the connection arrowhead) read these same tokens at draw time, so a token override re-skins them too.
+
+### Design-system bridges + dark mode
+
+Each package ships token presets that map the flow tokens onto a known design system's published CSS variables — so the canvas automatically follows that system's light/dark theme and accent — plus a `base.css` that carries the full token vocabulary **and dark mode**:
+
+```ts
+import '@rozie-ui/rete-react/themes/base.css';      // full token set + dark mode (see below)
+import '@rozie-ui/rete-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--background/--foreground…
+import '@rozie-ui/rete-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
+import '@rozie-ui/rete-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
+```
+
+Swap `-react` for your target framework's package. The bridges are **colors-only** — they remap the color/accent tokens and leave the *sizing* tokens (radii, socket size, stroke widths, grid) at their component defaults.
+
+**Dark mode** ships in `themes/base.css` (import it to enable). It covers both the OS-driven `@media (prefers-color-scheme: dark)` and an app-toggled `.dark` / `[data-theme="dark"]` root class, and because it sets the tokens at the document root — where CSS custom properties inherit and pierce the shadow boundary — it re-skins the Lit custom element too. It lives in the imported stylesheet rather than the component's own scoped styles because Rozie's CSS scoping pass strips `@media` at-rules; the raw preset preserves them. The light default is unchanged whether or not you import it.
+
+The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/themes/base.css).
