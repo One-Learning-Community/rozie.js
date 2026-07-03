@@ -158,6 +158,35 @@ const carousel = ref();
 
 Set `autoplay` to mount the Autoplay plugin; `autoplayDelay` controls the interval. Toggling either at runtime rebuilds the plugin set via `reInit(options, plugins)`. For any other Embla plugin (Fade, Class Names, Wheel Gestures, …), pass it through the `:plugins` escape-hatch array.
 
+## Theming
+
+Every value the component renders is a `--rozie-embla-*` CSS custom property with a built-in inline `var(token, fallback)` default, so it works with **zero configuration** yet is completely re-skinnable. Override tokens at any ancestor scope. As a shortcut, overriding just `--rozie-embla-accent` shifts every "selected/active" affordance at once — the arrow foreground, the selected dot background, and the selected thumb border color all fall back to it.
+
+```css
+.rozie-embla {
+  --rozie-embla-accent: #16a34a;
+  --rozie-embla-arrow-bg: #0b1220;
+  --rozie-embla-arrow-radius: 8px;
+  --rozie-embla-dot-selected-scale: 1.4;
+  --rozie-embla-thumb-selected-border-color: #16a34a;
+}
+```
+
+### Design-system bridges
+
+Each package ships token presets that map the embla tokens onto a known design system's published CSS variables — so the carousel automatically follows that system's light/dark theme and accent:
+
+```ts
+import '@rozie-ui/embla-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--primary/--ring…
+import '@rozie-ui/embla-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
+import '@rozie-ui/embla-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
+import '@rozie-ui/embla-react/themes/base.css';      // the documented default token set
+```
+
+Swap `-react` for your target framework's package. The embla presets are **colors-only** — they remap the color/accent tokens onto each design system's variables and leave the arrow/dot/thumb *sizing* tokens at their component defaults.
+
+The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/themes/base.css).
+
 ## See also
 
 - [Embla — live demo](/components/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for all six targets.
