@@ -38,6 +38,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Plugin / options escape hatch | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ `:plugins` + `:options` |
 | Config-array **and** declarative slides | ❌ (slot only) | ❌ | ❌ | ❌ | ❌ | — | ✅ `:slides` array OR default slot |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
+| Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ## Where Rozie wins today
@@ -48,6 +49,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **A uniform 14-verb imperative handle** (`scrollNext` / `scrollPrev` / `scrollToIndex` / `reInitCarousel` / `canScrollNext` / `canScrollPrev` / `getSelectedIndex` / `scrollSnapList` / `scrollProgress` / `slidesInView` / `slidesNotInView` / `previousScrollSnap` / `getPlugins` / `getInstance`) grabbed with each framework's native ref — identical on every target.
 - **Two slide-source modes from one component** — pass a `:slides` config array, or drop declarative `.rozie-embla__slide` children into the default slot. The official wrappers only support consumer-authored slide DOM.
 - **`getInstance()` is always one hop from the raw engine**, so the full Embla v8 API is reachable on any target when the curated surface doesn't cover something.
+- **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-embla-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5. The official wrappers ship the bare engine unstyled — you wire arrows, dots, and thumbnails yourself; Rozie works on drop-in yet stays fully re-skinnable.
 
 ## What Rozie defers {#what-rozie-defers}
 
@@ -60,11 +62,11 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 ## Try it
 
-The [`@rozie-ui/embla` showcase + API reference](/components/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 14-verb imperative handle, and the prev/next/dots recipe.
+The [`@rozie-ui/embla` showcase + API reference](/components/embla) documents the `@rozie-ui/embla-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay`, etc.). There is **no engine CSS to import** — Embla's carousel skeleton ships scoped and fully-tokenised inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The showcase walks the two-way `selectedIndex` binding, the 4-event surface, the 14-verb imperative handle, theming, and the prev/next/dots recipe.
 
 ## Cross-references
 
-- [Embla — showcase & API](/components/embla) — the full `@rozie-ui/embla` surface, quick starts, and recipes.
+- [Embla — showcase & API](/components/embla) — the full `@rozie-ui/embla` surface, quick starts, theming, and recipes.
 - [Embla — live demo](/components/embla-demo) — the real Vue package running in the page.
 - [`Carousel.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie)
 - [Cropper libraries comparison](/components/cropper-comparison) — a sibling engine-wrapper port.
