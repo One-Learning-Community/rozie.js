@@ -19,6 +19,7 @@ import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
+import { collectComponentRefTypes } from './componentRefs.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -209,6 +210,13 @@ export function rewriteListenerExpression(
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
+  // Finding §3.2 (data-table-super-crosstarget-findings.md) — a ref on a
+  // CHILD COMPONENT lowers to the COMPONENT INSTANCE (`this.foo()`), NOT the
+  // host `ElementRef` (`this.foo()?.nativeElement`) — the instance carries the
+  // $expose methods; the host DOM node does not. Same classification the
+  // <script>-body path already uses (rewriteScript.ts, Phase 66) — reused here
+  // so this SEPARATE inline-<listeners>-body lowering path agrees.
+  const componentRefNames = new Set(collectComponentRefTypes(ir).keys());
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
   // Bug 2 (260520-gi1): the output() FIELD identifier is the sanitized
@@ -389,16 +397,23 @@ export function rewriteListenerExpression(
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
+        // $refs.foo → this.foo()?.nativeElement (HTML-element ref) OR
+        // this.foo() (composed-component ref: the COMPONENT INSTANCE itself
+        // — finding §3.2, no .nativeElement deref, matches the <script>-body
+        // lowering).
+        const refCall = t.callExpression(
+          t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
+          [],
+        );
         path.replaceWith(
-          t.optionalMemberExpression(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
-            t.identifier('nativeElement'),
-            false,
-            true,
-          ),
+          componentRefNames.has(prop.name)
+            ? refCall
+            : t.optionalMemberExpression(
+                refCall,
+                t.identifier('nativeElement'),
+                false,
+                true,
+              ),
         );
         path.skip();
         return;
@@ -445,16 +460,20 @@ export function rewriteListenerExpression(
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
+        // See MemberExpression branch above — same composed-vs-DOM ref split.
+        const refCall = t.callExpression(
+          t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
+          [],
+        );
         path.replaceWith(
-          t.optionalMemberExpression(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
-            t.identifier('nativeElement'),
-            false,
-            true,
-          ),
+          componentRefNames.has(prop.name)
+            ? refCall
+            : t.optionalMemberExpression(
+                refCall,
+                t.identifier('nativeElement'),
+                false,
+                true,
+              ),
         );
         path.skip();
         return;

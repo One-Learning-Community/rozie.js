@@ -159,6 +159,46 @@ describe('rewriteListenerExpression — MemberExpression sigil rewrites', () => 
   });
 });
 
+// Finding §3.2 (data-table-super-crosstarget-findings.md) — a ref on a
+// COMPOSED Rozie CHILD COMPONENT must call the COMPONENT INSTANCE directly
+// (`this.tbl().expandAll()`), NOT deref through `.nativeElement`
+// (`this.tbl()?.nativeElement.expandAll()` — the host DOM node has no
+// `$expose`d verbs, so the call silently no-ops). Mirrors the already-correct
+// `<script>`-block resolver (rewriteScript.ts / Phase 66) — this is the SAME
+// classification (a ref is a component ref when its `elementTag` matches a
+// registered `<components>` child's `localName`), applied to the SEPARATE
+// inline-`<listeners>`-body lowering path.
+describe('rewriteListenerExpression — $refs on a composed-component ref (finding §3.2)', () => {
+  it('bare $refs.X on a composed-component ref → this.X() (instance, no .nativeElement deref)', () => {
+    const ir = buildIR({
+      refs: [{ type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc } as RefDecl],
+      components: [
+        { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+      ],
+    } as Partial<IRComponent>);
+    expect(rw('$refs.tbl', ir)).toBe('this.tbl()');
+  });
+
+  it('$refs.X.verb() on a composed-component ref calls the instance — no "nativeElement" in output', () => {
+    const ir = buildIR({
+      refs: [{ type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc } as RefDecl],
+      components: [
+        { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+      ],
+    } as Partial<IRComponent>);
+    const out = rw('$refs.tbl.expandAll()', ir);
+    expect(out).not.toContain('nativeElement');
+    expect(out).toContain('.expandAll()');
+  });
+
+  it('control: bare $refs.X on a plain DOM-element ref still derefs through .nativeElement (unchanged)', () => {
+    const ir = buildIR({
+      refs: [{ type: 'RefDecl', name: 'inputEl', elementTag: 'input', sourceLoc: sloc } as RefDecl],
+    });
+    expect(rw('$refs.inputEl', ir)).toBe('this.inputEl()?.nativeElement');
+  });
+});
+
 describe('rewriteListenerExpression — OptionalMemberExpression sigil rewrites', () => {
   it('$props?.X (model) → this.X()', () => {
     const ir = buildIR({ props: [mkProp('value', true)] });

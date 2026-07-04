@@ -116,3 +116,52 @@ describe('§slots-X-merge — optional-member-expression branch', () => {
     expect(out).toBe("(headerTpl ?? templates()?.['header'])");
   });
 });
+
+// Finding §3.2 (data-table-super-crosstarget-findings.md) — an inline
+// template `@click="$refs.tbl.expandAll()"` where `tbl` is a ref on a
+// COMPOSED Rozie CHILD COMPONENT (e.g. `<DataTable ref="tbl">`) must call the
+// COMPONENT INSTANCE directly (`tbl().expandAll()`), NOT deref through
+// `.nativeElement` (`tbl()?.nativeElement.expandAll()` — the host DOM node
+// has no `$expose`d verbs, so the call silently no-ops). Mirrors the
+// already-correct `<script>`-block resolver (rewriteScript.ts / Phase 66) —
+// same classification (a ref is a component ref when its `elementTag`
+// matches a registered `<components>` child's `localName`), applied to the
+// SEPARATE inline-template-expression lowering path.
+describe('rewriteTemplateExpression — $refs on a composed-component ref (finding §3.2)', () => {
+  it('bare $refs.X on a composed-component ref → X() (instance, no .nativeElement deref)', () => {
+    const ir = makeIR({});
+    (ir as unknown as { refs: unknown[] }).refs = [
+      { type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc },
+    ];
+    (ir as unknown as { components: unknown[] }).components = [
+      { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+    ];
+    const expr = parseExpression('$refs.tbl');
+    const out = rewriteTemplateExpression(expr, ir);
+    expect(out).toBe('tbl()');
+  });
+
+  it('$refs.X.verb() on a composed-component ref calls the instance — no "nativeElement" in output', () => {
+    const ir = makeIR({});
+    (ir as unknown as { refs: unknown[] }).refs = [
+      { type: 'RefDecl', name: 'tbl', elementTag: 'DataTable', sourceLoc: sloc },
+    ];
+    (ir as unknown as { components: unknown[] }).components = [
+      { type: 'ComponentDecl', localName: 'DataTable', importPath: './DataTable.rozie', sourceLoc: sloc },
+    ];
+    const expr = parseExpression('$refs.tbl.expandAll()');
+    const out = rewriteTemplateExpression(expr, ir);
+    expect(out).not.toContain('nativeElement');
+    expect(out).toContain('.expandAll()');
+  });
+
+  it('control: bare $refs.X on a plain DOM-element ref still derefs through .nativeElement (unchanged)', () => {
+    const ir = makeIR({});
+    (ir as unknown as { refs: unknown[] }).refs = [
+      { type: 'RefDecl', name: 'inputEl', elementTag: 'input', sourceLoc: sloc },
+    ];
+    const expr = parseExpression('$refs.inputEl');
+    const out = rewriteTemplateExpression(expr, ir);
+    expect(out).toBe('inputEl()?.nativeElement');
+  });
+});
