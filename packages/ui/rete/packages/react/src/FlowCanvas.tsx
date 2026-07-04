@@ -3103,14 +3103,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     <>
     <div className={"rozie-flow-canvas"} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="">
       
-      {(props.controls) && <div className={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
+      {!!(props.controls) && <div className={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-in" aria-label="Zoom in" onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-out" aria-label="Zoom out" onClick={controlZoomOut} data-rozie-s-cd396d6a="">&#8722;</button>
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-fit" aria-label="Fit view" onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
         
-        {(props.marquee) && <button type="button" className={clsx("rozie-flow-controls__btn", { "is-active": mode === 'select' })} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>}</div>}{(props.minimap) && <div className={"rozie-flow-minimap"} ref={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a="" />}<div className={"rozie-flow-marquee"} ref={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
+        {!!(props.marquee) && <button type="button" className={clsx("rozie-flow-controls__btn", { "is-active": mode === 'select' })} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>}</div>}{!!(props.minimap) && <div className={"rozie-flow-minimap"} ref={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a="" />}<div className={"rozie-flow-marquee"} ref={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
       
-      {(props.nodeToolbar) && <div className={"rozie-flow-toolbar"} ref={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" />}</div>
+      {!!(props.nodeToolbar) && <div className={"rozie-flow-toolbar"} ref={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" />}</div>
 
 
 

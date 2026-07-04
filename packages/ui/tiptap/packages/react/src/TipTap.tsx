@@ -672,7 +672,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     <>
     <div className={clsx("rozie-tiptap", { "is-readonly": !props.editable })} data-rozie-s-2aeee876="">
       
-      {(props.editable && !(props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar"} data-rozie-s-2aeee876="">
+      {!!(props.editable && !(props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar"} data-rozie-s-2aeee876="">
         <button type="button" className={clsx({ active: active.bold })} aria-label="Bold" onClick={toggleBold} data-rozie-s-2aeee876=""><strong data-rozie-s-2aeee876="">B</strong></button>
         <button type="button" className={clsx({ active: active.italic })} aria-label="Italic" onClick={toggleItalic} data-rozie-s-2aeee876=""><em data-rozie-s-2aeee876="">I</em></button>
         <span className={"sep"} data-rozie-s-2aeee876="" />
@@ -680,7 +680,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         <button type="button" className={clsx({ active: active.h2 })} aria-label="Heading 2" onClick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876="">H2</button>
         <span className={"sep"} data-rozie-s-2aeee876="" />
         <button type="button" className={clsx({ active: active.bulletList })} aria-label="Bullet list" onClick={toggleBulletList} data-rozie-s-2aeee876="">• List</button>
-      </div>}{(props.editable && (props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={toolbarEl} data-rozie-s-2aeee876="" />}<div ref={editorEl} className={"rozie-tiptap-content"} data-placeholder={props.placeholder} data-rozie-s-2aeee876="" />
+      </div>}{!!(props.editable && (props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={toolbarEl} data-rozie-s-2aeee876="" />}<div ref={editorEl} className={"rozie-tiptap-content"} data-placeholder={props.placeholder} data-rozie-s-2aeee876="" />
     </div>
 
 

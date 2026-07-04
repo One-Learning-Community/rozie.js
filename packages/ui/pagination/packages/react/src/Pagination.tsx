@@ -212,9 +212,9 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
 
       
       {model().pages.map((item, index) => <Fragment key={item + '-' + index}>
-        {(item === 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
+        {!!(item === 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(props.renderEllipsis ?? props.slots?.['ellipsis']) ? ((props.renderEllipsis ?? props.slots?.['ellipsis']) as Function)({ index }) : "…"}
-        </span>}{(item !== 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
+        </span>}{!!(item !== 'ellipsis') && <span key={item + '-' + index} className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
           {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: item, selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={tabIndexFor(isActive(item))} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
         </span>}</Fragment>)}
 
