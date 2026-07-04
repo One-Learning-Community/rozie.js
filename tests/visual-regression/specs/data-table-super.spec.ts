@@ -58,18 +58,37 @@ test('grid mode exposes role=grid', async ({ page }) => {
   await expect(page.locator('[role="grid"]')).toBeVisible();
 });
 
-test('virtualization windows the rows', async ({ page }) => {
-  await page.goto('/?example=DataTableSuper&target=vue');
-  await page.getByTestId('ctl-virtual').check();
-  // Two-sided bound (folded-in Task 3 review fix): a one-sided `< 100` also
-  // passes on a SILENT construction failure (windowedRows() returning `[]` —
-  // 0 rows). Assert `count > 0` (rules out the empty-render regression) AND
-  // `count < 100` (rules out the ~1,500 no-window regression). Window ≈
-  // 25-30 rows at estimateRowHeight=40 / maxHeight=440px, so `5 < count <
-  // 50` is a tight-but-safe real-poll bound.
-  await expect.poll(async () => page.locator('tbody tr').count()).toBeGreaterThan(5);
-  await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(50);
-});
+// Keyed-remount verification (2026-07-03 plan): the demo's `:key="String($data.virtual)"`
+// on <DataTable> forces a real destroy+recreate when `virtual` toggles, because
+// DataTable's Virtualizer is built once at $onMount from the initial `virtual` prop
+// (a construction-time-only prop otherwise can't react). Before the keyed-remount
+// codegen fix this idiom only worked on Vue (Vue emits a bare `:key` as a real vnode
+// key natively) — the other five targets either dropped `:key` entirely (React,
+// Solid) or forwarded it as an inert prop (Svelte/Angular/Lit), so toggling
+// `virtual` rendered only the 2 zero-height spacer <tr>s instead of real windowed
+// rows (docs/superpowers/plans/data-table-super-crosstarget-findings.md §3.1). Tasks
+// 2-6 taught each non-Vue emitter its native remount-on-key construct (React
+// `key=`, Lit `keyed()`, Svelte `{#key}`, Solid `<Show keyed>`, Angular keyed
+// `@for`-recreation); this loop is the cross-target acceptance proof.
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`virtualization windows the rows [${target}]`, async ({ page }) => {
+    await page.goto(`/?example=DataTableSuper&target=${target}`);
+    await page.getByTestId('ctl-virtual').check();
+    // Two-sided bound (folded-in Task 3 review fix): a one-sided `< 100` also
+    // passes on a SILENT construction failure (windowedRows() returning `[]` —
+    // 0 rows) OR the pre-fix 2-spacer empty render. Assert `count > 5` (rules
+    // out both the empty-render regression AND the 2-spacer case) AND `count <
+    // 50` (rules out the ~1,500 no-window regression). Window ≈ 25-30 rows at
+    // estimateRowHeight=40 / maxHeight=440px, so `5 < count < 50` is a
+    // tight-but-safe real-poll bound.
+    await expect.poll(async () => page.locator('tbody tr').count()).toBeGreaterThan(5);
+    await expect.poll(async () => page.locator('tbody tr').count()).toBeLessThan(50);
+  });
+}
 
 test('editing a Customer cell fires cellEditCommit', async ({ page }) => {
   await page.goto('/?example=DataTableSuper&target=vue');

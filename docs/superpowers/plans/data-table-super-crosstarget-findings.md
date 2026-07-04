@@ -46,12 +46,29 @@ Legend: ✅ works · ⚠️ works with a caveat · ❌ broken (symptom + root-ca
 | Imperative panel: `verb-applyGrouping` → `grouping` readout | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | Theme swap (`ctl-theme`→material) → header bg computed-style change | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ (expected) |
 | Grouping via GroupBar UI (seed + render + remove-×) | ✅ | ✅ | ✅ | ❌ (cascades) | ✅ | ✅ |
-| `virtual` toggle (`:key`-remount workaround) → real windowed rows | ✅ (22 rows) | ❌ (2 spacer rows) | ❌ (2) | ❌ (2) | ❌ (2) | ❌ (2) |
+| `virtual` toggle (`:key`-remount workaround) → real windowed rows | ✅ (22 rows) | ✅ (22 rows) | ✅ (22 rows) | ✅ (20 rows) | ✅ (22 rows, settles after a brief ResizeObserver-driven overshoot) | ✅ (22 rows) |
 
 ## 3. Root-cause candidates
 
-### 3.1 `virtual` toggle: `:key`-forces-remount is a VUE-ONLY primitive — compiler gap
-**Symptom:** Checking `ctl-virtual` renders 22 real body rows on Vue, but only the 2
+### 3.1 `virtual` toggle: `:key`-forces-remount is a VUE-ONLY primitive — compiler gap — **FIXED 2026-07-03 (keyed-remount codegen, Tasks 1-7)**
+**RESOLVED:** `docs/superpowers/plans/2026-07-03-keyed-remount-codegen.md` added an
+additive-optional `remountKeyExpression` IR field (Task 1) and taught each non-Vue
+emitter its native remount-on-key construct (Task 2-6: React `key={expr}`, Lit
+`keyed(expr, …)`, Svelte `{#key expr}…{/key}`, Solid `<Show keyed when={expr}>`, Angular
+a keyed single-element `@for` recreation), while retaining Vue's already-working raw
+`:key` binding unchanged. Task 7 (this update) re-drove the exact repro from this
+section — checking `ctl-virtual` on `DataTableSuperDemo` — across all six targets via
+the generalized `virtualization windows the rows [<target>]` loop in
+`tests/visual-regression/specs/data-table-super.spec.ts`. **All six now render real
+windowed rows** (previously only Vue): vue 22, react 22, svelte 22, angular 20, solid 22
+(after a brief ResizeObserver-driven transient overshoot before settling), lit 22 — every
+count comfortably inside the `>5 && <50` bound that rules out both the pre-fix 2-spacer
+empty render and the ~1,500-row no-window case. `tests/dist-parity` was rebuilt +
+rebootstrapped as part of Task 7; it stayed byte-identical (no curated dist-parity
+reference example composes a component-level `:key`, so this feature produced zero
+dist-parity drift — confirmed, not assumed).
+
+**Original symptom (pre-fix):** Checking `ctl-virtual` renders 22 real body rows on Vue, but only the 2
 zero-height spacer `<tr>`s on react/svelte/angular/solid/lit — i.e. the demo's documented
 `:key="String($data.virtual)"` remount workaround (needed because `DataTable`'s
 Virtualizer is built once at `$onMount` from the initial `virtual` prop) **only works on
@@ -189,12 +206,14 @@ and "confirmed broken with an already-known, accepted root cause":
   `onChange` JSX key, silently dropping the r-model write (§3.3).
   These are the two prioritized bugs to fix out of this pass — both are narrowly
   scoped and both have an exact repro (this demo) and an exact code location.
-- **Confirmed broken, bigger/pre-existing architecture gap**: `:key`-forces-remount is
-  Vue-only (§3.1) — every other target either drops the `:key` binding or treats it as an
-  inert prop, so any construction-time-only-prop workaround using this idiom (this demo's
-  `virtual`, and the pre-existing `SortableListShowcaseDemo.rozie` knobs) silently fails
-  everywhere except Vue. This is the highest-leverage finding of the whole pass because it
-  is a *reusable idiom* already load-bearing elsewhere in the codebase, not a one-off.
+- **FIXED 2026-07-03**: `:key`-forces-remount was Vue-only (§3.1) — every other target
+  either dropped the `:key` binding or treated it as an inert prop, so any
+  construction-time-only-prop workaround using this idiom (this demo's `virtual`, and the
+  pre-existing `SortableListShowcaseDemo.rozie` knobs) silently failed everywhere except
+  Vue. This was the highest-leverage finding of the whole pass because it is a *reusable
+  idiom* already load-bearing elsewhere in the codebase, not a one-off. The keyed-remount
+  codegen plan (`2026-07-03-keyed-remount-codegen.md`, Tasks 1-7) closed the gap on all
+  six targets — see the updated §3.1 for the re-driven cross-target proof.
 - **Confirmed broken, already-known and accepted**: Lit theme-swap NOOP (shadow-DOM
   encapsulation, §3.4) — unchanged from Task 7, not a new regression.
 
