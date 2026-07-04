@@ -121,7 +121,13 @@ function vendorPopover() {
   writeFileSync(dest, POPOVER_BANNER + readFileSync(canonical, 'utf8'));
 
   const internalSrc = resolve(POPOVER_ROOT, 'src/internal');
-  cpSync(internalSrc, resolve(ROOT, 'src/internal'), {
+  const internalDest = resolve(ROOT, 'src/internal');
+  // Clean-before-copy so the vendored internal tree is a MIRROR, not an
+  // accretion: if the canonical popover ever DELETES an internal file, the
+  // stale vendored copy must not persist (cpSync merges into an existing dir,
+  // it never prunes). Only vendored files live here, so a full wipe is safe.
+  rmSync(internalDest, { recursive: true, force: true });
+  cpSync(internalSrc, internalDest, {
     recursive: true,
     filter: (from) => !from.endsWith('.test.ts'),
   });
@@ -190,7 +196,11 @@ function copyThemes(leafSrc) {
 function copyInternal(leafSrc) {
   const src = resolve(ROOT, 'src/internal');
   if (!existsSync(src)) return;
-  cpSync(src, resolve(leafSrc, 'internal'), {
+  const leafInternal = resolve(leafSrc, 'internal');
+  // Clean-before-copy (see vendorPopover): a deleted vendored file must not
+  // linger in the leaf's internal tree either.
+  rmSync(leafInternal, { recursive: true, force: true });
+  cpSync(src, leafInternal, {
     recursive: true,
     filter: (from) => !from.endsWith('.test.ts'),
   });
