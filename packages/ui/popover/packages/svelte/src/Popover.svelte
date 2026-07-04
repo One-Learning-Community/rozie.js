@@ -228,12 +228,18 @@ const position = () => {
   });
   // 'fixed' inline position MUST be written before computePosition measures the
   // floating element's offset parent (fixed vs absolute changes the containing
-  // block). Default 'absolute' writes NO inline position — the stylesheet's
-  // `position: absolute` stands unchanged, so the default path stays
-  // byte-identical (adding an unconditional inline `position: absolute` here
-  // would be a specificity change even though the value matches).
+  // block). Default 'absolute' explicitly CLEARS any inline position instead of
+  // writing `position: absolute` — so a never-fixed popover still writes no
+  // visible inline position (byte-identical-off preserved: `style.position = ''`
+  // is a no-op when the property was never set), while a live `strategy`
+  // reconcile (fixed → absolute, see the $watch below) correctly resets the
+  // stale inline `fixed` so the stylesheet's `position: absolute` rule re-takes
+  // over instead of positioning `fixed` with absolute-computed coordinates
+  // (72-REVIEW.md WR-01).
   if (strategy === 'fixed') {
     floatingNode.style.position = 'fixed';
+  } else {
+    floatingNode.style.position = '';
   }
   let opts: any = null;
   opts = {
