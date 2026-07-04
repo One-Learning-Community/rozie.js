@@ -205,7 +205,7 @@ const FAMILIES: FamilySpec[] = [
         TS2345: 9,
         TS7053: 4,
         TS2379: 1,
-        TS7006: 10,
+        TS7006: 12,
         TS2322: 4,
       },
       'DetailPanel.tsx': {
@@ -231,7 +231,7 @@ const FAMILIES: FamilySpec[] = [
         TS7053: 2,
       },
       'GroupBar.tsx': {
-        TS2345: 1,
+        TS2345: 2,
         TS2322: 1,
       },
     },
