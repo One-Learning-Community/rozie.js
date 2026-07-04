@@ -25,7 +25,7 @@ Each package carries the **`pdfjs-dist` engine peer** (`^6`) plus its framework 
 npm i @rozie-ui/pdf-react pdfjs-dist
 ```
 
-Unlike [MapLibre](/components/maplibre) or [Cropper](/components/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from a version-matched jsDelivr CDN, so the component works with **zero config** out of the box — override the `workerSrc` prop only for offline / CSP / bundled-worker setups (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `PdfViewer.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+Unlike [MapLibre](/components/maplibre) or [Cropper](/components/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from the jsDelivr CDN copy matching your **installed `pdfjs-dist`'s own `.version`** (read at runtime, not a hand-typed string), so the component works with **zero config** and the default can't drift from the engine version your app resolves. Override the `workerSrc` / `standardFontDataUrl` props for offline / a strict CSP / a bundled worker (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `PdfViewer.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
 
 ## Quick start
 
@@ -176,8 +176,8 @@ el.addEventListener('load', (e) => console.log(e.detail.numPages));
 | `page` | `Number` | `1` | ✓ | ✓ | The 1-based current page. **Two-way.** In single-page mode it drives which page renders; in `render-all-pages` mode it reflects the scrolled-to page (and scrolls the container when the consumer writes it). Clamped to `[1, pageCount]`. |
 | `scale` | `Number` | `1` | | ✓ | The zoom scale (`1` = 100%). One-way: the `setScale` / `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` handle verbs override it imperatively. A consumer write reconciles the live render. |
 | `rotation` | `Number` | `0` | | ✓ | Rotation in degrees (`0` / `90` / `180` / `270`). One-way: the `rotateCW` / `rotateCCW` verbs override it. Normalized into `[0, 360)`. |
-| `workerSrc` | `String` | `"https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs"` | | ✓ | The PDF.js worker URL. Set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the **version-matched jsDelivr CDN** so the component works with zero config; override for offline / CSP / a bundled worker (see [Gotchas](#the-pdf-js-worker)). |
-| `standardFontDataUrl` | `String` | `"https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/"` | | ✓ | The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Version-matched CDN default; override (or pass a bundled dir) for offline / CSP. |
+| `workerSrc` | `String` | `undefined` | | ✓ | The PDF.js worker URL. Set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the **jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version`** (read at runtime, so it can't drift from a hand-typed version string) so the component works with zero config; override for offline / a strict CSP / a bundled worker (see [Gotchas](#the-pdf-js-worker)). |
+| `standardFontDataUrl` | `String` | `undefined` | | ✓ | The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s `.version` (same runtime-version rationale as `workerSrc`); override (or pass a bundled dir) for offline / a strict CSP. |
 | `renderAllPages` | `Boolean` | `false` | | ✓ | `false` = single page with nav (the two-way `page` drives it). `true` = continuous scroll of every page; the most-visible page reflects back into `page` and the `pagechange` event via an `IntersectionObserver`. |
 | `textLayer` | `Boolean` | `true` | | ✓ | Render PDF.js's selectable / copyable text-layer spans over each page canvas (the differentiator vs a dumb canvas image). The required `.textLayer` CSS + `--scale-factor` var ship with the component — no extra import. |
 | `password` | `unknown` | `undefined` | | ✓ | Password for an encrypted PDF. If the document is encrypted and no (or a wrong) password is set, the `passwordrequest` event fires with `{ reason }`. Changing it reloads the document. |
@@ -340,7 +340,7 @@ A `data:application/pdf;base64,…` URL string also works — the wrapper decode
 
 ### Overriding the worker for a bundler
 
-The default `workerSrc` is the version-matched CDN. To bundle the worker with your app (offline, CSP, or to avoid the CDN round-trip), point `workerSrc` at the worker resolved by your bundler. With Vite:
+The default `workerSrc` is the jsDelivr CDN copy matching your installed `pdfjs-dist` version (no recipe needed to keep it in sync — see [Gotchas](#the-pdf-js-worker)). To bundle the worker with your app instead (offline, CSP, or to avoid the CDN round-trip), point `workerSrc` at the worker resolved by your bundler. With Vite:
 
 ```vue
 <script setup lang="ts">
@@ -358,17 +358,19 @@ const workerSrc = new URL(
 </template>
 ```
 
+**Targeting Angular?** `new URL(..., import.meta.url)` is left unresolved by the Angular (analogjs) AOT pipeline and trips `ngtsc` into a JIT fallback. Use a static `?url` import instead (Vite-based Angular setups only): `import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'`.
+
 For fully-offline rendering, also bundle the standard fonts and point `standardFontDataUrl` at the bundled directory (otherwise the base-14 fonts still hit the CDN).
 
 ## Gotchas
 
 ### The PDF.js worker {#the-pdf-js-worker}
 
-PDF.js parses documents in a **Web Worker**, so `GlobalWorkerOptions.workerSrc` **must** be set before `getDocument`. The `workerSrc` prop defaults to the version-matched jsDelivr CDN copy, so the component works with **zero config** — but that default makes a network request to the CDN on first load. For **offline** apps, a strict **CSP** (the CDN URL must be in `worker-src` / `script-src`), or to avoid the round-trip, override `workerSrc` with a bundled worker (see the Vite recipe above). The worker version must match the `pdfjs-dist` version your app resolves — the default URL is pinned to the engine version this package was built against; if you upgrade `pdfjs-dist`, override `workerSrc` to the matching version.
+PDF.js parses documents in a **Web Worker**, so `GlobalWorkerOptions.workerSrc` **must** be set before `getDocument`. The `workerSrc` prop defaults to the jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version` (read at runtime off the dynamically-imported engine, not a hand-typed string), so the component works with **zero config** and the default can't drift from the `pdfjs-dist` version your app actually resolves — but that default still makes a network request to the CDN on first load. For **offline** apps, a strict **CSP** (the CDN URL must be in `worker-src` / `script-src`), or to avoid the round-trip, override `workerSrc` with a bundled worker (see the recipe above).
 
 ### `standardFontDataUrl` for correct glyphs
 
-PDF.js doesn't embed the base-14 standard fonts (Helvetica / Times / Courier / Symbol / ZapfDingbats). Without `standardFontDataUrl`, documents that rely on them render with substituted glyphs and console warnings. The prop defaults to the version-matched CDN so the fonts "just work" online; for offline / CSP, bundle the `pdfjs-dist/standard_fonts/` directory and point `standardFontDataUrl` at it.
+PDF.js doesn't embed the base-14 standard fonts (Helvetica / Times / Courier / Symbol / ZapfDingbats). Without `standardFontDataUrl`, documents that rely on them render with substituted glyphs and console warnings. The prop defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s `.version` so the fonts "just work" online with no version-drift risk; for offline / CSP, bundle the `pdfjs-dist/standard_fonts/` directory and point `standardFontDataUrl` at it.
 
 ### The container needs a height
 

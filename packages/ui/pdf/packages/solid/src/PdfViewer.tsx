@@ -74,11 +74,11 @@ interface PdfViewerProps {
    */
   rotation?: number;
   /**
-   * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the version-matched jsDelivr CDN copy so the component works with zero config; override for offline / CSP / a bundled worker (e.g. Vite's `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`).
+   * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version` (read at runtime, not a hand-typed string), so the component works with zero config and the default can't drift from the engine version your app resolves. Override for offline / a strict CSP / a bundled worker.
    */
   workerSrc?: string;
   /**
-   * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Version-matched CDN default; override (or pass a bundled dir) for offline / CSP.
+   * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s own `.version` (same runtime-version rationale as `workerSrc`). Override (or pass a bundled dir) for offline / a strict CSP.
    */
   standardFontDataUrl?: string;
   /**
@@ -134,7 +134,7 @@ export interface PdfViewerHandle {
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
-  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs', standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/', renderAllPages: false, textLayer: true, password: undefined, query: undefined, options: (() => ({}))() }, _props);
+  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: undefined, standardFontDataUrl: undefined, renderAllPages: false, textLayer: true, password: undefined, query: undefined, options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'query', 'options', 'ref']);
   onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind }); });
 
@@ -155,7 +155,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     import('pdfjs-dist').then((mod: any) => {
       if (cancelled) return;
       pdfjsLib = mod;
-      pdfjsLib.GlobalWorkerOptions.workerSrc = local.workerSrc;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = local.workerSrc || cdnBase() + '/build/pdf.worker.min.mjs';
       // hand off to the lazy $watch below rather than calling load() from this
       // (React: mount-frozen) closure — see the $data.engineReady note above.
       setEngineReady(engineReady() + 1);
@@ -219,6 +219,18 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   // `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
   let pdfjsLib: any = null;
 
+  // version-locked jsDelivr CDN base for the workerSrc/standardFontDataUrl
+  // defaults — built from pdfjsLib.version (read at runtime off the dynamically
+  // imported engine, once resolved) rather than a hand-typed version string, so
+  // the default can never drift from the pdfjs-dist actually installed. NOT
+  // `new URL(..., import.meta.url)`: that idiom is left unresolved by the
+  // Angular (analogjs) AOT pipeline and trips ngtsc into a JIT fallback (see the
+  // PdfViewerDemo `?url`-worker note) — a plain CDN string works uniformly across
+  // every target's own build tooling AND every downstream consumer bundler.
+  function cdnBase() {
+    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + pdfjsLib.version;
+  }
+
   // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
   // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
   // containerEl is the scroll host, observer is the continuous-mode scroll spy.
@@ -272,10 +284,15 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
         cfg.url = srcInput;
       }
     } else if (srcInput) {
-      cfg.data = srcInput;
+      // clone before handing to pdfjs — getDocument() transfers cfg.data.buffer to
+      // the worker, which DETACHES the source ArrayBuffer (byteLength -> 0). A
+      // consumer that reuses the same reference (remount, re-render with the same
+      // src, password retry) would then load from an empty buffer and throw. The
+      // clone is the throwaway that gets transferred; the caller's array survives.
+      cfg.data = srcInput instanceof Uint8Array ? srcInput.slice() : srcInput;
     }
     if (local.password != null) cfg.password = local.password;
-    if (local.standardFontDataUrl) cfg.standardFontDataUrl = local.standardFontDataUrl;
+    cfg.standardFontDataUrl = local.standardFontDataUrl || cdnBase() + '/standard_fonts/';
     return cfg;
   }
 

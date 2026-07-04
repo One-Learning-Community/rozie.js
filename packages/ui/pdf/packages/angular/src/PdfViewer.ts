@@ -90,13 +90,13 @@ export class PdfViewer {
    */
   rotation = input<number>(0);
   /**
-   * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the version-matched jsDelivr CDN copy so the component works with zero config; override for offline / CSP / a bundled worker (e.g. Vite's `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`).
+   * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version` (read at runtime, not a hand-typed string), so the component works with zero config and the default can't drift from the engine version your app resolves. Override for offline / a strict CSP / a bundled worker.
    */
-  workerSrc = input<string>('https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs');
+  workerSrc = input<string>(undefined);
   /**
-   * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Version-matched CDN default; override (or pass a bundled dir) for offline / CSP.
+   * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s own `.version` (same runtime-version rationale as `workerSrc`). Override (or pass a bundled dir) for offline / a strict CSP.
    */
-  standardFontDataUrl = input<string>('https://cdn.jsdelivr.net/npm/pdfjs-dist@6.0.227/standard_fonts/');
+  standardFontDataUrl = input<string>(undefined);
   /**
    * `false` (default) renders a single page with nav (the two-way `page` drives it). `true` renders a continuous scroll of every page; the most-visible page reflects back into `page` and the `pagechange` event via an `IntersectionObserver`.
    */
@@ -193,7 +193,7 @@ export class PdfViewer {
     import('pdfjs-dist').then((mod: any) => {
       if (this.cancelled) return;
       this.pdfjsLib = mod;
-      this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc();
+      this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc() || this.cdnBase() + '/build/pdf.worker.min.mjs';
       // hand off to the lazy $watch below rather than calling load() from this
       // (React: mount-frozen) closure — see the $data.engineReady note above.
       this.engineReady.set(this.engineReady() + 1);
@@ -214,6 +214,9 @@ export class PdfViewer {
   }
 
   pdfjsLib: any = null;
+  cdnBase = () => {
+    return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + this.pdfjsLib.version;
+  };
   instance: any = null;
   containerEl: any = null;
   observer: any = null;
@@ -226,7 +229,6 @@ export class PdfViewer {
   cancelled = false;
   buildSource = () => {
     const __password = this.password();
-    const __standardFontDataUrl = this.standardFontDataUrl();
     let cfg: any = null;
     cfg = {
       ...this.options()
@@ -249,10 +251,15 @@ export class PdfViewer {
         cfg.url = srcInput;
       }
     } else if (srcInput) {
-      cfg.data = srcInput;
+      // clone before handing to pdfjs — getDocument() transfers cfg.data.buffer to
+      // the worker, which DETACHES the source ArrayBuffer (byteLength -> 0). A
+      // consumer that reuses the same reference (remount, re-render with the same
+      // src, password retry) would then load from an empty buffer and throw. The
+      // clone is the throwaway that gets transferred; the caller's array survives.
+      cfg.data = srcInput instanceof Uint8Array ? srcInput.slice() : srcInput;
     }
     if (__password != null) cfg.password = __password;
-    if (__standardFontDataUrl) cfg.standardFontDataUrl = __standardFontDataUrl;
+    cfg.standardFontDataUrl = this.standardFontDataUrl() || this.cdnBase() + '/standard_fonts/';
     return cfg;
   };
   renderPage = async (pdf: any, pageNum: any, container: any) => {
