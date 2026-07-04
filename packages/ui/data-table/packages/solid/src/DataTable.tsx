@@ -303,6 +303,8 @@ interface SelectAllSlotCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderSlotCtx { columnId: any; column: any; label: any; }
 
+interface FilterSlotCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: any; }
+
 interface SelectCellSlotCtx { row: any; checked: any; toggle: any; }
 
 interface CellSlotCtx { columnId: any; column: any; row: any; value: any; }
@@ -449,6 +451,7 @@ interface DataTableProps {
   groupBarSlot?: (ctx: GroupBarSlotCtx) => JSX.Element;
   selectAllSlot?: (ctx: SelectAllSlotCtx) => JSX.Element;
   colHeaderSlot?: (ctx: ColHeaderSlotCtx) => JSX.Element;
+  filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   selectCellSlot?: (ctx: SelectCellSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
   editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
@@ -1856,12 +1859,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return editorTypeOf(colId) === 'custom' && !!(_props.editorSlot ?? _props.slots?.["editor"]);
   }
 
-  // hasFilterSlot (phase 72, temporarily REMOVED): the consumer supplied a #filter scoped
-  // slot, so it OWNS the per-column filter UI. This helper referenced `$slots.filter`,
-  // which ROZ103-errors now that BOTH header branches (72-03) have removed their
-  // `<slot name="filter">` host — the filter UI (inline input + #filter slot) relocates to
-  // the dedicated filter row in 72-05, which will re-render a `<slot name="filter">` and
-  // can reinstate this exact helper (`() => !!$slots.filter`) at that point.
+  // hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+  // filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
+  // host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
+  function hasFilterSlot() {
+    return !!(_props.filterSlot ?? _props.slots?.["filter"]);
+  }
   function columnIsFilterable(colId: any) {
     const d = defFor(colId);
     return !!(d && d.filterable);
@@ -5311,7 +5314,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
             </span></Show>}</th>}</For>
         </tr>}</For>
-      </thead>
+        
+        {<Show when={hasAnyFilterableColumn()}><tr class={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
+          <For each={headerGroups()[headerGroups().length - 1].headers}>{(header) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+            {<Show when={isSelectColumn(header.column.id)} fallback={<Show when={isExpanderColumn(header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={columnIsFilterable(header.column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} class={"rdt-col-filter"} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header.column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+              </span></Show>}</span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}</th>}</For>
+        </tr></Show>}</thead>
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         

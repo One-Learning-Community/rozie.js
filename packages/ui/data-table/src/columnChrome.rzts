@@ -69,12 +69,10 @@ const editorOptionsOf = (colId) => {
 // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
 const hasEditorSlot = (colId) => editorTypeOf(colId) === 'custom' && !!$slots.editor
 
-// hasFilterSlot (phase 72, temporarily REMOVED): the consumer supplied a #filter scoped
-// slot, so it OWNS the per-column filter UI. This helper referenced `$slots.filter`,
-// which ROZ103-errors now that BOTH header branches (72-03) have removed their
-// `<slot name="filter">` host — the filter UI (inline input + #filter slot) relocates to
-// the dedicated filter row in 72-05, which will re-render a `<slot name="filter">` and
-// can reinstate this exact helper (`() => !!$slots.filter`) at that point.
+// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+// filter UI (re-added in 72-05 alongside the dedicated filter row's `<slot name="filter">`
+// host — see the 72-03 removal note in that plan's SUMMARY for why this was briefly gone).
+const hasFilterSlot = () => !!$slots.filter
 const columnIsFilterable = (colId) => {
   const d = defFor(colId)
   return !!(d && d.filterable)
@@ -201,4 +199,4 @@ const thStyle = (colId) => {
   return s
 }
 
-export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }
+export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }

@@ -60,6 +60,14 @@ interface ColHeaderCtx {
   label: any;
 }
 
+interface FilterCtx {
+  $implicit: { columnId: any; uniqueValues: any; minMax: any; setFilter: any };
+  columnId: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
+}
+
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
@@ -228,7 +236,28 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
         </tr>
     }
-      </thead>
+        
+        @if (hasAnyFilterableColumn()) {
+    <tr class="rdt-filter-row">
+          @for (header of headerGroups()[headerGroups().length - 1].headers; track header.id) {
+    <th class="rdt-filter-cell" role="presentation" [style]="pinStyle(header.column.id)">
+            @if (isSelectColumn(header.column.id)) {
+    <span style="display:contents"></span>
+    } @else if (isExpanderColumn(header.column.id)) {
+    <span style="display:contents"></span>
+    } @else {
+    <span style="display:contents">
+              @if (columnIsFilterable(header.column.id) && !hasFilterSlot()) {
+    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+    }@if (columnIsFilterable(header.column.id)) {
+    <span style="display:contents">
+                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+              </span>
+    }</span>
+    }</th>
+    }
+        </tr>
+    }</thead>
 
       <tbody class="rdt-tbody" role="rowgroup">
         
@@ -932,6 +961,7 @@ export class DataTable {
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
+  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
@@ -1868,6 +1898,7 @@ export class DataTable {
     return m && m.editorOptions != null ? m.editorOptions : [];
   };
   hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this.editorTpl ?? this.templates()?.['editor']);
+  hasFilterSlot = () => !!(this.filterTpl ?? this.templates()?.['filter']);
   columnIsFilterable = (colId: any) => {
     const d = this.defFor(colId);
     return !!(d && d.filterable);
@@ -4277,7 +4308,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx {
     return true;
   }
 

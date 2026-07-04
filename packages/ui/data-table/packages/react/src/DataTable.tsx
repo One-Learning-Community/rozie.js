@@ -42,6 +42,8 @@ interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
+interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: any; }
+
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
@@ -187,6 +189,7 @@ interface DataTableProps {
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
+  renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
@@ -1089,6 +1092,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function hasEditorSlot(colId: any) {
     return editorTypeOf(colId) === 'custom' && !!(props.renderEditor ?? props.slots?.["editor"]);
   }
+  function hasFilterSlot() {
+    return !!(props.renderFilter ?? props.slots?.["filter"]);
+  }
   function columnIsFilterable(colId: any) {
     const d = defFor(colId);
     return !!(d && d.filterable);
@@ -1192,10 +1198,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     writeGlobalFilter(value);
   }, [writeGlobalFilter]);
-  function onColumnFilterInput(colId: any, evt: any) {
+  const onColumnFilterInput = useCallback((colId: any, evt: any) => {
     const value = evt && evt.target ? evt.target.value : '';
     setColumnFilter(colId, value);
-  }
+  }, [setColumnFilter]);
   function globalFilterValue() {
     const v = currentState().globalFilter;
     return v != null ? v : '';
@@ -1306,9 +1312,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     return out;
   }
-  function stopEvent(evt: any) {
+  const stopEvent = useCallback((evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
-  }
+  }, []);
   function isAllRowsSelected() {
     return !!(tick() >= 0 && table.current && table.current.getIsAllRowsSelected());
   }
@@ -3876,7 +3882,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}</th>)}
         </tr>)}
-      </thead>
+        
+        {!!(hasAnyFilterableColumn()) && <tr className={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
+          {headerGroups[headerGroups.length - 1].headers.map((header) => <th key={header.id} className={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+            {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {!!(columnIsFilterable(header.column.id) && !hasFilterSlot()) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+              </span>}</span>}</th>)}
+        </tr>}</thead>
 
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         

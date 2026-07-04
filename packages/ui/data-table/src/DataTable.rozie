@@ -1064,7 +1064,7 @@ const onHeaderSort = (colId, evt) => {
 // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
 // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
 const tick = () => $data.rowModelVer
-import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
+import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
 import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
@@ -1475,6 +1475,50 @@ $expose({
             @pointerdown="onResizeStart(header.column.id, $event)"
             @touchstart="onResizeStart(header.column.id, $event)"
           ><span class="rdt-resize-grip" aria-hidden="true"></span></button>
+        </span>
+      </th>
+    </tr>
+    <!-- Dedicated filter row (phase 72, D-04/D-10) — the floating-filter pattern. Relocates
+         the per-column filter input + #filter slot host removed from the header in 72-03,
+         one cell per column, aligned under pinned columns. Gated on hasAnyFilterableColumn()
+         so the whole row is ABSENT (byte-identical-off) when no column is filterable. Iterates
+         the LEAF header group ($data.headerGroups[length-1].headers), NOT hg from the r-for
+         above, so a multi-level-header table's filter cells align 1:1 with the body <td>
+         columns rather than an intermediate spanning group. `role="presentation"` on each
+         cell — a filter cell is not a column header. No data-grid-cell/data-row/tabindex —
+         onGridKeyDown only intercepts a focused `[data-grid-cell]` (gridKeydownHandlers.rzts),
+         so these inputs are naturally inert to the roving-tabindex grid and just tab normally
+         (mirrors the rdt-spacer inert-row precedent, minus aria-hidden since these cells hold
+         real focusable controls). -->
+    <tr class="rdt-filter-row" r-if="hasAnyFilterableColumn()">
+      <th
+        class="rdt-filter-cell"
+        role="presentation"
+        r-for="header in $data.headerGroups[$data.headerGroups.length - 1].headers"
+        :key="header.id"
+        :style="pinStyle(header.column.id)"
+      >
+        <span style="display:contents" r-if="isSelectColumn(header.column.id)"></span>
+        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
+        <span style="display:contents" r-else>
+          <input
+            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
+            class="rdt-col-filter"
+            type="text"
+            :aria-label="'Filter ' + headerLabel(header.column.id)"
+            :value="columnFilterValue(header.column.id)"
+            @input="onColumnFilterInput(header.column.id, $event)"
+            @click="stopEvent($event)"
+          />
+          <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
+            <slot
+              name="filter"
+              :columnId="header.column.id"
+              :uniqueValues="getFacetedUniqueValues(header.column.id)"
+              :minMax="getFacetedMinMaxValues(header.column.id)"
+              :setFilter="setColumnFilter"
+            />
+          </span>
         </span>
       </th>
     </tr>
