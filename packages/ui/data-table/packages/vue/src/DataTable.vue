@@ -6010,7 +6010,11 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 }
 .rozie-data-table .rdt-thead .rdt-th {
   font-weight: var(--rdt-header-weight, 600);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+  /* OPAQUE default (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body
+     bleed through in sticky mode. #f7f7f7 is the visual equivalent of the old 3%-black
+     tint over white, but solid. The three design-system themes already ship opaque
+     header backgrounds; this makes the zero-config default consistent with them. */
+  background: var(--rdt-header-bg, #f7f7f7);
 }
 .rozie-data-table .rdt-sort-btn {
   display: inline-flex;
@@ -6032,7 +6036,6 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   position: sticky;
   top: var(--rdt-sticky-top, 0);
   z-index: var(--rdt-sticky-z, 2);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
 }
 .rozie-data-table-wrap .rdt-scroll {
   max-height: var(--rozie-data-table-max-height);
@@ -6044,7 +6047,7 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   align-items: center;
   gap: var(--rdt-group-bar-gap, 0.375rem);
 }
-.rozie-data-table-wrap .rdt-group-token {
+.rozie-data-table-wrap :deep(.rdt-group-token) {
   display: inline-flex;
   align-items: center;
   padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);

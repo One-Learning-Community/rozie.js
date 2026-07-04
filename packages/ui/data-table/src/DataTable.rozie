@@ -2150,7 +2150,11 @@ $expose({
 }
 .rozie-data-table .rdt-thead .rdt-th {
   font-weight: var(--rdt-header-weight, 600);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+  /* OPAQUE default (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body
+     bleed through in sticky mode. #f7f7f7 is the visual equivalent of the old 3%-black
+     tint over white, but solid. The three design-system themes already ship opaque
+     header backgrounds; this makes the zero-config default consistent with them. */
+  background: var(--rdt-header-bg, #f7f7f7);
 }
 .rozie-data-table .rdt-sort-btn {
   display: inline-flex;
@@ -2168,12 +2172,15 @@ $expose({
   font-size: 0.8em;
   opacity: var(--rdt-sort-ind-opacity, 0.7);
 }
-/* Sticky header (req-12) — token-driven, gated by the stickyHeader prop. */
+/* Sticky header (req-12) — token-driven, gated by the stickyHeader prop. The background
+   is NOT re-declared here: --rdt-header-bg is OPAQUE (see base.css), so the base
+   `.rdt-thead .rdt-th` background rule already gives sticky cells an opaque backdrop the
+   scrolling body can't bleed through. A translucent header-bg would show through — that
+   is why the default was made opaque rather than left at rgba(0,0,0,0.03). */
 .rozie-data-table.rdt-sticky .rdt-thead .rdt-th {
   position: sticky;
   top: var(--rdt-sticky-top, 0);
   z-index: var(--rdt-sticky-z, 2);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
 }
 /* Vertical row windowing (phase 53, req-3/D-06) — the bounded scroll viewport, emitted ONLY
    when virtual. The maxHeight prop sets max-height inline (and mirrors the custom property);
@@ -2192,7 +2199,7 @@ $expose({
   align-items: center;
   gap: var(--rdt-group-bar-gap, 0.375rem);
 }
-.rozie-data-table-wrap .rdt-group-token {
+.rozie-data-table-wrap :deep(.rdt-group-token) {
   display: inline-flex;
   align-items: center;
   padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);

@@ -86,7 +86,11 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
   font-weight: var(--rdt-header-weight, 600);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
+  /* OPAQUE default (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body
+     bleed through in sticky mode. #f7f7f7 is the visual equivalent of the old 3%-black
+     tint over white, but solid. The three design-system themes already ship opaque
+     header backgrounds; this makes the zero-config default consistent with them. */
+  background: var(--rdt-header-bg, #f7f7f7);
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-sort-btn[data-rozie-s-d5dcab4c] {
   display: inline-flex;
@@ -108,7 +112,6 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
   position: sticky;
   top: var(--rdt-sticky-top, 0);
   z-index: var(--rdt-sticky-z, 2);
-  background: var(--rdt-header-bg, rgba(0, 0, 0, 0.03));
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-scroll[data-rozie-s-d5dcab4c] {
   max-height: var(--rozie-data-table-max-height);
@@ -120,7 +123,7 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
   align-items: center;
   gap: var(--rdt-group-bar-gap, 0.375rem);
 }
-.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-token[data-rozie-s-d5dcab4c] {
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-group-token {
   display: inline-flex;
   align-items: center;
   padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);

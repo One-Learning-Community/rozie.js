@@ -36,7 +36,10 @@
   --rozie-data-table-cell-padding: 0.5rem 0.75rem;
 
   /* ── header ─────────────────────────────────────────────────────────────── */
-  --rozie-data-table-header-bg: rgba(0, 0, 0, 0.03);
+  /* OPAQUE (was rgba(0,0,0,0.03)): a translucent header lets the scrolling body bleed
+     through in sticky mode. #f7f7f7 ≈ the old 3%-black tint over white, but solid —
+     matching the opaque header backgrounds the design-system themes already ship. */
+  --rozie-data-table-header-bg: #f7f7f7;
   --rozie-data-table-header-weight: 600;
 
   /* ── sort indicator ─────────────────────────────────────────────────────── */
