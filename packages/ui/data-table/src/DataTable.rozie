@@ -1053,7 +1053,7 @@ const onHeaderSort = (colId, evt) => {
 // aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
 // helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
 const tick = () => $data.rowModelVer
-import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
+import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
 import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
@@ -1356,7 +1356,7 @@ $expose({
         :colspan="header.colSpan > 1 ? header.colSpan : null"
         :data-col-index="headerColIndexOf(hg, header)"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
-        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header.column.id)"
       >
@@ -1377,6 +1377,11 @@ $expose({
             />
           </slot>
         </span>
+        <!-- auto-injected expander column (D-04) is CHROME — its header stays EMPTY.
+             Without this branch it falls into the generic-column r-else below and renders
+             its raw internal id ('__rdt_expander') as the label, plus stray pin-controls and
+             a resize handle that don't belong on a chevron column. -->
+        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
         <span style="display:contents" r-else>
           <button
             r-if="header.column.getCanSort && header.column.getCanSort()"
@@ -1405,7 +1410,7 @@ $expose({
             </span>
           </span>
           <input
-            r-if="columnIsFilterable(header.column.id)"
+            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
             class="rdt-col-filter"
             type="text"
             :aria-label="'Filter ' + headerLabel(header.column.id)"
@@ -1511,7 +1516,7 @@ $expose({
         :data-row="wr.vi.index"
         :data-col-index="colIndexOf(wr.row, cellCtx)"
         :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }"
         :style="bodyCellStyle(wr.row, cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))"
         :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null"
@@ -1708,7 +1713,7 @@ $expose({
         :colspan="header.colSpan > 1 ? header.colSpan : null"
         :data-col-index="headerColIndexOf(hg, header)"
         :tabindex="cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)"
-        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
+        :class="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }"
         :aria-sort="ariaSortFor(header.column.id)"
         :style="thStyle(header.column.id)"
       >
@@ -1743,6 +1748,11 @@ $expose({
             />
           </slot>
         </span>
+        <!-- auto-injected expander column (D-04) is CHROME — its header stays EMPTY.
+             Without this branch it falls into the generic-column r-else below and renders
+             its raw internal id ('__rdt_expander') as the label, plus stray pin-controls and
+             a resize handle that don't belong on a chevron column. -->
+        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
         <span style="display:contents" r-else>
           <!-- sortable header → a button that toggles sort (shift = multi). -->
           <button
@@ -1776,7 +1786,7 @@ $expose({
           <!-- per-column filter input (req-5) — gated by the column's filterable flag.
                Bound value, NOT eval'd (T-48-XSS). -->
           <input
-            r-if="columnIsFilterable(header.column.id)"
+            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
             class="rdt-col-filter"
             type="text"
             :aria-label="'Filter ' + headerLabel(header.column.id)"
@@ -1868,7 +1878,7 @@ $expose({
         :data-row="rowIndexOf(row)"
         :data-col-index="colIndexOf(row, cellCtx)"
         :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }"
+        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }"
         :style="bodyCellStyle(row, cellCtx.column.id)"
         :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
         :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null"
@@ -2214,15 +2224,18 @@ $expose({
   gap: var(--rdt-toolbar-gap, 0.5rem);
 }
 .rozie-data-table-wrap .rdt-global-filter,
-.rozie-data-table-wrap .rdt-col-filter {
+.rozie-data-table-wrap :deep(.rdt-col-filter) {
   font: inherit;
+  /* border-box so the padding + border count INSIDE the declared width — without it
+     the col-filter's `width: 100%` + padding overflows its (constrained) header cell. */
+  box-sizing: border-box;
   padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
   border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
   border-radius: var(--rdt-filter-radius, 4px);
   background: var(--rdt-filter-bg, transparent);
   color: inherit;
 }
-.rozie-data-table-wrap .rdt-col-filter {
+.rozie-data-table-wrap :deep(.rdt-col-filter) {
   display: block;
   margin-top: var(--rdt-col-filter-gap, 0.25rem);
   width: 100%;
@@ -2346,6 +2359,15 @@ $expose({
 .rozie-data-table .rdt-select-td {
   width: var(--rdt-select-col-width, 1%);
   text-align: var(--rdt-select-col-align, center);
+  white-space: nowrap;
+}
+/* Expander is a chevron-only CHROME column — shrink it to its content (the `width: 1%`
+   table trick, mirroring the select column) instead of inheriting table-core's 150px
+   default column size, which leaves a large empty gap beside the toggle. */
+.rozie-data-table .rdt-expander-th,
+.rozie-data-table .rdt-expander-td {
+  width: var(--rdt-expander-col-width, 1%);
+  text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }
 .rozie-data-table .rdt-select-all,

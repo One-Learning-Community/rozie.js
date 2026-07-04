@@ -69,6 +69,13 @@ const editorOptionsOf = (colId) => {
 // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
 const hasEditorSlot = (colId) => editorTypeOf(colId) === 'custom' && !!$slots.editor
 
+// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+// filter UI — the built-in text input is suppressed (slot REPLACES built-in, mirroring
+// #editor/#cell/#colHeader), never rendered alongside it (the double-input bug). Global,
+// not per-column: the single #filter slot dispatches by columnId internally (with an
+// r-else fallback), so its mere presence takes over filtering for every filterable column.
+const hasFilterSlot = () => !!$slots.filter
+
 const columnIsFilterable = (colId) => {
   const d = defFor(colId)
   return !!(d && d.filterable)
@@ -131,13 +138,16 @@ const onToggleVisibility = (colId) => {
   if (col && col.toggleVisibility) col.toggleVisibility()
 }
 // The full set of leaf columns (for the visibility-toggle menu) — id + header label +
-// current visibility. Excludes the auto-injected select column (always present).
+// current visibility. Excludes the auto-injected CHROME columns (select + expander) —
+// neither is a data column: they carry no header label (so they'd surface their raw
+// internal id, e.g. '__rdt_expander') and their presence is governed by the
+// selectionMode/expandable props, not user-toggleable visibility.
 const allLeafColumns = () => {
   if (tick() < 0 || !table) return []
   const cols = table.getAllLeafColumns ? table.getAllLeafColumns() : []
   const out = []
   for (const c of cols) {
-    if (!c || c.id === SELECT_COL_ID) continue
+    if (!c || c.id === SELECT_COL_ID || c.id === EXPANDER_COL_ID) continue
     out.push({ id: c.id, label: headerLabel(c.id), visible: !!(c.getIsVisible && c.getIsVisible()) })
   }
   return out
@@ -192,4 +202,4 @@ const thStyle = (colId) => {
   return s
 }
 
-export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }
+export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }

@@ -27,11 +27,11 @@
 <table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="rows.length" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
+      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
-        </span><span v-else style="display:contents">
+        </span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
@@ -41,7 +41,7 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
+          </span><input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
             <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
           </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
@@ -61,7 +61,7 @@
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined" :style="bodyCellStyle(wr.row, cellCtx.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
+      <td v-for="cellCtx in visibleCellsFor(wr.row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cellCtx)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))) ?? undefined" :style="bodyCellStyle(wr.row, cellCtx.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
         
         <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
           <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
@@ -98,14 +98,14 @@
 </div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(totalRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
+      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         
         
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
-        </span><span v-else style="display:contents">
+        </span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           
           <button v-if="header.column.getCanSort && header.column.getCanSort()" type="button" class="rdt-sort-btn" @click="onHeaderSort(header.column.id, $event)">
             
@@ -117,7 +117,7 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><input v-if="columnIsFilterable(header.column.id)" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
+          </span><input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
             <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
           </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
             <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
@@ -134,7 +134,7 @@
     
     <template v-for="row in rows" :key="row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined" :aria-level="(groupingActive() ? row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined" :style="bodyCellStyle(row, cellCtx.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
+      <td v-for="cellCtx in visibleCellsFor(row)" :key="cellCtx.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }]" :role="cellRole()" :data-col="cellCtx.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cellCtx)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))) ?? undefined" :style="bodyCellStyle(row, cellCtx.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : undefined">
         
         <span v-if="isExpanderColumn(cellCtx.column.id)" style="display:contents">
           <button v-if="rowCanExpand(row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(row)" :aria-label="rowIsExpanded(row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(row, $event)">{{ rowIsExpanded(row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cellCtx.column.id)" style="display:contents">
@@ -1769,6 +1769,18 @@ const editorOptionsOf = (colId: any) => {
 // provided an #editor slot. Falls through to the built-in editor otherwise (e.g. a
 // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
 const hasEditorSlot = (colId: any) => editorTypeOf(colId) === 'custom' && !!slots.editor;
+
+// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+// filter UI — the built-in text input is suppressed (slot REPLACES built-in, mirroring
+// #editor/#cell/#colHeader), never rendered alongside it (the double-input bug). Global,
+// not per-column: the single #filter slot dispatches by columnId internally (with an
+// r-else fallback), so its mere presence takes over filtering for every filterable column.
+// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
+// filter UI — the built-in text input is suppressed (slot REPLACES built-in, mirroring
+// #editor/#cell/#colHeader), never rendered alongside it (the double-input bug). Global,
+// not per-column: the single #filter slot dispatches by columnId internally (with an
+// r-else fallback), so its mere presence takes over filtering for every filterable column.
+const hasFilterSlot = () => !!slots.filter;
 const columnIsFilterable = (colId: any) => {
   const d = defFor(colId);
   return !!(d && d.filterable);
@@ -1842,15 +1854,21 @@ const onToggleVisibility = (colId: any) => {
   if (col && col.toggleVisibility) col.toggleVisibility();
 };
 // The full set of leaf columns (for the visibility-toggle menu) — id + header label +
-// current visibility. Excludes the auto-injected select column (always present).
+// current visibility. Excludes the auto-injected CHROME columns (select + expander) —
+// neither is a data column: they carry no header label (so they'd surface their raw
+// internal id, e.g. '__rdt_expander') and their presence is governed by the
+// selectionMode/expandable props, not user-toggleable visibility.
 // The full set of leaf columns (for the visibility-toggle menu) — id + header label +
-// current visibility. Excludes the auto-injected select column (always present).
+// current visibility. Excludes the auto-injected CHROME columns (select + expander) —
+// neither is a data column: they carry no header label (so they'd surface their raw
+// internal id, e.g. '__rdt_expander') and their presence is governed by the
+// selectionMode/expandable props, not user-toggleable visibility.
 const allLeafColumns = () => {
   if (tick() < 0 || !table) return [];
   const cols = table.getAllLeafColumns ? table.getAllLeafColumns() : [];
   const out = [];
   for (const c of cols as any) {
-    if (!c || c.id === SELECT_COL_ID) continue;
+    if (!c || c.id === SELECT_COL_ID || c.id === EXPANDER_COL_ID) continue;
     out.push({
       id: c.id,
       label: headerLabel(c.id),
@@ -6056,15 +6074,18 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   gap: var(--rdt-toolbar-gap, 0.5rem);
 }
 .rozie-data-table-wrap .rdt-global-filter,
-.rozie-data-table-wrap .rdt-col-filter {
+.rozie-data-table-wrap :deep(.rdt-col-filter) {
   font: inherit;
+  /* border-box so the padding + border count INSIDE the declared width — without it
+     the col-filter's `width: 100%` + padding overflows its (constrained) header cell. */
+  box-sizing: border-box;
   padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
   border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
   border-radius: var(--rdt-filter-radius, 4px);
   background: var(--rdt-filter-bg, transparent);
   color: inherit;
 }
-.rozie-data-table-wrap .rdt-col-filter {
+.rozie-data-table-wrap :deep(.rdt-col-filter) {
   display: block;
   margin-top: var(--rdt-col-filter-gap, 0.25rem);
   width: 100%;
@@ -6182,6 +6203,12 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 .rozie-data-table .rdt-select-td {
   width: var(--rdt-select-col-width, 1%);
   text-align: var(--rdt-select-col-align, center);
+  white-space: nowrap;
+}
+.rozie-data-table .rdt-expander-th,
+.rozie-data-table .rdt-expander-td {
+  width: var(--rdt-expander-col-width, 1%);
+  text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }
 .rozie-data-table .rdt-select-all,

@@ -114,15 +114,18 @@
   gap: var(--rdt-toolbar-gap, 0.5rem);
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-global-filter[data-rozie-s-d5dcab4c],
-.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter[data-rozie-s-d5dcab4c] {
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter {
   font: inherit;
+  /* border-box so the padding + border count INSIDE the declared width — without it
+     the col-filter's `width: 100%` + padding overflows its (constrained) header cell. */
+  box-sizing: border-box;
   padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
   border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
   border-radius: var(--rdt-filter-radius, 4px);
   background: var(--rdt-filter-bg, transparent);
   color: inherit;
 }
-.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter[data-rozie-s-d5dcab4c] {
+.rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter {
   display: block;
   margin-top: var(--rdt-col-filter-gap, 0.25rem);
   width: 100%;
@@ -240,6 +243,12 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-td[data-rozie-s-d5dcab4c] {
   width: var(--rdt-select-col-width, 1%);
   text-align: var(--rdt-select-col-align, center);
+  white-space: nowrap;
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-th[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-td[data-rozie-s-d5dcab4c] {
+  width: var(--rdt-expander-col-width, 1%);
+  text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-all[data-rozie-s-d5dcab4c],
