@@ -37,6 +37,10 @@ export interface PopoverProps {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   disabled?: boolean;
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  strategy?: string;
   onChange?: (...args: unknown[]) => void;
   renderAnchor?: (params: { open: boolean; toggle: () => void; show: () => void; hide: () => void }) => ReactNode;
   children?: ReactNode;

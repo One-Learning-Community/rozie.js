@@ -37,6 +37,10 @@ interface Props {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   disabled?: boolean;
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  strategy?: string;
   anchor?: Snippet<[{ open: any; toggle: any; show: any; hide: any }]>;
   children?: Snippet;
   snippets?: Record<string, any>;
@@ -53,6 +57,7 @@ let {
   disableShift = false,
   arrow = false,
   disabled = false,
+  strategy = 'absolute',
   anchor: __anchorProp,
   children: __childrenProp,
   snippets,
@@ -153,9 +158,19 @@ const position = () => {
     arrow: arrow,
     arrowEl: arrowNode
   });
+  // 'fixed' inline position MUST be written before computePosition measures the
+  // floating element's offset parent (fixed vs absolute changes the containing
+  // block). Default 'absolute' writes NO inline position — the stylesheet's
+  // `position: absolute` stands unchanged, so the default path stays
+  // byte-identical (adding an unconditional inline `position: absolute` here
+  // would be a specificity change even though the value matches).
+  if (strategy === 'fixed') {
+    floatingNode.style.position = 'fixed';
+  }
   let opts: any = null;
   opts = {
     placement: placement,
+    strategy: strategy,
     middleware
   };
   computePosition(anchorNode, floatingNode, opts).then((result: any) => {
@@ -283,6 +298,10 @@ $effect(() => { (() => disableFlip)(); untrack(() => { if (__rozieWatchInitial_3
 })(); }); });
 let __rozieWatchInitial_4 = true;
 $effect(() => { (() => disableShift)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
+  if (open) position();
+})(); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { (() => strategy)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
   if (open) position();
 })(); }); });
 

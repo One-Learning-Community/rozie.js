@@ -62,6 +62,10 @@ interface PopoverProps {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   disabled?: boolean;
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  strategy?: string;
   onChange?: (...args: any[]) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
@@ -76,7 +80,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'strategy'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; strategy: string } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -85,10 +89,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     disableShift: _props.disableShift ?? false,
     arrow: _props.arrow ?? false,
     disabled: _props.disabled ?? false,
+    strategy: _props.strategy ?? 'absolute',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, strategy, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void strategy; void defaultValue; void onOpenChange; void defaultOpen;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -110,6 +115,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _watch2First = useRef(true);
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
+  const _watch5First = useRef(true);
 
   function requestOpen(next: any) {
     if (open === next) return;
@@ -141,9 +147,19 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       arrow: props.arrow,
       arrowEl: arrowNode.current
     });
+    // 'fixed' inline position MUST be written before computePosition measures the
+    // floating element's offset parent (fixed vs absolute changes the containing
+    // block). Default 'absolute' writes NO inline position — the stylesheet's
+    // `position: absolute` stands unchanged, so the default path stays
+    // byte-identical (adding an unconditional inline `position: absolute` here
+    // would be a specificity change even though the value matches).
+    if (props.strategy === 'fixed') {
+      floatingNode.current.style.position = 'fixed';
+    }
     let opts: any = null;
     opts = {
       placement: props.placement,
+      strategy: props.strategy,
       middleware
     };
     computePosition(anchorNode.current, floatingNode.current, opts).then((result: any) => {
@@ -252,6 +268,10 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     if (_watch4First.current) { _watch4First.current = false; return; }
     if (open) position();
   }, [props.disableShift]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (open) position();
+  }, [props.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!(open)) return;

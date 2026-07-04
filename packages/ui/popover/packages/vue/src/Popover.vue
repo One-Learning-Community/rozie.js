@@ -48,8 +48,12 @@ const props = withDefaults(
      * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
      */
     disabled?: boolean;
+    /**
+     * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+     */
+    strategy?: string;
   }>(),
-  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false }
+  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, strategy: 'absolute' }
 );
 
 /**
@@ -156,9 +160,19 @@ const position = () => {
     arrow: props.arrow,
     arrowEl: arrowNode
   });
+  // 'fixed' inline position MUST be written before computePosition measures the
+  // floating element's offset parent (fixed vs absolute changes the containing
+  // block). Default 'absolute' writes NO inline position — the stylesheet's
+  // `position: absolute` stands unchanged, so the default path stays
+  // byte-identical (adding an unconditional inline `position: absolute` here
+  // would be a specificity change even though the value matches).
+  if (props.strategy === 'fixed') {
+    floatingNode.style.position = 'fixed';
+  }
   let opts: any = null;
   opts = {
     placement: props.placement,
+    strategy: props.strategy,
     middleware
   };
   computePosition(anchorNode, floatingNode, opts).then((result: any) => {
@@ -283,6 +297,9 @@ watch(() => props.disableFlip, () => {
   if (open.value) position();
 });
 watch(() => props.disableShift, () => {
+  if (open.value) position();
+});
+watch(() => props.strategy, () => {
   if (open.value) position();
 });
 

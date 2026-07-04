@@ -90,6 +90,10 @@ interface PopoverProps {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   disabled?: boolean;
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  strategy?: string;
   onChange?: (...args: unknown[]) => void;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
@@ -106,8 +110,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'children', 'ref']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, strategy: 'absolute' }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'strategy', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -149,6 +153,9 @@ export default function Popover(_props: PopoverProps): JSX.Element {
     if (open()) position();
   })()), { defer: true }));
   createEffect(on(() => (() => local.disableShift)(), (v) => untrack(() => (() => {
+    if (open()) position();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.strategy)(), (v) => untrack(() => (() => {
     if (open()) position();
   })()), { defer: true }));
   let anchorElRef: HTMLElement | null = null;
@@ -211,9 +218,19 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       arrow: local.arrow,
       arrowEl: arrowNode
     });
+    // 'fixed' inline position MUST be written before computePosition measures the
+    // floating element's offset parent (fixed vs absolute changes the containing
+    // block). Default 'absolute' writes NO inline position — the stylesheet's
+    // `position: absolute` stands unchanged, so the default path stays
+    // byte-identical (adding an unconditional inline `position: absolute` here
+    // would be a specificity change even though the value matches).
+    if (local.strategy === 'fixed') {
+      floatingNode.style.position = 'fixed';
+    }
     let opts: any = null;
     opts = {
       placement: local.placement,
+      strategy: local.strategy,
       middleware
     };
     computePosition(anchorNode, floatingNode, opts).then((result: any) => {

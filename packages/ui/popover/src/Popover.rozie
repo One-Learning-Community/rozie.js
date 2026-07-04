@@ -105,6 +105,14 @@
     default: false,
     docs: { description: 'Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.' },
   },
+  // Floating UI positioning strategy. 'absolute' (default) writes NO inline
+  // position — the stylesheet rule stands, byte-identical to pre-strategy Popover.
+  // 'fixed' escapes a scrollable/overflow-clipping ancestor. Runtime-reconciled.
+  strategy: {
+    type: String,
+    default: 'absolute',
+    docs: { description: "Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime." },
+  },
 }
 </props>
 
@@ -174,8 +182,17 @@ const position = () => {
       arrowEl: arrowNode,
     },
   )
+  // 'fixed' inline position MUST be written before computePosition measures the
+  // floating element's offset parent (fixed vs absolute changes the containing
+  // block). Default 'absolute' writes NO inline position — the stylesheet's
+  // `position: absolute` stands unchanged, so the default path stays
+  // byte-identical (adding an unconditional inline `position: absolute` here
+  // would be a specificity change even though the value matches).
+  if ($props.strategy === 'fixed') {
+    floatingNode.style.position = 'fixed'
+  }
   let opts = null
-  opts = { placement: $props.placement, middleware }
+  opts = { placement: $props.placement, strategy: $props.strategy, middleware }
   computePosition(anchorNode, floatingNode, opts).then((result) => {
     applyPosition(result.x, result.y, result.middlewareData)
   })
@@ -232,6 +249,7 @@ $watch(() => $props.placement, () => { if ($props.open) position() })
 $watch(() => $props.offset, () => { if ($props.open) position() })
 $watch(() => $props.disableFlip, () => { if ($props.open) position() })
 $watch(() => $props.disableShift, () => { if ($props.open) position() })
+$watch(() => $props.strategy, () => { if ($props.open) position() })
 
 // ─── trigger gesture handlers (wired conditionally on the anchor by `trigger`) ──
 const onAnchorClick = () => {

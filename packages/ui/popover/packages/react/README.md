@@ -52,6 +52,7 @@ Every visual value is a `--rozie-popover-*` CSS custom property (background, bor
 | `disableShift` | `Boolean` | `false` |  |  | Disable the Floating UI `shift` middleware. By default the content shifts along its axis to stay within the viewport; set this to keep it strictly aligned to the anchor. |
 | `arrow` | `Boolean` | `false` |  |  | Opt in to a positioned arrow element. When set, Popover renders an arrow `<div>` and runs the Floating UI `arrow` middleware against it so it points at the anchor. Style it via the `--rozie-popover-*` arrow CSS custom properties. |
 | `disabled` | `Boolean` | `false` |  |  | Disable the control entirely: the trigger no longer opens the content and any open content is suppressed. |
+| `strategy` | `String` | `"absolute"` |  |  | Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime. |
 
 ## Events
 

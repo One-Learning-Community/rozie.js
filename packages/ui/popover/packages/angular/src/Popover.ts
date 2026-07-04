@@ -150,6 +150,10 @@ export class Popover {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   disabled = input<boolean>(false);
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  strategy = input<string>('absolute');
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -163,6 +167,7 @@ export class Popover {
   private __rozieWatchInitial_2 = true;
   private __rozieWatchInitial_3 = true;
   private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -209,6 +214,9 @@ export class Popover {
     effect(() => { const __watchVal = (() => this.disableShift())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
       if (this.open()) this.position();
     })(); }); });
+    effect(() => { const __watchVal = (() => this.strategy())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+      if (this.open()) this.position();
+    })(); }); });
   }
 
   ngAfterViewInit() {
@@ -248,6 +256,7 @@ export class Popover {
     }
   };
   position = () => {
+    const __strategy = this.strategy();
     if (!this.anchorNode || !this.floatingNode) return;
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
@@ -261,9 +270,19 @@ export class Popover {
       arrow: this.arrow(),
       arrowEl: this.arrowNode
     });
+    // 'fixed' inline position MUST be written before computePosition measures the
+    // floating element's offset parent (fixed vs absolute changes the containing
+    // block). Default 'absolute' writes NO inline position — the stylesheet's
+    // `position: absolute` stands unchanged, so the default path stays
+    // byte-identical (adding an unconditional inline `position: absolute` here
+    // would be a specificity change even though the value matches).
+    if (__strategy === 'fixed') {
+      this.floatingNode.style.position = 'fixed';
+    }
     let opts: any = null;
     opts = {
       placement: this.placement(),
+      strategy: __strategy,
       middleware
     };
     computePosition(this.anchorNode, this.floatingNode, opts).then((result: any) => {

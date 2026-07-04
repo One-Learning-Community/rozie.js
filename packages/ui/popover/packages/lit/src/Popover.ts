@@ -98,6 +98,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    * Disable the control entirely: the trigger no longer opens the content and any open content is suppressed.
    */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  /**
+   * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
+   */
+  @property({ type: String, reflect: true }) strategy: string = 'absolute';
   @query('[data-rozie-ref="anchorEl"]') private _refAnchorEl!: HTMLElement;
   @query('[data-rozie-ref="floatingEl"]') private _refFloatingEl!: HTMLElement;
   @query('[data-rozie-ref="arrowEl"]') private _refArrowEl!: HTMLElement;
@@ -196,6 +200,9 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disableShift'))) { const __watchVal = (() => this.disableShift)(); (() => {
       if (this.open) this.position();
     })(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('strategy'))) { const __watchVal = (() => this.strategy)(); (() => {
+      if (this.open) this.position();
+    })(); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -274,9 +281,19 @@ private __rozieFirstUpdateDone = false;
     arrow: this.arrow,
     arrowEl: this.arrowNode
   });
+  // 'fixed' inline position MUST be written before computePosition measures the
+  // floating element's offset parent (fixed vs absolute changes the containing
+  // block). Default 'absolute' writes NO inline position — the stylesheet's
+  // `position: absolute` stands unchanged, so the default path stays
+  // byte-identical (adding an unconditional inline `position: absolute` here
+  // would be a specificity change even though the value matches).
+  if (this.strategy === 'fixed') {
+    this.floatingNode.style.position = 'fixed';
+  }
   let opts: any = null;
   opts = {
     placement: this.placement,
+    strategy: this.strategy,
     middleware
   };
   computePosition(this.anchorNode, this.floatingNode, opts).then((result: any) => {
@@ -365,7 +382,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled']);
+    const __skip = new Set<string>(['open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'strategy']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;
