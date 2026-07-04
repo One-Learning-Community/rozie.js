@@ -67,7 +67,7 @@
            PRODUCER declares only { columnId, uniqueValues, minMax, setFilter } (NO
            column/value — those are optional drop-in props that default to null), so we
            forward exactly the declared scope. The drop-ins call setFilter(columnId, value). -->
-      <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
+      <template #filter="{ columnId, value, uniqueValues, minMax, setFilter }">
         <FilterText
           r-if="columnId === 'name'"
           :columnId="columnId"
@@ -76,6 +76,7 @@
         <FilterSelect
           r-else-if="columnId === 'category'"
           :columnId="columnId"
+          :value="value"
           :setFilter="setFilter"
           :uniqueValues="uniqueValues"
         />

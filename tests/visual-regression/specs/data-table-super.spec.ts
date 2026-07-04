@@ -132,6 +132,11 @@ test('faceted select filter narrows every visible row to the selected category',
     const texts = await categoryCells.allTextContents();
     return texts.length > 0 && texts.every((t) => t === 'Hardware');
   }).toBe(true);
+  // REFLECT (phase-72 regression guard): the controlled <select> keeps showing the
+  // applied category rather than snapping back to "All". The #filter slot forwards
+  // `value` (columnFilterValue) so FilterSelect's :value reflects live filter state —
+  // without it the rows still narrow but the select resets to '' (the reported bug).
+  await expect.poll(async () => categorySelect.inputValue(), { timeout: 10_000 }).toBe('Hardware');
 });
 
 test('numeric range filter on Amount narrows every visible row into the range', async ({ page }) => {

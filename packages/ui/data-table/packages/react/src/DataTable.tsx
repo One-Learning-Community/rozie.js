@@ -42,7 +42,7 @@ interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
-interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: any; }
+interface FilterCtx { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any; }
 
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
@@ -3887,7 +3887,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {headerGroups[headerGroups.length - 1].headers.map((header) => <th key={header.id} className={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {!!(columnIsFilterable(header.column.id) && !hasFilterSlot()) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
               </span>}</span>}</th>)}
         </tr>}</thead>
 
@@ -3969,7 +3969,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           {headerGroups[headerGroups.length - 1].headers.map((header) => <th key={header.id} className={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {!!(columnIsFilterable(header.column.id) && !hasFilterSlot()) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
               </span>}</span>}</th>)}
         </tr>}</thead>
 

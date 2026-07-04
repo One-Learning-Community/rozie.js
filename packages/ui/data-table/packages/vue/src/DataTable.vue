@@ -58,7 +58,7 @@
       <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
+            <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
           </span></span></th>
     </tr></thead>
 
@@ -144,7 +144,7 @@
       <th v-for="header in headerGroups[headerGroups.length - 1].headers" :key="header.id" class="rdt-filter-cell" role="presentation" :style="pinStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents"></span><span v-else-if="isExpanderColumn(header.column.id)" style="display:contents"></span><span v-else style="display:contents">
           <input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
+            <slot name="filter" :columnId="header.column.id" :value="columnFilterValue(header.column.id)" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
           </span></span></th>
     </tr></thead>
 
@@ -332,7 +332,7 @@ defineSlots<{
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
-  filter(props: { columnId: any; uniqueValues: any; minMax: any; setFilter: any }): any;
+  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;
@@ -341,7 +341,7 @@ defineSlots<{
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
-  filter(props: { columnId: any; uniqueValues: any; minMax: any; setFilter: any }): any;
+  filter(props: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;

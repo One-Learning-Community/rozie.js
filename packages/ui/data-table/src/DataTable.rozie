@@ -1525,6 +1525,7 @@ $expose({
             <slot
               name="filter"
               :columnId="header.column.id"
+              :value="columnFilterValue(header.column.id)"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
               :setFilter="setColumnFilter"
@@ -1947,6 +1948,7 @@ $expose({
             <slot
               name="filter"
               :columnId="header.column.id"
+              :value="columnFilterValue(header.column.id)"
               :uniqueValues="getFacetedUniqueValues(header.column.id)"
               :minMax="getFacetedMinMaxValues(header.column.id)"
               :setFilter="setColumnFilter"

@@ -160,8 +160,15 @@ for (const target of TARGETS) {
     await expect(categoryFilter).toBeVisible({ timeout: 10_000 });
     await categoryFilter.selectOption('Hardware');
     await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(2);
+    // REFLECT (phase-72 regression guard): the controlled <select> must KEEP showing the
+    // applied value after the filter re-renders — not snap back to "All". This is the
+    // downward half of the contract: the #filter slot forwards `value` (columnFilterValue)
+    // so FilterSelect's :value reflects live column-filter state. Without it the filter
+    // still applies (rows narrow) but the select resets to '' — the reported bug.
+    await expect.poll(async () => categoryFilter.inputValue(), { timeout: 10_000 }).toBe('Hardware');
     await categoryFilter.selectOption('');
     await expect.poll(async () => bodyRows.count(), { timeout: 10_000 }).toBe(5);
+    await expect.poll(async () => categoryFilter.inputValue(), { timeout: 10_000 }).toBe('');
 
     // ── FilterNumberRange (price): BEST-EFFORT / non-gating. Setting the max bound to 50
     //    and firing change should drop the rows priced above 50 (Beta=90, Epsilon=70 → 3

@@ -435,11 +435,11 @@ $onMount(() => {
            FilterSelect (category/status — faceted) / FilterNumberRange (amount) /
            FilterText (everything else) drop-ins (mirrors
            DataTableFilterDropinsDemo.rozie's proven idiom). -->
-      <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
+      <template #filter="{ columnId, value, uniqueValues, minMax, setFilter }">
         <template r-match="columnId">
           <FilterSelect
             r-case="'category', 'status'"
-            :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues"
+            :columnId="columnId" :value="value" :setFilter="setFilter" :uniqueValues="uniqueValues"
           />
           <FilterNumberRange
             r-case="'amount'"
