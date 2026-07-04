@@ -24,6 +24,7 @@
  */
 import type { RozieAST } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
+import { stampMissingFilename } from '../diagnostics/stampFilename.js';
 import type { ReactiveDepGraph } from '../reactivity/ReactiveDepGraph.js';
 import type { ModifierRegistry } from '../modifiers/ModifierRegistry.js';
 import type { BindingsTable } from '../semantic/types.js';
@@ -169,6 +170,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // No content blocks at all → no IR (rare; parse() typically rejects sources
   // without a <rozie> envelope before this point).
   if (!ast.props && !ast.data && !ast.script && !ast.template && !ast.listeners && !ast.style) {
+    stampMissingFilename(diagnostics, opts.filename);
     return { ir: null, diagnostics, depGraph, bindings };
   }
 
@@ -430,5 +432,6 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Only-on-collision: a non-colliding state key is byte-identical (D-02).
   deconflictStateExposeCollision(ir);
 
+  stampMissingFilename(diagnostics, opts.filename);
   return { ir, diagnostics, depGraph, bindings };
 }

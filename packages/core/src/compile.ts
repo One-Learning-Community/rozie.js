@@ -45,6 +45,7 @@ import { parse } from './parse.js';
 import { lowerToIR } from './ir/lower.js';
 import { createDefaultRegistry } from './modifiers/registerBuiltins.js';
 import type { Diagnostic } from './diagnostics/Diagnostic.js';
+import { stampMissingFilename } from './diagnostics/stampFilename.js';
 import type { ModifierRegistry } from './modifiers/ModifierRegistry.js';
 import type { SourceMap } from 'magic-string';
 // Phase 07.2 Plan 01 Task 3 — wire IRCache + ProducerResolver + threadParamTypes
@@ -335,6 +336,11 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // lvalue per D-03), and ROZ945 (cross-package resolver miss) when needed.
   validateTwoWayBindings(ir, filename ?? '<anonymous>', cache, resolver, acc);
 
+  // Backfill `filename` on every pre-emit diagnostic that doesn't already
+  // carry one (threadParamTypes/validatePortalScopedStyle/validateTwoWayBindings
+  // push plain Diagnostic objects with no filename context of their own).
+  stampMissingFilename(acc, filename);
+
   // Gate on accumulated errors before emit. Both the deferred irDiags errors
   // (ROZ920 etc.) and any validator errors (ROZ947/949/950/951/945) block.
   // Emitters traverse the IR's AttributeBinding union and TypeScript
@@ -386,7 +392,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via defineProps<T>()
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       });
     }
     case 'react': {
@@ -400,7 +406,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         types,
         css: r.css,
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       };
       if (r.globalCss !== undefined) {
         result.globalCss = r.globalCss;
@@ -414,7 +420,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via $props<T>()
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       });
     }
     case 'angular': {
@@ -432,7 +438,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via @Input() decorators
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       });
     }
     case 'solid': {
@@ -442,7 +448,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         map: wantSourceMap ? r.map : null,
         types: '', // inline-typed via splitProps + TypeScript inference
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       });
     }
     case 'lit': {
@@ -452,7 +458,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         map: wantSourceMap ? r.map : null,
         types: '', // inline-typed via @property decorators + TypeScript inference
         componentDeps, // D-120
-        diagnostics: [...acc, ...r.diagnostics],
+        diagnostics: stampMissingFilename([...acc, ...r.diagnostics], filename),
       });
     }
     default: {

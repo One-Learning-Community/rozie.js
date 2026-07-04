@@ -81,6 +81,7 @@ import { emitAngular, type EmitAngularResult } from '../../targets/angular/src/e
 import { emitSolid, type EmitSolidResult } from '../../targets/solid/src/emitSolid.js';
 import { emitLit, type EmitLitResult } from '../../targets/lit/src/emitLit.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
+import { stampMissingFilename } from '../../core/src/diagnostics/stampFilename.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
 
@@ -1783,6 +1784,10 @@ function surfaceWarnings(
   filePath: string,
   source: string,
 ): void {
+  // Phase 2+ (semantic/IR/validator) diagnostics reach here with no filename
+  // of their own — backfill the host file being compiled so every 6-target
+  // pipeline surfaces an attributable warning (mirrors compile()'s stamping).
+  stampMissingFilename(warnings, filePath);
   for (const w of warnings) {
     if (typeof this?.warn === 'function') {
       const loc = formatLoc(w.loc, filePath, source);
