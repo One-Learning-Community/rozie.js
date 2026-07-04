@@ -2242,6 +2242,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   row.toggleSelected(!!(evt && evt.target && evt.target.checked));
 };
 
+  onHideColumn = (colId: any, evt: any) => {
+  if (evt && evt.stopPropagation) evt.stopPropagation();
+  if (!this.table) return;
+  const col = this.table.getColumn(colId);
+  if (col && col.toggleVisibility) col.toggleVisibility(false);
+};
+
+  hasAnyFilterableColumn = () => {
+  const cols = this.allLeafColumns();
+  for (const c of cols as any) {
+    if (c && this.columnIsFilterable(c.id)) return true;
+  }
+  return false;
+};
+
   selectAllBox: any = null;
 
   syncIndeterminate = () => {

@@ -1335,6 +1335,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
+  function onHideColumn(colId: any, evt: any) {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
+    if (!table.current) return;
+    const col = table.current.getColumn(colId);
+    if (col && col.toggleVisibility) col.toggleVisibility(false);
+  }
+  function hasAnyFilterableColumn() {
+    const cols = allLeafColumns();
+    for (const c of cols as any) {
+      if (c && columnIsFilterable(c.id)) return true;
+    }
+    return false;
+  }
   const syncIndeterminate = useCallback(() => {
     if (!__rozieRoot.current || !__rozieRoot.current!.querySelector) return;
     selectAllBox.current = __rozieRoot.current!.querySelector('.rdt-select-all');

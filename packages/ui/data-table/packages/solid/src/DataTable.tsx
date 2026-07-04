@@ -2220,6 +2220,29 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }
+
+  // ── Header ⋯ menu chrome (phase 72, D-06) ──────────────────────────────────────────
+  // onHideColumn: the ⋯ menu's "Hide column" item. Reuses the SAME columnVisibility write
+  // funnel as the existing colvis toggle (onToggleVisibility in columnChrome.rzts) — just
+  // forced to `false` rather than toggled, since hide is a one-directional action from the
+  // menu (the colvis panel is the re-show path). Event stopped HERE (not a `.stop`
+  // modifier) — same Angular @for-hoist hazard as onPinColumn/onResizeStart (F5).
+  function onHideColumn(colId: any, evt: any) {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
+    if (!table) return;
+    const col = table.getColumn(colId);
+    if (col && col.toggleVisibility) col.toggleVisibility(false);
+  }
+  // hasAnyFilterableColumn: gates the dedicated filter row (72-05) — true when at least one
+  // leaf column (excluding the select/expander chrome columns, already excluded by
+  // allLeafColumns) is filterable. Reactive via allLeafColumns()'s own tick() gate.
+  function hasAnyFilterableColumn() {
+    const cols = allLeafColumns();
+    for (const c of cols as any) {
+      if (c && columnIsFilterable(c.id)) return true;
+    }
+    return false;
+  }
   // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
   // binding only takes effect on Vue (which binds known DOM props); on
   // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
