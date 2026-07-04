@@ -253,10 +253,18 @@ private __rozieFirstUpdateDone = false;
 
   lastFocusedEl: any = null;
 
+  deepActiveElement = () => {
+  let el = document.activeElement;
+  while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+    el = el.shadowRoot.activeElement;
+  }
+  return el;
+};
+
   requestOpen = (next: any) => {
   if (this.open === next) return;
   if (next && this.trigger === 'click') {
-    this.lastFocusedEl = document.activeElement;
+    this.lastFocusedEl = this.deepActiveElement();
   }
   this._openControllable.write(next);
   this.dispatchEvent(new CustomEvent("change", {

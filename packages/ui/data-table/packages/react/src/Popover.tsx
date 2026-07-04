@@ -124,10 +124,17 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
 
+  function deepActiveElement() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  }
   function requestOpen(next: any) {
     if (open === next) return;
     if (next && props.trigger === 'click') {
-      lastFocusedEl.current = document.activeElement;
+      lastFocusedEl.current = deepActiveElement();
     }
     setOpen(next);
     props.onChange && props.onChange(next);
