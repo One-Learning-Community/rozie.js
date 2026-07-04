@@ -476,16 +476,87 @@ function isMeaningfulChild(node: TemplateNode): boolean {
 }
 
 /**
- * Emit a TemplateElement. Walks attributes, events; renders children.
+ * Emit a TemplateElement.
+ *
+ * Keyed-remount codegen Task 6 (Angular — the HARDEST target) — a
+ * component-level `:key="expr"` (NOT under r-for; that path owns `key` via
+ * `TemplateLoopIR.keyExpression` and never sets this field — see Task 1's
+ * Global Constraints) lowers to `remountKeyExpression`. Angular has NO
+ * first-class "recreate this view when a key changes" primitive. The idiom
+ * that produces a real destroy+recreate is a SINGLE-ELEMENT keyed `@for`:
+ *
+ *   @for (__rozieRemountKey of [<expr>]; track __rozieRemountKey) {
+ *     <rozie-child …/>
+ *   }
+ *
+ * The array `[<expr>]` always has exactly one element (so the child renders
+ * once and is NEVER hidden — no falsy-key guard is needed, unlike Solid's
+ * `<Show>`), and `track __rozieRemountKey` tracks by the KEY VALUE. When the
+ * key value is unchanged across change-detection the tracked identity is
+ * stable → no churn; when it changes, Angular tears down the old embedded
+ * view and builds a fresh one → the remount. The previously-forwarded inert
+ * `[key]` input (the child declares no `key` input) is stripped inside
+ * `emitElementInner` (guarded on this SAME field) so it's never also emitted.
+ *
+ * REF INTERACTION (the reason this task is hard): a component may carry BOTH
+ * `:key` AND `ref=` (e.g. DataTableSuperDemo — `:key="String($data.virtual)"`
+ * + `ref="tbl"`). `ref=` emits a `#tbl` template-ref var on the tag and a
+ * `tbl = viewChild<Child>('tbl')` SIGNAL query in the class. Wrapping the tag
+ * in `@for` moves `#tbl` into the block's embedded view. Angular's SIGNAL view
+ * queries (`viewChild()`) are DYNAMIC (never `{static:true}`) and reactively
+ * match template-reference variables inside `@if`/`@for` control-flow blocks
+ * — they re-resolve as the embedded view is created/destroyed. So the imperative
+ * `$refs.tbl.verb()` calls (which fire at user-interaction time, i.e. at rest
+ * after view init) still resolve to the current child instance. This does NOT
+ * regress Fix #3 (the imperative-handle repair).
  */
 function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  const markup = emitElementInner(origNode, ctx);
+
+  if (
+    (origNode.tagKind === 'component' || origNode.tagKind === 'self') &&
+    origNode.remountKeyExpression
+  ) {
+    const keyExpr = rewriteTemplateExpression(origNode.remountKeyExpression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
+    });
+    // Single-element keyed @for: `[expr]` always renders exactly one child;
+    // `track` by the key value recreates it only when the value changes.
+    return `@for (__rozieRemountKey of [${keyExpr}]; track __rozieRemountKey) {\n${markup}\n}`;
+  }
+
+  return markup;
+}
+
+/**
+ * Emit a TemplateElement's markup. Walks attributes, events; renders children.
+ */
+function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
   // BEFORE any listener emission runs; it's routed into the inline
   // controller's `KeynavHost.commit` by `emitScript.ts`, never as an Angular
   // `(keynavCommit)=` template binding (see `emitKeynav.ts`'s
   // `stripKeynavCommitEvent` doc comment). No-op (returns the SAME node) for
   // every element that isn't a keynav root.
-  const node = stripKeynavCommitEvent(origNode);
+  let node = stripKeynavCommitEvent(origNode);
+
+  // Keyed-remount codegen Task 6 — when this element carries a
+  // `remountKeyExpression` (a component-level `:key`, not an r-for loop key),
+  // the raw `key` binding is retained upstream in the IR (Task 1 — Vue still
+  // emits it as a working vnode key) but MUST NOT be forwarded here as an
+  // inert `[key]` input now that `emitElement` wraps the whole invocation in
+  // a keyed `@for`. Strip it before attrs are computed below.
+  if (node.remountKeyExpression) {
+    node = {
+      ...node,
+      attributes: node.attributes.filter(
+        (a) => !(a.kind === 'binding' && a.name === 'key'),
+      ),
+    };
+  }
 
   // Detect ngModel binding (either [(ngModel)] shorthand or [ngModel]/(ngModelChange)
   // long form) for FormsModule wiring. r-model on form-input always lowers to one of

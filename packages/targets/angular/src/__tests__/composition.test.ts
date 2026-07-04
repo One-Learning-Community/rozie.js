@@ -136,3 +136,101 @@ describe('emitAngular — Phase 06.2 P2 composition + recursion', () => {
     expect(code).toContain('aria-label="card"');
   });
 });
+
+// Keyed-remount codegen, Task 6 (Angular — HARDEST) — a `:key` on a composed
+// component now lowers to `TemplateElementIR.remountKeyExpression` (Task 1,
+// DONE). Angular USED TO forward it as an inert `[key]` property input (dead —
+// the child declares no `key` input, so it never remounted; see
+// data-table-super-crosstarget-findings.md §3.1). Fix: emit a single-element
+// keyed `@for (__rozieRemountKey of [<expr>]; track __rozieRemountKey) { … }`
+// so a key change tears down and rebuilds the embedded view (the remount), and
+// STOP forwarding the inert `[key]` input.
+describe('emitAngular — component :key structural-recreates via keyed @for (keyed-remount codegen Task 6)', () => {
+  it('component :key wraps the invocation in a single-element keyed @for and drops the inert [key] input', () => {
+    const src = `<rozie name="KeyedHost">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ v: 0 }</data>
+<template>
+  <div>
+    <MyComp :key="String($data.v)" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileAngular(src, 'KeyedHost.rozie');
+    // THE fix — a real single-element keyed @for around the component tag.
+    expect(code).toMatch(
+      /@for \(__rozieRemountKey of \[String\(v\(\)\)\]; track __rozieRemountKey\) \{\s*<rozie-my-comp><\/rozie-my-comp>\s*\}/,
+    );
+    // The inert `[key]` input is NO LONGER forwarded onto the component tag.
+    expect(code).not.toMatch(/\[key\]=/);
+  });
+
+  it('control: component WITHOUT :key emits no @for wrap and no [key] input', () => {
+    const src = `<rozie name="KeyedHostNoKey">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<template>
+  <div>
+    <MyComp />
+  </div>
+</template>
+</rozie>`;
+    const code = compileAngular(src, 'KeyedHostNoKey.rozie');
+    expect(code).not.toMatch(/@for/);
+    expect(code).not.toMatch(/__rozieRemountKey/);
+    expect(code).not.toMatch(/\[key\]=/);
+  });
+
+  it('control: r-for loop key on a component still emits @for with track <keyExpr> (unaffected by remountKeyExpression)', () => {
+    const src = `<rozie name="KeyedHostLoop">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ xs: [] }</data>
+<template>
+  <div>
+    <MyComp r-for="x in $data.xs" :key="x.id" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileAngular(src, 'KeyedHostLoop.rozie');
+    // The r-for loop still tracks by the user's :key expression, NOT by the
+    // remount-key sentinel — this task must not touch the loop path.
+    expect(code).toMatch(/@for \(x of xs\(\); track x\.id\)/);
+    expect(code).not.toMatch(/__rozieRemountKey/);
+    expect(code).not.toMatch(/\[key\]=/);
+  });
+
+  // CRITICAL interaction (the reason this task is hard): a component carrying
+  // BOTH `:key` AND `ref=` (the DataTableSuperDemo shape). Wrapping the tag in
+  // `@for` moves the `#tbl` template-ref var into the block's embedded view.
+  // Angular SIGNAL view queries (`viewChild()`) are dynamic and reactively
+  // match template-ref vars inside `@if`/`@for` blocks, so the emitted
+  // `tbl = viewChild<MyComp>('tbl')` query still resolves the child instance
+  // at rest, and the imperative `$refs.tbl.verb()` call (which fires at
+  // user-interaction time, after view-init) still works — Fix #3 is NOT
+  // regressed. We assert BOTH the keyed @for AND the intact viewChild query.
+  it('ref + :key interaction: keyed @for wraps the #tbl-bearing tag AND the viewChild query is intact', () => {
+    const src = `<rozie name="KeyedRefHost">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ v: 0 }</data>
+<refs>{ tbl: null }</refs>
+<template>
+  <div>
+    <MyComp :key="String($data.v)" ref="tbl" />
+  </div>
+  <button @click="$refs.tbl.reload()">go</button>
+</template>
+</rozie>`;
+    const code = compileAngular(src, 'KeyedRefHost.rozie');
+    // Keyed @for wraps the tag; the `#tbl` template-ref var rides along on the
+    // child tag INSIDE the block (moved with the component, as it must).
+    expect(code).toMatch(
+      /@for \(__rozieRemountKey of \[String\(v\(\)\)\]; track __rozieRemountKey\) \{\s*<rozie-my-comp #tbl><\/rozie-my-comp>\s*\}/,
+    );
+    // The signal viewChild query is UNCHANGED — it still targets 'tbl' and
+    // resolves the component instance (dynamic queries cross @for blocks).
+    expect(code).toContain("tbl = viewChild<MyComp>('tbl');");
+    // The imperative handle call (Fix #3) is preserved.
+    expect(code).toContain('tbl().reload()');
+    // No inert [key] input alongside the ref.
+    expect(code).not.toMatch(/\[key\]=/);
+  });
+});
