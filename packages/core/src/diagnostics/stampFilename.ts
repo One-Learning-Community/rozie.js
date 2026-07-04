@@ -10,11 +10,15 @@
  * pipeline) stamps the host filename in here once it is known.
  *
  * Never overwrites an already-set `filename` — a diagnostic that already
- * points at a more specific origin (e.g. a spliced `.rzts`/`.rzjs`
- * script-partial file) keeps that attribution. Byte-offset attribution for
- * partial-sourced diagnostics is a separate, not-yet-solved problem — see
- * inlineScriptPartials.ts R7; this pass only fills in the common host-file
- * case.
+ * points at a more specific origin keeps that attribution.
+ *
+ * Prefers a loc-carried partial origin over the host fallback: when
+ * `d.filename` is undefined, this sets `d.filename = d.loc.filename ?? filename`
+ * — i.e. if the offending Babel node's loc carries a partial's absolute path
+ * (inlineScriptPartials R7), that wins over the host `filename` argument even
+ * when a host filename IS available. Applies `d.loc.filename` even when the
+ * host `filename` arg is `undefined` (does not early-return before checking
+ * `d.loc.filename`) — only leaves `d.filename` unset when BOTH are absent.
  *
  * Mutates `diagnostics` in place and returns the same array for call-site
  * chaining convenience.
@@ -25,9 +29,10 @@ export function stampMissingFilename<T extends Diagnostic>(
   diagnostics: T[],
   filename: string | undefined,
 ): T[] {
-  if (filename === undefined) return diagnostics;
   for (const d of diagnostics) {
-    if (d.filename === undefined) d.filename = filename;
+    if (d.filename !== undefined) continue;
+    const resolved = d.loc.filename ?? filename;
+    if (resolved !== undefined) d.filename = resolved;
   }
   return diagnostics;
 }

@@ -36,6 +36,7 @@ import _traverse from '@babel/traverse';
 import type { RozieAST, SourceLoc } from '../../ast/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { BindingsTable, PropDeclEntry } from '../types.js';
 import { detectMagicAccess } from '../visitors.js';
 
@@ -47,7 +48,7 @@ const traverse: TraverseFn =
     : (_traverse as unknown as { default: TraverseFn }).default;
 
 function locFromNode(node: t.Node): SourceLoc {
-  return { start: node.start ?? 0, end: node.end ?? 0 };
+  return locFromBabel(node);
 }
 
 /**

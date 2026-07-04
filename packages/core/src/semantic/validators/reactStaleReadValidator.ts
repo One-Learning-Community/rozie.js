@@ -53,6 +53,7 @@ import type { RozieAST, SourceLoc } from '../../ast/types.js';
 import type { ScriptAST } from '../../ast/blocks/ScriptAST.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import { detectMagicAccess } from '../visitors.js';
 
 // Default-export interop: see refsPreMountValidator.ts for the same pattern.
@@ -68,7 +69,7 @@ interface ValidatorContext {
 
 /** `<script>` nodes carry absolute .rozie offsets — baseOffset 0. */
 function locFromNode(node: t.Node): SourceLoc {
-  return { start: node.start ?? 0, end: node.end ?? 0 };
+  return locFromBabel(node);
 }
 
 /**

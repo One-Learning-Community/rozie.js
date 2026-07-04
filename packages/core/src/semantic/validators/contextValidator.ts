@@ -32,10 +32,11 @@ import * as t from '@babel/types';
 import type { SourceLoc } from '../../ast/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { BindingsTable } from '../types.js';
 
 function locFromNode(node: t.Node): SourceLoc {
-  return { start: node.start ?? 0, end: node.end ?? 0 };
+  return locFromBabel(node);
 }
 
 /**

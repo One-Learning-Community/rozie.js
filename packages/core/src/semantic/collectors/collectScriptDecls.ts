@@ -24,6 +24,7 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { ScriptAST } from '../../ast/blocks/ScriptAST.js';
 import type {
   BindingsTable,
@@ -70,7 +71,7 @@ function extractComputedFromDeclarator(
   return {
     name: declarator.id.name,
     callback: cb,
-    sourceLoc: { start: declarator.start ?? 0, end: declarator.end ?? 0 },
+    sourceLoc: locFromBabel(declarator),
   };
 }
 
@@ -86,7 +87,7 @@ function extractLifecycleFromExpression(
   return {
     phase,
     callback,
-    sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
+    sourceLoc: locFromBabel(expr),
   };
 }
 
@@ -140,7 +141,7 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
     getter,
     callback,
     immediate,
-    sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
+    sourceLoc: locFromBabel(expr),
   };
 }
 
@@ -178,7 +179,7 @@ function extractExposeFromExpression(
     if (FORBIDDEN_EXPOSE_KEYS.has(name)) continue;
     entries.push({
       name,
-      sourceLoc: { start: prop.start ?? 0, end: prop.end ?? 0 },
+      sourceLoc: locFromBabel(prop),
     });
   }
   return entries;
@@ -206,7 +207,7 @@ function extractProvideFromExpression(
   return {
     key: keyArg.value,
     valueExpr: valueArg,
-    sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
+    sourceLoc: locFromBabel(expr),
   };
 }
 
@@ -231,7 +232,7 @@ function extractInjectFromDeclarator(
   const entry: InjectEntry = {
     key: keyArg.value,
     localBinding: declarator.id.name,
-    sourceLoc: { start: init.start ?? 0, end: init.end ?? 0 },
+    sourceLoc: locFromBabel(init),
   };
   if (fallbackArg && t.isExpression(fallbackArg)) {
     entry.fallbackExpr = fallbackArg;

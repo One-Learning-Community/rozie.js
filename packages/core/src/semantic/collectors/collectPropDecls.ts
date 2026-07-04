@@ -21,6 +21,7 @@
  * shapes; Plan 02-01 collectors are silent.
  */
 import * as t from '@babel/types';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { PropsAST } from '../../ast/blocks/PropsAST.js';
 import type { BindingsTable, PropDeclEntry } from '../types.js';
 
@@ -90,7 +91,7 @@ export function collectPropDecls(props: PropsAST, bindings: BindingsTable): void
       defaultExpression,
       docsExpression,
       isModel,
-      sourceLoc: { start: prop.start ?? 0, end: prop.end ?? 0 },
+      sourceLoc: locFromBabel(prop),
     };
     bindings.props.set(name, entry);
   }

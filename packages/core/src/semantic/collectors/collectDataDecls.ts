@@ -12,6 +12,7 @@
  * Per D-08 collected-not-thrown: this function NEVER throws.
  */
 import * as t from '@babel/types';
+import { locFromBabel } from '../../diagnostics/locFromBabel.js';
 import type { DataAST } from '../../ast/blocks/DataAST.js';
 import type { BindingsTable, DataDeclEntry } from '../types.js';
 
@@ -36,7 +37,7 @@ export function collectDataDecls(data: DataAST, bindings: BindingsTable): void {
       name,
       decl: prop,
       initializer: prop.value,
-      sourceLoc: { start: prop.start ?? 0, end: prop.end ?? 0 },
+      sourceLoc: locFromBabel(prop),
     };
     bindings.data.set(name, entry);
   }

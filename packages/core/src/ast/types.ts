@@ -6,6 +6,11 @@
 export interface SourceLoc {
   start: number;
   end: number;
+  /**
+   * Absolute origin path when the loc came from a spliced .rzts/.rzjs
+   * partial; absent for host-origin locs. See inlineScriptPartials R7.
+   */
+  filename?: string;
 }
 
 /**
