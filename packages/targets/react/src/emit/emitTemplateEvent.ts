@@ -261,6 +261,55 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
 }
 
 /**
+ * fix2 (review finding, commit 6bcde016 follow-up) — predict the JSX prop
+ * name a Listener will ACTUALLY render to, without fully emitting it.
+ *
+ * Used by the r-model/same-event collision check in emitTemplateNode.ts,
+ * which must decide whether an explicit `@event` listener collides with the
+ * model's own on-event attribute BEFORE calling `emitTemplateEvent`. The
+ * naive prediction — `eventNameToJsxProp(listener.event)` alone — ignores
+ * the modifier pipeline: a `.capture` modifier renders as a DISTINCT JSX
+ * prop (`onChangeCapture`, via the `desc.token === 'capture'` branch below),
+ * so `@change.capture` must NOT be treated as colliding with `onChange`.
+ *
+ * Mirrors the exact `for (const entry of listener.modifierPipeline)` walk
+ * below (registry lookup + `impl.react()` + `desc.kind === 'native' &&
+ * desc.token === 'capture'`) so this can never silently fall out of sync
+ * with what emission actually produces — it does not special-case the
+ * `capture` modifier by name; any current or future modifier whose
+ * `react()` hook returns a native `capture` descriptor is honored the same
+ * way real emission honors it.
+ */
+export function resolveJsxEventPropName(
+  listener: Listener,
+  registry: ModifierRegistry,
+): string {
+  let jsxName = eventNameToJsxProp(listener.event);
+  for (const entry of listener.modifierPipeline) {
+    let modifierName: string;
+    let modifierArgs: ModifierArg[];
+    if (entry.kind === 'listenerOption') {
+      modifierName = entry.option;
+      modifierArgs = [];
+    } else {
+      modifierName = entry.modifier;
+      modifierArgs = entry.args;
+    }
+    const impl = registry.get(modifierName);
+    if (!impl || !isEventModifier(impl) || !impl.react) continue;
+    const desc: ReactEmissionDescriptor = impl.react(modifierArgs, {
+      source: 'template-event',
+      event: listener.event,
+      sourceLoc: entry.sourceLoc,
+    });
+    if (desc.kind === 'native' && desc.token === 'capture') {
+      jsxName = jsxName + 'Capture';
+    }
+  }
+  return jsxName;
+}
+
+/**
  * Emit a single template @event listener as a JSX attribute.
  */
 export function emitTemplateEvent(

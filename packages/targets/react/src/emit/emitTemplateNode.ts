@@ -54,7 +54,7 @@ import {
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent, eventNameToJsxProp } from './emitTemplateEvent.js';
+import { emitTemplateEvent, resolveJsxEventPropName } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
@@ -367,10 +367,17 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
       const modelEventAttr = rModelResult.replacementAttributes.find(
         (a) => a.kind === 'binding' && a.name.startsWith(':on'),
       );
+      // fix2 (review finding) — compare against the listener's ACTUAL
+      // rendered JSX prop name (modifier-pipeline-aware, `.capture`-aware),
+      // NOT a prediction from the bare event name. `eventNameToJsxProp`
+      // alone would falsely collide `@change.capture` (renders as the
+      // DISTINCT prop `onChangeCapture`) with the model's `onChange`,
+      // silently dropping the capture-phase registration. See
+      // resolveJsxEventPropName's doc comment in emitTemplateEvent.ts.
       const collidingEvents =
         modelEventAttr && modelEventAttr.kind === 'binding'
           ? node.events.filter(
-              (ev) => eventNameToJsxProp(ev.event) === modelEventAttr.name.slice(1),
+              (ev) => resolveJsxEventPropName(ev, ctx.registry) === modelEventAttr.name.slice(1),
             )
           : [];
 
