@@ -3870,8 +3870,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
-              </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={({ toggle }) => (<>
-                  <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} onClick={toggle} data-rozie-s-d5dcab4c="">⋯</button>
+              </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={() => (<>
+                  <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)} children={<><div className={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
                   <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
                   <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
@@ -3951,8 +3951,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
-              </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={({ toggle }) => (<>
-                  <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} onClick={toggle} data-rozie-s-d5dcab4c="">⋯</button>
+              </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={() => (<>
+                  <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)} children={<><div className={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
                   <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
                   <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>

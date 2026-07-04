@@ -1,10 +1,9 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptConsumerStyles, createLitControllableProperty, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
-import { ref } from 'lit/directives/ref.js';
 import './Popover';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
@@ -1099,9 +1098,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             <span class="rdt-header-label" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
-          </span>`}<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" .offset=${4} data-rozie-s-d5dcab4c .anchor=${(scope: { toggle: unknown }) => html`
-              <button class="rdt-col-menu-trigger" type="button" aria-label=${rozieAttr('Column options for ' + this.headerLabel(header.column.id))} @click=${scope.toggle} data-rozie-s-d5dcab4c>⋯</button>
-            `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}><div class="rdt-col-menu" role="menu" data-rozie-s-d5dcab4c>
+          </span>`}<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" .offset=${4} data-rozie-s-d5dcab4c><button class="rdt-col-menu-trigger" type="button" aria-label=${rozieAttr('Column options for ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c slot="anchor">⋯</button><div class="rdt-col-menu" role="menu" data-rozie-s-d5dcab4c>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>Pin left</button>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>Pin right</button>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>Unpin</button>
@@ -1184,9 +1181,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             <span class="rdt-header-label" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
-          </span>`}<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" .offset=${4} data-rozie-s-d5dcab4c .anchor=${(scope: { toggle: unknown }) => html`
-              <button class="rdt-col-menu-trigger" type="button" aria-label=${rozieAttr('Column options for ' + this.headerLabel(header.column.id))} @click=${scope.toggle} data-rozie-s-d5dcab4c>⋯</button>
-            `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}><div class="rdt-col-menu" role="menu" data-rozie-s-d5dcab4c>
+          </span>`}<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" .offset=${4} data-rozie-s-d5dcab4c><button class="rdt-col-menu-trigger" type="button" aria-label=${rozieAttr('Column options for ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c slot="anchor">⋯</button><div class="rdt-col-menu" role="menu" data-rozie-s-d5dcab4c>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>Pin left</button>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>Pin right</button>
               <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>Unpin</button>

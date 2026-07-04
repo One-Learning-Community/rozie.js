@@ -221,8 +221,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
                 </span>
               </span>
-    }<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" [offset]="4"><ng-template #anchor let-toggle="toggle">
-                  <button type="button" class="rdt-col-menu-trigger" [attr.aria-label]="rozieAttr('Column options for ' + headerLabel(header.column.id))" (click)="toggle($event)">⋯</button>
+    }<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" [offset]="4"><ng-template #anchor>
+                  <button type="button" class="rdt-col-menu-trigger" [attr.aria-label]="rozieAttr('Column options for ' + headerLabel(header.column.id))">⋯</button>
                 </ng-template><ng-template #defaultSlot><div class="rdt-col-menu" role="menu">
                   <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
                   <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
@@ -394,8 +394,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
                 </span>
               </span>
-    }<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" [offset]="4"><ng-template #anchor let-toggle="toggle">
-                  <button type="button" class="rdt-col-menu-trigger" [attr.aria-label]="rozieAttr('Column options for ' + headerLabel(header.column.id))" (click)="toggle($event)">⋯</button>
+    }<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" [offset]="4"><ng-template #anchor>
+                  <button type="button" class="rdt-col-menu-trigger" [attr.aria-label]="rozieAttr('Column options for ' + headerLabel(header.column.id))">⋯</button>
                 </ng-template><ng-template #defaultSlot><div class="rdt-col-menu" role="menu">
                   <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
                   <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">Pin right</button>

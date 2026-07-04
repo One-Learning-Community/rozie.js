@@ -5277,8 +5277,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) ?? rozieDisplay(headerLabel(header.column.id))}
                 </span>
                 <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
-              </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={({ toggle }) => (<>
-                  <button type="button" aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} class={"rdt-col-menu-trigger"} onClick={toggle} data-rozie-s-d5dcab4c="">⋯</button>
+              </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
+                  <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)}><div class={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
                   <button type="button" role="menuitem" aria-pressed={columnPinSide(header.column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
                   <button type="button" role="menuitem" aria-pressed={columnPinSide(header.column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
@@ -5347,8 +5347,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) ?? rozieDisplay(headerLabel(header.column.id))}
                 </span>
                 <span class={"rdt-sort-ind"} aria-hidden="true" data-rozie-s-d5dcab4c="">{rozieDisplay(sortIndicator(header.column.id))}</span>
-              </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={({ toggle }) => (<>
-                  <button type="button" aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} class={"rdt-col-menu-trigger"} onClick={toggle} data-rozie-s-d5dcab4c="">⋯</button>
+              </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
+                  <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)}><div class={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
                   <button type="button" role="menuitem" aria-pressed={columnPinSide(header.column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
                   <button type="button" role="menuitem" aria-pressed={columnPinSide(header.column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>

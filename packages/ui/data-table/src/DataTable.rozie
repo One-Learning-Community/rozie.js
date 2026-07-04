@@ -1429,12 +1429,23 @@ $expose({
                relocate to the dedicated filter row (72-05); filtering is intentionally offline
                until that wave lands. -->
           <Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4">
-            <template #anchor="{ toggle }">
+            <!-- No @click="toggle" here (72-06 fix): trigger="click" already wires a
+                 click handler onto Popover's OWN .rozie-popover-anchor wrapper div, which
+                 is a TRUE DOM ancestor of this button (both the property-fill-rendered
+                 anchor content on Lit AND the plain-slotted anchor on the other 5 targets).
+                 A click on this button bubbles to that wrapper and toggles once already —
+                 mirrors the working PopoverBehaviorDemo precedent (plain anchor button, no
+                 handler of its own). Redundantly ALSO calling the destructured `toggle`
+                 here double-fires per click: on synchronous-reactivity targets (Lit
+                 verified; Vue/Svelte/Solid/Angular reasoned-identical) the two toggles
+                 cancel out and the menu never opens; React's batched state updates
+                 happened to mask the cancellation, which is why the 72-03 happy-dom
+                 probe (react-only) didn't catch it. -->
+            <template #anchor>
               <button
                 type="button"
                 class="rdt-col-menu-trigger"
                 :aria-label="'Column options for ' + headerLabel(header.column.id)"
-                @click="toggle"
               >⋯</button>
             </template>
             <div class="rdt-col-menu" role="menu">
@@ -1844,12 +1855,23 @@ $expose({
                relocate to the dedicated filter row (72-05); filtering is intentionally offline
                until that wave lands. Identical composition to the virtual-branch twin above. -->
           <Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4">
-            <template #anchor="{ toggle }">
+            <!-- No @click="toggle" here (72-06 fix): trigger="click" already wires a
+                 click handler onto Popover's OWN .rozie-popover-anchor wrapper div, which
+                 is a TRUE DOM ancestor of this button (both the property-fill-rendered
+                 anchor content on Lit AND the plain-slotted anchor on the other 5 targets).
+                 A click on this button bubbles to that wrapper and toggles once already —
+                 mirrors the working PopoverBehaviorDemo precedent (plain anchor button, no
+                 handler of its own). Redundantly ALSO calling the destructured `toggle`
+                 here double-fires per click: on synchronous-reactivity targets (Lit
+                 verified; Vue/Svelte/Solid/Angular reasoned-identical) the two toggles
+                 cancel out and the menu never opens; React's batched state updates
+                 happened to mask the cancellation, which is why the 72-03 happy-dom
+                 probe (react-only) didn't catch it. -->
+            <template #anchor>
               <button
                 type="button"
                 class="rdt-col-menu-trigger"
                 :aria-label="'Column options for ' + headerLabel(header.column.id)"
-                @click="toggle"
               >⋯</button>
             </template>
             <div class="rdt-col-menu" role="menu">

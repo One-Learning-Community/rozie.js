@@ -41,8 +41,8 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor="{ toggle }">
-              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)" @click="toggle">⋯</button>
+          </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor>
+              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)">⋯</button>
             </template><div class="rdt-col-menu" role="menu">
               <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
               <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
@@ -126,8 +126,8 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor="{ toggle }">
-              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)" @click="toggle">⋯</button>
+          </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor>
+              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)">⋯</button>
             </template><div class="rdt-col-menu" role="menu">
               <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
               <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
