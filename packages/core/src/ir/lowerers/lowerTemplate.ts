@@ -1427,27 +1427,29 @@ function lowerBareElement(
 
   // Keyed-remount codegen Task 1 — a `key` binding on a COMPOSED CHILD
   // (`tagKind === 'component' | 'self'`) that was NOT already consumed as the
-  // enclosing r-for's LOOP key is a component remount key: move its
-  // expression to `remountKeyExpression` and remove the raw `key` binding
-  // from `attributes` so no per-target emitter can mistake it for a normal
-  // prop. Plain DOM elements (`tagKind === 'html'`) and any element whose
-  // `:key` the r-for path already consumed (`keyConsumedByLoop`) are left
-  // untouched.
+  // enclosing r-for's LOOP key is a component remount key: COPY its
+  // expression to `remountKeyExpression`. Fix (post-ship Critical review) —
+  // the raw `key` binding is intentionally left in `.attributes` untouched:
+  // the Vue emitter has no `key`-drop filter for bare (non-r-for) component
+  // tags and relies on the raw `:key` binding surviving to `.attributes` to
+  // emit a real vnode-key remount (`<MyComp :key="foo">`) — stripping it here
+  // silently deleted that working Vue idiom with no Vue task to re-add it.
+  // This makes the marker truly additive: every per-target emitter task that
+  // takes over remounting for its OWN target is responsible for dropping the
+  // raw `key` binding at its OWN emitter seam, not here in shared lowering.
+  // Plain DOM elements (`tagKind === 'html'`) and any element whose `:key`
+  // the r-for path already consumed (`keyConsumedByLoop`) are left untouched
+  // as before.
   let remountKeyExpression: t.Expression | undefined;
   if (
     !keyConsumedByLoop &&
     (annotation.tagKind === 'component' || annotation.tagKind === 'self')
   ) {
-    const keyIdx = attributes.findIndex(
+    const keyAttr = attributes.find(
       (a) => a.kind === 'binding' && a.name === 'key',
-    );
-    if (keyIdx !== -1) {
-      const keyAttr = attributes[keyIdx] as Extract<
-        AttributeBinding,
-        { kind: 'binding' }
-      >;
+    ) as Extract<AttributeBinding, { kind: 'binding' }> | undefined;
+    if (keyAttr) {
       remountKeyExpression = keyAttr.expression;
-      attributes.splice(keyIdx, 1);
     }
   }
 
