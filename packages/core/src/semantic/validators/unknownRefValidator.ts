@@ -79,11 +79,20 @@ function locFromNode(node: t.Node): SourceLoc {
 /**
  * Shift Babel-relative offsets (computed against the parsed expression
  * fragment) into absolute offsets in the .rozie file by adding `baseOffset`.
+ *
+ * Quick plan 260703-vk4: delegates to `locFromBabel` so a script-origin node
+ * (baseOffset 0 — traversed directly off `script.program`, which may be a
+ * spliced `.rzts`/`.rzjs` partial per inlineScriptPartials R7) still carries
+ * `loc.filename`. Re-parsed template-attribute/listener fragment expressions
+ * (non-zero baseOffset) are parsed with no `sourceFilename`, so their nodes
+ * never carry a `loc.filename` — this is a no-op for that path.
  */
 function locFromNodeOffset(node: t.Node, baseOffset: number): SourceLoc {
+  const base = locFromBabel(node);
   return {
-    start: (node.start ?? 0) + baseOffset,
-    end: (node.end ?? 0) + baseOffset,
+    start: base.start + baseOffset,
+    end: base.end + baseOffset,
+    ...(base.filename !== undefined ? { filename: base.filename } : {}),
   };
 }
 
