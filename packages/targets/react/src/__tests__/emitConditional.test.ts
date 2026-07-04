@@ -42,9 +42,29 @@ describe('emitConditional — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    // The test is wrapped in parens for safe operator-precedence composition
-    // (e.g. `(A || B) && body` rather than `A || B && body`).
-    expect(jsx).toMatch(/\{\(props\.open\) && /);
+    // The test is boolean-coerced with `!!(...)` (which also supplies the
+    // operator-precedence parens): `!!(A || B) && body`, never `A || B && body`.
+    expect(jsx).toMatch(/\{!!\(props\.open\) && /);
+  });
+
+  it('Test 4b: single r-if on a numeric expr → `!!(...)` so `{0 && …}` never paints a literal 0', () => {
+    // React renders a falsy-but-non-boolean short-circuit result LITERALLY, so
+    // `r-if="list.length"` (0 when empty) would paint a stray "0". The `!!` coercion
+    // collapses it to `false`, which React drops. Regression guard for the GroupBar bug.
+    const ir = lowerInline(`
+<rozie name="X">
+<props>{ list: { type: Array, default: () => [] } }</props>
+<template>
+<div>
+  <button r-if="$props.list.length">Clear</button>
+</div>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    expect(jsx).toContain('!!(props.list.length) && ');
+    // The raw `(props.list.length) && ` (no coercion) must NOT appear.
+    expect(jsx).not.toMatch(/[^!]\(props\.list\.length\) && /);
   });
 
   it('Test 5: r-if + r-else → ternary', () => {

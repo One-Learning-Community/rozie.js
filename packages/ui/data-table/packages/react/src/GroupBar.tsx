@@ -73,7 +73,7 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
       </span>
 
       
-      {(props.grouping.length) && <button type="button" className={"rdt-group-clear"} onClick={($event) => { clearAll(); }} data-rozie-s-546c469a="">Clear</button>}</div>
+      {!!(props.grouping.length) && <button type="button" className={"rdt-group-clear"} onClick={($event) => { clearAll(); }} data-rozie-s-546c469a="">Clear</button>}</div>
     </>
   );
 }

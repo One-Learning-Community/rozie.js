@@ -1,14 +1,14 @@
 <>
-{(open) && <div className={"modal-backdrop"} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }}>
+{!!(open) && <div className={"modal-backdrop"} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }}>
   <div ref={dialogEl} className={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieAttr(props.title || undefined)} tabIndex={-1}>
-    {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header>
+    {!!(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header>
       {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2>{props.title}</h2>}
       <button className={"close-btn"} aria-label="Close" onClick={close}>×</button>
     </header>}<div className={"modal-body"}>
       {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
     </div>
 
-    {((props.renderFooter ?? props.slots?.['footer'])) && <footer>
+    {!!((props.renderFooter ?? props.slots?.['footer'])) && <footer>
       {(props.renderFooter ?? props.slots?.['footer'])?.({ close })}
     </footer>}</div>
 </div>}</>

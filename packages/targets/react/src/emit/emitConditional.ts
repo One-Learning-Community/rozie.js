@@ -52,13 +52,18 @@ export function emitConditional(
     out = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
   } else {
     // No trailing r-else — short-circuit form `cond && body` for the last branch.
-    // Wrap the test in parens so any inner `||` / `??` / lower-precedence
-    // operators don't bind tighter than the trailing `&&` (e.g. `A || B && C`
-    // parses as `A || (B && C)`, not `(A || B) && C` — the latter is what we
-    // need for r-if to gate the body).
+    // Boolean-coerce the test with `!!(...)`: React renders a falsy-but-non-boolean
+    // short-circuit result LITERALLY — `{0 && <x>}` paints "0", `{'' && <x>}` paints
+    // nothing but is still fragile, `{NaN && <x>}` paints "NaN". A bare `r-if="list.length"`
+    // (0 when empty) is the common trap. `!!(...)` collapses any falsy value to `false`
+    // (which React drops) while keeping truthy values gating the body. The other five
+    // targets don't need this — only React's `cond && jsx` idiom leaks the raw value.
+    // (The ternary branches below are already safe: a falsy test routes to `: alternate`.)
+    // The `!!(...)` also supplies the precedence parens the old `(test)` form provided,
+    // so inner `||` / `??` still can't bind tighter than the trailing `&&`.
     const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir);
     const bodyCode = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
-    out = `(${testCode}) && ${bodyCode}`;
+    out = `!!(${testCode}) && ${bodyCode}`;
   }
 
   // Build right-to-left for any preceding branches.
