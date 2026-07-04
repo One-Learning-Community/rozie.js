@@ -23,6 +23,12 @@ import { buildMiddleware } from './internal/middleware';
 //   `const X = $refs.X` init shape).
 //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
 //   onMount→onCleanup split (teardown is a separate closure) can still see it.
+//   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
+//   `trigger="click"` popover opened (natively the clicked trigger element itself,
+//   since a mousedown focuses a native `<button>` before its `click` fires) —
+//   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+//   Same null-let convention as the others: read/written only in handlers, `any`
+//   via typeNeutralize.
 
 __rozieInjectStyle('Popover-c6cf02ea', `.rozie-popover[data-rozie-s-c6cf02ea] {
   display: contents;
@@ -173,17 +179,42 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   //   `const X = $refs.X` init shape).
   //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
   //   onMount→onCleanup split (teardown is a separate closure) can still see it.
+  //   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
+  //   `trigger="click"` popover opened (natively the clicked trigger element itself,
+  //   since a mousedown focuses a native `<button>` before its `click` fires) —
+  //   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+  //   Same null-let convention as the others: read/written only in handlers, `any`
+  //   via typeNeutralize.
   let anchorNode: any = null;
   let floatingNode: any = null;
   let arrowNode: any = null;
   let stopAutoUpdate: any = null;
+  let lastFocusedEl: any = null;
 
   // Drive the two-way model + emit in one place. Named `requestOpen` (NOT `setOpen`)
   // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
+  //
+  // Focus-return (phase 72-06b, D-08 a11y finding): scoped to `trigger === 'click'`
+  // only — click-triggered popovers are genuinely interactive (a real dialog the
+  // user tabs/clicks into), so restoring focus to the trigger on dismissal matches
+  // standard disclosure-widget a11y practice. Deliberately NOT applied to
+  // `hover`/`focus` triggers (tooltip-flavored, see `isTooltip()`): those close on
+  // pointerleave/blur constantly during normal mouse/keyboard traversal, and
+  // forcing a focus() call on every such close would fight the user's own focus
+  // movement rather than restore anything lost.
   function requestOpen(next: any) {
     if (open() === next) return;
+    if (next && local.trigger === 'click') {
+      lastFocusedEl = document.activeElement;
+    }
     setOpen(next);
     _props.onChange?.(next);
+    if (!next && local.trigger === 'click' && lastFocusedEl && lastFocusedEl.isConnected && typeof lastFocusedEl.focus === 'function') {
+      lastFocusedEl.focus();
+    }
+    if (!next) {
+      lastFocusedEl = null;
+    }
   }
 
   // Apply the resolved x/y (and arrow offset, when present) onto the floating element.

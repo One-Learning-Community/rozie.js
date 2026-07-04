@@ -24,6 +24,12 @@ import { buildMiddleware } from './internal/middleware';
 //   `const X = $refs.X` init shape).
 //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
 //   onMount→onCleanup split (teardown is a separate closure) can still see it.
+//   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
+//   `trigger="click"` popover opened (natively the clicked trigger element itself,
+//   since a mousedown focuses a native `<button>` before its `click` fires) —
+//   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+//   Same null-let convention as the others: read/written only in handlers, `any`
+//   via typeNeutralize.
 
 interface RozieAnchorSlotCtx {
   open: unknown;
@@ -245,14 +251,25 @@ private __rozieFirstUpdateDone = false;
 
   stopAutoUpdate: any = null;
 
+  lastFocusedEl: any = null;
+
   requestOpen = (next: any) => {
   if (this.open === next) return;
+  if (next && this.trigger === 'click') {
+    this.lastFocusedEl = document.activeElement;
+  }
   this._openControllable.write(next);
   this.dispatchEvent(new CustomEvent("change", {
     detail: next,
     bubbles: true,
     composed: true
   }));
+  if (!next && this.trigger === 'click' && this.lastFocusedEl && this.lastFocusedEl.isConnected && typeof this.lastFocusedEl.focus === 'function') {
+    this.lastFocusedEl.focus();
+  }
+  if (!next) {
+    this.lastFocusedEl = null;
+  }
 };
 
   applyPosition = (x: any, y: any, middlewareData: any) => {
