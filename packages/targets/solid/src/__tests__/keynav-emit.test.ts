@@ -129,9 +129,13 @@ describe('Solid r-keynav emitter (Plan 71-07 Task 2)', () => {
     const { code } = emitSolid(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toContain('data-rozie-keynav-item={');
     // The index alias is synthesized (author wrote a bare r-for with no
-    // index) — SPEC §5: "item index comes from the r-for context". Solid's
-    // <For> index is an Accessor, so every use appends `()`.
-    expect(code).toMatch(/<For each=\{local\.items\}>\{\(it, __rozieKeynavIndex\) =>/);
+    // index) — SPEC §5: "item index comes from the r-for context". The loop
+    // carries `:key="it.id"`, so it emits <Key> (260704-mf3). The `by` key fn
+    // receives the RAW item (`it.id`, no accessor call); the CHILDREN callback
+    // yields Accessors, so body uses of `it` / the synthesized index append `()`.
+    expect(code).toMatch(
+      /<Key each=\{local\.items as readonly any\[\]\} by=\{\(it\) => it\.id\}>\{\(it, __rozieKeynavIndex\) =>/,
+    );
     expect(code).toContain('data-rozie-keynav-item={__rozieKeynavIndex()}');
   });
 

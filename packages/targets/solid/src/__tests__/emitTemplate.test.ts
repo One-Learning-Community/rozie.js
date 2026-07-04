@@ -61,13 +61,15 @@ describe('<template r-for> multi-root loop body — Phase 50', () => {
 </rozie>
 `;
 
-  it('wraps a 2-root loop body in a JSX fragment <>…</> inside <For> (no DOM wrapper)', () => {
+  it('wraps a 2-root loop body in a JSX fragment <>…</> inside <Key> (keyed, no DOM wrapper)', () => {
     const ir = lowerInline(MULTI, 'ForSolid');
     const { code } = emitSolid(ir, { filename: 'ForSolid.rozie', source: MULTI });
-    expect(code).toContain('<For each={');
+    // The loop carries `:key="row.id"` → keyed <Key> reconciliation (260704-mf3).
+    expect(code).toContain('<Key each={');
+    expect(code).toContain('by={(row) => row.id}');
     // Per-iteration wrapper-free fragment wrapping both sibling roots.
     expect(code).toMatch(/\{\(row\) => <>/);
-    expect(code).toContain('</>}</For>');
+    expect(code).toContain('</>}</Key>');
     // Solid emits class bindings in JSX-expression form `class={"data"}`.
     expect(code).toContain('class={"data"}');
     expect(code).toContain('class={"detail"}');

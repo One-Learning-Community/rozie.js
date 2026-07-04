@@ -23,6 +23,13 @@ export interface EmitTemplateResult {
    * These are merged into the component body BEFORE the return statement.
    */
   scriptInjections: string[];
+  /**
+   * Quick task 260704-mf3 — true when the walk emitted at least one keyed
+   * `r-for` as `<Key>` (from `@solid-primitives/keyed`). emitSolid reads this
+   * to inject the matching import as a bespoke shell part (Key is not a
+   * solid-js export, so it can't ride the SolidImportCollector).
+   */
+  needsKeyedImport: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -44,11 +51,16 @@ export function emitTemplate(
   const diagnostics: Diagnostic[] = [];
 
   if (ir.template === null) {
-    return { jsx: 'null', scriptInjections: [], diagnostics: [] };
+    return { jsx: 'null', scriptInjections: [], needsKeyedImport: false, diagnostics: [] };
   }
 
   const scriptInjections: string[] = [];
   const injectionCounter = { next: 0 };
+  // Quick task 260704-mf3 — shared mutable flag set by descendant emitLoop
+  // calls when they emit a keyed loop as `<Key>`. Object (not a bare boolean)
+  // so the reference survives the spread-copy of every child ctx (mirrors how
+  // `injectionCounter` / `scriptInjections` are threaded).
+  const keyedImport = { needed: false };
 
   // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
   // emitKeynav.ts's module doc comment). `null` for the overwhelming
@@ -64,6 +76,7 @@ export function emitTemplate(
     diagnostics,
     scriptInjections,
     injectionCounter,
+    keyedImport,
     keynav,
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
   };
@@ -77,5 +90,5 @@ export function emitTemplate(
     scriptInjections.push(...buildKeynavScriptInjections(keynav, ir, collectors));
   }
 
-  return { jsx, scriptInjections, diagnostics };
+  return { jsx, scriptInjections, needsKeyedImport: keyedImport.needed, diagnostics };
 }

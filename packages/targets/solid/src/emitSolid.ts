@@ -277,11 +277,20 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     ? "import { render } from 'solid-js/web';\n"
     : '';
 
+  // Quick task 260704-mf3 — inject `Key` from @solid-primitives/keyed ONLY when
+  // the template emitted a keyed `r-for` as `<Key>` (byte-identical import lines
+  // otherwise). `Key` is not a solid-js export, so it rides its own shell part
+  // rather than the SolidImportCollector — mirrors `portalImport`.
+  const keyedImport = templateResult.needsKeyedImport
+    ? "import { Key } from '@solid-primitives/keyed';\n"
+    : undefined;
+
   const shellParts = {
     componentName: ir.name,
     propsInterface,
     solidImports: solidImportsStr,
     portalImport,
+    keyedImport,
     runtimeImports: runtimeImports.render(),
     userImports: scriptResult.userImports,
     hoistedTypeDecls: scriptResult.hoistedTypeDecls,

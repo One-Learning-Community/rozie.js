@@ -29,6 +29,13 @@ export interface SolidShellParts {
    * line. Empty/undefined when no portal slots.
    */
   portalImport?: string;
+  /**
+   * Quick task 260704-mf3 — `import { Key } from '@solid-primitives/keyed';\n`
+   * line. Present only when the template emitted a keyed `r-for` as `<Key>`;
+   * undefined/empty otherwise (byte-identical imports for keyless components).
+   * Sits adjacent to `portalImport` in the module import block.
+   */
+  keyedImport?: string;
   /** `import { createControllableSignal, ... } from '@rozie/runtime-solid';\n` (or empty) */
   runtimeImports: string;
   /**
@@ -195,6 +202,8 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   if (parts.solidImports.length > 0) moduleParts.push(parts.solidImports);
   if (parts.portalImport && parts.portalImport.length > 0)
     moduleParts.push(parts.portalImport);
+  if (parts.keyedImport && parts.keyedImport.length > 0)
+    moduleParts.push(parts.keyedImport);
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   // Phase 06.2 P2 (D-118): user-component imports.
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
@@ -208,6 +217,7 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   // Blank line between imports and interface (only if any imports).
   if (
     parts.solidImports.length > 0 ||
+    (parts.keyedImport !== undefined && parts.keyedImport.length > 0) ||
     parts.runtimeImports.length > 0 ||
     (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
     (parts.userImports !== undefined && parts.userImports.length > 0)
@@ -379,6 +389,7 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   const ms = new MagicString('');
 
   if (parts.solidImports.length > 0) ms.append(parts.solidImports);
+  if (parts.keyedImport && parts.keyedImport.length > 0) ms.append(parts.keyedImport);
   if (parts.runtimeImports.length > 0) ms.append(parts.runtimeImports);
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     ms.append(parts.componentImportsBlock);
@@ -390,6 +401,7 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
 
   if (
     parts.solidImports.length > 0 ||
+    (parts.keyedImport !== undefined && parts.keyedImport.length > 0) ||
     parts.runtimeImports.length > 0 ||
     (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
     (parts.userImports !== undefined && parts.userImports.length > 0)

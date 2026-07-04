@@ -56,7 +56,7 @@ describe('Solid keyed r-for → <Key> (260704-mf3)', () => {
     const { code } = emitSolid(ir, { filename: 'KeyedLoop.rozie', source: KEYED });
     // <Key> replaces <For> for the keyed loop.
     expect(code).toContain('<Key each={');
-    expect(code).toContain('by={(item) => item().id}');
+    expect(code).toContain('by={(item) => item.id}');
     // Body item ref is invoked as an accessor (Key yields accessors).
     expect(code).toContain('item().label');
     // The keyless <For> element must NOT appear for this keyed source.
@@ -80,7 +80,7 @@ describe('Solid keyed r-for → <Key> (260704-mf3)', () => {
   it('Test 3 — index alias under <Key> is routed through invokeAccessors (i())', () => {
     const ir = lowerInline(KEYED_INDEX);
     const { code } = emitSolid(ir, { filename: 'KeyedIndexLoop.rozie', source: KEYED_INDEX });
-    expect(code).toContain('by={(item) => item().id}');
+    expect(code).toContain('by={(item) => item.id}');
     expect(code).toContain('item().label');
     // Key passes index as an ACCESSOR too — the author alias `i` must invoke.
     expect(code).toContain('i()');

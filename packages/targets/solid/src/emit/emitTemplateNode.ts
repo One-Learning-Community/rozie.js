@@ -126,6 +126,19 @@ export interface EmitNodeCtx {
    * appends `()` at each use site.
    */
   keynavItemIndexAlias?: string | null;
+  /**
+   * Quick task 260704-mf3 — shared mutable flag threaded from `emitTemplate`
+   * (created there beside `scriptInjections`/`injectionCounter`, mutated by
+   * descendant `emitLoop` calls). A keyed `r-for` (`node.keyExpression !==
+   * null`) sets `needed = true`, which `emitSolid.ts` reads back through
+   * `EmitTemplateResult.needsKeyedImport` to inject
+   * `import { Key } from '@solid-primitives/keyed';`. An OBJECT (not a bare
+   * boolean) because child ctxs are spread-copied — the object reference is
+   * shared, a primitive would not propagate up. Optional/back-compat: any
+   * caller that doesn't thread it emits keyless loops only (the `<Key>` branch
+   * guards on `ctx.keyedImport`).
+   */
+  keyedImport?: { needed: boolean };
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -155,23 +168,85 @@ function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
 }
 
 /**
- * Emit a TemplateLoop as `<For each={items()}>{(item, index) => ...}</For>`.
+ * Quick task 260704-mf3 — true when `expr`'s AST contains an `Identifier`
+ * named `name` (a free reference, e.g. the loop index alias inside a `:key`
+ * expression). Duck-typed walk mirroring `tempNameIsReferenced` — no
+ * @babel/types import needed; the IR `Expression` nodes carry `type`/`name`.
+ */
+function expressionReferencesIdentifier(expr: unknown, name: string): boolean {
+  const walk = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(walk);
+    if (value === null || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    if (obj['type'] === 'Identifier' && obj['name'] === name) return true;
+    return Object.values(obj).some(walk);
+  };
+  return walk(expr);
+}
+
+/**
+ * Emit a TemplateLoop.
  *
- * Solid's <For> component uses referential identity for keying by default.
- * The `:key` attribute from the source is informational only — <For> does NOT
- * accept a `key` prop (it uses structural identity internally). We document
- * this in a comment but do NOT emit key= on the <For> element.
+ * KEYLESS (`node.keyExpression === null`) — `<For each={items()}>{(item,
+ * index) => ...}</For>`. Solid's <For> reconciles by referential identity;
+ * under <For> the item alias is a RAW value (never an accessor).
  *
- * NOTE: Solid also has <Index> for keying by index; we always use <For> for
- * r-for because r-for semantics match <For> (item-identity tracking).
+ * KEYED (`node.keyExpression !== null`) — quick task 260704-mf3. The author
+ * wrote `:key="expr"`, so honor it via `@solid-primitives/keyed`'s `<Key>`:
+ * `<Key each={items()} by={(item) => <keyExpr>}>{(item, index) => ...}</Key>`.
+ * <Key> reconciles by the `by` key (NOT array-item reference), preserving
+ * composed-child state (e.g. an open Popover menu) when the iterable returns
+ * fresh wrapper objects with stable keys (table-core's `getHeaderGroups()`).
+ * Under <Key> BOTH the item and index callback params are Solid Accessors, so
+ * every body reference to either is routed through `invokeAccessors` to get
+ * `()` appended (`item().label`, `i()`). The `by` key function's param is the
+ * item accessor too, so the key expr is rewritten with the item alias in
+ * `invokeAccessors` (`item().id`).
+ *
+ * Angular (`track`), Svelte (`{#each ...(key)}`), and Lit already honor
+ * `keyExpression`; this closes the Solid gap. Keyless output is byte-identical
+ * to HEAD (the keyed branch is fully separate).
  */
 function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
-  ctx.collectors.solid.add('For');
+  // Quick task 260704-mf3 — `<Key>` reconciles by a `by={(item) => key}`
+  // function whose ONLY parameter is the item accessor; Solid's `<Key>` does
+  // NOT pass the index into `by`. So an author who keyed by the loop's index
+  // alias (`:key="index"`) cannot be honored via `<Key>` — the key expression
+  // would reference an out-of-scope identifier. Keying by index also defeats
+  // the purpose of `<Key>` (stable-id reconciliation), so we fall back to the
+  // byte-identical `<For>` path (status quo: the index-key was already dropped
+  // for Solid) rather than emit broken output. Only the AUTHOR index alias is
+  // checked — a synthesized keynav index never appears in an author `:key`.
+  const keyDependsOnIndex =
+    node.keyExpression !== null &&
+    node.indexAlias !== null &&
+    expressionReferencesIdentifier(node.keyExpression, node.indexAlias);
+  const keyed = node.keyExpression !== null && !keyDependsOnIndex;
 
-  // The iterable expression is OUTSIDE the loop scope — no accessor wrapping
-  // needed here even if a parent loop is active (Solid's <For> accessor names
-  // shadow parent bindings inside the inner callback only).
-  const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
+  if (!keyed) {
+    ctx.collectors.solid.add('For');
+  } else if (ctx.keyedImport) {
+    // Signal emitSolid to inject `import { Key } from '@solid-primitives/keyed'`.
+    // `Key` is NOT a solid-js export, so it does NOT go through
+    // `collectors.solid.add` (the SolidImportCollector allowlists solid-js
+    // names only) — it flows via this shared-object flag + a bespoke shell part.
+    ctx.keyedImport.needed = true;
+  }
+
+  // The iterable expression is OUTSIDE the CURRENT loop's scope (the current
+  // item alias is not yet bound), so it never invokes THIS loop's own item.
+  // But it DOES live inside any PARENT loop's body scope — and under a keyed
+  // parent (`<Key>`, 260704-mf3) the parent's item alias is an Accessor. A
+  // nested loop whose iterable reads the outer item (`each={group.members}`)
+  // must therefore invoke it: `each={group().members}`. Threading the parent
+  // scope's `ctx.invokeAccessors` (which excludes the current item — that is
+  // only added to `childCtx` below) does exactly this, and is a no-op for a
+  // top-level loop or a keyless parent (the outer item isn't an accessor
+  // there), so keyless output stays byte-identical.
+  const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+    scopeAccessorParams: ctx.scopeAccessorParams,
+  });
 
   // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
   // context". An author who wrote a bare `r-for="it in items"` (no `(it,
@@ -181,6 +256,8 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // than requiring the author to declare an index alias just for keynav's
   // sake. `loopBodyHasKeynavItem` deliberately does not recurse into a
   // NESTED r-for, so this synthesis never fires for an unrelated outer loop.
+  // Preserved identically under the <Key> branch — <Key> passes the index as
+  // an accessor too, exactly like <For>.
   const needsKeynavIndex =
     (ctx.keynav ?? null) !== null &&
     node.indexAlias === null &&
@@ -198,16 +275,25 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // CallExpressions — see EmitNodeCtx.invokeAccessors for rationale.
   // `keynavItemIndexAlias` is scoped to THIS loop's body subtree only — a
   // nested loop's own `emitLoop` call overwrites it for its own children.
-  const childCtx: EmitNodeCtx = indexAlias
-    ? {
-        ...ctx,
-        invokeAccessors: new Set([
-          ...(ctx.invokeAccessors ?? []),
-          indexAlias,
-        ]),
-        keynavItemIndexAlias: indexAlias,
-      }
-    : { ...ctx, keynavItemIndexAlias: null };
+  //
+  // KEYED (<Key>): the ITEM alias is ALSO an accessor, so it joins
+  // `invokeAccessors` too (every body ref to the loop var gets `()`). The
+  // spread `...(ctx.invokeAccessors ?? [])` carries an outer loop's item
+  // accessor down into a nested loop body, so `outerItem()` stays correct at
+  // inner depth.
+  const bodyAccessors = new Set([
+    ...(ctx.invokeAccessors ?? []),
+    ...(keyed ? [node.itemAlias] : []),
+    ...(indexAlias ? [indexAlias] : []),
+  ]);
+  const childCtx: EmitNodeCtx =
+    keyed || indexAlias
+      ? {
+          ...ctx,
+          invokeAccessors: bodyAccessors,
+          keynavItemIndexAlias: indexAlias,
+        }
+      : { ...ctx, keynavItemIndexAlias: null };
 
   let bodyJsx: string;
   if (node.body.length === 1) {
@@ -217,7 +303,28 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     bodyJsx = `<>${parts}</>`;
   }
 
-  return `<For each={${iterableCode}}>{${aliasStr} => ${bodyJsx}}</For>`;
+  if (!keyed) {
+    return `<For each={${iterableCode}}>{${aliasStr} => ${bodyJsx}}</For>`;
+  }
+
+  // Keyed: `@solid-primitives/keyed`'s `<Key by={(v) => key}>` receives the
+  // RAW item value `T` (NOT an Accessor) — only the CHILDREN callback yields
+  // accessors. So the key expression rewrites the current item alias as a RAW
+  // reference (`item.id`, no `()`), which is why `node.itemAlias` is NOT added
+  // to `invokeAccessors` here. A PARENT loop's item alias, however, IS an
+  // accessor in this scope, so `ctx.invokeAccessors` (parent scope, excludes
+  // the current item) is threaded so a nested key expr that reads the outer
+  // item invokes it correctly. The iterable stays outside loop scope.
+  const keyCode = rewriteTemplateExpression(node.keyExpression!, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+  });
+  // `<Key>`'s `each?: readonly T[]` infers `T = unknown` from a bare `any`
+  // iterable (e.g. a `Record<string, any>` member access), which then poisons
+  // the item accessor (`x` is `unknown` → TS18046 in the body). Solid's `<For>`
+  // (`each: T extends readonly any[]`) tolerated bare `any` implicitly; restore
+  // that by casting the iterable to `readonly any[]` so `<Key>` always infers a
+  // usable element type. Type-only (erased at runtime) — reactivity unchanged.
+  return `<Key each={${iterableCode} as readonly any[]} by={(${node.itemAlias}) => ${keyCode}}>{${aliasStr} => ${bodyJsx}}</Key>`;
 }
 
 /**
