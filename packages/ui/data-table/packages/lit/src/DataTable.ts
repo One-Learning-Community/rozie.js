@@ -2159,7 +2159,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
 
-  rowShowsDetail = (row: any) => this.getSubRows == null && this.rowIsExpanded(row);
+  rowShowsDetail = (row: any) => this.getSubRows == null && !this.rowIsGrouped(row) && this.rowIsExpanded(row);
 
   onToggleExpand = (row: any, evt: any) => {
   if (!row || !row.toggleExpanded) return;

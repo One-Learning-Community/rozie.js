@@ -2079,10 +2079,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
   }
   // rowShowsDetail: the #detail <tr> renders ONLY in #detail mode (no getSubRows) when the
-  // row is expanded. With getSubRows the children arrive as ordinary depth-indented rows in
-  // $data.rows (table-core flattens) — NO additive detail row, NO nested r-for (Pitfall 1).
+  // row is expanded AND is NOT a group-header row. With getSubRows the children arrive as
+  // ordinary depth-indented rows in $data.rows (table-core flattens) — NO additive detail
+  // row, NO nested r-for (Pitfall 1). The `!rowIsGrouped` guard is load-bearing: grouping
+  // and detail-expand share table-core's SINGLE `expanded` state, so a group-header row is
+  // `getIsExpanded()===true` the moment its group opens; without this guard that expanded
+  // group row also satisfied `getSubRows==null && rowIsExpanded`, painting a spurious
+  // #detail panel under every opened group (the group-toggle looked "linked" to detail).
   function rowShowsDetail(row: any) {
-    return local.getSubRows == null && rowIsExpanded(row);
+    return local.getSubRows == null && !rowIsGrouped(row) && rowIsExpanded(row);
   }
   // Toggle a row's expanded state through table-core so onExpandedChange → writeExpanded
   // fires exactly one expanded-change. Used by the chevron @click (native <button> handles

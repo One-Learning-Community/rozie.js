@@ -1251,7 +1251,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
   }
   function rowShowsDetail(row: any) {
-    return props.getSubRows == null && rowIsExpanded(row);
+    return props.getSubRows == null && !rowIsGrouped(row) && rowIsExpanded(row);
   }
   const onToggleExpand = useCallback((row: any, evt: any) => {
     if (!row || !row.toggleExpanded) return;

@@ -2024,7 +2024,7 @@ export class DataTable {
   isExpanderColumn = (colId: any) => colId === this.EXPANDER_COL_ID;
   rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
   rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
-  rowShowsDetail = (row: any) => this.getSubRows() == null && this.rowIsExpanded(row);
+  rowShowsDetail = (row: any) => this.getSubRows() == null && !this.rowIsGrouped(row) && this.rowIsExpanded(row);
   onToggleExpand = (row: any, evt: any) => {
     if (!row || !row.toggleExpanded) return;
     // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
