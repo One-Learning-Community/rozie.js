@@ -626,12 +626,52 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
  * Emit a TemplateElement. Applies element-level special-cases (r-show, r-html,
  * r-text, r-model) then falls through to standard tag/attr/children form.
  *
+ * Keyed-remount codegen Task 5 — a component-level `:key="expr"` (NOT under
+ * r-for; that path owns `key` via `TemplateLoopIR.keyExpression` and never
+ * sets this field — see Task 1's Global Constraints) lowers to
+ * `remountKeyExpression`. Solid's native destroy+recreate primitive is
+ * `<Show keyed when={...}>` (the `keyed` prop forces the children to be torn
+ * down and rebuilt whenever `when`'s value changes, rather than just toggling
+ * visibility). We wrap the ENTIRE emitted component invocation in it. The raw
+ * `key`/`:key` binding was ALREADY dropped for Solid before this task (see
+ * `isConsumedAttribute` in emitTemplateAttribute.ts) — there is no inert prop
+ * to additionally strip here, only the wrap to add.
+ *
+ * FALSY-KEY GUARD: `<Show when={x}>` also GATES visibility — it hides its
+ * children whenever `x` is falsy. A real remount key can legitimately be a
+ * falsy value (`String(0)` is truthy, but a raw `0`/`false`/`''` key is not
+ * out of the question), so binding `when` directly to the raw key expression
+ * would make the component disappear whenever the key is falsy — a much
+ * worse bug than the dropped-key status quo. We guard by prefixing a
+ * non-empty literal (`` `k${expr}` ``): the resulting string is NEVER empty
+ * (so the child is never hidden) while still changing value — and thus
+ * still triggering `keyed` recreation — whenever the underlying key changes.
+ */
+function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  const markup = emitElementInner(origNode, ctx);
+
+  if (
+    (origNode.tagKind === 'component' || origNode.tagKind === 'self') &&
+    origNode.remountKeyExpression
+  ) {
+    const keyExprCode = rewriteTemplateExpression(origNode.remountKeyExpression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
+    });
+    ctx.collectors.solid.add('Show');
+    return `<Show keyed when={\`k\${${keyExprCode}}\`}>${markup}</Show>`;
+  }
+
+  return markup;
+}
+
+/**
  * tagKind discrimination per D-115:
  *   - 'html': standard HTML element, class stays as `class=` (Solid supports this)
  *   - 'component': PascalCase tag, emit verbatim; cross-rozie imports handled by emitSolid
  *   - 'self': self-reference, emit verbatim PascalCase (JS scope resolves it)
  */
-function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
   // BEFORE any listener emission runs; it's routed into `createKeynav`'s
   // `onCommit` option by `emitTemplate.ts`, never as a JSX `onKeynavCommit=`
