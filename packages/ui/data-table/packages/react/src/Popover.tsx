@@ -268,9 +268,12 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     if (_watch0First.current) { _watch0First.current = false; return; }
     const isOpen = open;
     if (isOpen && !props.disabled) {
-      floatingNode.current = floatingEl.current;
-      arrowNode.current = arrowEl.current;
-      startTracking();
+      queueMicrotask(() => {
+        if (!open || props.disabled) return;
+        floatingNode.current = floatingEl.current;
+        arrowNode.current = arrowEl.current;
+        startTracking();
+      });
     } else {
       stopTracking();
     }

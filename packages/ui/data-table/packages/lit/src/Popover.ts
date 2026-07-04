@@ -173,9 +173,12 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
       if (isOpen && !this.disabled) {
-        this.floatingNode = this._refFloatingEl;
-        this.arrowNode = this._refArrowEl;
-        this.startTracking();
+        queueMicrotask(() => {
+          if (!this.open || this.disabled) return;
+          this.floatingNode = this._refFloatingEl;
+          this.arrowNode = this._refArrowEl;
+          this.startTracking();
+        });
       } else {
         this.stopTracking();
       }
