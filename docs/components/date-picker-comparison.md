@@ -1,6 +1,6 @@
 ---
 title: DatePicker — comparison
-surface_hash: 4df0b282a837
+surface_hash: afd83814da6a
 ---
 
 # DatePicker vs the per-framework date pickers
@@ -109,7 +109,7 @@ This page is honest about where the incumbents win — that's what keeps it
 credible.
 
 - **You ship one framework and want maximum features.** If you're React-only and
-  need **time-of-day, month/year/multi-calendar, or non-Gregorian systems**,
+  need **time-of-day, month/year *picker modes*, or non-Gregorian systems**,
   [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) or
   [react-datepicker](https://github.com/Hacker0x01/react-datepicker) out-feature
   Rozie outright (note MUI's *range* pickers are a commercial Pro tier — Rozie's
@@ -164,7 +164,7 @@ is the point:
 | Capability | `@rozie-ui/date-picker` | Per-framework incumbents |
 | --- | --- | --- |
 | Cross-framework parity | ✓ one source → 6 idiomatic packages | ✗ a different library per framework |
-| Headless / restyleable | ✓ token-themed + `#header` slot | ~ varies; usually opinionated CSS |
+| Headless / restyleable | ✓ token-themed + `#header` / `#footer` / `#presets` slots | ~ varies; usually opinionated CSS |
 | `min` / `max` / disabled dates | ✓ built in | ✓ usually |
 | Roving-grid keyboard a11y | ✓ [WAI-ARIA grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) (arrows / Home / End / PageUp / PageDown / Enter / Space) | ~ ranges from best-in-class to a known weak spot |
 | Localized labels | ✓ `Intl.DateTimeFormat` | ✓ usually (often via a date lib) |
@@ -172,6 +172,7 @@ is the point:
 | Imperative handle | ✓ uniform `focus()` / `goToToday()` / `clear()` | ~ varies per library |
 | Date-library dependency | ✓ none (UTC-safe internal helper) | ~ frequently `date-fns` / `dayjs` / `luxon` |
 | Range selection + presets | ✓ `selectionMode="range"` + `presetRanges`/`#presets`, all six | ✓ many lead here |
+| Multi-month view + month/year drill nav | ✓ `numberOfMonths` (two-up/three-up) + `monthYearNav` (days → months → years) | ~ varies |
 | Time-of-day / arbitrary multi-date | ✗ out of scope (deliberate) | ✓ many lead here |
 
 ## See also

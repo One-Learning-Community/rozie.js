@@ -1,3 +1,8 @@
+---
+title: Waveform — comparison
+surface_hash: c094ffccb048
+---
+
 # wavesurfer libraries — comparison
 
 [wavesurfer.js](https://wavesurfer.xyz) does the real work (canvas rendering + Web Audio). The question is the **wrapper**: how do you drop a waveform into *your* framework with idiomatic props, events, two-way state, and an imperative handle? Today that answer is uneven across ecosystems — which is the gap `@rozie-ui/wavesurfer` closes.
