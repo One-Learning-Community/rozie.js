@@ -24,6 +24,12 @@ import { buildMiddleware } from './internal/middleware';
 //   `const X = $refs.X` init shape).
 //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
 //   onMount→onCleanup split (teardown is a separate closure) can still see it.
+//   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
+//   `trigger="click"` popover opened (natively the clicked trigger element itself,
+//   since a mousedown focuses a native `<button>` before its `click` fires) —
+//   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+//   Same null-let convention as the others: read/written only in handlers, `any`
+//   via typeNeutralize.
 
 interface AnchorCtx { open: any; toggle: any; show: any; hide: any; }
 
@@ -100,6 +106,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const floatingNode = useRef<any>(null);
   const arrowNode = useRef<any>(null);
   const stopAutoUpdate = useRef<any>(null);
+  const lastFocusedEl = useRef<any>(null);
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultOpen ?? false,
@@ -119,8 +126,17 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
 
   function requestOpen(next: any) {
     if (open === next) return;
+    if (next && props.trigger === 'click') {
+      lastFocusedEl.current = document.activeElement;
+    }
     setOpen(next);
     props.onChange && props.onChange(next);
+    if (!next && props.trigger === 'click' && lastFocusedEl.current && lastFocusedEl.current.isConnected && typeof lastFocusedEl.current.focus === 'function') {
+      lastFocusedEl.current.focus();
+    }
+    if (!next) {
+      lastFocusedEl.current = null;
+    }
   }
   function applyPosition(x: any, y: any, middlewareData: any) {
     if (!floatingNode.current) return;
