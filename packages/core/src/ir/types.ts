@@ -848,6 +848,24 @@ export interface TemplateElementIR {
    */
   isExternal?: boolean;
   /**
+   * Keyed-remount codegen (2026-07-03 plan, Task 1) — `:key="expr"` on a
+   * COMPOSED CHILD (`tagKind === 'component' | 'self'`), NOT consumed by an
+   * enclosing `r-for` (that case routes through `TemplateLoopIR.keyExpression`
+   * instead — see `findKeyExpression`). Additive-optional, mirroring
+   * `isExternal`: absent on every element without a component-level `:key`,
+   * so existing corpus IR is byte-identical (no rebless for the front-end).
+   *
+   * Set in `lowerBareElement`: when present, the raw `key` binding is REMOVED
+   * from `attributes` (it is no longer a generic prop) and its expression is
+   * carried here instead. Each per-target emitter consumes this field to
+   * produce that target's native keyed-remount construct (React `key={…}`,
+   * Vue's existing vnode `key`, Lit `keyed()`, Svelte `{#key}`, Solid
+   * `<Show keyed>`, Angular structural recreation) so the child is destroyed
+   * and recreated — not just patched — when the key expression's value
+   * changes.
+   */
+  remountKeyExpression?: Expression;
+  /**
    * Phase 71 — `r-keynav:<focus-model>[.<modifier>…]="…"` (+ a co-located
    * `r-keynav-active-class="…"`, SPEC §9) lowered onto the nav-root element.
    * Additive-optional: absent on every element without the directive, so

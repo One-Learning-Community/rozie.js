@@ -643,6 +643,10 @@ function lowerElement(
       usedNames,
       lowerInFillBody,
       matchCounter,
+      // Keyed-remount codegen Task 1 — this element's `:key` was already
+      // consumed above as the LOOP key (`keyExpression`/`findKeyExpression`).
+      // Do NOT double-handle it as a component remount key.
+      true,
     );
 
     const loop: TemplateLoopIR = {
@@ -672,6 +676,9 @@ function lowerElement(
     usedNames,
     lowerInFillBody,
     matchCounter,
+    // No enclosing r-for — a `:key` here (if any) is eligible to become a
+    // component remount key (Keyed-remount codegen Task 1).
+    false,
   );
 }
 
@@ -869,6 +876,12 @@ function lowerBareElement(
   lowerInFillBody: boolean,
   // Phase 11 D-03 — per-component hoist temp-name counter (Pitfall 5).
   matchCounter: MatchTempCounter,
+  // Keyed-remount codegen Task 1 — true when this element is the STRIPPED
+  // inner element of an r-for wrap (`lowerElement`'s r-for branch): its
+  // `:key` (if any) was already consumed as the LOOP key
+  // (`TemplateLoopIR.keyExpression`), so the component-remount-key
+  // extraction below must NOT fire for it (no double-handling).
+  keyConsumedByLoop = false,
 ): IRTemplateNode {
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
@@ -1412,6 +1425,32 @@ function lowerBareElement(
     usedNames.add(annotation.used);
   }
 
+  // Keyed-remount codegen Task 1 — a `key` binding on a COMPOSED CHILD
+  // (`tagKind === 'component' | 'self'`) that was NOT already consumed as the
+  // enclosing r-for's LOOP key is a component remount key: move its
+  // expression to `remountKeyExpression` and remove the raw `key` binding
+  // from `attributes` so no per-target emitter can mistake it for a normal
+  // prop. Plain DOM elements (`tagKind === 'html'`) and any element whose
+  // `:key` the r-for path already consumed (`keyConsumedByLoop`) are left
+  // untouched.
+  let remountKeyExpression: t.Expression | undefined;
+  if (
+    !keyConsumedByLoop &&
+    (annotation.tagKind === 'component' || annotation.tagKind === 'self')
+  ) {
+    const keyIdx = attributes.findIndex(
+      (a) => a.kind === 'binding' && a.name === 'key',
+    );
+    if (keyIdx !== -1) {
+      const keyAttr = attributes[keyIdx] as Extract<
+        AttributeBinding,
+        { kind: 'binding' }
+      >;
+      remountKeyExpression = keyAttr.expression;
+      attributes.splice(keyIdx, 1);
+    }
+  }
+
   // Component-tag children form fill bodies (per D-03: any non-<template>
   // child becomes default-shorthand fill content; <template #name> children
   // are explicit fills). Every <slot> inside any of these bodies must lower
@@ -1468,6 +1507,10 @@ function lowerBareElement(
     // elements stay byte-identical to the pre-change IR (and dist-parity
     // strict-bytes assertions don't drift).
     ...(isExternal ? { isExternal: true } : {}),
+    // Keyed-remount codegen Task 1 — component remount-key marker. Spread
+    // only when set so elements without a component-level `:key` stay
+    // byte-identical to the pre-change IR (no rebless for the front-end).
+    ...(remountKeyExpression !== undefined ? { remountKeyExpression } : {}),
     // Phase 71 — `r-keynav`/`r-keynav-item` markers. Spread only when set so
     // non-marked elements (i.e. all existing corpus `.rozie` — SPEC §11)
     // stay byte-identical to the pre-phase IR.
