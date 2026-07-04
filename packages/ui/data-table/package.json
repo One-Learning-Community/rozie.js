@@ -7,15 +7,19 @@
   "scripts": {
     "build": "node scripts/codegen.mjs",
     "probe": "node scripts/probe-48-00.mjs",
-    "test": "echo 'no unit tests (pure-Rozie component; behaviour covered by the VR matrix)'",
+    "test": "vitest run",
     "typecheck": "echo 'no local TS to check (pure-Rozie source); the emitted leaves typecheck individually'"
   },
   "comment:headless-core-devdep": "Phase 64 (D-04): @rozie-ui/headless-core is a SOURCE-ONLY workspace package whose `windowing.rzts` script-partial DISSOLVES into this family's compiled leaves via inlineScriptPartials() at compile — zero runtime dependency. It is a devDependency (the cross-package bare-specifier import is resolved at compile-time via the producer exports map; the canonical add-as-devDep mechanism proven in 64-01, no tsconfig paths needed).",
+  "comment:popover-devdep": "Phase 72 (D-01/D-04): data-table VENDORS @rozie-ui/popover's .rozie source at codegen time (Option B, the command-palette→combobox precedent) so the header column-menu can escape a scrollable header/body region via `strategy=\"fixed\"`. The vendored copy is compiled into each leaf, so this is NOT a runtime dependency of the published leaves. It is a devDependency because the authoring/dev surface — the VR harness, the surface test, and the IDE LSP — compiles DataTable.rozie from raw source and must resolve the stable `<components>` specifier `@rozie-ui/popover/Popover.rozie` via node resolution against the primitive's `exports` map. `@floating-ui/dom` is a devDependency here for the same reason the vendored Popover.rozie's internal/middleware.ts needs it resolvable at authoring time; each leaf ALSO declares it as a peerDependency (the composition's shipped runtime cost).",
   "devDependencies": {
     "@rozie/core": "workspace:*",
     "@rozie-ui/headless-core": "workspace:*",
+    "@rozie-ui/popover": "workspace:*",
+    "@floating-ui/dom": "^1.7.2",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "typescript": "~5.6.0"
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
   }
 }
