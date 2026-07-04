@@ -109,7 +109,7 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
         {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>
 
-      {(open) && <div ref={panelEl} className={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
+      {!!(open) && <div ref={panelEl} className={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
         {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
       </div>}</div>
     </>

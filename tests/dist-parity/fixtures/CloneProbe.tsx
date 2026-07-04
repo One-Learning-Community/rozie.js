@@ -22,7 +22,7 @@ export default function CloneProbe(props: CloneProbeProps): JSX.Element {
     <>
     <div {...attrs} className={clsx("probe", (attrs.className as string | undefined))} data-rozie-s-67c332fe="">
       <span className={"count"} data-rozie-s-67c332fe="">count: {rozieDisplay(state.count)}</span>
-      {(cloned) && <span className={"cloned"} data-rozie-s-67c332fe="">cloned</span>}</div>
+      {!!(cloned) && <span className={"cloned"} data-rozie-s-67c332fe="">cloned</span>}</div>
     </>
   );
 }

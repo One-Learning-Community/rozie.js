@@ -23,7 +23,7 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
   return (
     <>
     <section {...attrs} className={clsx("panel", (attrs.className as string | undefined))} data-rozie-s-224e77e7="">
-      {((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
+      {!!((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
         
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)() : props.title}
       </header>}<div className={"body"} data-rozie-s-224e77e7="">
