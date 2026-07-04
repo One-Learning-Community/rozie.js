@@ -40,8 +40,8 @@ function __rozieAttr(v: unknown): string | null {
     <span class="rdt-group-drop-hint">Drag columns here to group</span>
     }@for (gk of grouping(); track gk) {
     <span class="rdt-group-token" part="group-token" data-group-token="">
-          {{ rozieDisplay(gk) }}
-          <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr(gk)" (click)="removeKey(gk)">×</button>
+          {{ rozieDisplay(labelFor(gk)) }}
+          <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr('Remove ' + labelFor(gk) + ' grouping')" (click)="removeKey(gk)">×</button>
         </span>
     }
       </span>
@@ -75,6 +75,37 @@ function __rozieAttr(v: unknown): string | null {
       font-size: 0.8125em;
       user-select: none;
       pointer-events: none;
+    }
+    .rdt-group-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--rdt-group-bar-gap, 0.375rem);
+    }
+    .rdt-group-token-remove {
+      display: inline-flex;
+      align-items: center;
+      margin-inline-start: 0.125rem;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      font: inherit;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.6;
+    }
+    .rdt-group-token-remove:hover {
+      opacity: 1;
+    }
+    .rdt-group-clear {
+      cursor: pointer;
+    }
+    .rdt-group-token-remove:focus-visible,
+    .rdt-group-clear:focus-visible {
+      outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+      outline-offset: 1px;
+      border-radius: 2px;
     }
   `],
 })
@@ -130,6 +161,10 @@ export class GroupBar {
   clearAll = () => {
     const __clearGrouping = this.clearGrouping();
     __clearGrouping && __clearGrouping();
+  };
+  labelFor = (key: any) => {
+    const col = this.groupableColumns().find((c: any) => c.id === key);
+    return col && col.label || key;
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

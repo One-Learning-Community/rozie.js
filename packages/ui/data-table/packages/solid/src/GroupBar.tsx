@@ -24,6 +24,37 @@ __rozieInjectStyle('GroupBar-546c469a', `.rdt-group-drop-zone[data-rozie-s-546c4
   font-size: 0.8125em;
   user-select: none;
   pointer-events: none;
+}
+.rdt-group-bar[data-rozie-s-546c469a] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rdt-group-token-remove[data-rozie-s-546c469a] {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:hover {
+  opacity: 1;
+}
+.rdt-group-clear[data-rozie-s-546c469a] {
+  cursor: pointer;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:focus-visible,
+.rdt-group-clear[data-rozie-s-546c469a]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+  outline-offset: 1px;
+  border-radius: 2px;
 }`);
 
 interface GroupBarProps {
@@ -93,6 +124,14 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     local.clearGrouping && local.clearGrouping();
   }
 
+  // Resolve a grouping key to its column's friendly label (falls back to the raw
+  // key). Used for both the token text and the remove button's aria-label so the
+  // bar reads in human terms, not internal column ids. Untyped like the handlers.
+  function labelFor(key: any) {
+    const col = local.groupableColumns.find((c: any) => c.id === key);
+    return col && col.label || key;
+  }
+
   return (
     <>
     <div class={"rdt-group-bar"} data-rozie-s-546c469a="">
@@ -103,8 +142,8 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
       <span data-group-drop-zone="" class={"rdt-group-drop-zone" + " " + rozieClass({ 'is-over': isOver() })} onDragOver={($event) => { onDragOver($event); }} onDragLeave={($event) => { onDragLeave($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
         
         {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<For each={local.grouping}>{(gk) => <span class={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
-          {rozieDisplay(gk)}
-          <button type="button" aria-label={rozieAttr(gk)} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
+          {rozieDisplay(labelFor(gk))}
+          <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>}</For>
       </span>
 

@@ -8,8 +8,8 @@
   <span :class="['rdt-group-drop-zone', { 'is-over': isOver }]" data-group-drop-zone="" @dragover="onDragOver($event)" @dragleave="onDragLeave($event)" @drop="onDrop($event)">
     
     <span v-if="!props.grouping.length" class="rdt-group-drop-hint">Drag columns here to group</span><span v-for="gk in props.grouping" :key="gk" class="rdt-group-token" part="group-token" data-group-token="">
-      {{ gk }}
-      <button type="button" class="rdt-group-token-remove" :aria-label="gk" @click="removeKey(gk)">×</button>
+      {{ labelFor(gk) }}
+      <button type="button" class="rdt-group-token-remove" :aria-label="'Remove ' + labelFor(gk) + ' grouping'" @click="removeKey(gk)">×</button>
     </span>
   </span>
 
@@ -91,6 +91,17 @@ const removeKey = (key: any) => {
 const clearAll = () => {
   props.clearGrouping && props.clearGrouping();
 };
+
+// Resolve a grouping key to its column's friendly label (falls back to the raw
+// key). Used for both the token text and the remove button's aria-label so the
+// bar reads in human terms, not internal column ids. Untyped like the handlers.
+// Resolve a grouping key to its column's friendly label (falls back to the raw
+// key). Used for both the token text and the remove button's aria-label so the
+// bar reads in human terms, not internal column ids. Untyped like the handlers.
+const labelFor = (key: any) => {
+  const col = props.groupableColumns.find((c: any) => c.id === key);
+  return col && col.label || key;
+};
 </script>
 
 <style scoped>
@@ -116,5 +127,36 @@ const clearAll = () => {
   font-size: 0.8125em;
   user-select: none;
   pointer-events: none;
+}
+.rdt-group-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rdt-group-token-remove {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.rdt-group-token-remove:hover {
+  opacity: 1;
+}
+.rdt-group-clear {
+  cursor: pointer;
+}
+.rdt-group-token-remove:focus-visible,
+.rdt-group-clear:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+  outline-offset: 1px;
+  border-radius: 2px;
 }
 </style>

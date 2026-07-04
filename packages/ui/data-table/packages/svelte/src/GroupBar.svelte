@@ -78,9 +78,20 @@ const removeKey = (key: any) => {
 const clearAll = () => {
   clearGrouping && clearGrouping();
 };
+
+// Resolve a grouping key to its column's friendly label (falls back to the raw
+// key). Used for both the token text and the remove button's aria-label so the
+// bar reads in human terms, not internal column ids. Untyped like the handlers.
+// Resolve a grouping key to its column's friendly label (falls back to the raw
+// key). Used for both the token text and the remove button's aria-label so the
+// bar reads in human terms, not internal column ids. Untyped like the handlers.
+const labelFor = (key: any) => {
+  const col = groupableColumns.find((c: any) => c.id === key);
+  return col && col.label || key;
+};
 </script>
 
-<div class="rdt-group-bar" data-rozie-s-546c469a>{#each groupableColumns as col (col.id)}<span class="rdt-group-token" part="group-token" draggable="true" ondragstart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a>{rozieDisplay(col.label)}</span>{/each}<span class={["rdt-group-drop-zone", { 'is-over': isOver }]} data-group-drop-zone="" ondragover={($event) => { onDragOver($event); }} ondragleave={($event) => { onDragLeave($event); }} ondrop={($event) => { onDrop($event); }} data-rozie-s-546c469a>{#if !grouping.length}<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>{/if}{#each grouping as gk (gk)}<span class="rdt-group-token" part="group-token" data-group-token="" data-rozie-s-546c469a>{rozieDisplay(gk)}<button type="button" class="rdt-group-token-remove" aria-label={rozieAttr(gk)} onclick={($event) => { removeKey(gk); }} data-rozie-s-546c469a>×</button></span>{/each}</span>{#if grouping.length}<button type="button" class="rdt-group-clear" onclick={($event) => { clearAll(); }} data-rozie-s-546c469a>Clear</button>{/if}</div>
+<div class="rdt-group-bar" data-rozie-s-546c469a>{#each groupableColumns as col (col.id)}<span class="rdt-group-token" part="group-token" draggable="true" ondragstart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a>{rozieDisplay(col.label)}</span>{/each}<span class={["rdt-group-drop-zone", { 'is-over': isOver }]} data-group-drop-zone="" ondragover={($event) => { onDragOver($event); }} ondragleave={($event) => { onDragLeave($event); }} ondrop={($event) => { onDrop($event); }} data-rozie-s-546c469a>{#if !grouping.length}<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>{/if}{#each grouping as gk (gk)}<span class="rdt-group-token" part="group-token" data-group-token="" data-rozie-s-546c469a>{rozieDisplay(labelFor(gk))}<button type="button" class="rdt-group-token-remove" aria-label={rozieAttr('Remove ' + labelFor(gk) + ' grouping')} onclick={($event) => { removeKey(gk); }} data-rozie-s-546c469a>×</button></span>{/each}</span>{#if grouping.length}<button type="button" class="rdt-group-clear" onclick={($event) => { clearAll(); }} data-rozie-s-546c469a>Clear</button>{/if}</div>
 
 <style>
 :global {
@@ -106,6 +117,37 @@ const clearAll = () => {
     font-size: 0.8125em;
     user-select: none;
     pointer-events: none;
+  }
+  .rdt-group-bar[data-rozie-s-546c469a] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rdt-group-bar-gap, 0.375rem);
+  }
+  .rdt-group-token-remove[data-rozie-s-546c469a] {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-start: 0.125rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .rdt-group-token-remove[data-rozie-s-546c469a]:hover {
+    opacity: 1;
+  }
+  .rdt-group-clear[data-rozie-s-546c469a] {
+    cursor: pointer;
+  }
+  .rdt-group-token-remove[data-rozie-s-546c469a]:focus-visible,
+  .rdt-group-clear[data-rozie-s-546c469a]:focus-visible {
+    outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+    outline-offset: 1px;
+    border-radius: 2px;
   }
 }
 </style>

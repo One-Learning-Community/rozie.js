@@ -21,3 +21,34 @@
   user-select: none;
   pointer-events: none;
 }
+.rdt-group-bar[data-rozie-s-546c469a] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rdt-group-token-remove[data-rozie-s-546c469a] {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:hover {
+  opacity: 1;
+}
+.rdt-group-clear[data-rozie-s-546c469a] {
+  cursor: pointer;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:focus-visible,
+.rdt-group-clear[data-rozie-s-546c469a]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+  outline-offset: 1px;
+  border-radius: 2px;
+}

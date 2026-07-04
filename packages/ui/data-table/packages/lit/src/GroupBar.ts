@@ -30,6 +30,37 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   user-select: none;
   pointer-events: none;
 }
+.rdt-group-bar[data-rozie-s-546c469a] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+}
+.rdt-group-token-remove[data-rozie-s-546c469a] {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:hover {
+  opacity: 1;
+}
+.rdt-group-clear[data-rozie-s-546c469a] {
+  cursor: pointer;
+}
+.rdt-group-token-remove[data-rozie-s-546c469a]:focus-visible,
+.rdt-group-clear[data-rozie-s-546c469a]:focus-visible {
+  outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
+  outline-offset: 1px;
+  border-radius: 2px;
+}
 `;
 
   /**
@@ -76,8 +107,8 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" @dragover=${($event: Event) => { this.onDragOver($event); }} @dragleave=${($event: Event) => { this.onDragLeave($event); }} @drop=${($event: Event) => { this.onDrop($event); }} data-rozie-s-546c469a>
     
     ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" part="group-token" data-group-token="" key=${rozieAttr(gk)} data-rozie-s-546c469a>
-      ${rozieDisplay(gk)}
-      <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr(gk)} @click=${($event: Event) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
+      ${rozieDisplay(this.labelFor(gk))}
+      <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr('Remove ' + this.labelFor(gk) + ' grouping')} @click=${($event: Event) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
     </span>`)}
   </span>
 
@@ -119,5 +150,10 @@ export default class GroupBar extends SignalWatcher(LitElement) {
 
   clearAll = () => {
   this.clearGrouping && this.clearGrouping();
+};
+
+  labelFor = (key: any) => {
+  const col = this.groupableColumns.find((c: any) => c.id === key);
+  return col && col.label || key;
 };
 }

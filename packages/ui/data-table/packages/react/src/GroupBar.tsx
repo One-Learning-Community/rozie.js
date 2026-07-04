@@ -65,6 +65,10 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     const clearAll = useCallback(() => {
     _rozieProp_clearGrouping && _rozieProp_clearGrouping();
   }, [_rozieProp_clearGrouping]);
+  function labelFor(key: any) {
+    const col = props.groupableColumns.find((c: any) => c.id === key);
+    return col && col.label || key;
+  }
 
   return (
     <>
@@ -76,8 +80,8 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
       <span className={clsx("rdt-group-drop-zone", { "is-over": isOver })} data-group-drop-zone="" onDragOver={($event) => { onDragOver($event); }} onDragLeave={($event) => { onDragLeave($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
         
         {!!(!props.grouping.length) && <span className={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span>}{props.grouping.map((gk) => <span key={gk} className={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
-          {rozieDisplay(gk)}
-          <button type="button" className={"rdt-group-token-remove"} aria-label={rozieAttr(gk)} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
+          {rozieDisplay(labelFor(gk))}
+          <button type="button" className={"rdt-group-token-remove"} aria-label={rozieAttr('Remove ' + labelFor(gk) + ' grouping')} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>)}
       </span>
 
