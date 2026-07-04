@@ -2033,18 +2033,18 @@ export class DataTable {
     const col = this.table.getColumn(colId);
     if (col && col.pin) col.pin(side);
   };
-  pinStyle = (colId: any) => {
+  pinStyle = (colId: any, zIndex: any = 1) => {
     if (this.tick() < 0 || !this.table) return '';
     const col = this.table.getColumn(colId);
     if (!col || !col.getIsPinned) return '';
     const side = col.getIsPinned();
     if (side === 'left') {
       const left = col.getStart ? col.getStart('left') : 0;
-      return 'position:sticky;left:' + left + 'px;z-index:1;';
+      return 'position:sticky;left:' + left + 'px;z-index:' + zIndex + ';';
     }
     if (side === 'right') {
       const right = col.getAfter ? col.getAfter('right') : 0;
-      return 'position:sticky;right:' + right + 'px;z-index:1;';
+      return 'position:sticky;right:' + right + 'px;z-index:' + zIndex + ';';
     }
     return '';
   };
@@ -2052,7 +2052,7 @@ export class DataTable {
     let s = '';
     const w = this.headerWidth(colId);
     if (w) s += 'width:' + w + ';';
-    s += this.pinStyle(colId);
+    s += this.pinStyle(colId, 2);
     return s;
   };
   onGlobalFilterInput = (evt: any) => {

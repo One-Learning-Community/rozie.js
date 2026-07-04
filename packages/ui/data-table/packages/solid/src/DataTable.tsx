@@ -2010,28 +2010,43 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // Sticky inline style for a pinned header/cell — position:sticky + the computed left or
   // right offset. Returns '' (no sticky) for unpinned columns. Returned as a STRING (the
   // :style binding is value-driven — never an eval'd attr).
-  function pinStyle(colId: any) {
+  //
+  // `zIndex` (phase 72 fix, default 1 — body <td> / filter-row <th> layer): an INLINE style
+  // ALWAYS wins over the stylesheet's `.rozie-data-table.rdt-sticky .rdt-thead .rdt-th
+  // { z-index: var(--rdt-sticky-z, 2) }` rule, so a pinned header cell that unconditionally
+  // got `z-index:1` here (same as the pinned body/filter-row cells) silently DOWNGRADED the
+  // intended sticky-header stacking level from 2 to 1 — tying it with the dedicated filter
+  // row's own pinned <th> (72-05), which sits LATER in DOM order (a sibling <tr> beneath the
+  // header row) and therefore visually/interactively covers the header's ⋯ menu (phase 72,
+  // z-index:1000 relative to Popover's OWN local stacking context — capped by the pinned
+  // header <th>'s z-index, since a `position:fixed` descendant does not escape an ancestor's
+  // stacking context, only its layout containing block) whenever that SAME column is both
+  // pinned and filterable. thStyle() (the header caller) passes zIndex=2 so the header layer
+  // always wins ties against the filter-row/body layers, which keep the default of 1.
+  function pinStyle(colId: any, zIndex = 1) {
     if (tick() < 0 || !table) return '';
     const col = table.getColumn(colId);
     if (!col || !col.getIsPinned) return '';
     const side = col.getIsPinned();
     if (side === 'left') {
       const left = col.getStart ? col.getStart('left') : 0;
-      return 'position:sticky;left:' + left + 'px;z-index:1;';
+      return 'position:sticky;left:' + left + 'px;z-index:' + zIndex + ';';
     }
     if (side === 'right') {
       const right = col.getAfter ? col.getAfter('right') : 0;
-      return 'position:sticky;right:' + right + 'px;z-index:1;';
+      return 'position:sticky;right:' + right + 'px;z-index:' + zIndex + ';';
     }
     return '';
   }
   // Combined inline style for a <th> (width + pin) and a <td> (pin). Plain string concat —
-  // uniform on all 6, no bound-object trap.
+  // uniform on all 6, no bound-object trap. zIndex=2 (see pinStyle) so a pinned header cell
+  // — which hosts the ⋯ menu's floating content — always stacks above the pinned filter-row
+  // cell for the same column (zIndex=1, its own default).
   function thStyle(colId: any) {
     let s = '';
     const w = headerWidth(colId);
     if (w) s += 'width:' + w + ';';
-    s += pinStyle(colId);
+    s += pinStyle(colId, 2);
     return s;
   }
 

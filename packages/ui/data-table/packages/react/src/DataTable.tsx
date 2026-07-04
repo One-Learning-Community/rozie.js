@@ -1168,18 +1168,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const col = table.current.getColumn(colId);
     if (col && col.pin) col.pin(side);
   }, []);
-  function pinStyle(colId: any) {
+  function pinStyle(colId: any, zIndex = 1) {
     if (tick() < 0 || !table.current) return '';
     const col = table.current.getColumn(colId);
     if (!col || !col.getIsPinned) return '';
     const side = col.getIsPinned();
     if (side === 'left') {
       const left = col.getStart ? col.getStart('left') : 0;
-      return 'position:sticky;left:' + left + 'px;z-index:1;';
+      return 'position:sticky;left:' + left + 'px;z-index:' + zIndex + ';';
     }
     if (side === 'right') {
       const right = col.getAfter ? col.getAfter('right') : 0;
-      return 'position:sticky;right:' + right + 'px;z-index:1;';
+      return 'position:sticky;right:' + right + 'px;z-index:' + zIndex + ';';
     }
     return '';
   }
@@ -1187,7 +1187,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     let s = '';
     const w = headerWidth(colId);
     if (w) s += 'width:' + w + ';';
-    s += pinStyle(colId);
+    s += pinStyle(colId, 2);
     return s;
   }
   const onGlobalFilterInput = useCallback((evt: any) => {
