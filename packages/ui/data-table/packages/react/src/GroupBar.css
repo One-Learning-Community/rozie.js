@@ -52,3 +52,6 @@
   outline-offset: 1px;
   border-radius: 2px;
 }
+.rdt-group-token.is-drop-target[data-rozie-s-546c469a] {
+  box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
+}

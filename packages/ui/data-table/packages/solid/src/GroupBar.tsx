@@ -55,6 +55,9 @@ __rozieInjectStyle('GroupBar-546c469a', `.rdt-group-drop-zone[data-rozie-s-546c4
   outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
   outline-offset: 1px;
   border-radius: 2px;
+}
+.rdt-group-token.is-drop-target[data-rozie-s-546c469a] {
+  box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
 }`);
 
 interface GroupBarProps {
@@ -82,14 +85,25 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
 
   const [draggingId, setDraggingId] = createSignal('');
   const [isOver, setIsOver] = createSignal(false);
+  const [dragKind, setDragKind] = createSignal('');
+  const [dropKey, setDropKey] = createSignal('');
 
   // Untyped handler params neutralize to `any` so the native drag-event shapes
   // (dataTransfer / preventDefault) typecheck across all six strict leaves — the
   // global-filter idiom (see FilterText.rozie). NEVER annotate these params.
 
-  function onDragStart(e: any, id: any) {
+  // A palette CHIP started dragging → this is an ADD-a-new-column drag.
+  function onChipDragStart(e: any, id: any) {
     setDraggingId(id);
+    setDragKind('chip');
     if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id);
+  }
+
+  // An active TOKEN started dragging → this is a REORDER drag.
+  function onTokenDragStart(e: any, gk: any) {
+    setDraggingId(gk);
+    setDragKind('token');
+    if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk);
   }
 
   // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
@@ -99,19 +113,57 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     setIsOver(true);
   }
 
+  // While reordering, record the token under the pointer as the insertion anchor
+  // (we drop BEFORE it). preventDefault so the zone still accepts the drop. Ignored
+  // for chip drags — those just append at the end.
+  function onTokenDragOver(e: any, gk: any) {
+    if (e) e.preventDefault();
+    if (dragKind() === 'token') setDropKey(gk);
+  }
+
   // Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
   // crosses onto a child token, so ignore leaves whose relatedTarget is still inside
   // the zone (prevents flicker as you hover over existing grouping tokens).
   function onDragLeave(e: any) {
     if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
     setIsOver(false);
+    setDropKey('');
+  }
+
+  // Single reset for all ephemeral drag bookkeeping — called on drop AND on dragend
+  // (so an aborted drag, dropped outside the zone, still clears the marker/highlight).
+  function resetDrag() {
+    setDraggingId('');
+    setDragKind('');
+    setDropKey('');
+    setIsOver(false);
+  }
+  function onDragEnd() {
+    resetDrag();
   }
   function onDrop(e: any) {
-    setIsOver(false);
+    if (e) e.preventDefault();
+    const kind = dragKind();
+    const anchor = dropKey();
     const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || draggingId();
-    setDraggingId('');
+    resetDrag();
     if (!id) return;
-    // Append the dragged column id IF not already in the grouping — read the order
+    if (kind === 'token') {
+      // REORDER: pull the dragged key out, then splice it back in BEFORE the anchor
+      // token (or at the end when dropped on empty zone space). Shift-safe because we
+      // resolve the anchor by KEY inside the already-filtered array, not by raw index.
+      if (local.grouping.indexOf(id) === -1) return;
+      const without = local.grouping.filter((k: any) => k !== id);
+      let to = without.length;
+      if (anchor && anchor !== id) {
+        const j = without.indexOf(anchor);
+        if (j !== -1) to = j;
+      }
+      const next = without.slice(0, to).concat([id]).concat(without.slice(to));
+      local.applyGrouping && local.applyGrouping(next);
+      return;
+    }
+    // APPEND (chip): add the dragged column IF not already grouped — read the order
     // from $props.grouping, write the NEW order through applyGrouping.
     if (local.grouping.indexOf(id) !== -1) return;
     const next = local.grouping.concat([id]);
@@ -136,12 +188,12 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     <>
     <div class={"rdt-group-bar"} data-rozie-s-546c469a="">
       
-      <For each={local.groupableColumns}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>}</For>
+      <For each={local.groupableColumns}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onChipDragStart($event, col.id); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>}</For>
 
       
       <span data-group-drop-zone="" class={"rdt-group-drop-zone" + " " + rozieClass({ 'is-over': isOver() })} onDragOver={($event) => { onDragOver($event); }} onDragLeave={($event) => { onDragLeave($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
         
-        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<For each={local.grouping}>{(gk) => <span class={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
+        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<For each={local.grouping}>{(gk) => <span part="group-token" data-group-token="" draggable="true" class={"rdt-group-token" + " " + rozieClass({ 'is-drop-target': dragKind() === 'token' && dropKey() === gk && draggingId() !== gk })} onDragStart={($event) => { onTokenDragStart($event, gk); }} onDragOver={($event) => { onTokenDragOver($event, gk); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">
           {rozieDisplay(labelFor(gk))}
           <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>}</For>

@@ -15,11 +15,15 @@
   CONTRACT: the grouping order is the parent's source of truth. This drop-in NEVER
   keeps its own copy of the grouping order — it ALWAYS reads `$props.grouping` and
   writes ONLY through `$props.applyGrouping` / `$props.clearGrouping`. The only local
-  state is ephemeral drag bookkeeping (`$data.draggingId`).
+  state is ephemeral drag bookkeeping (`$data.draggingId` / `dragKind` / `dropKey` /
+  `isOver`).
 
-  Drag a column chip into the drop zone to add it to the grouping; click a token's ×
-  to remove it; "Clear" resets. Native DnD requires the drop zone to preventDefault on
-  dragover or @drop never fires — onDragOver handles that uniformly across all 6 targets.
+  Drag a column chip into the drop zone to add it to the grouping; drag an active
+  token onto another to REORDER it (it lands before the anchor token, or at the end
+  when dropped on empty zone space); click a token's × to remove it; "Clear" resets.
+  A chip drag (dragKind 'chip') APPENDS; a token drag (dragKind 'token') MOVES — the
+  onDrop branch keys off dragKind. Native DnD requires preventDefault on dragover or
+  @drop never fires — onDragOver / onTokenDragOver handle that across all 6 targets.
 
   PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. Styling split:
   the SHARED `.rdt-group-token` pill + `.rdt-group-bar-host` are descendant selectors
@@ -83,6 +87,13 @@
   // Presentational only; drives the .is-over class (light DOM) + `group-drop-zone-over`
   // ::part token (Lit shadow). Reset on drop / real leave.
   isOver: false,
+  // Ephemeral: which kind of drag is in flight — 'chip' (add a NEW column from the
+  // palette) vs 'token' (REORDER an existing grouping key). Selects the onDrop branch.
+  dragKind: '',
+  // Ephemeral: the active-token key currently under the pointer during a reorder drag
+  // — we drop BEFORE it. '' → the drop lands at the end (move-to-last). Also drives the
+  // .is-drop-target insertion marker.
+  dropKey: '',
 }
 </data>
 
@@ -91,9 +102,18 @@
 // (dataTransfer / preventDefault) typecheck across all six strict leaves — the
 // global-filter idiom (see FilterText.rozie). NEVER annotate these params.
 
-const onDragStart = (e, id) => {
+// A palette CHIP started dragging → this is an ADD-a-new-column drag.
+const onChipDragStart = (e, id) => {
   $data.draggingId = id
+  $data.dragKind = 'chip'
   if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id)
+}
+
+// An active TOKEN started dragging → this is a REORDER drag.
+const onTokenDragStart = (e, gk) => {
+  $data.draggingId = gk
+  $data.dragKind = 'token'
+  if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk)
 }
 
 // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
@@ -103,20 +123,59 @@ const onDragOver = (e) => {
   $data.isOver = true
 }
 
+// While reordering, record the token under the pointer as the insertion anchor
+// (we drop BEFORE it). preventDefault so the zone still accepts the drop. Ignored
+// for chip drags — those just append at the end.
+const onTokenDragOver = (e, gk) => {
+  if (e) e.preventDefault()
+  if ($data.dragKind === 'token') $data.dropKey = gk
+}
+
 // Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
 // crosses onto a child token, so ignore leaves whose relatedTarget is still inside
 // the zone (prevents flicker as you hover over existing grouping tokens).
 const onDragLeave = (e) => {
   if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
   $data.isOver = false
+  $data.dropKey = ''
+}
+
+// Single reset for all ephemeral drag bookkeeping — called on drop AND on dragend
+// (so an aborted drag, dropped outside the zone, still clears the marker/highlight).
+const resetDrag = () => {
+  $data.draggingId = ''
+  $data.dragKind = ''
+  $data.dropKey = ''
+  $data.isOver = false
+}
+
+const onDragEnd = () => {
+  resetDrag()
 }
 
 const onDrop = (e) => {
-  $data.isOver = false
+  if (e) e.preventDefault()
+  const kind = $data.dragKind
+  const anchor = $data.dropKey
   const id = (e && e.dataTransfer && e.dataTransfer.getData('text/plain')) || $data.draggingId
-  $data.draggingId = ''
+  resetDrag()
   if (!id) return
-  // Append the dragged column id IF not already in the grouping — read the order
+  if (kind === 'token') {
+    // REORDER: pull the dragged key out, then splice it back in BEFORE the anchor
+    // token (or at the end when dropped on empty zone space). Shift-safe because we
+    // resolve the anchor by KEY inside the already-filtered array, not by raw index.
+    if ($props.grouping.indexOf(id) === -1) return
+    const without = $props.grouping.filter((k) => k !== id)
+    let to = without.length
+    if (anchor && anchor !== id) {
+      const j = without.indexOf(anchor)
+      if (j !== -1) to = j
+    }
+    const next = without.slice(0, to).concat([id]).concat(without.slice(to))
+    $props.applyGrouping && $props.applyGrouping(next)
+    return
+  }
+  // APPEND (chip): add the dragged column IF not already grouped — read the order
   // from $props.grouping, write the NEW order through applyGrouping.
   if ($props.grouping.indexOf(id) !== -1) return
   const next = $props.grouping.concat([id])
@@ -142,14 +201,15 @@ const labelFor = (key) => {
 
 <template>
 <div class="rdt-group-bar">
-  <!-- (a) draggable column chips -->
+  <!-- (a) draggable column chips (the palette — ADD a new grouping key) -->
   <span
     class="rdt-group-token"
     part="group-token"
     r-for="col in $props.groupableColumns"
     :key="col.id"
     draggable="true"
-    @dragstart="onDragStart($event, col.id)"
+    @dragstart="onChipDragStart($event, col.id)"
+    @dragend="onDragEnd()"
   >{{ col.label }}</span>
 
   <!-- (b) drop zone listing the ACTIVE grouping as removable tokens -->
@@ -163,7 +223,19 @@ const labelFor = (key) => {
   >
     <!-- empty-state affordance: only shown when nothing is grouped yet -->
     <span class="rdt-group-drop-hint" r-if="!$props.grouping.length">Drag columns here to group</span>
-    <span class="rdt-group-token" part="group-token" data-group-token r-for="gk in $props.grouping" :key="gk">
+    <!-- active grouping tokens — draggable to REORDER; the anchor token gets .is-drop-target -->
+    <span
+      class="rdt-group-token"
+      part="group-token"
+      data-group-token
+      r-for="gk in $props.grouping"
+      :key="gk"
+      :class="{ 'is-drop-target': $data.dragKind === 'token' && $data.dropKey === gk && $data.draggingId !== gk }"
+      draggable="true"
+      @dragstart="onTokenDragStart($event, gk)"
+      @dragover="onTokenDragOver($event, gk)"
+      @dragend="onDragEnd()"
+    >
       {{ labelFor(gk) }}
       <button type="button" class="rdt-group-token-remove" :aria-label="'Remove ' + labelFor(gk) + ' grouping'" @click="removeKey(gk)">×</button>
     </span>
@@ -239,6 +311,11 @@ const labelFor = (key) => {
   outline: var(--rdt-focus-ring, 2px solid rgba(37, 99, 235, 0.7));
   outline-offset: 1px;
   border-radius: 2px;
+}
+/* Reorder insertion marker — a left rule on the token the dragged token will land
+   BEFORE. Driven by the ephemeral $data.dropKey (see the .is-drop-target binding). */
+.rdt-group-token.is-drop-target {
+  box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
 }
 </style>
 

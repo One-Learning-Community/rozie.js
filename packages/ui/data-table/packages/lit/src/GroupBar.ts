@@ -61,6 +61,9 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   outline-offset: 1px;
   border-radius: 2px;
 }
+.rdt-group-token.is-drop-target[data-rozie-s-546c469a] {
+  box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
+}
 `;
 
   /**
@@ -81,6 +84,8 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   @property({ type: Function }) clearGrouping: ((...args: unknown[]) => unknown) | null = null;
   private _draggingId = signal('');
   private _isOver = signal(false);
+  private _dragKind = signal('');
+  private _dropKey = signal('');
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -101,12 +106,12 @@ export default class GroupBar extends SignalWatcher(LitElement) {
     return html`
 <div class="rdt-group-bar" data-rozie-s-546c469a>
   
-  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event) => { this.onDragStart($event, col.id); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
+  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event) => { this.onChipDragStart($event, col.id); }} @dragend=${($event: Event) => { this.onDragEnd(); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
 
   
   <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" @dragover=${($event: Event) => { this.onDragOver($event); }} @dragleave=${($event: Event) => { this.onDragLeave($event); }} @drop=${($event: Event) => { this.onDrop($event); }} data-rozie-s-546c469a>
     
-    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" part="group-token" data-group-token="" key=${rozieAttr(gk)} data-rozie-s-546c469a>
+    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="${Object.entries({ "rdt-group-token": true, 'is-drop-target': this._dragKind.value === 'token' && this._dropKey.value === gk && this._draggingId.value !== gk }).filter(([, v]) => v).map(([k]) => k).join(' ')}" part="group-token" data-group-token="" key=${rozieAttr(gk)} draggable="true" @dragstart=${($event: Event) => { this.onTokenDragStart($event, gk); }} @dragover=${($event: Event) => { this.onTokenDragOver($event, gk); }} @dragend=${($event: Event) => { this.onDragEnd(); }} data-rozie-s-546c469a>
       ${rozieDisplay(this.labelFor(gk))}
       <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr('Remove ' + this.labelFor(gk) + ' grouping')} @click=${($event: Event) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
     </span>`)}
@@ -117,9 +122,16 @@ export default class GroupBar extends SignalWatcher(LitElement) {
 `;
   }
 
-  onDragStart = (e: any, id: any) => {
+  onChipDragStart = (e: any, id: any) => {
   this._draggingId.value = id;
+  this._dragKind.value = 'chip';
   if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id);
+};
+
+  onTokenDragStart = (e: any, gk: any) => {
+  this._draggingId.value = gk;
+  this._dragKind.value = 'token';
+  if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk);
 };
 
   onDragOver = (e: any) => {
@@ -127,17 +139,51 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   this._isOver.value = true;
 };
 
+  onTokenDragOver = (e: any, gk: any) => {
+  if (e) e.preventDefault();
+  if (this._dragKind.value === 'token') this._dropKey.value = gk;
+};
+
   onDragLeave = (e: any) => {
   if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
   this._isOver.value = false;
+  this._dropKey.value = '';
+};
+
+  resetDrag = () => {
+  this._draggingId.value = '';
+  this._dragKind.value = '';
+  this._dropKey.value = '';
+  this._isOver.value = false;
+};
+
+  onDragEnd = () => {
+  this.resetDrag();
 };
 
   onDrop = (e: any) => {
-  this._isOver.value = false;
+  if (e) e.preventDefault();
+  const kind = this._dragKind.value;
+  const anchor = this._dropKey.value;
   const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || this._draggingId.value;
-  this._draggingId.value = '';
+  this.resetDrag();
   if (!id) return;
-  // Append the dragged column id IF not already in the grouping — read the order
+  if (kind === 'token') {
+    // REORDER: pull the dragged key out, then splice it back in BEFORE the anchor
+    // token (or at the end when dropped on empty zone space). Shift-safe because we
+    // resolve the anchor by KEY inside the already-filtered array, not by raw index.
+    if (this.grouping.indexOf(id) === -1) return;
+    const without = this.grouping.filter((k: any) => k !== id);
+    let to = without.length;
+    if (anchor && anchor !== id) {
+      const j = without.indexOf(anchor);
+      if (j !== -1) to = j;
+    }
+    const next = without.slice(0, to).concat([id]).concat(without.slice(to));
+    this.applyGrouping && this.applyGrouping(next);
+    return;
+  }
+  // APPEND (chip): add the dragged column IF not already grouped — read the order
   // from $props.grouping, write the NEW order through applyGrouping.
   if (this.grouping.indexOf(id) !== -1) return;
   const next = this.grouping.concat([id]);

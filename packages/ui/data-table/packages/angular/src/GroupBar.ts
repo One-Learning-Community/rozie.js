@@ -30,7 +30,7 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rdt-group-bar">
       
       @for (col of groupableColumns(); track col.id) {
-    <span class="rdt-group-token" part="group-token" draggable="true" (dragstart)="onDragStart($event, col.id)">{{ rozieDisplay(col.label) }}</span>
+    <span class="rdt-group-token" part="group-token" draggable="true" (dragstart)="onChipDragStart($event, col.id)" (dragend)="onDragEnd()">{{ rozieDisplay(col.label) }}</span>
     }
 
       
@@ -39,7 +39,7 @@ function __rozieAttr(v: unknown): string | null {
         @if (!grouping().length) {
     <span class="rdt-group-drop-hint">Drag columns here to group</span>
     }@for (gk of grouping(); track gk) {
-    <span class="rdt-group-token" part="group-token" data-group-token="">
+    <span class="rdt-group-token" [ngClass]="{ 'is-drop-target': dragKind() === 'token' && dropKey() === gk && draggingId() !== gk }" part="group-token" data-group-token="" draggable="true" (dragstart)="onTokenDragStart($event, gk)" (dragover)="onTokenDragOver($event, gk)" (dragend)="onDragEnd()">
           {{ rozieDisplay(labelFor(gk)) }}
           <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr('Remove ' + labelFor(gk) + ' grouping')" (click)="removeKey(gk)">×</button>
         </span>
@@ -107,6 +107,9 @@ function __rozieAttr(v: unknown): string | null {
       outline-offset: 1px;
       border-radius: 2px;
     }
+    .rdt-group-token.is-drop-target {
+      box-shadow: inset 3px 0 0 0 var(--rdt-group-drop-marker, rgba(37, 99, 235, 0.9));
+    }
   `],
 })
 export class GroupBar {
@@ -128,27 +131,66 @@ export class GroupBar {
   clearGrouping = input<((...args: unknown[]) => unknown) | null>(null);
   draggingId = signal('');
   isOver = signal(false);
+  dragKind = signal('');
+  dropKey = signal('');
 
-  onDragStart = (e: any, id: any) => {
+  onChipDragStart = (e: any, id: any) => {
     this.draggingId.set(id);
+    this.dragKind.set('chip');
     if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', id);
+  };
+  onTokenDragStart = (e: any, gk: any) => {
+    this.draggingId.set(gk);
+    this.dragKind.set('token');
+    if (e && e.dataTransfer) e.dataTransfer.setData('text/plain', gk);
   };
   onDragOver = (e: any) => {
     if (e) e.preventDefault();
     this.isOver.set(true);
   };
+  onTokenDragOver = (e: any, gk: any) => {
+    if (e) e.preventDefault();
+    if (this.dragKind() === 'token') this.dropKey.set(gk);
+  };
   onDragLeave = (e: any) => {
     if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
     this.isOver.set(false);
+    this.dropKey.set('');
+  };
+  resetDrag = () => {
+    this.draggingId.set('');
+    this.dragKind.set('');
+    this.dropKey.set('');
+    this.isOver.set(false);
+  };
+  onDragEnd = () => {
+    this.resetDrag();
   };
   onDrop = (e: any) => {
     const __grouping = this.grouping();
     const __applyGrouping = this.applyGrouping();
-    this.isOver.set(false);
+    if (e) e.preventDefault();
+    const kind = this.dragKind();
+    const anchor = this.dropKey();
     const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || this.draggingId();
-    this.draggingId.set('');
+    this.resetDrag();
     if (!id) return;
-    // Append the dragged column id IF not already in the grouping — read the order
+    if (kind === 'token') {
+      // REORDER: pull the dragged key out, then splice it back in BEFORE the anchor
+      // token (or at the end when dropped on empty zone space). Shift-safe because we
+      // resolve the anchor by KEY inside the already-filtered array, not by raw index.
+      if (__grouping.indexOf(id) === -1) return;
+      const without = __grouping.filter((k: any) => k !== id);
+      let to = without.length;
+      if (anchor && anchor !== id) {
+        const j = without.indexOf(anchor);
+        if (j !== -1) to = j;
+      }
+      const next = without.slice(0, to).concat([id]).concat(without.slice(to));
+      __applyGrouping && __applyGrouping(next);
+      return;
+    }
+    // APPEND (chip): add the dragged column IF not already grouped — read the order
     // from $props.grouping, write the NEW order through applyGrouping.
     if (__grouping.indexOf(id) !== -1) return;
     const next = __grouping.concat([id]);
