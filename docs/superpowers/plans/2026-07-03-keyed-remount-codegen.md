@@ -12,7 +12,8 @@
 
 - **Additive-optional IR change** — `remountKeyExpression?: Expression` on `TemplateElementIR` (`packages/core/src/ir/types.ts`), exactly like the existing optional `isExternal?` field (`types.ts:849`). No front-end/parser rebless from an additive-optional field.
 - **Disambiguation (critical):** a `:key` on an element under `r-for` is the LOOP key (→ `TemplateLoopIR.keyExpression`, `types.ts:1136`) and must NOT be treated as a remount key. The marker fires ONLY for a `key` binding on a `tagKind === 'component' | 'self'` element that the `r-for` path did not consume.
-- **Vue is unchanged** (already emits a real vnode `key`); it is the oracle for the verification task.
+- **Vue is unchanged and needs NO task** — it already emits a bare component `:key` as a real working vnode-key remount (Vue has no `key`-drop filter outside loops). It is the oracle for verification. **Therefore Task 1 must NOT strip the raw `key` binding from `.attributes`** (doing so silently deletes Vue's working remount — there is no Vue task to re-add it). Task 1 only ADDS `remountKeyExpression` alongside the retained raw binding.
+- **Per-emitter strip (replaces the Task-1 strip):** each non-Vue emitter task, when it emits its remount construct from `remountKeyExpression`, MUST also suppress the raw `key` binding on that element so no inert `key` prop/attr is also emitted. React and Solid already drop a bare `key`/`:key` via `isConsumedAttribute` (no-op for them); Svelte, Angular, and Lit currently forward it inert and must strip it at their own seam. Vue keeps emitting the raw `:key` (correct) and is left alone.
 - Each emitter task is **red-first** (a fixture proving the current inert/dropped output, then the corrected construct) + **byte-identity** discipline: rebless per-target `snapshot-suite`/`composition` snapshots and `tests/dist-parity` fixtures; the drift must be ONLY component-`:key` sites.
 - Emitter-change validation: `turbo run test --force --continue` (cold; target snapshots drift), `pnpm --filter dist-parity bootstrap` after `build --force`, and the relevant `turbo run typecheck --filter=…<target>… --force`.
 - Known pre-existing unrelated failure: `@rozie/docs#test` surface-hash gate (date-picker/pdf/wavesurfer) fails on clean `main` — ignore it (bisect-confirmed), do not "fix" by bumping hashes here.
@@ -28,17 +29,17 @@
 - Test: `packages/core/src/ir/**/__tests__/` (a lowering unit test)
 
 **Interfaces:**
-- Produces: `TemplateElementIR.remountKeyExpression?: Expression`. Set when a `key` binding exists on a `tagKind === 'component' | 'self'` element NOT consumed by an enclosing `r-for`; the raw `key` binding is REMOVED from `attributes` in that case. All later per-target tasks consume this field.
+- Produces: `TemplateElementIR.remountKeyExpression?: Expression`. Set when a `key` binding exists on a `tagKind === 'component' | 'self'` element NOT consumed by an enclosing `r-for`. **The raw `key` binding is RETAINED in `attributes`** (Vue still emits it as a working vnode key; each non-Vue emitter strips it at its own seam — see Global Constraints). All later per-target tasks consume this field.
 
 - [ ] **Step 1: Write the failing lowering test**
 
-Assert: lowering `<MyComp :key="foo" />` yields a `TemplateElementIR` with `remountKeyExpression` set to the `foo` expression and NO `key` binding left in `.attributes`; lowering `<div r-for="x in xs" :key="x.id" />` still yields a `TemplateLoopIR` with `keyExpression` and does NOT set `remountKeyExpression`; lowering a plain `<div :key="k">` (non-component) does NOT set it. Use the existing core lowering test harness (find a sibling test under `packages/core/src/ir` that calls the lowerer).
+Assert: lowering `<MyComp :key="foo" />` yields a `TemplateElementIR` with `remountKeyExpression` set to the `foo` expression AND the raw `key` binding STILL PRESENT in `.attributes` (retained, not stripped); lowering `<div r-for="x in xs" :key="x.id" />` still yields a `TemplateLoopIR` with `keyExpression`, does NOT set `remountKeyExpression`, and (assert this too) the loop-key strip behavior on the inner element is unchanged from base; lowering `<MyComp r-for="x in xs" :key="x.id" />` (component under r-for) → loop key, `remountKeyExpression` NOT set; lowering a plain `<div :key="k">` (non-component) does NOT set `remountKeyExpression` and is byte-identical to base. Use the existing core lowering test harness (find a sibling test under `packages/core/src/ir` that calls the lowerer).
 
 - [ ] **Step 2: Run it — verify RED** (`remountKeyExpression` undefined today).
 
 - [ ] **Step 3: Implement**
 
-Add the optional field to `TemplateElementIR` (mirror `isExternal?`). In `lowerBareElement`, after collecting `attributes`, if the element is a component/self tag and has a `key` binding and is not on the r-for-consumed path, move that binding's expression into `remountKeyExpression` and drop it from `attributes`. Guard the `<Comp r-for :key>` case (the r-for path already routes `:key` via `findKeyExpression`/`TemplateLoopIR.keyExpression` — do not double-handle).
+Add the optional field to `TemplateElementIR` (mirror `isExternal?`). In `lowerBareElement`, after collecting `attributes`, if the element is a component/self tag and has a `key` binding and is not on the r-for-consumed path, COPY that binding's expression into `remountKeyExpression` — **do NOT drop the raw `key` binding from `attributes`** (Vue relies on it; per-emitter tasks strip it later). Guard the `<Comp r-for :key>` case (the r-for path already routes `:key` via `findKeyExpression`/`TemplateLoopIR.keyExpression` — do not double-handle). Note: the guard matches `a.kind === 'binding' && a.name === 'key'` — a `{{ }}`-interpolated key lowers to `kind: 'interpolated'` and is out of scope (add a one-line comment noting this for the emitter tasks).
 
 - [ ] **Step 4: Run test — GREEN.** Then run core suite cold: `turbo run test --force --continue --filter=@rozie/core`. Additive-optional → no snapshot drift expected; if any drifts, investigate (the field must not change existing emit — emitters don't consume it yet).
 
