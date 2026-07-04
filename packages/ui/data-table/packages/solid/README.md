@@ -515,8 +515,8 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | groupBar | grouping, groupableColumns, applyGrouping, clearGrouping |
 | selectAll | checked, indeterminate, toggle |
 | colHeader | columnId, column, label |
-| filter | columnId, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
 | cell | columnId, column, row, value |
 | editor | columnId, column, row, value, commit, cancel |
 | detail | row |
+| filter | columnId, uniqueValues, minMax, setFilter |

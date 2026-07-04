@@ -2,6 +2,7 @@ import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useR
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
+import Popover from './Popover';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
 // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
@@ -41,8 +42,6 @@ interface SelectAllCtx { checked: any; indeterminate: any; toggle: any; }
 
 interface ColHeaderCtx { columnId: any; column: any; label: any; }
 
-interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: any; }
-
 interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
@@ -50,6 +49,8 @@ interface CellCtx { columnId: any; column: any; row: any; value: any; }
 interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
 
 interface DetailCtx { row: any; }
+
+interface FilterCtx { columnId: any; uniqueValues: any; minMax: any; setFilter: any; }
 
 interface DataTableProps {
   /**
@@ -188,11 +189,11 @@ interface DataTableProps {
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
   renderSelectAll?: (ctx: SelectAllCtx) => ReactNode;
   renderColHeader?: (ctx: ColHeaderCtx) => ReactNode;
-  renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderSelectCell?: (ctx: SelectCellCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
   renderDetail?: (ctx: DetailCtx) => ReactNode;
+  renderFilter?: (ctx: FilterCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -1335,12 +1336,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!row || !row.toggleSelected) return;
     row.toggleSelected(!!(evt && evt.target && evt.target.checked));
   }, []);
-  function onHideColumn(colId: any, evt: any) {
+  const onHideColumn = useCallback((colId: any, evt: any) => {
     if (evt && evt.stopPropagation) evt.stopPropagation();
     if (!table.current) return;
     const col = table.current.getColumn(colId);
     if (col && col.toggleVisibility) col.toggleVisibility(false);
-  }
+  }, []);
   function hasAnyFilterableColumn() {
     const cols = allLeafColumns();
     for (const c of cols as any) {
@@ -3869,13 +3870,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 <span className={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(props.renderColHeader ?? props.slots?.['colHeader']) ? ((props.renderColHeader ?? props.slots?.['colHeader']) as Function)({ columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }) : rozieDisplay(headerLabel(header.column.id))}
                 </span>
-              </span>}{!!(columnIsFilterable(header.column.id) && !hasFilterSlot()) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
-              </span>}<span className={"rdt-pin-controls"} role="group" aria-label={rozieAttr('Pin ' + headerLabel(header.column.id))} data-rozie-s-d5dcab4c="">
-                <button type="button" className={"rdt-pin-btn rdt-pin-left"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">⇤</button>
-                <button type="button" className={"rdt-pin-btn rdt-pin-none"} aria-label={rozieAttr('Unpin ' + headerLabel(header.column.id))} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">⇔</button>
-                <button type="button" className={"rdt-pin-btn rdt-pin-right"} aria-label={rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">⇥</button>
-              </span>
+              </span>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" renderAnchor={({ toggle }) => (<>
+                  <button type="button" className={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header.column.id))} onClick={toggle} data-rozie-s-d5dcab4c="">⋯</button>
+                </>)} children={<><div className={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
+                  <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'left'} onClick={($event) => { onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
+                  <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={columnPinSide(header.column.id) === 'right'} onClick={($event) => { onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
+                  <button type="button" role="menuitem" className={"rdt-col-menu-item"} aria-pressed={!columnPinSide(header.column.id)} onClick={($event) => { onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
+                  <hr className={"rdt-col-menu-sep"} data-rozie-s-d5dcab4c="" />
+                  <button type="button" role="menuitem" className={"rdt-col-menu-item"} onClick={($event) => { onHideColumn(header.column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
+                </div></>} />
               <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}</th>)}
         </tr>)}

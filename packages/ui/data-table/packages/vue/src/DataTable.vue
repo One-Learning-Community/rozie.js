@@ -41,13 +41,15 @@
             <span class="rdt-header-label">
               <slot name="colHeader" :columnId="header.column.id" :column="header.column" :label="headerLabel(header.column.id)">{{ headerLabel(header.column.id) }}</slot>
             </span>
-          </span><input v-if="columnIsFilterable(header.column.id) && !hasFilterSlot()" class="rdt-col-filter" type="text" :aria-label="'Filter ' + headerLabel(header.column.id)" :value="columnFilterValue(header.column.id)" @input="onColumnFilterInput(header.column.id, $event)" @click="stopEvent($event)" /><span v-if="columnIsFilterable(header.column.id)" style="display:contents">
-            <slot name="filter" :columnId="header.column.id" :uniqueValues="getFacetedUniqueValues(header.column.id)" :minMax="getFacetedMinMaxValues(header.column.id)" :setFilter="setColumnFilter"></slot>
-          </span><span class="rdt-pin-controls" role="group" :aria-label="'Pin ' + headerLabel(header.column.id)">
-            <button type="button" class="rdt-pin-btn rdt-pin-left" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to left'" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">⇤</button>
-            <button type="button" class="rdt-pin-btn rdt-pin-none" :aria-label="'Unpin ' + headerLabel(header.column.id)" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">⇔</button>
-            <button type="button" class="rdt-pin-btn rdt-pin-right" :aria-label="'Pin ' + headerLabel(header.column.id) + ' to right'" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">⇥</button>
-          </span>
+          </span><Popover trigger="click" placement="bottom-end" strategy="fixed" :offset="4"><template #anchor="{ toggle }">
+              <button type="button" class="rdt-col-menu-trigger" :aria-label="'Column options for ' + headerLabel(header.column.id)" @click="toggle">⋯</button>
+            </template><div class="rdt-col-menu" role="menu">
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'left'" @click="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="columnPinSide(header.column.id) === 'right'" @click="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
+              <button type="button" role="menuitem" class="rdt-col-menu-item" :aria-pressed="!columnPinSide(header.column.id)" @click="onPinColumn(header.column.id, false, $event)">Unpin</button>
+              <hr class="rdt-col-menu-sep" />
+              <button type="button" role="menuitem" class="rdt-col-menu-item" @click="onHideColumn(header.column.id, $event)">Hide column</button>
+            </div></Popover>
           <button type="button" class="rdt-resize-handle" :aria-label="'Resize ' + headerLabel(header.column.id)" @pointerdown="onResizeStart(header.column.id, $event)" @touchstart="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
         </span></th>
     </tr>
@@ -180,6 +182,8 @@
 </template>
 
 <script setup lang="ts">
+import Popover from './Popover.vue';
+
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, useSlots, watch } from 'vue';
 
 const props = withDefaults(
@@ -312,7 +316,6 @@ defineSlots<{
   selectAll(props: { checked: any; indeterminate: any; toggle: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
   colHeader(props: { columnId: any; column: any; label: any }): any;
-  filter(props: { columnId: any; uniqueValues: any; minMax: any; setFilter: any }): any;
   selectCell(props: { row: any; checked: any; toggle: any }): any;
   cell(props: { columnId: any; column: any; row: any; value: any }): any;
   editor(props: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any }): any;

@@ -1,6 +1,8 @@
 import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
+import { Popover } from './Popover';
+
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
 // (mirrors the expand/group models) — inert until a consumer READS a column facet via the
@@ -58,14 +60,6 @@ interface ColHeaderCtx {
   label: any;
 }
 
-interface FilterCtx {
-  $implicit: { columnId: any; uniqueValues: any; minMax: any; setFilter: any };
-  columnId: any;
-  uniqueValues: any;
-  minMax: any;
-  setFilter: any;
-}
-
 interface SelectCellCtx {
   $implicit: { row: any; checked: any; toggle: any };
   row: any;
@@ -94,6 +88,14 @@ interface EditorCtx {
 interface DetailCtx {
   $implicit: { row: any };
   row: any;
+}
+
+interface FilterCtx {
+  $implicit: { columnId: any; uniqueValues: any; minMax: any; setFilter: any };
+  columnId: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -133,7 +135,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 @Component({
   selector: 'rozie-data-table',
   standalone: true,
-  imports: [NgTemplateOutlet, NgClass],
+  imports: [NgTemplateOutlet, NgClass, Popover],
   template: `
 
 
@@ -219,17 +221,15 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
                 </span>
               </span>
-    }@if (columnIsFilterable(header.column.id) && !hasFilterSlot()) {
-    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
-    }@if (columnIsFilterable(header.column.id)) {
-    <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
-              </span>
-    }<span class="rdt-pin-controls" role="group" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id))">
-                <button type="button" class="rdt-pin-btn rdt-pin-left" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to left')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">⇤</button>
-                <button type="button" class="rdt-pin-btn rdt-pin-none" [attr.aria-label]="rozieAttr('Unpin ' + headerLabel(header.column.id))" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">⇔</button>
-                <button type="button" class="rdt-pin-btn rdt-pin-right" [attr.aria-label]="rozieAttr('Pin ' + headerLabel(header.column.id) + ' to right')" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">⇥</button>
-              </span>
+    }<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" [offset]="4"><ng-template #anchor let-toggle="toggle">
+                  <button type="button" class="rdt-col-menu-trigger" [attr.aria-label]="rozieAttr('Column options for ' + headerLabel(header.column.id))" (click)="toggle($event)">⋯</button>
+                </ng-template><ng-template #defaultSlot><div class="rdt-col-menu" role="menu">
+                  <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'left'" (click)="onPinColumn(header.column.id, 'left', $event)">Pin left</button>
+                  <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="columnPinSide(header.column.id) === 'right'" (click)="onPinColumn(header.column.id, 'right', $event)">Pin right</button>
+                  <button type="button" role="menuitem" class="rdt-col-menu-item" [attr.aria-pressed]="!columnPinSide(header.column.id)" (click)="onPinColumn(header.column.id, false, $event)">Unpin</button>
+                  <hr class="rdt-col-menu-sep" />
+                  <button type="button" role="menuitem" class="rdt-col-menu-item" (click)="onHideColumn(header.column.id, $event)">Hide column</button>
+                </div></ng-template></rozie-popover>
               <button type="button" class="rdt-resize-handle" [attr.aria-label]="rozieAttr('Resize ' + headerLabel(header.column.id))" (pointerdown)="onResizeStart(header.column.id, $event)" (touchstart)="onResizeStart(header.column.id, $event)"><span class="rdt-resize-grip" aria-hidden="true"></span></button>
             </span>
     }</th>
@@ -942,11 +942,11 @@ export class DataTable {
   @ContentChild('groupBar', { read: TemplateRef }) groupBarTpl?: TemplateRef<GroupBarCtx>;
   @ContentChild('selectAll', { read: TemplateRef }) selectAllTpl?: TemplateRef<SelectAllCtx>;
   @ContentChild('colHeader', { read: TemplateRef }) colHeaderTpl?: TemplateRef<ColHeaderCtx>;
-  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   @ContentChild('selectCell', { read: TemplateRef }) selectCellTpl?: TemplateRef<SelectCellCtx>;
   @ContentChild('cell', { read: TemplateRef }) cellTpl?: TemplateRef<CellCtx>;
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
+  @ContentChild('filter', { read: TemplateRef }) filterTpl?: TemplateRef<FilterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
 
@@ -4289,7 +4289,7 @@ export class DataTable {
   static ngTemplateContextGuard(
     _dir: DataTable,
     _ctx: unknown,
-  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | FilterCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx {
+  ): _ctx is DefaultCtx | GroupBarCtx | SelectAllCtx | ColHeaderCtx | SelectCellCtx | CellCtx | EditorCtx | DetailCtx | FilterCtx {
     return true;
   }
 
